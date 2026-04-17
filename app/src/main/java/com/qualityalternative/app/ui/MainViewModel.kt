@@ -11,17 +11,26 @@ import com.qualityalternative.app.domain.model.AnalyticsEvent
 import com.qualityalternative.app.domain.model.AnalyticsEventType
 import com.qualityalternative.app.domain.model.AppSettings
 import com.qualityalternative.app.domain.model.ContentItem
+import com.qualityalternative.app.domain.model.DelayWindow
 import com.qualityalternative.app.domain.model.DistractingApp
 import com.qualityalternative.app.domain.model.DurationBucket
 import com.qualityalternative.app.domain.model.EditorialPack
 import com.qualityalternative.app.domain.model.OnboardingSelection
+import com.qualityalternative.app.domain.model.PermissionReadiness
+import com.qualityalternative.app.domain.model.PermissionStatus
 import com.qualityalternative.app.domain.model.RecommendationSet
+import com.qualityalternative.app.domain.model.RecommendationSignals
+import com.qualityalternative.app.domain.model.RecommendationSource
+import com.qualityalternative.app.domain.model.ReplacementHistoryEntry
 import com.qualityalternative.app.domain.model.SessionFeedback
+import com.qualityalternative.app.domain.model.TimeOfDayBucket
 import com.qualityalternative.app.domain.model.TopicTag
 import com.qualityalternative.app.domain.model.UserPreferences
 import com.qualityalternative.app.domain.service.AnalyticsTracker
 import com.qualityalternative.app.domain.service.ContentRepository
 import com.qualityalternative.app.domain.service.DelayGate
+import com.qualityalternative.app.domain.service.HistoryRepository
+import com.qualityalternative.app.domain.service.InterceptionMonitor
 import com.qualityalternative.app.domain.service.RecommendationEngine
 import com.qualityalternative.app.domain.service.SettingsRepository
 import kotlinx.coroutines.launch
@@ -43,6 +52,11 @@ data class MainUiState(
     val currentRecommendationSet: RecommendationSet? = null,
     val currentContent: ContentItem? = null,
     val currentContentBody: String = "",
+    val currentSessionId: String? = null,
+    val currentSessionStartedAtMillis: Long? = null,
+    val activeDelayWindow: DelayWindow? = null,
+    val permissionReadiness: PermissionReadiness = unavailablePermissionReadiness(),
+    val historyEntries: List<ReplacementHistoryEntry> = emptyList(),
     val completedContentIds: Set<String> = emptySet(),
     val latestMessage: String? = null,
     val events: List<AnalyticsEvent> = emptyList(),
@@ -64,6 +78,8 @@ class MainViewModel(
     private val recommendationEngine: RecommendationEngine,
     private val delayGate: DelayGate,
     private val analyticsTracker: AnalyticsTracker,
+    private val historyRepository: HistoryRepository,
+    private val interceptionMonitor: InterceptionMonitor,
 ) : ViewModel() {
     private val supportedApps = settingsRepository.supportedDistractingApps()
     private val starterPacks = contentRepository.starterPacks()
@@ -78,6 +94,8 @@ class MainViewModel(
                 starterPacks = starterPacks,
             ),
             events = analyticsTracker.allEvents(),
+            historyEntries = historyRepository.recentHistory(),
+            permissionReadiness = interceptionMonitor.currentReadiness(),
         ),
     )
         private set
@@ -85,41 +103,35 @@ class MainViewModel(
     init {
         viewModelScope.launch {
             settingsRepository.observeAppSettings().collect { settings ->
-                val preferences = settings.toUserPreferences(
-                    supportedApps = supportedApps,
-                    fallbackPackIds = starterPackIds,
-                )
-                val availableTargetApps = if (settings.hasCompletedOnboarding) preferences.selectedApps else emptyList()
-                val selectedTargetApp = if (settings.hasCompletedOnboarding) {
-                    uiState.selectedTargetApp.takeIf { candidate ->
-                        availableTargetApps.any { it.packageName == candidate?.packageName }
-                    } ?: availableTargetApps.firstOrNull()
-                } else {
-                    null
-                }
-
+                applySettings(settings)
+            }
+        }
+        viewModelScope.launch {
+            analyticsTracker.observeEvents().collect { events ->
+                uiState = uiState.copy(events = events)
+            }
+        }
+        viewModelScope.launch {
+            historyRepository.observeRecentHistory().collect { history ->
                 uiState = uiState.copy(
-                    isLoadingSettings = false,
-                    hasCompletedOnboarding = settings.hasCompletedOnboarding,
-                    availableTargetApps = availableTargetApps,
-                    selectedTargetApp = selectedTargetApp,
-                    preferences = preferences.takeIf { settings.hasCompletedOnboarding },
-                    onboardingSelection = settings.toOnboardingSelection(
-                        supportedApps = supportedApps,
-                        starterPacks = starterPacks,
-                    ),
-                    screen = when {
-                        !settings.hasCompletedOnboarding -> MainScreen.Onboarding
-                        uiState.screen == MainScreen.Onboarding -> MainScreen.Home
-                        else -> uiState.screen
-                    },
+                    historyEntries = history,
+                    completedContentIds = history.filter(ReplacementHistoryEntry::isCompleted)
+                        .mapTo(mutableSetOf(), ReplacementHistoryEntry::contentId),
                 )
             }
         }
     }
 
     fun selectTargetApp(app: DistractingApp) {
-        uiState = uiState.copy(selectedTargetApp = app, latestMessage = null)
+        uiState = uiState.copy(
+            selectedTargetApp = app,
+            activeDelayWindow = delayGate.activeDelay(app),
+            latestMessage = null,
+        )
+    }
+
+    fun refreshPermissionReadiness() {
+        uiState = uiState.copy(permissionReadiness = interceptionMonitor.currentReadiness())
     }
 
     fun toggleOnboardingApp(app: DistractingApp) {
@@ -177,8 +189,12 @@ class MainViewModel(
         val targetApp = uiState.selectedTargetApp ?: return
         val preferences = uiState.preferences ?: return
 
-        if (delayGate.activeDelay(targetApp = targetApp, nowMillis = nowMillis) != null) {
+        recordReturnSignalIfNeeded(targetApp = targetApp, nowMillis = nowMillis)
+
+        val activeDelay = delayGate.activeDelay(targetApp = targetApp, nowMillis = nowMillis)
+        if (activeDelay != null) {
             uiState = uiState.copy(
+                activeDelayWindow = activeDelay,
                 latestMessage = "${targetApp.displayName} is delayed for 15 minutes.",
                 screen = MainScreen.Home,
             )
@@ -186,12 +202,13 @@ class MainViewModel(
         }
 
         val filteredInventory = contentRepository.inventory().filter { it.packId in preferences.selectedPackIds }
-
+        val signals = buildRecommendationSignals(nowMillis = nowMillis)
         val recommendationSet = recommendationEngine.generate(
             targetApp = targetApp,
             preferences = preferences,
             inventory = filteredInventory,
             excludedIds = uiState.completedContentIds,
+            signals = signals,
             nowMillis = nowMillis,
         )
 
@@ -229,43 +246,61 @@ class MainViewModel(
     fun acceptPrimary() {
         val targetApp = uiState.selectedTargetApp ?: return
         val recommendationSet = uiState.currentRecommendationSet ?: return
+        val nowMillis = System.currentTimeMillis()
+        val sessionId = historyRepository.recordAcceptedSession(
+            targetApp = targetApp,
+            content = recommendationSet.primary,
+            source = RecommendationSource.PRIMARY,
+            acceptedAtMillis = nowMillis,
+        )
         recordEvent(
             AnalyticsEvent(
                 type = AnalyticsEventType.PRIMARY_ACCEPTED,
-                timestampMillis = System.currentTimeMillis(),
+                timestampMillis = nowMillis,
                 targetAppPackage = targetApp.packageName,
                 contentId = recommendationSet.primary.id,
+                metadata = mapOf("sessionId" to sessionId),
             ),
         )
-        openReader(content = recommendationSet.primary)
+        openReader(content = recommendationSet.primary, sessionId = sessionId, startedAtMillis = nowMillis)
     }
 
     fun acceptBackup(content: ContentItem) {
         val targetApp = uiState.selectedTargetApp ?: return
+        val nowMillis = System.currentTimeMillis()
+        val sessionId = historyRepository.recordAcceptedSession(
+            targetApp = targetApp,
+            content = content,
+            source = RecommendationSource.BACKUP,
+            acceptedAtMillis = nowMillis,
+        )
         recordEvent(
             AnalyticsEvent(
                 type = AnalyticsEventType.BACKUP_ACCEPTED,
-                timestampMillis = System.currentTimeMillis(),
+                timestampMillis = nowMillis,
                 targetAppPackage = targetApp.packageName,
                 contentId = content.id,
+                metadata = mapOf("sessionId" to sessionId),
             ),
         )
-        openReader(content = content)
+        openReader(content = content, sessionId = sessionId, startedAtMillis = nowMillis)
     }
 
     fun delayFor15Minutes() {
         val targetApp = uiState.selectedTargetApp ?: return
-        delayGate.storeDelay(targetApp = targetApp)
+        val nowMillis = System.currentTimeMillis()
+        val window = delayGate.storeDelay(targetApp = targetApp, nowMillis = nowMillis)
         recordEvent(
             AnalyticsEvent(
                 type = AnalyticsEventType.DELAY_SELECTED,
-                timestampMillis = System.currentTimeMillis(),
+                timestampMillis = nowMillis,
                 targetAppPackage = targetApp.packageName,
             ),
         )
         uiState = uiState.copy(
             screen = MainScreen.Home,
             currentRecommendationSet = null,
+            activeDelayWindow = window,
             latestMessage = "${targetApp.displayName} delayed for 15 minutes.",
         )
     }
@@ -288,17 +323,39 @@ class MainViewModel(
 
     fun finishReading() {
         val content = uiState.currentContent ?: return
+        val sessionId = uiState.currentSessionId ?: return
+        val nowMillis = System.currentTimeMillis()
+        historyRepository.markCompleted(sessionId = sessionId, completedAtMillis = nowMillis)
         recordEvent(
             AnalyticsEvent(
                 type = AnalyticsEventType.READER_COMPLETED,
-                timestampMillis = System.currentTimeMillis(),
+                timestampMillis = nowMillis,
                 targetAppPackage = uiState.selectedTargetApp?.packageName,
                 contentId = content.id,
+                metadata = sessionDurationMetadata(nowMillis),
             ),
         )
         uiState = uiState.copy(
             screen = MainScreen.Feedback,
-            completedContentIds = uiState.completedContentIds + content.id,
+        )
+    }
+
+    fun skipReading() {
+        val content = uiState.currentContent ?: return
+        val sessionId = uiState.currentSessionId ?: return
+        val nowMillis = System.currentTimeMillis()
+        historyRepository.markSkipped(sessionId = sessionId, skippedAtMillis = nowMillis)
+        recordEvent(
+            AnalyticsEvent(
+                type = AnalyticsEventType.READER_SKIPPED,
+                timestampMillis = nowMillis,
+                targetAppPackage = uiState.selectedTargetApp?.packageName,
+                contentId = content.id,
+                metadata = sessionDurationMetadata(nowMillis),
+            ),
+        )
+        clearActiveSession(
+            latestMessage = "Replacement session skipped.",
         )
     }
 
@@ -308,6 +365,9 @@ class MainViewModel(
             helpedAvoidScrolling = helpedAvoidScrolling,
             submittedAtMillis = System.currentTimeMillis(),
         )
+        uiState.currentSessionId?.let { sessionId ->
+            historyRepository.attachFeedback(sessionId = sessionId, feedback = feedback)
+        }
         recordEvent(
             AnalyticsEvent(
                 type = AnalyticsEventType.FEEDBACK_SUBMITTED,
@@ -320,31 +380,133 @@ class MainViewModel(
                 ),
             ),
         )
-        uiState = uiState.copy(
-            screen = MainScreen.Home,
-            currentContent = null,
-            currentContentBody = "",
-            currentRecommendationSet = null,
+        clearActiveSession(
             lastFeedback = feedback,
             latestMessage = "Feedback captured for the replacement session.",
         )
+    }
+
+    fun skipFeedback() {
+        clearActiveSession(latestMessage = "Feedback skipped for this session.")
     }
 
     fun dismissMessage() {
         uiState = uiState.copy(latestMessage = null)
     }
 
-    private fun openReader(content: ContentItem) {
+    private fun applySettings(settings: AppSettings) {
+        val preferences = settings.toUserPreferences(
+            supportedApps = supportedApps,
+            fallbackPackIds = starterPackIds,
+        )
+        val availableTargetApps = if (settings.hasCompletedOnboarding) preferences.selectedApps else emptyList()
+        val selectedTargetApp = if (settings.hasCompletedOnboarding) {
+            uiState.selectedTargetApp.takeIf { candidate ->
+                availableTargetApps.any { it.packageName == candidate?.packageName }
+            } ?: availableTargetApps.firstOrNull()
+        } else {
+            null
+        }
+
+        uiState = uiState.copy(
+            isLoadingSettings = false,
+            hasCompletedOnboarding = settings.hasCompletedOnboarding,
+            availableTargetApps = availableTargetApps,
+            selectedTargetApp = selectedTargetApp,
+            preferences = preferences.takeIf { settings.hasCompletedOnboarding },
+            onboardingSelection = settings.toOnboardingSelection(
+                supportedApps = supportedApps,
+                starterPacks = starterPacks,
+            ),
+            activeDelayWindow = selectedTargetApp?.let { delayGate.activeDelay(it) },
+            permissionReadiness = interceptionMonitor.currentReadiness(),
+            screen = when {
+                !settings.hasCompletedOnboarding -> MainScreen.Onboarding
+                uiState.screen == MainScreen.Onboarding -> MainScreen.Home
+                else -> uiState.screen
+            },
+        )
+    }
+
+    private fun buildRecommendationSignals(nowMillis: Long): RecommendationSignals {
+        val history = historyRepository.recentHistory(nowMillis = nowMillis)
+        return RecommendationSignals(
+            completedTopics = history.filter(ReplacementHistoryEntry::isCompleted)
+                .flatMapTo(mutableSetOf(), ReplacementHistoryEntry::contentTopics),
+            skippedTopics = history.filter(ReplacementHistoryEntry::isSkipped)
+                .flatMapTo(mutableSetOf(), ReplacementHistoryEntry::contentTopics),
+            successfulPackIds = history.filter { entry ->
+                entry.isCompleted() && entry.feedbackHelpedAvoidScrolling != false
+            }.mapTo(mutableSetOf(), ReplacementHistoryEntry::packId),
+            timeOfDay = TimeOfDayBucket.from(nowMillis),
+        )
+    }
+
+    private fun recordReturnSignalIfNeeded(targetApp: DistractingApp, nowMillis: Long) {
+        val signal = historyRepository.markReturnedToTarget(
+            targetAppPackage = targetApp.packageName,
+            returnedAtMillis = nowMillis,
+        ) ?: return
+
+        if (signal.within15Minutes) {
+            recordEvent(
+                AnalyticsEvent(
+                    type = AnalyticsEventType.RETURN_TO_APP_WITHIN_15_MINUTES,
+                    timestampMillis = nowMillis,
+                    targetAppPackage = signal.targetAppPackage,
+                    contentId = signal.contentId,
+                    metadata = mapOf("sessionId" to signal.sessionId),
+                ),
+            )
+        }
+
+        if (signal.within60Minutes) {
+            recordEvent(
+                AnalyticsEvent(
+                    type = AnalyticsEventType.RETURN_TO_APP_WITHIN_60_MINUTES,
+                    timestampMillis = nowMillis,
+                    targetAppPackage = signal.targetAppPackage,
+                    contentId = signal.contentId,
+                    metadata = mapOf("sessionId" to signal.sessionId),
+                ),
+            )
+        }
+    }
+
+    private fun openReader(content: ContentItem, sessionId: String, startedAtMillis: Long) {
         uiState = uiState.copy(
             currentContent = content,
             currentContentBody = contentRepository.contentBody(content),
+            currentSessionId = sessionId,
+            currentSessionStartedAtMillis = startedAtMillis,
             screen = MainScreen.Reader,
         )
     }
 
+    private fun clearActiveSession(
+        lastFeedback: SessionFeedback? = uiState.lastFeedback,
+        latestMessage: String,
+    ) {
+        uiState = uiState.copy(
+            screen = MainScreen.Home,
+            currentContent = null,
+            currentContentBody = "",
+            currentRecommendationSet = null,
+            currentSessionId = null,
+            currentSessionStartedAtMillis = null,
+            lastFeedback = lastFeedback,
+            latestMessage = latestMessage,
+        )
+    }
+
+    private fun sessionDurationMetadata(nowMillis: Long): Map<String, String> {
+        val startedAtMillis = uiState.currentSessionStartedAtMillis ?: return emptyMap()
+        val durationSeconds = ((nowMillis - startedAtMillis) / 1000L).coerceAtLeast(0)
+        return mapOf("sessionDurationSeconds" to durationSeconds.toString())
+    }
+
     private fun recordEvent(event: AnalyticsEvent) {
         analyticsTracker.record(event)
-        uiState = uiState.copy(events = analyticsTracker.allEvents())
     }
 }
 
@@ -360,6 +522,8 @@ class MainViewModelFactory(
             recommendationEngine = appContainer.recommendationEngine,
             delayGate = appContainer.delayGate,
             analyticsTracker = appContainer.analyticsTracker,
+            historyRepository = appContainer.historyRepository,
+            interceptionMonitor = appContainer.interceptionMonitor,
         ) as T
     }
 }
@@ -409,4 +573,13 @@ private fun AppSettings.toOnboardingSelection(
             starterPacks = starterPacks,
         )
     }
+}
+
+private fun unavailablePermissionReadiness(): PermissionReadiness {
+    return PermissionReadiness(
+        overlayStatus = PermissionStatus.MISSING,
+        accessibilityStatus = PermissionStatus.UNAVAILABLE_IN_BUILD,
+        interceptionReady = false,
+        summary = "System interception is not active in this build.",
+    )
 }

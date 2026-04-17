@@ -4,6 +4,8 @@ import com.qualityalternative.app.domain.model.ContentFormat
 import com.qualityalternative.app.domain.model.ContentItem
 import com.qualityalternative.app.domain.model.DistractingApp
 import com.qualityalternative.app.domain.model.DurationBucket
+import com.qualityalternative.app.domain.model.RecommendationSignals
+import com.qualityalternative.app.domain.model.TimeOfDayBucket
 import com.qualityalternative.app.domain.model.TopicTag
 import com.qualityalternative.app.domain.model.UserPreferences
 import org.junit.Assert.assertEquals
@@ -35,6 +37,7 @@ class DefaultRecommendationEngineTest {
             preferences = preferences,
             inventory = inventory,
             excludedIds = setOf("d"),
+            signals = RecommendationSignals(timeOfDay = TimeOfDayBucket.MIDDAY),
             nowMillis = 0L,
         )
 
@@ -44,9 +47,39 @@ class DefaultRecommendationEngineTest {
         assertTrue(result!!.backups.all { it.durationMinutes <= result.primary.durationMinutes })
     }
 
-    private fun item(id: String, minutes: Int, topics: Set<TopicTag>): ContentItem = ContentItem(
+    @Test
+    fun generate_penalizesSkippedTopicsAndBoostsSuccessfulPacks() {
+        val preferences = UserPreferences(
+            selectedApps = listOf(DistractingApp(packageName = "pkg", displayName = "Instagram")),
+            preferredTopics = setOf(TopicTag.SCIENCE),
+            preferredDurationBucket = DurationBucket.FOCUS,
+            selectedPackIds = setOf("science", "history"),
+        )
+
+        val inventory = listOf(
+            item(id = "science-skip", packId = "science", minutes = 6, topics = setOf(TopicTag.SCIENCE)),
+            item(id = "history-win", packId = "history", minutes = 6, topics = setOf(TopicTag.SCIENCE)),
+        )
+
+        val result = engine.generate(
+            targetApp = DistractingApp(packageName = "pkg", displayName = "Instagram"),
+            preferences = preferences,
+            inventory = inventory,
+            excludedIds = emptySet(),
+            signals = RecommendationSignals(
+                skippedTopics = setOf(TopicTag.SCIENCE),
+                successfulPackIds = setOf("history"),
+                timeOfDay = TimeOfDayBucket.MIDDAY,
+            ),
+            nowMillis = 0L,
+        )
+
+        assertEquals("history-win", result?.primary?.id)
+    }
+
+    private fun item(id: String, packId: String = "pack", minutes: Int, topics: Set<TopicTag>): ContentItem = ContentItem(
         id = id,
-        packId = "pack",
+        packId = packId,
         title = id,
         description = "desc",
         durationMinutes = minutes,

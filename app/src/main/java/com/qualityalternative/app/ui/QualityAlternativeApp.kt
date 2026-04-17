@@ -38,10 +38,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.qualityalternative.app.domain.model.AnalyticsEvent
 import com.qualityalternative.app.domain.model.ContentItem
+import com.qualityalternative.app.domain.model.DelayWindow
 import com.qualityalternative.app.domain.model.DistractingApp
 import com.qualityalternative.app.domain.model.DurationBucket
 import com.qualityalternative.app.domain.model.EditorialPack
 import com.qualityalternative.app.domain.model.OnboardingSelection
+import com.qualityalternative.app.domain.model.PermissionReadiness
+import com.qualityalternative.app.domain.model.PermissionStatus
+import com.qualityalternative.app.domain.model.ReplacementHistoryEntry
 import com.qualityalternative.app.domain.model.TopicTag
 import com.qualityalternative.app.ui.theme.QualityAlternativeTheme
 import java.time.Instant
@@ -102,6 +106,7 @@ fun QualityAlternativeApp(
                             state = uiState,
                             onSelectTargetApp = viewModel::selectTargetApp,
                             onTriggerIntervention = viewModel::triggerDebugIntervention,
+                            onRefreshReadiness = viewModel::refreshPermissionReadiness,
                         )
 
                         MainScreen.Intervention -> InterventionScreen(
@@ -115,10 +120,12 @@ fun QualityAlternativeApp(
                         MainScreen.Reader -> ReaderScreen(
                             state = uiState,
                             onFinishReading = viewModel::finishReading,
+                            onSkipReading = viewModel::skipReading,
                         )
 
                         MainScreen.Feedback -> FeedbackScreen(
                             onSubmit = viewModel::submitFeedback,
+                            onSkip = viewModel::skipFeedback,
                         )
                     }
                 }
@@ -284,6 +291,7 @@ private fun HomeScreen(
     state: MainUiState,
     onSelectTargetApp: (DistractingApp) -> Unit,
     onTriggerIntervention: () -> Unit,
+    onRefreshReadiness: () -> Unit,
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -298,7 +306,7 @@ private fun HomeScreen(
                     fontWeight = FontWeight.Bold,
                 )
                 Text(
-                    text = "Onboarding and local user state are now persisted. This build still uses a manual debug trigger for the intervention loop.",
+                    text = "Onboarding, delay state, analytics, and replacement history are now persisted. This build still uses a manual debug trigger instead of live interception.",
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -316,6 +324,12 @@ private fun HomeScreen(
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                     )
+                    state.activeDelayWindow?.let { delayWindow ->
+                        ActiveDelayNotice(
+                            targetApp = state.selectedTargetApp,
+                            delayWindow = delayWindow,
+                        )
+                    }
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -336,6 +350,17 @@ private fun HomeScreen(
                     }
                 }
             }
+        }
+
+        item {
+            PermissionReadinessCard(
+                readiness = state.permissionReadiness,
+                onRefresh = onRefreshReadiness,
+            )
+        }
+
+        item {
+            ReplacementHistoryCard(entries = state.historyEntries)
         }
 
         item {
@@ -385,6 +410,93 @@ private fun PreferenceSummary(state: MainUiState) {
                     text = "Completed items excluded from future primary recommendations: ${state.completedContentIds.size}",
                     style = MaterialTheme.typography.bodyMedium,
                 )
+            }
+            if (state.historyEntries.isNotEmpty()) {
+                Text(
+                    text = "Recent replacement sessions in the last 7 days: ${state.historyEntries.size}",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ActiveDelayNotice(
+    targetApp: DistractingApp?,
+    delayWindow: DelayWindow,
+) {
+    Text(
+        text = "${targetApp?.displayName ?: delayWindow.targetAppPackage} delayed until ${formatTimestamp(delayWindow.endsAtMillis)}",
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        style = MaterialTheme.typography.bodyMedium,
+    )
+}
+
+@Composable
+private fun PermissionReadinessCard(
+    readiness: PermissionReadiness,
+    onRefresh: () -> Unit,
+) {
+    Card {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(
+                text = "Interception readiness",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = readiness.summary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text("Overlay permission: ${readiness.overlayStatus.displayLabel()}")
+            Text("Accessibility interception: ${readiness.accessibilityStatus.displayLabel()}")
+            Text(
+                text = if (readiness.interceptionReady) "Interception ready" else "Manual mode only",
+                style = MaterialTheme.typography.labelLarge,
+            )
+            OutlinedButton(onClick = onRefresh) {
+                Text("Refresh status")
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReplacementHistoryCard(entries: List<ReplacementHistoryEntry>) {
+    Card {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text = "Recent replacement history",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            if (entries.isEmpty()) {
+                Text(
+                    text = "No replacement sessions yet. Finish one session to start building history.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                entries.forEach { entry ->
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(text = entry.contentTitle, fontWeight = FontWeight.Medium)
+                        Text(
+                            text = "${entry.targetAppDisplayName} • ${formatTimestamp(entry.acceptedAtMillis)}",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        Text(
+                            text = entry.statusSummary(),
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
             }
         }
     }
@@ -539,6 +651,7 @@ private fun RecommendationCard(
 private fun ReaderScreen(
     state: MainUiState,
     onFinishReading: () -> Unit,
+    onSkipReading: () -> Unit,
 ) {
     val content = state.currentContent ?: return
 
@@ -563,8 +676,13 @@ private fun ReaderScreen(
             text = state.currentContentBody,
             style = MaterialTheme.typography.bodyLarge,
         )
-        Button(onClick = onFinishReading) {
-            Text("Finish session")
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Button(onClick = onFinishReading) {
+                Text("Finish session")
+            }
+            OutlinedButton(onClick = onSkipReading) {
+                Text("Leave session")
+            }
         }
     }
 }
@@ -572,6 +690,7 @@ private fun ReaderScreen(
 @Composable
 private fun FeedbackScreen(
     onSubmit: (Boolean, Boolean) -> Unit,
+    onSkip: () -> Unit,
 ) {
     var wasGoodFit by remember { mutableStateOf(true) }
     var helped by remember { mutableStateOf(true) }
@@ -597,8 +716,13 @@ private fun FeedbackScreen(
             selected = helped,
             onSelect = { helped = it },
         )
-        Button(onClick = { onSubmit(wasGoodFit, helped) }) {
-            Text("Submit feedback")
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Button(onClick = { onSubmit(wasGoodFit, helped) }) {
+                Text("Submit feedback")
+            }
+            OutlinedButton(onClick = onSkip) {
+                Text("Skip feedback")
+            }
         }
     }
 }
@@ -644,4 +768,30 @@ private fun DurationBucket.displayName(): String = when (this) {
     DurationBucket.QUICK -> "3-5 minutes"
     DurationBucket.FOCUS -> "5-10 minutes"
     DurationBucket.DEEP -> "10-20 minutes"
+}
+
+private fun PermissionStatus.displayLabel(): String = when (this) {
+    PermissionStatus.READY -> "Ready"
+    PermissionStatus.MISSING -> "Missing"
+    PermissionStatus.UNAVAILABLE_IN_BUILD -> "Not available in this build"
+}
+
+private fun ReplacementHistoryEntry.statusSummary(): String {
+    val labels = mutableListOf<String>()
+    if (isCompleted()) {
+        labels += "Completed"
+    }
+    if (isSkipped()) {
+        labels += "Skipped"
+    }
+    if (returnedToTarget()) {
+        labels += "Returned to app"
+    }
+    if (labels.isEmpty()) {
+        labels += "Accepted"
+    }
+    if (feedbackGoodFit != null && feedbackHelpedAvoidScrolling != null) {
+        labels += if (feedbackHelpedAvoidScrolling == true) "Helped" else "Did not help"
+    }
+    return labels.joinToString(" • ")
 }
