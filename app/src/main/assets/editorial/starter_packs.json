@@ -1,0 +1,72 @@
+{
+  "packs": [
+    {
+      "id": "philosophy",
+      "title": "Philosophy Starter Pack",
+      "description": "Short long-form pieces designed to slow down impulse and sharpen intent.",
+      "items": [
+        {
+          "id": "stoic-morning",
+          "title": "Use the morning before the scroll uses you",
+          "description": "A seven-minute reflection on how intention changes the emotional shape of the day.",
+          "durationMinutes": 7,
+          "format": "MARKDOWN",
+          "topics": ["PHILOSOPHY", "PSYCHOLOGY"],
+          "bodyAssetPath": "editorial/items/stoic_morning.md"
+        },
+        {
+          "id": "attention-commons",
+          "title": "Treat your attention like a common resource",
+          "description": "A compact argument for protecting attention before it gets fragmented.",
+          "durationMinutes": 5,
+          "format": "MARKDOWN",
+          "topics": ["PHILOSOPHY", "ECONOMICS"],
+          "bodyAssetPath": "editorial/items/attention_commons.md"
+        },
+        {
+          "id": "history-of-waiting",
+          "title": "The history of waiting on purpose",
+          "description": "A short historical essay on delay as a deliberate human practice.",
+          "durationMinutes": 4,
+          "format": "MARKDOWN",
+          "topics": ["HISTORY", "PHILOSOPHY"],
+          "bodyAssetPath": "editorial/items/history_of_waiting.md"
+        }
+      ]
+    },
+    {
+      "id": "science",
+      "title": "Science Starter Pack",
+      "description": "Calmer, knowledge-dense reads that can substitute for impulsive opens.",
+      "items": [
+        {
+          "id": "dopamine-design",
+          "title": "How product loops borrow from reward prediction",
+          "description": "A science-forward explanation of why intermittent reward keeps users checking.",
+          "durationMinutes": 8,
+          "format": "MARKDOWN",
+          "topics": ["SCIENCE", "PSYCHOLOGY"],
+          "bodyAssetPath": "editorial/items/dopamine_design.md"
+        },
+        {
+          "id": "small-bets",
+          "title": "Why tiny commitments beat heroic intention",
+          "description": "A compact behavior-science read about why a short replacement often wins.",
+          "durationMinutes": 6,
+          "format": "MARKDOWN",
+          "topics": ["SCIENCE", "PSYCHOLOGY"],
+          "bodyAssetPath": "editorial/items/small_bets.md"
+        },
+        {
+          "id": "curiosity-engine",
+          "title": "Designing for curiosity without designing addiction",
+          "description": "A product essay on making discovery finite instead of compulsive.",
+          "durationMinutes": 9,
+          "format": "MARKDOWN",
+          "topics": ["SCIENCE", "CREATIVITY"],
+          "bodyAssetPath": "editorial/items/curiosity_engine.md"
+        }
+      ]
+    }
+  ]
+}
