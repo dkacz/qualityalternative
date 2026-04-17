@@ -1,12 +1,15 @@
 package com.qualityalternative.app.domain.service
 
 import com.qualityalternative.app.domain.model.AnalyticsEvent
+import com.qualityalternative.app.domain.model.AppSettings
 import com.qualityalternative.app.domain.model.ContentItem
 import com.qualityalternative.app.domain.model.DelayWindow
 import com.qualityalternative.app.domain.model.DistractingApp
 import com.qualityalternative.app.domain.model.EditorialPack
+import com.qualityalternative.app.domain.model.OnboardingSelection
 import com.qualityalternative.app.domain.model.RecommendationSet
 import com.qualityalternative.app.domain.model.UserPreferences
+import kotlinx.coroutines.flow.Flow
 
 interface ContentRepository {
     fun starterPacks(): List<EditorialPack>
@@ -15,8 +18,9 @@ interface ContentRepository {
 }
 
 interface SettingsRepository {
-    fun currentPreferences(): UserPreferences
+    fun observeAppSettings(): Flow<AppSettings>
     fun supportedDistractingApps(): List<DistractingApp>
+    suspend fun saveOnboardingSelection(selection: OnboardingSelection)
 }
 
 interface RecommendationEngine {

@@ -1,20 +1,15 @@
 package com.qualityalternative.app.ui
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -22,6 +17,7 @@ import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
@@ -37,18 +33,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.compose.currentStateAsState
-import androidx.lifecycle.compose.dropUnlessResumed
-import androidx.lifecycle.compose.rememberLifecycleOwner
 import com.qualityalternative.app.domain.model.AnalyticsEvent
 import com.qualityalternative.app.domain.model.ContentItem
 import com.qualityalternative.app.domain.model.DistractingApp
+import com.qualityalternative.app.domain.model.DurationBucket
 import com.qualityalternative.app.domain.model.EditorialPack
+import com.qualityalternative.app.domain.model.OnboardingSelection
+import com.qualityalternative.app.domain.model.TopicTag
 import com.qualityalternative.app.ui.theme.QualityAlternativeTheme
 import java.time.Instant
 import java.time.ZoneId
@@ -79,31 +73,207 @@ fun QualityAlternativeApp(
                     .safeDrawingPadding(),
                 color = MaterialTheme.colorScheme.background,
             ) {
-                when (uiState.screen) {
-                    MainScreen.Home -> HomeScreen(
-                        state = uiState,
-                        onSelectTargetApp = viewModel::selectTargetApp,
-                        onTriggerIntervention = viewModel::triggerDebugIntervention,
+                when {
+                    uiState.isLoadingSettings -> LoadingScreen()
+                    !uiState.hasCompletedOnboarding -> OnboardingScreen(
+                        selection = uiState.onboardingSelection,
+                        supportedApps = uiState.allSupportedApps,
+                        starterPacks = uiState.starterPacks,
+                        onToggleApp = viewModel::toggleOnboardingApp,
+                        onToggleTopic = viewModel::toggleOnboardingTopic,
+                        onSelectDuration = viewModel::setOnboardingDuration,
+                        onTogglePack = viewModel::toggleOnboardingPack,
+                        onComplete = viewModel::completeOnboarding,
                     )
 
-                    MainScreen.Intervention -> InterventionScreen(
-                        state = uiState,
-                        onAcceptPrimary = viewModel::acceptPrimary,
-                        onAcceptBackup = viewModel::acceptBackup,
-                        onDelay = viewModel::delayFor15Minutes,
-                        onOpenAnyway = viewModel::openAnyway,
-                    )
+                    else -> when (uiState.screen) {
+                        MainScreen.Onboarding -> OnboardingScreen(
+                            selection = uiState.onboardingSelection,
+                            supportedApps = uiState.allSupportedApps,
+                            starterPacks = uiState.starterPacks,
+                            onToggleApp = viewModel::toggleOnboardingApp,
+                            onToggleTopic = viewModel::toggleOnboardingTopic,
+                            onSelectDuration = viewModel::setOnboardingDuration,
+                            onTogglePack = viewModel::toggleOnboardingPack,
+                            onComplete = viewModel::completeOnboarding,
+                        )
 
-                    MainScreen.Reader -> ReaderScreen(
-                        state = uiState,
-                        onFinishReading = viewModel::finishReading,
-                    )
+                        MainScreen.Home -> HomeScreen(
+                            state = uiState,
+                            onSelectTargetApp = viewModel::selectTargetApp,
+                            onTriggerIntervention = viewModel::triggerDebugIntervention,
+                        )
 
-                    MainScreen.Feedback -> FeedbackScreen(
-                        onSubmit = viewModel::submitFeedback,
+                        MainScreen.Intervention -> InterventionScreen(
+                            state = uiState,
+                            onAcceptPrimary = viewModel::acceptPrimary,
+                            onAcceptBackup = viewModel::acceptBackup,
+                            onDelay = viewModel::delayFor15Minutes,
+                            onOpenAnyway = viewModel::openAnyway,
+                        )
+
+                        MainScreen.Reader -> ReaderScreen(
+                            state = uiState,
+                            onFinishReading = viewModel::finishReading,
+                        )
+
+                        MainScreen.Feedback -> FeedbackScreen(
+                            onSubmit = viewModel::submitFeedback,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LoadingScreen() {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        verticalArrangement = Arrangement.Center,
+    ) {
+        CircularProgressIndicator()
+        Text(
+            text = "Loading local settings…",
+            modifier = Modifier.padding(top = 16.dp),
+            style = MaterialTheme.typography.bodyLarge,
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun OnboardingScreen(
+    selection: OnboardingSelection,
+    supportedApps: List<DistractingApp>,
+    starterPacks: List<EditorialPack>,
+    onToggleApp: (DistractingApp) -> Unit,
+    onToggleTopic: (TopicTag) -> Unit,
+    onSelectDuration: (DurationBucket) -> Unit,
+    onTogglePack: (EditorialPack) -> Unit,
+    onComplete: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp),
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = "Let’s set up your replacement loop",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                text = "Choose at least 3 distracting apps, 3 topics, a preferred session length, and at least 1 starter pack.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        SelectionSection(title = "Distracting apps") {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                supportedApps.forEach { app ->
+                    FilterChip(
+                        selected = app.packageName in selection.selectedAppPackages,
+                        onClick = { onToggleApp(app) },
+                        label = { Text(app.displayName) },
                     )
                 }
             }
+            Text(
+                text = "${selection.selectedAppPackages.size} selected",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        SelectionSection(title = "Topics") {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                TopicTag.entries.forEach { topic ->
+                    FilterChip(
+                        selected = topic in selection.preferredTopics,
+                        onClick = { onToggleTopic(topic) },
+                        label = { Text(topic.displayName()) },
+                    )
+                }
+            }
+            Text(
+                text = "${selection.preferredTopics.size} selected",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        SelectionSection(title = "Preferred session length") {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                DurationBucket.entries.forEach { bucket ->
+                    FilterChip(
+                        selected = bucket == selection.preferredDurationBucket,
+                        onClick = { onSelectDuration(bucket) },
+                        label = { Text(bucket.displayName()) },
+                    )
+                }
+            }
+        }
+
+        SelectionSection(title = "Starter packs") {
+            starterPacks.forEach { pack ->
+                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        FilterChip(
+                            selected = pack.id in selection.selectedPackIds,
+                            onClick = { onTogglePack(pack) },
+                            label = { Text(if (pack.id in selection.selectedPackIds) "Selected" else "Select") },
+                        )
+                        Text(text = pack.title, fontWeight = FontWeight.SemiBold)
+                        Text(text = pack.description, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(text = "${pack.items.size} items", style = MaterialTheme.typography.labelMedium)
+                    }
+                }
+            }
+        }
+
+        Button(
+            onClick = onComplete,
+            enabled = selection.isValid(),
+        ) {
+            Text("Complete setup")
+        }
+    }
+}
+
+@Composable
+private fun SelectionSection(
+    title: String,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Card {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            content()
         }
     }
 }
@@ -128,7 +298,7 @@ private fun HomeScreen(
                     fontWeight = FontWeight.Bold,
                 )
                 Text(
-                    text = "Sprint 0-1 prototype: a manual replacement loop with starter packs, recommendation ranking, and local analytics.",
+                    text = "Onboarding and local user state are now persisted. This build still uses a manual debug trigger for the intervention loop.",
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -150,7 +320,7 @@ private fun HomeScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        state.supportedApps.forEach { app ->
+                        state.availableTargetApps.forEach { app ->
                             FilterChip(
                                 selected = state.selectedTargetApp == app,
                                 onClick = { onSelectTargetApp(app) },
@@ -173,7 +343,11 @@ private fun HomeScreen(
         }
 
         item {
-            StarterPackSummary(starterPacks = state.starterPacks)
+            StarterPackSummary(
+                starterPacks = state.starterPacks.filter { pack ->
+                    pack.id in state.preferences?.selectedPackIds.orEmpty()
+                },
+            )
         }
 
         item {
@@ -190,16 +364,20 @@ private fun PreferenceSummary(state: MainUiState) {
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text(
-                text = "Prototype preferences",
+                text = "Local preferences",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
-                text = "Duration bucket: ${state.preferences?.preferredDurationBucket?.name ?: "Unknown"}",
+                text = "Duration bucket: ${state.preferences?.preferredDurationBucket?.displayName() ?: "Unknown"}",
                 style = MaterialTheme.typography.bodyMedium,
             )
             Text(
-                text = "Preferred topics: ${state.preferences?.preferredTopics?.joinToString()}",
+                text = "Preferred topics: ${state.preferences?.preferredTopics?.joinToString { it.displayName() }}",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Text(
+                text = "Selected distracting apps: ${state.availableTargetApps.joinToString { it.displayName }}",
                 style = MaterialTheme.typography.bodyMedium,
             )
             if (state.completedContentIds.isNotEmpty()) {
@@ -220,7 +398,7 @@ private fun StarterPackSummary(starterPacks: List<EditorialPack>) {
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                text = "Editorial starter packs",
+                text = "Active starter packs",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
             )
@@ -377,7 +555,7 @@ private fun ReaderScreen(
             fontWeight = FontWeight.Bold,
         )
         Text(
-            text = "${content.durationMinutes} min • ${content.topicTags.joinToString()}",
+            text = "${content.durationMinutes} min • ${content.topicTags.joinToString { it.displayName() }}",
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -458,4 +636,12 @@ private fun formatTimestamp(timestampMillis: Long): String {
     return formatter.format(
         Instant.ofEpochMilli(timestampMillis).atZone(ZoneId.systemDefault()),
     )
+}
+
+private fun TopicTag.displayName(): String = name.lowercase().replaceFirstChar(Char::uppercase)
+
+private fun DurationBucket.displayName(): String = when (this) {
+    DurationBucket.QUICK -> "3-5 minutes"
+    DurationBucket.FOCUS -> "5-10 minutes"
+    DurationBucket.DEEP -> "10-20 minutes"
 }

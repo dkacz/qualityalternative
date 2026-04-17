@@ -1,20 +1,43 @@
 package com.qualityalternative.app.ui
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
 import com.qualityalternative.app.data.AppContainer
 import com.qualityalternative.app.domain.model.AnalyticsEvent
 import com.qualityalternative.app.domain.model.AnalyticsEventType
+import com.qualityalternative.app.domain.model.AppSettings
 import com.qualityalternative.app.domain.model.ContentItem
 import com.qualityalternative.app.domain.model.DistractingApp
+import com.qualityalternative.app.domain.model.DurationBucket
 import com.qualityalternative.app.domain.model.EditorialPack
+import com.qualityalternative.app.domain.model.OnboardingSelection
 import com.qualityalternative.app.domain.model.RecommendationSet
 import com.qualityalternative.app.domain.model.SessionFeedback
+import com.qualityalternative.app.domain.model.TopicTag
 import com.qualityalternative.app.domain.model.UserPreferences
+import com.qualityalternative.app.domain.service.AnalyticsTracker
+import com.qualityalternative.app.domain.service.ContentRepository
+import com.qualityalternative.app.domain.service.DelayGate
+import com.qualityalternative.app.domain.service.RecommendationEngine
+import com.qualityalternative.app.domain.service.SettingsRepository
+import kotlinx.coroutines.launch
 
 data class MainUiState(
+    val isLoadingSettings: Boolean = true,
+    val hasCompletedOnboarding: Boolean = false,
+    val allSupportedApps: List<DistractingApp> = emptyList(),
+    val availableTargetApps: List<DistractingApp> = emptyList(),
+    val onboardingSelection: OnboardingSelection = OnboardingSelection(
+        selectedAppPackages = emptySet(),
+        preferredTopics = emptySet(),
+        preferredDurationBucket = DurationBucket.FOCUS,
+        selectedPackIds = emptySet(),
+    ),
     val selectedTargetApp: DistractingApp? = null,
-    val supportedApps: List<DistractingApp> = emptyList(),
     val preferences: UserPreferences? = null,
     val starterPacks: List<EditorialPack> = emptyList(),
     val currentRecommendationSet: RecommendationSet? = null,
@@ -23,11 +46,12 @@ data class MainUiState(
     val completedContentIds: Set<String> = emptySet(),
     val latestMessage: String? = null,
     val events: List<AnalyticsEvent> = emptyList(),
-    val screen: MainScreen = MainScreen.Home,
+    val screen: MainScreen = MainScreen.Onboarding,
     val lastFeedback: SessionFeedback? = null,
 )
 
 enum class MainScreen {
+    Onboarding,
     Home,
     Intervention,
     Reader,
@@ -35,31 +59,118 @@ enum class MainScreen {
 }
 
 class MainViewModel(
-    private val appContainer: AppContainer,
+    private val contentRepository: ContentRepository,
+    private val settingsRepository: SettingsRepository,
+    private val recommendationEngine: RecommendationEngine,
+    private val delayGate: DelayGate,
+    private val analyticsTracker: AnalyticsTracker,
 ) : ViewModel() {
-    private val contentRepository = appContainer.contentRepository
-    private val settingsRepository = appContainer.settingsRepository
-    private val recommendationEngine = appContainer.recommendationEngine
-    private val delayGate = appContainer.delayGate
-    private val analyticsTracker = appContainer.analyticsTracker
+    private val supportedApps = settingsRepository.supportedDistractingApps()
+    private val starterPacks = contentRepository.starterPacks()
+    private val starterPackIds = starterPacks.mapTo(mutableSetOf(), EditorialPack::id)
 
-    var uiState: MainUiState = MainUiState()
+    var uiState by mutableStateOf(
+        MainUiState(
+            allSupportedApps = supportedApps,
+            starterPacks = starterPacks,
+            onboardingSelection = defaultOnboardingSelection(
+                supportedApps = supportedApps,
+                starterPacks = starterPacks,
+            ),
+            events = analyticsTracker.allEvents(),
+        ),
+    )
         private set
 
     init {
-        val preferences = settingsRepository.currentPreferences()
-        val apps = settingsRepository.supportedDistractingApps()
-        uiState = uiState.copy(
-            selectedTargetApp = apps.firstOrNull(),
-            supportedApps = apps,
-            preferences = preferences,
-            starterPacks = contentRepository.starterPacks(),
-            events = analyticsTracker.allEvents(),
-        )
+        viewModelScope.launch {
+            settingsRepository.observeAppSettings().collect { settings ->
+                val preferences = settings.toUserPreferences(
+                    supportedApps = supportedApps,
+                    fallbackPackIds = starterPackIds,
+                )
+                val availableTargetApps = if (settings.hasCompletedOnboarding) preferences.selectedApps else emptyList()
+                val selectedTargetApp = if (settings.hasCompletedOnboarding) {
+                    uiState.selectedTargetApp.takeIf { candidate ->
+                        availableTargetApps.any { it.packageName == candidate?.packageName }
+                    } ?: availableTargetApps.firstOrNull()
+                } else {
+                    null
+                }
+
+                uiState = uiState.copy(
+                    isLoadingSettings = false,
+                    hasCompletedOnboarding = settings.hasCompletedOnboarding,
+                    availableTargetApps = availableTargetApps,
+                    selectedTargetApp = selectedTargetApp,
+                    preferences = preferences.takeIf { settings.hasCompletedOnboarding },
+                    onboardingSelection = settings.toOnboardingSelection(
+                        supportedApps = supportedApps,
+                        starterPacks = starterPacks,
+                    ),
+                    screen = when {
+                        !settings.hasCompletedOnboarding -> MainScreen.Onboarding
+                        uiState.screen == MainScreen.Onboarding -> MainScreen.Home
+                        else -> uiState.screen
+                    },
+                )
+            }
+        }
     }
 
     fun selectTargetApp(app: DistractingApp) {
         uiState = uiState.copy(selectedTargetApp = app, latestMessage = null)
+    }
+
+    fun toggleOnboardingApp(app: DistractingApp) {
+        val selected = uiState.onboardingSelection.selectedAppPackages.toMutableSet()
+        if (!selected.add(app.packageName)) {
+            selected.remove(app.packageName)
+        }
+        uiState = uiState.copy(
+            onboardingSelection = uiState.onboardingSelection.copy(selectedAppPackages = selected),
+        )
+    }
+
+    fun toggleOnboardingTopic(topic: TopicTag) {
+        val selected = uiState.onboardingSelection.preferredTopics.toMutableSet()
+        if (!selected.add(topic)) {
+            selected.remove(topic)
+        }
+        uiState = uiState.copy(
+            onboardingSelection = uiState.onboardingSelection.copy(preferredTopics = selected),
+        )
+    }
+
+    fun setOnboardingDuration(durationBucket: DurationBucket) {
+        uiState = uiState.copy(
+            onboardingSelection = uiState.onboardingSelection.copy(preferredDurationBucket = durationBucket),
+        )
+    }
+
+    fun toggleOnboardingPack(pack: EditorialPack) {
+        val selected = uiState.onboardingSelection.selectedPackIds.toMutableSet()
+        if (!selected.add(pack.id)) {
+            selected.remove(pack.id)
+        }
+        uiState = uiState.copy(
+            onboardingSelection = uiState.onboardingSelection.copy(selectedPackIds = selected),
+        )
+    }
+
+    fun completeOnboarding() {
+        val selection = uiState.onboardingSelection
+        if (!selection.isValid()) {
+            uiState = uiState.copy(
+                latestMessage = "Select at least 3 distracting apps, 3 topics, and 1 starter pack.",
+            )
+            return
+        }
+
+        viewModelScope.launch {
+            settingsRepository.saveOnboardingSelection(selection)
+            uiState = uiState.copy(latestMessage = "Onboarding saved locally.")
+        }
     }
 
     fun triggerDebugIntervention(nowMillis: Long = System.currentTimeMillis()) {
@@ -74,10 +185,12 @@ class MainViewModel(
             return
         }
 
+        val filteredInventory = contentRepository.inventory().filter { it.packId in preferences.selectedPackIds }
+
         val recommendationSet = recommendationEngine.generate(
             targetApp = targetApp,
             preferences = preferences,
-            inventory = contentRepository.inventory(),
+            inventory = filteredInventory,
             excludedIds = uiState.completedContentIds,
             nowMillis = nowMillis,
         )
@@ -241,6 +354,59 @@ class MainViewModelFactory(
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         require(modelClass.isAssignableFrom(MainViewModel::class.java))
         @Suppress("UNCHECKED_CAST")
-        return MainViewModel(appContainer = appContainer) as T
+        return MainViewModel(
+            contentRepository = appContainer.contentRepository,
+            settingsRepository = appContainer.settingsRepository,
+            recommendationEngine = appContainer.recommendationEngine,
+            delayGate = appContainer.delayGate,
+            analyticsTracker = appContainer.analyticsTracker,
+        ) as T
+    }
+}
+
+private fun defaultOnboardingSelection(
+    supportedApps: List<DistractingApp>,
+    starterPacks: List<EditorialPack>,
+): OnboardingSelection {
+    return OnboardingSelection(
+        selectedAppPackages = supportedApps.take(3).mapTo(mutableSetOf(), DistractingApp::packageName),
+        preferredTopics = TopicTag.entries.take(3).toSet(),
+        preferredDurationBucket = DurationBucket.FOCUS,
+        selectedPackIds = starterPacks.take(1).mapTo(mutableSetOf(), EditorialPack::id),
+    )
+}
+
+private fun AppSettings.toUserPreferences(
+    supportedApps: List<DistractingApp>,
+    fallbackPackIds: Set<String>,
+): UserPreferences {
+    val selectedApps = supportedApps.filter { it.packageName in selectedAppPackages }
+        .ifEmpty { supportedApps.take(3) }
+    val selectedTopics = preferredTopics.ifEmpty { TopicTag.entries.take(3).toSet() }
+    val packs = selectedPackIds.ifEmpty { fallbackPackIds.take(1).toSet() }
+    return UserPreferences(
+        selectedApps = selectedApps,
+        preferredTopics = selectedTopics,
+        preferredDurationBucket = preferredDurationBucket,
+        selectedPackIds = packs,
+    )
+}
+
+private fun AppSettings.toOnboardingSelection(
+    supportedApps: List<DistractingApp>,
+    starterPacks: List<EditorialPack>,
+): OnboardingSelection {
+    return if (hasCompletedOnboarding) {
+        OnboardingSelection(
+            selectedAppPackages = selectedAppPackages,
+            preferredTopics = preferredTopics,
+            preferredDurationBucket = preferredDurationBucket,
+            selectedPackIds = selectedPackIds,
+        )
+    } else {
+        defaultOnboardingSelection(
+            supportedApps = supportedApps,
+            starterPacks = starterPacks,
+        )
     }
 }

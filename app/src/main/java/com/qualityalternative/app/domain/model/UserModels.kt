@@ -9,7 +9,29 @@ data class UserPreferences(
     val selectedApps: List<DistractingApp>,
     val preferredTopics: Set<TopicTag>,
     val preferredDurationBucket: DurationBucket,
+    val selectedPackIds: Set<String>,
 )
+
+data class AppSettings(
+    val hasCompletedOnboarding: Boolean,
+    val selectedAppPackages: Set<String>,
+    val preferredTopics: Set<TopicTag>,
+    val preferredDurationBucket: DurationBucket,
+    val selectedPackIds: Set<String>,
+)
+
+data class OnboardingSelection(
+    val selectedAppPackages: Set<String>,
+    val preferredTopics: Set<TopicTag>,
+    val preferredDurationBucket: DurationBucket,
+    val selectedPackIds: Set<String>,
+) {
+    fun isValid(minApps: Int = 3, minTopics: Int = 3): Boolean {
+        return selectedAppPackages.size >= minApps &&
+            preferredTopics.size >= minTopics &&
+            selectedPackIds.isNotEmpty()
+    }
+}
 
 data class DelayWindow(
     val targetAppPackage: String,

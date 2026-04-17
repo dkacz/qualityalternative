@@ -20,6 +20,7 @@ class DefaultRecommendationEngineTest {
             selectedApps = listOf(DistractingApp(packageName = "pkg", displayName = "Instagram")),
             preferredTopics = setOf(TopicTag.PHILOSOPHY, TopicTag.PSYCHOLOGY),
             preferredDurationBucket = DurationBucket.FOCUS,
+            selectedPackIds = setOf("pack"),
         )
 
         val inventory = listOf(

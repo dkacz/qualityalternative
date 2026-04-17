@@ -10,6 +10,7 @@ This repository now contains:
 - a bootstrapped Android app in `Kotlin + Jetpack Compose`
 - a working Sprint 0 foundation
 - a first local replacement-loop prototype for Sprint 1, triggered manually from inside the app
+- a Sprint 2 settings slice with onboarding and persisted local user state
 
 ## Source of Truth
 
@@ -32,13 +33,16 @@ This repository now contains:
 
 - `app/` contains the Android client prototype.
 - The current build is local-first and uses editorial starter packs from app assets.
+- User settings are persisted with `DataStore`.
 - The prototype already supports:
+  - onboarding with selected distracting apps, preferred topics, session length, and starter packs
   - manual debug intervention trigger
   - one primary recommendation plus two backups
   - reader flow
   - feedback flow
   - local analytics ledger
-- System interception, persistence, onboarding, and fixture distractor apps are still future slices.
+- persisted onboarding and target-app preferences after restart
+- System interception, session history, richer persistence, and fixture distractor apps are still future slices.
 
 ## Working Approach
 
@@ -60,4 +64,4 @@ Use `JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home` a
 
 ## Near-Term Next Step
 
-Move from the manual prototype loop to persisted user state: onboarding, local settings storage, delay logic, and history.
+Finish the rest of Sprint 2 by adding persisted delay logic and a replacement-session history view before moving into Android interception.
