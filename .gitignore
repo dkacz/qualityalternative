@@ -1,0 +1,20 @@
+.DS_Store
+.idea/
+.vscode/
+*.iml
+
+# Android / Gradle
+.gradle/
+build/
+app/build/
+local.properties
+captures/
+
+# Kotlin / Java
+out/
+
+# Logs
+*.log
+
+# OS files
+Thumbs.db
