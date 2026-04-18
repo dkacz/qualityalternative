@@ -26,23 +26,14 @@ class MainActivityTest {
         targetContext.filesDir.resolve("datastore").deleteRecursively()
     }
 
-    @Before
-    fun launchApp() {
-        scenario = ActivityScenario.launch(
-            Intent(
-                InstrumentationRegistry.getInstrumentation().targetContext,
-                MainActivity::class.java,
-            ),
-        )
-    }
-
     @After
     fun tearDown() {
         scenario?.close()
     }
 
     @Test
-    fun onboardingCompletesAndPersistsAfterActivityRecreate() {
+    fun onboardingCompletesAndPersistsAfterColdRelaunch() {
+        launchApp()
         composeRule.waitUntil(timeoutMillis = 10_000) {
             hasNode("Let’s set up your replacement loop")
         }
@@ -58,7 +49,9 @@ class MainActivityTest {
 
         composeRule.onNodeWithText("Quality Alternative").assertIsDisplayed()
 
-        scenario?.recreate()
+        scenario?.close()
+        scenario = null
+        launchApp()
 
         composeRule.waitUntil(timeoutMillis = 10_000) {
             hasNode("Quality Alternative")
@@ -72,5 +65,14 @@ class MainActivityTest {
             composeRule.onNodeWithText(text).fetchSemanticsNode()
             true
         }.getOrDefault(false)
+    }
+
+    private fun launchApp() {
+        scenario = ActivityScenario.launch(
+            Intent(
+                InstrumentationRegistry.getInstrumentation().targetContext,
+                MainActivity::class.java,
+            ),
+        )
     }
 }

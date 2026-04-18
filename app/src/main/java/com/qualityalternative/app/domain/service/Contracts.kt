@@ -56,13 +56,28 @@ interface DelayGate {
         targetApp: DistractingApp,
         nowMillis: Long = System.currentTimeMillis(),
         durationMinutes: Int = 15,
+        interventionId: String? = null,
+        interventionShownAtMillis: Long? = null,
+        primaryContentId: String? = null,
+        backupContentIds: List<String> = emptyList(),
     ): DelayWindow
+
+    fun recordFirstReturnAttempt(
+        targetApp: DistractingApp,
+        nowMillis: Long = System.currentTimeMillis(),
+    ): DelayWindow?
+
+    fun isReady(): Boolean = true
+
+    fun observeReady(): Flow<Boolean> = flowOf(isReady())
 }
 
 interface AnalyticsTracker {
     fun record(event: AnalyticsEvent)
     fun allEvents(): List<AnalyticsEvent>
     fun observeEvents(): Flow<List<AnalyticsEvent>> = flowOf(allEvents())
+    fun isReady(): Boolean = true
+    fun observeReady(): Flow<Boolean> = flowOf(isReady())
 }
 
 interface HistoryRepository {
@@ -70,7 +85,13 @@ interface HistoryRepository {
     fun observeRecentHistory(nowMillis: Long = System.currentTimeMillis(), windowDays: Int = 7): Flow<List<ReplacementHistoryEntry>> =
         flowOf(recentHistory(nowMillis = nowMillis, windowDays = windowDays))
 
-    fun recordAcceptedSession(
+    fun observeCompletedContentIds(): Flow<Set<String>> =
+        flowOf(
+            recentHistory().filter(ReplacementHistoryEntry::isCompleted)
+                .mapTo(mutableSetOf(), ReplacementHistoryEntry::contentId),
+        )
+
+    suspend fun recordAcceptedSession(
         targetApp: DistractingApp,
         interventionId: String,
         interventionShownAtMillis: Long,
@@ -81,14 +102,18 @@ interface HistoryRepository {
         acceptedAtMillis: Long = System.currentTimeMillis(),
     ): String
 
-    fun markCompleted(sessionId: String, completedAtMillis: Long = System.currentTimeMillis())
+    suspend fun markCompleted(sessionId: String, completedAtMillis: Long = System.currentTimeMillis())
 
-    fun markSkipped(sessionId: String, skippedAtMillis: Long = System.currentTimeMillis())
+    suspend fun markSkipped(sessionId: String, skippedAtMillis: Long = System.currentTimeMillis())
 
-    fun attachFeedback(sessionId: String, feedback: SessionFeedback)
+    suspend fun attachFeedback(sessionId: String, feedback: SessionFeedback)
 
-    fun markReturnedToTarget(
+    suspend fun markReturnedToTarget(
         targetAppPackage: String,
         returnedAtMillis: Long = System.currentTimeMillis(),
     ): ReturnToTargetSignal?
+
+    fun isReady(): Boolean = true
+
+    fun observeReady(): Flow<Boolean> = flowOf(isReady())
 }

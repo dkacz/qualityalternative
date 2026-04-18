@@ -23,14 +23,36 @@ class InMemoryDelayGate : DelayGate {
         return inspectDelay(targetApp = targetApp, nowMillis = nowMillis).activeWindow
     }
 
-    override fun storeDelay(targetApp: DistractingApp, nowMillis: Long, durationMinutes: Int): DelayWindow {
+    override fun storeDelay(
+        targetApp: DistractingApp,
+        nowMillis: Long,
+        durationMinutes: Int,
+        interventionId: String?,
+        interventionShownAtMillis: Long?,
+        primaryContentId: String?,
+        backupContentIds: List<String>,
+    ): DelayWindow {
         val window = DelayWindow(
             id = UUID.randomUUID().toString(),
             targetAppPackage = targetApp.packageName,
             startsAtMillis = nowMillis,
             endsAtMillis = nowMillis + durationMinutes * 60_000L,
+            interventionId = interventionId,
+            interventionShownAtMillis = interventionShownAtMillis,
+            primaryContentId = primaryContentId,
+            backupContentIds = backupContentIds,
         )
         windows[targetApp.packageName] = window
         return window
+    }
+
+    override fun recordFirstReturnAttempt(targetApp: DistractingApp, nowMillis: Long): DelayWindow? {
+        val current = windows[targetApp.packageName] ?: return null
+        if (current.firstReturnAttemptAtMillis != null) {
+            return null
+        }
+        val updated = current.copy(firstReturnAttemptAtMillis = nowMillis)
+        windows[targetApp.packageName] = updated
+        return updated
     }
 }

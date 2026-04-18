@@ -19,6 +19,7 @@ class RoomAnalyticsTracker(
     private val scope: CoroutineScope,
 ) : AnalyticsTracker {
     private val events = MutableStateFlow<List<AnalyticsEvent>>(emptyList())
+    private val ready = MutableStateFlow(false)
 
     init {
         scope.launch {
@@ -26,6 +27,7 @@ class RoomAnalyticsTracker(
                 .map { rows -> rows.map(AnalyticsEventEntity::toModel) }
                 .collect { loadedEvents ->
                     events.value = loadedEvents
+                    ready.value = true
                 }
         }
     }
@@ -39,6 +41,10 @@ class RoomAnalyticsTracker(
     override fun allEvents(): List<AnalyticsEvent> = events.value
 
     override fun observeEvents(): Flow<List<AnalyticsEvent>> = events.asStateFlow()
+
+    override fun isReady(): Boolean = ready.value
+
+    override fun observeReady(): Flow<Boolean> = ready.asStateFlow()
 }
 
 private fun AnalyticsEvent.toEntity(): AnalyticsEventEntity {

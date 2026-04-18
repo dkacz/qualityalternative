@@ -10,10 +10,13 @@ import com.qualityalternative.app.domain.model.DelayWindow
 import com.qualityalternative.app.domain.model.DistractingApp
 import com.qualityalternative.app.domain.service.DelayGate
 import java.io.IOException
+import java.util.Base64
 import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
@@ -23,6 +26,7 @@ class PreferencesDelayGate(
     private val scope: CoroutineScope,
 ) : DelayGate {
     private val windows = MutableStateFlow<Map<String, DelayWindow>>(emptyMap())
+    private val ready = MutableStateFlow(false)
 
     init {
         scope.launch(start = CoroutineStart.UNDISPATCHED) {
@@ -39,6 +43,7 @@ class PreferencesDelayGate(
                         .orEmpty()
                         .mapNotNull(::decodeWindow)
                         .associateBy(DelayWindow::targetAppPackage)
+                    ready.value = true
                 }
         }
     }
@@ -58,18 +63,46 @@ class PreferencesDelayGate(
         return inspectDelay(targetApp = targetApp, nowMillis = nowMillis).activeWindow
     }
 
-    override fun storeDelay(targetApp: DistractingApp, nowMillis: Long, durationMinutes: Int): DelayWindow {
+    override fun storeDelay(
+        targetApp: DistractingApp,
+        nowMillis: Long,
+        durationMinutes: Int,
+        interventionId: String?,
+        interventionShownAtMillis: Long?,
+        primaryContentId: String?,
+        backupContentIds: List<String>,
+    ): DelayWindow {
         val window = DelayWindow(
             id = UUID.randomUUID().toString(),
             targetAppPackage = targetApp.packageName,
             startsAtMillis = nowMillis,
             endsAtMillis = nowMillis + durationMinutes * 60_000L,
+            interventionId = interventionId,
+            interventionShownAtMillis = interventionShownAtMillis,
+            primaryContentId = primaryContentId,
+            backupContentIds = backupContentIds,
         )
         val updated = windows.value + (targetApp.packageName to window)
         windows.value = updated
         persist(updated)
         return window
     }
+
+    override fun recordFirstReturnAttempt(targetApp: DistractingApp, nowMillis: Long): DelayWindow? {
+        val current = windows.value[targetApp.packageName] ?: return null
+        if (current.firstReturnAttemptAtMillis != null) {
+            return null
+        }
+        val updated = current.copy(firstReturnAttemptAtMillis = nowMillis)
+        val updatedWindows = windows.value + (targetApp.packageName to updated)
+        windows.value = updatedWindows
+        persist(updatedWindows)
+        return updated
+    }
+
+    override fun isReady(): Boolean = ready.value
+
+    override fun observeReady(): Flow<Boolean> = ready.asStateFlow()
 
     private fun persist(currentWindows: Map<String, DelayWindow>) {
         scope.launch {
@@ -81,18 +114,39 @@ class PreferencesDelayGate(
 
     internal companion object {
         val DelayWindows = stringSetPreferencesKey("delay_windows")
+        private const val WINDOW_ENCODING_VERSION = "v2"
 
         fun encodeWindow(window: DelayWindow): String {
             return listOf(
-                window.id,
-                window.targetAppPackage,
+                WINDOW_ENCODING_VERSION,
+                encodeField(window.id),
+                encodeField(window.targetAppPackage),
                 window.startsAtMillis.toString(),
                 window.endsAtMillis.toString(),
+                encodeField(window.interventionId),
+                encodeNullableLong(window.interventionShownAtMillis),
+                encodeField(window.primaryContentId),
+                encodeField(window.backupContentIds.joinToString(",")),
+                encodeNullableLong(window.firstReturnAttemptAtMillis),
             ).joinToString("|")
         }
 
         fun decodeWindow(raw: String): DelayWindow? {
-            val parts = raw.split("|")
+            val parts = raw.split('|')
+            if (parts.firstOrNull() == WINDOW_ENCODING_VERSION && parts.size == 10) {
+                return DelayWindow(
+                    id = decodeField(parts[1]),
+                    targetAppPackage = decodeField(parts[2]),
+                    startsAtMillis = parts[3].toLongOrNull() ?: return null,
+                    endsAtMillis = parts[4].toLongOrNull() ?: return null,
+                    interventionId = decodeField(parts[5]).ifBlank { null },
+                    interventionShownAtMillis = decodeNullableLong(parts[6]),
+                    primaryContentId = decodeField(parts[7]).ifBlank { null },
+                    backupContentIds = decodeField(parts[8]).split(",").filter(String::isNotBlank),
+                    firstReturnAttemptAtMillis = decodeNullableLong(parts[9]),
+                ).takeIf { it.id.isNotBlank() && it.targetAppPackage.isNotBlank() }
+            }
+
             if (parts.size != 4) {
                 return null
             }
@@ -107,3 +161,19 @@ class PreferencesDelayGate(
         }
     }
 }
+
+private fun encodeField(value: String?): String {
+    val bytes = (value ?: "").toByteArray(Charsets.UTF_8)
+    return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
+}
+
+private fun decodeField(value: String): String {
+    if (value.isBlank()) {
+        return ""
+    }
+    return String(Base64.getUrlDecoder().decode(value), Charsets.UTF_8)
+}
+
+private fun encodeNullableLong(value: Long?): String = value?.toString().orEmpty()
+
+private fun decodeNullableLong(value: String): Long? = value.toLongOrNull()

@@ -38,6 +38,11 @@ data class DelayWindow(
     val targetAppPackage: String,
     val startsAtMillis: Long,
     val endsAtMillis: Long,
+    val interventionId: String? = null,
+    val interventionShownAtMillis: Long? = null,
+    val primaryContentId: String? = null,
+    val backupContentIds: List<String> = emptyList(),
+    val firstReturnAttemptAtMillis: Long? = null,
 ) {
     fun isActive(nowMillis: Long): Boolean = nowMillis < endsAtMillis
 }

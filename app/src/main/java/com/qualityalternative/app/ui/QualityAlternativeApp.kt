@@ -144,7 +144,7 @@ private fun LoadingScreen() {
     ) {
         CircularProgressIndicator()
         Text(
-            text = "Loading local settings…",
+            text = "Loading local replacement state…",
             modifier = Modifier.padding(top = 16.dp),
             style = MaterialTheme.typography.bodyLarge,
         )

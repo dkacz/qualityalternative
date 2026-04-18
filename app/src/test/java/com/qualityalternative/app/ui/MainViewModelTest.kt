@@ -20,6 +20,7 @@ import com.qualityalternative.app.domain.model.SessionFeedback
 import com.qualityalternative.app.domain.model.TopicTag
 import com.qualityalternative.app.domain.service.ContentRepository
 import com.qualityalternative.app.domain.service.DefaultRecommendationEngine
+import com.qualityalternative.app.domain.service.DelayGate
 import com.qualityalternative.app.domain.service.HistoryRepository
 import com.qualityalternative.app.domain.service.InterceptionMonitor
 import com.qualityalternative.app.domain.service.SettingsRepository
@@ -70,7 +71,9 @@ class MainViewModelTest {
         viewModel.completeOnboarding()
         advanceUntilIdle()
         viewModel.triggerDebugIntervention(nowMillis = 1_000L)
+        advanceUntilIdle()
         viewModel.acceptPrimary()
+        advanceUntilIdle()
         viewModel.finishReading()
         advanceUntilIdle()
 
@@ -124,6 +127,7 @@ class MainViewModelTest {
             analyticsTracker = InMemoryAnalyticsTracker(),
             historyRepository = FakeHistoryRepository(),
             interceptionMonitor = FakeInterceptionMonitor(),
+            enableDelayRefreshTicker = false,
         )
 
         advanceUntilIdle()
@@ -141,32 +145,119 @@ class MainViewModelTest {
         assertEquals(MainScreen.Intervention, viewModel.uiState.screen)
     }
 
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun triggerDebugIntervention_keepsLoadingUntilPersistedSourcesAreReady() = runTest {
+        val settingsRepository = FakeSettingsRepository()
+        val historyRepository = FakeHistoryRepository(isReady = false)
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val delayGate = FakeDelayGate(isReady = false)
+        val viewModel = MainViewModel(
+            contentRepository = FakeContentRepository(),
+            settingsRepository = settingsRepository,
+            recommendationEngine = DefaultRecommendationEngine(),
+            delayGate = delayGate,
+            analyticsTracker = analyticsTracker,
+            historyRepository = historyRepository,
+            interceptionMonitor = FakeInterceptionMonitor(),
+            enableDelayRefreshTicker = false,
+        )
+
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.isLoadingSettings)
+
+        historyRepository.setReady(true)
+        delayGate.setReady(true)
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.isLoadingSettings)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun completedExclusion_usesAllCompletedIdsNotJustVisibleHistoryWindow() = runTest {
+        val settingsRepository = FakeSettingsRepository(
+            initial = AppSettings(
+                hasCompletedOnboarding = true,
+                selectedAppPackages = SupportedCatalog.distractingApps.take(3).mapTo(mutableSetOf(), DistractingApp::packageName),
+                preferredTopics = setOf(TopicTag.PHILOSOPHY, TopicTag.SCIENCE, TopicTag.HISTORY),
+                preferredDurationBucket = DurationBucket.FOCUS,
+                selectedPackIds = setOf("philosophy", "science"),
+            ),
+        )
+        val historyRepository = FakeHistoryRepository(
+            initialHistory = emptyList(),
+            initialCompletedIds = setOf("p1"),
+        )
+        val viewModel = createViewModel(
+            settingsRepository = settingsRepository,
+            historyRepository = historyRepository,
+        )
+
+        advanceUntilIdle()
+        viewModel.triggerDebugIntervention(nowMillis = 2_000L)
+        advanceUntilIdle()
+
+        assertEquals("s1", viewModel.uiState.currentRecommendationSet?.primary?.id)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun triggerDebugIntervention_recordsStructuredDelayReturnEvents() = runTest {
+        val delayGate = InMemoryDelayGate()
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val viewModel = createViewModel(
+            analyticsTracker = analyticsTracker,
+            delayGate = delayGate,
+        )
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+        viewModel.triggerDebugIntervention(nowMillis = 1_000L)
+        advanceUntilIdle()
+        viewModel.delayFor15Minutes()
+        advanceUntilIdle()
+
+        viewModel.triggerDebugIntervention(nowMillis = 2_000L)
+        advanceUntilIdle()
+
+        val returnEvents = analyticsTracker.allEvents().filter {
+            it.type.name.startsWith("RETURN_TO_APP")
+        }
+        assertTrue(returnEvents.isNotEmpty())
+        assertTrue(returnEvents.all { it.interventionId != null })
+        assertTrue(returnEvents.all { it.metadata["delayReturnOrigin"] == "active_delay" })
+    }
+
     private fun createViewModel(
         settingsRepository: FakeSettingsRepository = FakeSettingsRepository(),
         historyRepository: FakeHistoryRepository = FakeHistoryRepository(),
         analyticsTracker: InMemoryAnalyticsTracker = InMemoryAnalyticsTracker(),
+        delayGate: DelayGate = InMemoryDelayGate(),
     ): MainViewModel {
         return MainViewModel(
             contentRepository = FakeContentRepository(),
             settingsRepository = settingsRepository,
             recommendationEngine = DefaultRecommendationEngine(),
-            delayGate = InMemoryDelayGate(),
+            delayGate = delayGate,
             analyticsTracker = analyticsTracker,
             historyRepository = historyRepository,
             interceptionMonitor = FakeInterceptionMonitor(),
+            enableDelayRefreshTicker = false,
         )
     }
 
-    private class FakeSettingsRepository : SettingsRepository {
-        private val state = MutableStateFlow(
-            AppSettings(
-                hasCompletedOnboarding = false,
-                selectedAppPackages = emptySet(),
-                preferredTopics = emptySet(),
-                preferredDurationBucket = DurationBucket.FOCUS,
-                selectedPackIds = emptySet(),
-            ),
-        )
+    private class FakeSettingsRepository(
+        initial: AppSettings = AppSettings(
+            hasCompletedOnboarding = false,
+            selectedAppPackages = emptySet(),
+            preferredTopics = emptySet(),
+            preferredDurationBucket = DurationBucket.FOCUS,
+            selectedPackIds = emptySet(),
+        ),
+    ) : SettingsRepository {
+        private val state = MutableStateFlow(initial)
 
         override fun observeAppSettings(): Flow<AppSettings> = state
 
@@ -183,14 +274,30 @@ class MainViewModelTest {
         }
     }
 
-    private class FakeHistoryRepository : HistoryRepository {
-        val historyEntries = MutableStateFlow<List<ReplacementHistoryEntry>>(emptyList())
+    private class FakeHistoryRepository(
+        initialHistory: List<ReplacementHistoryEntry> = emptyList(),
+        initialCompletedIds: Set<String> = emptySet(),
+        isReady: Boolean = true,
+    ) : HistoryRepository {
+        val historyEntries = MutableStateFlow(initialHistory)
+        private val completedIds = MutableStateFlow(initialCompletedIds)
+        private val ready = MutableStateFlow(isReady)
 
         override fun recentHistory(nowMillis: Long, windowDays: Int): List<ReplacementHistoryEntry> = historyEntries.value
 
         override fun observeRecentHistory(nowMillis: Long, windowDays: Int): Flow<List<ReplacementHistoryEntry>> = historyEntries
 
-        override fun recordAcceptedSession(
+        override fun observeCompletedContentIds(): Flow<Set<String>> = completedIds
+
+        override fun isReady(): Boolean = ready.value
+
+        override fun observeReady(): Flow<Boolean> = ready
+
+        fun setReady(value: Boolean) {
+            ready.value = value
+        }
+
+        override suspend fun recordAcceptedSession(
             targetApp: DistractingApp,
             interventionId: String,
             interventionShownAtMillis: Long,
@@ -220,19 +327,21 @@ class MainViewModelTest {
             return entry.sessionId
         }
 
-        override fun markCompleted(sessionId: String, completedAtMillis: Long) {
+        override suspend fun markCompleted(sessionId: String, completedAtMillis: Long) {
             historyEntries.value = historyEntries.value.map { entry ->
                 if (entry.sessionId == sessionId) entry.copy(completedAtMillis = completedAtMillis) else entry
             }
+            completedIds.value = historyEntries.value.filter(ReplacementHistoryEntry::isCompleted)
+                .mapTo(mutableSetOf(), ReplacementHistoryEntry::contentId)
         }
 
-        override fun markSkipped(sessionId: String, skippedAtMillis: Long) {
+        override suspend fun markSkipped(sessionId: String, skippedAtMillis: Long) {
             historyEntries.value = historyEntries.value.map { entry ->
                 if (entry.sessionId == sessionId) entry.copy(skippedAtMillis = skippedAtMillis) else entry
             }
         }
 
-        override fun attachFeedback(sessionId: String, feedback: SessionFeedback) {
+        override suspend fun attachFeedback(sessionId: String, feedback: SessionFeedback) {
             historyEntries.value = historyEntries.value.map { entry ->
                 if (entry.sessionId == sessionId) {
                     entry.copy(
@@ -245,7 +354,7 @@ class MainViewModelTest {
             }
         }
 
-        override fun markReturnedToTarget(targetAppPackage: String, returnedAtMillis: Long): ReturnToTargetSignal? {
+        override suspend fun markReturnedToTarget(targetAppPackage: String, returnedAtMillis: Long): ReturnToTargetSignal? {
             val candidate = historyEntries.value.firstOrNull { it.targetAppPackage == targetAppPackage } ?: return null
             historyEntries.value = historyEntries.value.map { entry ->
                 if (entry.sessionId == candidate.sessionId) {
@@ -265,6 +374,46 @@ class MainViewModelTest {
                 within15Minutes = true,
                 within60Minutes = true,
             )
+        }
+    }
+
+    private class FakeDelayGate(isReady: Boolean) : DelayGate {
+        private val delegate = InMemoryDelayGate()
+        private val ready = MutableStateFlow(isReady)
+
+        override fun inspectDelay(targetApp: DistractingApp, nowMillis: Long) =
+            delegate.inspectDelay(targetApp = targetApp, nowMillis = nowMillis)
+
+        override fun activeDelay(targetApp: DistractingApp, nowMillis: Long) =
+            delegate.activeDelay(targetApp = targetApp, nowMillis = nowMillis)
+
+        override fun storeDelay(
+            targetApp: DistractingApp,
+            nowMillis: Long,
+            durationMinutes: Int,
+            interventionId: String?,
+            interventionShownAtMillis: Long?,
+            primaryContentId: String?,
+            backupContentIds: List<String>,
+        ) = delegate.storeDelay(
+            targetApp = targetApp,
+            nowMillis = nowMillis,
+            durationMinutes = durationMinutes,
+            interventionId = interventionId,
+            interventionShownAtMillis = interventionShownAtMillis,
+            primaryContentId = primaryContentId,
+            backupContentIds = backupContentIds,
+        )
+
+        override fun recordFirstReturnAttempt(targetApp: DistractingApp, nowMillis: Long) =
+            delegate.recordFirstReturnAttempt(targetApp = targetApp, nowMillis = nowMillis)
+
+        override fun isReady(): Boolean = ready.value
+
+        override fun observeReady(): Flow<Boolean> = ready
+
+        fun setReady(value: Boolean) {
+            ready.value = value
         }
     }
 

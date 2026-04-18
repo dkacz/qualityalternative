@@ -20,6 +20,8 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 class RoomHistoryRepository(
     private val dao: ReplacementSessionDao,
@@ -27,13 +29,16 @@ class RoomHistoryRepository(
 ) : HistoryRepository {
     private val entries = MutableStateFlow<List<ReplacementHistoryEntry>>(emptyList())
     private val nowMillis = MutableStateFlow(System.currentTimeMillis())
+    private val ready = MutableStateFlow(false)
+    private val writeMutex = Mutex()
 
     init {
         scope.launch {
             dao.observeAll()
                 .map { rows -> rows.map(ReplacementSessionEntity::toModel) }
                 .collect { loadedEntries ->
-                    entries.value = loadedEntries
+                    entries.value = loadedEntries.sortedByDescending(ReplacementHistoryEntry::acceptedAtMillis)
+                    ready.value = true
                 }
         }
         scope.launch {
@@ -54,7 +59,14 @@ class RoomHistoryRepository(
         }
     }
 
-    override fun recordAcceptedSession(
+    override fun observeCompletedContentIds(): Flow<Set<String>> {
+        return entries.asStateFlow().map { currentEntries ->
+            currentEntries.filter(ReplacementHistoryEntry::isCompleted)
+                .mapTo(mutableSetOf(), ReplacementHistoryEntry::contentId)
+        }
+    }
+
+    override suspend fun recordAcceptedSession(
         targetApp: DistractingApp,
         interventionId: String,
         interventionShownAtMillis: Long,
@@ -64,74 +76,88 @@ class RoomHistoryRepository(
         source: RecommendationSource,
         acceptedAtMillis: Long,
     ): String {
-        val sessionId = UUID.randomUUID().toString()
-        val entry = ReplacementHistoryEntry(
-            sessionId = sessionId,
-            interventionId = interventionId,
-            targetAppPackage = targetApp.packageName,
-            targetAppDisplayName = targetApp.displayName,
-            interventionShownAtMillis = interventionShownAtMillis,
-            primaryContentId = primaryContentId,
-            backupContentIds = backupContentIds,
-            contentId = content.id,
-            contentTitle = content.title,
-            contentDescription = content.description,
-            contentTopics = content.topicTags,
-            packId = content.packId,
-            recommendationSource = source,
-            acceptedAtMillis = acceptedAtMillis,
-        )
-        persist(entry)
-        return sessionId
-    }
-
-    override fun markCompleted(sessionId: String, completedAtMillis: Long) {
-        updateEntry(sessionId) { entry ->
-            entry.copy(completedAtMillis = completedAtMillis, skippedAtMillis = null)
+        return writeMutex.withLock {
+            val sessionId = UUID.randomUUID().toString()
+            val entry = ReplacementHistoryEntry(
+                sessionId = sessionId,
+                interventionId = interventionId,
+                targetAppPackage = targetApp.packageName,
+                targetAppDisplayName = targetApp.displayName,
+                interventionShownAtMillis = interventionShownAtMillis,
+                primaryContentId = primaryContentId,
+                backupContentIds = backupContentIds,
+                contentId = content.id,
+                contentTitle = content.title,
+                contentDescription = content.description,
+                contentTopics = content.topicTags,
+                packId = content.packId,
+                recommendationSource = source,
+                acceptedAtMillis = acceptedAtMillis,
+            )
+            persist(entry)
+            sessionId
         }
     }
 
-    override fun markSkipped(sessionId: String, skippedAtMillis: Long) {
-        updateEntry(sessionId) { entry ->
-            entry.copy(skippedAtMillis = skippedAtMillis)
+    override suspend fun markCompleted(sessionId: String, completedAtMillis: Long) {
+        writeMutex.withLock {
+            updateEntry(sessionId) { entry ->
+                entry.copy(completedAtMillis = completedAtMillis, skippedAtMillis = null)
+            }
         }
     }
 
-    override fun attachFeedback(sessionId: String, feedback: SessionFeedback) {
-        updateEntry(sessionId) { entry ->
-            entry.copy(
-                feedbackGoodFit = feedback.wasGoodFit,
-                feedbackHelpedAvoidScrolling = feedback.helpedAvoidScrolling,
+    override suspend fun markSkipped(sessionId: String, skippedAtMillis: Long) {
+        writeMutex.withLock {
+            updateEntry(sessionId) { entry ->
+                entry.copy(skippedAtMillis = skippedAtMillis)
+            }
+        }
+    }
+
+    override suspend fun attachFeedback(sessionId: String, feedback: SessionFeedback) {
+        writeMutex.withLock {
+            updateEntry(sessionId) { entry ->
+                entry.copy(
+                    feedbackGoodFit = feedback.wasGoodFit,
+                    feedbackHelpedAvoidScrolling = feedback.helpedAvoidScrolling,
+                )
+            }
+        }
+    }
+
+    override suspend fun markReturnedToTarget(
+        targetAppPackage: String,
+        returnedAtMillis: Long,
+    ): ReturnToTargetSignal? {
+        return writeMutex.withLock {
+            val candidate = entries.value.firstOrNull { entry ->
+                entry.targetAppPackage == targetAppPackage &&
+                    entry.returnedToTargetAtMillis == null
+            } ?: return@withLock null
+
+            val delta = returnedAtMillis - candidate.interventionShownAtMillis
+            val updated = candidate.copy(returnedToTargetAtMillis = returnedAtMillis)
+            persist(updated)
+            ReturnToTargetSignal(
+                sessionId = candidate.sessionId,
+                interventionId = candidate.interventionId,
+                targetAppPackage = candidate.targetAppPackage,
+                primaryContentId = candidate.primaryContentId,
+                backupContentIds = candidate.backupContentIds,
+                contentId = candidate.contentId,
+                returnedAtMillis = returnedAtMillis,
+                within15Minutes = delta <= 15 * 60_000L,
+                within60Minutes = delta <= 60 * 60_000L,
             )
         }
     }
 
-    override fun markReturnedToTarget(
-        targetAppPackage: String,
-        returnedAtMillis: Long,
-    ): ReturnToTargetSignal? {
-        val candidate = entries.value.firstOrNull { entry ->
-            entry.targetAppPackage == targetAppPackage &&
-                entry.returnedToTargetAtMillis == null
-        } ?: return null
+    override fun isReady(): Boolean = ready.value
 
-        val delta = returnedAtMillis - candidate.interventionShownAtMillis
-        val updated = candidate.copy(returnedToTargetAtMillis = returnedAtMillis)
-        persist(updated)
-        return ReturnToTargetSignal(
-            sessionId = candidate.sessionId,
-            interventionId = candidate.interventionId,
-            targetAppPackage = candidate.targetAppPackage,
-            primaryContentId = candidate.primaryContentId,
-            backupContentIds = candidate.backupContentIds,
-            contentId = candidate.contentId,
-            returnedAtMillis = returnedAtMillis,
-            within15Minutes = delta <= 15 * 60_000L,
-            within60Minutes = delta <= 60 * 60_000L,
-        )
-    }
+    override fun observeReady(): Flow<Boolean> = ready.asStateFlow()
 
-    private fun updateEntry(
+    private suspend fun updateEntry(
         sessionId: String,
         transform: (ReplacementHistoryEntry) -> ReplacementHistoryEntry,
     ) {
@@ -139,10 +165,9 @@ class RoomHistoryRepository(
         persist(transform(existing))
     }
 
-    private fun persist(entry: ReplacementHistoryEntry) {
-        scope.launch {
-            dao.insertOrReplace(entry.toEntity())
-        }
+    private suspend fun persist(entry: ReplacementHistoryEntry) {
+        dao.insertOrReplace(entry.toEntity())
+        entries.value = upsertEntry(entries.value, entry)
     }
 
     private fun filterRecentHistory(
@@ -160,6 +185,16 @@ class RoomHistoryRepository(
         const val DAY_IN_MILLIS = 24 * 60 * 60 * 1000L
         const val HISTORY_REFRESH_INTERVAL_MILLIS = 60_000L
     }
+}
+
+private fun upsertEntry(
+    currentEntries: List<ReplacementHistoryEntry>,
+    updatedEntry: ReplacementHistoryEntry,
+): List<ReplacementHistoryEntry> {
+    return currentEntries
+        .filterNot { it.sessionId == updatedEntry.sessionId }
+        .plus(updatedEntry)
+        .sortedByDescending(ReplacementHistoryEntry::acceptedAtMillis)
 }
 
 private fun ReplacementHistoryEntry.toEntity(): ReplacementSessionEntity {
