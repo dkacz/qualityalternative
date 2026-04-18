@@ -36,6 +36,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -44,8 +45,16 @@ import org.junit.Rule
 import org.junit.Test
 
 class MainViewModelTest {
+    private val createdViewModels = mutableListOf<MainViewModel>()
+
     @get:Rule
     val dispatcherRule = MainDispatcherRule()
+
+    @After
+    fun tearDown() {
+        createdViewModels.forEach(MainViewModel::closeForTests)
+        createdViewModels.clear()
+    }
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -126,15 +135,17 @@ class MainViewModelTest {
     @OptIn(ExperimentalCoroutinesApi::class)
     fun triggerDebugIntervention_clearsExpiredDelayWindowFromUiState() = runTest {
         val delayGate = InMemoryDelayGate()
-        val viewModel = MainViewModel(
-            contentRepository = FakeContentRepository(),
-            settingsRepository = FakeSettingsRepository(),
-            recommendationEngine = DefaultRecommendationEngine(),
-            delayGate = delayGate,
-            analyticsTracker = InMemoryAnalyticsTracker(),
-            historyRepository = FakeHistoryRepository(),
-            interceptionMonitor = FakeInterceptionMonitor(),
-            enableDelayRefreshTicker = false,
+        val viewModel = track(
+            MainViewModel(
+                contentRepository = FakeContentRepository(),
+                settingsRepository = FakeSettingsRepository(),
+                recommendationEngine = DefaultRecommendationEngine(),
+                delayGate = delayGate,
+                analyticsTracker = InMemoryAnalyticsTracker(),
+                historyRepository = FakeHistoryRepository(),
+                interceptionMonitor = FakeInterceptionMonitor(),
+                enableDelayRefreshTicker = false,
+            ),
         )
 
         advanceUntilIdle()
@@ -159,15 +170,17 @@ class MainViewModelTest {
         val historyRepository = FakeHistoryRepository(isReady = false)
         val analyticsTracker = InMemoryAnalyticsTracker()
         val delayGate = FakeDelayGate(isReady = false)
-        val viewModel = MainViewModel(
-            contentRepository = FakeContentRepository(),
-            settingsRepository = settingsRepository,
-            recommendationEngine = DefaultRecommendationEngine(),
-            delayGate = delayGate,
-            analyticsTracker = analyticsTracker,
-            historyRepository = historyRepository,
-            interceptionMonitor = FakeInterceptionMonitor(),
-            enableDelayRefreshTicker = false,
+        val viewModel = track(
+            MainViewModel(
+                contentRepository = FakeContentRepository(),
+                settingsRepository = settingsRepository,
+                recommendationEngine = DefaultRecommendationEngine(),
+                delayGate = delayGate,
+                analyticsTracker = analyticsTracker,
+                historyRepository = historyRepository,
+                interceptionMonitor = FakeInterceptionMonitor(),
+                enableDelayRefreshTicker = false,
+            ),
         )
 
         advanceUntilIdle()
@@ -357,16 +370,23 @@ class MainViewModelTest {
         analyticsTracker: InMemoryAnalyticsTracker = InMemoryAnalyticsTracker(),
         delayGate: DelayGate = InMemoryDelayGate(),
     ): MainViewModel {
-        return MainViewModel(
-            contentRepository = FakeContentRepository(),
-            settingsRepository = settingsRepository,
-            recommendationEngine = DefaultRecommendationEngine(),
-            delayGate = delayGate,
-            analyticsTracker = analyticsTracker,
-            historyRepository = historyRepository,
-            interceptionMonitor = FakeInterceptionMonitor(),
-            enableDelayRefreshTicker = false,
+        return track(
+            MainViewModel(
+                contentRepository = FakeContentRepository(),
+                settingsRepository = settingsRepository,
+                recommendationEngine = DefaultRecommendationEngine(),
+                delayGate = delayGate,
+                analyticsTracker = analyticsTracker,
+                historyRepository = historyRepository,
+                interceptionMonitor = FakeInterceptionMonitor(),
+                enableDelayRefreshTicker = false,
+            ),
         )
+    }
+
+    private fun track(viewModel: MainViewModel): MainViewModel {
+        createdViewModels += viewModel
+        return viewModel
     }
 
     private class FakeSettingsRepository(

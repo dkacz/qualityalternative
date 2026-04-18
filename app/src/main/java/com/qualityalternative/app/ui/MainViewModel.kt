@@ -34,6 +34,7 @@ import com.qualityalternative.app.domain.service.InterceptionMonitor
 import com.qualityalternative.app.domain.service.RecommendationEngine
 import com.qualityalternative.app.domain.service.SettingsRepository
 import java.util.UUID
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
@@ -400,38 +401,40 @@ class MainViewModel(
         val recommendationSet = uiState.currentRecommendationSet ?: return
         val interventionId = uiState.currentInterventionId ?: return
         val nowMillis = System.currentTimeMillis()
-        val window = delayGate.storeDelay(
-            targetApp = targetApp,
-            nowMillis = nowMillis,
-            interventionId = interventionId,
-            interventionShownAtMillis = uiState.currentInterventionShownAtMillis,
-            primaryContentId = recommendationSet.primary.id,
-            backupContentIds = recommendationSet.backups.map(ContentItem::id),
-        )
-        recordEvent(
-            AnalyticsEvent(
-                type = AnalyticsEventType.DELAY_SELECTED,
-                timestampMillis = nowMillis,
+        viewModelScope.launch {
+            val window = delayGate.storeDelayDurably(
+                targetApp = targetApp,
+                nowMillis = nowMillis,
                 interventionId = interventionId,
-                targetAppPackage = targetApp.packageName,
+                interventionShownAtMillis = uiState.currentInterventionShownAtMillis,
                 primaryContentId = recommendationSet.primary.id,
                 backupContentIds = recommendationSet.backups.map(ContentItem::id),
-                metadata = mapOf(
-                    "delayId" to window.id,
-                    "delayStartedAtMillis" to window.startsAtMillis.toString(),
-                    "delayEndedAtMillis" to window.endsAtMillis.toString(),
-                    "interventionShownAtMillis" to (window.interventionShownAtMillis?.toString() ?: ""),
+            )
+            recordEvent(
+                AnalyticsEvent(
+                    type = AnalyticsEventType.DELAY_SELECTED,
+                    timestampMillis = nowMillis,
+                    interventionId = interventionId,
+                    targetAppPackage = targetApp.packageName,
+                    primaryContentId = recommendationSet.primary.id,
+                    backupContentIds = recommendationSet.backups.map(ContentItem::id),
+                    metadata = mapOf(
+                        "delayId" to window.id,
+                        "delayStartedAtMillis" to window.startsAtMillis.toString(),
+                        "delayEndedAtMillis" to window.endsAtMillis.toString(),
+                        "interventionShownAtMillis" to (window.interventionShownAtMillis?.toString() ?: ""),
+                    ),
                 ),
-            ),
-        )
-        uiState = uiState.copy(
-            screen = MainScreen.Home,
-            currentInterventionId = null,
-            currentInterventionShownAtMillis = null,
-            currentRecommendationSet = null,
-            activeDelayWindow = window,
-            latestMessage = "${targetApp.displayName} delayed for 15 minutes.",
-        )
+            )
+            uiState = uiState.copy(
+                screen = MainScreen.Home,
+                currentInterventionId = null,
+                currentInterventionShownAtMillis = null,
+                currentRecommendationSet = null,
+                activeDelayWindow = window,
+                latestMessage = "${targetApp.displayName} delayed for 15 minutes.",
+            )
+        }
     }
 
     fun openAnyway() {
@@ -631,8 +634,8 @@ class MainViewModel(
         }
     }
 
-    private fun recordDelayReturnDuringActiveWindow(targetApp: DistractingApp, nowMillis: Long) {
-        val recordedWindow = delayGate.recordFirstReturnAttempt(targetApp = targetApp, nowMillis = nowMillis)
+    private suspend fun recordDelayReturnDuringActiveWindow(targetApp: DistractingApp, nowMillis: Long) {
+        val recordedWindow = delayGate.recordFirstReturnAttemptDurably(targetApp = targetApp, nowMillis = nowMillis)
             ?: return
         recordDelayReturnMetrics(
             window = recordedWindow,
@@ -653,6 +656,7 @@ class MainViewModel(
                 contentId = expiredWindow.primaryContentId,
                 metadata = mapOf(
                     "delayId" to expiredWindow.id,
+                    "delayReturnOrigin" to "after_delay_expired",
                     "delayStartedAtMillis" to expiredWindow.startsAtMillis.toString(),
                     "delayEndedAtMillis" to expiredWindow.endsAtMillis.toString(),
                     "hadActiveDelayReturn" to (expiredWindow.firstReturnAttemptAtMillis != null).toString(),
@@ -776,6 +780,10 @@ class MainViewModel(
         if (uiState.isLoadingSettings != !isReady) {
             uiState = uiState.copy(isLoadingSettings = !isReady)
         }
+    }
+
+    internal fun closeForTests() {
+        viewModelScope.cancel()
     }
 }
 

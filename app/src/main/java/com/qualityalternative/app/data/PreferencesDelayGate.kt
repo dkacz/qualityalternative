@@ -81,11 +81,10 @@ class PreferencesDelayGate(
         primaryContentId: String?,
         backupContentIds: List<String>,
     ): DelayWindow {
-        val window = DelayWindow(
-            id = UUID.randomUUID().toString(),
-            targetAppPackage = targetApp.packageName,
-            startsAtMillis = nowMillis,
-            endsAtMillis = nowMillis + durationMinutes * 60_000L,
+        val window = createWindow(
+            targetApp = targetApp,
+            nowMillis = nowMillis,
+            durationMinutes = durationMinutes,
             interventionId = interventionId,
             interventionShownAtMillis = interventionShownAtMillis,
             primaryContentId = primaryContentId,
@@ -97,7 +96,65 @@ class PreferencesDelayGate(
         return window
     }
 
+    override suspend fun storeDelayDurably(
+        targetApp: DistractingApp,
+        nowMillis: Long,
+        durationMinutes: Int,
+        interventionId: String?,
+        interventionShownAtMillis: Long?,
+        primaryContentId: String?,
+        backupContentIds: List<String>,
+    ): DelayWindow {
+        val window = createWindow(
+            targetApp = targetApp,
+            nowMillis = nowMillis,
+            durationMinutes = durationMinutes,
+            interventionId = interventionId,
+            interventionShownAtMillis = interventionShownAtMillis,
+            primaryContentId = primaryContentId,
+            backupContentIds = backupContentIds,
+        )
+        val updated = windows.value + (targetApp.packageName to window)
+        windows.value = updated
+        persistDurably(updated)
+        return window
+    }
+
+    private fun createWindow(
+        targetApp: DistractingApp,
+        nowMillis: Long,
+        durationMinutes: Int,
+        interventionId: String?,
+        interventionShownAtMillis: Long?,
+        primaryContentId: String?,
+        backupContentIds: List<String>,
+    ): DelayWindow {
+        val window = DelayWindow(
+            id = UUID.randomUUID().toString(),
+            targetAppPackage = targetApp.packageName,
+            startsAtMillis = nowMillis,
+            endsAtMillis = nowMillis + durationMinutes * 60_000L,
+            interventionId = interventionId,
+            interventionShownAtMillis = interventionShownAtMillis,
+            primaryContentId = primaryContentId,
+            backupContentIds = backupContentIds,
+        )
+        return window
+    }
+
     override fun recordFirstReturnAttempt(targetApp: DistractingApp, nowMillis: Long): DelayWindow? {
+        val updated = updateFirstReturnAttempt(targetApp = targetApp, nowMillis = nowMillis) ?: return null
+        persist(windows.value)
+        return updated
+    }
+
+    override suspend fun recordFirstReturnAttemptDurably(targetApp: DistractingApp, nowMillis: Long): DelayWindow? {
+        val updated = updateFirstReturnAttempt(targetApp = targetApp, nowMillis = nowMillis) ?: return null
+        persistDurably(windows.value)
+        return updated
+    }
+
+    private fun updateFirstReturnAttempt(targetApp: DistractingApp, nowMillis: Long): DelayWindow? {
         val current = windows.value[targetApp.packageName] ?: return null
         if (current.firstReturnAttemptAtMillis != null) {
             return null
@@ -105,7 +162,6 @@ class PreferencesDelayGate(
         val updated = current.copy(firstReturnAttemptAtMillis = nowMillis)
         val updatedWindows = windows.value + (targetApp.packageName to updated)
         windows.value = updatedWindows
-        persist(updatedWindows)
         return updated
     }
 

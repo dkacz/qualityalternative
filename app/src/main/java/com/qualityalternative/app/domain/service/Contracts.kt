@@ -76,10 +76,37 @@ interface DelayGate {
         backupContentIds: List<String> = emptyList(),
     ): DelayWindow
 
+    suspend fun storeDelayDurably(
+        targetApp: DistractingApp,
+        nowMillis: Long = System.currentTimeMillis(),
+        durationMinutes: Int = 15,
+        interventionId: String? = null,
+        interventionShownAtMillis: Long? = null,
+        primaryContentId: String? = null,
+        backupContentIds: List<String> = emptyList(),
+    ): DelayWindow {
+        return storeDelay(
+            targetApp = targetApp,
+            nowMillis = nowMillis,
+            durationMinutes = durationMinutes,
+            interventionId = interventionId,
+            interventionShownAtMillis = interventionShownAtMillis,
+            primaryContentId = primaryContentId,
+            backupContentIds = backupContentIds,
+        )
+    }
+
     fun recordFirstReturnAttempt(
         targetApp: DistractingApp,
         nowMillis: Long = System.currentTimeMillis(),
     ): DelayWindow?
+
+    suspend fun recordFirstReturnAttemptDurably(
+        targetApp: DistractingApp,
+        nowMillis: Long = System.currentTimeMillis(),
+    ): DelayWindow? {
+        return recordFirstReturnAttempt(targetApp = targetApp, nowMillis = nowMillis)
+    }
 
     fun isReady(): Boolean = true
 

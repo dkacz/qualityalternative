@@ -29,7 +29,7 @@ class PreferencesDelayGateTest {
             scope = backgroundScope,
         )
 
-        val created = firstGate.storeDelay(
+        val created = firstGate.storeDelayDurably(
             targetApp = app,
             nowMillis = 1_000L,
             interventionId = "intervention-1",
@@ -37,7 +37,7 @@ class PreferencesDelayGateTest {
             primaryContentId = "primary-1",
             backupContentIds = listOf("backup-1", "backup-2"),
         )
-        val recordedReturn = firstGate.recordFirstReturnAttempt(targetApp = app, nowMillis = 1_500L)
+        val recordedReturn = firstGate.recordFirstReturnAttemptDurably(targetApp = app, nowMillis = 1_500L)
         assertNotNull(created)
         assertNotNull(recordedReturn)
         assertNotNull(firstGate.activeDelay(targetApp = app, nowMillis = 2_000L))

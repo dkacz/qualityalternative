@@ -41,6 +41,46 @@ class InMemoryDelayGate : DelayGate {
         primaryContentId: String?,
         backupContentIds: List<String>,
     ): DelayWindow {
+        return createWindow(
+            targetApp = targetApp,
+            nowMillis = nowMillis,
+            durationMinutes = durationMinutes,
+            interventionId = interventionId,
+            interventionShownAtMillis = interventionShownAtMillis,
+            primaryContentId = primaryContentId,
+            backupContentIds = backupContentIds,
+        )
+    }
+
+    override suspend fun storeDelayDurably(
+        targetApp: DistractingApp,
+        nowMillis: Long,
+        durationMinutes: Int,
+        interventionId: String?,
+        interventionShownAtMillis: Long?,
+        primaryContentId: String?,
+        backupContentIds: List<String>,
+    ): DelayWindow {
+        return createWindow(
+            targetApp = targetApp,
+            nowMillis = nowMillis,
+            durationMinutes = durationMinutes,
+            interventionId = interventionId,
+            interventionShownAtMillis = interventionShownAtMillis,
+            primaryContentId = primaryContentId,
+            backupContentIds = backupContentIds,
+        )
+    }
+
+    private fun createWindow(
+        targetApp: DistractingApp,
+        nowMillis: Long,
+        durationMinutes: Int,
+        interventionId: String?,
+        interventionShownAtMillis: Long?,
+        primaryContentId: String?,
+        backupContentIds: List<String>,
+    ): DelayWindow {
         val window = DelayWindow(
             id = UUID.randomUUID().toString(),
             targetAppPackage = targetApp.packageName,
@@ -56,6 +96,14 @@ class InMemoryDelayGate : DelayGate {
     }
 
     override fun recordFirstReturnAttempt(targetApp: DistractingApp, nowMillis: Long): DelayWindow? {
+        return updateFirstReturnAttempt(targetApp = targetApp, nowMillis = nowMillis)
+    }
+
+    override suspend fun recordFirstReturnAttemptDurably(targetApp: DistractingApp, nowMillis: Long): DelayWindow? {
+        return updateFirstReturnAttempt(targetApp = targetApp, nowMillis = nowMillis)
+    }
+
+    private fun updateFirstReturnAttempt(targetApp: DistractingApp, nowMillis: Long): DelayWindow? {
         val current = windows[targetApp.packageName] ?: return null
         if (current.firstReturnAttemptAtMillis != null) {
             return null
