@@ -9,6 +9,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 
@@ -20,15 +22,15 @@ class RoomAnalyticsTracker(
 
     init {
         scope.launch {
-            val loaded = dao.getAll().map(AnalyticsEventEntity::toModel)
-            if (events.value.isEmpty()) {
-                events.value = loaded
-            }
+            dao.observeAll()
+                .map { rows -> rows.map(AnalyticsEventEntity::toModel) }
+                .collect { loadedEvents ->
+                    events.value = loadedEvents
+                }
         }
     }
 
     override fun record(event: AnalyticsEvent) {
-        events.value = (events.value + event).sortedByDescending(AnalyticsEvent::timestampMillis)
         scope.launch {
             dao.insert(event.toEntity())
         }
@@ -43,7 +45,11 @@ private fun AnalyticsEvent.toEntity(): AnalyticsEventEntity {
     return AnalyticsEventEntity(
         type = type.name,
         timestampMillis = timestampMillis,
+        interventionId = interventionId,
+        sessionId = sessionId,
         targetAppPackage = targetAppPackage,
+        primaryContentId = primaryContentId,
+        backupContentIdsCsv = backupContentIds.joinToString(","),
         contentId = contentId,
         metadataJson = JSONObject(metadata).toString(),
     )
@@ -53,7 +59,11 @@ private fun AnalyticsEventEntity.toModel(): AnalyticsEvent {
     return AnalyticsEvent(
         type = AnalyticsEventType.valueOf(type),
         timestampMillis = timestampMillis,
+        interventionId = interventionId,
+        sessionId = sessionId,
         targetAppPackage = targetAppPackage,
+        primaryContentId = primaryContentId,
+        backupContentIds = backupContentIdsCsv.toStringList(),
         contentId = contentId,
         metadata = metadataJson.toMetadataMap(),
     )
@@ -69,4 +79,11 @@ private fun String.toMetadataMap(): Map<String, String> {
             put(key, json.optString(key))
         }
     }
+}
+
+private fun String.toStringList(): List<String> {
+    if (isBlank()) {
+        return emptyList()
+    }
+    return split(",").filter(String::isNotBlank)
 }

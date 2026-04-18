@@ -36,7 +36,7 @@ class DefaultRecommendationEngineTest {
             targetApp = DistractingApp(packageName = "pkg", displayName = "Instagram"),
             preferences = preferences,
             inventory = inventory,
-            excludedIds = setOf("d"),
+            primaryExcludedIds = setOf("d"),
             signals = RecommendationSignals(timeOfDay = TimeOfDayBucket.MIDDAY),
             nowMillis = 0L,
         )
@@ -65,7 +65,7 @@ class DefaultRecommendationEngineTest {
             targetApp = DistractingApp(packageName = "pkg", displayName = "Instagram"),
             preferences = preferences,
             inventory = inventory,
-            excludedIds = emptySet(),
+            primaryExcludedIds = emptySet(),
             signals = RecommendationSignals(
                 skippedTopics = setOf(TopicTag.SCIENCE),
                 successfulPackIds = setOf("history"),
@@ -75,6 +75,34 @@ class DefaultRecommendationEngineTest {
         )
 
         assertEquals("history-win", result?.primary?.id)
+    }
+
+    @Test
+    fun generate_excludesCompletedItemsFromPrimaryButCanReuseThemAsBackups() {
+        val preferences = UserPreferences(
+            selectedApps = listOf(DistractingApp(packageName = "pkg", displayName = "Instagram")),
+            preferredTopics = setOf(TopicTag.PHILOSOPHY),
+            preferredDurationBucket = DurationBucket.FOCUS,
+            selectedPackIds = setOf("pack"),
+        )
+
+        val inventory = listOf(
+            item(id = "primary-done", minutes = 7, topics = setOf(TopicTag.PHILOSOPHY)),
+            item(id = "fresh", minutes = 6, topics = setOf(TopicTag.PHILOSOPHY)),
+            item(id = "done-backup", minutes = 5, topics = setOf(TopicTag.HISTORY)),
+        )
+
+        val result = engine.generate(
+            targetApp = DistractingApp(packageName = "pkg", displayName = "Instagram"),
+            preferences = preferences,
+            inventory = inventory,
+            primaryExcludedIds = setOf("primary-done", "done-backup"),
+            signals = RecommendationSignals(timeOfDay = TimeOfDayBucket.MIDDAY),
+            nowMillis = 0L,
+        )
+
+        assertEquals("fresh", result?.primary?.id)
+        assertTrue(result?.backups?.any { it.id == "done-backup" } == true)
     }
 
     private fun item(id: String, packId: String = "pack", minutes: Int, topics: Set<TopicTag>): ContentItem = ContentItem(

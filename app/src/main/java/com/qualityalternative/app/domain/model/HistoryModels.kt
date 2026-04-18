@@ -37,8 +37,12 @@ data class RecommendationSignals(
 
 data class ReplacementHistoryEntry(
     val sessionId: String,
+    val interventionId: String,
     val targetAppPackage: String,
     val targetAppDisplayName: String,
+    val interventionShownAtMillis: Long,
+    val primaryContentId: String,
+    val backupContentIds: List<String>,
     val contentId: String,
     val contentTitle: String,
     val contentDescription: String,
@@ -57,20 +61,14 @@ data class ReplacementHistoryEntry(
     fun isSkipped(): Boolean = skippedAtMillis != null
 
     fun returnedToTarget(): Boolean = returnedToTargetAtMillis != null
-
-    fun lastInteractionAtMillis(): Long {
-        return listOfNotNull(
-            returnedToTargetAtMillis,
-            completedAtMillis,
-            skippedAtMillis,
-            acceptedAtMillis,
-        ).max()
-    }
 }
 
 data class ReturnToTargetSignal(
     val sessionId: String,
+    val interventionId: String,
     val targetAppPackage: String,
+    val primaryContentId: String,
+    val backupContentIds: List<String>,
     val contentId: String,
     val returnedAtMillis: Long,
     val within15Minutes: Boolean,

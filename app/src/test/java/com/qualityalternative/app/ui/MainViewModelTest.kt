@@ -12,6 +12,7 @@ import com.qualityalternative.app.domain.model.EditorialPack
 import com.qualityalternative.app.domain.model.OnboardingSelection
 import com.qualityalternative.app.domain.model.PermissionReadiness
 import com.qualityalternative.app.domain.model.PermissionStatus
+import com.qualityalternative.app.domain.model.RecommendationSet
 import com.qualityalternative.app.domain.model.RecommendationSource
 import com.qualityalternative.app.domain.model.ReplacementHistoryEntry
 import com.qualityalternative.app.domain.model.ReturnToTargetSignal
@@ -84,6 +85,10 @@ class MainViewModelTest {
         val historyRepository = FakeHistoryRepository().apply {
             recordAcceptedSession(
                 targetApp = SupportedCatalog.distractingApps.first(),
+                interventionId = "intervention-1",
+                interventionShownAtMillis = 1_000L,
+                primaryContentId = "p1",
+                backupContentIds = listOf("s1"),
                 content = FakeContentRepository().inventory().first(),
                 source = RecommendationSource.PRIMARY,
                 acceptedAtMillis = 1_000L,
@@ -105,6 +110,35 @@ class MainViewModelTest {
         val types = analyticsTracker.allEvents().map { it.type }
         assertTrue(types.contains(com.qualityalternative.app.domain.model.AnalyticsEventType.RETURN_TO_APP_WITHIN_15_MINUTES))
         assertTrue(viewModel.uiState.historyEntries.first().returnedToTarget())
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun triggerDebugIntervention_clearsExpiredDelayWindowFromUiState() = runTest {
+        val delayGate = InMemoryDelayGate()
+        val viewModel = MainViewModel(
+            contentRepository = FakeContentRepository(),
+            settingsRepository = FakeSettingsRepository(),
+            recommendationEngine = DefaultRecommendationEngine(),
+            delayGate = delayGate,
+            analyticsTracker = InMemoryAnalyticsTracker(),
+            historyRepository = FakeHistoryRepository(),
+            interceptionMonitor = FakeInterceptionMonitor(),
+        )
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+
+        val targetApp = viewModel.uiState.availableTargetApps.first()
+        viewModel.selectTargetApp(targetApp)
+        delayGate.storeDelay(targetApp = targetApp, nowMillis = 1_000L, durationMinutes = 15)
+
+        viewModel.triggerDebugIntervention(nowMillis = 1_000L + 16 * 60_000L)
+        advanceUntilIdle()
+
+        assertEquals(null, viewModel.uiState.activeDelayWindow)
+        assertEquals(MainScreen.Intervention, viewModel.uiState.screen)
     }
 
     private fun createViewModel(
@@ -158,14 +192,22 @@ class MainViewModelTest {
 
         override fun recordAcceptedSession(
             targetApp: DistractingApp,
+            interventionId: String,
+            interventionShownAtMillis: Long,
+            primaryContentId: String,
+            backupContentIds: List<String>,
             content: ContentItem,
             source: RecommendationSource,
             acceptedAtMillis: Long,
         ): String {
             val entry = ReplacementHistoryEntry(
                 sessionId = "session-${historyEntries.value.size}",
+                interventionId = interventionId,
                 targetAppPackage = targetApp.packageName,
                 targetAppDisplayName = targetApp.displayName,
+                interventionShownAtMillis = interventionShownAtMillis,
+                primaryContentId = primaryContentId,
+                backupContentIds = backupContentIds,
                 contentId = content.id,
                 contentTitle = content.title,
                 contentDescription = content.description,
@@ -214,7 +256,10 @@ class MainViewModelTest {
             }
             return ReturnToTargetSignal(
                 sessionId = candidate.sessionId,
+                interventionId = candidate.interventionId,
                 targetAppPackage = candidate.targetAppPackage,
+                primaryContentId = candidate.primaryContentId,
+                backupContentIds = candidate.backupContentIds,
                 contentId = candidate.contentId,
                 returnedAtMillis = returnedAtMillis,
                 within15Minutes = true,

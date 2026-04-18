@@ -22,6 +22,7 @@ data class SessionFeedback(
 
 enum class AnalyticsEventType {
     INTERVENTION_SHOWN,
+    NO_RECOMMENDATION_AVAILABLE,
     PRIMARY_ACCEPTED,
     BACKUP_ACCEPTED,
     DELAY_SELECTED,
@@ -32,12 +33,17 @@ enum class AnalyticsEventType {
     INVENTORY_SHORTAGE,
     RETURN_TO_APP_WITHIN_15_MINUTES,
     RETURN_TO_APP_WITHIN_60_MINUTES,
+    RETURN_AFTER_DELAY_ENDED,
 }
 
 data class AnalyticsEvent(
     val type: AnalyticsEventType,
     val timestampMillis: Long,
+    val interventionId: String? = null,
+    val sessionId: String? = null,
     val targetAppPackage: String? = null,
+    val primaryContentId: String? = null,
+    val backupContentIds: List<String> = emptyList(),
     val contentId: String? = null,
     val metadata: Map<String, String> = emptyMap(),
 )

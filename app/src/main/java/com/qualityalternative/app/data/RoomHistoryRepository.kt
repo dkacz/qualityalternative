@@ -12,9 +12,12 @@ import com.qualityalternative.app.domain.model.TopicTag
 import com.qualityalternative.app.domain.service.HistoryRepository
 import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
@@ -23,33 +26,40 @@ class RoomHistoryRepository(
     private val scope: CoroutineScope,
 ) : HistoryRepository {
     private val entries = MutableStateFlow<List<ReplacementHistoryEntry>>(emptyList())
+    private val nowMillis = MutableStateFlow(System.currentTimeMillis())
 
     init {
         scope.launch {
-            val loaded = dao.getAll().map(ReplacementSessionEntity::toModel)
-            if (entries.value.isEmpty()) {
-                entries.value = loaded
+            dao.observeAll()
+                .map { rows -> rows.map(ReplacementSessionEntity::toModel) }
+                .collect { loadedEntries ->
+                    entries.value = loadedEntries
+                }
+        }
+        scope.launch {
+            while (true) {
+                nowMillis.value = System.currentTimeMillis()
+                delay(HISTORY_REFRESH_INTERVAL_MILLIS)
             }
         }
     }
 
     override fun recentHistory(nowMillis: Long, windowDays: Int): List<ReplacementHistoryEntry> {
-        val cutoff = nowMillis - windowDays * DAY_IN_MILLIS
-        return entries.value
-            .filter { it.acceptedAtMillis >= cutoff }
-            .sortedByDescending(ReplacementHistoryEntry::acceptedAtMillis)
+        return filterRecentHistory(entries = entries.value, nowMillis = nowMillis, windowDays = windowDays)
     }
 
     override fun observeRecentHistory(nowMillis: Long, windowDays: Int): Flow<List<ReplacementHistoryEntry>> {
-        return entries.asStateFlow().map { all ->
-            val cutoff = nowMillis - windowDays * DAY_IN_MILLIS
-            all.filter { it.acceptedAtMillis >= cutoff }
-                .sortedByDescending(ReplacementHistoryEntry::acceptedAtMillis)
+        return entries.asStateFlow().combine(this.nowMillis.asStateFlow()) { allEntries, currentTime ->
+            filterRecentHistory(entries = allEntries, nowMillis = currentTime, windowDays = windowDays)
         }
     }
 
     override fun recordAcceptedSession(
         targetApp: DistractingApp,
+        interventionId: String,
+        interventionShownAtMillis: Long,
+        primaryContentId: String,
+        backupContentIds: List<String>,
         content: ContentItem,
         source: RecommendationSource,
         acceptedAtMillis: Long,
@@ -57,8 +67,12 @@ class RoomHistoryRepository(
         val sessionId = UUID.randomUUID().toString()
         val entry = ReplacementHistoryEntry(
             sessionId = sessionId,
+            interventionId = interventionId,
             targetAppPackage = targetApp.packageName,
             targetAppDisplayName = targetApp.displayName,
+            interventionShownAtMillis = interventionShownAtMillis,
+            primaryContentId = primaryContentId,
+            backupContentIds = backupContentIds,
             contentId = content.id,
             contentTitle = content.title,
             contentDescription = content.description,
@@ -67,7 +81,6 @@ class RoomHistoryRepository(
             recommendationSource = source,
             acceptedAtMillis = acceptedAtMillis,
         )
-        applyUpdate(entry.sessionId) { entry }
         persist(entry)
         return sessionId
     }
@@ -102,13 +115,15 @@ class RoomHistoryRepository(
                 entry.returnedToTargetAtMillis == null
         } ?: return null
 
-        val delta = returnedAtMillis - candidate.lastInteractionAtMillis()
+        val delta = returnedAtMillis - candidate.interventionShownAtMillis
         val updated = candidate.copy(returnedToTargetAtMillis = returnedAtMillis)
-        applyUpdate(candidate.sessionId) { updated }
         persist(updated)
         return ReturnToTargetSignal(
             sessionId = candidate.sessionId,
+            interventionId = candidate.interventionId,
             targetAppPackage = candidate.targetAppPackage,
+            primaryContentId = candidate.primaryContentId,
+            backupContentIds = candidate.backupContentIds,
             contentId = candidate.contentId,
             returnedAtMillis = returnedAtMillis,
             within15Minutes = delta <= 15 * 60_000L,
@@ -121,19 +136,7 @@ class RoomHistoryRepository(
         transform: (ReplacementHistoryEntry) -> ReplacementHistoryEntry,
     ) {
         val existing = entries.value.firstOrNull { it.sessionId == sessionId } ?: return
-        val updated = transform(existing)
-        applyUpdate(sessionId) { updated }
-        persist(updated)
-    }
-
-    private fun applyUpdate(
-        sessionId: String,
-        createOrUpdate: (ReplacementHistoryEntry?) -> ReplacementHistoryEntry,
-    ) {
-        val existing = entries.value.firstOrNull { it.sessionId == sessionId }
-        val next = createOrUpdate(existing)
-        entries.value = (entries.value.filterNot { it.sessionId == sessionId } + next)
-            .sortedByDescending(ReplacementHistoryEntry::acceptedAtMillis)
+        persist(transform(existing))
     }
 
     private fun persist(entry: ReplacementHistoryEntry) {
@@ -142,16 +145,32 @@ class RoomHistoryRepository(
         }
     }
 
+    private fun filterRecentHistory(
+        entries: List<ReplacementHistoryEntry>,
+        nowMillis: Long,
+        windowDays: Int,
+    ): List<ReplacementHistoryEntry> {
+        val cutoff = nowMillis - windowDays * DAY_IN_MILLIS
+        return entries
+            .filter { it.acceptedAtMillis >= cutoff }
+            .sortedByDescending(ReplacementHistoryEntry::acceptedAtMillis)
+    }
+
     private companion object {
         const val DAY_IN_MILLIS = 24 * 60 * 60 * 1000L
+        const val HISTORY_REFRESH_INTERVAL_MILLIS = 60_000L
     }
 }
 
 private fun ReplacementHistoryEntry.toEntity(): ReplacementSessionEntity {
     return ReplacementSessionEntity(
         sessionId = sessionId,
+        interventionId = interventionId,
         targetAppPackage = targetAppPackage,
         targetAppDisplayName = targetAppDisplayName,
+        interventionShownAtMillis = interventionShownAtMillis,
+        primaryContentId = primaryContentId,
+        backupContentIdsCsv = backupContentIds.joinToString(","),
         contentId = contentId,
         contentTitle = contentTitle,
         contentDescription = contentDescription,
@@ -170,8 +189,12 @@ private fun ReplacementHistoryEntry.toEntity(): ReplacementSessionEntity {
 private fun ReplacementSessionEntity.toModel(): ReplacementHistoryEntry {
     return ReplacementHistoryEntry(
         sessionId = sessionId,
+        interventionId = interventionId,
         targetAppPackage = targetAppPackage,
         targetAppDisplayName = targetAppDisplayName,
+        interventionShownAtMillis = interventionShownAtMillis,
+        primaryContentId = primaryContentId,
+        backupContentIds = backupContentIdsCsv.toStringList(),
         contentId = contentId,
         contentTitle = contentTitle,
         contentDescription = contentDescription,
@@ -192,4 +215,11 @@ private fun ReplacementSessionEntity.toModel(): ReplacementHistoryEntry {
         feedbackGoodFit = feedbackGoodFit,
         feedbackHelpedAvoidScrolling = feedbackHelpedAvoidScrolling,
     )
+}
+
+private fun String.toStringList(): List<String> {
+    if (isBlank()) {
+        return emptyList()
+    }
+    return split(",").filter(String::isNotBlank)
 }

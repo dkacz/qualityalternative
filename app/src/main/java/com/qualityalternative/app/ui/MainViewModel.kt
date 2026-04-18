@@ -33,6 +33,8 @@ import com.qualityalternative.app.domain.service.HistoryRepository
 import com.qualityalternative.app.domain.service.InterceptionMonitor
 import com.qualityalternative.app.domain.service.RecommendationEngine
 import com.qualityalternative.app.domain.service.SettingsRepository
+import java.util.UUID
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 
 data class MainUiState(
@@ -49,6 +51,8 @@ data class MainUiState(
     val selectedTargetApp: DistractingApp? = null,
     val preferences: UserPreferences? = null,
     val starterPacks: List<EditorialPack> = emptyList(),
+    val currentInterventionId: String? = null,
+    val currentInterventionShownAtMillis: Long? = null,
     val currentRecommendationSet: RecommendationSet? = null,
     val currentContent: ContentItem? = null,
     val currentContentBody: String = "",
@@ -115,7 +119,8 @@ class MainViewModel(
             historyRepository.observeRecentHistory().collect { history ->
                 uiState = uiState.copy(
                     historyEntries = history,
-                    completedContentIds = history.filter(ReplacementHistoryEntry::isCompleted)
+                    completedContentIds = history
+                        .filter(ReplacementHistoryEntry::isCompleted)
                         .mapTo(mutableSetOf(), ReplacementHistoryEntry::contentId),
                 )
             }
@@ -191,37 +196,73 @@ class MainViewModel(
 
         recordReturnSignalIfNeeded(targetApp = targetApp, nowMillis = nowMillis)
 
-        val activeDelay = delayGate.activeDelay(targetApp = targetApp, nowMillis = nowMillis)
-        if (activeDelay != null) {
+        val delayInspection = delayGate.inspectDelay(targetApp = targetApp, nowMillis = nowMillis)
+        if (delayInspection.activeWindow != null) {
             uiState = uiState.copy(
-                activeDelayWindow = activeDelay,
+                activeDelayWindow = delayInspection.activeWindow,
                 latestMessage = "${targetApp.displayName} is delayed for 15 minutes.",
                 screen = MainScreen.Home,
             )
             return
         }
 
+        delayInspection.expiredWindow?.let { expiredWindow ->
+            recordEvent(
+                AnalyticsEvent(
+                    type = AnalyticsEventType.RETURN_AFTER_DELAY_ENDED,
+                    timestampMillis = nowMillis,
+                    targetAppPackage = targetApp.packageName,
+                    metadata = mapOf(
+                        "delayId" to expiredWindow.id,
+                        "delayStartedAtMillis" to expiredWindow.startsAtMillis.toString(),
+                        "delayEndedAtMillis" to expiredWindow.endsAtMillis.toString(),
+                    ),
+                ),
+            )
+        }
+
+        val interventionId = UUID.randomUUID().toString()
         val filteredInventory = contentRepository.inventory().filter { it.packId in preferences.selectedPackIds }
         val signals = buildRecommendationSignals(nowMillis = nowMillis)
         val recommendationSet = recommendationEngine.generate(
             targetApp = targetApp,
             preferences = preferences,
             inventory = filteredInventory,
-            excludedIds = uiState.completedContentIds,
+            primaryExcludedIds = uiState.completedContentIds,
             signals = signals,
             nowMillis = nowMillis,
         )
 
         if (recommendationSet == null) {
-            uiState = uiState.copy(latestMessage = "No replacement inventory is available yet.")
+            recordEvent(
+                AnalyticsEvent(
+                    type = AnalyticsEventType.NO_RECOMMENDATION_AVAILABLE,
+                    timestampMillis = nowMillis,
+                    interventionId = interventionId,
+                    targetAppPackage = targetApp.packageName,
+                    metadata = mapOf("selectedPackCount" to preferences.selectedPackIds.size.toString()),
+                ),
+            )
+            uiState = uiState.copy(
+                currentInterventionId = null,
+                currentInterventionShownAtMillis = null,
+                currentRecommendationSet = null,
+                activeDelayWindow = null,
+                latestMessage = "No replacement inventory is available yet.",
+            )
             return
         }
+
+        val backupIds = recommendationSet.backups.map(ContentItem::id)
 
         recordEvent(
             AnalyticsEvent(
                 type = AnalyticsEventType.INTERVENTION_SHOWN,
                 timestampMillis = nowMillis,
+                interventionId = interventionId,
                 targetAppPackage = targetApp.packageName,
+                primaryContentId = recommendationSet.primary.id,
+                backupContentIds = backupIds,
                 contentId = recommendationSet.primary.id,
             ),
         )
@@ -231,13 +272,20 @@ class MainViewModel(
                 AnalyticsEvent(
                     type = AnalyticsEventType.INVENTORY_SHORTAGE,
                     timestampMillis = nowMillis,
+                    interventionId = interventionId,
                     targetAppPackage = targetApp.packageName,
+                    primaryContentId = recommendationSet.primary.id,
+                    backupContentIds = backupIds,
+                    contentId = recommendationSet.primary.id,
                 ),
             )
         }
 
         uiState = uiState.copy(
+            currentInterventionId = interventionId,
+            currentInterventionShownAtMillis = nowMillis,
             currentRecommendationSet = recommendationSet,
+            activeDelayWindow = null,
             latestMessage = null,
             screen = MainScreen.Intervention,
         )
@@ -246,9 +294,15 @@ class MainViewModel(
     fun acceptPrimary() {
         val targetApp = uiState.selectedTargetApp ?: return
         val recommendationSet = uiState.currentRecommendationSet ?: return
+        val interventionId = uiState.currentInterventionId ?: return
+        val interventionShownAtMillis = uiState.currentInterventionShownAtMillis ?: return
         val nowMillis = System.currentTimeMillis()
         val sessionId = historyRepository.recordAcceptedSession(
             targetApp = targetApp,
+            interventionId = interventionId,
+            interventionShownAtMillis = interventionShownAtMillis,
+            primaryContentId = recommendationSet.primary.id,
+            backupContentIds = recommendationSet.backups.map(ContentItem::id),
             content = recommendationSet.primary,
             source = RecommendationSource.PRIMARY,
             acceptedAtMillis = nowMillis,
@@ -257,9 +311,12 @@ class MainViewModel(
             AnalyticsEvent(
                 type = AnalyticsEventType.PRIMARY_ACCEPTED,
                 timestampMillis = nowMillis,
+                interventionId = interventionId,
+                sessionId = sessionId,
                 targetAppPackage = targetApp.packageName,
+                primaryContentId = recommendationSet.primary.id,
+                backupContentIds = recommendationSet.backups.map(ContentItem::id),
                 contentId = recommendationSet.primary.id,
-                metadata = mapOf("sessionId" to sessionId),
             ),
         )
         openReader(content = recommendationSet.primary, sessionId = sessionId, startedAtMillis = nowMillis)
@@ -267,9 +324,16 @@ class MainViewModel(
 
     fun acceptBackup(content: ContentItem) {
         val targetApp = uiState.selectedTargetApp ?: return
+        val recommendationSet = uiState.currentRecommendationSet ?: return
+        val interventionId = uiState.currentInterventionId ?: return
+        val interventionShownAtMillis = uiState.currentInterventionShownAtMillis ?: return
         val nowMillis = System.currentTimeMillis()
         val sessionId = historyRepository.recordAcceptedSession(
             targetApp = targetApp,
+            interventionId = interventionId,
+            interventionShownAtMillis = interventionShownAtMillis,
+            primaryContentId = recommendationSet.primary.id,
+            backupContentIds = recommendationSet.backups.map(ContentItem::id),
             content = content,
             source = RecommendationSource.BACKUP,
             acceptedAtMillis = nowMillis,
@@ -278,9 +342,12 @@ class MainViewModel(
             AnalyticsEvent(
                 type = AnalyticsEventType.BACKUP_ACCEPTED,
                 timestampMillis = nowMillis,
+                interventionId = interventionId,
+                sessionId = sessionId,
                 targetAppPackage = targetApp.packageName,
+                primaryContentId = recommendationSet.primary.id,
+                backupContentIds = recommendationSet.backups.map(ContentItem::id),
                 contentId = content.id,
-                metadata = mapOf("sessionId" to sessionId),
             ),
         )
         openReader(content = content, sessionId = sessionId, startedAtMillis = nowMillis)
@@ -288,17 +355,29 @@ class MainViewModel(
 
     fun delayFor15Minutes() {
         val targetApp = uiState.selectedTargetApp ?: return
+        val recommendationSet = uiState.currentRecommendationSet ?: return
+        val interventionId = uiState.currentInterventionId ?: return
         val nowMillis = System.currentTimeMillis()
         val window = delayGate.storeDelay(targetApp = targetApp, nowMillis = nowMillis)
         recordEvent(
             AnalyticsEvent(
                 type = AnalyticsEventType.DELAY_SELECTED,
                 timestampMillis = nowMillis,
+                interventionId = interventionId,
                 targetAppPackage = targetApp.packageName,
+                primaryContentId = recommendationSet.primary.id,
+                backupContentIds = recommendationSet.backups.map(ContentItem::id),
+                metadata = mapOf(
+                    "delayId" to window.id,
+                    "delayStartedAtMillis" to window.startsAtMillis.toString(),
+                    "delayEndedAtMillis" to window.endsAtMillis.toString(),
+                ),
             ),
         )
         uiState = uiState.copy(
             screen = MainScreen.Home,
+            currentInterventionId = null,
+            currentInterventionShownAtMillis = null,
             currentRecommendationSet = null,
             activeDelayWindow = window,
             latestMessage = "${targetApp.displayName} delayed for 15 minutes.",
@@ -307,15 +386,21 @@ class MainViewModel(
 
     fun openAnyway() {
         val targetApp = uiState.selectedTargetApp ?: return
+        val recommendationSet = uiState.currentRecommendationSet
         recordEvent(
             AnalyticsEvent(
                 type = AnalyticsEventType.OPEN_ANYWAY_SELECTED,
                 timestampMillis = System.currentTimeMillis(),
+                interventionId = uiState.currentInterventionId,
                 targetAppPackage = targetApp.packageName,
+                primaryContentId = recommendationSet?.primary?.id,
+                backupContentIds = recommendationSet?.backups.orEmpty().map(ContentItem::id),
             ),
         )
         uiState = uiState.copy(
             screen = MainScreen.Home,
+            currentInterventionId = null,
+            currentInterventionShownAtMillis = null,
             currentRecommendationSet = null,
             latestMessage = "Prototype override recorded for ${targetApp.displayName}.",
         )
@@ -330,7 +415,11 @@ class MainViewModel(
             AnalyticsEvent(
                 type = AnalyticsEventType.READER_COMPLETED,
                 timestampMillis = nowMillis,
+                interventionId = uiState.currentInterventionId,
+                sessionId = sessionId,
                 targetAppPackage = uiState.selectedTargetApp?.packageName,
+                primaryContentId = uiState.currentRecommendationSet?.primary?.id,
+                backupContentIds = uiState.currentRecommendationSet?.backups.orEmpty().map(ContentItem::id),
                 contentId = content.id,
                 metadata = sessionDurationMetadata(nowMillis),
             ),
@@ -349,7 +438,11 @@ class MainViewModel(
             AnalyticsEvent(
                 type = AnalyticsEventType.READER_SKIPPED,
                 timestampMillis = nowMillis,
+                interventionId = uiState.currentInterventionId,
+                sessionId = sessionId,
                 targetAppPackage = uiState.selectedTargetApp?.packageName,
+                primaryContentId = uiState.currentRecommendationSet?.primary?.id,
+                backupContentIds = uiState.currentRecommendationSet?.backups.orEmpty().map(ContentItem::id),
                 contentId = content.id,
                 metadata = sessionDurationMetadata(nowMillis),
             ),
@@ -372,7 +465,11 @@ class MainViewModel(
             AnalyticsEvent(
                 type = AnalyticsEventType.FEEDBACK_SUBMITTED,
                 timestampMillis = feedback.submittedAtMillis,
+                interventionId = uiState.currentInterventionId,
+                sessionId = uiState.currentSessionId,
                 targetAppPackage = uiState.selectedTargetApp?.packageName,
+                primaryContentId = uiState.currentRecommendationSet?.primary?.id,
+                backupContentIds = uiState.currentRecommendationSet?.backups.orEmpty().map(ContentItem::id),
                 contentId = uiState.currentContent?.id,
                 metadata = mapOf(
                     "goodFit" to wasGoodFit.toString(),
@@ -453,9 +550,12 @@ class MainViewModel(
                 AnalyticsEvent(
                     type = AnalyticsEventType.RETURN_TO_APP_WITHIN_15_MINUTES,
                     timestampMillis = nowMillis,
+                    interventionId = signal.interventionId,
+                    sessionId = signal.sessionId,
                     targetAppPackage = signal.targetAppPackage,
+                    primaryContentId = signal.primaryContentId,
+                    backupContentIds = signal.backupContentIds,
                     contentId = signal.contentId,
-                    metadata = mapOf("sessionId" to signal.sessionId),
                 ),
             )
         }
@@ -465,9 +565,12 @@ class MainViewModel(
                 AnalyticsEvent(
                     type = AnalyticsEventType.RETURN_TO_APP_WITHIN_60_MINUTES,
                     timestampMillis = nowMillis,
+                    interventionId = signal.interventionId,
+                    sessionId = signal.sessionId,
                     targetAppPackage = signal.targetAppPackage,
+                    primaryContentId = signal.primaryContentId,
+                    backupContentIds = signal.backupContentIds,
                     contentId = signal.contentId,
-                    metadata = mapOf("sessionId" to signal.sessionId),
                 ),
             )
         }
@@ -489,6 +592,8 @@ class MainViewModel(
     ) {
         uiState = uiState.copy(
             screen = MainScreen.Home,
+            currentInterventionId = null,
+            currentInterventionShownAtMillis = null,
             currentContent = null,
             currentContentBody = "",
             currentRecommendationSet = null,

@@ -6,8 +6,12 @@ import androidx.room.PrimaryKey
 @Entity(tableName = "replacement_sessions")
 data class ReplacementSessionEntity(
     @PrimaryKey val sessionId: String,
+    val interventionId: String,
     val targetAppPackage: String,
     val targetAppDisplayName: String,
+    val interventionShownAtMillis: Long,
+    val primaryContentId: String,
+    val backupContentIdsCsv: String,
     val contentId: String,
     val contentTitle: String,
     val contentDescription: String,

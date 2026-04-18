@@ -3,6 +3,7 @@ package com.qualityalternative.app.domain.service
 import com.qualityalternative.app.domain.model.AnalyticsEvent
 import com.qualityalternative.app.domain.model.AppSettings
 import com.qualityalternative.app.domain.model.ContentItem
+import com.qualityalternative.app.domain.model.DelayInspection
 import com.qualityalternative.app.domain.model.DelayWindow
 import com.qualityalternative.app.domain.model.DistractingApp
 import com.qualityalternative.app.domain.model.EditorialPack
@@ -35,7 +36,7 @@ interface RecommendationEngine {
         targetApp: DistractingApp,
         preferences: UserPreferences,
         inventory: List<ContentItem>,
-        excludedIds: Set<String>,
+        primaryExcludedIds: Set<String>,
         signals: RecommendationSignals,
         nowMillis: Long = System.currentTimeMillis(),
     ): RecommendationSet?
@@ -47,7 +48,10 @@ interface InterceptionMonitor {
 }
 
 interface DelayGate {
+    fun inspectDelay(targetApp: DistractingApp, nowMillis: Long = System.currentTimeMillis()): DelayInspection
+
     fun activeDelay(targetApp: DistractingApp, nowMillis: Long = System.currentTimeMillis()): DelayWindow?
+
     fun storeDelay(
         targetApp: DistractingApp,
         nowMillis: Long = System.currentTimeMillis(),
@@ -68,6 +72,10 @@ interface HistoryRepository {
 
     fun recordAcceptedSession(
         targetApp: DistractingApp,
+        interventionId: String,
+        interventionShownAtMillis: Long,
+        primaryContentId: String,
+        backupContentIds: List<String>,
         content: ContentItem,
         source: RecommendationSource,
         acceptedAtMillis: Long = System.currentTimeMillis(),

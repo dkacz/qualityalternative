@@ -34,9 +34,15 @@ data class OnboardingSelection(
 }
 
 data class DelayWindow(
+    val id: String,
     val targetAppPackage: String,
     val startsAtMillis: Long,
     val endsAtMillis: Long,
 ) {
     fun isActive(nowMillis: Long): Boolean = nowMillis < endsAtMillis
 }
+
+data class DelayInspection(
+    val activeWindow: DelayWindow? = null,
+    val expiredWindow: DelayWindow? = null,
+)

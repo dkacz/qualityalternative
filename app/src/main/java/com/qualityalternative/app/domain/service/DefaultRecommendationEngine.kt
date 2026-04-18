@@ -14,21 +14,24 @@ class DefaultRecommendationEngine : RecommendationEngine {
         targetApp: DistractingApp,
         preferences: UserPreferences,
         inventory: List<ContentItem>,
-        excludedIds: Set<String>,
+        primaryExcludedIds: Set<String>,
         signals: RecommendationSignals,
         nowMillis: Long,
     ): RecommendationSet? {
-        val candidates = inventory
-            .filterNot { it.id in excludedIds }
+        val scoredCandidates = inventory
             .sortedWith(
                 compareByDescending<ContentItem> { score(item = it, preferences = preferences, signals = signals) }
                     .thenBy { abs(it.durationMinutes - preferences.preferredDurationBucket.midpoint) }
                     .thenBy { it.title },
             )
 
-        val primary = candidates.firstOrNull() ?: return null
-        val backups = candidates
-            .drop(1)
+        val primary = scoredCandidates
+            .firstOrNull { it.id !in primaryExcludedIds }
+            ?: scoredCandidates.firstOrNull()
+            ?: return null
+
+        val backups = scoredCandidates
+            .filterNot { it.id == primary.id }
             .filter { it.durationMinutes <= primary.durationMinutes }
             .sortedWith(
                 compareBy<ContentItem> { abs(it.durationMinutes - DurationBucket.QUICK.midpoint) }

@@ -8,7 +8,6 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
-import org.junit.Assert.assertTrue
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
@@ -19,6 +18,13 @@ class MainActivityTest {
     val composeRule = createEmptyComposeRule()
 
     private var scenario: ActivityScenario<MainActivity>? = null
+
+    @Before
+    fun resetAppState() {
+        val targetContext = InstrumentationRegistry.getInstrumentation().targetContext
+        targetContext.deleteDatabase("quality_alternative.db")
+        targetContext.filesDir.resolve("datastore").deleteRecursively()
+    }
 
     @Before
     fun launchApp() {
@@ -38,17 +44,16 @@ class MainActivityTest {
     @Test
     fun onboardingCompletesAndPersistsAfterActivityRecreate() {
         composeRule.waitUntil(timeoutMillis = 10_000) {
-            hasNode("Let’s set up your replacement loop") || hasNode("Quality Alternative")
+            hasNode("Let’s set up your replacement loop")
         }
 
-        if (hasNode("Let’s set up your replacement loop")) {
-            composeRule.onNodeWithText("Complete setup", useUnmergedTree = true)
-                .performScrollTo()
-                .performClick()
+        composeRule.onNodeWithText("Let’s set up your replacement loop").assertIsDisplayed()
+        composeRule.onNodeWithText("Complete setup", useUnmergedTree = true)
+            .performScrollTo()
+            .performClick()
 
-            composeRule.waitUntil(timeoutMillis = 10_000) {
-                hasNode("Quality Alternative")
-            }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasNode("Quality Alternative")
         }
 
         composeRule.onNodeWithText("Quality Alternative").assertIsDisplayed()

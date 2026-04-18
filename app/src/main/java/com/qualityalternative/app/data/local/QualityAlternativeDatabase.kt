@@ -10,7 +10,7 @@ import androidx.room.RoomDatabase
         AnalyticsEventEntity::class,
         ReplacementSessionEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = false,
 )
 abstract class QualityAlternativeDatabase : RoomDatabase() {
@@ -24,7 +24,9 @@ abstract class QualityAlternativeDatabase : RoomDatabase() {
                 context,
                 QualityAlternativeDatabase::class.java,
                 "quality_alternative.db",
-            ).build()
+            )
+                .fallbackToDestructiveMigration(true)
+                .build()
         }
     }
 }
