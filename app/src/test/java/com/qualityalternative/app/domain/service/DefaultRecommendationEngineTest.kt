@@ -105,6 +105,32 @@ class DefaultRecommendationEngineTest {
         assertTrue(result?.backups?.any { it.id == "done-backup" } == true)
     }
 
+    @Test
+    fun generate_returnsNullWhenOnlyCompletedCandidatesRemainForPrimary() {
+        val preferences = UserPreferences(
+            selectedApps = listOf(DistractingApp(packageName = "pkg", displayName = "Instagram")),
+            preferredTopics = setOf(TopicTag.PHILOSOPHY),
+            preferredDurationBucket = DurationBucket.FOCUS,
+            selectedPackIds = setOf("pack"),
+        )
+
+        val inventory = listOf(
+            item(id = "done-1", minutes = 7, topics = setOf(TopicTag.PHILOSOPHY)),
+            item(id = "done-2", minutes = 6, topics = setOf(TopicTag.PHILOSOPHY)),
+        )
+
+        val result = engine.generate(
+            targetApp = DistractingApp(packageName = "pkg", displayName = "Instagram"),
+            preferences = preferences,
+            inventory = inventory,
+            primaryExcludedIds = setOf("done-1", "done-2"),
+            signals = RecommendationSignals(timeOfDay = TimeOfDayBucket.MIDDAY),
+            nowMillis = 0L,
+        )
+
+        assertEquals(null, result)
+    }
+
     private fun item(id: String, packId: String = "pack", minutes: Int, topics: Set<TopicTag>): ContentItem = ContentItem(
         id = id,
         packId = packId,

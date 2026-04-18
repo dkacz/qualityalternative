@@ -4,6 +4,7 @@ import com.qualityalternative.app.analytics.InMemoryAnalyticsTracker
 import com.qualityalternative.app.data.InMemoryDelayGate
 import com.qualityalternative.app.data.SupportedCatalog
 import com.qualityalternative.app.domain.model.AppSettings
+import com.qualityalternative.app.domain.model.AnalyticsEventType
 import com.qualityalternative.app.domain.model.ContentFormat
 import com.qualityalternative.app.domain.model.ContentItem
 import com.qualityalternative.app.domain.model.DistractingApp
@@ -228,6 +229,47 @@ class MainViewModelTest {
         assertTrue(returnEvents.isNotEmpty())
         assertTrue(returnEvents.all { it.interventionId != null })
         assertTrue(returnEvents.all { it.metadata["delayReturnOrigin"] == "active_delay" })
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun triggerDebugIntervention_preservesExpiredDelayProvenanceAcrossActiveDelayReads() = runTest {
+        val delayGate = InMemoryDelayGate()
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val viewModel = createViewModel(
+            analyticsTracker = analyticsTracker,
+            delayGate = delayGate,
+        )
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+
+        val targetApp = viewModel.uiState.selectedTargetApp!!
+        delayGate.storeDelay(
+            targetApp = targetApp,
+            nowMillis = 1_000L,
+            durationMinutes = 15,
+            interventionId = "delay-intervention",
+            interventionShownAtMillis = 900L,
+            primaryContentId = "p1",
+            backupContentIds = listOf("s1"),
+        )
+        val expiredAt = 1_000L + 16 * 60_000L
+
+        assertEquals(null, delayGate.activeDelay(targetApp = targetApp, nowMillis = expiredAt))
+
+        viewModel.triggerDebugIntervention(nowMillis = expiredAt)
+        advanceUntilIdle()
+
+        val events = analyticsTracker.allEvents()
+        val expiredDelayEvent = events.firstOrNull { it.type == AnalyticsEventType.RETURN_AFTER_DELAY_ENDED }
+        val within60 = events.firstOrNull { it.type == AnalyticsEventType.RETURN_TO_APP_WITHIN_60_MINUTES }
+
+        assertNotNull(expiredDelayEvent)
+        assertEquals("delay-intervention", expiredDelayEvent?.interventionId)
+        assertEquals("after_delay_expired", within60?.metadata?.get("delayReturnOrigin"))
+        assertEquals(MainScreen.Intervention, viewModel.uiState.screen)
     }
 
     private fun createViewModel(

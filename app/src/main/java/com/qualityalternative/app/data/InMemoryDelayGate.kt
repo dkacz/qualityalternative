@@ -20,7 +20,8 @@ class InMemoryDelayGate : DelayGate {
     }
 
     override fun activeDelay(targetApp: DistractingApp, nowMillis: Long): DelayWindow? {
-        return inspectDelay(targetApp = targetApp, nowMillis = nowMillis).activeWindow
+        val current = windows[targetApp.packageName] ?: return null
+        return current.takeIf { it.isActive(nowMillis) }
     }
 
     override fun storeDelay(

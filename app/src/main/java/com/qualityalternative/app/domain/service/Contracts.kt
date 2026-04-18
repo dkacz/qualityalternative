@@ -48,8 +48,15 @@ interface InterceptionMonitor {
 }
 
 interface DelayGate {
+    /**
+     * Returns the current delay state for an intervention attempt and may consume expired delay
+     * provenance once it has been observed by the trigger path.
+     */
     fun inspectDelay(targetApp: DistractingApp, nowMillis: Long = System.currentTimeMillis()): DelayInspection
 
+    /**
+     * Returns the currently active delay window without consuming expired provenance.
+     */
     fun activeDelay(targetApp: DistractingApp, nowMillis: Long = System.currentTimeMillis()): DelayWindow?
 
     fun storeDelay(

@@ -27,6 +27,7 @@ class PreferencesDelayGateTest {
         assertNotNull(created)
         assertNotNull(firstGate.activeDelay(targetApp = app, nowMillis = 2_000L))
         assertNull(firstGate.activeDelay(targetApp = app, nowMillis = created.endsAtMillis + 1))
+        assertEquals(created.id, firstGate.inspectDelay(targetApp = app, nowMillis = created.endsAtMillis + 1).expiredWindow?.id)
     }
 
     @Test

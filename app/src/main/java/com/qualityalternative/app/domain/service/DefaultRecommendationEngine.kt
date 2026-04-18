@@ -27,7 +27,6 @@ class DefaultRecommendationEngine : RecommendationEngine {
 
         val primary = scoredCandidates
             .firstOrNull { it.id !in primaryExcludedIds }
-            ?: scoredCandidates.firstOrNull()
             ?: return null
 
         val backups = scoredCandidates
