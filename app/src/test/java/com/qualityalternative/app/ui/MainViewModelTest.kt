@@ -1,7 +1,11 @@
 package com.qualityalternative.app.ui
 
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.core.Preferences
 import com.qualityalternative.app.analytics.InMemoryAnalyticsTracker
 import com.qualityalternative.app.data.InMemoryDelayGate
+import com.qualityalternative.app.data.PreferencesDelayGate
 import com.qualityalternative.app.data.SupportedCatalog
 import com.qualityalternative.app.domain.model.AppSettings
 import com.qualityalternative.app.domain.model.AnalyticsEventType
@@ -25,9 +29,11 @@ import com.qualityalternative.app.domain.service.DelayGate
 import com.qualityalternative.app.domain.service.HistoryRepository
 import com.qualityalternative.app.domain.service.InterceptionMonitor
 import com.qualityalternative.app.domain.service.SettingsRepository
+import java.io.File
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -272,6 +278,79 @@ class MainViewModelTest {
         assertEquals(MainScreen.Intervention, viewModel.uiState.screen)
     }
 
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun triggerDebugIntervention_reportsNoRecommendationWhenAllInventoryIsCompleted() = runTest {
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val historyRepository = FakeHistoryRepository(initialCompletedIds = setOf("p1", "s1"))
+        val viewModel = createViewModel(
+            analyticsTracker = analyticsTracker,
+            historyRepository = historyRepository,
+        )
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+        viewModel.triggerDebugIntervention(nowMillis = 2_000L)
+        advanceUntilIdle()
+
+        assertEquals(null, viewModel.uiState.currentRecommendationSet)
+        assertEquals(null, viewModel.uiState.currentInterventionId)
+        assertEquals(MainScreen.Home, viewModel.uiState.screen)
+        assertEquals("No replacement inventory is available yet.", viewModel.uiState.latestMessage)
+        assertTrue(analyticsTracker.allEvents().any { it.type == AnalyticsEventType.NO_RECOMMENDATION_AVAILABLE })
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun triggerDebugIntervention_preservesExpiredDelayProvenanceWithPreferencesDelayGate() = runTest {
+        val file = File.createTempFile("delay-gate-viewmodel", ".preferences_pb").apply { deleteOnExit() }
+        val delayGate = PreferencesDelayGate(
+            dataStore = testDataStore(file),
+            scope = backgroundScope,
+        )
+        delayGate.observeReady().first { it }
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val viewModel = createViewModel(
+            analyticsTracker = analyticsTracker,
+            delayGate = delayGate,
+        )
+
+        advanceUntilIdle()
+        assertFalse(viewModel.uiState.isLoadingSettings)
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+
+        val targetApp = viewModel.uiState.selectedTargetApp!!
+        val created = delayGate.storeDelay(
+            targetApp = targetApp,
+            nowMillis = 1_000L,
+            durationMinutes = 15,
+            interventionId = "delay-intervention",
+            interventionShownAtMillis = 900L,
+            primaryContentId = "p1",
+            backupContentIds = listOf("s1"),
+        )
+        val expiredAt = 1_000L + 16 * 60_000L
+
+        assertEquals(null, delayGate.activeDelay(targetApp = targetApp, nowMillis = expiredAt))
+
+        viewModel.triggerDebugIntervention(nowMillis = expiredAt)
+        advanceUntilIdle()
+
+        val events = analyticsTracker.allEvents()
+        val expiredDelayEvent = events.firstOrNull { it.type == AnalyticsEventType.RETURN_AFTER_DELAY_ENDED }
+        val within60 = events.firstOrNull { it.type == AnalyticsEventType.RETURN_TO_APP_WITHIN_60_MINUTES }
+        val postConsumeInspection = delayGate.inspectDelay(targetApp = targetApp, nowMillis = expiredAt)
+
+        assertNotNull(expiredDelayEvent)
+        assertEquals("delay-intervention", expiredDelayEvent?.interventionId)
+        assertEquals("after_delay_expired", within60?.metadata?.get("delayReturnOrigin"))
+        assertEquals(null, postConsumeInspection.activeWindow)
+        assertEquals(null, postConsumeInspection.expiredWindow)
+        assertEquals(false, delayGate.consumeExpiredDelay(targetApp = targetApp, delayId = created.id, nowMillis = expiredAt))
+    }
+
     private fun createViewModel(
         settingsRepository: FakeSettingsRepository = FakeSettingsRepository(),
         historyRepository: FakeHistoryRepository = FakeHistoryRepository(),
@@ -429,6 +508,9 @@ class MainViewModelTest {
         override fun activeDelay(targetApp: DistractingApp, nowMillis: Long) =
             delegate.activeDelay(targetApp = targetApp, nowMillis = nowMillis)
 
+        override suspend fun consumeExpiredDelay(targetApp: DistractingApp, delayId: String, nowMillis: Long) =
+            delegate.consumeExpiredDelay(targetApp = targetApp, delayId = delayId, nowMillis = nowMillis)
+
         override fun storeDelay(
             targetApp: DistractingApp,
             nowMillis: Long,
@@ -523,5 +605,9 @@ class MainViewModelTest {
                 summary = "Manual mode only",
             )
         }
+    }
+
+    private fun testDataStore(file: File): DataStore<Preferences> {
+        return PreferenceDataStoreFactory.create(produceFile = { file })
     }
 }

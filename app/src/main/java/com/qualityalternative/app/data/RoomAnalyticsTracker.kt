@@ -38,6 +38,10 @@ class RoomAnalyticsTracker(
         }
     }
 
+    override suspend fun recordDurably(event: AnalyticsEvent) {
+        dao.insert(event.toEntity())
+    }
+
     override fun allEvents(): List<AnalyticsEvent> = events.value
 
     override fun observeEvents(): Flow<List<AnalyticsEvent>> = events.asStateFlow()

@@ -3,15 +3,21 @@ package com.qualityalternative.app.data
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
+import com.qualityalternative.app.ui.MainDispatcherRule
 import java.io.File
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertEquals
+import org.junit.Rule
 import org.junit.Test
 
 class PreferencesDelayGateTest {
+    @get:Rule
+    val dispatcherRule = MainDispatcherRule()
+
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
     fun storedDelayIsActiveThenExpires() = runTest {
@@ -23,11 +29,39 @@ class PreferencesDelayGateTest {
             scope = backgroundScope,
         )
 
-        val created = firstGate.storeDelay(targetApp = app, nowMillis = 1_000L)
+        val created = firstGate.storeDelay(
+            targetApp = app,
+            nowMillis = 1_000L,
+            interventionId = "intervention-1",
+            interventionShownAtMillis = 900L,
+            primaryContentId = "primary-1",
+            backupContentIds = listOf("backup-1", "backup-2"),
+        )
+        val recordedReturn = firstGate.recordFirstReturnAttempt(targetApp = app, nowMillis = 1_500L)
         assertNotNull(created)
+        assertNotNull(recordedReturn)
         assertNotNull(firstGate.activeDelay(targetApp = app, nowMillis = 2_000L))
         assertNull(firstGate.activeDelay(targetApp = app, nowMillis = created.endsAtMillis + 1))
-        assertEquals(created.id, firstGate.inspectDelay(targetApp = app, nowMillis = created.endsAtMillis + 1).expiredWindow?.id)
+        val expiredWindow = firstGate.inspectDelay(targetApp = app, nowMillis = created.endsAtMillis + 1).expiredWindow
+        assertEquals(created.id, expiredWindow?.id)
+        assertEquals("intervention-1", expiredWindow?.interventionId)
+        assertEquals(900L, expiredWindow?.interventionShownAtMillis)
+        assertEquals("primary-1", expiredWindow?.primaryContentId)
+        assertEquals(listOf("backup-1", "backup-2"), expiredWindow?.backupContentIds)
+        assertEquals(1_500L, expiredWindow?.firstReturnAttemptAtMillis)
+
+        assertEquals(
+            true,
+            firstGate.consumeExpiredDelay(
+                targetApp = app,
+                delayId = created.id,
+                nowMillis = created.endsAtMillis + 1,
+            ),
+        )
+        val afterConsume = firstGate.inspectDelay(targetApp = app, nowMillis = created.endsAtMillis + 1)
+        assertEquals(null, afterConsume.activeWindow)
+        assertEquals(null, afterConsume.expiredWindow)
+        advanceUntilIdle()
     }
 
     @Test

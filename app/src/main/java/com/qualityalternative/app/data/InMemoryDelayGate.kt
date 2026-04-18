@@ -14,7 +14,6 @@ class InMemoryDelayGate : DelayGate {
         return if (current.isActive(nowMillis)) {
             DelayInspection(activeWindow = current)
         } else {
-            windows.remove(targetApp.packageName)
             DelayInspection(expiredWindow = current)
         }
     }
@@ -22,6 +21,15 @@ class InMemoryDelayGate : DelayGate {
     override fun activeDelay(targetApp: DistractingApp, nowMillis: Long): DelayWindow? {
         val current = windows[targetApp.packageName] ?: return null
         return current.takeIf { it.isActive(nowMillis) }
+    }
+
+    override suspend fun consumeExpiredDelay(targetApp: DistractingApp, delayId: String, nowMillis: Long): Boolean {
+        val current = windows[targetApp.packageName] ?: return false
+        if (current.id != delayId || current.isActive(nowMillis)) {
+            return false
+        }
+        windows.remove(targetApp.packageName)
+        return true
     }
 
     override fun storeDelay(

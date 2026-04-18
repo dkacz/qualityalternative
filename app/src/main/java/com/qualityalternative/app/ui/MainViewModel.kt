@@ -249,6 +249,11 @@ class MainViewModel(
 
             delayInspection.expiredWindow?.let { expiredWindow ->
                 recordDelayReturnAfterExpiry(expiredWindow = expiredWindow, nowMillis = nowMillis)
+                delayGate.consumeExpiredDelay(
+                    targetApp = targetApp,
+                    delayId = expiredWindow.id,
+                    nowMillis = nowMillis,
+                )
             }
 
             recordReturnSignalIfNeeded(targetApp = targetApp, nowMillis = nowMillis)
@@ -636,8 +641,8 @@ class MainViewModel(
         )
     }
 
-    private fun recordDelayReturnAfterExpiry(expiredWindow: DelayWindow, nowMillis: Long) {
-        recordEvent(
+    private suspend fun recordDelayReturnAfterExpiry(expiredWindow: DelayWindow, nowMillis: Long) {
+        recordEventDurably(
             AnalyticsEvent(
                 type = AnalyticsEventType.RETURN_AFTER_DELAY_ENDED,
                 timestampMillis = nowMillis,
@@ -655,7 +660,7 @@ class MainViewModel(
             ),
         )
         if (expiredWindow.firstReturnAttemptAtMillis == null) {
-            recordDelayReturnMetrics(
+            recordDelayReturnMetricsDurably(
                 window = expiredWindow,
                 nowMillis = nowMillis,
                 origin = "after_delay_expired",
@@ -664,6 +669,16 @@ class MainViewModel(
     }
 
     private fun recordDelayReturnMetrics(window: DelayWindow, nowMillis: Long, origin: String) {
+        delayReturnMetricEvents(window = window, nowMillis = nowMillis, origin = origin).forEach(::recordEvent)
+    }
+
+    private suspend fun recordDelayReturnMetricsDurably(window: DelayWindow, nowMillis: Long, origin: String) {
+        delayReturnMetricEvents(window = window, nowMillis = nowMillis, origin = origin).forEach { event ->
+            recordEventDurably(event)
+        }
+    }
+
+    private fun delayReturnMetricEvents(window: DelayWindow, nowMillis: Long, origin: String): List<AnalyticsEvent> {
         val anchorMillis = window.interventionShownAtMillis ?: window.startsAtMillis
         val delta = nowMillis - anchorMillis
         val metadata = mapOf(
@@ -672,36 +687,35 @@ class MainViewModel(
             "delayStartedAtMillis" to window.startsAtMillis.toString(),
             "delayEndedAtMillis" to window.endsAtMillis.toString(),
         )
+        val events = mutableListOf<AnalyticsEvent>()
 
         if (delta <= 15 * 60_000L) {
-            recordEvent(
-                AnalyticsEvent(
-                    type = AnalyticsEventType.RETURN_TO_APP_WITHIN_15_MINUTES,
-                    timestampMillis = nowMillis,
-                    interventionId = window.interventionId,
-                    targetAppPackage = window.targetAppPackage,
-                    primaryContentId = window.primaryContentId,
-                    backupContentIds = window.backupContentIds,
-                    contentId = window.primaryContentId,
-                    metadata = metadata,
-                ),
+            events += AnalyticsEvent(
+                type = AnalyticsEventType.RETURN_TO_APP_WITHIN_15_MINUTES,
+                timestampMillis = nowMillis,
+                interventionId = window.interventionId,
+                targetAppPackage = window.targetAppPackage,
+                primaryContentId = window.primaryContentId,
+                backupContentIds = window.backupContentIds,
+                contentId = window.primaryContentId,
+                metadata = metadata,
             )
         }
 
         if (delta <= 60 * 60_000L) {
-            recordEvent(
-                AnalyticsEvent(
-                    type = AnalyticsEventType.RETURN_TO_APP_WITHIN_60_MINUTES,
-                    timestampMillis = nowMillis,
-                    interventionId = window.interventionId,
-                    targetAppPackage = window.targetAppPackage,
-                    primaryContentId = window.primaryContentId,
-                    backupContentIds = window.backupContentIds,
-                    contentId = window.primaryContentId,
-                    metadata = metadata,
-                ),
+            events += AnalyticsEvent(
+                type = AnalyticsEventType.RETURN_TO_APP_WITHIN_60_MINUTES,
+                timestampMillis = nowMillis,
+                interventionId = window.interventionId,
+                targetAppPackage = window.targetAppPackage,
+                primaryContentId = window.primaryContentId,
+                backupContentIds = window.backupContentIds,
+                contentId = window.primaryContentId,
+                metadata = metadata,
             )
         }
+
+        return events
     }
 
     private fun openReader(content: ContentItem, sessionId: String, startedAtMillis: Long) {
@@ -740,6 +754,10 @@ class MainViewModel(
 
     private fun recordEvent(event: AnalyticsEvent) {
         analyticsTracker.record(event)
+    }
+
+    private suspend fun recordEventDurably(event: AnalyticsEvent) {
+        analyticsTracker.recordDurably(event)
     }
 
     private fun refreshActiveDelayWindow(nowMillis: Long = System.currentTimeMillis()) {

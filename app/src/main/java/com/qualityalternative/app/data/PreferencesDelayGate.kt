@@ -53,15 +53,23 @@ class PreferencesDelayGate(
         if (current.isActive(nowMillis)) {
             return DelayInspection(activeWindow = current)
         }
-        val updated = windows.value - targetApp.packageName
-        windows.value = updated
-        persist(updated)
         return DelayInspection(expiredWindow = current)
     }
 
     override fun activeDelay(targetApp: DistractingApp, nowMillis: Long): DelayWindow? {
         val current = windows.value[targetApp.packageName] ?: return null
         return current.takeIf { it.isActive(nowMillis) }
+    }
+
+    override suspend fun consumeExpiredDelay(targetApp: DistractingApp, delayId: String, nowMillis: Long): Boolean {
+        val current = windows.value[targetApp.packageName] ?: return false
+        if (current.id != delayId || current.isActive(nowMillis)) {
+            return false
+        }
+        val updated = windows.value - targetApp.packageName
+        windows.value = updated
+        persistDurably(updated)
+        return true
     }
 
     override fun storeDelay(
@@ -107,9 +115,13 @@ class PreferencesDelayGate(
 
     private fun persist(currentWindows: Map<String, DelayWindow>) {
         scope.launch {
-            dataStore.edit { preferences ->
-                preferences[DelayWindows] = currentWindows.values.mapTo(mutableSetOf(), ::encodeWindow)
-            }
+            persistDurably(currentWindows)
+        }
+    }
+
+    private suspend fun persistDurably(currentWindows: Map<String, DelayWindow>) {
+        dataStore.edit { preferences ->
+            preferences[DelayWindows] = currentWindows.values.mapTo(mutableSetOf(), ::encodeWindow)
         }
     }
 

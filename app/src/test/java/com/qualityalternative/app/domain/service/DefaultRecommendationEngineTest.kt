@@ -131,6 +131,35 @@ class DefaultRecommendationEngineTest {
         assertEquals(null, result)
     }
 
+    @Test
+    fun generate_prefersPrimaryThatCanProduceTwoBackupsWhenInventoryAllowsIt() {
+        val preferences = UserPreferences(
+            selectedApps = listOf(DistractingApp(packageName = "pkg", displayName = "Instagram")),
+            preferredTopics = setOf(TopicTag.PHILOSOPHY),
+            preferredDurationBucket = DurationBucket.FOCUS,
+            selectedPackIds = setOf("pack"),
+        )
+
+        val inventory = listOf(
+            item(id = "longer-fit", minutes = 7, topics = setOf(TopicTag.PHILOSOPHY)),
+            item(id = "shorter-greedy", minutes = 5, topics = setOf(TopicTag.PHILOSOPHY)),
+            item(id = "quick-backup", minutes = 4, topics = setOf(TopicTag.HISTORY)),
+        )
+
+        val result = engine.generate(
+            targetApp = DistractingApp(packageName = "pkg", displayName = "Instagram"),
+            preferences = preferences,
+            inventory = inventory,
+            primaryExcludedIds = emptySet(),
+            signals = RecommendationSignals(timeOfDay = TimeOfDayBucket.MORNING),
+            nowMillis = 0L,
+        )
+
+        assertEquals("longer-fit", result?.primary?.id)
+        assertEquals(setOf("shorter-greedy", "quick-backup"), result?.backups?.map(ContentItem::id)?.toSet())
+        assertEquals(false, result?.inventoryShortage)
+    }
+
     private fun item(id: String, packId: String = "pack", minutes: Int, topics: Set<TopicTag>): ContentItem = ContentItem(
         id = id,
         packId = packId,

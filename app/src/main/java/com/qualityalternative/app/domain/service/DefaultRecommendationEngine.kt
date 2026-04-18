@@ -19,31 +19,55 @@ class DefaultRecommendationEngine : RecommendationEngine {
         nowMillis: Long,
     ): RecommendationSet? {
         val scoredCandidates = inventory
+            .map { item ->
+                ScoredCandidate(
+                    item = item,
+                    score = score(item = item, preferences = preferences, signals = signals),
+                    durationDistance = abs(item.durationMinutes - preferences.preferredDurationBucket.midpoint),
+                )
+            }
             .sortedWith(
-                compareByDescending<ContentItem> { score(item = it, preferences = preferences, signals = signals) }
-                    .thenBy { abs(it.durationMinutes - preferences.preferredDurationBucket.midpoint) }
-                    .thenBy { it.title },
+                compareByDescending<ScoredCandidate> { it.score }
+                    .thenBy { it.durationDistance }
+                    .thenBy { it.item.title },
             )
 
-        val primary = scoredCandidates
-            .firstOrNull { it.id !in primaryExcludedIds }
+        val candidateSets = scoredCandidates
+            .filter { it.item.id !in primaryExcludedIds }
+            .map { primary ->
+                CandidateRecommendation(
+                    primary = primary,
+                    backups = backupsFor(primary = primary, scoredCandidates = scoredCandidates),
+                )
+            }
+
+        val canBuildFullSet = candidateSets.any { it.backups.size == 2 }
+        val chosen = candidateSets
+            .firstOrNull { !canBuildFullSet || it.backups.size == 2 }
             ?: return null
 
-        val backups = scoredCandidates
-            .filterNot { it.id == primary.id }
-            .filter { it.durationMinutes <= primary.durationMinutes }
-            .sortedWith(
-                compareBy<ContentItem> { abs(it.durationMinutes - DurationBucket.QUICK.midpoint) }
-                    .thenByDescending { score(item = it, preferences = preferences, signals = signals) },
-            )
-            .take(2)
-
         return RecommendationSet(
-            primary = primary,
-            backups = backups,
-            inventoryShortage = backups.size < 2,
+            primary = chosen.primary.item,
+            backups = chosen.backups.map(ScoredCandidate::item),
+            inventoryShortage = chosen.backups.size < 2,
             generatedAtMillis = nowMillis,
         )
+    }
+
+    private fun backupsFor(
+        primary: ScoredCandidate,
+        scoredCandidates: List<ScoredCandidate>,
+    ): List<ScoredCandidate> {
+        return scoredCandidates
+            .filterNot { it.item.id == primary.item.id }
+            .filter { it.item.durationMinutes <= primary.item.durationMinutes }
+            .sortedWith(
+                compareBy<ScoredCandidate> { abs(it.item.durationMinutes - DurationBucket.QUICK.midpoint) }
+                    .thenByDescending { it.score }
+                    .thenBy { it.durationDistance }
+                    .thenBy { it.item.title },
+            )
+            .take(2)
     }
 
     private fun score(
@@ -74,4 +98,15 @@ class DefaultRecommendationEngine : RecommendationEngine {
         }
         return topicScore + durationScore + completionBoost + packBoost + timeOfDayBoost - skipPenalty
     }
+
+    private data class ScoredCandidate(
+        val item: ContentItem,
+        val score: Int,
+        val durationDistance: Int,
+    )
+
+    private data class CandidateRecommendation(
+        val primary: ScoredCandidate,
+        val backups: List<ScoredCandidate>,
+    )
 }
