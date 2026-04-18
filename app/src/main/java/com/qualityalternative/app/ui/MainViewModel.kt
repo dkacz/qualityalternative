@@ -637,7 +637,7 @@ class MainViewModel(
     private suspend fun recordDelayReturnDuringActiveWindow(targetApp: DistractingApp, nowMillis: Long) {
         val recordedWindow = delayGate.recordFirstReturnAttemptDurably(targetApp = targetApp, nowMillis = nowMillis)
             ?: return
-        recordDelayReturnMetrics(
+        recordDelayReturnMetricsDurably(
             window = recordedWindow,
             nowMillis = nowMillis,
             origin = "active_delay",
@@ -670,10 +670,6 @@ class MainViewModel(
                 origin = "after_delay_expired",
             )
         }
-    }
-
-    private fun recordDelayReturnMetrics(window: DelayWindow, nowMillis: Long, origin: String) {
-        delayReturnMetricEvents(window = window, nowMillis = nowMillis, origin = origin).forEach(::recordEvent)
     }
 
     private suspend fun recordDelayReturnMetricsDurably(window: DelayWindow, nowMillis: Long, origin: String) {

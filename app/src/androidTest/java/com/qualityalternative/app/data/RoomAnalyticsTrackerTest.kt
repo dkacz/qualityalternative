@@ -23,6 +23,7 @@ import com.qualityalternative.app.domain.service.InterceptionMonitor
 import com.qualityalternative.app.domain.service.SettingsRepository
 import com.qualityalternative.app.ui.MainViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -37,6 +38,76 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class RoomAnalyticsTrackerTest {
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun productionActiveDelayPath_persistsRoomAnalyticsWithExpectedMetadata() = runTest {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val database = Room.inMemoryDatabaseBuilder(
+            context,
+            QualityAlternativeDatabase::class.java,
+        ).allowMainThreadQueries().build()
+        val delayFile = File.createTempFile("room-analytics-active-delay-gate", ".preferences_pb").apply { deleteOnExit() }
+
+        try {
+            val tracker = RoomAnalyticsTracker(
+                dao = database.analyticsEventDao(),
+                scope = backgroundScope,
+            )
+            val delayGate = PreferencesDelayGate(
+                dataStore = testDataStore(delayFile),
+                scope = backgroundScope,
+            )
+            val viewModel = MainViewModel(
+                contentRepository = AssetContentRepository(context),
+                settingsRepository = AndroidSettingsRepository(),
+                recommendationEngine = com.qualityalternative.app.domain.service.DefaultRecommendationEngine(),
+                delayGate = delayGate,
+                analyticsTracker = tracker,
+                historyRepository = AndroidHistoryRepository(),
+                interceptionMonitor = AndroidInterceptionMonitor(),
+                enableDelayRefreshTicker = false,
+            )
+
+            tracker.observeReady().first { it }
+            delayGate.observeReady().first { it }
+            advanceUntilIdle()
+
+            val targetApp = viewModel.uiState.selectedTargetApp!!
+            val created = delayGate.storeDelayDurably(
+                targetApp = targetApp,
+                nowMillis = 1_000L,
+                durationMinutes = 15,
+                interventionId = "intervention-1",
+                interventionShownAtMillis = 900L,
+                primaryContentId = "primary-1",
+                backupContentIds = listOf("backup-1", "backup-2"),
+            )
+            viewModel.triggerDebugIntervention(nowMillis = 2_000L)
+            advanceUntilIdle()
+
+            val events = tracker.observeEvents().first { tracked ->
+                tracked.any { it.type == AnalyticsEventType.RETURN_TO_APP_WITHIN_15_MINUTES } &&
+                    tracked.any { it.type == AnalyticsEventType.RETURN_TO_APP_WITHIN_60_MINUTES }
+            }
+            val within15 = events.first { it.type == AnalyticsEventType.RETURN_TO_APP_WITHIN_15_MINUTES }
+            val within60 = events.first { it.type == AnalyticsEventType.RETURN_TO_APP_WITHIN_60_MINUTES }
+            val afterTrigger = delayGate.inspectDelay(targetApp = targetApp, nowMillis = 2_000L)
+
+            assertEquals("intervention-1", within15.interventionId)
+            assertEquals("primary-1", within15.primaryContentId)
+            assertEquals(listOf("backup-1", "backup-2"), within15.backupContentIds)
+            assertEquals(created.id, within15.metadata["delayId"])
+            assertEquals("active_delay", within15.metadata["delayReturnOrigin"])
+            assertEquals(created.id, within60.metadata["delayId"])
+            assertEquals("active_delay", within60.metadata["delayReturnOrigin"])
+            assertEquals(2_000L, afterTrigger.activeWindow?.firstReturnAttemptAtMillis)
+            assertEquals(created.id, afterTrigger.activeWindow?.id)
+            assertEquals(null, afterTrigger.expiredWindow)
+        } finally {
+            database.close()
+        }
+    }
+
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
     fun productionExpiryPath_persistsRoomAnalyticsWithExpectedMetadata() = runTest {
@@ -99,7 +170,9 @@ class RoomAnalyticsTrackerTest {
             assertEquals(created.id, expiryEvent.metadata["delayId"])
             assertEquals(created.id, within60.metadata["delayId"])
             assertEquals("after_delay_expired", within60.metadata["delayReturnOrigin"])
-            val afterConsume = delayGate.inspectDelay(targetApp = targetApp, nowMillis = created.endsAtMillis + 1)
+            val afterConsume = waitForDelayInspection {
+                delayGate.inspectDelay(targetApp = targetApp, nowMillis = created.endsAtMillis + 1)
+            }
             assertEquals(null, afterConsume.activeWindow)
             assertEquals(null, afterConsume.expiredWindow)
             assertFalse(delayGate.consumeExpiredDelay(targetApp = targetApp, delayId = created.id, nowMillis = created.endsAtMillis + 1))
@@ -172,5 +245,18 @@ class RoomAnalyticsTrackerTest {
 
     private fun testDataStore(file: File): DataStore<Preferences> {
         return PreferenceDataStoreFactory.create(produceFile = { file })
+    }
+
+    private suspend fun waitForDelayInspection(
+        provider: () -> com.qualityalternative.app.domain.model.DelayInspection,
+    ): com.qualityalternative.app.domain.model.DelayInspection {
+        repeat(20) {
+            val inspection = provider()
+            if (inspection.activeWindow == null && inspection.expiredWindow == null) {
+                return inspection
+            }
+            delay(25)
+        }
+        return provider()
     }
 }
