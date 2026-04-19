@@ -55,4 +55,22 @@ class InterceptionReadinessEvaluatorTest {
             readiness.summary,
         )
     }
+
+    @Test
+    fun evaluate_keepsInterceptionDisabled_whenBothPermissionsGranted() {
+        val readiness = evaluator.evaluate(
+            InterceptionPermissionSnapshot(
+                overlayGranted = true,
+                accessibilityGranted = true,
+            ),
+        )
+
+        assertEquals(PermissionStatus.READY, readiness.overlayStatus)
+        assertEquals(PermissionStatus.READY, readiness.accessibilityStatus)
+        assertFalse(readiness.interceptionReady)
+        assertEquals(
+            "Foreground detection and overlay permissions are ready. This slice logs selected app opens; the live intervention surface lands next.",
+            readiness.summary,
+        )
+    }
 }

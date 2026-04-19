@@ -4,7 +4,6 @@ import android.accessibilityservice.AccessibilityService
 import android.content.ComponentName
 import android.content.Context
 import android.provider.Settings
-import android.text.TextUtils
 import com.qualityalternative.app.domain.model.PermissionReadiness
 import com.qualityalternative.app.domain.service.InterceptionMonitor
 import com.qualityalternative.app.interception.QualityAlternativeAccessibilityService
@@ -32,26 +31,43 @@ internal fun isAccessibilityServiceEnabled(
     context: Context,
     serviceClass: Class<out AccessibilityService>,
 ): Boolean {
+    val accessibilityEnabled = Settings.Secure.getInt(
+        context.contentResolver,
+        Settings.Secure.ACCESSIBILITY_ENABLED,
+        0,
+    ) == 1
+    if (!accessibilityEnabled) {
+        return false
+    }
+
     val enabledServices = Settings.Secure.getString(
         context.contentResolver,
         Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
     ).orEmpty()
+    val expectedComponent = ComponentName(context, serviceClass)
+    return isAccessibilityServiceEnabled(
+        accessibilityEnabled = accessibilityEnabled,
+        enabledServices = enabledServices,
+        expectedServices = setOf(
+            expectedComponent.flattenToString(),
+            expectedComponent.flattenToShortString(),
+        ),
+    )
+}
+
+internal fun isAccessibilityServiceEnabled(
+    accessibilityEnabled: Boolean,
+    enabledServices: String,
+    expectedServices: Set<String>,
+): Boolean {
+    if (!accessibilityEnabled) {
+        return false
+    }
     if (enabledServices.isBlank()) {
         return false
     }
 
-    val expectedComponent = ComponentName(context, serviceClass)
-    val expectedServices = setOf(
-        expectedComponent.flattenToString(),
-        expectedComponent.flattenToShortString(),
-    )
-    val splitter = TextUtils.SimpleStringSplitter(':').apply {
-        setString(enabledServices)
-    }
-    while (splitter.hasNext()) {
-        if (splitter.next() in expectedServices) {
-            return true
-        }
-    }
-    return false
+    return enabledServices
+        .split(':')
+        .any { it in expectedServices }
 }
