@@ -21,6 +21,7 @@ data class SessionFeedback(
 )
 
 enum class AnalyticsEventType {
+    TARGET_APP_FOREGROUND_DETECTED,
     INTERVENTION_SHOWN,
     NO_RECOMMENDATION_AVAILABLE,
     PRIMARY_ACCEPTED,

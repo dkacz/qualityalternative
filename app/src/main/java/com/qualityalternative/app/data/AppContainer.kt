@@ -38,6 +38,6 @@ class AppContainer(context: Context) {
         dataStore = context.delayGateDataStore,
         scope = appScope,
     )
-    val interceptionMonitor: InterceptionMonitor = BuildStageInterceptionMonitor(context = context)
+    val interceptionMonitor: InterceptionMonitor = AndroidInterceptionMonitor(context = context)
     val recommendationEngine: RecommendationEngine = DefaultRecommendationEngine()
 }

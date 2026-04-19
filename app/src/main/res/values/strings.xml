@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">Quality Alternative</string>
+    <string name="accessibility_service_label">Quality Alternative Foreground Detection</string>
+    <string name="accessibility_service_description">Detects when selected distracting apps reach the foreground so the app can prepare a mindful replacement flow.</string>
 </resources>

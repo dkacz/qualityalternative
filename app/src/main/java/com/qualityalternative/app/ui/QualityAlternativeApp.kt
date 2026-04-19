@@ -1,5 +1,8 @@
 package com.qualityalternative.app.ui
 
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -34,6 +37,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.qualityalternative.app.domain.model.AnalyticsEvent
@@ -306,7 +310,7 @@ private fun HomeScreen(
                     fontWeight = FontWeight.Bold,
                 )
                 Text(
-                    text = "Onboarding, delay state, analytics, and replacement history are now persisted. This build still uses a manual debug trigger instead of live interception.",
+                    text = "Onboarding, delay state, analytics, and replacement history are persisted. This build now includes an Android accessibility skeleton that can log selected app opens before the live intervention surface is wired in.",
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -438,6 +442,7 @@ private fun PermissionReadinessCard(
     readiness: PermissionReadiness,
     onRefresh: () -> Unit,
 ) {
+    val context = LocalContext.current
     Card {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -452,14 +457,51 @@ private fun PermissionReadinessCard(
                 text = readiness.summary,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            Text(
+                text = "Accessibility detects selected distracting apps reaching foreground. Overlay permission will be used by the next slice to show the live intervention above those apps.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+            )
             Text("Overlay permission: ${readiness.overlayStatus.displayLabel()}")
             Text("Accessibility interception: ${readiness.accessibilityStatus.displayLabel()}")
             Text(
-                text = if (readiness.interceptionReady) "Interception ready" else "Manual mode only",
+                text = if (readiness.interceptionReady) "Interception ready" else "Setup still in progress",
                 style = MaterialTheme.typography.labelLarge,
             )
-            OutlinedButton(onClick = onRefresh) {
-                Text("Refresh status")
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                if (readiness.accessibilityStatus != PermissionStatus.READY) {
+                    OutlinedButton(
+                        onClick = {
+                            context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            })
+                        },
+                    ) {
+                        Text("Open Accessibility")
+                    }
+                }
+                if (readiness.overlayStatus != PermissionStatus.READY) {
+                    OutlinedButton(
+                        onClick = {
+                            context.startActivity(
+                                Intent(
+                                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                    Uri.parse("package:${context.packageName}"),
+                                ).apply {
+                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                },
+                            )
+                        },
+                    ) {
+                        Text("Open Overlay")
+                    }
+                }
+                OutlinedButton(onClick = onRefresh) {
+                    Text("Refresh status")
+                }
             }
         }
     }
