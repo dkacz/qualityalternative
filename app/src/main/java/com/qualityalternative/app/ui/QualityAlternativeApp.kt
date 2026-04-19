@@ -51,7 +51,6 @@ import com.qualityalternative.app.domain.model.PermissionReadiness
 import com.qualityalternative.app.domain.model.PermissionStatus
 import com.qualityalternative.app.domain.model.ReplacementHistoryEntry
 import com.qualityalternative.app.domain.model.TopicTag
-import com.qualityalternative.app.ui.theme.QualityAlternativeTheme
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -59,8 +58,9 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun QualityAlternativeApp(
     viewModel: MainViewModel,
+    onExitToTarget: () -> Unit = {},
 ) {
-    QualityAlternativeTheme {
+    MaterialTheme {
         val snackbarHostState = remember { SnackbarHostState() }
         val uiState = viewModel.uiState
 
@@ -118,7 +118,11 @@ fun QualityAlternativeApp(
                             onAcceptPrimary = viewModel::acceptPrimary,
                             onAcceptBackup = viewModel::acceptBackup,
                             onDelay = viewModel::delayFor15Minutes,
-                            onOpenAnyway = viewModel::openAnyway,
+                            onOpenAnyway = {
+                                if (viewModel.openAnyway()) {
+                                    onExitToTarget()
+                                }
+                            },
                         )
 
                         MainScreen.Reader -> ReaderScreen(
@@ -310,7 +314,7 @@ private fun HomeScreen(
                     fontWeight = FontWeight.Bold,
                 )
                 Text(
-                    text = "Onboarding, delay state, analytics, and replacement history are persisted. This build now includes an Android accessibility skeleton that can log selected app opens before the live intervention surface is wired in.",
+                    text = "Onboarding, delay state, analytics, and replacement history are persisted. This build can now bring the live intervention surface over selected app opens through the Accessibility Service, with fixture distractors included for automation tests.",
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -458,14 +462,14 @@ private fun PermissionReadinessCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
-                text = "Accessibility detects selected distracting apps reaching foreground. Overlay permission will be used by the next slice to show the live intervention above those apps.",
+                text = "Accessibility is the required path for the current Android alpha interception flow. Overlay permission is optional and reserved for future floating-surface experiments.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall,
             )
             Text("Overlay permission: ${readiness.overlayStatus.displayLabel()}")
             Text("Accessibility interception: ${readiness.accessibilityStatus.displayLabel()}")
             Text(
-                text = if (readiness.interceptionReady) "Interception ready" else "Setup still in progress",
+                text = if (readiness.interceptionReady) "System intervention ready" else "Setup still in progress",
                 style = MaterialTheme.typography.labelLarge,
             )
             FlowRow(
@@ -496,7 +500,7 @@ private fun PermissionReadinessCard(
                             )
                         },
                     ) {
-                        Text("Open Overlay")
+                        Text("Optional Overlay")
                     }
                 }
                 OutlinedButton(onClick = onRefresh) {

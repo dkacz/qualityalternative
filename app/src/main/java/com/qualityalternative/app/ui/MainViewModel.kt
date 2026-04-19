@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.qualityalternative.app.data.AppContainer
+import com.qualityalternative.app.data.SupportedCatalog
 import com.qualityalternative.app.domain.model.AnalyticsEvent
 import com.qualityalternative.app.domain.model.AnalyticsSemanticKeys
 import com.qualityalternative.app.domain.model.AnalyticsEventType
@@ -35,6 +36,7 @@ import com.qualityalternative.app.domain.service.HistoryRepository
 import com.qualityalternative.app.domain.service.InterceptionMonitor
 import com.qualityalternative.app.domain.service.RecommendationEngine
 import com.qualityalternative.app.domain.service.SettingsRepository
+import com.qualityalternative.app.interception.InterceptionRuntimeGate
 import java.util.UUID
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
@@ -58,6 +60,7 @@ data class MainUiState(
     val currentInterventionId: String? = null,
     val currentInterventionShownAtMillis: Long? = null,
     val currentRecommendationSet: RecommendationSet? = null,
+    val currentInterventionOrigin: InterventionOrigin? = null,
     val currentContent: ContentItem? = null,
     val currentContentBody: String = "",
     val currentSessionId: String? = null,
@@ -80,6 +83,11 @@ enum class MainScreen {
     Feedback,
 }
 
+enum class InterventionOrigin {
+    DEBUG,
+    SYSTEM,
+}
+
 class MainViewModel(
     private val contentRepository: ContentRepository,
     private val settingsRepository: SettingsRepository,
@@ -97,6 +105,7 @@ class MainViewModel(
     private var analyticsReady = analyticsTracker.isReady()
     private var historyReady = historyRepository.isReady()
     private var delayReady = delayGate.isReady()
+    private var pendingSystemInterception: PendingSystemInterception? = null
 
     var uiState by mutableStateOf(
         MainUiState(
@@ -242,6 +251,38 @@ class MainViewModel(
 
     fun triggerDebugIntervention(nowMillis: Long = System.currentTimeMillis()) {
         val targetApp = uiState.selectedTargetApp ?: return
+        triggerIntervention(
+            targetApp = targetApp,
+            origin = InterventionOrigin.DEBUG,
+            nowMillis = nowMillis,
+        )
+    }
+
+    fun requestSystemInterception(
+        targetAppPackage: String,
+        nowMillis: Long = System.currentTimeMillis(),
+    ) {
+        if (uiState.isLoadingSettings) {
+            pendingSystemInterception = PendingSystemInterception(
+                targetAppPackage = targetAppPackage,
+                triggeredAtMillis = nowMillis,
+            )
+            return
+        }
+
+        val targetApp = findTargetApp(targetAppPackage) ?: return
+        triggerIntervention(
+            targetApp = targetApp,
+            origin = InterventionOrigin.SYSTEM,
+            nowMillis = nowMillis,
+        )
+    }
+
+    fun triggerIntervention(
+        targetApp: DistractingApp,
+        origin: InterventionOrigin,
+        nowMillis: Long = System.currentTimeMillis(),
+    ) {
         val preferences = uiState.preferences ?: return
         if (uiState.isLoadingSettings) {
             uiState = uiState.copy(latestMessage = "Local replacement state is still loading.")
@@ -253,9 +294,11 @@ class MainViewModel(
             if (delayInspection.activeWindow != null) {
                 recordDelayReturnDuringActiveWindow(targetApp = targetApp, nowMillis = nowMillis)
                 uiState = uiState.copy(
+                    selectedTargetApp = targetApp,
                     activeDelayWindow = delayGate.activeDelay(targetApp = targetApp, nowMillis = nowMillis),
                     latestMessage = "${targetApp.displayName} is delayed for 15 minutes.",
                     screen = MainScreen.Home,
+                    currentInterventionOrigin = null,
                 )
                 return@launch
             }
@@ -294,11 +337,14 @@ class MainViewModel(
                     ),
                 )
                 uiState = uiState.copy(
+                    selectedTargetApp = targetApp,
                     currentInterventionId = null,
                     currentInterventionShownAtMillis = null,
                     currentRecommendationSet = null,
                     activeDelayWindow = null,
+                    currentInterventionOrigin = null,
                     latestMessage = "No replacement inventory is available yet.",
+                    screen = MainScreen.Home,
                 )
                 return@launch
             }
@@ -332,9 +378,11 @@ class MainViewModel(
             }
 
             uiState = uiState.copy(
+                selectedTargetApp = targetApp,
                 currentInterventionId = interventionId,
                 currentInterventionShownAtMillis = nowMillis,
                 currentRecommendationSet = recommendationSet,
+                currentInterventionOrigin = origin,
                 activeDelayWindow = null,
                 latestMessage = null,
                 screen = MainScreen.Intervention,
@@ -428,32 +476,43 @@ class MainViewModel(
                 currentInterventionId = null,
                 currentInterventionShownAtMillis = null,
                 currentRecommendationSet = null,
+                currentInterventionOrigin = null,
                 activeDelayWindow = window,
                 latestMessage = "${targetApp.displayName} delayed for 15 minutes.",
             )
         }
     }
 
-    fun openAnyway() {
-        val targetApp = uiState.selectedTargetApp ?: return
+    fun openAnyway(): Boolean {
+        val targetApp = uiState.selectedTargetApp ?: return false
         val recommendationSet = uiState.currentRecommendationSet
+        val nowMillis = System.currentTimeMillis()
+        val shouldExitToTarget = uiState.currentInterventionOrigin == InterventionOrigin.SYSTEM
         recordEvent(
             AnalyticsEvent(
                 type = AnalyticsEventType.OPEN_ANYWAY_SELECTED,
-                timestampMillis = System.currentTimeMillis(),
+                timestampMillis = nowMillis,
                 interventionId = uiState.currentInterventionId,
                 targetAppPackage = targetApp.packageName,
                 primaryContentId = recommendationSet?.primary?.id,
                 backupContentIds = recommendationSet?.backups.orEmpty().map(ContentItem::id),
             ),
         )
+        if (shouldExitToTarget) {
+            InterceptionRuntimeGate.suppressPackage(
+                targetAppPackage = targetApp.packageName,
+                untilMillis = nowMillis + OPEN_ANYWAY_SUPPRESSION_WINDOW_MILLIS,
+            )
+        }
         uiState = uiState.copy(
             screen = MainScreen.Home,
             currentInterventionId = null,
             currentInterventionShownAtMillis = null,
             currentRecommendationSet = null,
+            currentInterventionOrigin = null,
             latestMessage = "Prototype override recorded for ${targetApp.displayName}.",
         )
+        return shouldExitToTarget
     }
 
     fun finishReading() {
@@ -822,6 +881,7 @@ class MainViewModel(
             currentContent = null,
             currentContentBody = "",
             currentRecommendationSet = null,
+            currentInterventionOrigin = null,
             currentSessionId = null,
             currentSessionStartedAtMillis = null,
             lastFeedback = lastFeedback,
@@ -859,10 +919,23 @@ class MainViewModel(
         if (uiState.isLoadingSettings != !isReady) {
             uiState = uiState.copy(isLoadingSettings = !isReady)
         }
+        if (isReady) {
+            val pending = pendingSystemInterception ?: return
+            pendingSystemInterception = null
+            requestSystemInterception(
+                targetAppPackage = pending.targetAppPackage,
+                nowMillis = pending.triggeredAtMillis,
+            )
+        }
     }
 
     internal fun closeForTests() {
         viewModelScope.cancel()
+    }
+
+    private fun findTargetApp(targetAppPackage: String): DistractingApp? {
+        return uiState.availableTargetApps.firstOrNull { it.packageName == targetAppPackage }
+            ?: SupportedCatalog.findByPackage(targetAppPackage)
     }
 }
 
@@ -941,3 +1014,9 @@ private fun unavailablePermissionReadiness(): PermissionReadiness {
 }
 
 private const val ACTIVE_DELAY_REFRESH_INTERVAL_MILLIS = 1_000L
+private const val OPEN_ANYWAY_SUPPRESSION_WINDOW_MILLIS = 60_000L
+
+private data class PendingSystemInterception(
+    val targetAppPackage: String,
+    val triggeredAtMillis: Long,
+)

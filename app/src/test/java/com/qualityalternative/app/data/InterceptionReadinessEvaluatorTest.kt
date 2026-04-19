@@ -20,6 +20,10 @@ class InterceptionReadinessEvaluatorTest {
         assertEquals(PermissionStatus.MISSING, readiness.overlayStatus)
         assertEquals(PermissionStatus.MISSING, readiness.accessibilityStatus)
         assertFalse(readiness.interceptionReady)
+        assertEquals(
+            "Turn on the Accessibility Service to activate system interception for selected distracting apps.",
+            readiness.summary,
+        )
     }
 
     @Test
@@ -33,8 +37,9 @@ class InterceptionReadinessEvaluatorTest {
 
         assertEquals(PermissionStatus.MISSING, readiness.overlayStatus)
         assertEquals(PermissionStatus.READY, readiness.accessibilityStatus)
+        assertEquals(true, readiness.interceptionReady)
         assertEquals(
-            "Foreground detection is active. Grant overlay permission next so the future intervention surface can appear over selected apps.",
+            "System intervention is ready through Accessibility. Overlay permission is optional for later floating-surface experiments, but the current alpha can already interrupt selected app opens.",
             readiness.summary,
         )
     }
@@ -51,13 +56,13 @@ class InterceptionReadinessEvaluatorTest {
         assertEquals(PermissionStatus.READY, readiness.overlayStatus)
         assertEquals(PermissionStatus.MISSING, readiness.accessibilityStatus)
         assertEquals(
-            "Overlay permission is ready. Turn on the Accessibility Service so the app can detect when selected distracting apps reach the foreground.",
+            "Overlay permission is available, but interception is still off. Turn on the Accessibility Service so the app can detect and interrupt selected distracting app opens.",
             readiness.summary,
         )
     }
 
     @Test
-    fun evaluate_keepsInterceptionDisabled_whenBothPermissionsGranted() {
+    fun evaluate_marksSystemInterceptionReady_whenBothPermissionsGranted() {
         val readiness = evaluator.evaluate(
             InterceptionPermissionSnapshot(
                 overlayGranted = true,
@@ -67,9 +72,9 @@ class InterceptionReadinessEvaluatorTest {
 
         assertEquals(PermissionStatus.READY, readiness.overlayStatus)
         assertEquals(PermissionStatus.READY, readiness.accessibilityStatus)
-        assertFalse(readiness.interceptionReady)
+        assertEquals(true, readiness.interceptionReady)
         assertEquals(
-            "Foreground detection and overlay permissions are ready. This slice logs selected app opens; the live intervention surface lands next.",
+            "System intervention is ready. Accessibility can interrupt selected app opens now, and overlay permission is also available for future floating-surface experiments.",
             readiness.summary,
         )
     }

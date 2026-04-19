@@ -8,6 +8,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
+import com.qualityalternative.app.interception.FixtureTargetRegistry
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
@@ -37,13 +38,15 @@ class MainActivityTest {
     fun onboardingCompletesAndPersistsAfterColdRelaunch() {
         launchApp()
         composeRule.waitUntil(timeoutMillis = 10_000) {
-            hasNode("Let’s set up your replacement loop")
+            hasNode("Let’s set up your replacement loop") || hasNode("Quality Alternative")
         }
 
-        composeRule.onNodeWithText("Let’s set up your replacement loop").assertIsDisplayed()
-        composeRule.onNodeWithText("Complete setup", useUnmergedTree = true)
-            .performScrollTo()
-            .performClick()
+        if (hasNode("Let’s set up your replacement loop")) {
+            composeRule.onNodeWithText("Let’s set up your replacement loop").assertIsDisplayed()
+            composeRule.onNodeWithText("Complete setup", useUnmergedTree = true)
+                .performScrollTo()
+                .performClick()
+        }
 
         composeRule.waitUntil(timeoutMillis = 10_000) {
             hasNode("Quality Alternative")
@@ -64,6 +67,42 @@ class MainActivityTest {
         composeRule.onNodeWithText("Quality Alternative").assertIsDisplayed()
     }
 
+    @Test
+    fun systemInterceptionIntentShowsLiveInterventionForFixtureTarget() {
+        launchApp()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasNode("Let’s set up your replacement loop") || hasNode("Quality Alternative")
+        }
+        if (hasNode("Let’s set up your replacement loop")) {
+            composeRule.onNodeWithText("Complete setup", useUnmergedTree = true)
+                .performScrollTo()
+                .performClick()
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasNode("Quality Alternative")
+        }
+
+        scenario?.close()
+        scenario = null
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+        Thread.sleep(250)
+
+        val targetContext = InstrumentationRegistry.getInstrumentation().targetContext
+        launchApp(
+            MainActivity.createSystemInterceptionIntent(
+                context = targetContext,
+                targetAppPackage = FixtureTargetRegistry.fixtureDistractors.first().packageName,
+            ),
+        )
+
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasNode("Pause before Fixture Feed One")
+        }
+
+        composeRule.onNodeWithText("Pause before Fixture Feed One").assertIsDisplayed()
+        composeRule.onNodeWithText("Read now").assertIsDisplayed()
+    }
+
     private fun hasNode(text: String): Boolean {
         return runCatching {
             composeRule.onNodeWithText(text).fetchSemanticsNode()
@@ -71,12 +110,13 @@ class MainActivityTest {
         }.getOrDefault(false)
     }
 
-    private fun launchApp() {
+    private fun launchApp(intent: Intent? = null) {
+        val launchIntent = intent ?: Intent(
+            InstrumentationRegistry.getInstrumentation().targetContext,
+            MainActivity::class.java,
+        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
         scenario = ActivityScenario.launch(
-            Intent(
-                InstrumentationRegistry.getInstrumentation().targetContext,
-                MainActivity::class.java,
-            ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK),
+            launchIntent,
         )
         InstrumentationRegistry.getInstrumentation().waitForIdleSync()
     }

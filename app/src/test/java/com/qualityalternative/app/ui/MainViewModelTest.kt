@@ -29,6 +29,8 @@ import com.qualityalternative.app.domain.service.DelayGate
 import com.qualityalternative.app.domain.service.HistoryRepository
 import com.qualityalternative.app.domain.service.InterceptionMonitor
 import com.qualityalternative.app.domain.service.SettingsRepository
+import com.qualityalternative.app.interception.FixtureTargetRegistry
+import com.qualityalternative.app.interception.InterceptionRuntimeGate
 import java.io.File
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -54,6 +56,7 @@ class MainViewModelTest {
     fun tearDown() {
         createdViewModels.forEach(MainViewModel::closeForTests)
         createdViewModels.clear()
+        InterceptionRuntimeGate.clearAll()
     }
 
     @Test
@@ -362,6 +365,64 @@ class MainViewModelTest {
         assertEquals(null, postConsumeInspection.activeWindow)
         assertEquals(null, postConsumeInspection.expiredWindow)
         assertEquals(false, delayGate.consumeExpiredDelay(targetApp = targetApp, delayId = created.id, nowMillis = expiredAt))
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun requestSystemInterception_opensFixtureTargetAndOpenAnywayReturnsTrue() = runTest {
+        val viewModel = createViewModel()
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+
+        val fixtureTarget = FixtureTargetRegistry.fixtureDistractors.first()
+        viewModel.requestSystemInterception(targetAppPackage = fixtureTarget.packageName, nowMillis = 5_000L)
+        advanceUntilIdle()
+
+        assertEquals(MainScreen.Intervention, viewModel.uiState.screen)
+        assertEquals(InterventionOrigin.SYSTEM, viewModel.uiState.currentInterventionOrigin)
+        assertEquals(fixtureTarget.packageName, viewModel.uiState.selectedTargetApp?.packageName)
+
+        val exitsToTarget = viewModel.openAnyway()
+
+        assertTrue(exitsToTarget)
+        assertTrue(
+            InterceptionRuntimeGate.shouldSuppress(
+                targetAppPackage = fixtureTarget.packageName,
+                nowMillis = 5_001L,
+            ),
+        )
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun requestSystemInterception_waitsUntilHydrationCompletes() = runTest {
+        val settingsRepository = FakeSettingsRepository()
+        val historyRepository = FakeHistoryRepository(isReady = false)
+        val delayGate = FakeDelayGate(isReady = false)
+        val viewModel = createViewModel(
+            settingsRepository = settingsRepository,
+            historyRepository = historyRepository,
+            delayGate = delayGate,
+        )
+
+        viewModel.requestSystemInterception(
+            targetAppPackage = FixtureTargetRegistry.fixtureDistractors.first().packageName,
+            nowMillis = 7_000L,
+        )
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.isLoadingSettings)
+        assertEquals(MainScreen.Onboarding, viewModel.uiState.screen)
+
+        viewModel.completeOnboarding()
+        historyRepository.setReady(true)
+        delayGate.setReady(true)
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.isLoadingSettings)
+        assertEquals(MainScreen.Intervention, viewModel.uiState.screen)
+        assertEquals(InterventionOrigin.SYSTEM, viewModel.uiState.currentInterventionOrigin)
     }
 
     private fun createViewModel(

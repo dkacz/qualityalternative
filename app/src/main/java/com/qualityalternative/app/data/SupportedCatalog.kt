@@ -1,6 +1,7 @@
 package com.qualityalternative.app.data
 
 import com.qualityalternative.app.domain.model.DistractingApp
+import com.qualityalternative.app.interception.FixtureTargetRegistry
 
 object SupportedCatalog {
     val distractingApps: List<DistractingApp> = listOf(
@@ -10,4 +11,9 @@ object SupportedCatalog {
         DistractingApp(packageName = "com.reddit.frontpage", displayName = "Reddit"),
         DistractingApp(packageName = "com.zhiliaoapp.musically", displayName = "TikTok"),
     )
+
+    fun findByPackage(packageName: String): DistractingApp? {
+        return distractingApps.firstOrNull { it.packageName == packageName }
+            ?: FixtureTargetRegistry.findByPackage(packageName)
+    }
 }
