@@ -73,6 +73,7 @@ class QualityAlternativeAccessibilityService : AccessibilityService() {
             MainActivity.createSystemInterceptionIntent(
                 context = this,
                 targetAppPackage = targetApp.packageName,
+                triggeredAtMillis = nowMillis,
             ),
         )
     }

@@ -397,6 +397,30 @@ class MainViewModelTest {
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
+    fun requestSystemInterception_recordsDegradedPerformanceWhenShownTooLate() = runTest {
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val fixtureTarget = FixtureTargetRegistry.fixtureDistractors.first()
+        val viewModel = createViewModel(
+            analyticsTracker = analyticsTracker,
+            nowProvider = { 5_000L },
+        )
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+
+        viewModel.requestSystemInterception(targetAppPackage = fixtureTarget.packageName, nowMillis = 1_000L)
+        advanceUntilIdle()
+
+        val degradedEvent = analyticsTracker.allEvents().firstOrNull {
+            it.type == AnalyticsEventType.INTERVENTION_DEGRADED_PERFORMANCE
+        }
+        assertNotNull(degradedEvent)
+        assertEquals("4000", degradedEvent?.metadata?.get("interceptionDelayMillis"))
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
     fun requestSystemInterception_waitsUntilHydrationCompletes() = runTest {
         val settingsRepository = FakeSettingsRepository()
         val historyRepository = FakeHistoryRepository(isReady = false)
@@ -430,6 +454,7 @@ class MainViewModelTest {
         historyRepository: FakeHistoryRepository = FakeHistoryRepository(),
         analyticsTracker: InMemoryAnalyticsTracker = InMemoryAnalyticsTracker(),
         delayGate: DelayGate = InMemoryDelayGate(),
+        nowProvider: () -> Long = { 1_000L },
     ): MainViewModel {
         return track(
             MainViewModel(
@@ -441,6 +466,7 @@ class MainViewModelTest {
                 historyRepository = historyRepository,
                 interceptionMonitor = FakeInterceptionMonitor(),
                 enableDelayRefreshTicker = false,
+                nowProvider = nowProvider,
             ),
         )
     }

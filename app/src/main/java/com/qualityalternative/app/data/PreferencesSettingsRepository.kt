@@ -34,10 +34,7 @@ class PreferencesSettingsRepository(
             .map { preferences ->
                 AppSettings(
                     hasCompletedOnboarding = preferences[HasCompletedOnboarding] ?: false,
-                    selectedAppPackages = preferences[SelectedAppPackages].orEmpty()
-                        .filterTo(mutableSetOf()) { packageName ->
-                            supportedApps.any { it.packageName == packageName }
-                        },
+                    selectedAppPackages = preferences[SelectedAppPackages].orEmpty(),
                     preferredTopics = preferences[PreferredTopics].orEmpty()
                         .mapNotNullTo(mutableSetOf()) { raw ->
                             runCatching { TopicTag.valueOf(raw) }.getOrNull()

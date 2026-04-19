@@ -11,6 +11,7 @@ This repository now contains:
 - a working Sprint 0 foundation
 - a first local replacement-loop prototype for Sprint 1, triggered manually from inside the app
 - a completed Sprint 2 local-state slice with onboarding, persisted delay logic, history, and readiness signaling
+- a completed Sprint 3 Android interception alpha slice with live system-intent intervention, fixture distractor apps, and cross-app automation coverage
 
 ## Source of Truth
 
@@ -41,12 +42,15 @@ This repository now contains:
   - one primary recommendation plus two backups
   - reader flow
   - optional feedback flow
-  - local analytics ledger
-  - recent replacement history for the last 7 days
-  - permission readiness signaling for future interception
+- local analytics ledger
+- recent replacement history for the last 7 days
+- live accessibility-driven interception readiness guidance
 - persisted onboarding and target-app preferences after restart
 - persisted delay windows across sessions
-- System interception and fixture distractor apps are still future slices.
+- live system-interception routing from the accessibility service into the in-app intervention surface
+- internal fixture distractor apps for cross-app automation tests
+- cross-app instrumentation coverage for fixture-to-intervention transitions
+- internal alpha readiness docs in `docs/INTERNAL_ALPHA_CHECKLIST.md` and `docs/REAL_DEVICE_SMOKE.md`
 
 ## Working Approach
 
@@ -66,6 +70,8 @@ This repository now contains:
 
 Use `JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home` and `ANDROID_SDK_ROOT=/opt/homebrew/share/android-commandlinetools` when running the project from the CLI on this machine.
 
-## Near-Term Next Step
+## Alpha Status
 
-Move into Sprint 3: Android interception, degraded permission handling, and fixture distractor apps for cross-app automation.
+- Sprint 0-3 implementation is code-complete on Android.
+- Emulator validation is green for unit, lint, and instrumentation suites.
+- Final internal-alpha validation still requires one real-device smoke pass; see `docs/REAL_DEVICE_SMOKE.md`.

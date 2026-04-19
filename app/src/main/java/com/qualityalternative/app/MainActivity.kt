@@ -46,21 +46,31 @@ class MainActivity : ComponentActivity() {
             return
         }
         val targetAppPackage = intent.getStringExtra(EXTRA_TARGET_APP_PACKAGE) ?: return
-        mainViewModel.requestSystemInterception(targetAppPackage = targetAppPackage)
+        val triggeredAtMillis = intent.getLongExtra(
+            EXTRA_TRIGGERED_AT_MILLIS,
+            System.currentTimeMillis(),
+        )
+        mainViewModel.requestSystemInterception(
+            targetAppPackage = targetAppPackage,
+            nowMillis = triggeredAtMillis,
+        )
     }
 
     companion object {
         private const val ACTION_SYSTEM_INTERVENTION =
             "com.qualityalternative.app.action.SYSTEM_INTERVENTION"
         private const val EXTRA_TARGET_APP_PACKAGE = "extra_target_app_package"
+        private const val EXTRA_TRIGGERED_AT_MILLIS = "extra_triggered_at_millis"
 
         fun createSystemInterceptionIntent(
             context: Context,
             targetAppPackage: String,
+            triggeredAtMillis: Long = System.currentTimeMillis(),
         ): Intent {
             return Intent(context, MainActivity::class.java).apply {
                 action = ACTION_SYSTEM_INTERVENTION
                 putExtra(EXTRA_TARGET_APP_PACKAGE, targetAppPackage)
+                putExtra(EXTRA_TRIGGERED_AT_MILLIS, triggeredAtMillis)
                 addFlags(
                     Intent.FLAG_ACTIVITY_NEW_TASK or
                         Intent.FLAG_ACTIVITY_SINGLE_TOP or

@@ -97,6 +97,7 @@ class MainViewModel(
     private val historyRepository: HistoryRepository,
     private val interceptionMonitor: InterceptionMonitor,
     private val enableDelayRefreshTicker: Boolean = true,
+    private val nowProvider: () -> Long = System::currentTimeMillis,
 ) : ViewModel() {
     private val supportedApps = settingsRepository.supportedDistractingApps()
     private val starterPacks = contentRepository.starterPacks()
@@ -254,13 +255,14 @@ class MainViewModel(
         triggerIntervention(
             targetApp = targetApp,
             origin = InterventionOrigin.DEBUG,
-            nowMillis = nowMillis,
+            triggeredAtMillis = nowMillis,
+            processingNowMillis = nowMillis,
         )
     }
 
     fun requestSystemInterception(
         targetAppPackage: String,
-        nowMillis: Long = System.currentTimeMillis(),
+        nowMillis: Long = nowProvider(),
     ) {
         if (uiState.isLoadingSettings) {
             pendingSystemInterception = PendingSystemInterception(
@@ -274,14 +276,16 @@ class MainViewModel(
         triggerIntervention(
             targetApp = targetApp,
             origin = InterventionOrigin.SYSTEM,
-            nowMillis = nowMillis,
+            triggeredAtMillis = nowMillis,
+            processingNowMillis = nowProvider(),
         )
     }
 
     fun triggerIntervention(
         targetApp: DistractingApp,
         origin: InterventionOrigin,
-        nowMillis: Long = System.currentTimeMillis(),
+        triggeredAtMillis: Long = nowProvider(),
+        processingNowMillis: Long = triggeredAtMillis,
     ) {
         val preferences = uiState.preferences ?: return
         if (uiState.isLoadingSettings) {
@@ -290,12 +294,19 @@ class MainViewModel(
         }
 
         viewModelScope.launch {
-            val delayInspection = delayGate.inspectDelay(targetApp = targetApp, nowMillis = nowMillis)
+            maybeRecordInterceptionLatencyDegradation(
+                origin = origin,
+                targetApp = targetApp,
+                triggeredAtMillis = triggeredAtMillis,
+                shownAtMillis = processingNowMillis,
+            )
+
+            val delayInspection = delayGate.inspectDelay(targetApp = targetApp, nowMillis = processingNowMillis)
             if (delayInspection.activeWindow != null) {
-                recordDelayReturnDuringActiveWindow(targetApp = targetApp, nowMillis = nowMillis)
+                recordDelayReturnDuringActiveWindow(targetApp = targetApp, nowMillis = processingNowMillis)
                 uiState = uiState.copy(
                     selectedTargetApp = targetApp,
-                    activeDelayWindow = delayGate.activeDelay(targetApp = targetApp, nowMillis = nowMillis),
+                    activeDelayWindow = delayGate.activeDelay(targetApp = targetApp, nowMillis = processingNowMillis),
                     latestMessage = "${targetApp.displayName} is delayed for 15 minutes.",
                     screen = MainScreen.Home,
                     currentInterventionOrigin = null,
@@ -304,33 +315,33 @@ class MainViewModel(
             }
 
             delayInspection.expiredWindow?.let { expiredWindow ->
-                recordDelayReturnAfterExpiry(expiredWindow = expiredWindow, nowMillis = nowMillis)
+                recordDelayReturnAfterExpiry(expiredWindow = expiredWindow, nowMillis = processingNowMillis)
                 delayGate.consumeExpiredDelay(
                     targetApp = targetApp,
                     delayId = expiredWindow.id,
-                    nowMillis = nowMillis,
+                    nowMillis = processingNowMillis,
                 )
             }
 
-            recordReturnSignalIfNeeded(targetApp = targetApp, nowMillis = nowMillis)
+            recordReturnSignalIfNeeded(targetApp = targetApp, nowMillis = processingNowMillis)
 
             val interventionId = UUID.randomUUID().toString()
             val filteredInventory = contentRepository.inventory().filter { it.packId in preferences.selectedPackIds }
-            val signals = buildRecommendationSignals(nowMillis = nowMillis)
+            val signals = buildRecommendationSignals(nowMillis = processingNowMillis)
             val recommendationSet = recommendationEngine.generate(
                 targetApp = targetApp,
                 preferences = preferences,
                 inventory = filteredInventory,
                 primaryExcludedIds = uiState.completedContentIds,
                 signals = signals,
-                nowMillis = nowMillis,
+                nowMillis = processingNowMillis,
             )
 
             if (recommendationSet == null) {
                 recordEvent(
                     AnalyticsEvent(
                         type = AnalyticsEventType.NO_RECOMMENDATION_AVAILABLE,
-                        timestampMillis = nowMillis,
+                        timestampMillis = processingNowMillis,
                         interventionId = interventionId,
                         targetAppPackage = targetApp.packageName,
                         metadata = mapOf("selectedPackCount" to preferences.selectedPackIds.size.toString()),
@@ -354,7 +365,7 @@ class MainViewModel(
             recordEvent(
                 AnalyticsEvent(
                     type = AnalyticsEventType.INTERVENTION_SHOWN,
-                    timestampMillis = nowMillis,
+                    timestampMillis = processingNowMillis,
                     interventionId = interventionId,
                     targetAppPackage = targetApp.packageName,
                     primaryContentId = recommendationSet.primary.id,
@@ -367,7 +378,7 @@ class MainViewModel(
                 recordEvent(
                     AnalyticsEvent(
                         type = AnalyticsEventType.INVENTORY_SHORTAGE,
-                        timestampMillis = nowMillis,
+                        timestampMillis = processingNowMillis,
                         interventionId = interventionId,
                         targetAppPackage = targetApp.packageName,
                         primaryContentId = recommendationSet.primary.id,
@@ -380,7 +391,7 @@ class MainViewModel(
             uiState = uiState.copy(
                 selectedTargetApp = targetApp,
                 currentInterventionId = interventionId,
-                currentInterventionShownAtMillis = nowMillis,
+                currentInterventionShownAtMillis = processingNowMillis,
                 currentRecommendationSet = recommendationSet,
                 currentInterventionOrigin = origin,
                 activeDelayWindow = null,
@@ -666,6 +677,33 @@ class MainViewModel(
             returnedAtMillis = nowMillis,
         ) ?: return
         recordSessionReturnMetricsDurably(signal)
+    }
+
+    private fun maybeRecordInterceptionLatencyDegradation(
+        origin: InterventionOrigin,
+        targetApp: DistractingApp,
+        triggeredAtMillis: Long,
+        shownAtMillis: Long,
+    ) {
+        if (origin != InterventionOrigin.SYSTEM) {
+            return
+        }
+        val delayMillis = shownAtMillis - triggeredAtMillis
+        if (delayMillis <= INTERVENTION_DEGRADED_THRESHOLD_MILLIS) {
+            return
+        }
+        recordEvent(
+            AnalyticsEvent(
+                type = AnalyticsEventType.INTERVENTION_DEGRADED_PERFORMANCE,
+                timestampMillis = shownAtMillis,
+                targetAppPackage = targetApp.packageName,
+                metadata = mapOf(
+                    "triggeredAtMillis" to triggeredAtMillis.toString(),
+                    "shownAtMillis" to shownAtMillis.toString(),
+                    "interceptionDelayMillis" to delayMillis.toString(),
+                ),
+            ),
+        )
     }
 
     private suspend fun recordDelayReturnDuringActiveWindow(targetApp: DistractingApp, nowMillis: Long) {
@@ -1015,6 +1053,7 @@ private fun unavailablePermissionReadiness(): PermissionReadiness {
 
 private const val ACTIVE_DELAY_REFRESH_INTERVAL_MILLIS = 1_000L
 private const val OPEN_ANYWAY_SUPPRESSION_WINDOW_MILLIS = 60_000L
+private const val INTERVENTION_DEGRADED_THRESHOLD_MILLIS = 2_000L
 
 private data class PendingSystemInterception(
     val targetAppPackage: String,
