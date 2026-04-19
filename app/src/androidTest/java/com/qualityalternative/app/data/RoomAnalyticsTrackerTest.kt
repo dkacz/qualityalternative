@@ -15,6 +15,7 @@ import com.qualityalternative.app.domain.model.AnalyticsEvent
 import com.qualityalternative.app.domain.model.AnalyticsSemanticKeys
 import com.qualityalternative.app.domain.model.AppSettings
 import com.qualityalternative.app.domain.model.AnalyticsEventType
+import com.qualityalternative.app.domain.model.ContentFormat
 import com.qualityalternative.app.domain.model.ContentItem
 import com.qualityalternative.app.domain.model.DelayWindow
 import com.qualityalternative.app.domain.model.DistractingApp
@@ -327,20 +328,13 @@ class RoomAnalyticsTrackerTest {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val databaseName = "room-analytics-session-replay-${System.nanoTime()}"
         val targetApp = SupportedCatalog.distractingApps.first()
-        val signal = ReturnToTargetSignal(
-            sessionId = "session-1",
-            interventionId = "intervention-1",
-            targetAppPackage = targetApp.packageName,
-            primaryContentId = "primary-1",
-            backupContentIds = listOf("backup-1", "backup-2"),
-            contentId = "primary-1",
-            returnedAtMillis = 4_000L,
-            within15Minutes = true,
-            within60Minutes = true,
-        )
         val delayFile = File.createTempFile("room-analytics-session-replay", ".preferences_pb").apply { deleteOnExit() }
         val dataStoreScope = integrationScope()
         val dataStore = testDataStore(delayFile)
+        val content = historyContentFixture()
+        val backupContentIds = listOf("backup-1", "backup-2")
+        val interventionId = "intervention-1"
+        var sessionId: String? = null
 
         try {
             val firstDatabase = fileBackedDatabase(context, databaseName)
@@ -349,6 +343,10 @@ class RoomAnalyticsTrackerTest {
             try {
                 val tracker = RoomAnalyticsTracker(
                     dao = firstDatabase.analyticsEventDao(),
+                    scope = firstScope,
+                )
+                val historyRepository = RoomHistoryRepository(
+                    dao = firstDatabase.replacementSessionDao(),
                     scope = firstScope,
                 )
                 firstViewModel = MainViewModel(
@@ -360,30 +358,40 @@ class RoomAnalyticsTrackerTest {
                         scope = dataStoreScope,
                     ),
                     analyticsTracker = tracker,
-                    historyRepository = ReplayableReturnHistoryRepository(signal),
+                    historyRepository = historyRepository,
                     interceptionMonitor = AndroidInterceptionMonitor(),
                     enableDelayRefreshTicker = false,
                 )
                 tracker.observeReady().first { it }
+                historyRepository.observeReady().first { it }
                 waitForHydratedMainState(firstViewModel, targetApp.packageName)
 
-                firstViewModel.triggerDebugIntervention(nowMillis = 5_000L)
-                withTimeout(10_000L) {
-                    tracker.observeEvents().first { tracked ->
-                        tracked.count {
-                            it.semanticKey == AnalyticsSemanticKeys.sessionReturn(
-                                sessionId = signal.sessionId,
-                                type = AnalyticsEventType.RETURN_TO_APP_WITHIN_15_MINUTES,
-                            )
-                        } == 1 &&
-                            tracked.count {
-                                it.semanticKey == AnalyticsSemanticKeys.sessionReturn(
-                                    sessionId = signal.sessionId,
-                                    type = AnalyticsEventType.RETURN_TO_APP_WITHIN_60_MINUTES,
-                                )
-                            } == 1
-                    }
+                sessionId = historyRepository.recordAcceptedSession(
+                    targetApp = targetApp,
+                    interventionId = interventionId,
+                    interventionShownAtMillis = 1_000L,
+                    primaryContentId = content.id,
+                    backupContentIds = backupContentIds,
+                    content = content,
+                    source = RecommendationSource.PRIMARY,
+                    acceptedAtMillis = 1_100L,
+                )
+                val initialSignal = historyRepository.markReturnedToTarget(
+                    targetAppPackage = targetApp.packageName,
+                    returnedAtMillis = 4_000L,
+                )
+                assertEquals(sessionId, initialSignal?.sessionId)
+                assertEquals(4_000L, initialSignal?.returnedAtMillis)
+                assertEquals(true, initialSignal?.within15Minutes)
+                assertEquals(true, initialSignal?.within60Minutes)
+
+                val persistedEntry = waitForHistoryEntry {
+                    historyRepository.recentHistory(nowMillis = 4_000L)
+                        .singleOrNull()
+                        ?.takeIf { it.returnedToTargetAtMillis == 4_000L }
                 }
+                assertEquals(4_000L, persistedEntry.returnedToTargetAtMillis)
+                assertTrue(tracker.allEvents().isEmpty())
             } finally {
                 firstViewModel?.closeForTests()
                 firstScope.cancel()
@@ -399,6 +407,10 @@ class RoomAnalyticsTrackerTest {
                     dao = reopenedDatabase.analyticsEventDao(),
                     scope = secondScope,
                 )
+                val historyRepository = RoomHistoryRepository(
+                    dao = reopenedDatabase.replacementSessionDao(),
+                    scope = secondScope,
+                )
                 secondViewModel = MainViewModel(
                     contentRepository = AssetContentRepository(context),
                     settingsRepository = AndroidSettingsRepository(),
@@ -408,12 +420,13 @@ class RoomAnalyticsTrackerTest {
                         scope = dataStoreScope,
                     ),
                     analyticsTracker = tracker,
-                    historyRepository = ReplayableReturnHistoryRepository(signal),
+                    historyRepository = historyRepository,
                     interceptionMonitor = AndroidInterceptionMonitor(),
                     enableDelayRefreshTicker = false,
                 )
 
                 tracker.observeReady().first { it }
+                historyRepository.observeReady().first { it }
                 waitForHydratedMainState(secondViewModel, targetApp.packageName)
 
                 secondViewModel.triggerDebugIntervention(nowMillis = 6_000L)
@@ -422,13 +435,13 @@ class RoomAnalyticsTrackerTest {
                     tracker.observeEvents().first { tracked ->
                         tracked.count {
                             it.semanticKey == AnalyticsSemanticKeys.sessionReturn(
-                                sessionId = signal.sessionId,
+                                sessionId = sessionId!!,
                                 type = AnalyticsEventType.RETURN_TO_APP_WITHIN_15_MINUTES,
                             )
                         } == 1 &&
                             tracked.count {
                                 it.semanticKey == AnalyticsSemanticKeys.sessionReturn(
-                                    sessionId = signal.sessionId,
+                                    sessionId = sessionId!!,
                                     type = AnalyticsEventType.RETURN_TO_APP_WITHIN_60_MINUTES,
                                 )
                             } == 1
@@ -436,18 +449,29 @@ class RoomAnalyticsTrackerTest {
                 }
                 val within15 = events.first {
                     it.semanticKey == AnalyticsSemanticKeys.sessionReturn(
-                        sessionId = signal.sessionId,
+                        sessionId = sessionId!!,
                         type = AnalyticsEventType.RETURN_TO_APP_WITHIN_15_MINUTES,
                     )
                 }
+                val within60 = events.first {
+                    it.semanticKey == AnalyticsSemanticKeys.sessionReturn(
+                        sessionId = sessionId!!,
+                        type = AnalyticsEventType.RETURN_TO_APP_WITHIN_60_MINUTES,
+                    )
+                }
                 assertEquals(4_000L, within15.timestampMillis)
+                assertEquals(4_000L, within60.timestampMillis)
+                assertEquals(interventionId, within15.interventionId)
+                assertEquals(content.id, within15.contentId)
+                assertEquals(targetApp.packageName, within15.targetAppPackage)
 
+                secondViewModel.triggerDebugIntervention(nowMillis = 7_000L)
                 val afterRetry = tracker.allEvents()
                 assertEquals(
                     1,
                     afterRetry.count {
                         it.semanticKey == AnalyticsSemanticKeys.sessionReturn(
-                            sessionId = signal.sessionId,
+                            sessionId = sessionId!!,
                             type = AnalyticsEventType.RETURN_TO_APP_WITHIN_15_MINUTES,
                         )
                     },
@@ -456,11 +480,13 @@ class RoomAnalyticsTrackerTest {
                     1,
                     afterRetry.count {
                         it.semanticKey == AnalyticsSemanticKeys.sessionReturn(
-                            sessionId = signal.sessionId,
+                            sessionId = sessionId!!,
                             type = AnalyticsEventType.RETURN_TO_APP_WITHIN_60_MINUTES,
                         )
                     },
                 )
+                val replayedEntry = historyRepository.recentHistory(nowMillis = 7_000L).single()
+                assertEquals(4_000L, replayedEntry.returnedToTargetAtMillis)
             } finally {
                 secondViewModel?.closeForTests()
                 secondScope.cancel()
@@ -675,33 +701,6 @@ class RoomAnalyticsTrackerTest {
         override suspend fun markReturnedToTarget(targetAppPackage: String, returnedAtMillis: Long): ReturnToTargetSignal? = null
     }
 
-    private class ReplayableReturnHistoryRepository(
-        private val signal: ReturnToTargetSignal,
-    ) : HistoryRepository {
-        override fun recentHistory(nowMillis: Long, windowDays: Int): List<ReplacementHistoryEntry> = emptyList()
-
-        override suspend fun recordAcceptedSession(
-            targetApp: DistractingApp,
-            interventionId: String,
-            interventionShownAtMillis: Long,
-            primaryContentId: String,
-            backupContentIds: List<String>,
-            content: ContentItem,
-            source: RecommendationSource,
-            acceptedAtMillis: Long,
-        ): String = signal.sessionId
-
-        override suspend fun markCompleted(sessionId: String, completedAtMillis: Long) = Unit
-
-        override suspend fun markSkipped(sessionId: String, skippedAtMillis: Long) = Unit
-
-        override suspend fun attachFeedback(sessionId: String, feedback: SessionFeedback) = Unit
-
-        override suspend fun markReturnedToTarget(targetAppPackage: String, returnedAtMillis: Long): ReturnToTargetSignal? {
-            return signal.takeIf { it.targetAppPackage == targetAppPackage }
-        }
-    }
-
     private class AndroidInterceptionMonitor : InterceptionMonitor {
         override fun isAvailable(): Boolean = false
 
@@ -757,6 +756,29 @@ class RoomAnalyticsTrackerTest {
             delay(25)
         }
         return provider()
+    }
+
+    private suspend fun waitForHistoryEntry(
+        provider: () -> ReplacementHistoryEntry?,
+    ): ReplacementHistoryEntry {
+        repeat(400) {
+            provider()?.let { return it }
+            delay(25)
+        }
+        throw AssertionError("Timed out waiting for history entry")
+    }
+
+    private fun historyContentFixture(): ContentItem {
+        return ContentItem(
+            id = "content-1",
+            packId = "philosophy",
+            title = "Stoic note",
+            description = "A short reflective text",
+            durationMinutes = 7,
+            format = ContentFormat.MARKDOWN,
+            topicTags = setOf(TopicTag.PHILOSOPHY),
+            bodyAssetPath = "unused",
+        )
     }
 
     private suspend fun waitForHydratedMainState(

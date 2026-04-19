@@ -9,10 +9,14 @@ import com.qualityalternative.app.domain.model.ContentItem
 import com.qualityalternative.app.domain.model.RecommendationSource
 import com.qualityalternative.app.domain.model.SessionFeedback
 import com.qualityalternative.app.domain.model.TopicTag
-import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.advanceUntilIdle
-import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -21,18 +25,18 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class RoomHistoryRepositoryTest {
     @Test
-    @OptIn(ExperimentalCoroutinesApi::class)
-    fun acceptThenImmediateMutationsRemainVisible() = runTest {
+    fun acceptThenImmediateMutationsRemainVisible() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val database = Room.inMemoryDatabaseBuilder(
             context,
             QualityAlternativeDatabase::class.java,
         ).allowMainThreadQueries().build()
+        val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
         try {
             val repository = RoomHistoryRepository(
                 dao = database.replacementSessionDao(),
-                scope = backgroundScope,
+                scope = appScope,
             )
             repository.observeReady().first { it }
 
@@ -68,33 +72,36 @@ class RoomHistoryRepositoryTest {
                 ),
             )
             repository.markReturnedToTarget(targetAppPackage = targetApp.packageName, returnedAtMillis = 3_000L)
-            advanceUntilIdle()
 
             val historyEntry = repository.recentHistory(nowMillis = 3_000L).single()
-            val completedIds = repository.observeCompletedContentIds().first()
+            val completedIds = withTimeout(10_000L) {
+                repository.observeCompletedContentIds().first { it == setOf(content.id) }
+            }
 
             assertTrue(historyEntry.isCompleted())
             assertEquals(3_000L, historyEntry.returnedToTargetAtMillis)
             assertEquals(true, historyEntry.feedbackHelpedAvoidScrolling)
             assertEquals(setOf(content.id), completedIds)
         } finally {
+            appScope.cancel()
+            delay(100)
             database.close()
         }
     }
 
     @Test
-    @OptIn(ExperimentalCoroutinesApi::class)
-    fun repeatedMarkReturnedToTarget_replaysPersistedSignalWithoutMutatingTimestamp() = runTest {
+    fun repeatedMarkReturnedToTarget_replaysPersistedSignalWithoutMutatingTimestamp() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val database = Room.inMemoryDatabaseBuilder(
             context,
             QualityAlternativeDatabase::class.java,
         ).allowMainThreadQueries().build()
+        val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
         try {
             val repository = RoomHistoryRepository(
                 dao = database.replacementSessionDao(),
-                scope = backgroundScope,
+                scope = appScope,
             )
             repository.observeReady().first { it }
 
@@ -128,8 +135,6 @@ class RoomHistoryRepositoryTest {
                 targetAppPackage = targetApp.packageName,
                 returnedAtMillis = 9_000L,
             )
-            advanceUntilIdle()
-
             val historyEntry = repository.recentHistory(nowMillis = 9_000L).single()
 
             assertEquals(3_000L, firstSignal?.returnedAtMillis)
@@ -137,6 +142,8 @@ class RoomHistoryRepositoryTest {
             assertEquals(true, replayedSignal?.within15Minutes)
             assertEquals(3_000L, historyEntry.returnedToTargetAtMillis)
         } finally {
+            appScope.cancel()
+            delay(100)
             database.close()
         }
     }
