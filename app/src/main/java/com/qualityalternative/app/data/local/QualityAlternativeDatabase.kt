@@ -10,7 +10,7 @@ import androidx.room.RoomDatabase
         AnalyticsEventEntity::class,
         ReplacementSessionEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = false,
 )
 abstract class QualityAlternativeDatabase : RoomDatabase() {

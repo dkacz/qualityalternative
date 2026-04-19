@@ -81,4 +81,63 @@ class RoomHistoryRepositoryTest {
             database.close()
         }
     }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun repeatedMarkReturnedToTarget_replaysPersistedSignalWithoutMutatingTimestamp() = runTest {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val database = Room.inMemoryDatabaseBuilder(
+            context,
+            QualityAlternativeDatabase::class.java,
+        ).allowMainThreadQueries().build()
+
+        try {
+            val repository = RoomHistoryRepository(
+                dao = database.replacementSessionDao(),
+                scope = backgroundScope,
+            )
+            repository.observeReady().first { it }
+
+            val targetApp = SupportedCatalog.distractingApps.first()
+            val content = ContentItem(
+                id = "content-1",
+                packId = "philosophy",
+                title = "Stoic note",
+                description = "A short reflective text",
+                durationMinutes = 7,
+                format = ContentFormat.MARKDOWN,
+                topicTags = setOf(TopicTag.PHILOSOPHY),
+                bodyAssetPath = "unused",
+            )
+
+            repository.recordAcceptedSession(
+                targetApp = targetApp,
+                interventionId = "intervention-1",
+                interventionShownAtMillis = 1_000L,
+                primaryContentId = content.id,
+                backupContentIds = listOf("backup-1", "backup-2"),
+                content = content,
+                source = RecommendationSource.PRIMARY,
+                acceptedAtMillis = 1_100L,
+            )
+            val firstSignal = repository.markReturnedToTarget(
+                targetAppPackage = targetApp.packageName,
+                returnedAtMillis = 3_000L,
+            )
+            val replayedSignal = repository.markReturnedToTarget(
+                targetAppPackage = targetApp.packageName,
+                returnedAtMillis = 9_000L,
+            )
+            advanceUntilIdle()
+
+            val historyEntry = repository.recentHistory(nowMillis = 9_000L).single()
+
+            assertEquals(3_000L, firstSignal?.returnedAtMillis)
+            assertEquals(3_000L, replayedSignal?.returnedAtMillis)
+            assertEquals(true, replayedSignal?.within15Minutes)
+            assertEquals(3_000L, historyEntry.returnedToTargetAtMillis)
+        } finally {
+            database.close()
+        }
+    }
 }

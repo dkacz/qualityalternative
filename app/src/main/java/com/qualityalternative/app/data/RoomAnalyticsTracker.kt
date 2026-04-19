@@ -55,6 +55,7 @@ private fun AnalyticsEvent.toEntity(): AnalyticsEventEntity {
     return AnalyticsEventEntity(
         type = type.name,
         timestampMillis = timestampMillis,
+        semanticKey = semanticKey,
         interventionId = interventionId,
         sessionId = sessionId,
         targetAppPackage = targetAppPackage,
@@ -69,6 +70,7 @@ private fun AnalyticsEventEntity.toModel(): AnalyticsEvent {
     return AnalyticsEvent(
         type = AnalyticsEventType.valueOf(type),
         timestampMillis = timestampMillis,
+        semanticKey = semanticKey,
         interventionId = interventionId,
         sessionId = sessionId,
         targetAppPackage = targetAppPackage,

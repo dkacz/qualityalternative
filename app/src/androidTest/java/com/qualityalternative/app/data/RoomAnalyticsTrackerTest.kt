@@ -1,19 +1,28 @@
 package com.qualityalternative.app.data
 
+import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.edit
 import androidx.room.Room
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.qualityalternative.app.data.local.AnalyticsEventEntity
 import com.qualityalternative.app.data.local.QualityAlternativeDatabase
+import com.qualityalternative.app.data.local.ReplacementSessionEntity
+import com.qualityalternative.app.domain.model.AnalyticsEvent
+import com.qualityalternative.app.domain.model.AnalyticsSemanticKeys
 import com.qualityalternative.app.domain.model.AppSettings
 import com.qualityalternative.app.domain.model.AnalyticsEventType
+import com.qualityalternative.app.domain.model.ContentItem
+import com.qualityalternative.app.domain.model.DelayWindow
 import com.qualityalternative.app.domain.model.DistractingApp
 import com.qualityalternative.app.domain.model.DurationBucket
 import com.qualityalternative.app.domain.model.OnboardingSelection
 import com.qualityalternative.app.domain.model.PermissionReadiness
 import com.qualityalternative.app.domain.model.PermissionStatus
+import com.qualityalternative.app.domain.model.RecommendationSource
 import com.qualityalternative.app.domain.model.ReplacementHistoryEntry
 import com.qualityalternative.app.domain.model.ReturnToTargetSignal
 import com.qualityalternative.app.domain.model.SessionFeedback
@@ -22,42 +31,469 @@ import com.qualityalternative.app.domain.service.HistoryRepository
 import com.qualityalternative.app.domain.service.InterceptionMonitor
 import com.qualityalternative.app.domain.service.SettingsRepository
 import com.qualityalternative.app.ui.MainViewModel
-import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.test.advanceUntilIdle
-import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.json.JSONObject
 
 @RunWith(AndroidJUnit4::class)
 class RoomAnalyticsTrackerTest {
     @Test
-    @OptIn(ExperimentalCoroutinesApi::class)
-    fun productionActiveDelayPath_persistsRoomAnalyticsWithExpectedMetadata() = runTest {
+    fun activeDelayReplay_repairsPersistedMetricsExactlyOnceAfterRestart() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val databaseName = "room-analytics-active-replay-${System.nanoTime()}"
+        val delayFile = File.createTempFile("room-analytics-active-replay", ".preferences_pb").apply { deleteOnExit() }
+        val targetApp = SupportedCatalog.distractingApps.first()
+        val dataStore = testDataStore(delayFile)
+        val appScope = integrationScope()
+        val created = DelayWindow(
+            id = "delay-active-replay",
+            targetAppPackage = targetApp.packageName,
+            startsAtMillis = 1_000L,
+            endsAtMillis = 1_000L + 15 * 60_000L,
+            interventionId = "intervention-1",
+            interventionShownAtMillis = 900L,
+            primaryContentId = "primary-1",
+            backupContentIds = listOf("backup-1", "backup-2"),
+            firstReturnAttemptAtMillis = 2_000L,
+        )
+
+        try {
+            dataStore.edit { preferences ->
+                preferences[PreferencesDelayGate.DelayWindows] = setOf(PreferencesDelayGate.encodeWindow(created))
+            }
+
+            val reopenedDatabase = fileBackedDatabase(context, databaseName)
+            var viewModel: MainViewModel? = null
+            try {
+                val tracker = RoomAnalyticsTracker(
+                    dao = reopenedDatabase.analyticsEventDao(),
+                    scope = appScope,
+                )
+                val reopenedDelayGate = PreferencesDelayGate(
+                    dataStore = dataStore,
+                    scope = appScope,
+                )
+                viewModel = MainViewModel(
+                    contentRepository = AssetContentRepository(context),
+                    settingsRepository = AndroidSettingsRepository(),
+                    recommendationEngine = com.qualityalternative.app.domain.service.DefaultRecommendationEngine(),
+                    delayGate = reopenedDelayGate,
+                    analyticsTracker = tracker,
+                    historyRepository = AndroidHistoryRepository(),
+                    interceptionMonitor = AndroidInterceptionMonitor(),
+                    enableDelayRefreshTicker = false,
+                )
+
+                tracker.observeReady().first { it }
+                reopenedDelayGate.observeReady().first { it }
+                waitForHydratedMainState(viewModel, targetApp.packageName)
+
+                viewModel.triggerDebugIntervention(nowMillis = 3_000L)
+
+                val repairedEvents = withTimeout(10_000L) {
+                    tracker.observeEvents().first { tracked ->
+                        tracked.count { it.type == AnalyticsEventType.DELAY_SELECTED } == 1 &&
+                            tracked.count { it.type == AnalyticsEventType.RETURN_TO_APP_WITHIN_15_MINUTES } == 1 &&
+                            tracked.count { it.type == AnalyticsEventType.RETURN_TO_APP_WITHIN_60_MINUTES } == 1
+                    }
+                }
+                val delaySelected = repairedEvents.first { it.type == AnalyticsEventType.DELAY_SELECTED }
+                val within15 = repairedEvents.first { it.type == AnalyticsEventType.RETURN_TO_APP_WITHIN_15_MINUTES }
+                val within60 = repairedEvents.first { it.type == AnalyticsEventType.RETURN_TO_APP_WITHIN_60_MINUTES }
+
+                assertEquals(created.id, delaySelected.metadata["delayId"])
+                assertEquals(1_000L, delaySelected.timestampMillis)
+                assertEquals(created.id, within15.metadata["delayId"])
+                assertEquals("active_delay", within15.metadata["delayReturnOrigin"])
+                assertEquals(2_000L, within15.timestampMillis)
+                assertEquals(created.id, within60.metadata["delayId"])
+                assertEquals("active_delay", within60.metadata["delayReturnOrigin"])
+                assertEquals(2_000L, within60.timestampMillis)
+
+                viewModel.triggerDebugIntervention(nowMillis = 4_000L)
+                delay(250)
+
+                val afterRetry = tracker.allEvents()
+                assertEquals(1, afterRetry.count { it.type == AnalyticsEventType.DELAY_SELECTED })
+                assertEquals(1, afterRetry.count { it.type == AnalyticsEventType.RETURN_TO_APP_WITHIN_15_MINUTES })
+                assertEquals(1, afterRetry.count { it.type == AnalyticsEventType.RETURN_TO_APP_WITHIN_60_MINUTES })
+            } finally {
+                viewModel?.closeForTests()
+                appScope.cancel()
+                delay(100)
+                reopenedDatabase.close()
+            }
+        } finally {
+            context.deleteDatabase(databaseName)
+        }
+    }
+
+    @Test
+    fun expiredDelayReplay_doesNotDuplicatePersistedAnalytics() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val databaseName = "room-analytics-expired-replay-${System.nanoTime()}"
+        val delayFile = File.createTempFile("room-analytics-expired-replay", ".preferences_pb").apply { deleteOnExit() }
+        val targetApp = SupportedCatalog.distractingApps.first()
+        val dataStoreScope = integrationScope()
+        val dataStore = testDataStore(delayFile)
+        val delayGate = PreferencesDelayGate(
+            dataStore = dataStore,
+            scope = dataStoreScope,
+        )
+
+        try {
+            delayGate.observeReady().first { it }
+            val created = delayGate.storeDelayDurably(
+                targetApp = targetApp,
+                nowMillis = 1_000L,
+                durationMinutes = 15,
+                interventionId = "intervention-1",
+                interventionShownAtMillis = 900L,
+                primaryContentId = "primary-1",
+                backupContentIds = listOf("backup-1", "backup-2"),
+            )
+            val firstDatabase = fileBackedDatabase(context, databaseName)
+            try {
+                firstDatabase.analyticsEventDao().insert(
+                    analyticsEntity(
+                        AnalyticsEvent(
+                            type = AnalyticsEventType.RETURN_AFTER_DELAY_ENDED,
+                            timestampMillis = created.endsAtMillis + 1,
+                            semanticKey = AnalyticsSemanticKeys.delayEnded(created.id),
+                            interventionId = "intervention-1",
+                            targetAppPackage = targetApp.packageName,
+                            primaryContentId = "primary-1",
+                            backupContentIds = listOf("backup-1", "backup-2"),
+                            contentId = "primary-1",
+                            metadata = mapOf(
+                                "delayId" to created.id,
+                                "delayReturnOrigin" to "after_delay_expired",
+                                "delayStartedAtMillis" to created.startsAtMillis.toString(),
+                                "delayEndedAtMillis" to created.endsAtMillis.toString(),
+                                "hadActiveDelayReturn" to "false",
+                            ),
+                        ),
+                    ),
+                )
+                firstDatabase.analyticsEventDao().insert(
+                    analyticsEntity(
+                        AnalyticsEvent(
+                            type = AnalyticsEventType.RETURN_TO_APP_WITHIN_15_MINUTES,
+                            timestampMillis = created.endsAtMillis + 1,
+                            semanticKey = AnalyticsSemanticKeys.delayReturn(
+                                delayId = created.id,
+                                origin = "after_delay_expired",
+                                type = AnalyticsEventType.RETURN_TO_APP_WITHIN_15_MINUTES,
+                            ),
+                            interventionId = "intervention-1",
+                            targetAppPackage = targetApp.packageName,
+                            primaryContentId = "primary-1",
+                            backupContentIds = listOf("backup-1", "backup-2"),
+                            contentId = "primary-1",
+                            metadata = mapOf(
+                                "delayId" to created.id,
+                                "delayReturnOrigin" to "after_delay_expired",
+                                "delayStartedAtMillis" to created.startsAtMillis.toString(),
+                                "delayEndedAtMillis" to created.endsAtMillis.toString(),
+                            ),
+                        ),
+                    ),
+                )
+                firstDatabase.analyticsEventDao().insert(
+                    analyticsEntity(
+                        AnalyticsEvent(
+                            type = AnalyticsEventType.RETURN_TO_APP_WITHIN_60_MINUTES,
+                            timestampMillis = created.endsAtMillis + 1,
+                            semanticKey = AnalyticsSemanticKeys.delayReturn(
+                                delayId = created.id,
+                                origin = "after_delay_expired",
+                                type = AnalyticsEventType.RETURN_TO_APP_WITHIN_60_MINUTES,
+                            ),
+                            interventionId = "intervention-1",
+                            targetAppPackage = targetApp.packageName,
+                            primaryContentId = "primary-1",
+                            backupContentIds = listOf("backup-1", "backup-2"),
+                            contentId = "primary-1",
+                            metadata = mapOf(
+                                "delayId" to created.id,
+                                "delayReturnOrigin" to "after_delay_expired",
+                                "delayStartedAtMillis" to created.startsAtMillis.toString(),
+                                "delayEndedAtMillis" to created.endsAtMillis.toString(),
+                            ),
+                        ),
+                    ),
+                )
+            } finally {
+                firstDatabase.close()
+            }
+
+            val reopenedDatabase = fileBackedDatabase(context, databaseName)
+            val reopenedScope = integrationScope()
+            var viewModel: MainViewModel? = null
+            try {
+                val tracker = RoomAnalyticsTracker(
+                    dao = reopenedDatabase.analyticsEventDao(),
+                    scope = reopenedScope,
+                )
+                val reopenedDelayGate = PreferencesDelayGate(
+                    dataStore = dataStore,
+                    scope = dataStoreScope,
+                )
+                viewModel = MainViewModel(
+                    contentRepository = AssetContentRepository(context),
+                    settingsRepository = AndroidSettingsRepository(),
+                    recommendationEngine = com.qualityalternative.app.domain.service.DefaultRecommendationEngine(),
+                    delayGate = reopenedDelayGate,
+                    analyticsTracker = tracker,
+                    historyRepository = AndroidHistoryRepository(),
+                    interceptionMonitor = AndroidInterceptionMonitor(),
+                    enableDelayRefreshTicker = false,
+                )
+
+                tracker.observeReady().first { it }
+                reopenedDelayGate.observeReady().first { it }
+                waitForHydratedMainState(viewModel, targetApp.packageName)
+
+                viewModel.triggerDebugIntervention(nowMillis = created.endsAtMillis + 1)
+
+                val events = withTimeout(10_000L) {
+                    tracker.observeEvents().first { tracked ->
+                        tracked.count { it.semanticKey == AnalyticsSemanticKeys.delayEnded(created.id) } == 1 &&
+                            tracked.count {
+                                it.semanticKey == AnalyticsSemanticKeys.delayReturn(
+                                    delayId = created.id,
+                                    origin = "after_delay_expired",
+                                    type = AnalyticsEventType.RETURN_TO_APP_WITHIN_15_MINUTES,
+                                )
+                            } == 1 &&
+                            tracked.count {
+                                it.semanticKey == AnalyticsSemanticKeys.delayReturn(
+                                    delayId = created.id,
+                                    origin = "after_delay_expired",
+                                    type = AnalyticsEventType.RETURN_TO_APP_WITHIN_60_MINUTES,
+                                )
+                            } == 1
+                    }
+                }
+                assertEquals(1, events.count { it.semanticKey == AnalyticsSemanticKeys.delayEnded(created.id) })
+                assertEquals(
+                    1,
+                    events.count {
+                        it.semanticKey == AnalyticsSemanticKeys.delayReturn(
+                            delayId = created.id,
+                            origin = "after_delay_expired",
+                            type = AnalyticsEventType.RETURN_TO_APP_WITHIN_15_MINUTES,
+                        )
+                    },
+                )
+                assertEquals(
+                    1,
+                    events.count {
+                        it.semanticKey == AnalyticsSemanticKeys.delayReturn(
+                            delayId = created.id,
+                            origin = "after_delay_expired",
+                            type = AnalyticsEventType.RETURN_TO_APP_WITHIN_60_MINUTES,
+                        )
+                    },
+                )
+            } finally {
+                viewModel?.closeForTests()
+                reopenedScope.cancel()
+                delay(100)
+                reopenedDatabase.close()
+            }
+        } finally {
+            dataStoreScope.cancel()
+            context.deleteDatabase(databaseName)
+        }
+    }
+
+    @Test
+    fun returnedSessionReplay_repairsMetricsExactlyOnceAfterRestart() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val databaseName = "room-analytics-session-replay-${System.nanoTime()}"
+        val targetApp = SupportedCatalog.distractingApps.first()
+        val signal = ReturnToTargetSignal(
+            sessionId = "session-1",
+            interventionId = "intervention-1",
+            targetAppPackage = targetApp.packageName,
+            primaryContentId = "primary-1",
+            backupContentIds = listOf("backup-1", "backup-2"),
+            contentId = "primary-1",
+            returnedAtMillis = 4_000L,
+            within15Minutes = true,
+            within60Minutes = true,
+        )
+        val delayFile = File.createTempFile("room-analytics-session-replay", ".preferences_pb").apply { deleteOnExit() }
+        val dataStoreScope = integrationScope()
+        val dataStore = testDataStore(delayFile)
+
+        try {
+            val firstDatabase = fileBackedDatabase(context, databaseName)
+            val firstScope = integrationScope()
+            var firstViewModel: MainViewModel? = null
+            try {
+                val tracker = RoomAnalyticsTracker(
+                    dao = firstDatabase.analyticsEventDao(),
+                    scope = firstScope,
+                )
+                firstViewModel = MainViewModel(
+                    contentRepository = AssetContentRepository(context),
+                    settingsRepository = AndroidSettingsRepository(),
+                    recommendationEngine = com.qualityalternative.app.domain.service.DefaultRecommendationEngine(),
+                    delayGate = PreferencesDelayGate(
+                        dataStore = dataStore,
+                        scope = dataStoreScope,
+                    ),
+                    analyticsTracker = tracker,
+                    historyRepository = ReplayableReturnHistoryRepository(signal),
+                    interceptionMonitor = AndroidInterceptionMonitor(),
+                    enableDelayRefreshTicker = false,
+                )
+                tracker.observeReady().first { it }
+                waitForHydratedMainState(firstViewModel, targetApp.packageName)
+
+                firstViewModel.triggerDebugIntervention(nowMillis = 5_000L)
+                withTimeout(10_000L) {
+                    tracker.observeEvents().first { tracked ->
+                        tracked.count {
+                            it.semanticKey == AnalyticsSemanticKeys.sessionReturn(
+                                sessionId = signal.sessionId,
+                                type = AnalyticsEventType.RETURN_TO_APP_WITHIN_15_MINUTES,
+                            )
+                        } == 1 &&
+                            tracked.count {
+                                it.semanticKey == AnalyticsSemanticKeys.sessionReturn(
+                                    sessionId = signal.sessionId,
+                                    type = AnalyticsEventType.RETURN_TO_APP_WITHIN_60_MINUTES,
+                                )
+                            } == 1
+                    }
+                }
+            } finally {
+                firstViewModel?.closeForTests()
+                firstScope.cancel()
+                delay(100)
+                firstDatabase.close()
+            }
+
+            val reopenedDatabase = fileBackedDatabase(context, databaseName)
+            val secondScope = integrationScope()
+            var secondViewModel: MainViewModel? = null
+            try {
+                val tracker = RoomAnalyticsTracker(
+                    dao = reopenedDatabase.analyticsEventDao(),
+                    scope = secondScope,
+                )
+                secondViewModel = MainViewModel(
+                    contentRepository = AssetContentRepository(context),
+                    settingsRepository = AndroidSettingsRepository(),
+                    recommendationEngine = com.qualityalternative.app.domain.service.DefaultRecommendationEngine(),
+                    delayGate = PreferencesDelayGate(
+                        dataStore = dataStore,
+                        scope = dataStoreScope,
+                    ),
+                    analyticsTracker = tracker,
+                    historyRepository = ReplayableReturnHistoryRepository(signal),
+                    interceptionMonitor = AndroidInterceptionMonitor(),
+                    enableDelayRefreshTicker = false,
+                )
+
+                tracker.observeReady().first { it }
+                waitForHydratedMainState(secondViewModel, targetApp.packageName)
+
+                secondViewModel.triggerDebugIntervention(nowMillis = 6_000L)
+
+                val events = withTimeout(10_000L) {
+                    tracker.observeEvents().first { tracked ->
+                        tracked.count {
+                            it.semanticKey == AnalyticsSemanticKeys.sessionReturn(
+                                sessionId = signal.sessionId,
+                                type = AnalyticsEventType.RETURN_TO_APP_WITHIN_15_MINUTES,
+                            )
+                        } == 1 &&
+                            tracked.count {
+                                it.semanticKey == AnalyticsSemanticKeys.sessionReturn(
+                                    sessionId = signal.sessionId,
+                                    type = AnalyticsEventType.RETURN_TO_APP_WITHIN_60_MINUTES,
+                                )
+                            } == 1
+                    }
+                }
+                val within15 = events.first {
+                    it.semanticKey == AnalyticsSemanticKeys.sessionReturn(
+                        sessionId = signal.sessionId,
+                        type = AnalyticsEventType.RETURN_TO_APP_WITHIN_15_MINUTES,
+                    )
+                }
+                assertEquals(4_000L, within15.timestampMillis)
+
+                val afterRetry = tracker.allEvents()
+                assertEquals(
+                    1,
+                    afterRetry.count {
+                        it.semanticKey == AnalyticsSemanticKeys.sessionReturn(
+                            sessionId = signal.sessionId,
+                            type = AnalyticsEventType.RETURN_TO_APP_WITHIN_15_MINUTES,
+                        )
+                    },
+                )
+                assertEquals(
+                    1,
+                    afterRetry.count {
+                        it.semanticKey == AnalyticsSemanticKeys.sessionReturn(
+                            sessionId = signal.sessionId,
+                            type = AnalyticsEventType.RETURN_TO_APP_WITHIN_60_MINUTES,
+                        )
+                    },
+                )
+            } finally {
+                secondViewModel?.closeForTests()
+                secondScope.cancel()
+                delay(100)
+                reopenedDatabase.close()
+            }
+        } finally {
+            dataStoreScope.cancel()
+            context.deleteDatabase(databaseName)
+        }
+    }
+
+    @Test
+    fun productionActiveDelayPath_persistsRoomAnalyticsWithExpectedMetadata() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val database = Room.inMemoryDatabaseBuilder(
             context,
             QualityAlternativeDatabase::class.java,
         ).allowMainThreadQueries().build()
         val delayFile = File.createTempFile("room-analytics-active-delay-gate", ".preferences_pb").apply { deleteOnExit() }
+        val appScope = integrationScope()
 
         try {
             val tracker = RoomAnalyticsTracker(
                 dao = database.analyticsEventDao(),
-                scope = backgroundScope,
+                scope = appScope,
             )
             val delayGate = PreferencesDelayGate(
                 dataStore = testDataStore(delayFile),
-                scope = backgroundScope,
+                scope = appScope,
             )
-            val viewModel = MainViewModel(
+            var viewModel: MainViewModel? = null
+            viewModel = MainViewModel(
                 contentRepository = AssetContentRepository(context),
                 settingsRepository = AndroidSettingsRepository(),
                 recommendationEngine = com.qualityalternative.app.domain.service.DefaultRecommendationEngine(),
@@ -70,7 +506,7 @@ class RoomAnalyticsTrackerTest {
 
             tracker.observeReady().first { it }
             delayGate.observeReady().first { it }
-            advanceUntilIdle()
+            waitForHydratedMainState(viewModel)
 
             val targetApp = viewModel.uiState.selectedTargetApp!!
             val created = delayGate.storeDelayDurably(
@@ -83,11 +519,12 @@ class RoomAnalyticsTrackerTest {
                 backupContentIds = listOf("backup-1", "backup-2"),
             )
             viewModel.triggerDebugIntervention(nowMillis = 2_000L)
-            advanceUntilIdle()
 
-            val events = tracker.observeEvents().first { tracked ->
-                tracked.any { it.type == AnalyticsEventType.RETURN_TO_APP_WITHIN_15_MINUTES } &&
-                    tracked.any { it.type == AnalyticsEventType.RETURN_TO_APP_WITHIN_60_MINUTES }
+            val events = withTimeout(10_000L) {
+                tracker.observeEvents().first { tracked ->
+                    tracked.any { it.type == AnalyticsEventType.RETURN_TO_APP_WITHIN_15_MINUTES } &&
+                        tracked.any { it.type == AnalyticsEventType.RETURN_TO_APP_WITHIN_60_MINUTES }
+                }
             }
             val within15 = events.first { it.type == AnalyticsEventType.RETURN_TO_APP_WITHIN_15_MINUTES }
             val within60 = events.first { it.type == AnalyticsEventType.RETURN_TO_APP_WITHIN_60_MINUTES }
@@ -103,31 +540,35 @@ class RoomAnalyticsTrackerTest {
             assertEquals(2_000L, afterTrigger.activeWindow?.firstReturnAttemptAtMillis)
             assertEquals(created.id, afterTrigger.activeWindow?.id)
             assertEquals(null, afterTrigger.expiredWindow)
+            viewModel.closeForTests()
         } finally {
+            appScope.cancel()
+            delay(100)
             database.close()
         }
     }
 
     @Test
-    @OptIn(ExperimentalCoroutinesApi::class)
-    fun productionExpiryPath_persistsRoomAnalyticsWithExpectedMetadata() = runTest {
+    fun productionExpiryPath_persistsRoomAnalyticsWithExpectedMetadata() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val database = Room.inMemoryDatabaseBuilder(
             context,
             QualityAlternativeDatabase::class.java,
         ).allowMainThreadQueries().build()
         val delayFile = File.createTempFile("room-analytics-delay-gate", ".preferences_pb").apply { deleteOnExit() }
+        val appScope = integrationScope()
 
         try {
             val tracker = RoomAnalyticsTracker(
                 dao = database.analyticsEventDao(),
-                scope = backgroundScope,
+                scope = appScope,
             )
             val delayGate = PreferencesDelayGate(
                 dataStore = testDataStore(delayFile),
-                scope = backgroundScope,
+                scope = appScope,
             )
-            val viewModel = MainViewModel(
+            var viewModel: MainViewModel? = null
+            viewModel = MainViewModel(
                 contentRepository = AssetContentRepository(context),
                 settingsRepository = AndroidSettingsRepository(),
                 recommendationEngine = com.qualityalternative.app.domain.service.DefaultRecommendationEngine(),
@@ -140,7 +581,7 @@ class RoomAnalyticsTrackerTest {
 
             tracker.observeReady().first { it }
             delayGate.observeReady().first { it }
-            advanceUntilIdle()
+            waitForHydratedMainState(viewModel)
 
             val targetApp = viewModel.uiState.selectedTargetApp!!
             val created = delayGate.storeDelayDurably(
@@ -153,11 +594,12 @@ class RoomAnalyticsTrackerTest {
                 backupContentIds = listOf("backup-1", "backup-2"),
             )
             viewModel.triggerDebugIntervention(nowMillis = created.endsAtMillis + 1)
-            advanceUntilIdle()
 
-            val events = tracker.observeEvents().first { tracked ->
-                tracked.any { it.type == AnalyticsEventType.RETURN_AFTER_DELAY_ENDED } &&
-                    tracked.any { it.type == AnalyticsEventType.RETURN_TO_APP_WITHIN_60_MINUTES }
+            val events = withTimeout(10_000L) {
+                tracker.observeEvents().first { tracked ->
+                    tracked.any { it.type == AnalyticsEventType.RETURN_AFTER_DELAY_ENDED } &&
+                        tracked.any { it.type == AnalyticsEventType.RETURN_TO_APP_WITHIN_60_MINUTES }
+                }
             }
             val expiryEvent = events.first { it.type == AnalyticsEventType.RETURN_AFTER_DELAY_ENDED }
             val within60 = events.first { it.type == AnalyticsEventType.RETURN_TO_APP_WITHIN_60_MINUTES }
@@ -176,7 +618,10 @@ class RoomAnalyticsTrackerTest {
             assertEquals(null, afterConsume.activeWindow)
             assertEquals(null, afterConsume.expiredWindow)
             assertFalse(delayGate.consumeExpiredDelay(targetApp = targetApp, delayId = created.id, nowMillis = created.endsAtMillis + 1))
+            viewModel.closeForTests()
         } finally {
+            appScope.cancel()
+            delay(100)
             database.close()
         }
     }
@@ -230,6 +675,33 @@ class RoomAnalyticsTrackerTest {
         override suspend fun markReturnedToTarget(targetAppPackage: String, returnedAtMillis: Long): ReturnToTargetSignal? = null
     }
 
+    private class ReplayableReturnHistoryRepository(
+        private val signal: ReturnToTargetSignal,
+    ) : HistoryRepository {
+        override fun recentHistory(nowMillis: Long, windowDays: Int): List<ReplacementHistoryEntry> = emptyList()
+
+        override suspend fun recordAcceptedSession(
+            targetApp: DistractingApp,
+            interventionId: String,
+            interventionShownAtMillis: Long,
+            primaryContentId: String,
+            backupContentIds: List<String>,
+            content: ContentItem,
+            source: RecommendationSource,
+            acceptedAtMillis: Long,
+        ): String = signal.sessionId
+
+        override suspend fun markCompleted(sessionId: String, completedAtMillis: Long) = Unit
+
+        override suspend fun markSkipped(sessionId: String, skippedAtMillis: Long) = Unit
+
+        override suspend fun attachFeedback(sessionId: String, feedback: SessionFeedback) = Unit
+
+        override suspend fun markReturnedToTarget(targetAppPackage: String, returnedAtMillis: Long): ReturnToTargetSignal? {
+            return signal.takeIf { it.targetAppPackage == targetAppPackage }
+        }
+    }
+
     private class AndroidInterceptionMonitor : InterceptionMonitor {
         override fun isAvailable(): Boolean = false
 
@@ -247,6 +719,33 @@ class RoomAnalyticsTrackerTest {
         return PreferenceDataStoreFactory.create(produceFile = { file })
     }
 
+    private fun fileBackedDatabase(context: Context, name: String): QualityAlternativeDatabase {
+        return Room.databaseBuilder(
+            context,
+            QualityAlternativeDatabase::class.java,
+            name,
+        ).allowMainThreadQueries().build()
+    }
+
+    private fun integrationScope(): CoroutineScope {
+        return CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    }
+
+    private fun analyticsEntity(event: AnalyticsEvent): AnalyticsEventEntity {
+        return AnalyticsEventEntity(
+            type = event.type.name,
+            timestampMillis = event.timestampMillis,
+            semanticKey = event.semanticKey,
+            interventionId = event.interventionId,
+            sessionId = event.sessionId,
+            targetAppPackage = event.targetAppPackage,
+            primaryContentId = event.primaryContentId,
+            backupContentIdsCsv = event.backupContentIds.joinToString(","),
+            contentId = event.contentId,
+            metadataJson = JSONObject(event.metadata).toString(),
+        )
+    }
+
     private suspend fun waitForDelayInspection(
         provider: () -> com.qualityalternative.app.domain.model.DelayInspection,
     ): com.qualityalternative.app.domain.model.DelayInspection {
@@ -258,5 +757,22 @@ class RoomAnalyticsTrackerTest {
             delay(25)
         }
         return provider()
+    }
+
+    private suspend fun waitForHydratedMainState(
+        viewModel: MainViewModel,
+        expectedTargetPackage: String? = null,
+    ) {
+        withTimeout(10_000L) {
+            while (true) {
+                val uiState = viewModel.uiState
+                val targetMatches = expectedTargetPackage == null ||
+                    uiState.selectedTargetApp?.packageName == expectedTargetPackage
+                if (!uiState.isLoadingSettings && targetMatches) {
+                    return@withTimeout
+                }
+                delay(25)
+            }
+        }
     }
 }

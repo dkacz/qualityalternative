@@ -132,13 +132,14 @@ class RoomHistoryRepository(
     ): ReturnToTargetSignal? {
         return writeMutex.withLock {
             val candidate = entries.value.firstOrNull { entry ->
-                entry.targetAppPackage == targetAppPackage &&
-                    entry.returnedToTargetAtMillis == null
+                entry.targetAppPackage == targetAppPackage
             } ?: return@withLock null
 
-            val delta = returnedAtMillis - candidate.interventionShownAtMillis
-            val updated = candidate.copy(returnedToTargetAtMillis = returnedAtMillis)
-            persist(updated)
+            val effectiveReturnedAtMillis = candidate.returnedToTargetAtMillis ?: returnedAtMillis
+            if (candidate.returnedToTargetAtMillis == null) {
+                persist(candidate.copy(returnedToTargetAtMillis = returnedAtMillis))
+            }
+            val delta = effectiveReturnedAtMillis - candidate.interventionShownAtMillis
             ReturnToTargetSignal(
                 sessionId = candidate.sessionId,
                 interventionId = candidate.interventionId,
@@ -146,7 +147,7 @@ class RoomHistoryRepository(
                 primaryContentId = candidate.primaryContentId,
                 backupContentIds = candidate.backupContentIds,
                 contentId = candidate.contentId,
-                returnedAtMillis = returnedAtMillis,
+                returnedAtMillis = effectiveReturnedAtMillis,
                 within15Minutes = delta <= 15 * 60_000L,
                 within60Minutes = delta <= 60 * 60_000L,
             )

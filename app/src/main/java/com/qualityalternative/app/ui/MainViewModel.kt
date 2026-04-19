@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.qualityalternative.app.data.AppContainer
 import com.qualityalternative.app.domain.model.AnalyticsEvent
+import com.qualityalternative.app.domain.model.AnalyticsSemanticKeys
 import com.qualityalternative.app.domain.model.AnalyticsEventType
 import com.qualityalternative.app.domain.model.AppSettings
 import com.qualityalternative.app.domain.model.ContentItem
@@ -22,6 +23,7 @@ import com.qualityalternative.app.domain.model.RecommendationSet
 import com.qualityalternative.app.domain.model.RecommendationSignals
 import com.qualityalternative.app.domain.model.RecommendationSource
 import com.qualityalternative.app.domain.model.ReplacementHistoryEntry
+import com.qualityalternative.app.domain.model.ReturnToTargetSignal
 import com.qualityalternative.app.domain.model.SessionFeedback
 import com.qualityalternative.app.domain.model.TimeOfDayBucket
 import com.qualityalternative.app.domain.model.TopicTag
@@ -152,6 +154,11 @@ class MainViewModel(
             delayGate.observeReady().collect { ready ->
                 delayReady = ready
                 refreshActiveDelayWindow()
+                if (ready) {
+                    uiState.selectedTargetApp?.let { targetApp ->
+                        reconcilePersistedDelayAnalytics(targetApp = targetApp)
+                    }
+                }
                 updateHydrationState()
             }
         }
@@ -171,6 +178,11 @@ class MainViewModel(
             activeDelayWindow = if (delayReady) delayGate.activeDelay(app) else null,
             latestMessage = null,
         )
+        if (delayReady) {
+            viewModelScope.launch {
+                reconcilePersistedDelayAnalytics(targetApp = app)
+            }
+        }
     }
 
     fun refreshPermissionReadiness() {
@@ -410,22 +422,7 @@ class MainViewModel(
                 primaryContentId = recommendationSet.primary.id,
                 backupContentIds = recommendationSet.backups.map(ContentItem::id),
             )
-            recordEvent(
-                AnalyticsEvent(
-                    type = AnalyticsEventType.DELAY_SELECTED,
-                    timestampMillis = nowMillis,
-                    interventionId = interventionId,
-                    targetAppPackage = targetApp.packageName,
-                    primaryContentId = recommendationSet.primary.id,
-                    backupContentIds = recommendationSet.backups.map(ContentItem::id),
-                    metadata = mapOf(
-                        "delayId" to window.id,
-                        "delayStartedAtMillis" to window.startsAtMillis.toString(),
-                        "delayEndedAtMillis" to window.endsAtMillis.toString(),
-                        "interventionShownAtMillis" to (window.interventionShownAtMillis?.toString() ?: ""),
-                    ),
-                ),
-            )
+            recordDelaySelectedDurably(window)
             uiState = uiState.copy(
                 screen = MainScreen.Home,
                 currentInterventionId = null,
@@ -581,6 +578,13 @@ class MainViewModel(
                 else -> uiState.screen
             },
         )
+        if (settings.hasCompletedOnboarding && delayReady) {
+            selectedTargetApp?.let { targetApp ->
+                viewModelScope.launch {
+                    reconcilePersistedDelayAnalytics(targetApp = targetApp)
+                }
+            }
+        }
     }
 
     private fun buildRecommendationSignals(nowMillis: Long): RecommendationSignals {
@@ -602,53 +606,28 @@ class MainViewModel(
             targetAppPackage = targetApp.packageName,
             returnedAtMillis = nowMillis,
         ) ?: return
-
-        if (signal.within15Minutes) {
-            recordEvent(
-                AnalyticsEvent(
-                    type = AnalyticsEventType.RETURN_TO_APP_WITHIN_15_MINUTES,
-                    timestampMillis = nowMillis,
-                    interventionId = signal.interventionId,
-                    sessionId = signal.sessionId,
-                    targetAppPackage = signal.targetAppPackage,
-                    primaryContentId = signal.primaryContentId,
-                    backupContentIds = signal.backupContentIds,
-                    contentId = signal.contentId,
-                ),
-            )
-        }
-
-        if (signal.within60Minutes) {
-            recordEvent(
-                AnalyticsEvent(
-                    type = AnalyticsEventType.RETURN_TO_APP_WITHIN_60_MINUTES,
-                    timestampMillis = nowMillis,
-                    interventionId = signal.interventionId,
-                    sessionId = signal.sessionId,
-                    targetAppPackage = signal.targetAppPackage,
-                    primaryContentId = signal.primaryContentId,
-                    backupContentIds = signal.backupContentIds,
-                    contentId = signal.contentId,
-                ),
-            )
-        }
+        recordSessionReturnMetricsDurably(signal)
     }
 
     private suspend fun recordDelayReturnDuringActiveWindow(targetApp: DistractingApp, nowMillis: Long) {
+        val activeWindow = delayGate.activeDelay(targetApp = targetApp, nowMillis = nowMillis) ?: return
         val recordedWindow = delayGate.recordFirstReturnAttemptDurably(targetApp = targetApp, nowMillis = nowMillis)
-            ?: return
+            ?: activeWindow
+        recordDelaySelectedDurably(recordedWindow)
         recordDelayReturnMetricsDurably(
             window = recordedWindow,
-            nowMillis = nowMillis,
+            eventTimestampMillis = recordedWindow.firstReturnAttemptAtMillis ?: nowMillis,
             origin = "active_delay",
         )
     }
 
     private suspend fun recordDelayReturnAfterExpiry(expiredWindow: DelayWindow, nowMillis: Long) {
+        recordDelaySelectedDurably(expiredWindow)
         recordEventDurably(
             AnalyticsEvent(
                 type = AnalyticsEventType.RETURN_AFTER_DELAY_ENDED,
                 timestampMillis = nowMillis,
+                semanticKey = AnalyticsSemanticKeys.delayEnded(expiredWindow.id),
                 interventionId = expiredWindow.interventionId,
                 targetAppPackage = expiredWindow.targetAppPackage,
                 primaryContentId = expiredWindow.primaryContentId,
@@ -666,21 +645,39 @@ class MainViewModel(
         if (expiredWindow.firstReturnAttemptAtMillis == null) {
             recordDelayReturnMetricsDurably(
                 window = expiredWindow,
-                nowMillis = nowMillis,
+                eventTimestampMillis = nowMillis,
                 origin = "after_delay_expired",
+            )
+        } else {
+            recordDelayReturnMetricsDurably(
+                window = expiredWindow,
+                eventTimestampMillis = expiredWindow.firstReturnAttemptAtMillis,
+                origin = "active_delay",
             )
         }
     }
 
-    private suspend fun recordDelayReturnMetricsDurably(window: DelayWindow, nowMillis: Long, origin: String) {
-        delayReturnMetricEvents(window = window, nowMillis = nowMillis, origin = origin).forEach { event ->
+    private suspend fun recordDelayReturnMetricsDurably(
+        window: DelayWindow,
+        eventTimestampMillis: Long,
+        origin: String,
+    ) {
+        delayReturnMetricEvents(
+            window = window,
+            eventTimestampMillis = eventTimestampMillis,
+            origin = origin,
+        ).forEach { event ->
             recordEventDurably(event)
         }
     }
 
-    private fun delayReturnMetricEvents(window: DelayWindow, nowMillis: Long, origin: String): List<AnalyticsEvent> {
+    private fun delayReturnMetricEvents(
+        window: DelayWindow,
+        eventTimestampMillis: Long,
+        origin: String,
+    ): List<AnalyticsEvent> {
         val anchorMillis = window.interventionShownAtMillis ?: window.startsAtMillis
-        val delta = nowMillis - anchorMillis
+        val delta = eventTimestampMillis - anchorMillis
         val metadata = mapOf(
             "delayId" to window.id,
             "delayReturnOrigin" to origin,
@@ -692,7 +689,12 @@ class MainViewModel(
         if (delta <= 15 * 60_000L) {
             events += AnalyticsEvent(
                 type = AnalyticsEventType.RETURN_TO_APP_WITHIN_15_MINUTES,
-                timestampMillis = nowMillis,
+                timestampMillis = eventTimestampMillis,
+                semanticKey = AnalyticsSemanticKeys.delayReturn(
+                    delayId = window.id,
+                    origin = origin,
+                    type = AnalyticsEventType.RETURN_TO_APP_WITHIN_15_MINUTES,
+                ),
                 interventionId = window.interventionId,
                 targetAppPackage = window.targetAppPackage,
                 primaryContentId = window.primaryContentId,
@@ -705,7 +707,12 @@ class MainViewModel(
         if (delta <= 60 * 60_000L) {
             events += AnalyticsEvent(
                 type = AnalyticsEventType.RETURN_TO_APP_WITHIN_60_MINUTES,
-                timestampMillis = nowMillis,
+                timestampMillis = eventTimestampMillis,
+                semanticKey = AnalyticsSemanticKeys.delayReturn(
+                    delayId = window.id,
+                    origin = origin,
+                    type = AnalyticsEventType.RETURN_TO_APP_WITHIN_60_MINUTES,
+                ),
                 interventionId = window.interventionId,
                 targetAppPackage = window.targetAppPackage,
                 primaryContentId = window.primaryContentId,
@@ -716,6 +723,82 @@ class MainViewModel(
         }
 
         return events
+    }
+
+    private suspend fun recordSessionReturnMetricsDurably(signal: ReturnToTargetSignal) {
+        if (signal.within15Minutes) {
+            recordEventDurably(
+                AnalyticsEvent(
+                    type = AnalyticsEventType.RETURN_TO_APP_WITHIN_15_MINUTES,
+                    timestampMillis = signal.returnedAtMillis,
+                    semanticKey = AnalyticsSemanticKeys.sessionReturn(
+                        sessionId = signal.sessionId,
+                        type = AnalyticsEventType.RETURN_TO_APP_WITHIN_15_MINUTES,
+                    ),
+                    interventionId = signal.interventionId,
+                    sessionId = signal.sessionId,
+                    targetAppPackage = signal.targetAppPackage,
+                    primaryContentId = signal.primaryContentId,
+                    backupContentIds = signal.backupContentIds,
+                    contentId = signal.contentId,
+                ),
+            )
+        }
+
+        if (signal.within60Minutes) {
+            recordEventDurably(
+                AnalyticsEvent(
+                    type = AnalyticsEventType.RETURN_TO_APP_WITHIN_60_MINUTES,
+                    timestampMillis = signal.returnedAtMillis,
+                    semanticKey = AnalyticsSemanticKeys.sessionReturn(
+                        sessionId = signal.sessionId,
+                        type = AnalyticsEventType.RETURN_TO_APP_WITHIN_60_MINUTES,
+                    ),
+                    interventionId = signal.interventionId,
+                    sessionId = signal.sessionId,
+                    targetAppPackage = signal.targetAppPackage,
+                    primaryContentId = signal.primaryContentId,
+                    backupContentIds = signal.backupContentIds,
+                    contentId = signal.contentId,
+                ),
+            )
+        }
+    }
+
+    private suspend fun recordDelaySelectedDurably(window: DelayWindow) {
+        recordEventDurably(
+            AnalyticsEvent(
+                type = AnalyticsEventType.DELAY_SELECTED,
+                timestampMillis = window.startsAtMillis,
+                semanticKey = AnalyticsSemanticKeys.delaySelected(window.id),
+                interventionId = window.interventionId,
+                targetAppPackage = window.targetAppPackage,
+                primaryContentId = window.primaryContentId,
+                backupContentIds = window.backupContentIds,
+                contentId = window.primaryContentId,
+                metadata = mapOf(
+                    "delayId" to window.id,
+                    "delayStartedAtMillis" to window.startsAtMillis.toString(),
+                    "delayEndedAtMillis" to window.endsAtMillis.toString(),
+                    "interventionShownAtMillis" to (window.interventionShownAtMillis?.toString() ?: ""),
+                ),
+            ),
+        )
+    }
+
+    private suspend fun reconcilePersistedDelayAnalytics(
+        targetApp: DistractingApp,
+        nowMillis: Long = System.currentTimeMillis(),
+    ) {
+        val activeWindow = delayGate.activeDelay(targetApp = targetApp, nowMillis = nowMillis) ?: return
+        recordDelaySelectedDurably(activeWindow)
+        activeWindow.firstReturnAttemptAtMillis?.let { firstReturnAtMillis ->
+            recordDelayReturnMetricsDurably(
+                window = activeWindow,
+                eventTimestampMillis = firstReturnAtMillis,
+                origin = "active_delay",
+            )
+        }
     }
 
     private fun openReader(content: ContentItem, sessionId: String, startedAtMillis: Long) {

@@ -39,6 +39,7 @@ enum class AnalyticsEventType {
 data class AnalyticsEvent(
     val type: AnalyticsEventType,
     val timestampMillis: Long,
+    val semanticKey: String? = null,
     val interventionId: String? = null,
     val sessionId: String? = null,
     val targetAppPackage: String? = null,

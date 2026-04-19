@@ -29,6 +29,8 @@ class MainActivityTest {
     @After
     fun tearDown() {
         scenario?.close()
+        scenario = null
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
     }
 
     @Test
@@ -51,6 +53,8 @@ class MainActivityTest {
 
         scenario?.close()
         scenario = null
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+        Thread.sleep(250)
         launchApp()
 
         composeRule.waitUntil(timeoutMillis = 10_000) {
@@ -72,7 +76,8 @@ class MainActivityTest {
             Intent(
                 InstrumentationRegistry.getInstrumentation().targetContext,
                 MainActivity::class.java,
-            ),
+            ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK),
         )
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
     }
 }

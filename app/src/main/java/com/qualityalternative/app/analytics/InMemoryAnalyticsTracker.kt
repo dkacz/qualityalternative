@@ -10,7 +10,11 @@ class InMemoryAnalyticsTracker : AnalyticsTracker {
     private val events = MutableStateFlow<List<AnalyticsEvent>>(emptyList())
 
     override fun record(event: AnalyticsEvent) {
-        events.value = (events.value + event).sortedByDescending(AnalyticsEvent::timestampMillis)
+        val current = events.value
+        if (event.semanticKey != null && current.any { it.semanticKey == event.semanticKey }) {
+            return
+        }
+        events.value = (current + event).sortedByDescending(AnalyticsEvent::timestampMillis)
     }
 
     override fun allEvents(): List<AnalyticsEvent> = events.value

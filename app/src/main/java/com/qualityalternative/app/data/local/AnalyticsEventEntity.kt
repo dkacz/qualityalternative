@@ -1,13 +1,20 @@
 package com.qualityalternative.app.data.local
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "analytics_events")
+@Entity(
+    tableName = "analytics_events",
+    indices = [
+        Index(value = ["semanticKey"], unique = true),
+    ],
+)
 data class AnalyticsEventEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val type: String,
     val timestampMillis: Long,
+    val semanticKey: String?,
     val interventionId: String?,
     val sessionId: String?,
     val targetAppPackage: String?,
