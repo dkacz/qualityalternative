@@ -68,7 +68,7 @@ class RoomUserLinkRepository(
         )
 
         dao.insertOrReplace(item.toEntity(createdAtMillis = createdAtMillis, updatedAtMillis = nowMillis))
-        links.value = upsertLink(links.value, item)
+        links.value = upsertUserLinkForOptimisticState(links.value, item)
         return AddUserLinkResult.Added(item)
     }
 
@@ -143,13 +143,20 @@ private fun String.toTopicTags(): Set<TopicTag> {
     }
 }
 
-private fun upsertLink(
+internal fun upsertUserLinkForOptimisticState(
     currentLinks: List<ContentItem>,
     updatedLink: ContentItem,
 ): List<ContentItem> {
-    return currentLinks
-        .filterNot { it.id == updatedLink.id || it.externalUrl == updatedLink.externalUrl }
-        .plus(updatedLink)
+    val existingIndex = currentLinks.indexOfFirst { item ->
+        item.id == updatedLink.id || item.externalUrl == updatedLink.externalUrl
+    }
+    return if (existingIndex >= 0) {
+        currentLinks.mapIndexed { index, item ->
+            if (index == existingIndex) updatedLink else item
+        }
+    } else {
+        listOf(updatedLink) + currentLinks
+    }
 }
 
 private fun stableUserLinkId(normalizedUrl: String): String {

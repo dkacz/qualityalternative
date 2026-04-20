@@ -1229,11 +1229,22 @@ private fun AddLinkFormState.visibleValidationErrors(): Set<UserLinkValidationEr
     val errors = mutableSetOf<UserLinkValidationError>()
     val trimmedUrl = url.trim()
     val duration = durationMinutes.trim()
+    val validUrl = UserLinkValidator.validateUrl(trimmedUrl).isValid
+    val validDuration = duration.toIntOrNull()?.let { it in 1..60 } == true
     if (trimmedUrl.isNotBlank()) {
         errors += UserLinkValidator.validateUrl(trimmedUrl).errors
     }
-    if (duration.isNotBlank() && duration.toIntOrNull()?.let { it in 1..60 } != true) {
+    if (duration.isNotBlank() && !validDuration) {
         errors += UserLinkValidationError.INVALID_DURATION
+    }
+    if (duration.isBlank() && (trimmedUrl.isNotBlank() || title.isNotBlank() || selectedTopics.isNotEmpty())) {
+        errors += UserLinkValidationError.INVALID_DURATION
+    }
+    if (title.isBlank() && (validUrl || selectedTopics.isNotEmpty())) {
+        errors += UserLinkValidationError.BLANK_TITLE
+    }
+    if (selectedTopics.isEmpty() && validUrl && title.isNotBlank() && validDuration) {
+        errors += UserLinkValidationError.NO_TOPICS
     }
     return errors
 }

@@ -132,6 +132,27 @@ class MainActivityTest {
     }
 
     @Test
+    fun addLinkKeepsSaveDisabledForMissingTopic() {
+        launchOnboardedApp()
+
+        composeRule.onNodeWithTag("home-add-link")
+            .performClick()
+
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasNode("Add a replacement link")
+        }
+        composeRule.onNodeWithTag("add-link-url").performTextInput("https://example.com/essay")
+        composeRule.onNodeWithTag("add-link-title").performTextInput("Saved essay")
+        composeRule.onNodeWithText("Choose at least one topic so the app can rank this link.")
+            .performScrollTo()
+            .assertIsDisplayed()
+
+        composeRule.onNodeWithTag("add-link-save")
+            .performScrollTo()
+            .assertIsNotEnabled()
+    }
+
+    @Test
     fun addLinkSavesValidLinkAndReturnsHome() {
         launchOnboardedApp()
 

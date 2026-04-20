@@ -230,6 +230,64 @@ class MainViewModelTest {
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
+    fun addLinkWithBlankTitle_staysDisabledAndShowsTitleError() = runTest {
+        val viewModel = createViewModel()
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+
+        viewModel.openAddLink()
+        viewModel.updateAddLinkUrl("https://example.com/essay")
+        viewModel.updateAddLinkDuration("7")
+        viewModel.toggleAddLinkTopic(TopicTag.SCIENCE)
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.addLinkForm.canSave)
+        assertTrue(UserLinkValidationError.BLANK_TITLE in viewModel.uiState.addLinkForm.validationErrors)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun addLinkWithNoTopic_staysDisabledAndShowsTopicError() = runTest {
+        val viewModel = createViewModel()
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+
+        viewModel.openAddLink()
+        viewModel.updateAddLinkUrl("https://example.com/essay")
+        viewModel.updateAddLinkTitle("Saved essay")
+        viewModel.updateAddLinkDuration("7")
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.addLinkForm.canSave)
+        assertTrue(UserLinkValidationError.NO_TOPICS in viewModel.uiState.addLinkForm.validationErrors)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun addLinkWithBlankDuration_staysDisabledAndShowsDurationError() = runTest {
+        val viewModel = createViewModel()
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+
+        viewModel.openAddLink()
+        viewModel.updateAddLinkUrl("https://example.com/essay")
+        viewModel.updateAddLinkTitle("Saved essay")
+        viewModel.updateAddLinkDuration("")
+        viewModel.toggleAddLinkTopic(TopicTag.SCIENCE)
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.addLinkForm.canSave)
+        assertTrue(UserLinkValidationError.INVALID_DURATION in viewModel.uiState.addLinkForm.validationErrors)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
     fun finishReading_marksHistoryCompletedAndExcludesContent() = runTest {
         val viewModel = createViewModel()
 
