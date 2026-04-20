@@ -4,6 +4,7 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -870,82 +871,212 @@ private fun InterventionScreen(
 ) {
     val recommendationSet = state.currentRecommendationSet ?: return
     val targetApp = state.selectedTargetApp ?: return
+    val colors = QualityAlternativeThemeTokens.colors
+    val backups = recommendationSet.backups.take(MAX_BACKUP_RECOMMENDATIONS)
+    val backupHeading = when (backups.size) {
+        0 -> "No backup choices"
+        1 -> "One backup choice"
+        else -> "Two backup choices"
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(20.dp)
             .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Text(
-            text = "Pause before ${targetApp.displayName}",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-        )
-        Text(
-            text = "One strong replacement, two lighter backups, and an explicit override path.",
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        InterventionHeaderCard(targetApp = targetApp)
 
-        RecommendationCard(
+        PrimaryRecommendationCard(
             content = recommendationSet.primary,
             actionLabel = if (recommendationSet.primary.isUserLink()) "Open link" else "Read now",
-            highlighted = true,
             onClick = onAcceptPrimary,
         )
 
-        recommendationSet.backups.forEach { backup ->
-            RecommendationCard(
-                content = backup,
-                actionLabel = if (backup.isUserLink()) "Open link" else "Choose backup",
-                highlighted = false,
-                onClick = { onAcceptBackup(backup) },
-            )
+        Card(
+            colors = CardDefaults.cardColors(containerColor = colors.elevatedSurface),
+            shape = RoundedCornerShape(24.dp),
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text(
+                    text = backupHeading,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = "Still finite: no browsing, no feed, just two lighter ways out of the scroll.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.mutedText,
+                )
+                backups.forEach { backup ->
+                    BackupRecommendationCard(
+                        content = backup,
+                        actionLabel = if (backup.isUserLink()) "Open link" else "Choose backup",
+                        onClick = { onAcceptBackup(backup) },
+                    )
+                }
+                if (backups.isEmpty()) {
+                    Text(
+                        text = "No extra choices are available right now, so this moment stays focused on the primary recommendation.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colors.mutedText,
+                    )
+                }
+            }
         }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedButton(onClick = onDelay) {
-                Text("Delay for 15 minutes")
-            }
-            Button(onClick = onOpenAnyway) {
-                Text("Open anyway")
+        InterventionDecisionCard(
+            onDelay = onDelay,
+            onOpenAnyway = onOpenAnyway,
+        )
+    }
+}
+
+@Composable
+private fun InterventionHeaderCard(targetApp: DistractingApp) {
+    val colors = QualityAlternativeThemeTokens.colors
+    Card(
+        colors = CardDefaults.cardColors(containerColor = colors.elevatedSurface),
+        shape = RoundedCornerShape(28.dp),
+        border = BorderStroke(width = 1.dp, color = colors.line),
+    ) {
+        Column(
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                text = "Pause before ${targetApp.displayName}",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                text = "Take one breath. If this still matters, you can open it. If not, choose one finite replacement.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = colors.mutedText,
+            )
+        }
+    }
+}
+
+@Composable
+private fun PrimaryRecommendationCard(
+    content: ContentItem,
+    actionLabel: String,
+    onClick: () -> Unit,
+) {
+    val colors = QualityAlternativeThemeTokens.colors
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+        shape = RoundedCornerShape(30.dp),
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text = "One thoughtful alternative",
+                style = MaterialTheme.typography.labelMedium,
+                color = colors.mutedText,
+            )
+            Text(
+                text = content.title,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = content.description,
+                color = colors.mutedText,
+            )
+            Text(
+                text = content.metaLine(),
+                style = MaterialTheme.typography.labelMedium,
+                color = colors.mutedText,
+            )
+            Button(onClick = onClick) {
+                Text(actionLabel)
             }
         }
     }
 }
 
 @Composable
-private fun RecommendationCard(
+private fun BackupRecommendationCard(
     content: ContentItem,
     actionLabel: String,
-    highlighted: Boolean,
     onClick: () -> Unit,
 ) {
-    val containerColor = if (highlighted) {
-        MaterialTheme.colorScheme.primaryContainer
-    } else {
-        MaterialTheme.colorScheme.surfaceVariant
-    }
-
+    val colors = QualityAlternativeThemeTokens.colors
     Card(
-        colors = CardDefaults.cardColors(containerColor = containerColor),
-        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.background),
+        shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(width = 1.dp, color = colors.line),
     ) {
         Column(
-            modifier = Modifier.padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
-                text = "${content.durationMinutes} min • ${if (content.isUserLink()) "Saved link" else "Editorial"}",
+                text = content.metaLine(),
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = colors.faintText,
             )
-            Text(text = content.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-            Text(text = content.description, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Button(onClick = onClick) {
+            Text(
+                text = content.title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = content.description,
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.mutedText,
+            )
+            OutlinedButton(onClick = onClick) {
                 Text(actionLabel)
+            }
+        }
+    }
+}
+
+@Composable
+private fun InterventionDecisionCard(
+    onDelay: () -> Unit,
+    onOpenAnyway: () -> Unit,
+) {
+    val colors = QualityAlternativeThemeTokens.colors
+    Card(
+        colors = CardDefaults.cardColors(containerColor = colors.elevatedSurface),
+        shape = RoundedCornerShape(24.dp),
+        border = BorderStroke(width = 1.dp, color = colors.line),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text = "Your call, deliberately made",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = "Delay the impulse, or continue with the app on purpose. No lock-in, no shame loop.",
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.mutedText,
+            )
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                OutlinedButton(onClick = onDelay) {
+                    Text("Delay for 15 minutes")
+                }
+                Button(onClick = onOpenAnyway) {
+                    Text("Open anyway")
+                }
             }
         }
     }
@@ -1125,10 +1256,18 @@ private fun TopicTag.displayName(): String = name.lowercase().replaceFirstChar(C
 
 private fun ContentItem.isUserLink(): Boolean = sourceType == ContentSourceType.USER_LINK
 
+private fun ContentItem.metaLine(): String {
+    val sourceLabel = if (isUserLink()) "Saved link" else "Editorial"
+    val topicLabel = topicTags.joinToString { it.displayName() }
+    return "$durationMinutes min • $sourceLabel • $topicLabel"
+}
+
 private fun AppThemeMode.displayName(): String = when (this) {
     AppThemeMode.LIGHT -> "Light"
     AppThemeMode.DARK -> "Dark"
 }
+
+private const val MAX_BACKUP_RECOMMENDATIONS = 2
 
 private fun launchExternalLink(
     context: android.content.Context,

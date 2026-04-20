@@ -2,6 +2,11 @@
 
 Status: `active`
 
+Current slice:
+
+- `5.2 Core Intervention Restyle`
+  Status: implemented, validated locally, under Pro review.
+
 ## Goal
 
 Bring the Android app closer to the reviewed mockup direction without changing the product scope. Sprint 5 is a visual and interaction-quality pass, not a new ingestion sprint.

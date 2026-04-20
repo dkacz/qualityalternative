@@ -17,6 +17,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.qualityalternative.app.interception.FixtureTargetRegistry
 import kotlinx.coroutines.runBlocking
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -106,6 +107,16 @@ class MainActivityTest {
         }
 
         composeRule.onNodeWithText("Pause before Fixture Feed One").assertIsDisplayed()
+        composeRule.onNodeWithText("One thoughtful alternative")
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("Two backup choices")
+            .performScrollTo()
+            .assertIsDisplayed()
+        assertEquals(2, composeRule.onAllNodesWithText("Choose backup").fetchSemanticsNodes().size)
+        composeRule.onNodeWithText("Your call, deliberately made")
+            .performScrollTo()
+            .assertIsDisplayed()
         composeRule.waitUntil(timeoutMillis = 10_000) {
             hasNode("Read now") || hasNode("Open link")
         }
