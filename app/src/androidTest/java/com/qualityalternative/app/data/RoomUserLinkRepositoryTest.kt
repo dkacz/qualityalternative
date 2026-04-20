@@ -384,6 +384,91 @@ class RoomUserLinkRepositoryTest {
                     assertTrue(cursor.moveToFirst())
                     assertEquals(0, cursor.getInt(0))
                 }
+                migrated.openHelper.writableDatabase.query(
+                    """
+                    SELECT
+                        type,
+                        timestampMillis,
+                        semanticKey,
+                        interventionId,
+                        sessionId,
+                        targetAppPackage,
+                        primaryContentId,
+                        backupContentIdsCsv,
+                        contentId,
+                        metadataJson
+                    FROM analytics_events
+                    """.trimIndent(),
+                ).use { cursor ->
+                    assertTrue(cursor.moveToFirst())
+                    assertEquals("INTERVENTION_SHOWN", cursor.getString(0))
+                    assertEquals(1000L, cursor.getLong(1))
+                    assertEquals("event:1", cursor.getString(2))
+                    assertEquals("intervention-1", cursor.getString(3))
+                    assertEquals("session-1", cursor.getString(4))
+                    assertEquals("pkg", cursor.getString(5))
+                    assertEquals("content-1", cursor.getString(6))
+                    assertEquals("backup-1", cursor.getString(7))
+                    assertEquals("content-1", cursor.getString(8))
+                    assertEquals("{}", cursor.getString(9))
+                }
+                migrated.openHelper.writableDatabase.query(
+                    """
+                    SELECT
+                        sessionId,
+                        interventionId,
+                        targetAppPackage,
+                        targetAppDisplayName,
+                        interventionShownAtMillis,
+                        primaryContentId,
+                        backupContentIdsCsv,
+                        contentId,
+                        contentTitle,
+                        contentDescription,
+                        contentTopicsCsv,
+                        packId,
+                        recommendationSource,
+                        acceptedAtMillis,
+                        completedAtMillis,
+                        skippedAtMillis,
+                        returnedToTargetAtMillis,
+                        feedbackGoodFit,
+                        feedbackHelpedAvoidScrolling
+                    FROM replacement_sessions
+                    """.trimIndent(),
+                ).use { cursor ->
+                    assertTrue(cursor.moveToFirst())
+                    assertEquals("session-1", cursor.getString(0))
+                    assertEquals("intervention-1", cursor.getString(1))
+                    assertEquals("pkg", cursor.getString(2))
+                    assertEquals("Target", cursor.getString(3))
+                    assertEquals(1000L, cursor.getLong(4))
+                    assertEquals("content-1", cursor.getString(5))
+                    assertEquals("backup-1", cursor.getString(6))
+                    assertEquals("content-1", cursor.getString(7))
+                    assertEquals("Title", cursor.getString(8))
+                    assertEquals("Description", cursor.getString(9))
+                    assertEquals("SCIENCE", cursor.getString(10))
+                    assertEquals("pack", cursor.getString(11))
+                    assertEquals("PRIMARY", cursor.getString(12))
+                    assertEquals(1100L, cursor.getLong(13))
+                    assertTrue(cursor.isNull(14))
+                    assertTrue(cursor.isNull(15))
+                    assertTrue(cursor.isNull(16))
+                    assertTrue(cursor.isNull(17))
+                    assertTrue(cursor.isNull(18))
+                }
+                migrated.openHelper.writableDatabase.query("PRAGMA index_list('user_links')").use { cursor ->
+                    var foundUniqueNormalizedUrlIndex = false
+                    while (cursor.moveToNext()) {
+                        val indexName = cursor.getString(cursor.getColumnIndexOrThrow("name"))
+                        val isUnique = cursor.getInt(cursor.getColumnIndexOrThrow("unique")) == 1
+                        if (indexName == "index_user_links_normalizedUrl" && isUnique) {
+                            foundUniqueNormalizedUrlIndex = true
+                        }
+                    }
+                    assertTrue(foundUniqueNormalizedUrlIndex)
+                }
             } finally {
                 migrated.close()
             }

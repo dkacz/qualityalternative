@@ -10,9 +10,16 @@ import com.qualityalternative.app.domain.model.UserLinkDraft
 import com.qualityalternative.app.domain.service.AddUserLinkResult
 import com.qualityalternative.app.domain.service.ContentRepository
 import com.qualityalternative.app.domain.service.UserLinkRepository
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.take
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Test
@@ -49,7 +56,55 @@ class CompositeContentRepositoryTest {
         assertEquals("Fallback summary", repository.contentBody(userLink))
     }
 
-    private class FakeEditorialRepository : ContentRepository {
+    @Test
+    fun isReady_requiresBothRepositoriesToBeReady() {
+        val repository = CompositeContentRepository(
+            editorialRepository = FakeEditorialRepository(isReady = MutableStateFlow(true)),
+            userLinkRepository = FakeUserLinkRepository(
+                links = emptyList(),
+                isReady = MutableStateFlow(false),
+            ),
+        )
+
+        assertFalse(repository.isReady())
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun observeReady_requiresEditorialAndUserLinksToBeReady() = runTest {
+        val editorialReady = MutableStateFlow(false)
+        val userLinksReady = MutableStateFlow(false)
+        val repository = CompositeContentRepository(
+            editorialRepository = FakeEditorialRepository(isReady = editorialReady),
+            userLinkRepository = FakeUserLinkRepository(
+                links = emptyList(),
+                isReady = userLinksReady,
+            ),
+        )
+        val emissions = mutableListOf<Boolean>()
+
+        val job = launch {
+            repository.observeReady().take(2).toList(emissions)
+        }
+        advanceUntilIdle()
+
+        assertEquals(listOf(false), emissions)
+
+        userLinksReady.value = true
+        advanceUntilIdle()
+
+        assertEquals(listOf(false), emissions)
+
+        editorialReady.value = true
+        advanceUntilIdle()
+
+        assertEquals(listOf(false, true), emissions)
+        job.cancel()
+    }
+
+    private class FakeEditorialRepository(
+        private val isReady: MutableStateFlow<Boolean> = MutableStateFlow(true),
+    ) : ContentRepository {
         private val item = ContentItem(
             id = "editorial-1",
             packId = "starter",
@@ -73,10 +128,15 @@ class CompositeContentRepositoryTest {
         override fun inventory(): List<ContentItem> = listOf(item)
 
         override fun contentBody(item: ContentItem): String = "Editorial body"
+
+        override fun isReady(): Boolean = isReady.value
+
+        override fun observeReady(): Flow<Boolean> = isReady
     }
 
     private class FakeUserLinkRepository(
         private val links: List<ContentItem>,
+        private val isReady: MutableStateFlow<Boolean> = MutableStateFlow(true),
     ) : UserLinkRepository {
         override fun userLinks(): List<ContentItem> = links
 
@@ -91,6 +151,10 @@ class CompositeContentRepositoryTest {
             contentId: String,
             nowMillis: Long,
         ) = Unit
+
+        override fun isReady(): Boolean = isReady.value
+
+        override fun observeReady(): Flow<Boolean> = isReady
     }
 
     private fun userLink(

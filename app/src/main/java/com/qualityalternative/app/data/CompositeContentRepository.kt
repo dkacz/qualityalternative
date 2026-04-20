@@ -7,6 +7,8 @@ import com.qualityalternative.app.domain.model.EditorialPack
 import com.qualityalternative.app.domain.service.ContentRepository
 import com.qualityalternative.app.domain.service.UserLinkRepository
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 
 class CompositeContentRepository(
     private val editorialRepository: ContentRepository,
@@ -30,5 +32,12 @@ class CompositeContentRepository(
 
     override fun isReady(): Boolean = editorialRepository.isReady() && userLinkRepository.isReady()
 
-    override fun observeReady(): Flow<Boolean> = userLinkRepository.observeReady()
+    override fun observeReady(): Flow<Boolean> {
+        return combine(
+            editorialRepository.observeReady(),
+            userLinkRepository.observeReady(),
+        ) { editorialReady, userLinksReady ->
+            editorialReady && userLinksReady
+        }.distinctUntilChanged()
+    }
 }

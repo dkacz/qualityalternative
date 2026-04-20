@@ -14,7 +14,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         UserLinkEntity::class,
     ],
     version = 4,
-    exportSchema = false,
+    exportSchema = true,
 )
 abstract class QualityAlternativeDatabase : RoomDatabase() {
     abstract fun analyticsEventDao(): AnalyticsEventDao
