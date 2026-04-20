@@ -1,5 +1,6 @@
 package com.qualityalternative.app.ui
 
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
@@ -10,13 +11,13 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -25,6 +26,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -38,10 +40,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.qualityalternative.app.domain.model.AnalyticsEvent
 import com.qualityalternative.app.domain.model.ContentItem
+import com.qualityalternative.app.domain.model.ContentSourceType
 import com.qualityalternative.app.domain.model.DelayWindow
 import com.qualityalternative.app.domain.model.DistractingApp
 import com.qualityalternative.app.domain.model.DurationBucket
@@ -51,6 +55,7 @@ import com.qualityalternative.app.domain.model.PermissionReadiness
 import com.qualityalternative.app.domain.model.PermissionStatus
 import com.qualityalternative.app.domain.model.ReplacementHistoryEntry
 import com.qualityalternative.app.domain.model.TopicTag
+import com.qualityalternative.app.domain.model.UserLinkValidationError
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -111,6 +116,17 @@ fun QualityAlternativeApp(
                             onSelectTargetApp = viewModel::selectTargetApp,
                             onTriggerIntervention = viewModel::triggerDebugIntervention,
                             onRefreshReadiness = viewModel::refreshPermissionReadiness,
+                            onOpenAddLink = viewModel::openAddLink,
+                        )
+
+                        MainScreen.AddLink -> AddLinkScreen(
+                            form = uiState.addLinkForm,
+                            onUrlChange = viewModel::updateAddLinkUrl,
+                            onTitleChange = viewModel::updateAddLinkTitle,
+                            onDurationChange = viewModel::updateAddLinkDuration,
+                            onToggleTopic = viewModel::toggleAddLinkTopic,
+                            onSave = viewModel::saveUserLink,
+                            onCancel = viewModel::cancelAddLink,
                         )
 
                         MainScreen.Intervention -> InterventionScreen(
@@ -129,6 +145,15 @@ fun QualityAlternativeApp(
                             state = uiState,
                             onFinishReading = viewModel::finishReading,
                             onSkipReading = viewModel::skipReading,
+                        )
+
+                        MainScreen.ExternalHandoff -> ExternalLinkHandoffScreen(
+                            state = uiState,
+                            onOpenLink = {
+                                launchExternalLink(context = it, viewModel = viewModel)
+                            },
+                            onFinishSession = viewModel::finishReading,
+                            onSkipSession = viewModel::skipReading,
                         )
 
                         MainScreen.Feedback -> FeedbackScreen(
@@ -300,6 +325,7 @@ private fun HomeScreen(
     onSelectTargetApp: (DistractingApp) -> Unit,
     onTriggerIntervention: () -> Unit,
     onRefreshReadiness: () -> Unit,
+    onOpenAddLink: () -> Unit,
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -319,6 +345,13 @@ private fun HomeScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+        }
+
+        item {
+            PersonalLibraryCard(
+                userLinks = state.userLinks,
+                onOpenAddLink = onOpenAddLink,
+            )
         }
 
         item {
@@ -385,6 +418,173 @@ private fun HomeScreen(
 
         item {
             AnalyticsLog(events = state.events)
+        }
+    }
+}
+
+@Composable
+private fun PersonalLibraryCard(
+    userLinks: List<ContentItem>,
+    onOpenAddLink: () -> Unit,
+) {
+    Card {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(
+                text = "Personal replacement library",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = "Personal library: ${userLinks.size} ${if (userLinks.size == 1) "link" else "links"} saved.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (userLinks.isNotEmpty()) {
+                Text(
+                    text = "Latest saved: ${userLinks.first().title}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Button(
+                modifier = Modifier.testTag("home-add-link"),
+                onClick = onOpenAddLink,
+            ) {
+                Text("Add link")
+            }
+        }
+    }
+}
+
+@Composable
+private fun AddLinkScreen(
+    form: AddLinkFormState,
+    onUrlChange: (String) -> Unit,
+    onTitleChange: (String) -> Unit,
+    onDurationChange: (String) -> Unit,
+    onToggleTopic: (TopicTag) -> Unit,
+    onSave: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = "Add a replacement link",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                text = "Save one useful article or essay for future impulse moments. This is not a feed.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        OutlinedTextField(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("add-link-url"),
+            value = form.url,
+            onValueChange = onUrlChange,
+            label = { Text("URL") },
+            singleLine = true,
+            isError = form.validationErrors.any { it.isUrlError() },
+            supportingText = {
+                if (form.validationErrors.any { it.isUrlError() }) {
+                    Text(form.validationErrors.first { it.isUrlError() }.displayMessage())
+                } else {
+                    Text("Use a full http or https link.")
+                }
+            },
+        )
+
+        OutlinedTextField(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("add-link-title"),
+            value = form.title,
+            onValueChange = onTitleChange,
+            label = { Text("Title") },
+            singleLine = true,
+            isError = UserLinkValidationError.BLANK_TITLE in form.validationErrors,
+            supportingText = {
+                if (UserLinkValidationError.BLANK_TITLE in form.validationErrors) {
+                    Text(UserLinkValidationError.BLANK_TITLE.displayMessage())
+                } else {
+                    Text("Give the link a clear name for the intervention card.")
+                }
+            },
+        )
+
+        OutlinedTextField(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("add-link-duration"),
+            value = form.durationMinutes,
+            onValueChange = { value -> onDurationChange(value.filter(Char::isDigit).take(2)) },
+            label = { Text("Estimated minutes") },
+            singleLine = true,
+            isError = UserLinkValidationError.INVALID_DURATION in form.validationErrors,
+            supportingText = {
+                if (UserLinkValidationError.INVALID_DURATION in form.validationErrors) {
+                    Text(UserLinkValidationError.INVALID_DURATION.displayMessage())
+                } else {
+                    Text("Use 1-60 minutes. The intervention stays finite.")
+                }
+            },
+        )
+
+        Card {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    text = "Topics",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    TopicTag.entries.forEach { topic ->
+                        FilterChip(
+                            modifier = Modifier.testTag("add-link-topic-${topic.name}"),
+                            selected = topic in form.selectedTopics,
+                            onClick = { onToggleTopic(topic) },
+                            label = { Text(topic.displayName()) },
+                        )
+                    }
+                }
+                if (UserLinkValidationError.NO_TOPICS in form.validationErrors) {
+                    Text(
+                        text = UserLinkValidationError.NO_TOPICS.displayMessage(),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+        }
+
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Button(
+                modifier = Modifier.testTag("add-link-save"),
+                onClick = onSave,
+                enabled = form.canSave && !form.isSaving,
+            ) {
+                Text(if (form.isSaving) "Saving…" else "Save link")
+            }
+            OutlinedButton(onClick = onCancel) {
+                Text("Cancel")
+            }
         }
     }
 }
@@ -630,20 +830,16 @@ private fun InterventionScreen(
         )
 
         RecommendationCard(
-            title = recommendationSet.primary.title,
-            subtitle = recommendationSet.primary.description,
-            durationLabel = "${recommendationSet.primary.durationMinutes} min",
-            actionLabel = "Read now",
+            content = recommendationSet.primary,
+            actionLabel = if (recommendationSet.primary.isUserLink()) "Open link" else "Read now",
             highlighted = true,
             onClick = onAcceptPrimary,
         )
 
         recommendationSet.backups.forEach { backup ->
             RecommendationCard(
-                title = backup.title,
-                subtitle = backup.description,
-                durationLabel = "${backup.durationMinutes} min",
-                actionLabel = "Choose backup",
+                content = backup,
+                actionLabel = if (backup.isUserLink()) "Open link" else "Choose backup",
                 highlighted = false,
                 onClick = { onAcceptBackup(backup) },
             )
@@ -662,9 +858,7 @@ private fun InterventionScreen(
 
 @Composable
 private fun RecommendationCard(
-    title: String,
-    subtitle: String,
-    durationLabel: String,
+    content: ContentItem,
     actionLabel: String,
     highlighted: Boolean,
     onClick: () -> Unit,
@@ -683,12 +877,71 @@ private fun RecommendationCard(
             modifier = Modifier.padding(18.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            AssistChip(onClick = {}, label = { Text(durationLabel) })
-            Text(text = title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-            Text(text = subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                text = "${content.durationMinutes} min • ${if (content.isUserLink()) "Saved link" else "Editorial"}",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(text = content.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+            Text(text = content.description, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Button(onClick = onClick) {
                 Text(actionLabel)
             }
+        }
+    }
+}
+
+@Composable
+private fun ExternalLinkHandoffScreen(
+    state: MainUiState,
+    onOpenLink: (android.content.Context) -> Unit,
+    onFinishSession: () -> Unit,
+    onSkipSession: () -> Unit,
+) {
+    val content = state.currentContent ?: return
+    val context = LocalContext.current
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(20.dp)
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Text(
+            text = content.title,
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+        )
+        Text(
+            text = "Saved link • ${content.durationMinutes} min • ${content.topicTags.joinToString { it.displayName() }}",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = "This is one of your saved links. We'll hand you to the browser and keep the replacement session attached here for feedback.",
+            style = MaterialTheme.typography.bodyLarge,
+        )
+        content.externalUrl?.let { url ->
+            Text(
+                text = url,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Button(
+                modifier = Modifier.testTag("external-link-open"),
+                onClick = { onOpenLink(context) },
+            ) {
+                Text("Open external link")
+            }
+            OutlinedButton(onClick = onSkipSession) {
+                Text("Leave session")
+            }
+        }
+        OutlinedButton(onClick = onFinishSession) {
+            Text("I read it")
         }
     }
 }
@@ -810,6 +1063,28 @@ private fun formatTimestamp(timestampMillis: Long): String {
 
 private fun TopicTag.displayName(): String = name.lowercase().replaceFirstChar(Char::uppercase)
 
+private fun ContentItem.isUserLink(): Boolean = sourceType == ContentSourceType.USER_LINK
+
+private fun launchExternalLink(
+    context: android.content.Context,
+    viewModel: MainViewModel,
+) {
+    val url = viewModel.currentExternalLinkUrl()
+    if (url == null) {
+        viewModel.recordExternalLinkHandoffFailed(reason = "missing_url")
+        return
+    }
+    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+    runCatching {
+        context.startActivity(intent)
+    }.onSuccess {
+        viewModel.recordExternalLinkOpened()
+    }.onFailure { error ->
+        val reason = if (error is ActivityNotFoundException) "no_handler" else "start_activity_failed"
+        viewModel.recordExternalLinkHandoffFailed(reason = reason)
+    }
+}
+
 private fun DurationBucket.displayName(): String = when (this) {
     DurationBucket.QUICK -> "3-5 minutes"
     DurationBucket.FOCUS -> "5-10 minutes"
@@ -840,4 +1115,21 @@ private fun ReplacementHistoryEntry.statusSummary(): String {
         labels += if (feedbackHelpedAvoidScrolling == true) "Helped" else "Did not help"
     }
     return labels.joinToString(" • ")
+}
+
+private fun UserLinkValidationError.isUrlError(): Boolean {
+    return this == UserLinkValidationError.EMPTY_URL ||
+        this == UserLinkValidationError.UNSUPPORTED_SCHEME ||
+        this == UserLinkValidationError.MISSING_HOST
+}
+
+private fun UserLinkValidationError.displayMessage(): String {
+    return when (this) {
+        UserLinkValidationError.EMPTY_URL -> "Add the link you want to save."
+        UserLinkValidationError.UNSUPPORTED_SCHEME -> "Use a normal web link starting with http or https."
+        UserLinkValidationError.MISSING_HOST -> "This link is missing a website address."
+        UserLinkValidationError.BLANK_TITLE -> "Add a title so the recommendation is easy to recognize."
+        UserLinkValidationError.INVALID_DURATION -> "Choose an estimated reading time from 1 to 60 minutes."
+        UserLinkValidationError.NO_TOPICS -> "Choose at least one topic so the app can rank this link."
+    }
 }
