@@ -1,7 +1,9 @@
 package com.qualityalternative.app.domain.service
 
+import com.qualityalternative.app.domain.model.ContentAvailability
 import com.qualityalternative.app.domain.model.ContentFormat
 import com.qualityalternative.app.domain.model.ContentItem
+import com.qualityalternative.app.domain.model.ContentSourceType
 import com.qualityalternative.app.domain.model.DistractingApp
 import com.qualityalternative.app.domain.model.DurationBucket
 import com.qualityalternative.app.domain.model.RecommendationSignals
@@ -160,14 +162,133 @@ class DefaultRecommendationEngineTest {
         assertEquals(false, result?.inventoryShortage)
     }
 
-    private fun item(id: String, packId: String = "pack", minutes: Int, topics: Set<TopicTag>): ContentItem = ContentItem(
+    @Test
+    fun generate_canSelectUserLinkWhenItIsTheBestFit() {
+        val preferences = UserPreferences(
+            selectedApps = listOf(DistractingApp(packageName = "pkg", displayName = "Instagram")),
+            preferredTopics = setOf(TopicTag.SCIENCE),
+            preferredDurationBucket = DurationBucket.FOCUS,
+            selectedPackIds = setOf("pack", "user-links"),
+        )
+
+        val inventory = listOf(
+            item(id = "editorial-mismatch", minutes = 12, topics = setOf(TopicTag.HISTORY)),
+            item(
+                id = "saved-link",
+                packId = "user-links",
+                minutes = 7,
+                topics = setOf(TopicTag.SCIENCE),
+                format = ContentFormat.HTML,
+                sourceType = ContentSourceType.USER_LINK,
+                availability = ContentAvailability.NEEDS_FALLBACK,
+                externalUrl = "https://example.com/essay",
+            ),
+        )
+
+        val result = engine.generate(
+            targetApp = DistractingApp(packageName = "pkg", displayName = "Instagram"),
+            preferences = preferences,
+            inventory = inventory,
+            primaryExcludedIds = emptySet(),
+            signals = RecommendationSignals(timeOfDay = TimeOfDayBucket.MIDDAY),
+            nowMillis = 0L,
+        )
+
+        assertEquals("saved-link", result?.primary?.id)
+    }
+
+    @Test
+    fun generate_canMixEditorialAndUserLinkBackups() {
+        val preferences = UserPreferences(
+            selectedApps = listOf(DistractingApp(packageName = "pkg", displayName = "Instagram")),
+            preferredTopics = setOf(TopicTag.PHILOSOPHY),
+            preferredDurationBucket = DurationBucket.FOCUS,
+            selectedPackIds = setOf("pack", "user-links"),
+        )
+
+        val inventory = listOf(
+            item(id = "primary", minutes = 7, topics = setOf(TopicTag.PHILOSOPHY)),
+            item(
+                id = "saved-backup",
+                packId = "user-links",
+                minutes = 5,
+                topics = setOf(TopicTag.PHILOSOPHY),
+                format = ContentFormat.HTML,
+                sourceType = ContentSourceType.USER_LINK,
+                availability = ContentAvailability.NEEDS_FALLBACK,
+                externalUrl = "https://example.com/short",
+            ),
+            item(id = "editorial-backup", minutes = 4, topics = setOf(TopicTag.HISTORY)),
+        )
+
+        val result = engine.generate(
+            targetApp = DistractingApp(packageName = "pkg", displayName = "Instagram"),
+            preferences = preferences,
+            inventory = inventory,
+            primaryExcludedIds = emptySet(),
+            signals = RecommendationSignals(timeOfDay = TimeOfDayBucket.MIDDAY),
+            nowMillis = 0L,
+        )
+
+        assertEquals("primary", result?.primary?.id)
+        assertEquals(setOf("saved-backup", "editorial-backup"), result?.backups?.map(ContentItem::id)?.toSet())
+    }
+
+    @Test
+    fun generate_excludesCompletedUserLinksFromPrimary() {
+        val preferences = UserPreferences(
+            selectedApps = listOf(DistractingApp(packageName = "pkg", displayName = "Instagram")),
+            preferredTopics = setOf(TopicTag.SCIENCE),
+            preferredDurationBucket = DurationBucket.FOCUS,
+            selectedPackIds = setOf("pack", "user-links"),
+        )
+
+        val inventory = listOf(
+            item(
+                id = "completed-link",
+                packId = "user-links",
+                minutes = 7,
+                topics = setOf(TopicTag.SCIENCE),
+                format = ContentFormat.HTML,
+                sourceType = ContentSourceType.USER_LINK,
+                availability = ContentAvailability.NEEDS_FALLBACK,
+                externalUrl = "https://example.com/done",
+            ),
+            item(id = "fresh-editorial", minutes = 7, topics = setOf(TopicTag.SCIENCE)),
+        )
+
+        val result = engine.generate(
+            targetApp = DistractingApp(packageName = "pkg", displayName = "Instagram"),
+            preferences = preferences,
+            inventory = inventory,
+            primaryExcludedIds = setOf("completed-link"),
+            signals = RecommendationSignals(timeOfDay = TimeOfDayBucket.MIDDAY),
+            nowMillis = 0L,
+        )
+
+        assertEquals("fresh-editorial", result?.primary?.id)
+    }
+
+    private fun item(
+        id: String,
+        packId: String = "pack",
+        minutes: Int,
+        topics: Set<TopicTag>,
+        format: ContentFormat = ContentFormat.MARKDOWN,
+        sourceType: ContentSourceType = ContentSourceType.EDITORIAL,
+        availability: ContentAvailability = ContentAvailability.AVAILABLE,
+        externalUrl: String? = null,
+    ): ContentItem = ContentItem(
         id = id,
         packId = packId,
         title = id,
         description = "desc",
         durationMinutes = minutes,
-        format = ContentFormat.MARKDOWN,
+        format = format,
         topicTags = topics,
         bodyAssetPath = "unused",
+        externalUrl = externalUrl,
+        sourceType = sourceType,
+        availability = availability,
     )
 }

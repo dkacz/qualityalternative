@@ -11,6 +11,7 @@ import com.qualityalternative.app.domain.service.HistoryRepository
 import com.qualityalternative.app.domain.service.InterceptionMonitor
 import com.qualityalternative.app.domain.service.RecommendationEngine
 import com.qualityalternative.app.domain.service.SettingsRepository
+import com.qualityalternative.app.domain.service.UserLinkRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -26,7 +27,14 @@ class AppContainer(context: Context) {
         dao = database.analyticsEventDao(),
         scope = appScope,
     )
-    val contentRepository: ContentRepository = AssetContentRepository(context = context)
+    val userLinkRepository: UserLinkRepository = RoomUserLinkRepository(
+        dao = database.userLinkDao(),
+        scope = appScope,
+    )
+    val contentRepository: ContentRepository = CompositeContentRepository(
+        editorialRepository = AssetContentRepository(context = context),
+        userLinkRepository = userLinkRepository,
+    )
     val historyRepository: HistoryRepository = RoomHistoryRepository(
         dao = database.replacementSessionDao(),
         scope = appScope,

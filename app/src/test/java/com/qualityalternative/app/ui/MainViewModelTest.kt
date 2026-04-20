@@ -9,8 +9,10 @@ import com.qualityalternative.app.data.PreferencesDelayGate
 import com.qualityalternative.app.data.SupportedCatalog
 import com.qualityalternative.app.domain.model.AppSettings
 import com.qualityalternative.app.domain.model.AnalyticsEventType
+import com.qualityalternative.app.domain.model.ContentAvailability
 import com.qualityalternative.app.domain.model.ContentFormat
 import com.qualityalternative.app.domain.model.ContentItem
+import com.qualityalternative.app.domain.model.ContentSourceType
 import com.qualityalternative.app.domain.model.DistractingApp
 import com.qualityalternative.app.domain.model.DurationBucket
 import com.qualityalternative.app.domain.model.EditorialPack
@@ -18,23 +20,31 @@ import com.qualityalternative.app.domain.model.OnboardingSelection
 import com.qualityalternative.app.domain.model.PermissionReadiness
 import com.qualityalternative.app.domain.model.PermissionStatus
 import com.qualityalternative.app.domain.model.RecommendationSet
+import com.qualityalternative.app.domain.model.RecommendationSignals
 import com.qualityalternative.app.domain.model.RecommendationSource
 import com.qualityalternative.app.domain.model.ReplacementHistoryEntry
 import com.qualityalternative.app.domain.model.ReturnToTargetSignal
 import com.qualityalternative.app.domain.model.SessionFeedback
 import com.qualityalternative.app.domain.model.TopicTag
+import com.qualityalternative.app.domain.model.UserLinkDraft
+import com.qualityalternative.app.domain.model.UserLinkValidationError
+import com.qualityalternative.app.domain.model.UserPreferences
+import com.qualityalternative.app.domain.service.AddUserLinkResult
 import com.qualityalternative.app.domain.service.ContentRepository
 import com.qualityalternative.app.domain.service.DefaultRecommendationEngine
 import com.qualityalternative.app.domain.service.DelayGate
 import com.qualityalternative.app.domain.service.HistoryRepository
 import com.qualityalternative.app.domain.service.InterceptionMonitor
+import com.qualityalternative.app.domain.service.RecommendationEngine
 import com.qualityalternative.app.domain.service.SettingsRepository
+import com.qualityalternative.app.domain.service.UserLinkRepository
 import com.qualityalternative.app.interception.FixtureTargetRegistry
 import com.qualityalternative.app.interception.InterceptionRuntimeGate
 import java.io.File
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -79,6 +89,320 @@ class MainViewModelTest {
         assertEquals(MainScreen.Home, viewModel.uiState.screen)
         assertEquals(3, viewModel.uiState.availableTargetApps.size)
         assertEquals(setOf("philosophy"), viewModel.uiState.preferences?.selectedPackIds)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun hydrationWaitsForContentRepositoryReadiness() = runTest {
+        val contentRepository = FakeContentRepository(isReady = false)
+        val viewModel = createViewModel(contentRepository = contentRepository)
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.isLoadingSettings)
+
+        contentRepository.setReady(true)
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.isLoadingSettings)
+        assertEquals(MainScreen.Home, viewModel.uiState.screen)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun interventionInventoryIncludesUserLinksOnceFallbackFlowExists() = runTest {
+        val userLink = savedUserLink()
+        val contentRepository = FakeContentRepository(extraItems = listOf(userLink))
+        val recommendationEngine = RecordingRecommendationEngine()
+        val viewModel = createViewModel(
+            contentRepository = contentRepository,
+            recommendationEngine = recommendationEngine,
+        )
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+        viewModel.triggerDebugIntervention(nowMillis = 1_000L)
+        advanceUntilIdle()
+
+        assertEquals(
+            setOf("p1", "user-link"),
+            recommendationEngine.lastInventory.mapTo(mutableSetOf(), ContentItem::id),
+        )
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun acceptingUserLinkRoutesToExternalHandoffAndRecordsFallbackOpen() = runTest {
+        val userLink = savedUserLink()
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val viewModel = createViewModel(
+            contentRepository = FakeContentRepository(extraItems = listOf(userLink)),
+            recommendationEngine = FixedRecommendationEngine(
+                RecommendationSet(
+                    primary = userLink,
+                    backups = emptyList(),
+                    inventoryShortage = true,
+                    generatedAtMillis = 1_000L,
+                ),
+            ),
+            analyticsTracker = analyticsTracker,
+        )
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+        viewModel.triggerDebugIntervention(nowMillis = 1_000L)
+        advanceUntilIdle()
+        viewModel.acceptPrimary()
+        advanceUntilIdle()
+
+        assertEquals(MainScreen.ExternalHandoff, viewModel.uiState.screen)
+        assertEquals("https://example.com/essay", viewModel.currentExternalLinkUrl())
+        assertFalse(analyticsTracker.allEvents().any { it.type == AnalyticsEventType.USER_LINK_FALLBACK_OPENED })
+
+        viewModel.recordExternalLinkOpened(nowMillis = 2_000L)
+
+        val event = analyticsTracker.allEvents().first {
+            it.type == AnalyticsEventType.USER_LINK_FALLBACK_OPENED
+        }
+        assertEquals(userLink.id, event.contentId)
+        assertEquals("USER_LINK", event.metadata["sourceType"])
+        assertEquals("NEEDS_FALLBACK", event.metadata["availability"])
+        assertEquals("https://example.com/essay", event.metadata["externalUrl"])
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun failedUserLinkHandoffMarksLinkUnavailableAndDoesNotRecordSuccessfulOpen() = runTest {
+        val userLink = savedUserLink()
+        val userLinkRepository = FakeUserLinkRepository(initialLinks = listOf(userLink))
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val viewModel = createViewModel(
+            contentRepository = FakeContentRepository(extraItems = listOf(userLink)),
+            userLinkRepository = userLinkRepository,
+            recommendationEngine = FixedRecommendationEngine(
+                RecommendationSet(
+                    primary = userLink,
+                    backups = emptyList(),
+                    inventoryShortage = true,
+                    generatedAtMillis = 1_000L,
+                ),
+            ),
+            analyticsTracker = analyticsTracker,
+        )
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+        viewModel.triggerDebugIntervention(nowMillis = 1_000L)
+        advanceUntilIdle()
+        viewModel.acceptPrimary()
+        advanceUntilIdle()
+
+        viewModel.recordExternalLinkHandoffFailed(reason = "no_handler", nowMillis = 2_000L)
+        advanceUntilIdle()
+
+        assertFalse(analyticsTracker.allEvents().any { it.type == AnalyticsEventType.USER_LINK_FALLBACK_OPENED })
+        val failure = analyticsTracker.allEvents().first {
+            it.type == AnalyticsEventType.USER_LINK_HANDOFF_FAILED
+        }
+        assertEquals(userLink.id, failure.contentId)
+        assertEquals("no_handler", failure.metadata["failureReason"])
+        assertEquals("USER_LINK", failure.metadata["sourceType"])
+        assertEquals(ContentAvailability.UNAVAILABLE, userLinkRepository.links.value.single().availability)
+        assertEquals(listOf(userLink.id), userLinkRepository.markedUnavailableIds)
+        assertEquals(MainScreen.Home, viewModel.uiState.screen)
+        assertEquals(
+            "This saved link could not be opened and was removed from future recommendations.",
+            viewModel.uiState.latestMessage,
+        )
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun saveUserLinkFromForm_persistsLinkAndRecordsAnalytics() = runTest {
+        val userLinkRepository = FakeUserLinkRepository()
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val viewModel = createViewModel(
+            userLinkRepository = userLinkRepository,
+            analyticsTracker = analyticsTracker,
+        )
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+
+        viewModel.openAddLink()
+        viewModel.updateAddLinkUrl("https://example.com/essay")
+        viewModel.updateAddLinkTitle("Saved essay")
+        viewModel.updateAddLinkDuration("9")
+        viewModel.toggleAddLinkTopic(TopicTag.SCIENCE)
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.addLinkForm.canSave)
+
+        viewModel.saveUserLink(nowMillis = 2_000L)
+        advanceUntilIdle()
+
+        assertEquals(MainScreen.Home, viewModel.uiState.screen)
+        assertEquals("Saved essay", userLinkRepository.links.value.single().title)
+        assertEquals("Saved essay", viewModel.uiState.userLinks.single().title)
+        val event = analyticsTracker.allEvents().first { it.type == AnalyticsEventType.USER_LINK_ADDED }
+        assertEquals("user-link:1", event.contentId)
+        assertEquals("USER_LINK", event.metadata["sourceType"])
+        assertEquals("https://example.com/essay", event.metadata["externalUrl"])
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun saveUserLinkWithRejectedDraft_keepsAddLinkOpenWithErrors() = runTest {
+        val viewModel = createViewModel()
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+
+        viewModel.openAddLink()
+        viewModel.updateAddLinkUrl("quality://bad")
+        viewModel.updateAddLinkTitle("Bad link")
+        viewModel.updateAddLinkDuration("7")
+        viewModel.toggleAddLinkTopic(TopicTag.SCIENCE)
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.addLinkForm.canSave)
+        assertTrue(UserLinkValidationError.UNSUPPORTED_SCHEME in viewModel.uiState.addLinkForm.validationErrors)
+
+        viewModel.saveUserLink(nowMillis = 2_000L)
+        advanceUntilIdle()
+
+        assertEquals(MainScreen.AddLink, viewModel.uiState.screen)
+        assertTrue(UserLinkValidationError.UNSUPPORTED_SCHEME in viewModel.uiState.addLinkForm.validationErrors)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun saveUserLinkWithRepositoryFailure_keepsAddLinkOpenAndClearsSaving() = runTest {
+        val viewModel = createViewModel(
+            userLinkRepository = FakeUserLinkRepository(throwOnAdd = true),
+        )
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+
+        viewModel.openAddLink()
+        viewModel.updateAddLinkUrl("https://example.com/essay")
+        viewModel.updateAddLinkTitle("Saved essay")
+        viewModel.updateAddLinkDuration("7")
+        viewModel.toggleAddLinkTopic(TopicTag.SCIENCE)
+        advanceUntilIdle()
+
+        viewModel.saveUserLink(nowMillis = 2_000L)
+        advanceUntilIdle()
+
+        assertEquals(MainScreen.AddLink, viewModel.uiState.screen)
+        assertFalse(viewModel.uiState.addLinkForm.isSaving)
+        assertEquals("The link could not be saved locally. Try again.", viewModel.uiState.latestMessage)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun malformedWebUrl_staysDisabledAndShowsMissingHostError() = runTest {
+        val viewModel = createViewModel()
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+
+        viewModel.openAddLink()
+        viewModel.updateAddLinkUrl("https://")
+        viewModel.updateAddLinkTitle("Missing host")
+        viewModel.updateAddLinkDuration("7")
+        viewModel.toggleAddLinkTopic(TopicTag.SCIENCE)
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.addLinkForm.canSave)
+        assertTrue(UserLinkValidationError.MISSING_HOST in viewModel.uiState.addLinkForm.validationErrors)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun addLinkWithBlankTitle_staysDisabledAndShowsTitleError() = runTest {
+        val viewModel = createViewModel()
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+
+        viewModel.openAddLink()
+        viewModel.updateAddLinkUrl("https://example.com/essay")
+        viewModel.updateAddLinkDuration("7")
+        viewModel.toggleAddLinkTopic(TopicTag.SCIENCE)
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.addLinkForm.canSave)
+        assertTrue(UserLinkValidationError.BLANK_TITLE in viewModel.uiState.addLinkForm.validationErrors)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun addLinkWithNoTopic_staysDisabledAndShowsTopicError() = runTest {
+        val viewModel = createViewModel()
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+
+        viewModel.openAddLink()
+        viewModel.updateAddLinkUrl("https://example.com/essay")
+        viewModel.updateAddLinkTitle("Saved essay")
+        viewModel.updateAddLinkDuration("7")
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.addLinkForm.canSave)
+        assertTrue(UserLinkValidationError.NO_TOPICS in viewModel.uiState.addLinkForm.validationErrors)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun addLinkWithBlankDuration_staysDisabledAndShowsDurationError() = runTest {
+        val viewModel = createViewModel()
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+
+        viewModel.openAddLink()
+        viewModel.updateAddLinkUrl("https://example.com/essay")
+        viewModel.updateAddLinkTitle("Saved essay")
+        viewModel.updateAddLinkDuration("")
+        viewModel.toggleAddLinkTopic(TopicTag.SCIENCE)
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.addLinkForm.canSave)
+        assertTrue(UserLinkValidationError.INVALID_DURATION in viewModel.uiState.addLinkForm.validationErrors)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun addLinkWithBlankUrl_staysDisabledAndShowsUrlError() = runTest {
+        val viewModel = createViewModel()
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+
+        viewModel.openAddLink()
+        viewModel.updateAddLinkTitle("Saved essay")
+        viewModel.updateAddLinkDuration("7")
+        viewModel.toggleAddLinkTopic(TopicTag.SCIENCE)
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.addLinkForm.canSave)
+        assertTrue(UserLinkValidationError.EMPTY_URL in viewModel.uiState.addLinkForm.validationErrors)
     }
 
     @Test
@@ -314,7 +638,34 @@ class MainViewModelTest {
         assertEquals(null, viewModel.uiState.currentInterventionId)
         assertEquals(MainScreen.Home, viewModel.uiState.screen)
         assertEquals("No replacement inventory is available yet.", viewModel.uiState.latestMessage)
-        assertTrue(analyticsTracker.allEvents().any { it.type == AnalyticsEventType.NO_RECOMMENDATION_AVAILABLE })
+        val event = analyticsTracker.allEvents().first { it.type == AnalyticsEventType.NO_RECOMMENDATION_AVAILABLE }
+        assertEquals("1", event.metadata["eligibleInventoryCount"])
+        assertEquals("1", event.metadata["eligibleEditorialCount"])
+        assertEquals("0", event.metadata["eligibleUserLinkCount"])
+        assertEquals("0", event.metadata["unavailableUserLinkCount"])
+        assertEquals("2", event.metadata["completedContentCount"])
+        assertEquals("philosophy", event.metadata["selectedPackIds"])
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun inventoryShortageRecordsSourceDiagnostics() = runTest {
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val viewModel = createViewModel(analyticsTracker = analyticsTracker)
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+        viewModel.triggerDebugIntervention(nowMillis = 2_000L)
+        advanceUntilIdle()
+
+        val event = analyticsTracker.allEvents().first { it.type == AnalyticsEventType.INVENTORY_SHORTAGE }
+        assertEquals("1", event.metadata["eligibleInventoryCount"])
+        assertEquals("1", event.metadata["eligibleEditorialCount"])
+        assertEquals("0", event.metadata["eligibleUserLinkCount"])
+        assertEquals("0", event.metadata["unavailableUserLinkCount"])
+        assertEquals("0", event.metadata["completedContentCount"])
+        assertEquals("philosophy", event.metadata["selectedPackIds"])
     }
 
     @Test
@@ -454,13 +805,17 @@ class MainViewModelTest {
         historyRepository: FakeHistoryRepository = FakeHistoryRepository(),
         analyticsTracker: InMemoryAnalyticsTracker = InMemoryAnalyticsTracker(),
         delayGate: DelayGate = InMemoryDelayGate(),
+        contentRepository: ContentRepository = FakeContentRepository(),
+        userLinkRepository: UserLinkRepository = FakeUserLinkRepository(),
+        recommendationEngine: RecommendationEngine = DefaultRecommendationEngine(),
         nowProvider: () -> Long = { 1_000L },
     ): MainViewModel {
         return track(
             MainViewModel(
-                contentRepository = FakeContentRepository(),
+                contentRepository = contentRepository,
+                userLinkRepository = userLinkRepository,
                 settingsRepository = settingsRepository,
-                recommendationEngine = DefaultRecommendationEngine(),
+                recommendationEngine = recommendationEngine,
                 delayGate = delayGate,
                 analyticsTracker = analyticsTracker,
                 historyRepository = historyRepository,
@@ -648,7 +1003,11 @@ class MainViewModelTest {
         }
     }
 
-    private class FakeContentRepository : ContentRepository {
+    private class FakeContentRepository(
+        extraItems: List<ContentItem> = emptyList(),
+        isReady: Boolean = true,
+    ) : ContentRepository {
+        private val ready = MutableStateFlow(isReady)
         private val packs = listOf(
             EditorialPack(
                 id = "philosophy",
@@ -677,12 +1036,21 @@ class MainViewModelTest {
                 ),
             ),
         )
+        private val inventory = packs.flatMap(EditorialPack::items) + extraItems
 
         override fun starterPacks(): List<EditorialPack> = packs
 
-        override fun inventory(): List<ContentItem> = packs.flatMap(EditorialPack::items)
+        override fun inventory(): List<ContentItem> = inventory
 
         override fun contentBody(item: ContentItem): String = item.title
+
+        override fun isReady(): Boolean = ready.value
+
+        override fun observeReady(): Flow<Boolean> = ready
+
+        fun setReady(value: Boolean) {
+            ready.value = value
+        }
 
         private fun contentItem(
             id: String,
@@ -701,6 +1069,59 @@ class MainViewModelTest {
         )
     }
 
+    private class FakeUserLinkRepository(
+        initialLinks: List<ContentItem> = emptyList(),
+        private val throwOnAdd: Boolean = false,
+    ) : UserLinkRepository {
+        val links = MutableStateFlow(initialLinks)
+        val markedUnavailableIds = mutableListOf<String>()
+        private var nextId = 0
+
+        override fun userLinks(): List<ContentItem> = links.value
+
+        override fun observeUserLinks(): Flow<List<ContentItem>> = links.asStateFlow()
+
+        override suspend fun addLink(
+            draft: UserLinkDraft,
+            nowMillis: Long,
+        ): AddUserLinkResult {
+            if (throwOnAdd) {
+                error("Simulated local persistence failure")
+            }
+            if (!draft.url.startsWith("http://") && !draft.url.startsWith("https://")) {
+                return AddUserLinkResult.Rejected(setOf(UserLinkValidationError.UNSUPPORTED_SCHEME))
+            }
+            val item = ContentItem(
+                id = "user-link:${++nextId}",
+                packId = "user-links",
+                title = draft.title.trim(),
+                description = draft.url.trim(),
+                durationMinutes = draft.durationMinutes,
+                format = ContentFormat.HTML,
+                topicTags = draft.topicTags,
+                externalUrl = draft.url.trim(),
+                sourceType = ContentSourceType.USER_LINK,
+                availability = ContentAvailability.NEEDS_FALLBACK,
+            )
+            links.value = links.value + item
+            return AddUserLinkResult.Added(item)
+        }
+
+        override suspend fun markUnavailable(
+            contentId: String,
+            nowMillis: Long,
+        ) {
+            markedUnavailableIds += contentId
+            links.value = links.value.map { item ->
+                if (item.id == contentId) {
+                    item.copy(availability = ContentAvailability.UNAVAILABLE)
+                } else {
+                    item
+                }
+            }
+        }
+    }
+
     private class FakeInterceptionMonitor : InterceptionMonitor {
         override fun isAvailable(): Boolean = false
 
@@ -712,6 +1133,55 @@ class MainViewModelTest {
                 summary = "Manual mode only",
             )
         }
+    }
+
+    private class RecordingRecommendationEngine : RecommendationEngine {
+        var lastInventory: List<ContentItem> = emptyList()
+            private set
+
+        override fun generate(
+            targetApp: DistractingApp,
+            preferences: UserPreferences,
+            inventory: List<ContentItem>,
+            primaryExcludedIds: Set<String>,
+            signals: RecommendationSignals,
+            nowMillis: Long,
+        ): RecommendationSet? {
+            lastInventory = inventory
+            return null
+        }
+    }
+
+    private class FixedRecommendationEngine(
+        private val recommendationSet: RecommendationSet,
+    ) : RecommendationEngine {
+        override fun generate(
+            targetApp: DistractingApp,
+            preferences: UserPreferences,
+            inventory: List<ContentItem>,
+            primaryExcludedIds: Set<String>,
+            signals: RecommendationSignals,
+            nowMillis: Long,
+        ): RecommendationSet = recommendationSet
+    }
+
+    private fun savedUserLink(
+        id: String = "user-link",
+        durationMinutes: Int = 6,
+        topics: Set<TopicTag> = setOf(TopicTag.PSYCHOLOGY),
+    ): ContentItem {
+        return ContentItem(
+            id = id,
+            packId = "user-links",
+            title = "Saved link",
+            description = "External link",
+            durationMinutes = durationMinutes,
+            format = ContentFormat.HTML,
+            topicTags = topics,
+            externalUrl = "https://example.com/essay",
+            sourceType = ContentSourceType.USER_LINK,
+            availability = ContentAvailability.NEEDS_FALLBACK,
+        )
     }
 
     private fun testDataStore(file: File): DataStore<Preferences> {
