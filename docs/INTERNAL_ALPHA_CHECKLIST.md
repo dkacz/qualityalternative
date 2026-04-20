@@ -1,6 +1,6 @@
 # Internal Alpha Checklist
 
-Status: `code complete, real-device smoke partially passed; second app pending`
+Status: `internal alpha validated on real device`
 
 This checklist tracks the Android-first internal alpha defined in Sprint 0-3.
 
@@ -28,11 +28,11 @@ This checklist tracks the Android-first internal alpha defined in Sprint 0-3.
 - [x] Repo docs reflect the current Sprint 3 state
 - [x] Real-device smoke instructions are documented in `docs/REAL_DEVICE_SMOKE.md`
 - [x] Internal alpha can be exercised on emulator for engineering validation
-- [ ] Manual smoke test completed on one real Android device
-- [ ] Manual interception confirmed on two real apps from the launch support list
+- [x] Manual smoke test completed on one real Android device
+- [x] Manual interception confirmed on two real apps from the launch support list
 
 ## Notes
 
-- Partial real-device smoke passed on a Samsung `SM-S721B` for YouTube at commit `0e96af7`.
-- Confirmed on device: YouTube interception, `Open anyway` without immediate loop, and `Delay for 15 minutes`.
-- Full internal-alpha validation still needs the same core flow confirmed on a second real app from the launch support list.
+- Real-device smoke passed on a Samsung `SM-S721B` for YouTube and X.
+- Confirmed on device: real-app interception, `Open anyway` without immediate loop, and `Delay for 15 minutes`.
+- Sprint 0-3 internal alpha is validated for the current Android-first scope.
