@@ -21,7 +21,12 @@ class AssetContentRepository(
 
     override fun inventory(): List<ContentItem> = cachedPacks.flatMap(EditorialPack::items)
 
-    override fun contentBody(item: ContentItem): String = loadAsset(item.bodyAssetPath)
+    override fun contentBody(item: ContentItem): String {
+        val bodyAssetPath = requireNotNull(item.bodyAssetPath) {
+            "Editorial content must provide a body asset path."
+        }
+        return loadAsset(bodyAssetPath)
+    }
 
     private fun loadAsset(path: String): String = context.assets.open(path).bufferedReader().use { it.readText() }
 

@@ -9,14 +9,17 @@ import androidx.room.RoomDatabase
     entities = [
         AnalyticsEventEntity::class,
         ReplacementSessionEntity::class,
+        UserLinkEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = false,
 )
 abstract class QualityAlternativeDatabase : RoomDatabase() {
     abstract fun analyticsEventDao(): AnalyticsEventDao
 
     abstract fun replacementSessionDao(): ReplacementSessionDao
+
+    abstract fun userLinkDao(): UserLinkDao
 
     companion object {
         fun build(context: Context): QualityAlternativeDatabase {

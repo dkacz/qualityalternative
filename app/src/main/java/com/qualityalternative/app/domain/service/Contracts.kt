@@ -15,6 +15,8 @@ import com.qualityalternative.app.domain.model.RecommendationSource
 import com.qualityalternative.app.domain.model.ReplacementHistoryEntry
 import com.qualityalternative.app.domain.model.ReturnToTargetSignal
 import com.qualityalternative.app.domain.model.SessionFeedback
+import com.qualityalternative.app.domain.model.UserLinkDraft
+import com.qualityalternative.app.domain.model.UserLinkValidationError
 import com.qualityalternative.app.domain.model.UserPreferences
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
@@ -23,6 +25,32 @@ interface ContentRepository {
     fun starterPacks(): List<EditorialPack>
     fun inventory(): List<ContentItem>
     fun contentBody(item: ContentItem): String
+}
+
+sealed class AddUserLinkResult {
+    data class Added(val item: ContentItem) : AddUserLinkResult()
+
+    data class Rejected(val errors: Set<UserLinkValidationError>) : AddUserLinkResult()
+}
+
+interface UserLinkRepository {
+    fun userLinks(): List<ContentItem>
+
+    fun observeUserLinks(): Flow<List<ContentItem>> = flowOf(userLinks())
+
+    suspend fun addLink(
+        draft: UserLinkDraft,
+        nowMillis: Long = System.currentTimeMillis(),
+    ): AddUserLinkResult
+
+    suspend fun markUnavailable(
+        contentId: String,
+        nowMillis: Long = System.currentTimeMillis(),
+    )
+
+    fun isReady(): Boolean = true
+
+    fun observeReady(): Flow<Boolean> = flowOf(isReady())
 }
 
 interface SettingsRepository {
