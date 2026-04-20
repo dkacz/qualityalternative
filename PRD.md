@@ -483,11 +483,15 @@ Decision on whether to invest further in:
 - stronger ranking
 - premium hard-block mode
 - additional content ingestion sources
+- free/premium packaging
+- streaks or other motivation mechanics
 - future iOS exploration
 
 ## Open Questions
 
 - What should the premium tier include first after MVP: hard-block mode, custom delay durations, or richer content ingestion?
+- Should the free tier combine core interception, basic content, and a limited personal library, with premium reserved for a broader curated library and materially higher or unlimited user-owned content capacity?
+- If streaks are added, should they reward successful substitutions and meaningful reading time rather than pure abstinence from social media?
 - At what level of Android-device variability should the team narrow the officially supported-device list for public launch?
 
 ## Launch Recommendation

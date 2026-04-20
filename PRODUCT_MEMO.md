@@ -40,6 +40,16 @@ This points to a hybrid strategy. The intervention mechanic gets the product int
 
 Hard blocking still has a role, but it should be optional. A premium or advanced mode can add stronger choices such as delaying social access for fifteen minutes, forcing a more explicit unlock flow, or limiting specific surfaces like Shorts or Reels where platform support makes that possible. Those features can improve retention for power users without defining the core product as punitive.
 
+## Founder Hypotheses: Habit, Packaging, and Motivation
+
+The founder-use case is simple and likely common: a person picks up the phone without a clear intention, taps a low-value social app, and only realizes what happened after the scroll has already started. The first product win is therefore not philosophical. It is mechanical. The app must reliably catch the user before the distracting app fully opens and create a short moment of agency: do you actually want to enter this now?
+
+The second product win is replacement quality. In the current alpha, this layer is intentionally primitive: short editorial articles are enough to demonstrate the loop, but they are not yet the full promise. The long-term product should make the alternative feel immediately worthwhile, not merely "healthier." That creates a natural packaging hypothesis. A free tier could provide the core interception layer, basic starter content, and a limited personal library so users can test the behavior change with their own material. The exact limit should stay flexible, but the mental model is clear: enough personal content to prove value, not enough to become an unlimited knowledge vault.
+
+Premium should be justified by depth, not punishment. The most credible premium bundle is access to a broader curated library of high-quality content plus materially higher or unlimited capacity for user-owned material such as links, PDFs, EPUBs, and later other formats. Hard-block modes may belong in premium, but they should not be the main reason to pay. The stronger reason is: when I am about to waste attention, this product consistently gives me something better.
+
+Streaks are another promising motivation layer, but they should be designed around substitution rather than shame. The product should not celebrate generic abstinence from social media as the only win. A better streak is "days converted": days when the user intercepted an impulse and spent meaningful time with a replacement. That frames progress as building a better reflex, not merely failing or succeeding at self-control.
+
 ## MVP Design
 
 First, users select the distracting apps they want to intercept. Second, they seed the product with potential replacements. That can come from three sources: their own saved queue of articles, newsletters, PDFs, and web links; small editorial starter packs such as philosophy, history, science, economics, or culture; and a lightweight preference setup covering topics, preferred session length, and format. Third, on each attempted app open, the product surfaces one main recommendation and two fallback options. The primary actions should be something like "Read for 7 minutes," "Delay social for 15 minutes," and "Open anyway."
