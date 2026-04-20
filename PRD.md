@@ -93,6 +93,7 @@ When I reach for a distracting app out of habit, help me pause and give me one w
   - Instagram
   - X
   - YouTube
+  - Facebook
   - Reddit
   - TikTok
 - Soft intervention shown when a selected app is opened.
