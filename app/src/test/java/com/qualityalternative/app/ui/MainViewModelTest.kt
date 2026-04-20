@@ -112,23 +112,9 @@ class MainViewModelTest {
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
-    fun interventionInventoryExcludesUserLinksUntilFallbackFlowExists() = runTest {
-        val contentRepository = FakeContentRepository(
-            extraItems = listOf(
-                ContentItem(
-                    id = "user-link",
-                    packId = "user-links",
-                    title = "Saved link",
-                    description = "External link",
-                    durationMinutes = 6,
-                    format = ContentFormat.HTML,
-                    topicTags = setOf(TopicTag.PSYCHOLOGY),
-                    externalUrl = "https://example.com/essay",
-                    sourceType = ContentSourceType.USER_LINK,
-                    availability = ContentAvailability.NEEDS_FALLBACK,
-                ),
-            ),
-        )
+    fun interventionInventoryIncludesUserLinksOnceFallbackFlowExists() = runTest {
+        val userLink = savedUserLink()
+        val contentRepository = FakeContentRepository(extraItems = listOf(userLink))
         val recommendationEngine = RecordingRecommendationEngine()
         val viewModel = createViewModel(
             contentRepository = contentRepository,
@@ -142,9 +128,47 @@ class MainViewModelTest {
         advanceUntilIdle()
 
         assertEquals(
-            setOf("p1"),
+            setOf("p1", "user-link"),
             recommendationEngine.lastInventory.mapTo(mutableSetOf(), ContentItem::id),
         )
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun acceptingUserLinkRoutesToExternalHandoffAndRecordsFallbackOpen() = runTest {
+        val userLink = savedUserLink()
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val viewModel = createViewModel(
+            contentRepository = FakeContentRepository(extraItems = listOf(userLink)),
+            recommendationEngine = FixedRecommendationEngine(
+                RecommendationSet(
+                    primary = userLink,
+                    backups = emptyList(),
+                    inventoryShortage = true,
+                    generatedAtMillis = 1_000L,
+                ),
+            ),
+            analyticsTracker = analyticsTracker,
+        )
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+        viewModel.triggerDebugIntervention(nowMillis = 1_000L)
+        advanceUntilIdle()
+        viewModel.acceptPrimary()
+        advanceUntilIdle()
+
+        assertEquals(MainScreen.ExternalHandoff, viewModel.uiState.screen)
+        assertEquals("https://example.com/essay", viewModel.openExternalLink(nowMillis = 2_000L))
+
+        val event = analyticsTracker.allEvents().first {
+            it.type == AnalyticsEventType.USER_LINK_FALLBACK_OPENED
+        }
+        assertEquals(userLink.id, event.contentId)
+        assertEquals("USER_LINK", event.metadata["sourceType"])
+        assertEquals("NEEDS_FALLBACK", event.metadata["availability"])
+        assertEquals("https://example.com/essay", event.metadata["externalUrl"])
     }
 
     @Test
@@ -1038,6 +1062,38 @@ class MainViewModelTest {
             lastInventory = inventory
             return null
         }
+    }
+
+    private class FixedRecommendationEngine(
+        private val recommendationSet: RecommendationSet,
+    ) : RecommendationEngine {
+        override fun generate(
+            targetApp: DistractingApp,
+            preferences: UserPreferences,
+            inventory: List<ContentItem>,
+            primaryExcludedIds: Set<String>,
+            signals: RecommendationSignals,
+            nowMillis: Long,
+        ): RecommendationSet = recommendationSet
+    }
+
+    private fun savedUserLink(
+        id: String = "user-link",
+        durationMinutes: Int = 6,
+        topics: Set<TopicTag> = setOf(TopicTag.PSYCHOLOGY),
+    ): ContentItem {
+        return ContentItem(
+            id = id,
+            packId = "user-links",
+            title = "Saved link",
+            description = "External link",
+            durationMinutes = durationMinutes,
+            format = ContentFormat.HTML,
+            topicTags = topics,
+            externalUrl = "https://example.com/essay",
+            sourceType = ContentSourceType.USER_LINK,
+            availability = ContentAvailability.NEEDS_FALLBACK,
+        )
     }
 
     private fun testDataStore(file: File): DataStore<Preferences> {

@@ -17,7 +17,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -45,6 +44,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.qualityalternative.app.domain.model.AnalyticsEvent
 import com.qualityalternative.app.domain.model.ContentItem
+import com.qualityalternative.app.domain.model.ContentSourceType
 import com.qualityalternative.app.domain.model.DelayWindow
 import com.qualityalternative.app.domain.model.DistractingApp
 import com.qualityalternative.app.domain.model.DurationBucket
@@ -144,6 +144,21 @@ fun QualityAlternativeApp(
                             state = uiState,
                             onFinishReading = viewModel::finishReading,
                             onSkipReading = viewModel::skipReading,
+                        )
+
+                        MainScreen.ExternalHandoff -> ExternalLinkHandoffScreen(
+                            state = uiState,
+                            onOpenLink = {
+                                val url = viewModel.openExternalLink()
+                                if (url != null) {
+                                    val context = it
+                                    runCatching {
+                                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                                    }
+                                }
+                            },
+                            onFinishSession = viewModel::finishReading,
+                            onSkipSession = viewModel::skipReading,
                         )
 
                         MainScreen.Feedback -> FeedbackScreen(
@@ -820,20 +835,16 @@ private fun InterventionScreen(
         )
 
         RecommendationCard(
-            title = recommendationSet.primary.title,
-            subtitle = recommendationSet.primary.description,
-            durationLabel = "${recommendationSet.primary.durationMinutes} min",
-            actionLabel = "Read now",
+            content = recommendationSet.primary,
+            actionLabel = if (recommendationSet.primary.isUserLink()) "Open link" else "Read now",
             highlighted = true,
             onClick = onAcceptPrimary,
         )
 
         recommendationSet.backups.forEach { backup ->
             RecommendationCard(
-                title = backup.title,
-                subtitle = backup.description,
-                durationLabel = "${backup.durationMinutes} min",
-                actionLabel = "Choose backup",
+                content = backup,
+                actionLabel = if (backup.isUserLink()) "Open link" else "Choose backup",
                 highlighted = false,
                 onClick = { onAcceptBackup(backup) },
             )
@@ -852,9 +863,7 @@ private fun InterventionScreen(
 
 @Composable
 private fun RecommendationCard(
-    title: String,
-    subtitle: String,
-    durationLabel: String,
+    content: ContentItem,
     actionLabel: String,
     highlighted: Boolean,
     onClick: () -> Unit,
@@ -873,12 +882,71 @@ private fun RecommendationCard(
             modifier = Modifier.padding(18.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            AssistChip(onClick = {}, label = { Text(durationLabel) })
-            Text(text = title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-            Text(text = subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                text = "${content.durationMinutes} min • ${if (content.isUserLink()) "Saved link" else "Editorial"}",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(text = content.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+            Text(text = content.description, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Button(onClick = onClick) {
                 Text(actionLabel)
             }
+        }
+    }
+}
+
+@Composable
+private fun ExternalLinkHandoffScreen(
+    state: MainUiState,
+    onOpenLink: (android.content.Context) -> Unit,
+    onFinishSession: () -> Unit,
+    onSkipSession: () -> Unit,
+) {
+    val content = state.currentContent ?: return
+    val context = LocalContext.current
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(20.dp)
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Text(
+            text = content.title,
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+        )
+        Text(
+            text = "Saved link • ${content.durationMinutes} min • ${content.topicTags.joinToString { it.displayName() }}",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = "This is one of your saved links. We'll hand you to the browser and keep the replacement session attached here for feedback.",
+            style = MaterialTheme.typography.bodyLarge,
+        )
+        content.externalUrl?.let { url ->
+            Text(
+                text = url,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Button(
+                modifier = Modifier.testTag("external-link-open"),
+                onClick = { onOpenLink(context) },
+            ) {
+                Text("Open external link")
+            }
+            OutlinedButton(onClick = onSkipSession) {
+                Text("Leave session")
+            }
+        }
+        OutlinedButton(onClick = onFinishSession) {
+            Text("I read it")
         }
     }
 }
@@ -999,6 +1067,8 @@ private fun formatTimestamp(timestampMillis: Long): String {
 }
 
 private fun TopicTag.displayName(): String = name.lowercase().replaceFirstChar(Char::uppercase)
+
+private fun ContentItem.isUserLink(): Boolean = sourceType == ContentSourceType.USER_LINK
 
 private fun DurationBucket.displayName(): String = when (this) {
     DurationBucket.QUICK -> "3-5 minutes"

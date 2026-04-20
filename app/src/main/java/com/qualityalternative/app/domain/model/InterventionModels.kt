@@ -37,6 +37,7 @@ enum class AnalyticsEventType {
     RETURN_TO_APP_WITHIN_60_MINUTES,
     RETURN_AFTER_DELAY_ENDED,
     USER_LINK_ADDED,
+    USER_LINK_FALLBACK_OPENED,
 }
 
 data class AnalyticsEvent(

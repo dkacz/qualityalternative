@@ -5,6 +5,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performScrollTo
@@ -104,7 +105,13 @@ class MainActivityTest {
         }
 
         composeRule.onNodeWithText("Pause before Fixture Feed One").assertIsDisplayed()
-        composeRule.onNodeWithText("Read now").assertIsDisplayed()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasNode("Read now") || hasNode("Open link")
+        }
+        val primaryActionLabel = if (hasNode("Read now")) "Read now" else "Open link"
+        composeRule.onAllNodesWithText(primaryActionLabel)[0]
+            .performScrollTo()
+            .assertIsDisplayed()
     }
 
     @Test

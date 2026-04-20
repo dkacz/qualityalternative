@@ -101,6 +101,7 @@ enum class MainScreen {
     AddLink,
     Intervention,
     Reader,
+    ExternalHandoff,
     Feedback,
 }
 
@@ -458,7 +459,7 @@ class MainViewModel(
 
             val interventionId = UUID.randomUUID().toString()
             val filteredInventory = contentRepository.inventory().filter { item ->
-                item.sourceType != ContentSourceType.USER_LINK && item.packId in preferences.selectedPackIds
+                item.sourceType == ContentSourceType.USER_LINK || item.packId in preferences.selectedPackIds
             }
             val signals = buildRecommendationSignals(nowMillis = processingNowMillis)
             val recommendationSet = recommendationEngine.generate(
@@ -504,6 +505,7 @@ class MainViewModel(
                     primaryContentId = recommendationSet.primary.id,
                     backupContentIds = backupIds,
                     contentId = recommendationSet.primary.id,
+                    metadata = recommendationSet.analyticsMetadata(),
                 ),
             )
 
@@ -517,6 +519,7 @@ class MainViewModel(
                         primaryContentId = recommendationSet.primary.id,
                         backupContentIds = backupIds,
                         contentId = recommendationSet.primary.id,
+                        metadata = recommendationSet.analyticsMetadata(),
                     ),
                 )
             }
@@ -561,9 +564,10 @@ class MainViewModel(
                     primaryContentId = recommendationSet.primary.id,
                     backupContentIds = recommendationSet.backups.map(ContentItem::id),
                     contentId = recommendationSet.primary.id,
+                    metadata = recommendationSet.primary.analyticsMetadata(),
                 ),
             )
-            openReader(content = recommendationSet.primary, sessionId = sessionId, startedAtMillis = nowMillis)
+            openReplacementSession(content = recommendationSet.primary, sessionId = sessionId, startedAtMillis = nowMillis)
         }
     }
 
@@ -594,9 +598,10 @@ class MainViewModel(
                     primaryContentId = recommendationSet.primary.id,
                     backupContentIds = recommendationSet.backups.map(ContentItem::id),
                     contentId = content.id,
+                    metadata = content.analyticsMetadata(),
                 ),
             )
-            openReader(content = content, sessionId = sessionId, startedAtMillis = nowMillis)
+            openReplacementSession(content = content, sessionId = sessionId, startedAtMillis = nowMillis)
         }
     }
 
@@ -675,7 +680,7 @@ class MainViewModel(
                     primaryContentId = uiState.currentRecommendationSet?.primary?.id,
                     backupContentIds = uiState.currentRecommendationSet?.backups.orEmpty().map(ContentItem::id),
                     contentId = content.id,
-                    metadata = sessionDurationMetadata(nowMillis),
+                    metadata = sessionDurationMetadata(nowMillis) + content.analyticsMetadata(),
                 ),
             )
             uiState = uiState.copy(
@@ -700,7 +705,7 @@ class MainViewModel(
                     primaryContentId = uiState.currentRecommendationSet?.primary?.id,
                     backupContentIds = uiState.currentRecommendationSet?.backups.orEmpty().map(ContentItem::id),
                     contentId = content.id,
-                    metadata = sessionDurationMetadata(nowMillis),
+                    metadata = sessionDurationMetadata(nowMillis) + content.analyticsMetadata(),
                 ),
             )
             clearActiveSession(
@@ -1032,13 +1037,38 @@ class MainViewModel(
         }
     }
 
-    private fun openReader(content: ContentItem, sessionId: String, startedAtMillis: Long) {
+    fun openExternalLink(nowMillis: Long = System.currentTimeMillis()): String? {
+        val content = uiState.currentContent ?: return null
+        val sessionId = uiState.currentSessionId ?: return null
+        val url = content.externalUrl ?: return null
+        recordEvent(
+            AnalyticsEvent(
+                type = AnalyticsEventType.USER_LINK_FALLBACK_OPENED,
+                timestampMillis = nowMillis,
+                interventionId = uiState.currentInterventionId,
+                sessionId = sessionId,
+                targetAppPackage = uiState.selectedTargetApp?.packageName,
+                primaryContentId = uiState.currentRecommendationSet?.primary?.id,
+                backupContentIds = uiState.currentRecommendationSet?.backups.orEmpty().map(ContentItem::id),
+                contentId = content.id,
+                metadata = content.analyticsMetadata(),
+            ),
+        )
+        return url
+    }
+
+    private fun openReplacementSession(content: ContentItem, sessionId: String, startedAtMillis: Long) {
+        val screen = if (content.sourceType == ContentSourceType.USER_LINK) {
+            MainScreen.ExternalHandoff
+        } else {
+            MainScreen.Reader
+        }
         uiState = uiState.copy(
             currentContent = content,
             currentContentBody = contentRepository.contentBody(content),
             currentSessionId = sessionId,
             currentSessionStartedAtMillis = startedAtMillis,
-            screen = MainScreen.Reader,
+            screen = screen,
         )
     }
 
@@ -1259,6 +1289,24 @@ private fun AddLinkFormState.visibleValidationErrors(): Set<UserLinkValidationEr
         errors += UserLinkValidationError.NO_TOPICS
     }
     return errors
+}
+
+private fun RecommendationSet.analyticsMetadata(): Map<String, String> {
+    return primary.analyticsMetadata(prefix = "primary") +
+        backups.flatMapIndexed { index, content ->
+            content.analyticsMetadata(prefix = "backup${index + 1}").entries
+        }.associate { it.toPair() }
+}
+
+private fun ContentItem.analyticsMetadata(prefix: String? = null): Map<String, String> {
+    fun key(name: String): String = prefix?.let { "${it}_$name" } ?: name
+    return buildMap {
+        put(key("sourceType"), sourceType.name)
+        put(key("availability"), availability.name)
+        put(key("format"), format.name)
+        put(key("packId"), packId)
+        externalUrl?.let { url -> put(key("externalUrl"), url) }
+    }
 }
 
 private object EmptyUserLinkRepository : UserLinkRepository {
