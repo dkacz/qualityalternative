@@ -13,6 +13,7 @@ import com.qualityalternative.app.domain.model.AnalyticsEvent
 import com.qualityalternative.app.domain.model.AnalyticsSemanticKeys
 import com.qualityalternative.app.domain.model.AnalyticsEventType
 import com.qualityalternative.app.domain.model.AppSettings
+import com.qualityalternative.app.domain.model.AppThemeMode
 import com.qualityalternative.app.domain.model.ContentAvailability
 import com.qualityalternative.app.domain.model.ContentItem
 import com.qualityalternative.app.domain.model.ContentSourceType
@@ -80,6 +81,7 @@ data class MainUiState(
     val completedContentIds: Set<String> = emptySet(),
     val userLinks: List<ContentItem> = emptyList(),
     val addLinkForm: AddLinkFormState = AddLinkFormState(),
+    val themeMode: AppThemeMode = AppThemeMode.LIGHT,
     val latestMessage: String? = null,
     val events: List<AnalyticsEvent> = emptyList(),
     val screen: MainScreen = MainScreen.Onboarding,
@@ -763,6 +765,14 @@ class MainViewModel(
         clearActiveSession(latestMessage = "Feedback skipped for this session.")
     }
 
+    fun selectThemeMode(themeMode: AppThemeMode) {
+        if (uiState.themeMode == themeMode) return
+        uiState = uiState.copy(themeMode = themeMode)
+        viewModelScope.launch {
+            settingsRepository.saveThemeMode(themeMode)
+        }
+    }
+
     fun dismissMessage() {
         uiState = uiState.copy(latestMessage = null)
     }
@@ -786,6 +796,7 @@ class MainViewModel(
             availableTargetApps = availableTargetApps,
             selectedTargetApp = selectedTargetApp,
             preferences = preferences.takeIf { settings.hasCompletedOnboarding },
+            themeMode = settings.themeMode,
             onboardingSelection = settings.toOnboardingSelection(
                 supportedApps = supportedApps,
                 starterPacks = starterPacks,

@@ -15,6 +15,7 @@ import com.qualityalternative.app.domain.service.UserLinkRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 
 private val Context.appSettingsDataStore by preferencesDataStore(name = "app_settings")
 private val Context.delayGateDataStore by preferencesDataStore(name = "delay_gate")
@@ -48,4 +49,15 @@ class AppContainer(context: Context) {
     )
     val interceptionMonitor: InterceptionMonitor = AndroidInterceptionMonitor(context = context)
     val recommendationEngine: RecommendationEngine = DefaultRecommendationEngine()
+
+    suspend fun resetPersistentStateForTests() {
+        database.clearAllTables()
+        (settingsRepository as PreferencesSettingsRepository).clearForTests()
+        (delayGate as PreferencesDelayGate).clearForTests()
+    }
+
+    fun closeForTests() {
+        appScope.cancel()
+        database.close()
+    }
 }

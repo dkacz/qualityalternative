@@ -169,6 +169,13 @@ class PreferencesDelayGate(
 
     override fun observeReady(): Flow<Boolean> = ready.asStateFlow()
 
+    suspend fun clearForTests() {
+        windows.value = emptyMap()
+        dataStore.edit { preferences ->
+            preferences.clear()
+        }
+    }
+
     private fun persist(currentWindows: Map<String, DelayWindow>) {
         scope.launch {
             persistDurably(currentWindows)

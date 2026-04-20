@@ -23,8 +23,7 @@ class AccessibilityInterceptionTest {
 
     @Before
     fun resetAppState() {
-        targetContext.deleteDatabase("quality_alternative.db")
-        targetContext.filesDir.resolve("datastore").deleteRecursively()
+        resetPersistentState()
         device.pressHome()
         instrumentation.waitForIdleSync()
     }
@@ -33,8 +32,7 @@ class AccessibilityInterceptionTest {
     fun tearDown() {
         device.pressHome()
         instrumentation.waitForIdleSync()
-        targetContext.deleteDatabase("quality_alternative.db")
-        targetContext.filesDir.resolve("datastore").deleteRecursively()
+        resetPersistentState()
     }
 
     @Test
@@ -69,5 +67,11 @@ class AccessibilityInterceptionTest {
                 selectedPackIds = setOf("philosophy"),
             ),
         )
+    }
+
+    private fun resetPersistentState() = runBlocking {
+        (targetContext.applicationContext as QualityAlternativeApplication)
+            .appContainer
+            .resetPersistentStateForTests()
     }
 }

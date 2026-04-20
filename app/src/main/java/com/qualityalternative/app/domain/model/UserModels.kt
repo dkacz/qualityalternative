@@ -12,12 +12,18 @@ data class UserPreferences(
     val selectedPackIds: Set<String>,
 )
 
+enum class AppThemeMode {
+    LIGHT,
+    INK,
+}
+
 data class AppSettings(
     val hasCompletedOnboarding: Boolean,
     val selectedAppPackages: Set<String>,
     val preferredTopics: Set<TopicTag>,
     val preferredDurationBucket: DurationBucket,
     val selectedPackIds: Set<String>,
+    val themeMode: AppThemeMode = AppThemeMode.LIGHT,
 )
 
 data class OnboardingSelection(

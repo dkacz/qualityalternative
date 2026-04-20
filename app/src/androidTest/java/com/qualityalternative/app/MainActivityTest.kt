@@ -4,6 +4,7 @@ import android.content.Intent
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
@@ -14,6 +15,7 @@ import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
 import com.qualityalternative.app.interception.FixtureTargetRegistry
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
@@ -27,9 +29,7 @@ class MainActivityTest {
 
     @Before
     fun resetAppState() {
-        val targetContext = InstrumentationRegistry.getInstrumentation().targetContext
-        targetContext.deleteDatabase("quality_alternative.db")
-        targetContext.filesDir.resolve("datastore").deleteRecursively()
+        resetPersistentState()
     }
 
     @After
@@ -37,6 +37,7 @@ class MainActivityTest {
         scenario?.close()
         scenario = null
         InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+        resetPersistentState()
     }
 
     @Test
@@ -211,6 +212,24 @@ class MainActivityTest {
         composeRule.onNodeWithText("Personal library: 1 link saved.").assertIsDisplayed()
     }
 
+    @Test
+    fun themeSettingSwitchesToInkMode() {
+        launchOnboardedApp()
+
+        composeRule.onNodeWithText("Theme: Light")
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag("theme-INK")
+            .performClick()
+
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasNode("Theme: Ink")
+        }
+        composeRule.onNodeWithTag("theme-INK")
+            .assertIsSelected()
+        composeRule.onNodeWithText("Theme: Ink")
+            .assertIsDisplayed()
+    }
+
     private fun hasNode(text: String): Boolean {
         return runCatching {
             composeRule.onNodeWithText(text).fetchSemanticsNode()
@@ -242,5 +261,12 @@ class MainActivityTest {
         composeRule.waitUntil(timeoutMillis = 10_000) {
             hasNode("Quality Alternative")
         }
+    }
+
+    private fun resetPersistentState() = runBlocking {
+        val targetContext = InstrumentationRegistry.getInstrumentation().targetContext
+        (targetContext.applicationContext as QualityAlternativeApplication)
+            .appContainer
+            .resetPersistentStateForTests()
     }
 }

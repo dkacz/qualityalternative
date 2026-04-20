@@ -2,6 +2,7 @@ package com.qualityalternative.app.domain.service
 
 import com.qualityalternative.app.domain.model.AnalyticsEvent
 import com.qualityalternative.app.domain.model.AppSettings
+import com.qualityalternative.app.domain.model.AppThemeMode
 import com.qualityalternative.app.domain.model.ContentItem
 import com.qualityalternative.app.domain.model.DelayInspection
 import com.qualityalternative.app.domain.model.DelayWindow
@@ -59,6 +60,7 @@ interface SettingsRepository {
     fun observeAppSettings(): Flow<AppSettings>
     fun supportedDistractingApps(): List<DistractingApp>
     suspend fun saveOnboardingSelection(selection: OnboardingSelection)
+    suspend fun saveThemeMode(themeMode: AppThemeMode)
 }
 
 interface RecommendationEngine {

@@ -15,6 +15,7 @@ import com.qualityalternative.app.domain.model.AnalyticsEvent
 import com.qualityalternative.app.domain.model.AnalyticsSemanticKeys
 import com.qualityalternative.app.domain.model.AppSettings
 import com.qualityalternative.app.domain.model.AnalyticsEventType
+import com.qualityalternative.app.domain.model.AppThemeMode
 import com.qualityalternative.app.domain.model.ContentFormat
 import com.qualityalternative.app.domain.model.ContentItem
 import com.qualityalternative.app.domain.model.DelayWindow
@@ -674,7 +675,12 @@ class RoomAnalyticsTrackerTest {
                 preferredTopics = selection.preferredTopics,
                 preferredDurationBucket = selection.preferredDurationBucket,
                 selectedPackIds = selection.selectedPackIds,
+                themeMode = state.value.themeMode,
             )
+        }
+
+        override suspend fun saveThemeMode(themeMode: AppThemeMode) {
+            state.value = state.value.copy(themeMode = themeMode)
         }
     }
 

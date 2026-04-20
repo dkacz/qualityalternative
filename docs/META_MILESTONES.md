@@ -19,9 +19,9 @@ Completed:
 
 Current active track:
 
-- Sprint 4: user-added links v0.
-- Work mode: emulator-only validation during the sprint.
-- Gate: every slice must go through Pro review and fixes before the next slice starts.
+- Sprint 5: UI/UX pass.
+- Work mode: preserve the Android-first MVP scope while implementing the reviewed analog mockup direction.
+- Gate: meaningful UI slices should pass automated validation and Pro review for PRD/scope drift.
 
 ## UI Timing
 
@@ -80,22 +80,13 @@ Not included:
 
 ## Milestone 2: Sprint 4 User-Added Links
 
-Status: `in progress`
+Status: `complete`
 
 Goal:
 
 - Let users bring their own web links into the replacement inventory without turning the product into a read-later feed.
 
-Slices:
-
-- `4.1 Domain and Persistence Foundation`
-  Status: implemented, under Pro review/fix loop.
-- `4.2 Add Link UI`
-  Status: next UI slice after 4.1 PASS.
-- `4.3 Recommendation Inventory Integration`
-  Status: pending.
-- `4.4 Link Open/Fallback Session`
-  Status: pending.
+Integrated on `main` as commit `882d115`.
 
 Definition of done:
 
@@ -111,9 +102,38 @@ Release stance:
 - This should not replace `v0.1.0-alpha` until Sprint 4 passes Pro review and emulator validation end to end.
 - A feature APK can be released separately only after explicit decision.
 
-## Milestone 3: Sprint 5 PDF and Pilot Readiness
+## Milestone 3: Sprint 5 UI/UX Pass
 
-Status: `planned, not active`
+Status: `active`
+
+Goal:
+
+- Implement the reviewed calm analog UI direction without changing the product scope.
+
+Included:
+
+- `Light` warm paper theme
+- `Ink` dark analog mode
+- restyled core intervention
+- restyled home, add-link, library, reader, external handoff, feedback, and progress/history surfaces
+- theme setting persistence
+
+Not included:
+
+- PDFs
+- iOS
+- premium packaging
+- hard-block mode
+- streak mechanics beyond constructive progress framing
+- additional ingestion sources
+
+Sprint plan:
+
+- See `docs/SPRINT_5_UI_UX.md`.
+
+## Milestone 4: PDF and Pilot Readiness
+
+Status: `planned, after Sprint 5 UI/UX`
 
 Goal:
 
@@ -141,9 +161,9 @@ Gate to start:
 
 - Sprint 4 must prove that user-owned content can enter the intervention loop cleanly.
 
-## Milestone 4: Small External Pilot
+## Milestone 5: Small External Pilot
 
-Status: `planned, after Sprint 5`
+Status: `planned, after UI/UX and PDF readiness`
 
 Goal:
 
@@ -164,7 +184,7 @@ Decision signals:
 - feedback saying the recommendation was a good fit
 - return to target app within 15 and 60 minutes
 
-## Milestone 5: iOS Discovery
+## Milestone 6: iOS Discovery
 
 Status: `later discovery, not implementation`
 
@@ -184,7 +204,7 @@ Gate to start:
 
 - Android pilot should show enough behavioral value to justify platform risk.
 
-## Milestone 6: Post-Pilot Product Bet
+## Milestone 7: Post-Pilot Product Bet
 
 Status: `future`
 

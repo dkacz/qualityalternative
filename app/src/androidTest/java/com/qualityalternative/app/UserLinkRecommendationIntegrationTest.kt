@@ -27,9 +27,8 @@ class UserLinkRecommendationIntegrationTest {
     @Test
     fun productionContainerFeedsSavedLinkIntoInterventionAndExternalHandoff() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        context.deleteDatabase("quality_alternative.db")
-        context.filesDir.resolve("datastore").deleteRecursively()
         val appContainer = AppContainer(context)
+        appContainer.resetPersistentStateForTests()
         val selectedApps = SupportedCatalog.distractingApps
             .take(3)
             .mapTo(mutableSetOf(), DistractingApp::packageName)
@@ -101,6 +100,8 @@ class UserLinkRecommendationIntegrationTest {
             assertEquals("https://example.com/focused-essay", viewModel.currentExternalLinkUrl())
         } finally {
             viewModel.closeForTests()
+            appContainer.resetPersistentStateForTests()
+            appContainer.closeForTests()
         }
     }
 }

@@ -44,6 +44,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.qualityalternative.app.domain.model.AnalyticsEvent
+import com.qualityalternative.app.domain.model.AppThemeMode
 import com.qualityalternative.app.domain.model.ContentItem
 import com.qualityalternative.app.domain.model.ContentSourceType
 import com.qualityalternative.app.domain.model.DelayWindow
@@ -56,6 +57,8 @@ import com.qualityalternative.app.domain.model.PermissionStatus
 import com.qualityalternative.app.domain.model.ReplacementHistoryEntry
 import com.qualityalternative.app.domain.model.TopicTag
 import com.qualityalternative.app.domain.model.UserLinkValidationError
+import com.qualityalternative.app.ui.theme.QualityAlternativeAppTheme
+import com.qualityalternative.app.ui.theme.QualityAlternativeThemeTokens
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -65,9 +68,10 @@ fun QualityAlternativeApp(
     viewModel: MainViewModel,
     onExitToTarget: () -> Unit = {},
 ) {
-    MaterialTheme {
+    val uiState = viewModel.uiState
+
+    QualityAlternativeAppTheme(themeMode = uiState.themeMode) {
         val snackbarHostState = remember { SnackbarHostState() }
-        val uiState = viewModel.uiState
 
         LaunchedEffect(uiState.latestMessage) {
             val message = uiState.latestMessage ?: return@LaunchedEffect
@@ -117,6 +121,7 @@ fun QualityAlternativeApp(
                             onTriggerIntervention = viewModel::triggerDebugIntervention,
                             onRefreshReadiness = viewModel::refreshPermissionReadiness,
                             onOpenAddLink = viewModel::openAddLink,
+                            onSelectTheme = viewModel::selectThemeMode,
                         )
 
                         MainScreen.AddLink -> AddLinkScreen(
@@ -326,9 +331,12 @@ private fun HomeScreen(
     onTriggerIntervention: () -> Unit,
     onRefreshReadiness: () -> Unit,
     onOpenAddLink: () -> Unit,
+    onSelectTheme: (AppThemeMode) -> Unit,
 ) {
     LazyColumn(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .testTag("home-list"),
         contentPadding = PaddingValues(20.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
@@ -345,6 +353,13 @@ private fun HomeScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+        }
+
+        item {
+            ThemeSettingsCard(
+                themeMode = state.themeMode,
+                onSelectTheme = onSelectTheme,
+            )
         }
 
         item {
@@ -453,6 +468,51 @@ private fun PersonalLibraryCard(
                 onClick = onOpenAddLink,
             ) {
                 Text("Add link")
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ThemeSettingsCard(
+    themeMode: AppThemeMode,
+    onSelectTheme: (AppThemeMode) -> Unit,
+) {
+    val colors = QualityAlternativeThemeTokens.colors
+    Card(
+        colors = CardDefaults.cardColors(containerColor = colors.elevatedSurface),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text = "Theme",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = "Theme: ${themeMode.displayName()}",
+                color = colors.mutedText,
+            )
+            Text(
+                text = "Light keeps the warm paper feel. Ink is the calmer dark mode for night testing.",
+                color = colors.mutedText,
+                style = MaterialTheme.typography.bodySmall,
+            )
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                AppThemeMode.entries.forEach { mode ->
+                    FilterChip(
+                        modifier = Modifier.testTag("theme-${mode.name}"),
+                        selected = themeMode == mode,
+                        onClick = { onSelectTheme(mode) },
+                        label = { Text(mode.displayName()) },
+                    )
+                }
             }
         }
     }
@@ -1064,6 +1124,11 @@ private fun formatTimestamp(timestampMillis: Long): String {
 private fun TopicTag.displayName(): String = name.lowercase().replaceFirstChar(Char::uppercase)
 
 private fun ContentItem.isUserLink(): Boolean = sourceType == ContentSourceType.USER_LINK
+
+private fun AppThemeMode.displayName(): String = when (this) {
+    AppThemeMode.LIGHT -> "Light"
+    AppThemeMode.INK -> "Ink"
+}
 
 private fun launchExternalLink(
     context: android.content.Context,

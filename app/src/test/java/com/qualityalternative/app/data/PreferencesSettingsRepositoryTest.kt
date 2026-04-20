@@ -3,6 +3,7 @@ package com.qualityalternative.app.data
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
+import com.qualityalternative.app.domain.model.AppThemeMode
 import com.qualityalternative.app.domain.model.DurationBucket
 import com.qualityalternative.app.domain.model.OnboardingSelection
 import com.qualityalternative.app.domain.model.TopicTag
@@ -40,6 +41,29 @@ class PreferencesSettingsRepositoryTest {
         assertEquals(selection.preferredTopics, restored.preferredTopics)
         assertEquals(selection.preferredDurationBucket, restored.preferredDurationBucket)
         assertEquals(selection.selectedPackIds, restored.selectedPackIds)
+        assertEquals(AppThemeMode.LIGHT, restored.themeMode)
+    }
+
+    @Test
+    fun saveThemeMode_persistsWithoutResettingOnboarding() = runBlocking {
+        val repository = PreferencesSettingsRepository(
+            dataStore = testDataStore(),
+            supportedApps = SupportedCatalog.distractingApps,
+        )
+        val selection = OnboardingSelection(
+            selectedAppPackages = SupportedCatalog.distractingApps.take(3).mapTo(mutableSetOf()) { it.packageName },
+            preferredTopics = setOf(TopicTag.PHILOSOPHY, TopicTag.SCIENCE, TopicTag.HISTORY),
+            preferredDurationBucket = DurationBucket.DEEP,
+            selectedPackIds = setOf("science"),
+        )
+
+        repository.saveOnboardingSelection(selection)
+        repository.saveThemeMode(AppThemeMode.INK)
+
+        val restored = repository.observeAppSettings().first()
+        assertTrue(restored.hasCompletedOnboarding)
+        assertEquals(selection.selectedAppPackages, restored.selectedAppPackages)
+        assertEquals(AppThemeMode.INK, restored.themeMode)
     }
 
     private fun testDataStore(): DataStore<Preferences> {

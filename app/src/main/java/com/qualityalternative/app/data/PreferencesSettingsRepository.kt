@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import com.qualityalternative.app.domain.model.AppSettings
+import com.qualityalternative.app.domain.model.AppThemeMode
 import com.qualityalternative.app.domain.model.DistractingApp
 import com.qualityalternative.app.domain.model.DurationBucket
 import com.qualityalternative.app.domain.model.OnboardingSelection
@@ -43,6 +44,9 @@ class PreferencesSettingsRepository(
                         DurationBucket.valueOf(preferences[PreferredDurationBucket] ?: DurationBucket.FOCUS.name)
                     }.getOrDefault(DurationBucket.FOCUS),
                     selectedPackIds = preferences[SelectedPackIds].orEmpty(),
+                    themeMode = runCatching {
+                        AppThemeMode.valueOf(preferences[ThemeMode] ?: AppThemeMode.LIGHT.name)
+                    }.getOrDefault(AppThemeMode.LIGHT),
                 )
             }
     }
@@ -59,11 +63,24 @@ class PreferencesSettingsRepository(
         }
     }
 
+    override suspend fun saveThemeMode(themeMode: AppThemeMode) {
+        dataStore.edit { preferences ->
+            preferences[ThemeMode] = themeMode.name
+        }
+    }
+
+    suspend fun clearForTests() {
+        dataStore.edit { preferences ->
+            preferences.clear()
+        }
+    }
+
     private companion object {
         val HasCompletedOnboarding = booleanPreferencesKey("has_completed_onboarding")
         val SelectedAppPackages = stringSetPreferencesKey("selected_app_packages")
         val PreferredTopics = stringSetPreferencesKey("preferred_topics")
         val PreferredDurationBucket = stringPreferencesKey("preferred_duration_bucket")
         val SelectedPackIds = stringSetPreferencesKey("selected_pack_ids")
+        val ThemeMode = stringPreferencesKey("theme_mode")
     }
 }

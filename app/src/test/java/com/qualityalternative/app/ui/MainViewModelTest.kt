@@ -10,6 +10,7 @@ import com.qualityalternative.app.data.SupportedCatalog
 import com.qualityalternative.app.domain.model.AppSettings
 import com.qualityalternative.app.domain.model.AnalyticsEventType
 import com.qualityalternative.app.domain.model.ContentAvailability
+import com.qualityalternative.app.domain.model.AppThemeMode
 import com.qualityalternative.app.domain.model.ContentFormat
 import com.qualityalternative.app.domain.model.ContentItem
 import com.qualityalternative.app.domain.model.ContentSourceType
@@ -89,6 +90,22 @@ class MainViewModelTest {
         assertEquals(MainScreen.Home, viewModel.uiState.screen)
         assertEquals(3, viewModel.uiState.availableTargetApps.size)
         assertEquals(setOf("philosophy"), viewModel.uiState.preferences?.selectedPackIds)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun selectThemeMode_persistsAndUpdatesUiState() = runTest {
+        val settingsRepository = FakeSettingsRepository()
+        val viewModel = createViewModel(settingsRepository = settingsRepository)
+
+        advanceUntilIdle()
+        assertEquals(AppThemeMode.LIGHT, viewModel.uiState.themeMode)
+
+        viewModel.selectThemeMode(AppThemeMode.INK)
+        advanceUntilIdle()
+
+        assertEquals(AppThemeMode.INK, viewModel.uiState.themeMode)
+        assertEquals(AppThemeMode.INK, settingsRepository.state.value.themeMode)
     }
 
     @Test
@@ -840,7 +857,7 @@ class MainViewModelTest {
             selectedPackIds = emptySet(),
         ),
     ) : SettingsRepository {
-        private val state = MutableStateFlow(initial)
+        val state = MutableStateFlow(initial)
 
         override fun observeAppSettings(): Flow<AppSettings> = state
 
@@ -853,7 +870,12 @@ class MainViewModelTest {
                 preferredTopics = selection.preferredTopics,
                 preferredDurationBucket = selection.preferredDurationBucket,
                 selectedPackIds = selection.selectedPackIds,
+                themeMode = state.value.themeMode,
             )
+        }
+
+        override suspend fun saveThemeMode(themeMode: AppThemeMode) {
+            state.value = state.value.copy(themeMode = themeMode)
         }
     }
 
