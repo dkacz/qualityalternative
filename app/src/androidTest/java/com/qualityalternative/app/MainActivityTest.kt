@@ -1,6 +1,7 @@
 package com.qualityalternative.app
 
 import android.content.Intent
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -12,6 +13,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
@@ -180,6 +182,10 @@ class MainActivityTest {
         assertFalse(hasNode("Local preferences"))
         assertFalse(hasNode("Recent replacement history"))
         composeRule.onNodeWithTag("home-list")
+            .performScrollToNode(hasTestTag("progress-card"))
+        composeRule.onNodeWithText("Days converted, not streaks broken.")
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag("home-list")
             .performScrollToNode(hasTestTag("home-add-link"))
         composeRule.onNodeWithTag("home-add-link").assertIsDisplayed()
         composeRule.onNodeWithTag("home-list")
@@ -296,16 +302,59 @@ class MainActivityTest {
         composeRule.onNodeWithTag("home-list")
             .performScrollToNode(hasText("Theme: Light"))
         composeRule.onNodeWithText("Theme: Light").assertIsDisplayed()
+        composeRule.onNodeWithTag("home-list")
+            .performScrollToNode(hasTestTag("theme-DARK"))
         composeRule.onNodeWithTag("theme-DARK")
+            .performScrollTo()
+            .assertIsDisplayed()
+            .performSemanticsAction(SemanticsActions.OnClick)
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("theme-DARK")
+            .performScrollTo()
+            .assertIsSelected()
+
+        composeRule.onNodeWithTag("home-list")
+            .performScrollToNode(hasText("Theme: Dark"))
+        composeRule.onNodeWithText("Theme: Dark")
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun readerFeedbackAndProgressUseFiniteReplacementCopy() {
+        launchFixtureSystemIntervention()
+
+        composeRule.onNodeWithText("Read now")
+            .assertIsDisplayed()
+            .assertIsEnabled()
             .performClick()
 
         composeRule.waitUntil(timeoutMillis = 10_000) {
-            hasNode("Theme: Dark")
+            hasNode("Finite reader")
         }
-        composeRule.onNodeWithTag("theme-DARK")
-            .assertIsSelected()
-        composeRule.onNodeWithText("Theme: Dark")
+        composeRule.onNodeWithTag("reader-screen").assertIsDisplayed()
+        composeRule.onNodeWithText("One piece, then done").assertIsDisplayed()
+        composeRule.onNodeWithText("Finish session")
+            .performScrollTo()
             .assertIsDisplayed()
+            .performClick()
+
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasNode("Two-tap feedback")
+        }
+        composeRule.onNodeWithTag("feedback-screen").assertIsDisplayed()
+        composeRule.onNodeWithText("Was this a good fit?").assertIsDisplayed()
+        composeRule.onNodeWithText("Did it help you avoid mindless scrolling?").assertIsDisplayed()
+        composeRule.onNodeWithText("Submit feedback")
+            .assertIsDisplayed()
+            .performClick()
+
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasNode("Quality Alternative")
+        }
+        composeRule.onNodeWithTag("home-list")
+            .performScrollToNode(hasTestTag("progress-card"))
+        composeRule.onNodeWithText("Days converted, not streaks broken.").assertIsDisplayed()
+        composeRule.onNodeWithText("1 completed read").assertIsDisplayed()
     }
 
     private fun hasNode(text: String): Boolean {

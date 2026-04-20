@@ -46,6 +46,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.qualityalternative.app.domain.model.AnalyticsEvent
+import com.qualityalternative.app.domain.model.AnalyticsEventType
 import com.qualityalternative.app.domain.model.AppThemeMode
 import com.qualityalternative.app.domain.model.ContentItem
 import com.qualityalternative.app.domain.model.ContentSourceType
@@ -344,7 +345,7 @@ private fun HomeScreen(
         modifier = Modifier
             .fillMaxSize()
             .testTag("home-list"),
-        contentPadding = PaddingValues(22.dp),
+        contentPadding = PaddingValues(start = 22.dp, top = 22.dp, end = 22.dp, bottom = 96.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item {
@@ -401,6 +402,15 @@ private fun HomeScreen(
         }
 
         item {
+            ProgressCard(
+                snapshot = progressSnapshot(
+                    entries = state.historyEntries,
+                    events = state.events,
+                ),
+            )
+        }
+
+        item {
             PreviewInterventionCard(
                 state = state,
                 onSelectTargetApp = onSelectTargetApp,
@@ -437,6 +447,40 @@ internal fun homeHeroCopy(readiness: PermissionReadiness): HomeHeroCopy {
             showAddLinkAction = false,
         )
     }
+}
+
+internal data class ProgressSnapshot(
+    val daysConverted: Int,
+    val interventionsShown: Int,
+    val alternativesChosen: Int,
+    val delayedOpens: Int,
+    val consciousOverrides: Int,
+    val completedReads: Int,
+    val recentReplacements: List<ReplacementHistoryEntry>,
+)
+
+internal fun progressSnapshot(
+    entries: List<ReplacementHistoryEntry>,
+    events: List<AnalyticsEvent>,
+    zoneId: ZoneId = ZoneId.systemDefault(),
+): ProgressSnapshot {
+    val convertedDays = entries
+        .map { entry ->
+            Instant.ofEpochMilli(entry.acceptedAtMillis)
+                .atZone(zoneId)
+                .toLocalDate()
+        }
+        .toSet()
+
+    return ProgressSnapshot(
+        daysConverted = convertedDays.size,
+        interventionsShown = events.distinctProgressEventCount(AnalyticsEventType.INTERVENTION_SHOWN),
+        alternativesChosen = entries.size,
+        delayedOpens = events.distinctProgressEventCount(AnalyticsEventType.DELAY_SELECTED),
+        consciousOverrides = events.distinctProgressEventCount(AnalyticsEventType.OPEN_ANYWAY_SELECTED),
+        completedReads = entries.count(ReplacementHistoryEntry::isCompleted),
+        recentReplacements = entries.take(MAX_RECENT_PROGRESS_REPLACEMENTS),
+    )
 }
 
 @Composable
@@ -522,6 +566,105 @@ private fun StatCell(
             style = MaterialTheme.typography.titleLarge,
             color = accent,
             fontWeight = FontWeight.SemiBold,
+        )
+    }
+}
+
+@Composable
+private fun ProgressCard(snapshot: ProgressSnapshot) {
+    val colors = QualityAlternativeThemeTokens.colors
+    AnalogCard(modifier = Modifier.testTag("progress-card")) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            HomeSectionLabel(text = "Progress")
+            Text(
+                text = "Days converted, not streaks broken.",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = "This is a quiet record of impulses redirected into finite alternatives.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.mutedText,
+            )
+        }
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            ProgressMetric(label = "Days converted", value = snapshot.daysConverted.toString())
+            ProgressMetric(label = "Shown", value = snapshot.interventionsShown.toString())
+            ProgressMetric(label = "Chose", value = snapshot.alternativesChosen.toString())
+            ProgressMetric(label = "Delayed", value = snapshot.delayedOpens.toString())
+            ProgressMetric(label = "Overrides", value = snapshot.consciousOverrides.toString())
+        }
+        Text(
+            text = "${snapshot.completedReads} completed ${if (snapshot.completedReads == 1) "read" else "reads"}",
+            style = MaterialTheme.typography.bodySmall,
+            color = colors.mutedText,
+        )
+        if (snapshot.recentReplacements.isEmpty()) {
+            Text(
+                text = "No converted impulses yet. Once you choose a replacement, it appears here as history.",
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.mutedText,
+            )
+        } else {
+            Text(
+                text = "Recent replacements",
+                style = MaterialTheme.typography.labelMedium,
+                color = colors.faintText,
+            )
+            snapshot.recentReplacements.forEach { entry ->
+                RecentReplacementRow(entry = entry)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProgressMetric(
+    label: String,
+    value: String,
+) {
+    val colors = QualityAlternativeThemeTokens.colors
+    Card(
+        colors = CardDefaults.cardColors(containerColor = colors.accentSoft),
+        shape = RoundedCornerShape(16.dp),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 13.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                text = value,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = colors.accent,
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                color = colors.mutedText,
+            )
+        }
+    }
+}
+
+@Composable
+private fun RecentReplacementRow(entry: ReplacementHistoryEntry) {
+    val colors = QualityAlternativeThemeTokens.colors
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(
+            text = entry.contentTitle,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            text = "${entry.targetAppDisplayName} • ${entry.progressOutcomeLabel()}",
+            style = MaterialTheme.typography.bodySmall,
+            color = colors.mutedText,
         )
     }
 }
@@ -933,46 +1076,6 @@ private fun AddLinkScreen(
 }
 
 @Composable
-private fun PreferenceSummary(state: MainUiState) {
-    Card {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Text(
-                text = "Local preferences",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                text = "Duration bucket: ${state.preferences?.preferredDurationBucket?.displayName() ?: "Unknown"}",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            Text(
-                text = "Preferred topics: ${state.preferences?.preferredTopics?.joinToString { it.displayName() }}",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            Text(
-                text = "Selected distracting apps: ${state.availableTargetApps.joinToString { it.displayName }}",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            if (state.completedContentIds.isNotEmpty()) {
-                Text(
-                    text = "Completed items excluded from future primary recommendations: ${state.completedContentIds.size}",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-            if (state.historyEntries.isNotEmpty()) {
-                Text(
-                    text = "Recent replacement sessions in the last 7 days: ${state.historyEntries.size}",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-        }
-    }
-}
-
-@Composable
 private fun ActiveDelayNotice(
     targetApp: DistractingApp?,
     delayWindow: DelayWindow,
@@ -1048,95 +1151,6 @@ private fun PermissionReadinessCard(
                 }
                 OutlinedButton(onClick = onRefresh) {
                     Text("Refresh status")
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ReplacementHistoryCard(entries: List<ReplacementHistoryEntry>) {
-    Card {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Text(
-                text = "Recent replacement history",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-            if (entries.isEmpty()) {
-                Text(
-                    text = "No replacement sessions yet. Finish one session to start building history.",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            } else {
-                entries.forEach { entry ->
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(text = entry.contentTitle, fontWeight = FontWeight.Medium)
-                        Text(
-                            text = "${entry.targetAppDisplayName} • ${formatTimestamp(entry.acceptedAtMillis)}",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                        Text(
-                            text = entry.statusSummary(),
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun StarterPackSummary(starterPacks: List<EditorialPack>) {
-    Card {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Text(
-                text = "Active starter packs",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-            starterPacks.forEach { pack ->
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(text = pack.title, fontWeight = FontWeight.Medium)
-                    Text(text = pack.description, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(text = "${pack.items.size} items", style = MaterialTheme.typography.labelMedium)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun AnalyticsLog(events: List<AnalyticsEvent>) {
-    Card {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Text(
-                text = "Local analytics ledger",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-            if (events.isEmpty()) {
-                Text(
-                    text = "No events yet. Trigger an intervention to record the first session.",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            } else {
-                events.take(8).forEach { event ->
-                    Text(
-                        text = "${event.type.name} • ${event.targetAppPackage ?: "prototype"} • ${formatTimestamp(event.timestampMillis)}",
-                        style = MaterialTheme.typography.bodySmall,
-                    )
                 }
             }
         }
@@ -1376,48 +1390,83 @@ private fun ExternalLinkHandoffScreen(
 ) {
     val content = state.currentContent ?: return
     val context = LocalContext.current
+    val colors = QualityAlternativeThemeTokens.colors
 
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .testTag("external-handoff-screen")
             .padding(20.dp)
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text(
-            text = content.title,
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-        )
-        Text(
-            text = "Saved link • ${content.durationMinutes} min • ${content.topicTags.joinToString { it.displayName() }}",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            text = "This is one of your saved links. We'll hand you to the browser and keep the replacement session attached here for feedback.",
-            style = MaterialTheme.typography.bodyLarge,
-        )
-        content.externalUrl?.let { url ->
+        Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
             Text(
-                text = url,
+                text = "Saved link handoff",
+                style = MaterialTheme.typography.labelMedium,
+                color = colors.faintText,
+            )
+            Text(
+                text = content.title,
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                text = content.metaLine(),
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = colors.mutedText,
             )
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+
+        AnalogCard {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                SourceBadge(sourceType = ContentSourceType.USER_LINK)
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Text(
+                        text = "You are leaving the app for one saved link.",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        text = "Open it deliberately, then return here to finish or leave the session. No feed is created inside Quality Alternative.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colors.mutedText,
+                    )
+                }
+            }
+            content.externalUrl?.let { url ->
+                Text(
+                    text = url,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.faintText,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             Button(
                 modifier = Modifier.testTag("external-link-open"),
                 onClick = { onOpenLink(context) },
             ) {
-                Text("Open external link")
+                Text("Open saved link")
+            }
+            OutlinedButton(onClick = onFinishSession) {
+                Text("I read it")
             }
             OutlinedButton(onClick = onSkipSession) {
                 Text("Leave session")
             }
-        }
-        OutlinedButton(onClick = onFinishSession) {
-            Text("I read it")
         }
     }
 }
@@ -1429,29 +1478,50 @@ private fun ReaderScreen(
     onSkipReading: () -> Unit,
 ) {
     val content = state.currentContent ?: return
+    val colors = QualityAlternativeThemeTokens.colors
+    val paragraphs = finiteReaderParagraphs(state.currentContentBody)
 
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .testTag("reader-screen")
             .padding(20.dp)
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text(
-            text = content.title,
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-        )
-        Text(
-            text = "${content.durationMinutes} min • ${content.topicTags.joinToString { it.displayName() }}",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            text = state.currentContentBody,
-            style = MaterialTheme.typography.bodyLarge,
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            Text(
+                text = "Finite reader",
+                style = MaterialTheme.typography.labelMedium,
+                color = colors.faintText,
+            )
+            Text(
+                text = content.title,
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                text = content.metaLine(),
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.mutedText,
+            )
+        }
+
+        AnalogCard {
+            HomeSectionLabel(text = "One piece, then done")
+            paragraphs.forEach { paragraph ->
+                Text(
+                    text = paragraph,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = colors.primaryText,
+                )
+            }
+        }
+
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             Button(onClick = onFinishReading) {
                 Text("Finish session")
             }
@@ -1469,29 +1539,48 @@ private fun FeedbackScreen(
 ) {
     var wasGoodFit by remember { mutableStateOf(true) }
     var helped by remember { mutableStateOf(true) }
+    val colors = QualityAlternativeThemeTokens.colors
 
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .testTag("feedback-screen")
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
-        Text(
-            text = "Feedback",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-        )
-        BinaryQuestion(
-            title = "Was this a good fit?",
-            selected = wasGoodFit,
-            onSelect = { wasGoodFit = it },
-        )
-        BinaryQuestion(
-            title = "Did it help you avoid mindless scrolling?",
-            selected = helped,
-            onSelect = { helped = it },
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            Text(
+                text = "Two-tap feedback",
+                style = MaterialTheme.typography.labelMedium,
+                color = colors.faintText,
+            )
+            Text(
+                text = "Help the next impulse land better.",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                text = "No scoring, no streak pressure. Just tune fit and usefulness.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = colors.mutedText,
+            )
+        }
+        AnalogCard {
+            BinaryQuestion(
+                title = "Was this a good fit?",
+                selected = wasGoodFit,
+                onSelect = { wasGoodFit = it },
+            )
+            BinaryQuestion(
+                title = "Did it help you avoid mindless scrolling?",
+                selected = helped,
+                onSelect = { helped = it },
+            )
+        }
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             Button(onClick = { onSubmit(wasGoodFit, helped) }) {
                 Text("Submit feedback")
             }
@@ -1508,26 +1597,30 @@ private fun BinaryQuestion(
     selected: Boolean,
     onSelect: (Boolean) -> Unit,
 ) {
-    Card {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Text(text = title, style = MaterialTheme.typography.titleMedium)
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                FilterChip(
-                    selected = selected,
-                    onClick = { onSelect(true) },
-                    label = { Text("Yes") },
-                )
-                FilterChip(
-                    selected = !selected,
-                    onClick = { onSelect(false) },
-                    label = { Text("No") },
-                )
-            }
+    Column(
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text(text = title, style = MaterialTheme.typography.titleMedium)
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            FilterChip(
+                selected = selected,
+                onClick = { onSelect(true) },
+                label = { Text("Yes") },
+            )
+            FilterChip(
+                selected = !selected,
+                onClick = { onSelect(false) },
+                label = { Text("No") },
+            )
         }
     }
+}
+
+internal fun finiteReaderParagraphs(body: String): List<String> {
+    return body
+        .split(Regex("\\n\\s*\\n"))
+        .map(String::trim)
+        .filter(String::isNotEmpty)
 }
 
 private fun formatTimestamp(timestampMillis: Long): String {
@@ -1553,6 +1646,7 @@ private fun AppThemeMode.displayName(): String = when (this) {
 }
 
 private const val MAX_BACKUP_RECOMMENDATIONS = 2
+private const val MAX_RECENT_PROGRESS_REPLACEMENTS = 3
 
 private fun launchExternalLink(
     context: android.content.Context,
@@ -1586,24 +1680,29 @@ private fun PermissionStatus.displayLabel(): String = when (this) {
     PermissionStatus.UNAVAILABLE_IN_BUILD -> "Not available in this build"
 }
 
-private fun ReplacementHistoryEntry.statusSummary(): String {
+private fun ReplacementHistoryEntry.progressOutcomeLabel(): String {
     val labels = mutableListOf<String>()
-    if (isCompleted()) {
-        labels += "Completed"
-    }
-    if (isSkipped()) {
-        labels += "Skipped"
-    }
-    if (returnedToTarget()) {
-        labels += "Returned to app"
-    }
-    if (labels.isEmpty()) {
-        labels += "Accepted"
+    labels += when {
+        isCompleted() -> "Read"
+        isSkipped() -> "Left early"
+        else -> "Started"
     }
     if (feedbackGoodFit != null && feedbackHelpedAvoidScrolling != null) {
-        labels += if (feedbackHelpedAvoidScrolling == true) "Helped" else "Did not help"
+        labels += if (feedbackHelpedAvoidScrolling == true) "Helped" else "Needs tuning"
     }
     return labels.joinToString(" • ")
+}
+
+private fun List<AnalyticsEvent>.distinctProgressEventCount(type: AnalyticsEventType): Int {
+    return filter { it.type == type }
+        .map { event ->
+            event.metadata["delayId"]
+                ?: event.semanticKey
+                ?: event.interventionId
+                ?: "${event.type}:${event.targetAppPackage}:${event.timestampMillis}"
+        }
+        .toSet()
+        .size
 }
 
 private fun UserLinkValidationError.isUrlError(): Boolean {

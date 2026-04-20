@@ -1,0 +1,102 @@
+package com.qualityalternative.app.ui
+
+import com.qualityalternative.app.domain.model.AnalyticsEvent
+import com.qualityalternative.app.domain.model.AnalyticsEventType
+import com.qualityalternative.app.domain.model.RecommendationSource
+import com.qualityalternative.app.domain.model.ReplacementHistoryEntry
+import com.qualityalternative.app.domain.model.TopicTag
+import java.time.ZoneOffset
+import org.junit.Assert.assertEquals
+import org.junit.Test
+
+class ProgressSnapshotTest {
+    @Test
+    fun progressSnapshotCountsConstructiveOutcomesWithoutDuplicateDelayEvents() {
+        val entries = listOf(
+            replacementEntry(
+                sessionId = "session-1",
+                acceptedAtMillis = 1_000L,
+                completedAtMillis = 2_000L,
+            ),
+            replacementEntry(
+                sessionId = "session-2",
+                acceptedAtMillis = 3_000L,
+            ),
+        )
+        val events = listOf(
+            event(AnalyticsEventType.INTERVENTION_SHOWN, interventionId = "intervention-1"),
+            event(AnalyticsEventType.INTERVENTION_SHOWN, interventionId = "intervention-2"),
+            event(
+                AnalyticsEventType.DELAY_SELECTED,
+                interventionId = "intervention-1",
+                metadata = mapOf("delayId" to "delay-1"),
+            ),
+            event(
+                AnalyticsEventType.DELAY_SELECTED,
+                interventionId = "intervention-1",
+                metadata = mapOf("delayId" to "delay-1"),
+            ),
+            event(AnalyticsEventType.OPEN_ANYWAY_SELECTED, interventionId = "intervention-3"),
+        )
+
+        val snapshot = progressSnapshot(
+            entries = entries,
+            events = events,
+            zoneId = ZoneOffset.UTC,
+        )
+
+        assertEquals(1, snapshot.daysConverted)
+        assertEquals(2, snapshot.interventionsShown)
+        assertEquals(2, snapshot.alternativesChosen)
+        assertEquals(1, snapshot.delayedOpens)
+        assertEquals(1, snapshot.consciousOverrides)
+        assertEquals(1, snapshot.completedReads)
+        assertEquals(listOf("session-1", "session-2"), snapshot.recentReplacements.map { it.sessionId })
+    }
+
+    @Test
+    fun finiteReaderParagraphsReturnsOnlyRealParagraphs() {
+        assertEquals(
+            listOf("First paragraph.", "Second paragraph.", "Third paragraph."),
+            finiteReaderParagraphs(" First paragraph. \n\n\n Second paragraph. \n \n Third paragraph. "),
+        )
+    }
+
+    private fun event(
+        type: AnalyticsEventType,
+        interventionId: String,
+        metadata: Map<String, String> = emptyMap(),
+    ): AnalyticsEvent {
+        return AnalyticsEvent(
+            type = type,
+            timestampMillis = 1_000L,
+            interventionId = interventionId,
+            targetAppPackage = "com.fixture",
+            metadata = metadata,
+        )
+    }
+
+    private fun replacementEntry(
+        sessionId: String,
+        acceptedAtMillis: Long,
+        completedAtMillis: Long? = null,
+    ): ReplacementHistoryEntry {
+        return ReplacementHistoryEntry(
+            sessionId = sessionId,
+            interventionId = "intervention-$sessionId",
+            targetAppPackage = "com.fixture",
+            targetAppDisplayName = "Fixture Feed",
+            interventionShownAtMillis = acceptedAtMillis - 100L,
+            primaryContentId = "content-$sessionId",
+            backupContentIds = emptyList(),
+            contentId = "content-$sessionId",
+            contentTitle = "Replacement $sessionId",
+            contentDescription = "A finite replacement.",
+            contentTopics = setOf(TopicTag.SCIENCE),
+            packId = "science",
+            recommendationSource = RecommendationSource.PRIMARY,
+            acceptedAtMillis = acceptedAtMillis,
+            completedAtMillis = completedAtMillis,
+        )
+    }
+}
