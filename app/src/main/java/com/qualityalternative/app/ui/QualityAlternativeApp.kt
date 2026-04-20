@@ -1,5 +1,6 @@
 package com.qualityalternative.app.ui
 
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
@@ -149,13 +150,7 @@ fun QualityAlternativeApp(
                         MainScreen.ExternalHandoff -> ExternalLinkHandoffScreen(
                             state = uiState,
                             onOpenLink = {
-                                val url = viewModel.openExternalLink()
-                                if (url != null) {
-                                    val context = it
-                                    runCatching {
-                                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-                                    }
-                                }
+                                launchExternalLink(context = it, viewModel = viewModel)
                             },
                             onFinishSession = viewModel::finishReading,
                             onSkipSession = viewModel::skipReading,
@@ -1069,6 +1064,26 @@ private fun formatTimestamp(timestampMillis: Long): String {
 private fun TopicTag.displayName(): String = name.lowercase().replaceFirstChar(Char::uppercase)
 
 private fun ContentItem.isUserLink(): Boolean = sourceType == ContentSourceType.USER_LINK
+
+private fun launchExternalLink(
+    context: android.content.Context,
+    viewModel: MainViewModel,
+) {
+    val url = viewModel.currentExternalLinkUrl()
+    if (url == null) {
+        viewModel.recordExternalLinkHandoffFailed(reason = "missing_url")
+        return
+    }
+    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+    runCatching {
+        context.startActivity(intent)
+    }.onSuccess {
+        viewModel.recordExternalLinkOpened()
+    }.onFailure { error ->
+        val reason = if (error is ActivityNotFoundException) "no_handler" else "start_activity_failed"
+        viewModel.recordExternalLinkHandoffFailed(reason = reason)
+    }
+}
 
 private fun DurationBucket.displayName(): String = when (this) {
     DurationBucket.QUICK -> "3-5 minutes"

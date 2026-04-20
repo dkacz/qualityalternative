@@ -160,7 +160,10 @@ class MainViewModelTest {
         advanceUntilIdle()
 
         assertEquals(MainScreen.ExternalHandoff, viewModel.uiState.screen)
-        assertEquals("https://example.com/essay", viewModel.openExternalLink(nowMillis = 2_000L))
+        assertEquals("https://example.com/essay", viewModel.currentExternalLinkUrl())
+        assertFalse(analyticsTracker.allEvents().any { it.type == AnalyticsEventType.USER_LINK_FALLBACK_OPENED })
+
+        viewModel.recordExternalLinkOpened(nowMillis = 2_000L)
 
         val event = analyticsTracker.allEvents().first {
             it.type == AnalyticsEventType.USER_LINK_FALLBACK_OPENED
@@ -169,6 +172,53 @@ class MainViewModelTest {
         assertEquals("USER_LINK", event.metadata["sourceType"])
         assertEquals("NEEDS_FALLBACK", event.metadata["availability"])
         assertEquals("https://example.com/essay", event.metadata["externalUrl"])
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun failedUserLinkHandoffMarksLinkUnavailableAndDoesNotRecordSuccessfulOpen() = runTest {
+        val userLink = savedUserLink()
+        val userLinkRepository = FakeUserLinkRepository(initialLinks = listOf(userLink))
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val viewModel = createViewModel(
+            contentRepository = FakeContentRepository(extraItems = listOf(userLink)),
+            userLinkRepository = userLinkRepository,
+            recommendationEngine = FixedRecommendationEngine(
+                RecommendationSet(
+                    primary = userLink,
+                    backups = emptyList(),
+                    inventoryShortage = true,
+                    generatedAtMillis = 1_000L,
+                ),
+            ),
+            analyticsTracker = analyticsTracker,
+        )
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+        viewModel.triggerDebugIntervention(nowMillis = 1_000L)
+        advanceUntilIdle()
+        viewModel.acceptPrimary()
+        advanceUntilIdle()
+
+        viewModel.recordExternalLinkHandoffFailed(reason = "no_handler", nowMillis = 2_000L)
+        advanceUntilIdle()
+
+        assertFalse(analyticsTracker.allEvents().any { it.type == AnalyticsEventType.USER_LINK_FALLBACK_OPENED })
+        val failure = analyticsTracker.allEvents().first {
+            it.type == AnalyticsEventType.USER_LINK_HANDOFF_FAILED
+        }
+        assertEquals(userLink.id, failure.contentId)
+        assertEquals("no_handler", failure.metadata["failureReason"])
+        assertEquals("USER_LINK", failure.metadata["sourceType"])
+        assertEquals(ContentAvailability.UNAVAILABLE, userLinkRepository.links.value.single().availability)
+        assertEquals(listOf(userLink.id), userLinkRepository.markedUnavailableIds)
+        assertEquals(MainScreen.Home, viewModel.uiState.screen)
+        assertEquals(
+            "This saved link could not be opened and was removed from future recommendations.",
+            viewModel.uiState.latestMessage,
+        )
     }
 
     @Test
@@ -588,7 +638,34 @@ class MainViewModelTest {
         assertEquals(null, viewModel.uiState.currentInterventionId)
         assertEquals(MainScreen.Home, viewModel.uiState.screen)
         assertEquals("No replacement inventory is available yet.", viewModel.uiState.latestMessage)
-        assertTrue(analyticsTracker.allEvents().any { it.type == AnalyticsEventType.NO_RECOMMENDATION_AVAILABLE })
+        val event = analyticsTracker.allEvents().first { it.type == AnalyticsEventType.NO_RECOMMENDATION_AVAILABLE }
+        assertEquals("1", event.metadata["eligibleInventoryCount"])
+        assertEquals("1", event.metadata["eligibleEditorialCount"])
+        assertEquals("0", event.metadata["eligibleUserLinkCount"])
+        assertEquals("0", event.metadata["unavailableUserLinkCount"])
+        assertEquals("2", event.metadata["completedContentCount"])
+        assertEquals("philosophy", event.metadata["selectedPackIds"])
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun inventoryShortageRecordsSourceDiagnostics() = runTest {
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val viewModel = createViewModel(analyticsTracker = analyticsTracker)
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+        viewModel.triggerDebugIntervention(nowMillis = 2_000L)
+        advanceUntilIdle()
+
+        val event = analyticsTracker.allEvents().first { it.type == AnalyticsEventType.INVENTORY_SHORTAGE }
+        assertEquals("1", event.metadata["eligibleInventoryCount"])
+        assertEquals("1", event.metadata["eligibleEditorialCount"])
+        assertEquals("0", event.metadata["eligibleUserLinkCount"])
+        assertEquals("0", event.metadata["unavailableUserLinkCount"])
+        assertEquals("0", event.metadata["completedContentCount"])
+        assertEquals("philosophy", event.metadata["selectedPackIds"])
     }
 
     @Test
@@ -993,9 +1070,11 @@ class MainViewModelTest {
     }
 
     private class FakeUserLinkRepository(
+        initialLinks: List<ContentItem> = emptyList(),
         private val throwOnAdd: Boolean = false,
     ) : UserLinkRepository {
-        val links = MutableStateFlow<List<ContentItem>>(emptyList())
+        val links = MutableStateFlow(initialLinks)
+        val markedUnavailableIds = mutableListOf<String>()
         private var nextId = 0
 
         override fun userLinks(): List<ContentItem> = links.value
@@ -1031,7 +1110,16 @@ class MainViewModelTest {
         override suspend fun markUnavailable(
             contentId: String,
             nowMillis: Long,
-        ) = Unit
+        ) {
+            markedUnavailableIds += contentId
+            links.value = links.value.map { item ->
+                if (item.id == contentId) {
+                    item.copy(availability = ContentAvailability.UNAVAILABLE)
+                } else {
+                    item
+                }
+            }
+        }
     }
 
     private class FakeInterceptionMonitor : InterceptionMonitor {

@@ -38,6 +38,7 @@ enum class AnalyticsEventType {
     RETURN_AFTER_DELAY_ENDED,
     USER_LINK_ADDED,
     USER_LINK_FALLBACK_OPENED,
+    USER_LINK_HANDOFF_FAILED,
 }
 
 data class AnalyticsEvent(

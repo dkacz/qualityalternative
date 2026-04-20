@@ -13,6 +13,7 @@ import com.qualityalternative.app.domain.model.AnalyticsEvent
 import com.qualityalternative.app.domain.model.AnalyticsSemanticKeys
 import com.qualityalternative.app.domain.model.AnalyticsEventType
 import com.qualityalternative.app.domain.model.AppSettings
+import com.qualityalternative.app.domain.model.ContentAvailability
 import com.qualityalternative.app.domain.model.ContentItem
 import com.qualityalternative.app.domain.model.ContentSourceType
 import com.qualityalternative.app.domain.model.DelayWindow
@@ -458,9 +459,20 @@ class MainViewModel(
             recordReturnSignalIfNeeded(targetApp = targetApp, nowMillis = processingNowMillis)
 
             val interventionId = UUID.randomUUID().toString()
-            val filteredInventory = contentRepository.inventory().filter { item ->
-                item.sourceType == ContentSourceType.USER_LINK || item.packId in preferences.selectedPackIds
+            val rawInventory = contentRepository.inventory()
+            val filteredInventory = rawInventory.filter { item ->
+                when (item.sourceType) {
+                    ContentSourceType.USER_LINK -> item.availability != ContentAvailability.UNAVAILABLE
+                    ContentSourceType.EDITORIAL -> item.packId in preferences.selectedPackIds
+                }
             }
+            val inventoryDiagnostics = inventoryDiagnostics(
+                rawInventory = rawInventory,
+                eligibleInventory = filteredInventory,
+                preferences = preferences,
+                completedContentIds = uiState.completedContentIds,
+                userLinks = uiState.userLinks,
+            )
             val signals = buildRecommendationSignals(nowMillis = processingNowMillis)
             val recommendationSet = recommendationEngine.generate(
                 targetApp = targetApp,
@@ -478,7 +490,7 @@ class MainViewModel(
                         timestampMillis = processingNowMillis,
                         interventionId = interventionId,
                         targetAppPackage = targetApp.packageName,
-                        metadata = mapOf("selectedPackCount" to preferences.selectedPackIds.size.toString()),
+                        metadata = inventoryDiagnostics,
                     ),
                 )
                 uiState = uiState.copy(
@@ -505,7 +517,7 @@ class MainViewModel(
                     primaryContentId = recommendationSet.primary.id,
                     backupContentIds = backupIds,
                     contentId = recommendationSet.primary.id,
-                    metadata = recommendationSet.analyticsMetadata(),
+                    metadata = recommendationSet.analyticsMetadata() + inventoryDiagnostics,
                 ),
             )
 
@@ -519,7 +531,7 @@ class MainViewModel(
                         primaryContentId = recommendationSet.primary.id,
                         backupContentIds = backupIds,
                         contentId = recommendationSet.primary.id,
-                        metadata = recommendationSet.analyticsMetadata(),
+                        metadata = recommendationSet.analyticsMetadata() + inventoryDiagnostics,
                     ),
                 )
             }
@@ -1037,10 +1049,14 @@ class MainViewModel(
         }
     }
 
-    fun openExternalLink(nowMillis: Long = System.currentTimeMillis()): String? {
-        val content = uiState.currentContent ?: return null
-        val sessionId = uiState.currentSessionId ?: return null
-        val url = content.externalUrl ?: return null
+    fun currentExternalLinkUrl(): String? {
+        return uiState.currentContent?.externalUrl
+    }
+
+    fun recordExternalLinkOpened(nowMillis: Long = System.currentTimeMillis()) {
+        val content = uiState.currentContent ?: return
+        val sessionId = uiState.currentSessionId ?: return
+        content.externalUrl ?: return
         recordEvent(
             AnalyticsEvent(
                 type = AnalyticsEventType.USER_LINK_FALLBACK_OPENED,
@@ -1054,7 +1070,34 @@ class MainViewModel(
                 metadata = content.analyticsMetadata(),
             ),
         )
-        return url
+    }
+
+    fun recordExternalLinkHandoffFailed(
+        reason: String,
+        nowMillis: Long = System.currentTimeMillis(),
+    ) {
+        val content = uiState.currentContent ?: return
+        val sessionId = uiState.currentSessionId ?: return
+        viewModelScope.launch {
+            recordEvent(
+                AnalyticsEvent(
+                    type = AnalyticsEventType.USER_LINK_HANDOFF_FAILED,
+                    timestampMillis = nowMillis,
+                    interventionId = uiState.currentInterventionId,
+                    sessionId = sessionId,
+                    targetAppPackage = uiState.selectedTargetApp?.packageName,
+                    primaryContentId = uiState.currentRecommendationSet?.primary?.id,
+                    backupContentIds = uiState.currentRecommendationSet?.backups.orEmpty().map(ContentItem::id),
+                    contentId = content.id,
+                    metadata = content.analyticsMetadata() + mapOf("failureReason" to reason),
+                ),
+            )
+            userLinkRepository.markUnavailable(contentId = content.id, nowMillis = nowMillis)
+            historyRepository.markSkipped(sessionId = sessionId, skippedAtMillis = nowMillis)
+            clearActiveSession(
+                latestMessage = "This saved link could not be opened and was removed from future recommendations.",
+            )
+        }
     }
 
     private fun openReplacementSession(content: ContentItem, sessionId: String, startedAtMillis: Long) {
@@ -1296,6 +1339,32 @@ private fun RecommendationSet.analyticsMetadata(): Map<String, String> {
         backups.flatMapIndexed { index, content ->
             content.analyticsMetadata(prefix = "backup${index + 1}").entries
         }.associate { it.toPair() }
+}
+
+private fun inventoryDiagnostics(
+    rawInventory: List<ContentItem>,
+    eligibleInventory: List<ContentItem>,
+    preferences: UserPreferences,
+    completedContentIds: Set<String>,
+    userLinks: List<ContentItem>,
+): Map<String, String> {
+    val unavailableUserLinkIds = (rawInventory + userLinks)
+        .asSequence()
+        .filter { item ->
+            item.sourceType == ContentSourceType.USER_LINK &&
+                item.availability == ContentAvailability.UNAVAILABLE
+        }
+        .map(ContentItem::id)
+        .toSet()
+    return mapOf(
+        "selectedPackCount" to preferences.selectedPackIds.size.toString(),
+        "selectedPackIds" to preferences.selectedPackIds.sorted().joinToString(","),
+        "eligibleInventoryCount" to eligibleInventory.size.toString(),
+        "eligibleEditorialCount" to eligibleInventory.count { it.sourceType == ContentSourceType.EDITORIAL }.toString(),
+        "eligibleUserLinkCount" to eligibleInventory.count { it.sourceType == ContentSourceType.USER_LINK }.toString(),
+        "unavailableUserLinkCount" to unavailableUserLinkIds.size.toString(),
+        "completedContentCount" to completedContentIds.size.toString(),
+    )
 }
 
 private fun ContentItem.analyticsMetadata(prefix: String? = null): Map<String, String> {
