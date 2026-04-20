@@ -1,6 +1,6 @@
 # Internal Alpha Checklist
 
-Status: `code complete, alpha validation blocked by device`
+Status: `code complete, real-device smoke partially passed; second app pending`
 
 This checklist tracks the Android-first internal alpha defined in Sprint 0-3.
 
@@ -33,5 +33,6 @@ This checklist tracks the Android-first internal alpha defined in Sprint 0-3.
 
 ## Notes
 
-- The current machine only has the `qaApi36` emulator connected, so the real-device gate cannot be signed off yet.
-- Until that smoke run is completed, the correct alpha label remains `code complete, alpha validation blocked by device`.
+- Partial real-device smoke passed on a Samsung `SM-S721B` for YouTube at commit `0e96af7`.
+- Confirmed on device: YouTube interception, `Open anyway` without immediate loop, and `Delay for 15 minutes`.
+- Full internal-alpha validation still needs the same core flow confirmed on a second real app from the launch support list.
