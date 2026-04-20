@@ -2,10 +2,14 @@ package com.qualityalternative.app
 
 import android.content.Intent
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
 import com.qualityalternative.app.interception.FixtureTargetRegistry
@@ -103,6 +107,56 @@ class MainActivityTest {
         composeRule.onNodeWithText("Read now").assertIsDisplayed()
     }
 
+    @Test
+    fun addLinkKeepsSaveDisabledForInvalidUrl() {
+        launchOnboardedApp()
+
+        composeRule.onNodeWithTag("home-add-link")
+            .performClick()
+
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasNode("Add a replacement link")
+        }
+        composeRule.onNodeWithTag("add-link-url").performTextInput("quality://bad")
+        composeRule.onNodeWithTag("add-link-title").performTextInput("Saved essay")
+        composeRule.onNodeWithTag("add-link-topic-SCIENCE")
+            .performScrollTo()
+            .performClick()
+
+        composeRule.onNodeWithTag("add-link-save")
+            .performScrollTo()
+            .assertIsNotEnabled()
+    }
+
+    @Test
+    fun addLinkSavesValidLinkAndReturnsHome() {
+        launchOnboardedApp()
+
+        composeRule.onNodeWithTag("home-add-link")
+            .performClick()
+
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasNode("Add a replacement link")
+        }
+        composeRule.onNodeWithTag("add-link-url").performTextInput("https://example.com/essay")
+        composeRule.onNodeWithTag("add-link-title").performTextInput("Saved essay")
+        composeRule.onNodeWithTag("add-link-topic-SCIENCE")
+            .performScrollTo()
+            .performClick()
+        composeRule.onNodeWithTag("add-link-save")
+            .performScrollTo()
+            .assertIsEnabled()
+        composeRule.onNodeWithTag("add-link-save")
+            .performScrollTo()
+            .performClick()
+
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasNode("Quality Alternative") && hasNode("Personal library: 1 link saved.")
+        }
+
+        composeRule.onNodeWithText("Personal library: 1 link saved.").assertIsDisplayed()
+    }
+
     private fun hasNode(text: String): Boolean {
         return runCatching {
             composeRule.onNodeWithText(text).fetchSemanticsNode()
@@ -119,5 +173,20 @@ class MainActivityTest {
             launchIntent,
         )
         InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+    }
+
+    private fun launchOnboardedApp() {
+        launchApp()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasNode("Let’s set up your replacement loop") || hasNode("Quality Alternative")
+        }
+        if (hasNode("Let’s set up your replacement loop")) {
+            composeRule.onNodeWithText("Complete setup", useUnmergedTree = true)
+                .performScrollTo()
+                .performClick()
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasNode("Quality Alternative")
+        }
     }
 }

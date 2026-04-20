@@ -29,7 +29,10 @@ import com.qualityalternative.app.domain.model.ReturnToTargetSignal
 import com.qualityalternative.app.domain.model.SessionFeedback
 import com.qualityalternative.app.domain.model.TimeOfDayBucket
 import com.qualityalternative.app.domain.model.TopicTag
+import com.qualityalternative.app.domain.model.UserLinkDraft
+import com.qualityalternative.app.domain.model.UserLinkValidationError
 import com.qualityalternative.app.domain.model.UserPreferences
+import com.qualityalternative.app.domain.service.AddUserLinkResult
 import com.qualityalternative.app.domain.service.AnalyticsTracker
 import com.qualityalternative.app.domain.service.ContentRepository
 import com.qualityalternative.app.domain.service.DelayGate
@@ -37,11 +40,13 @@ import com.qualityalternative.app.domain.service.HistoryRepository
 import com.qualityalternative.app.domain.service.InterceptionMonitor
 import com.qualityalternative.app.domain.service.RecommendationEngine
 import com.qualityalternative.app.domain.service.SettingsRepository
+import com.qualityalternative.app.domain.service.UserLinkRepository
 import com.qualityalternative.app.interception.InterceptionRuntimeGate
 import java.util.UUID
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 
 data class MainUiState(
@@ -70,15 +75,28 @@ data class MainUiState(
     val permissionReadiness: PermissionReadiness = unavailablePermissionReadiness(),
     val historyEntries: List<ReplacementHistoryEntry> = emptyList(),
     val completedContentIds: Set<String> = emptySet(),
+    val userLinks: List<ContentItem> = emptyList(),
+    val addLinkForm: AddLinkFormState = AddLinkFormState(),
     val latestMessage: String? = null,
     val events: List<AnalyticsEvent> = emptyList(),
     val screen: MainScreen = MainScreen.Onboarding,
     val lastFeedback: SessionFeedback? = null,
 )
 
+data class AddLinkFormState(
+    val url: String = "",
+    val title: String = "",
+    val durationMinutes: String = "7",
+    val selectedTopics: Set<TopicTag> = emptySet(),
+    val validationErrors: Set<UserLinkValidationError> = emptySet(),
+    val canSave: Boolean = false,
+    val isSaving: Boolean = false,
+)
+
 enum class MainScreen {
     Onboarding,
     Home,
+    AddLink,
     Intervention,
     Reader,
     Feedback,
@@ -91,6 +109,7 @@ enum class InterventionOrigin {
 
 class MainViewModel(
     private val contentRepository: ContentRepository,
+    private val userLinkRepository: UserLinkRepository = EmptyUserLinkRepository,
     private val settingsRepository: SettingsRepository,
     private val recommendationEngine: RecommendationEngine,
     private val delayGate: DelayGate,
@@ -137,6 +156,11 @@ class MainViewModel(
             contentRepository.observeReady().collect { ready ->
                 contentReady = ready
                 updateHydrationState()
+            }
+        }
+        viewModelScope.launch {
+            userLinkRepository.observeUserLinks().collect { links ->
+                uiState = uiState.copy(userLinks = links)
             }
         }
         viewModelScope.launch {
@@ -255,6 +279,94 @@ class MainViewModel(
         viewModelScope.launch {
             settingsRepository.saveOnboardingSelection(selection)
             uiState = uiState.copy(latestMessage = "Onboarding saved locally.")
+        }
+    }
+
+    fun openAddLink() {
+        uiState = uiState.copy(
+            screen = MainScreen.AddLink,
+            addLinkForm = AddLinkFormState(),
+            latestMessage = null,
+        )
+    }
+
+    fun cancelAddLink() {
+        uiState = uiState.copy(
+            screen = MainScreen.Home,
+            addLinkForm = AddLinkFormState(),
+            latestMessage = null,
+        )
+    }
+
+    fun updateAddLinkUrl(url: String) {
+        updateAddLinkForm(uiState.addLinkForm.copy(url = url))
+    }
+
+    fun updateAddLinkTitle(title: String) {
+        updateAddLinkForm(uiState.addLinkForm.copy(title = title))
+    }
+
+    fun updateAddLinkDuration(durationMinutes: String) {
+        updateAddLinkForm(uiState.addLinkForm.copy(durationMinutes = durationMinutes))
+    }
+
+    fun toggleAddLinkTopic(topic: TopicTag) {
+        val selectedTopics = uiState.addLinkForm.selectedTopics.toMutableSet()
+        if (!selectedTopics.add(topic)) {
+            selectedTopics.remove(topic)
+        }
+        updateAddLinkForm(uiState.addLinkForm.copy(selectedTopics = selectedTopics))
+    }
+
+    fun saveUserLink(nowMillis: Long = nowProvider()) {
+        val draft = uiState.addLinkForm.toDraftOrNull()
+        if (draft == null) {
+            uiState = uiState.copy(
+                addLinkForm = uiState.addLinkForm.copy(
+                    validationErrors = uiState.addLinkForm.localValidationErrors(),
+                    canSave = false,
+                    isSaving = false,
+                ),
+                latestMessage = "This link needs a little cleanup before saving.",
+            )
+            return
+        }
+
+        uiState = uiState.copy(addLinkForm = uiState.addLinkForm.copy(isSaving = true))
+        viewModelScope.launch {
+            when (val result = userLinkRepository.addLink(draft = draft, nowMillis = nowMillis)) {
+                is AddUserLinkResult.Added -> {
+                    recordEventDurably(
+                        AnalyticsEvent(
+                            type = AnalyticsEventType.USER_LINK_ADDED,
+                            timestampMillis = nowMillis,
+                            contentId = result.item.id,
+                            metadata = mapOf(
+                                "sourceType" to result.item.sourceType.name,
+                                "externalUrl" to result.item.externalUrl.orEmpty(),
+                                "durationMinutes" to result.item.durationMinutes.toString(),
+                                "topicCount" to result.item.topicTags.size.toString(),
+                            ),
+                        ),
+                    )
+                    uiState = uiState.copy(
+                        screen = MainScreen.Home,
+                        addLinkForm = AddLinkFormState(),
+                        latestMessage = "Link saved for future replacement moments.",
+                    )
+                }
+
+                is AddUserLinkResult.Rejected -> {
+                    uiState = uiState.copy(
+                        addLinkForm = uiState.addLinkForm.copy(
+                            validationErrors = result.errors,
+                            canSave = false,
+                            isSaving = false,
+                        ),
+                        latestMessage = "This link needs a little cleanup before saving.",
+                    )
+                }
+            }
         }
     }
 
@@ -655,6 +767,7 @@ class MainViewModel(
             screen = when {
                 !settings.hasCompletedOnboarding -> MainScreen.Onboarding
                 uiState.screen == MainScreen.Onboarding -> MainScreen.Home
+                uiState.screen == MainScreen.AddLink -> MainScreen.AddLink
                 else -> uiState.screen
             },
         )
@@ -985,6 +1098,16 @@ class MainViewModel(
         return uiState.availableTargetApps.firstOrNull { it.packageName == targetAppPackage }
             ?: SupportedCatalog.findByPackage(targetAppPackage)
     }
+
+    private fun updateAddLinkForm(form: AddLinkFormState) {
+        uiState = uiState.copy(
+            addLinkForm = form.copy(
+                validationErrors = emptySet(),
+                canSave = form.localValidationErrors().isEmpty(),
+                isSaving = false,
+            ),
+        )
+    }
 }
 
 class MainViewModelFactory(
@@ -995,6 +1118,7 @@ class MainViewModelFactory(
         @Suppress("UNCHECKED_CAST")
         return MainViewModel(
             contentRepository = appContainer.contentRepository,
+            userLinkRepository = appContainer.userLinkRepository,
             settingsRepository = appContainer.settingsRepository,
             recommendationEngine = appContainer.recommendationEngine,
             delayGate = appContainer.delayGate,
@@ -1069,3 +1193,55 @@ private data class PendingSystemInterception(
     val targetAppPackage: String,
     val triggeredAtMillis: Long,
 )
+
+private fun AddLinkFormState.toDraftOrNull(): UserLinkDraft? {
+    val duration = durationMinutes.toIntOrNull() ?: return null
+    if (localValidationErrors().isNotEmpty()) {
+        return null
+    }
+    return UserLinkDraft(
+        url = url,
+        title = title,
+        durationMinutes = duration,
+        topicTags = selectedTopics,
+    )
+}
+
+private fun AddLinkFormState.localValidationErrors(): Set<UserLinkValidationError> {
+    val errors = mutableSetOf<UserLinkValidationError>()
+    val trimmedUrl = url.trim()
+    val duration = durationMinutes.toIntOrNull()
+    if (trimmedUrl.isBlank()) {
+        errors += UserLinkValidationError.EMPTY_URL
+    } else if (!trimmedUrl.startsWith("https://", ignoreCase = true) &&
+        !trimmedUrl.startsWith("http://", ignoreCase = true)
+    ) {
+        errors += UserLinkValidationError.UNSUPPORTED_SCHEME
+    }
+    if (title.isBlank()) {
+        errors += UserLinkValidationError.BLANK_TITLE
+    }
+    if (duration == null || duration !in 1..60) {
+        errors += UserLinkValidationError.INVALID_DURATION
+    }
+    if (selectedTopics.isEmpty()) {
+        errors += UserLinkValidationError.NO_TOPICS
+    }
+    return errors
+}
+
+private object EmptyUserLinkRepository : UserLinkRepository {
+    override fun userLinks(): List<ContentItem> = emptyList()
+
+    override fun observeUserLinks() = flowOf(emptyList<ContentItem>())
+
+    override suspend fun addLink(
+        draft: UserLinkDraft,
+        nowMillis: Long,
+    ): AddUserLinkResult = AddUserLinkResult.Rejected(setOf(UserLinkValidationError.UNSUPPORTED_SCHEME))
+
+    override suspend fun markUnavailable(
+        contentId: String,
+        nowMillis: Long,
+    ) = Unit
+}

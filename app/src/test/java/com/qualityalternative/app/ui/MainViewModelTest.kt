@@ -26,7 +26,10 @@ import com.qualityalternative.app.domain.model.ReplacementHistoryEntry
 import com.qualityalternative.app.domain.model.ReturnToTargetSignal
 import com.qualityalternative.app.domain.model.SessionFeedback
 import com.qualityalternative.app.domain.model.TopicTag
+import com.qualityalternative.app.domain.model.UserLinkDraft
+import com.qualityalternative.app.domain.model.UserLinkValidationError
 import com.qualityalternative.app.domain.model.UserPreferences
+import com.qualityalternative.app.domain.service.AddUserLinkResult
 import com.qualityalternative.app.domain.service.ContentRepository
 import com.qualityalternative.app.domain.service.DefaultRecommendationEngine
 import com.qualityalternative.app.domain.service.DelayGate
@@ -34,12 +37,14 @@ import com.qualityalternative.app.domain.service.HistoryRepository
 import com.qualityalternative.app.domain.service.InterceptionMonitor
 import com.qualityalternative.app.domain.service.RecommendationEngine
 import com.qualityalternative.app.domain.service.SettingsRepository
+import com.qualityalternative.app.domain.service.UserLinkRepository
 import com.qualityalternative.app.interception.FixtureTargetRegistry
 import com.qualityalternative.app.interception.InterceptionRuntimeGate
 import java.io.File
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -140,6 +145,66 @@ class MainViewModelTest {
             setOf("p1", "user-link"),
             recommendationEngine.lastInventory.mapTo(mutableSetOf(), ContentItem::id),
         )
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun saveUserLinkFromForm_persistsLinkAndRecordsAnalytics() = runTest {
+        val userLinkRepository = FakeUserLinkRepository()
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val viewModel = createViewModel(
+            userLinkRepository = userLinkRepository,
+            analyticsTracker = analyticsTracker,
+        )
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+
+        viewModel.openAddLink()
+        viewModel.updateAddLinkUrl("https://example.com/essay")
+        viewModel.updateAddLinkTitle("Saved essay")
+        viewModel.updateAddLinkDuration("9")
+        viewModel.toggleAddLinkTopic(TopicTag.SCIENCE)
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.addLinkForm.canSave)
+
+        viewModel.saveUserLink(nowMillis = 2_000L)
+        advanceUntilIdle()
+
+        assertEquals(MainScreen.Home, viewModel.uiState.screen)
+        assertEquals("Saved essay", userLinkRepository.links.value.single().title)
+        assertEquals("Saved essay", viewModel.uiState.userLinks.single().title)
+        val event = analyticsTracker.allEvents().first { it.type == AnalyticsEventType.USER_LINK_ADDED }
+        assertEquals("user-link:1", event.contentId)
+        assertEquals("USER_LINK", event.metadata["sourceType"])
+        assertEquals("https://example.com/essay", event.metadata["externalUrl"])
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun saveUserLinkWithRejectedDraft_keepsAddLinkOpenWithErrors() = runTest {
+        val viewModel = createViewModel()
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+
+        viewModel.openAddLink()
+        viewModel.updateAddLinkUrl("quality://bad")
+        viewModel.updateAddLinkTitle("Bad link")
+        viewModel.updateAddLinkDuration("7")
+        viewModel.toggleAddLinkTopic(TopicTag.SCIENCE)
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.addLinkForm.canSave)
+
+        viewModel.saveUserLink(nowMillis = 2_000L)
+        advanceUntilIdle()
+
+        assertEquals(MainScreen.AddLink, viewModel.uiState.screen)
+        assertTrue(UserLinkValidationError.UNSUPPORTED_SCHEME in viewModel.uiState.addLinkForm.validationErrors)
     }
 
     @Test
@@ -516,12 +581,14 @@ class MainViewModelTest {
         analyticsTracker: InMemoryAnalyticsTracker = InMemoryAnalyticsTracker(),
         delayGate: DelayGate = InMemoryDelayGate(),
         contentRepository: ContentRepository = FakeContentRepository(),
+        userLinkRepository: UserLinkRepository = FakeUserLinkRepository(),
         recommendationEngine: RecommendationEngine = DefaultRecommendationEngine(),
         nowProvider: () -> Long = { 1_000L },
     ): MainViewModel {
         return track(
             MainViewModel(
                 contentRepository = contentRepository,
+                userLinkRepository = userLinkRepository,
                 settingsRepository = settingsRepository,
                 recommendationEngine = recommendationEngine,
                 delayGate = delayGate,
@@ -775,6 +842,43 @@ class MainViewModelTest {
             topicTags = topics,
             bodyAssetPath = "unused",
         )
+    }
+
+    private class FakeUserLinkRepository : UserLinkRepository {
+        val links = MutableStateFlow<List<ContentItem>>(emptyList())
+        private var nextId = 0
+
+        override fun userLinks(): List<ContentItem> = links.value
+
+        override fun observeUserLinks(): Flow<List<ContentItem>> = links.asStateFlow()
+
+        override suspend fun addLink(
+            draft: UserLinkDraft,
+            nowMillis: Long,
+        ): AddUserLinkResult {
+            if (!draft.url.startsWith("http://") && !draft.url.startsWith("https://")) {
+                return AddUserLinkResult.Rejected(setOf(UserLinkValidationError.UNSUPPORTED_SCHEME))
+            }
+            val item = ContentItem(
+                id = "user-link:${++nextId}",
+                packId = "user-links",
+                title = draft.title.trim(),
+                description = draft.url.trim(),
+                durationMinutes = draft.durationMinutes,
+                format = ContentFormat.HTML,
+                topicTags = draft.topicTags,
+                externalUrl = draft.url.trim(),
+                sourceType = ContentSourceType.USER_LINK,
+                availability = ContentAvailability.NEEDS_FALLBACK,
+            )
+            links.value = links.value + item
+            return AddUserLinkResult.Added(item)
+        }
+
+        override suspend fun markUnavailable(
+            contentId: String,
+            nowMillis: Long,
+        ) = Unit
     }
 
     private class FakeInterceptionMonitor : InterceptionMonitor {
