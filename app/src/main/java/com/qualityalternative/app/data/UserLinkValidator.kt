@@ -48,20 +48,17 @@ object UserLinkValidator {
 
         val host = parsed.host?.lowercase()
             ?: return UrlValidation(error = UserLinkValidationError.MISSING_HOST)
-        val normalizedUrl = runCatching {
-            URI(
-                scheme,
-                parsed.userInfo,
-                host,
-                parsed.port,
-                parsed.path,
-                parsed.query,
-                parsed.fragment,
-            ).toASCIIString()
-        }.getOrNull()
+        val normalizedUrl = buildNormalizedUrl(
+            scheme = scheme,
+            rawUserInfo = parsed.rawUserInfo,
+            host = host,
+            port = parsed.port,
+            rawPath = parsed.rawPath,
+            rawQuery = parsed.rawQuery,
+            rawFragment = parsed.rawFragment,
+        )
         return UrlValidation(
             normalizedUrl = normalizedUrl,
-            error = if (normalizedUrl == null) UserLinkValidationError.UNSUPPORTED_SCHEME else null,
         )
     }
 
@@ -76,6 +73,39 @@ object UserLinkValidator {
             UserLinkValidationError.MISSING_HOST
         } else {
             UserLinkValidationError.UNSUPPORTED_SCHEME
+        }
+    }
+
+    private fun buildNormalizedUrl(
+        scheme: String,
+        rawUserInfo: String?,
+        host: String,
+        port: Int,
+        rawPath: String?,
+        rawQuery: String?,
+        rawFragment: String?,
+    ): String {
+        return buildString {
+            append(scheme)
+            append("://")
+            if (!rawUserInfo.isNullOrBlank()) {
+                append(rawUserInfo)
+                append("@")
+            }
+            append(host)
+            if (port >= 0) {
+                append(":")
+                append(port)
+            }
+            append(rawPath.orEmpty())
+            if (rawQuery != null) {
+                append("?")
+                append(rawQuery)
+            }
+            if (rawFragment != null) {
+                append("#")
+                append(rawFragment)
+            }
         }
     }
 

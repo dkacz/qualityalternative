@@ -11,6 +11,9 @@ interface UserLinkDao {
     @Query("SELECT * FROM user_links ORDER BY createdAtMillis DESC")
     fun observeAll(): Flow<List<UserLinkEntity>>
 
+    @Query("SELECT * FROM user_links WHERE normalizedUrl = :normalizedUrl LIMIT 1")
+    suspend fun findByNormalizedUrl(normalizedUrl: String): UserLinkEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOrReplace(link: UserLinkEntity)
 

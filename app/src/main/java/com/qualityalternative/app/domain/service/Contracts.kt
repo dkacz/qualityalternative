@@ -25,6 +25,8 @@ interface ContentRepository {
     fun starterPacks(): List<EditorialPack>
     fun inventory(): List<ContentItem>
     fun contentBody(item: ContentItem): String
+    fun isReady(): Boolean = true
+    fun observeReady(): Flow<Boolean> = flowOf(isReady())
 }
 
 sealed class AddUserLinkResult {

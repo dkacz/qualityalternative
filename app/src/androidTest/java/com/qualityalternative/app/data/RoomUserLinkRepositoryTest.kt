@@ -1,5 +1,6 @@
 package com.qualityalternative.app.data
 
+import android.database.sqlite.SQLiteDatabase
 import androidx.room.Room
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -38,7 +39,7 @@ class RoomUserLinkRepositoryTest {
             val repository = RoomUserLinkRepository(
                 dao = database.userLinkDao(),
                 scope = appScope,
-                idProvider = { "user-link:test" },
+                idProvider = { _ -> "user-link:test" },
             )
             repository.observeReady().first { it }
 
@@ -64,6 +65,21 @@ class RoomUserLinkRepositoryTest {
             assertEquals(ContentSourceType.USER_LINK, saved.sourceType)
             assertEquals(ContentAvailability.NEEDS_FALLBACK, saved.availability)
             assertEquals(setOf(TopicTag.PSYCHOLOGY, TopicTag.SCIENCE), saved.topicTags)
+
+            val reloadedScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+            val reloadedRepository = RoomUserLinkRepository(
+                dao = database.userLinkDao(),
+                scope = reloadedScope,
+                idProvider = { _ -> "user-link:unused" },
+            )
+            try {
+                val reloaded = withTimeout(10_000L) {
+                    reloadedRepository.observeUserLinks().first { it.size == 1 }.single()
+                }
+                assertEquals(saved, reloaded)
+            } finally {
+                reloadedScope.cancel()
+            }
         } finally {
             appScope.cancel()
             delay(100)
@@ -84,7 +100,7 @@ class RoomUserLinkRepositoryTest {
             val repository = RoomUserLinkRepository(
                 dao = database.userLinkDao(),
                 scope = appScope,
-                idProvider = { "user-link:test" },
+                idProvider = { _ -> "user-link:test" },
             )
             repository.observeReady().first { it }
 
@@ -128,7 +144,7 @@ class RoomUserLinkRepositoryTest {
             val repository = RoomUserLinkRepository(
                 dao = database.userLinkDao(),
                 scope = appScope,
-                idProvider = { "user-link:test" },
+                idProvider = { _ -> "user-link:test" },
             )
             repository.observeReady().first { it }
             repository.addLink(
@@ -149,10 +165,230 @@ class RoomUserLinkRepositoryTest {
                 }.single()
             }
             assertEquals(ContentAvailability.UNAVAILABLE, updated.availability)
+
+            val reloadedScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+            val reloadedRepository = RoomUserLinkRepository(
+                dao = database.userLinkDao(),
+                scope = reloadedScope,
+                idProvider = { _ -> "user-link:unused" },
+            )
+            try {
+                val reloaded = withTimeout(10_000L) {
+                    reloadedRepository.observeUserLinks().first {
+                        it.singleOrNull()?.availability == ContentAvailability.UNAVAILABLE
+                    }.single()
+                }
+                assertEquals(ContentAvailability.UNAVAILABLE, reloaded.availability)
+            } finally {
+                reloadedScope.cancel()
+            }
         } finally {
             appScope.cancel()
             delay(100)
             database.close()
+        }
+    }
+
+    @Test
+    fun addLink_preservesContentIdentityWhenSameUrlIsAddedAgain() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val database = Room.inMemoryDatabaseBuilder(
+            context,
+            QualityAlternativeDatabase::class.java,
+        ).allowMainThreadQueries().build()
+        val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        var nextId = 0
+
+        try {
+            val repository = RoomUserLinkRepository(
+                dao = database.userLinkDao(),
+                scope = appScope,
+                idProvider = { _ -> "user-link:${++nextId}" },
+            )
+            repository.observeReady().first { it }
+
+            val first = repository.addLink(
+                draft = UserLinkDraft(
+                    url = "https://example.com/essay",
+                    title = "Original title",
+                    durationMinutes = 8,
+                    topicTags = setOf(TopicTag.PSYCHOLOGY),
+                ),
+                nowMillis = 1_000L,
+            ) as AddUserLinkResult.Added
+            val second = repository.addLink(
+                draft = UserLinkDraft(
+                    url = "https://EXAMPLE.com/essay",
+                    title = "Updated title",
+                    durationMinutes = 10,
+                    topicTags = setOf(TopicTag.SCIENCE),
+                ),
+                nowMillis = 2_000L,
+            ) as AddUserLinkResult.Added
+
+            val links = withTimeout(10_000L) {
+                repository.observeUserLinks().first { it.size == 1 }
+            }
+
+            assertEquals(first.item.id, second.item.id)
+            assertEquals("user-link:1", second.item.id)
+            assertEquals("Updated title", links.single().title)
+            assertEquals(1, nextId)
+        } finally {
+            appScope.cancel()
+            delay(100)
+            database.close()
+        }
+    }
+
+    @Test
+    fun migrationFromVersion3PreservesExistingRowsAndCreatesUserLinks() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val databaseName = "user-link-migration-${System.nanoTime()}.db"
+        context.deleteDatabase(databaseName)
+
+        try {
+            SQLiteDatabase.openOrCreateDatabase(context.getDatabasePath(databaseName), null).use { database ->
+                database.execSQL(
+                    """
+                    CREATE TABLE analytics_events (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        type TEXT NOT NULL,
+                        timestampMillis INTEGER NOT NULL,
+                        semanticKey TEXT,
+                        interventionId TEXT,
+                        sessionId TEXT,
+                        targetAppPackage TEXT,
+                        primaryContentId TEXT,
+                        backupContentIdsCsv TEXT NOT NULL,
+                        contentId TEXT,
+                        metadataJson TEXT NOT NULL
+                    )
+                    """.trimIndent(),
+                )
+                database.execSQL(
+                    "CREATE UNIQUE INDEX index_analytics_events_semanticKey ON analytics_events(semanticKey)",
+                )
+                database.execSQL(
+                    """
+                    CREATE TABLE replacement_sessions (
+                        sessionId TEXT NOT NULL,
+                        interventionId TEXT NOT NULL,
+                        targetAppPackage TEXT NOT NULL,
+                        targetAppDisplayName TEXT NOT NULL,
+                        interventionShownAtMillis INTEGER NOT NULL,
+                        primaryContentId TEXT NOT NULL,
+                        backupContentIdsCsv TEXT NOT NULL,
+                        contentId TEXT NOT NULL,
+                        contentTitle TEXT NOT NULL,
+                        contentDescription TEXT NOT NULL,
+                        contentTopicsCsv TEXT NOT NULL,
+                        packId TEXT NOT NULL,
+                        recommendationSource TEXT NOT NULL,
+                        acceptedAtMillis INTEGER NOT NULL,
+                        completedAtMillis INTEGER,
+                        skippedAtMillis INTEGER,
+                        returnedToTargetAtMillis INTEGER,
+                        feedbackGoodFit INTEGER,
+                        feedbackHelpedAvoidScrolling INTEGER,
+                        PRIMARY KEY(sessionId)
+                    )
+                    """.trimIndent(),
+                )
+                database.execSQL(
+                    """
+                    INSERT INTO analytics_events (
+                        type,
+                        timestampMillis,
+                        semanticKey,
+                        interventionId,
+                        sessionId,
+                        targetAppPackage,
+                        primaryContentId,
+                        backupContentIdsCsv,
+                        contentId,
+                        metadataJson
+                    ) VALUES (
+                        'INTERVENTION_SHOWN',
+                        1000,
+                        'event:1',
+                        'intervention-1',
+                        'session-1',
+                        'pkg',
+                        'content-1',
+                        'backup-1',
+                        'content-1',
+                        '{}'
+                    )
+                    """.trimIndent(),
+                )
+                database.execSQL(
+                    """
+                    INSERT INTO replacement_sessions (
+                        sessionId,
+                        interventionId,
+                        targetAppPackage,
+                        targetAppDisplayName,
+                        interventionShownAtMillis,
+                        primaryContentId,
+                        backupContentIdsCsv,
+                        contentId,
+                        contentTitle,
+                        contentDescription,
+                        contentTopicsCsv,
+                        packId,
+                        recommendationSource,
+                        acceptedAtMillis,
+                        completedAtMillis,
+                        skippedAtMillis,
+                        returnedToTargetAtMillis,
+                        feedbackGoodFit,
+                        feedbackHelpedAvoidScrolling
+                    ) VALUES (
+                        'session-1',
+                        'intervention-1',
+                        'pkg',
+                        'Target',
+                        1000,
+                        'content-1',
+                        'backup-1',
+                        'content-1',
+                        'Title',
+                        'Description',
+                        'SCIENCE',
+                        'pack',
+                        'PRIMARY',
+                        1100,
+                        NULL,
+                        NULL,
+                        NULL,
+                        NULL,
+                        NULL
+                    )
+                    """.trimIndent(),
+                )
+                database.execSQL("PRAGMA user_version = 3")
+            }
+
+            val migrated = QualityAlternativeDatabase.build(context, databaseName = databaseName)
+            try {
+                migrated.openHelper.writableDatabase.query("SELECT COUNT(*) FROM analytics_events").use { cursor ->
+                    assertTrue(cursor.moveToFirst())
+                    assertEquals(1, cursor.getInt(0))
+                }
+                migrated.openHelper.writableDatabase.query("SELECT COUNT(*) FROM replacement_sessions").use { cursor ->
+                    assertTrue(cursor.moveToFirst())
+                    assertEquals(1, cursor.getInt(0))
+                }
+                migrated.openHelper.writableDatabase.query("SELECT COUNT(*) FROM user_links").use { cursor ->
+                    assertTrue(cursor.moveToFirst())
+                    assertEquals(0, cursor.getInt(0))
+                }
+            } finally {
+                migrated.close()
+            }
+        } finally {
+            context.deleteDatabase(databaseName)
         }
     }
 }

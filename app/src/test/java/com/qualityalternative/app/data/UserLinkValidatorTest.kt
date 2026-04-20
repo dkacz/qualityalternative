@@ -55,6 +55,21 @@ class UserLinkValidatorTest {
     }
 
     @Test
+    fun validate_preservesEncodedPathQueryAndFragment() {
+        val result = UserLinkValidator.validate(
+            UserLinkDraft(
+                url = "https://Example.com/%2F?q=a%2Fb#x%2Fy",
+                title = "Encoded URL",
+                durationMinutes = 8,
+                topicTags = setOf(TopicTag.PSYCHOLOGY),
+            ),
+        )
+
+        assertTrue(result.isValid)
+        assertEquals("https://example.com/%2F?q=a%2Fb#x%2Fy", result.normalizedUrl)
+    }
+
+    @Test
     fun validate_reportsAllMissingRequiredFields() {
         val result = UserLinkValidator.validate(
             UserLinkDraft(

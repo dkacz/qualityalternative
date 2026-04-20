@@ -9,8 +9,10 @@ import com.qualityalternative.app.data.PreferencesDelayGate
 import com.qualityalternative.app.data.SupportedCatalog
 import com.qualityalternative.app.domain.model.AppSettings
 import com.qualityalternative.app.domain.model.AnalyticsEventType
+import com.qualityalternative.app.domain.model.ContentAvailability
 import com.qualityalternative.app.domain.model.ContentFormat
 import com.qualityalternative.app.domain.model.ContentItem
+import com.qualityalternative.app.domain.model.ContentSourceType
 import com.qualityalternative.app.domain.model.DistractingApp
 import com.qualityalternative.app.domain.model.DurationBucket
 import com.qualityalternative.app.domain.model.EditorialPack
@@ -18,16 +20,19 @@ import com.qualityalternative.app.domain.model.OnboardingSelection
 import com.qualityalternative.app.domain.model.PermissionReadiness
 import com.qualityalternative.app.domain.model.PermissionStatus
 import com.qualityalternative.app.domain.model.RecommendationSet
+import com.qualityalternative.app.domain.model.RecommendationSignals
 import com.qualityalternative.app.domain.model.RecommendationSource
 import com.qualityalternative.app.domain.model.ReplacementHistoryEntry
 import com.qualityalternative.app.domain.model.ReturnToTargetSignal
 import com.qualityalternative.app.domain.model.SessionFeedback
 import com.qualityalternative.app.domain.model.TopicTag
+import com.qualityalternative.app.domain.model.UserPreferences
 import com.qualityalternative.app.domain.service.ContentRepository
 import com.qualityalternative.app.domain.service.DefaultRecommendationEngine
 import com.qualityalternative.app.domain.service.DelayGate
 import com.qualityalternative.app.domain.service.HistoryRepository
 import com.qualityalternative.app.domain.service.InterceptionMonitor
+import com.qualityalternative.app.domain.service.RecommendationEngine
 import com.qualityalternative.app.domain.service.SettingsRepository
 import com.qualityalternative.app.interception.FixtureTargetRegistry
 import com.qualityalternative.app.interception.InterceptionRuntimeGate
@@ -79,6 +84,62 @@ class MainViewModelTest {
         assertEquals(MainScreen.Home, viewModel.uiState.screen)
         assertEquals(3, viewModel.uiState.availableTargetApps.size)
         assertEquals(setOf("philosophy"), viewModel.uiState.preferences?.selectedPackIds)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun hydrationWaitsForContentRepositoryReadiness() = runTest {
+        val contentRepository = FakeContentRepository(isReady = false)
+        val viewModel = createViewModel(contentRepository = contentRepository)
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.isLoadingSettings)
+
+        contentRepository.setReady(true)
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.isLoadingSettings)
+        assertEquals(MainScreen.Home, viewModel.uiState.screen)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun interventionInventoryIncludesUserLinksOutsideSelectedEditorialPacks() = runTest {
+        val contentRepository = FakeContentRepository(
+            extraItems = listOf(
+                ContentItem(
+                    id = "user-link",
+                    packId = "user-links",
+                    title = "Saved link",
+                    description = "External link",
+                    durationMinutes = 6,
+                    format = ContentFormat.HTML,
+                    topicTags = setOf(TopicTag.PSYCHOLOGY),
+                    externalUrl = "https://example.com/essay",
+                    sourceType = ContentSourceType.USER_LINK,
+                    availability = ContentAvailability.NEEDS_FALLBACK,
+                ),
+            ),
+        )
+        val recommendationEngine = RecordingRecommendationEngine()
+        val viewModel = createViewModel(
+            contentRepository = contentRepository,
+            recommendationEngine = recommendationEngine,
+        )
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+        viewModel.triggerDebugIntervention(nowMillis = 1_000L)
+        advanceUntilIdle()
+
+        assertEquals(
+            setOf("p1", "user-link"),
+            recommendationEngine.lastInventory.mapTo(mutableSetOf(), ContentItem::id),
+        )
     }
 
     @Test
@@ -454,13 +515,15 @@ class MainViewModelTest {
         historyRepository: FakeHistoryRepository = FakeHistoryRepository(),
         analyticsTracker: InMemoryAnalyticsTracker = InMemoryAnalyticsTracker(),
         delayGate: DelayGate = InMemoryDelayGate(),
+        contentRepository: ContentRepository = FakeContentRepository(),
+        recommendationEngine: RecommendationEngine = DefaultRecommendationEngine(),
         nowProvider: () -> Long = { 1_000L },
     ): MainViewModel {
         return track(
             MainViewModel(
-                contentRepository = FakeContentRepository(),
+                contentRepository = contentRepository,
                 settingsRepository = settingsRepository,
-                recommendationEngine = DefaultRecommendationEngine(),
+                recommendationEngine = recommendationEngine,
                 delayGate = delayGate,
                 analyticsTracker = analyticsTracker,
                 historyRepository = historyRepository,
@@ -648,7 +711,11 @@ class MainViewModelTest {
         }
     }
 
-    private class FakeContentRepository : ContentRepository {
+    private class FakeContentRepository(
+        extraItems: List<ContentItem> = emptyList(),
+        isReady: Boolean = true,
+    ) : ContentRepository {
+        private val ready = MutableStateFlow(isReady)
         private val packs = listOf(
             EditorialPack(
                 id = "philosophy",
@@ -677,12 +744,21 @@ class MainViewModelTest {
                 ),
             ),
         )
+        private val inventory = packs.flatMap(EditorialPack::items) + extraItems
 
         override fun starterPacks(): List<EditorialPack> = packs
 
-        override fun inventory(): List<ContentItem> = packs.flatMap(EditorialPack::items)
+        override fun inventory(): List<ContentItem> = inventory
 
         override fun contentBody(item: ContentItem): String = item.title
+
+        override fun isReady(): Boolean = ready.value
+
+        override fun observeReady(): Flow<Boolean> = ready
+
+        fun setReady(value: Boolean) {
+            ready.value = value
+        }
 
         private fun contentItem(
             id: String,
@@ -711,6 +787,23 @@ class MainViewModelTest {
                 interceptionReady = false,
                 summary = "Manual mode only",
             )
+        }
+    }
+
+    private class RecordingRecommendationEngine : RecommendationEngine {
+        var lastInventory: List<ContentItem> = emptyList()
+            private set
+
+        override fun generate(
+            targetApp: DistractingApp,
+            preferences: UserPreferences,
+            inventory: List<ContentItem>,
+            primaryExcludedIds: Set<String>,
+            signals: RecommendationSignals,
+            nowMillis: Long,
+        ): RecommendationSet? {
+            lastInventory = inventory
+            return null
         }
     }
 

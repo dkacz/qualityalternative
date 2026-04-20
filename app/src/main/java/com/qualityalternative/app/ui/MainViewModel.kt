@@ -13,6 +13,7 @@ import com.qualityalternative.app.domain.model.AnalyticsSemanticKeys
 import com.qualityalternative.app.domain.model.AnalyticsEventType
 import com.qualityalternative.app.domain.model.AppSettings
 import com.qualityalternative.app.domain.model.ContentItem
+import com.qualityalternative.app.domain.model.ContentSourceType
 import com.qualityalternative.app.domain.model.DelayWindow
 import com.qualityalternative.app.domain.model.DistractingApp
 import com.qualityalternative.app.domain.model.DurationBucket
@@ -103,6 +104,7 @@ class MainViewModel(
     private val starterPacks = contentRepository.starterPacks()
     private val starterPackIds = starterPacks.mapTo(mutableSetOf(), EditorialPack::id)
     private var settingsLoaded = false
+    private var contentReady = contentRepository.isReady()
     private var analyticsReady = analyticsTracker.isReady()
     private var historyReady = historyRepository.isReady()
     private var delayReady = delayGate.isReady()
@@ -128,6 +130,12 @@ class MainViewModel(
             settingsRepository.observeAppSettings().collect { settings ->
                 settingsLoaded = true
                 applySettings(settings)
+                updateHydrationState()
+            }
+        }
+        viewModelScope.launch {
+            contentRepository.observeReady().collect { ready ->
+                contentReady = ready
                 updateHydrationState()
             }
         }
@@ -326,7 +334,9 @@ class MainViewModel(
             recordReturnSignalIfNeeded(targetApp = targetApp, nowMillis = processingNowMillis)
 
             val interventionId = UUID.randomUUID().toString()
-            val filteredInventory = contentRepository.inventory().filter { it.packId in preferences.selectedPackIds }
+            val filteredInventory = contentRepository.inventory().filter { item ->
+                item.sourceType == ContentSourceType.USER_LINK || item.packId in preferences.selectedPackIds
+            }
             val signals = buildRecommendationSignals(nowMillis = processingNowMillis)
             val recommendationSet = recommendationEngine.generate(
                 targetApp = targetApp,
@@ -953,7 +963,7 @@ class MainViewModel(
     }
 
     private fun updateHydrationState() {
-        val isReady = settingsLoaded && analyticsReady && historyReady && delayReady
+        val isReady = settingsLoaded && contentReady && analyticsReady && historyReady && delayReady
         if (uiState.isLoadingSettings != !isReady) {
             uiState = uiState.copy(isLoadingSettings = !isReady)
         }

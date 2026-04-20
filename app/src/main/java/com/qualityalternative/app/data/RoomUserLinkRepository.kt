@@ -10,7 +10,7 @@ import com.qualityalternative.app.domain.model.TopicTag
 import com.qualityalternative.app.domain.model.UserLinkDraft
 import com.qualityalternative.app.domain.service.AddUserLinkResult
 import com.qualityalternative.app.domain.service.UserLinkRepository
-import java.util.UUID
+import java.security.MessageDigest
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,7 +21,7 @@ import kotlinx.coroutines.launch
 class RoomUserLinkRepository(
     private val dao: UserLinkDao,
     private val scope: CoroutineScope,
-    private val idProvider: () -> String = { "user-link:${UUID.randomUUID()}" },
+    private val idProvider: (String) -> String = ::stableUserLinkId,
 ) : UserLinkRepository {
     private val links = MutableStateFlow<List<ContentItem>>(emptyList())
     private val ready = MutableStateFlow(false)
@@ -51,8 +51,10 @@ class RoomUserLinkRepository(
             return AddUserLinkResult.Rejected(validation.errors)
         }
 
+        val existing = dao.findByNormalizedUrl(normalizedUrl)
+        val createdAtMillis = existing?.createdAtMillis ?: nowMillis
         val item = ContentItem(
-            id = idProvider(),
+            id = existing?.id ?: idProvider(normalizedUrl),
             packId = USER_LINK_PACK_ID,
             title = draft.title.trim(),
             description = draft.description.trim().ifBlank { normalizedUrl },
@@ -65,7 +67,7 @@ class RoomUserLinkRepository(
             availability = ContentAvailability.NEEDS_FALLBACK,
         )
 
-        dao.insertOrReplace(item.toEntity(createdAtMillis = nowMillis, updatedAtMillis = nowMillis))
+        dao.insertOrReplace(item.toEntity(createdAtMillis = createdAtMillis, updatedAtMillis = nowMillis))
         links.value = upsertLink(links.value, item)
         return AddUserLinkResult.Added(item)
     }
@@ -146,6 +148,13 @@ private fun upsertLink(
     updatedLink: ContentItem,
 ): List<ContentItem> {
     return currentLinks
-        .filterNot { it.id == updatedLink.id }
+        .filterNot { it.id == updatedLink.id || it.externalUrl == updatedLink.externalUrl }
         .plus(updatedLink)
+}
+
+private fun stableUserLinkId(normalizedUrl: String): String {
+    val digest = MessageDigest.getInstance("SHA-256")
+        .digest(normalizedUrl.toByteArray(Charsets.UTF_8))
+        .joinToString("") { byte -> "%02x".format(byte) }
+    return "user-link:$digest"
 }

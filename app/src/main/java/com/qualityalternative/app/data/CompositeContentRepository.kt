@@ -6,6 +6,7 @@ import com.qualityalternative.app.domain.model.ContentSourceType
 import com.qualityalternative.app.domain.model.EditorialPack
 import com.qualityalternative.app.domain.service.ContentRepository
 import com.qualityalternative.app.domain.service.UserLinkRepository
+import kotlinx.coroutines.flow.Flow
 
 class CompositeContentRepository(
     private val editorialRepository: ContentRepository,
@@ -26,4 +27,8 @@ class CompositeContentRepository(
             ContentSourceType.USER_LINK -> item.description
         }
     }
+
+    override fun isReady(): Boolean = editorialRepository.isReady() && userLinkRepository.isReady()
+
+    override fun observeReady(): Flow<Boolean> = userLinkRepository.observeReady()
 }
