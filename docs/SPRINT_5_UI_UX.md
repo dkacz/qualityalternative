@@ -5,7 +5,7 @@ Status: `active`
 Current slice:
 
 - `5.3 Home, Library, Add Link`
-  Status: in implementation.
+  Status: implemented, validated locally, under Pro review.
 
 ## Goal
 
