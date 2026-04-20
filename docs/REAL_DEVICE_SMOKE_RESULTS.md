@@ -10,4 +10,5 @@
 - `Open anyway` result: passed, no immediate re-interception loop reported
 - Delay result: passed, `Delay for 15 minutes` reported working
 - App 2 result: X interception passed
+- App 3 result: Facebook interception passed
 - Status: pass; internal alpha real-device validation completed

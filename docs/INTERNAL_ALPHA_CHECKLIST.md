@@ -33,6 +33,6 @@ This checklist tracks the Android-first internal alpha defined in Sprint 0-3.
 
 ## Notes
 
-- Real-device smoke passed on a Samsung `SM-S721B` for YouTube and X.
+- Real-device smoke passed on a Samsung `SM-S721B` for YouTube, X, and Facebook.
 - Confirmed on device: real-app interception, `Open anyway` without immediate loop, and `Delay for 15 minutes`.
 - Sprint 0-3 internal alpha is validated for the current Android-first scope.
