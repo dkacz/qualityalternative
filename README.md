@@ -2,6 +2,24 @@
 
 Android-first MVP for replacing low-intention social app opens with one high-quality long-form alternative at the moment of impulse.
 
+## Tester Quick Start
+
+This repo publishes the internal alpha APK through GitHub Releases.
+
+Polish step-by-step tester instructions are in [`TESTER_README.md`](TESTER_README.md).
+
+For testers, the shortest path is:
+
+1. Download the latest APK from [GitHub Releases](https://github.com/dkacz/qualityalternative/releases/latest).
+2. Install it on an Android phone.
+3. Open `Quality Alternative` and complete onboarding.
+4. Enable the app in Android Accessibility settings when prompted.
+5. Select distracting apps such as YouTube, X, Facebook, Instagram, Reddit, or TikTok.
+6. Open one selected app and verify that the intervention appears.
+7. Test `Read now`, `Open anyway`, and `Delay for 15 minutes`.
+
+Important: this is a debug/internal alpha build. It is Android-only, requires Accessibility permission for interception, and is not a Play Store production release.
+
 ## Repository Status
 
 This repository now contains:
@@ -42,15 +60,15 @@ This repository now contains:
   - one primary recommendation plus two backups
   - reader flow
   - optional feedback flow
-- local analytics ledger
-- recent replacement history for the last 7 days
-- live accessibility-driven interception readiness guidance
-- persisted onboarding and target-app preferences after restart
-- persisted delay windows across sessions
-- live system-interception routing from the accessibility service into the in-app intervention surface
-- internal fixture distractor apps for cross-app automation tests
-- cross-app instrumentation coverage for fixture-to-intervention transitions
-- internal alpha readiness docs in `docs/INTERNAL_ALPHA_CHECKLIST.md` and `docs/REAL_DEVICE_SMOKE.md`
+  - local analytics ledger
+  - recent replacement history for the last 7 days
+  - live accessibility-driven interception readiness guidance
+  - persisted onboarding and target-app preferences after restart
+  - persisted delay windows across sessions
+  - live system-interception routing from the accessibility service into the in-app intervention surface
+  - internal fixture distractor apps for cross-app automation tests
+  - cross-app instrumentation coverage for fixture-to-intervention transitions
+  - internal alpha readiness docs in `docs/INTERNAL_ALPHA_CHECKLIST.md` and `docs/REAL_DEVICE_SMOKE.md`
 
 ## Working Approach
 
@@ -72,6 +90,7 @@ Use `JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home` a
 
 ## Alpha Status
 
-- Sprint 0-3 implementation is code-complete on Android.
+- Sprint 0-3 implementation is complete on Android.
 - Emulator validation is green for unit, lint, and instrumentation suites.
-- Final internal-alpha validation still requires one real-device smoke pass; see `docs/REAL_DEVICE_SMOKE.md`.
+- Internal alpha has been validated on a real Samsung `SM-S721B`.
+- Manual smoke passed for YouTube, X, and Facebook, including real interception, `Open anyway`, and `Delay for 15 minutes`.
