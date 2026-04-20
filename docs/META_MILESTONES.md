@@ -25,7 +25,7 @@ Current active track:
 
 ## UI Timing
 
-The next product UI work is **Sprint 4 Slice 4.2: Add Link UI**.
+The current product UI work is **Sprint 4 Slice 4.2: Add Link UI**.
 
 We do not build that UI until **Slice 4.1 Domain and Persistence Foundation** passes Pro review. The reason is intentional: the Add Link screen should sit on stable URL validation, stable content identity, safe Room persistence, and source-aware inventory behavior. Otherwise we risk building a nice-looking UI on a shaky model.
 
@@ -46,6 +46,13 @@ UI still to build in Sprint 4:
 - saved-link visibility without creating a feed
 - clear distinction between editorial content and external links
 - external-link fallback/handoff state when a recommended link is accepted
+
+The broader visual redesign should happen as a separate UI/UX pass after Sprint 4 functionality is stable. The reviewed mockups are captured in `docs/UI_UX_MOCKUP_INTAKE.md`. That pass should implement the mockup's calm analog direction with exactly two first-pass themes:
+
+- `Light`
+- `Ink` dark mode
+
+Other mockup directions and dark variants should remain out of scope until the core UI pass is validated.
 
 ## Milestone 1: Internal Alpha Baseline
 
