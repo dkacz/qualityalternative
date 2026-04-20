@@ -189,6 +189,10 @@ Candidate bets:
 
 - stronger ranking
 - better content ingestion
+- free vs premium packaging
+- broader curated premium library
+- higher or unlimited personal-content capacity
+- streaks and motivation layer
 - premium hard-block mode
 - custom delay durations
 - iOS implementation
@@ -197,6 +201,33 @@ Candidate bets:
 Default rule:
 
 - Do not expand into these until pilot data shows which constraint actually matters.
+
+## Packaging and Motivation Hypotheses
+
+These are strategic hypotheses, not active Sprint 4 requirements.
+
+Free tier hypothesis:
+
+- core app-open interception
+- basic editorial starter content
+- limited user-owned content capacity
+- enough value to prove the behavior loop without turning the product into an unlimited content manager
+
+Premium tier hypothesis:
+
+- broader curated library of high-quality replacement content
+- materially higher or unlimited capacity for user-owned links, PDFs, EPUBs, and later formats
+- advanced modes such as hard blocking only after soft intervention value is proven
+
+Streak hypothesis:
+
+- reward "days converted" rather than generic abstinence
+- count a day when the user intercepts an impulse and spends meaningful time with a replacement
+- avoid shame-heavy gamification that makes the product feel punitive
+
+Decision gate:
+
+- Do not implement monetization, unlimited storage, EPUB support, or streak mechanics until pilot data shows that users repeatedly accept replacements and ask for more content depth or motivation.
 
 ## Operating Rule
 
