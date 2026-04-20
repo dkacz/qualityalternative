@@ -453,7 +453,7 @@ private fun SetupSnapshotCard(
         ) {
             StatCell(
                 modifier = Modifier.weight(1f),
-                label = "Intercepting",
+                label = "Selected apps",
                 value = "${state.availableTargetApps.size} apps",
             )
             StatCell(
