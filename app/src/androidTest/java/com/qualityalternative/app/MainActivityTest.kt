@@ -5,6 +5,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -20,6 +21,7 @@ import com.qualityalternative.app.interception.FixtureTargetRegistry
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -119,8 +121,10 @@ class MainActivityTest {
             .performClick()
 
         composeRule.waitUntil(timeoutMillis = 10_000) {
-            hasNode("Quality Alternative") && hasNodeContaining("Fixture Feed One delayed until")
+            hasNode("Quality Alternative")
         }
+        composeRule.onNodeWithTag("home-list")
+            .performScrollToNode(hasText("Fixture Feed One delayed until", substring = true))
     }
 
     @Test
@@ -155,18 +159,26 @@ class MainActivityTest {
     fun homeShowsReadinessAndCompactLibrarySummary() {
         launchOnboardedApp()
 
-        composeRule.onNodeWithText("You're set up for quieter reading today.")
+        composeRule.onNodeWithText("Quality Alternative")
             .assertIsDisplayed()
+        composeRule.onNodeWithTag("home-list")
+            .performScrollToNode(hasText("Setup"))
         composeRule.onNodeWithText("Setup")
             .assertIsDisplayed()
+        composeRule.onNodeWithTag("home-list")
+            .performScrollToNode(hasText("Your library"))
         composeRule.onNodeWithText("Your library")
             .assertIsDisplayed()
         composeRule.onNodeWithText("Editorial picks")
             .assertIsDisplayed()
         composeRule.onNodeWithText("Your added links")
             .assertIsDisplayed()
-        composeRule.onNodeWithTag("home-add-link")
-            .assertIsDisplayed()
+        assertFalse(hasNode("Local analytics ledger"))
+        assertFalse(hasNode("Local preferences"))
+        assertFalse(hasNode("Recent replacement history"))
+        composeRule.onNodeWithTag("home-list")
+            .performScrollToNode(hasTestTag("home-add-link"))
+        composeRule.onNodeWithTag("home-add-link").assertIsDisplayed()
         composeRule.onNodeWithTag("home-list")
             .performScrollToNode(hasText("Preview intervention"))
         composeRule.onAllNodesWithText("Preview intervention")
@@ -178,8 +190,7 @@ class MainActivityTest {
     fun addLinkKeepsSaveDisabledForInvalidUrl() {
         launchOnboardedApp()
 
-        composeRule.onNodeWithTag("home-add-link")
-            .performClick()
+        openAddLinkFromHome()
 
         composeRule.waitUntil(timeoutMillis = 10_000) {
             hasNode("Add a replacement link")
@@ -204,8 +215,7 @@ class MainActivityTest {
     fun addLinkKeepsSaveDisabledForMissingTopic() {
         launchOnboardedApp()
 
-        composeRule.onNodeWithTag("home-add-link")
-            .performClick()
+        openAddLinkFromHome()
 
         composeRule.waitUntil(timeoutMillis = 10_000) {
             hasNode("Add a replacement link")
@@ -225,8 +235,7 @@ class MainActivityTest {
     fun addLinkKeepsSaveDisabledForBlankUrl() {
         launchOnboardedApp()
 
-        composeRule.onNodeWithTag("home-add-link")
-            .performClick()
+        openAddLinkFromHome()
 
         composeRule.waitUntil(timeoutMillis = 10_000) {
             hasNode("Add a replacement link")
@@ -248,8 +257,7 @@ class MainActivityTest {
     fun addLinkSavesValidLinkAndReturnsHome() {
         launchOnboardedApp()
 
-        composeRule.onNodeWithTag("home-add-link")
-            .performClick()
+        openAddLinkFromHome()
 
         composeRule.waitUntil(timeoutMillis = 10_000) {
             hasNode("Add a replacement link")
@@ -267,7 +275,7 @@ class MainActivityTest {
             .performClick()
 
         composeRule.waitUntil(timeoutMillis = 10_000) {
-            hasNode("Quality Alternative") && hasNode("Personal library: 1 link saved.")
+            hasNode("Quality Alternative")
         }
 
         composeRule.onNodeWithTag("home-list")
@@ -309,6 +317,13 @@ class MainActivityTest {
             composeRule.onNodeWithText(text, substring = true).fetchSemanticsNode()
             true
         }.getOrDefault(false)
+    }
+
+    private fun openAddLinkFromHome() {
+        composeRule.onNodeWithTag("home-list")
+            .performScrollToNode(hasTestTag("home-add-link"))
+        composeRule.onNodeWithTag("home-add-link")
+            .performClick()
     }
 
     private fun launchApp(intent: Intent? = null) {

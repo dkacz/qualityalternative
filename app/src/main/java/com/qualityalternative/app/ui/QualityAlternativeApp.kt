@@ -339,6 +339,7 @@ private fun HomeScreen(
     val selectedPacks = state.starterPacks.filter { pack ->
         pack.id in state.preferences?.selectedPackIds.orEmpty()
     }
+    val hero = homeHeroCopy(state.permissionReadiness)
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -354,21 +355,33 @@ private fun HomeScreen(
                     color = colors.faintText,
                 )
                 Text(
-                    text = "You're set up for quieter reading today.",
+                    text = hero.title,
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
                 )
                 Text(
-                    text = "When an impulse opens a selected app, the Android alpha can pause it and offer one finite alternative.",
+                    text = hero.body,
                     style = MaterialTheme.typography.bodyLarge,
                     color = colors.mutedText,
                 )
-                Button(
-                    modifier = Modifier.testTag("home-add-link"),
-                    onClick = onOpenAddLink,
-                ) {
-                    Text("Add link")
+                if (hero.showAddLinkAction) {
+                    Button(onClick = onOpenAddLink) {
+                        Text("Add link")
+                    }
+                } else {
+                    OutlinedButton(onClick = onRefreshReadiness) {
+                        Text("Refresh setup status")
+                    }
                 }
+            }
+        }
+
+        if (!state.permissionReadiness.interceptionReady) {
+            item {
+                PermissionReadinessCard(
+                    readiness = state.permissionReadiness,
+                    onRefresh = onRefreshReadiness,
+                )
             }
         }
 
@@ -396,34 +409,33 @@ private fun HomeScreen(
         }
 
         item {
-            PermissionReadinessCard(
-                readiness = state.permissionReadiness,
-                onRefresh = onRefreshReadiness,
-            )
-        }
-
-        item {
             ThemeSettingsCard(
                 themeMode = state.themeMode,
                 onSelectTheme = onSelectTheme,
             )
         }
+    }
+}
 
-        item {
-            ReplacementHistoryCard(entries = state.historyEntries)
-        }
+internal data class HomeHeroCopy(
+    val title: String,
+    val body: String,
+    val showAddLinkAction: Boolean,
+)
 
-        item {
-            PreferenceSummary(state = state)
-        }
-
-        item {
-            StarterPackSummary(starterPacks = selectedPacks)
-        }
-
-        item {
-            AnalyticsLog(events = state.events)
-        }
+internal fun homeHeroCopy(readiness: PermissionReadiness): HomeHeroCopy {
+    return if (readiness.interceptionReady) {
+        HomeHeroCopy(
+            title = "You're set up for quieter reading today.",
+            body = "When an impulse opens a selected app, the Android alpha can pause it and offer one finite alternative.",
+            showAddLinkAction = true,
+        )
+    } else {
+        HomeHeroCopy(
+            title = "Interception needs one more step.",
+            body = "Finish the Android setup first, so the app can meet the impulse before a social feed opens.",
+            showAddLinkAction = false,
+        )
     }
 }
 
@@ -632,6 +644,7 @@ private fun PersonalLibraryCard(
             )
         }
         Button(
+            modifier = Modifier.testTag("home-add-link"),
             onClick = onOpenAddLink,
         ) {
             Text("Add link")
