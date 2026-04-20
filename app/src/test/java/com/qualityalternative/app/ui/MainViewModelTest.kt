@@ -288,6 +288,25 @@ class MainViewModelTest {
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
+    fun addLinkWithBlankUrl_staysDisabledAndShowsUrlError() = runTest {
+        val viewModel = createViewModel()
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+
+        viewModel.openAddLink()
+        viewModel.updateAddLinkTitle("Saved essay")
+        viewModel.updateAddLinkDuration("7")
+        viewModel.toggleAddLinkTopic(TopicTag.SCIENCE)
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.addLinkForm.canSave)
+        assertTrue(UserLinkValidationError.EMPTY_URL in viewModel.uiState.addLinkForm.validationErrors)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
     fun finishReading_marksHistoryCompletedAndExcludesContent() = runTest {
         val viewModel = createViewModel()
 

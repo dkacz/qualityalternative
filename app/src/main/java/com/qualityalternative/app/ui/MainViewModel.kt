@@ -1231,7 +1231,9 @@ private fun AddLinkFormState.visibleValidationErrors(): Set<UserLinkValidationEr
     val duration = durationMinutes.trim()
     val validUrl = UserLinkValidator.validateUrl(trimmedUrl).isValid
     val validDuration = duration.toIntOrNull()?.let { it in 1..60 } == true
-    if (trimmedUrl.isNotBlank()) {
+    if (trimmedUrl.isBlank() && (title.isNotBlank() || selectedTopics.isNotEmpty())) {
+        errors += UserLinkValidationError.EMPTY_URL
+    } else if (trimmedUrl.isNotBlank()) {
         errors += UserLinkValidator.validateUrl(trimmedUrl).errors
     }
     if (duration.isNotBlank() && !validDuration) {

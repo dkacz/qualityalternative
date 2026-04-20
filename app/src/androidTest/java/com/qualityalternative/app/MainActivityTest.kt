@@ -153,6 +153,29 @@ class MainActivityTest {
     }
 
     @Test
+    fun addLinkKeepsSaveDisabledForBlankUrl() {
+        launchOnboardedApp()
+
+        composeRule.onNodeWithTag("home-add-link")
+            .performClick()
+
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasNode("Add a replacement link")
+        }
+        composeRule.onNodeWithTag("add-link-title").performTextInput("Saved essay")
+        composeRule.onNodeWithTag("add-link-topic-SCIENCE")
+            .performScrollTo()
+            .performClick()
+        composeRule.onNodeWithText("Add the link you want to save.")
+            .performScrollTo()
+            .assertIsDisplayed()
+
+        composeRule.onNodeWithTag("add-link-save")
+            .performScrollTo()
+            .assertIsNotEnabled()
+    }
+
+    @Test
     fun addLinkSavesValidLinkAndReturnsHome() {
         launchOnboardedApp()
 
