@@ -84,6 +84,12 @@ class MainActivityTest {
         composeRule.onNodeWithText("Two backup choices")
             .assertIsDisplayed()
         assertEquals(2, composeRule.onAllNodesWithText("Choose backup").fetchSemanticsNodes().size)
+        composeRule.onNodeWithTag("intervention-backup-action-0")
+            .assertIsDisplayed()
+            .assertIsEnabled()
+        composeRule.onNodeWithTag("intervention-backup-action-1")
+            .assertIsDisplayed()
+            .assertIsEnabled()
         composeRule.onNodeWithText("Your call, deliberately made")
             .assertIsDisplayed()
         composeRule.waitUntil(timeoutMillis = 10_000) {
@@ -126,6 +132,20 @@ class MainActivityTest {
 
         composeRule.waitUntil(timeoutMillis = 10_000) {
             scenario?.state == androidx.lifecycle.Lifecycle.State.DESTROYED
+        }
+    }
+
+    @Test
+    fun systemInterventionBackupActionIsClickableWithoutScrolling() {
+        launchFixtureSystemIntervention()
+
+        composeRule.onNodeWithTag("intervention-backup-action-0")
+            .assertIsDisplayed()
+            .assertIsEnabled()
+            .performClick()
+
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasNode("Finish session") || hasNode("Open external link")
         }
     }
 

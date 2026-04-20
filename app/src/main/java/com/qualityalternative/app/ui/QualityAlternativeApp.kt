@@ -994,10 +994,11 @@ private fun BackupRecommendationPanel(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        backups.forEach { backup ->
+        backups.forEachIndexed { index, backup ->
             BackupRecommendationRow(
                 content = backup,
                 actionLabel = if (backup.isUserLink()) "Open link" else "Choose backup",
+                testTag = "intervention-backup-action-$index",
                 onClick = { onAcceptBackup(backup) },
             )
         }
@@ -1015,6 +1016,7 @@ private fun BackupRecommendationPanel(
 private fun BackupRecommendationRow(
     content: ContentItem,
     actionLabel: String,
+    testTag: String,
     onClick: () -> Unit,
 ) {
     val colors = QualityAlternativeThemeTokens.colors
@@ -1041,7 +1043,10 @@ private fun BackupRecommendationRow(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        OutlinedButton(onClick = onClick) {
+        OutlinedButton(
+            modifier = Modifier.testTag(testTag),
+            onClick = onClick,
+        ) {
             Text(actionLabel)
         }
     }

@@ -15,13 +15,15 @@ import com.qualityalternative.app.domain.service.UserLinkRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.runBlocking
 
 private val Context.appSettingsDataStore by preferencesDataStore(name = "app_settings")
 private val Context.delayGateDataStore by preferencesDataStore(name = "delay_gate")
 
 class AppContainer(context: Context) {
-    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val appJob = SupervisorJob()
+    private val appScope = CoroutineScope(appJob + Dispatchers.IO)
     private val database = QualityAlternativeDatabase.build(context)
 
     val analyticsTracker: AnalyticsTracker = RoomAnalyticsTracker(
@@ -57,7 +59,9 @@ class AppContainer(context: Context) {
     }
 
     fun closeForTests() {
-        appScope.cancel()
+        runBlocking {
+            appJob.cancelAndJoin()
+        }
         database.close()
     }
 }
