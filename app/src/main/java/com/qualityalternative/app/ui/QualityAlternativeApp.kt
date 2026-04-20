@@ -4,7 +4,6 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -43,6 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.qualityalternative.app.domain.model.AnalyticsEvent
 import com.qualityalternative.app.domain.model.AppThemeMode
@@ -882,9 +882,8 @@ private fun InterventionScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(20.dp)
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         InterventionHeaderCard(targetApp = targetApp)
 
@@ -894,40 +893,11 @@ private fun InterventionScreen(
             onClick = onAcceptPrimary,
         )
 
-        Card(
-            colors = CardDefaults.cardColors(containerColor = colors.elevatedSurface),
-            shape = RoundedCornerShape(24.dp),
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Text(
-                    text = backupHeading,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    text = "Still finite: no browsing, no feed, just two lighter ways out of the scroll.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = colors.mutedText,
-                )
-                backups.forEach { backup ->
-                    BackupRecommendationCard(
-                        content = backup,
-                        actionLabel = if (backup.isUserLink()) "Open link" else "Choose backup",
-                        onClick = { onAcceptBackup(backup) },
-                    )
-                }
-                if (backups.isEmpty()) {
-                    Text(
-                        text = "No extra choices are available right now, so this moment stays focused on the primary recommendation.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = colors.mutedText,
-                    )
-                }
-            }
-        }
+        BackupRecommendationPanel(
+            heading = backupHeading,
+            backups = backups,
+            onAcceptBackup = onAcceptBackup,
+        )
 
         InterventionDecisionCard(
             onDelay = onDelay,
@@ -939,26 +909,19 @@ private fun InterventionScreen(
 @Composable
 private fun InterventionHeaderCard(targetApp: DistractingApp) {
     val colors = QualityAlternativeThemeTokens.colors
-    Card(
-        colors = CardDefaults.cardColors(containerColor = colors.elevatedSurface),
-        shape = RoundedCornerShape(28.dp),
-        border = BorderStroke(width = 1.dp, color = colors.line),
-    ) {
-        Column(
-            modifier = Modifier.padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Text(
-                text = "Pause before ${targetApp.displayName}",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                text = "Take one breath. If this still matters, you can open it. If not, choose one finite replacement.",
-                style = MaterialTheme.typography.bodyLarge,
-                color = colors.mutedText,
-            )
-        }
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(
+            text = "Pause before ${targetApp.displayName}",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+        )
+        Text(
+            text = "One finite replacement. Override stays available.",
+            style = MaterialTheme.typography.bodySmall,
+            color = colors.mutedText,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -972,11 +935,11 @@ private fun PrimaryRecommendationCard(
 
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-        shape = RoundedCornerShape(30.dp),
+        shape = RoundedCornerShape(24.dp),
     ) {
         Column(
-            modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(5.dp),
         ) {
             Text(
                 text = "One thoughtful alternative",
@@ -987,10 +950,15 @@ private fun PrimaryRecommendationCard(
                 text = content.title,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
             Text(
                 text = content.description,
                 color = colors.mutedText,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
             Text(
                 text = content.metaLine(),
@@ -1005,39 +973,76 @@ private fun PrimaryRecommendationCard(
 }
 
 @Composable
-private fun BackupRecommendationCard(
+private fun BackupRecommendationPanel(
+    heading: String,
+    backups: List<ContentItem>,
+    onAcceptBackup: (ContentItem) -> Unit,
+) {
+    val colors = QualityAlternativeThemeTokens.colors
+    Column(
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            text = heading,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Text(
+            text = "No feed: just two lighter ways out.",
+            style = MaterialTheme.typography.bodySmall,
+            color = colors.mutedText,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        backups.forEach { backup ->
+            BackupRecommendationRow(
+                content = backup,
+                actionLabel = if (backup.isUserLink()) "Open link" else "Choose backup",
+                onClick = { onAcceptBackup(backup) },
+            )
+        }
+        if (backups.isEmpty()) {
+            Text(
+                text = "No extra choices are available right now.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.mutedText,
+            )
+        }
+    }
+}
+
+@Composable
+private fun BackupRecommendationRow(
     content: ContentItem,
     actionLabel: String,
     onClick: () -> Unit,
 ) {
     val colors = QualityAlternativeThemeTokens.colors
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.background),
-        shape = RoundedCornerShape(20.dp),
-        border = BorderStroke(width = 1.dp, color = colors.line),
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(1.dp),
         ) {
-            Text(
-                text = content.metaLine(),
-                style = MaterialTheme.typography.labelMedium,
-                color = colors.faintText,
-            )
             Text(
                 text = content.title,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = content.description,
-                style = MaterialTheme.typography.bodyMedium,
-                color = colors.mutedText,
+                text = content.metaLine(),
+                style = MaterialTheme.typography.labelMedium,
+                color = colors.faintText,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
-            OutlinedButton(onClick = onClick) {
-                Text(actionLabel)
-            }
+        }
+        OutlinedButton(onClick = onClick) {
+            Text(actionLabel)
         }
     }
 }
@@ -1048,35 +1053,28 @@ private fun InterventionDecisionCard(
     onOpenAnyway: () -> Unit,
 ) {
     val colors = QualityAlternativeThemeTokens.colors
-    Card(
-        colors = CardDefaults.cardColors(containerColor = colors.elevatedSurface),
-        shape = RoundedCornerShape(24.dp),
-        border = BorderStroke(width = 1.dp, color = colors.line),
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            text = "Your call, deliberately made",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Text(
+            text = "Delay the impulse, or continue on purpose.",
+            style = MaterialTheme.typography.bodySmall,
+            color = colors.mutedText,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text(
-                text = "Your call, deliberately made",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                text = "Delay the impulse, or continue with the app on purpose. No lock-in, no shame loop.",
-                style = MaterialTheme.typography.bodySmall,
-                color = colors.mutedText,
-            )
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                OutlinedButton(onClick = onDelay) {
-                    Text("Delay for 15 minutes")
-                }
-                Button(onClick = onOpenAnyway) {
-                    Text("Open anyway")
-                }
+            OutlinedButton(onClick = onDelay) {
+                Text("Delay for 15 minutes")
+            }
+            Button(onClick = onOpenAnyway) {
+                Text("Open anyway")
             }
         }
     }

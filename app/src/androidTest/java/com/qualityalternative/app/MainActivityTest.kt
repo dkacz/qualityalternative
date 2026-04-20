@@ -76,54 +76,57 @@ class MainActivityTest {
 
     @Test
     fun systemInterceptionIntentShowsLiveInterventionForFixtureTarget() {
-        launchApp()
-        composeRule.waitUntil(timeoutMillis = 10_000) {
-            hasNode("Let’s set up your replacement loop") || hasNode("Quality Alternative")
-        }
-        if (hasNode("Let’s set up your replacement loop")) {
-            composeRule.onNodeWithText("Complete setup", useUnmergedTree = true)
-                .performScrollTo()
-                .performClick()
-        }
-        composeRule.waitUntil(timeoutMillis = 10_000) {
-            hasNode("Quality Alternative")
-        }
-
-        scenario?.close()
-        scenario = null
-        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
-        Thread.sleep(250)
-
-        val targetContext = InstrumentationRegistry.getInstrumentation().targetContext
-        launchApp(
-            MainActivity.createSystemInterceptionIntent(
-                context = targetContext,
-                targetAppPackage = FixtureTargetRegistry.fixtureDistractors.first().packageName,
-            ),
-        )
-
-        composeRule.waitUntil(timeoutMillis = 10_000) {
-            hasNode("Pause before Fixture Feed One")
-        }
+        launchFixtureSystemIntervention()
 
         composeRule.onNodeWithText("Pause before Fixture Feed One").assertIsDisplayed()
         composeRule.onNodeWithText("One thoughtful alternative")
-            .performScrollTo()
             .assertIsDisplayed()
         composeRule.onNodeWithText("Two backup choices")
-            .performScrollTo()
             .assertIsDisplayed()
         assertEquals(2, composeRule.onAllNodesWithText("Choose backup").fetchSemanticsNodes().size)
         composeRule.onNodeWithText("Your call, deliberately made")
-            .performScrollTo()
             .assertIsDisplayed()
         composeRule.waitUntil(timeoutMillis = 10_000) {
             hasNode("Read now") || hasNode("Open link")
         }
         val primaryActionLabel = if (hasNode("Read now")) "Read now" else "Open link"
         composeRule.onAllNodesWithText(primaryActionLabel)[0]
-            .performScrollTo()
             .assertIsDisplayed()
+            .assertIsEnabled()
+        composeRule.onNodeWithText("Delay for 15 minutes")
+            .assertIsDisplayed()
+            .assertIsEnabled()
+        composeRule.onNodeWithText("Open anyway")
+            .assertIsDisplayed()
+            .assertIsEnabled()
+    }
+
+    @Test
+    fun systemInterventionDelayActionIsClickableWithoutScrolling() {
+        launchFixtureSystemIntervention()
+
+        composeRule.onNodeWithText("Delay for 15 minutes")
+            .assertIsDisplayed()
+            .assertIsEnabled()
+            .performClick()
+
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasNode("Quality Alternative") && hasNodeContaining("Fixture Feed One delayed until")
+        }
+    }
+
+    @Test
+    fun systemInterventionOpenAnywayActionIsClickableWithoutScrolling() {
+        launchFixtureSystemIntervention()
+
+        composeRule.onNodeWithText("Open anyway")
+            .assertIsDisplayed()
+            .assertIsEnabled()
+            .performClick()
+
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            scenario?.state == androidx.lifecycle.Lifecycle.State.DESTROYED
+        }
     }
 
     @Test
@@ -248,6 +251,13 @@ class MainActivityTest {
         }.getOrDefault(false)
     }
 
+    private fun hasNodeContaining(text: String): Boolean {
+        return runCatching {
+            composeRule.onNodeWithText(text, substring = true).fetchSemanticsNode()
+            true
+        }.getOrDefault(false)
+    }
+
     private fun launchApp(intent: Intent? = null) {
         val launchIntent = intent ?: Intent(
             InstrumentationRegistry.getInstrumentation().targetContext,
@@ -271,6 +281,27 @@ class MainActivityTest {
         }
         composeRule.waitUntil(timeoutMillis = 10_000) {
             hasNode("Quality Alternative")
+        }
+    }
+
+    private fun launchFixtureSystemIntervention() {
+        launchOnboardedApp()
+
+        scenario?.close()
+        scenario = null
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+        Thread.sleep(250)
+
+        val targetContext = InstrumentationRegistry.getInstrumentation().targetContext
+        launchApp(
+            MainActivity.createSystemInterceptionIntent(
+                context = targetContext,
+                targetAppPackage = FixtureTargetRegistry.fixtureDistractors.first().packageName,
+            ),
+        )
+
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasNode("Pause before Fixture Feed One")
         }
     }
 
