@@ -199,12 +199,33 @@ class MainViewModelTest {
         advanceUntilIdle()
 
         assertFalse(viewModel.uiState.addLinkForm.canSave)
+        assertTrue(UserLinkValidationError.UNSUPPORTED_SCHEME in viewModel.uiState.addLinkForm.validationErrors)
 
         viewModel.saveUserLink(nowMillis = 2_000L)
         advanceUntilIdle()
 
         assertEquals(MainScreen.AddLink, viewModel.uiState.screen)
         assertTrue(UserLinkValidationError.UNSUPPORTED_SCHEME in viewModel.uiState.addLinkForm.validationErrors)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun malformedWebUrl_staysDisabledAndShowsMissingHostError() = runTest {
+        val viewModel = createViewModel()
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+
+        viewModel.openAddLink()
+        viewModel.updateAddLinkUrl("https://")
+        viewModel.updateAddLinkTitle("Missing host")
+        viewModel.updateAddLinkDuration("7")
+        viewModel.toggleAddLinkTopic(TopicTag.SCIENCE)
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.addLinkForm.canSave)
+        assertTrue(UserLinkValidationError.MISSING_HOST in viewModel.uiState.addLinkForm.validationErrors)
     }
 
     @Test

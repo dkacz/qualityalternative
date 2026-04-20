@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.qualityalternative.app.data.AppContainer
 import com.qualityalternative.app.data.SupportedCatalog
+import com.qualityalternative.app.data.UserLinkValidator
 import com.qualityalternative.app.domain.model.AnalyticsEvent
 import com.qualityalternative.app.domain.model.AnalyticsSemanticKeys
 import com.qualityalternative.app.domain.model.AnalyticsEventType
@@ -1102,7 +1103,7 @@ class MainViewModel(
     private fun updateAddLinkForm(form: AddLinkFormState) {
         uiState = uiState.copy(
             addLinkForm = form.copy(
-                validationErrors = emptySet(),
+                validationErrors = form.visibleValidationErrors(),
                 canSave = form.localValidationErrors().isEmpty(),
                 isSaving = false,
             ),
@@ -1211,13 +1212,7 @@ private fun AddLinkFormState.localValidationErrors(): Set<UserLinkValidationErro
     val errors = mutableSetOf<UserLinkValidationError>()
     val trimmedUrl = url.trim()
     val duration = durationMinutes.toIntOrNull()
-    if (trimmedUrl.isBlank()) {
-        errors += UserLinkValidationError.EMPTY_URL
-    } else if (!trimmedUrl.startsWith("https://", ignoreCase = true) &&
-        !trimmedUrl.startsWith("http://", ignoreCase = true)
-    ) {
-        errors += UserLinkValidationError.UNSUPPORTED_SCHEME
-    }
+    errors += UserLinkValidator.validateUrl(trimmedUrl).errors
     if (title.isBlank()) {
         errors += UserLinkValidationError.BLANK_TITLE
     }
@@ -1226,6 +1221,19 @@ private fun AddLinkFormState.localValidationErrors(): Set<UserLinkValidationErro
     }
     if (selectedTopics.isEmpty()) {
         errors += UserLinkValidationError.NO_TOPICS
+    }
+    return errors
+}
+
+private fun AddLinkFormState.visibleValidationErrors(): Set<UserLinkValidationError> {
+    val errors = mutableSetOf<UserLinkValidationError>()
+    val trimmedUrl = url.trim()
+    val duration = durationMinutes.trim()
+    if (trimmedUrl.isNotBlank()) {
+        errors += UserLinkValidator.validateUrl(trimmedUrl).errors
+    }
+    if (duration.isNotBlank() && duration.toIntOrNull()?.let { it in 1..60 } != true) {
+        errors += UserLinkValidationError.INVALID_DURATION
     }
     return errors
 }

@@ -11,11 +11,7 @@ object UserLinkValidator {
         val urlValidation = validateUrl(draft.url)
         val normalizedUrl = urlValidation.normalizedUrl
 
-        if (draft.url.isBlank()) {
-            errors += UserLinkValidationError.EMPTY_URL
-        } else {
-            urlValidation.error?.let { errors += it }
-        }
+        errors += urlValidation.errors
         if (draft.title.isBlank()) {
             errors += UserLinkValidationError.BLANK_TITLE
         }
@@ -32,22 +28,22 @@ object UserLinkValidator {
         )
     }
 
-    private fun validateUrl(rawUrl: String): UrlValidation {
+    fun validateUrl(rawUrl: String): UserLinkValidationResult {
         val trimmed = rawUrl.trim()
         if (trimmed.isBlank()) {
-            return UrlValidation()
+            return UserLinkValidationResult(errors = setOf(UserLinkValidationError.EMPTY_URL))
         }
 
         val parsed = runCatching { URI(trimmed) }.getOrNull()
-            ?: return UrlValidation(error = malformedUrlError(trimmed))
+            ?: return UserLinkValidationResult(errors = setOf(malformedUrlError(trimmed)))
         val scheme = parsed.scheme?.lowercase()
-            ?: return UrlValidation(error = UserLinkValidationError.UNSUPPORTED_SCHEME)
+            ?: return UserLinkValidationResult(errors = setOf(UserLinkValidationError.UNSUPPORTED_SCHEME))
         if (scheme !in SUPPORTED_SCHEMES) {
-            return UrlValidation(error = UserLinkValidationError.UNSUPPORTED_SCHEME)
+            return UserLinkValidationResult(errors = setOf(UserLinkValidationError.UNSUPPORTED_SCHEME))
         }
 
         val host = parsed.host?.lowercase()
-            ?: return UrlValidation(error = UserLinkValidationError.MISSING_HOST)
+            ?: return UserLinkValidationResult(errors = setOf(UserLinkValidationError.MISSING_HOST))
         val normalizedUrl = buildNormalizedUrl(
             scheme = scheme,
             rawUserInfo = parsed.rawUserInfo,
@@ -57,15 +53,10 @@ object UserLinkValidator {
             rawQuery = parsed.rawQuery,
             rawFragment = parsed.rawFragment,
         )
-        return UrlValidation(
+        return UserLinkValidationResult(
             normalizedUrl = normalizedUrl,
         )
     }
-
-    private data class UrlValidation(
-        val normalizedUrl: String? = null,
-        val error: UserLinkValidationError? = null,
-    )
 
     private fun malformedUrlError(rawUrl: String): UserLinkValidationError {
         val lower = rawUrl.lowercase()

@@ -433,7 +433,7 @@ private fun PersonalLibraryCard(
             )
             if (userLinks.isNotEmpty()) {
                 Text(
-                    text = "Latest saved: ${userLinks.last().title}",
+                    text = "Latest saved: ${userLinks.first().title}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

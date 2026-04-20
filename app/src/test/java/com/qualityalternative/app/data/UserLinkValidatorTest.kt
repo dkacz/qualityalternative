@@ -55,6 +55,15 @@ class UserLinkValidatorTest {
     }
 
     @Test
+    fun validateUrl_reportsMissingHostForMalformedWebUrl() {
+        val result = UserLinkValidator.validateUrl("https://")
+
+        assertFalse(result.isValid)
+        assertEquals(setOf(UserLinkValidationError.MISSING_HOST), result.errors)
+        assertEquals(null, result.normalizedUrl)
+    }
+
+    @Test
     fun validate_preservesEncodedPathQueryAndFragment() {
         val result = UserLinkValidator.validate(
             UserLinkDraft(

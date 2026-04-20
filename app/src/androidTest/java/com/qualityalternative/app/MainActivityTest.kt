@@ -122,6 +122,9 @@ class MainActivityTest {
         composeRule.onNodeWithTag("add-link-topic-SCIENCE")
             .performScrollTo()
             .performClick()
+        composeRule.onNodeWithText("Use a normal web link starting with http or https.")
+            .performScrollTo()
+            .assertIsDisplayed()
 
         composeRule.onNodeWithTag("add-link-save")
             .performScrollTo()
