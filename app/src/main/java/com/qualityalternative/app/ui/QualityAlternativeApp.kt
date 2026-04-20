@@ -4,6 +4,7 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -334,85 +335,77 @@ private fun HomeScreen(
     onOpenAddLink: () -> Unit,
     onSelectTheme: (AppThemeMode) -> Unit,
 ) {
+    val colors = QualityAlternativeThemeTokens.colors
+    val selectedPacks = state.starterPacks.filter { pack ->
+        pack.id in state.preferences?.selectedPackIds.orEmpty()
+    }
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .testTag("home-list"),
-        contentPadding = PaddingValues(20.dp),
-        verticalArrangement = Arrangement.spacedBy(18.dp),
+        contentPadding = PaddingValues(22.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
                 Text(
                     text = "Quality Alternative",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = colors.faintText,
+                )
+                Text(
+                    text = "You're set up for quieter reading today.",
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
                 )
                 Text(
-                    text = "Onboarding, delay state, analytics, and replacement history are persisted. This build can now bring the live intervention surface over selected app opens through the Accessibility Service, with fixture distractors included for automation tests.",
+                    text = "When an impulse opens a selected app, the Android alpha can pause it and offer one finite alternative.",
                     style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = colors.mutedText,
                 )
+                Button(
+                    modifier = Modifier.testTag("home-add-link"),
+                    onClick = onOpenAddLink,
+                ) {
+                    Text("Add link")
+                }
             }
         }
 
         item {
-            ThemeSettingsCard(
-                themeMode = state.themeMode,
-                onSelectTheme = onSelectTheme,
+            SetupSnapshotCard(
+                state = state,
+                onSelectTargetApp = onSelectTargetApp,
             )
         }
 
         item {
             PersonalLibraryCard(
                 userLinks = state.userLinks,
+                selectedStarterPacks = selectedPacks,
                 onOpenAddLink = onOpenAddLink,
             )
         }
 
         item {
-            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    Text(
-                        text = "Debug trigger",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    state.activeDelayWindow?.let { delayWindow ->
-                        ActiveDelayNotice(
-                            targetApp = state.selectedTargetApp,
-                            delayWindow = delayWindow,
-                        )
-                    }
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        state.availableTargetApps.forEach { app ->
-                            FilterChip(
-                                selected = state.selectedTargetApp == app,
-                                onClick = { onSelectTargetApp(app) },
-                                label = { Text(app.displayName) },
-                            )
-                        }
-                    }
-                    Button(
-                        onClick = onTriggerIntervention,
-                        enabled = state.selectedTargetApp != null,
-                    ) {
-                        Text("Trigger debug intervention")
-                    }
-                }
-            }
+            PreviewInterventionCard(
+                state = state,
+                onSelectTargetApp = onSelectTargetApp,
+                onTriggerIntervention = onTriggerIntervention,
+            )
         }
 
         item {
             PermissionReadinessCard(
                 readiness = state.permissionReadiness,
                 onRefresh = onRefreshReadiness,
+            )
+        }
+
+        item {
+            ThemeSettingsCard(
+                themeMode = state.themeMode,
+                onSelectTheme = onSelectTheme,
             )
         }
 
@@ -425,11 +418,7 @@ private fun HomeScreen(
         }
 
         item {
-            StarterPackSummary(
-                starterPacks = state.starterPacks.filter { pack ->
-                    pack.id in state.preferences?.selectedPackIds.orEmpty()
-                },
-            )
+            StarterPackSummary(starterPacks = selectedPacks)
         }
 
         item {
@@ -439,38 +428,294 @@ private fun HomeScreen(
 }
 
 @Composable
+private fun SetupSnapshotCard(
+    state: MainUiState,
+    onSelectTargetApp: (DistractingApp) -> Unit,
+) {
+    val colors = QualityAlternativeThemeTokens.colors
+    AnalogCard {
+        HomeSectionLabel(text = "Setup")
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(18.dp),
+        ) {
+            StatCell(
+                modifier = Modifier.weight(1f),
+                label = "Intercepting",
+                value = "${state.availableTargetApps.size} apps",
+            )
+            StatCell(
+                modifier = Modifier.weight(1f),
+                label = "Session length",
+                value = state.preferences?.preferredDurationBucket?.displayName() ?: "Unset",
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(18.dp),
+        ) {
+            StatCell(
+                modifier = Modifier.weight(1f),
+                label = "Topics",
+                value = "${state.preferences?.preferredTopics?.size ?: 0}",
+            )
+            StatCell(
+                modifier = Modifier.weight(1f),
+                label = "Status",
+                value = if (state.permissionReadiness.interceptionReady) "Active" else "Paused",
+                accent = if (state.permissionReadiness.interceptionReady) colors.success else colors.accent,
+            )
+        }
+        if (state.availableTargetApps.isNotEmpty()) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                state.availableTargetApps.forEach { app ->
+                    FilterChip(
+                        selected = state.selectedTargetApp == app,
+                        onClick = { onSelectTargetApp(app) },
+                        label = { Text(app.displayName) },
+                    )
+                }
+            }
+        }
+        state.activeDelayWindow?.let { delayWindow ->
+            ActiveDelayNotice(
+                targetApp = state.selectedTargetApp,
+                delayWindow = delayWindow,
+            )
+        }
+    }
+}
+
+@Composable
+private fun StatCell(
+    modifier: Modifier = Modifier,
+    label: String,
+    value: String,
+    accent: androidx.compose.ui.graphics.Color = QualityAlternativeThemeTokens.colors.primaryText,
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = QualityAlternativeThemeTokens.colors.faintText,
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleLarge,
+            color = accent,
+            fontWeight = FontWeight.SemiBold,
+        )
+    }
+}
+
+@Composable
+private fun PreviewInterventionCard(
+    state: MainUiState,
+    onSelectTargetApp: (DistractingApp) -> Unit,
+    onTriggerIntervention: () -> Unit,
+) {
+    val colors = QualityAlternativeThemeTokens.colors
+    AnalogCard {
+        HomeSectionLabel(text = "Preview intervention")
+        Text(
+            text = "Normally this appears automatically. Use this internal shortcut to rehearse the moment without opening a social app.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = colors.mutedText,
+        )
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            state.availableTargetApps.forEach { app ->
+                FilterChip(
+                    selected = state.selectedTargetApp == app,
+                    onClick = { onSelectTargetApp(app) },
+                    label = { Text(app.displayName) },
+                )
+            }
+        }
+        Button(
+            onClick = onTriggerIntervention,
+            enabled = state.selectedTargetApp != null,
+        ) {
+            Text("Preview intervention")
+        }
+    }
+}
+
+@Composable
+private fun AnalogCard(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val colors = QualityAlternativeThemeTokens.colors
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = colors.elevatedSurface),
+        shape = RoundedCornerShape(24.dp),
+        border = BorderStroke(width = 1.dp, color = colors.line),
+    ) {
+        Column(
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            content = content,
+        )
+    }
+}
+
+@Composable
+private fun HomeSectionLabel(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelMedium,
+        color = QualityAlternativeThemeTokens.colors.faintText,
+    )
+}
+
+@Composable
 private fun PersonalLibraryCard(
     userLinks: List<ContentItem>,
+    selectedStarterPacks: List<EditorialPack>,
     onOpenAddLink: () -> Unit,
 ) {
-    Card {
+    val colors = QualityAlternativeThemeTokens.colors
+    val editorialItems = selectedStarterPacks.sumOf { it.items.size }
+    val editorialMinutes = selectedStarterPacks.flatMap { it.items }.sumOf(ContentItem::durationMinutes)
+
+    AnalogCard {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                HomeSectionLabel(text = "Your library")
+                Text(
+                    text = "A small shelf for impulse moments.",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+            Text(
+                text = "${editorialItems + userLinks.size} items",
+                style = MaterialTheme.typography.labelMedium,
+                color = colors.faintText,
+            )
+        }
+
+        LibrarySummaryRow(
+            label = "Editorial picks",
+            value = "$editorialItems curated • $editorialMinutes min",
+            sourceType = ContentSourceType.EDITORIAL,
+        )
+        LibrarySummaryRow(
+            label = "Your added links",
+            value = "Personal library: ${userLinks.size} ${if (userLinks.size == 1) "link" else "links"} saved.",
+            sourceType = ContentSourceType.USER_LINK,
+        )
+        userLinks.take(2).forEach { link ->
+            SavedLinkRow(link = link)
+        }
+        if (userLinks.isEmpty()) {
+            Text(
+                text = "Add one piece you would genuinely read instead of scrolling.",
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.mutedText,
+            )
+        }
+        Button(
+            onClick = onOpenAddLink,
+        ) {
+            Text("Add link")
+        }
+    }
+}
+
+@Composable
+private fun LibrarySummaryRow(
+    label: String,
+    value: String,
+    sourceType: ContentSourceType,
+) {
+    val colors = QualityAlternativeThemeTokens.colors
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        SourceBadge(sourceType = sourceType)
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             Text(
-                text = "Personal replacement library",
-                style = MaterialTheme.typography.titleMedium,
+                text = label,
+                style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
-                text = "Personal library: ${userLinks.size} ${if (userLinks.size == 1) "link" else "links"} saved.",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                text = value,
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.mutedText,
             )
-            if (userLinks.isNotEmpty()) {
-                Text(
-                    text = "Latest saved: ${userLinks.first().title}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Button(
-                modifier = Modifier.testTag("home-add-link"),
-                onClick = onOpenAddLink,
-            ) {
-                Text("Add link")
-            }
         }
+    }
+}
+
+@Composable
+private fun SavedLinkRow(link: ContentItem) {
+    val colors = QualityAlternativeThemeTokens.colors
+    Column(
+        verticalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        Text(
+            text = "Saved link • ${link.durationMinutes} min",
+            style = MaterialTheme.typography.labelMedium,
+            color = colors.faintText,
+        )
+        Text(
+            text = link.title,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun SourceBadge(sourceType: ContentSourceType) {
+    val colors = QualityAlternativeThemeTokens.colors
+    val label = when (sourceType) {
+        ContentSourceType.EDITORIAL -> "E"
+        ContentSourceType.USER_LINK -> "L"
+    }
+    val background = when (sourceType) {
+        ContentSourceType.EDITORIAL -> colors.accentSoft
+        ContentSourceType.USER_LINK -> colors.successSoft
+    }
+    val foreground = when (sourceType) {
+        ContentSourceType.EDITORIAL -> colors.accent
+        ContentSourceType.USER_LINK -> colors.success
+    }
+    Card(
+        colors = CardDefaults.cardColors(containerColor = background),
+        shape = RoundedCornerShape(10.dp),
+    ) {
+        Text(
+            modifier = Modifier.padding(horizontal = 11.dp, vertical = 8.dp),
+            text = label,
+            color = foreground,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold,
+        )
     }
 }
 
@@ -529,119 +774,143 @@ private fun AddLinkScreen(
     onSave: () -> Unit,
     onCancel: () -> Unit,
 ) {
+    val colors = QualityAlternativeThemeTokens.colors
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+            .padding(22.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
             Text(
                 text = "Add a replacement link",
+                style = MaterialTheme.typography.labelMedium,
+                color = colors.faintText,
+            )
+            Text(
+                text = "Add to your quality alternative.",
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
             )
             Text(
-                text = "Save one useful article or essay for future impulse moments. This is not a feed.",
+                text = "One piece you would rather read than scroll. Keep the shelf small and intentional.",
                 style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = colors.mutedText,
             )
         }
 
-        OutlinedTextField(
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag("add-link-url"),
-            value = form.url,
-            onValueChange = onUrlChange,
-            label = { Text("URL") },
-            singleLine = true,
-            isError = form.validationErrors.any { it.isUrlError() },
-            supportingText = {
-                if (form.validationErrors.any { it.isUrlError() }) {
-                    Text(form.validationErrors.first { it.isUrlError() }.displayMessage())
-                } else {
-                    Text("Use a full http or https link.")
-                }
-            },
-        )
-
-        OutlinedTextField(
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag("add-link-title"),
-            value = form.title,
-            onValueChange = onTitleChange,
-            label = { Text("Title") },
-            singleLine = true,
-            isError = UserLinkValidationError.BLANK_TITLE in form.validationErrors,
-            supportingText = {
-                if (UserLinkValidationError.BLANK_TITLE in form.validationErrors) {
-                    Text(UserLinkValidationError.BLANK_TITLE.displayMessage())
-                } else {
-                    Text("Give the link a clear name for the intervention card.")
-                }
-            },
-        )
-
-        OutlinedTextField(
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag("add-link-duration"),
-            value = form.durationMinutes,
-            onValueChange = { value -> onDurationChange(value.filter(Char::isDigit).take(2)) },
-            label = { Text("Estimated minutes") },
-            singleLine = true,
-            isError = UserLinkValidationError.INVALID_DURATION in form.validationErrors,
-            supportingText = {
-                if (UserLinkValidationError.INVALID_DURATION in form.validationErrors) {
-                    Text(UserLinkValidationError.INVALID_DURATION.displayMessage())
-                } else {
-                    Text("Use 1-60 minutes. The intervention stays finite.")
-                }
-            },
-        )
-
-        Card {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Text(
-                    text = "Topics",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    TopicTag.entries.forEach { topic ->
-                        FilterChip(
-                            modifier = Modifier.testTag("add-link-topic-${topic.name}"),
-                            selected = topic in form.selectedTopics,
-                            onClick = { onToggleTopic(topic) },
-                            label = { Text(topic.displayName()) },
-                        )
+        AnalogCard {
+            HomeSectionLabel(text = "Link")
+            OutlinedTextField(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("add-link-url"),
+                value = form.url,
+                onValueChange = onUrlChange,
+                label = { Text("https://...") },
+                singleLine = true,
+                isError = form.validationErrors.any { it.isUrlError() },
+                supportingText = {
+                    if (form.validationErrors.any { it.isUrlError() }) {
+                        Text(form.validationErrors.first { it.isUrlError() }.displayMessage())
+                    } else {
+                        Text("Use a normal web link starting with http or https.")
                     }
-                }
-                if (UserLinkValidationError.NO_TOPICS in form.validationErrors) {
-                    Text(
-                        text = UserLinkValidationError.NO_TOPICS.displayMessage(),
-                        color = MaterialTheme.colorScheme.error,
+                },
+            )
+
+            OutlinedTextField(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("add-link-title"),
+                value = form.title,
+                onValueChange = onTitleChange,
+                label = { Text("Title") },
+                singleLine = true,
+                isError = UserLinkValidationError.BLANK_TITLE in form.validationErrors,
+                supportingText = {
+                    if (UserLinkValidationError.BLANK_TITLE in form.validationErrors) {
+                        Text(UserLinkValidationError.BLANK_TITLE.displayMessage())
+                    } else {
+                        Text("Give it the name you would recognize in an impulse moment.")
+                    }
+                },
+            )
+        }
+
+        AnalogCard {
+            HomeSectionLabel(text = "Estimated read")
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                listOf("3", "5", "7", "12", "20").forEach { minutes ->
+                    FilterChip(
+                        selected = form.durationMinutes == minutes,
+                        onClick = { onDurationChange(minutes) },
+                        label = { Text("$minutes min") },
                     )
                 }
             }
+            OutlinedTextField(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("add-link-duration"),
+                value = form.durationMinutes,
+                onValueChange = { value -> onDurationChange(value.filter(Char::isDigit).take(2)) },
+                label = { Text("Custom minutes") },
+                singleLine = true,
+                isError = UserLinkValidationError.INVALID_DURATION in form.validationErrors,
+                supportingText = {
+                    if (UserLinkValidationError.INVALID_DURATION in form.validationErrors) {
+                        Text(UserLinkValidationError.INVALID_DURATION.displayMessage())
+                    } else {
+                        Text("Use 1-60 minutes. The replacement stays finite.")
+                    }
+                },
+            )
         }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        AnalogCard {
+            HomeSectionLabel(text = "Topics")
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                TopicTag.entries.forEach { topic ->
+                    FilterChip(
+                        modifier = Modifier.testTag("add-link-topic-${topic.name}"),
+                        selected = topic in form.selectedTopics,
+                        onClick = { onToggleTopic(topic) },
+                        label = { Text(topic.displayName()) },
+                    )
+                }
+            }
+            if (UserLinkValidationError.NO_TOPICS in form.validationErrors) {
+                Text(
+                    text = UserLinkValidationError.NO_TOPICS.displayMessage(),
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            } else {
+                Text(
+                    text = "Topics help the local ranking choose this only when it fits.",
+                    color = colors.mutedText,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+        }
+
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
             Button(
                 modifier = Modifier.testTag("add-link-save"),
                 onClick = onSave,
                 enabled = form.canSave && !form.isSaving,
             ) {
-                Text(if (form.isSaving) "Saving…" else "Save link")
+                Text(if (form.isSaving) "Saving…" else "Add to library")
             }
             OutlinedButton(onClick = onCancel) {
                 Text("Cancel")

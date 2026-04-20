@@ -5,10 +5,12 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
@@ -150,6 +152,29 @@ class MainActivityTest {
     }
 
     @Test
+    fun homeShowsReadinessAndCompactLibrarySummary() {
+        launchOnboardedApp()
+
+        composeRule.onNodeWithText("You're set up for quieter reading today.")
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("Setup")
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("Your library")
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("Editorial picks")
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("Your added links")
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag("home-add-link")
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag("home-list")
+            .performScrollToNode(hasText("Preview intervention"))
+        composeRule.onAllNodesWithText("Preview intervention")
+            .fetchSemanticsNodes()
+            .also { nodes -> assertEquals(2, nodes.size) }
+    }
+
+    @Test
     fun addLinkKeepsSaveDisabledForInvalidUrl() {
         launchOnboardedApp()
 
@@ -159,6 +184,8 @@ class MainActivityTest {
         composeRule.waitUntil(timeoutMillis = 10_000) {
             hasNode("Add a replacement link")
         }
+        composeRule.onNodeWithText("Add to your quality alternative.")
+            .assertIsDisplayed()
         composeRule.onNodeWithTag("add-link-url").performTextInput("quality://bad")
         composeRule.onNodeWithTag("add-link-title").performTextInput("Saved essay")
         composeRule.onNodeWithTag("add-link-topic-SCIENCE")
@@ -243,15 +270,21 @@ class MainActivityTest {
             hasNode("Quality Alternative") && hasNode("Personal library: 1 link saved.")
         }
 
+        composeRule.onNodeWithTag("home-list")
+            .performScrollToNode(hasText("Personal library: 1 link saved."))
         composeRule.onNodeWithText("Personal library: 1 link saved.").assertIsDisplayed()
+        composeRule.onNodeWithTag("home-list")
+            .performScrollToNode(hasText("Saved essay"))
+        composeRule.onNodeWithText("Saved essay").assertIsDisplayed()
     }
 
     @Test
     fun themeSettingSwitchesToDarkMode() {
         launchOnboardedApp()
 
-        composeRule.onNodeWithText("Theme: Light")
-            .assertIsDisplayed()
+        composeRule.onNodeWithTag("home-list")
+            .performScrollToNode(hasText("Theme: Light"))
+        composeRule.onNodeWithText("Theme: Light").assertIsDisplayed()
         composeRule.onNodeWithTag("theme-DARK")
             .performClick()
 

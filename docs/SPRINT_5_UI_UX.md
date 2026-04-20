@@ -4,8 +4,8 @@ Status: `active`
 
 Current slice:
 
-- `5.2 Core Intervention Restyle`
-  Status: implemented, validated locally, under Pro review.
+- `5.3 Home, Library, Add Link`
+  Status: in implementation.
 
 ## Goal
 
