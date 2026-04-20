@@ -34,7 +34,7 @@ W aplikacji wybierz:
 3. Preferowaną długość sesji czytania.
 4. Starter packi z treściami.
 
-Wersja alpha obsługuje lokalne editorial starter packi. Nie ma jeszcze dodawania własnych linków ani PDF-ów.
+Wersja alpha obsługuje lokalne editorial starter packi oraz proste dodawanie własnych linków. Nie ma jeszcze PDF-ów.
 
 ## 4. Włącz Accessibility
 
@@ -91,6 +91,7 @@ Wyślij proszę krótką informację:
 - czy `Delay for 15 minutes` faktycznie wstrzymuje ponowną interwencję
 - czy aplikacja crashuje, zawiesza się albo pokazuje pusty ekran
 - czy rekomendacje treści wyglądają sensownie
+- czy zapisany własny link pojawia się w bibliotece i może zostać otwarty jako alternatywa
 
 Przykładowy raport:
 
@@ -110,7 +111,7 @@ Problemy: brak / opis problemu
 - Działa tylko na Androidzie.
 - Wymaga włączenia Accessibility.
 - Nie ma jeszcze iOS.
-- Nie ma jeszcze własnych linków, PDF-ów ani synchronizacji w chmurze.
+- Własne linki są lokalne i proste; nie ma jeszcze PDF-ów, EPUB-ów ani synchronizacji w chmurze.
 - Nie blokuje pojedynczych powierzchni typu Shorts/Reels; przechwytuje całą wybraną aplikację.
 - Testy real-device były dotąd potwierdzone na jednym Samsungu dla YouTube, X i Facebooka.
 
