@@ -50,7 +50,7 @@ UI still to build in Sprint 4:
 The broader visual redesign should happen as a separate UI/UX pass after Sprint 4 functionality is stable. The reviewed mockups are captured in `docs/UI_UX_MOCKUP_INTAKE.md`. That pass should implement the mockup's calm analog direction with exactly two first-pass themes:
 
 - `Light`
-- `Ink` dark mode
+- `Dark` mode
 
 Other mockup directions and dark variants should remain out of scope until the core UI pass is validated.
 
@@ -113,7 +113,7 @@ Goal:
 Included:
 
 - `Light` warm paper theme
-- `Ink` dark analog mode
+- `Dark` analog mode
 - restyled core intervention
 - restyled home, add-link, library, reader, external handoff, feedback, and progress/history surfaces
 - theme setting persistence

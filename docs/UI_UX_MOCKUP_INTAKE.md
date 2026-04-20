@@ -49,7 +49,7 @@ It should not feel:
 Implement exactly two themes in the first UI pass:
 
 - `Light`: the default warm paper mode from the analog mockup.
-- `Ink`: the dark analog mode from the mockup's `dark-ink` option.
+- `Dark`: the dark analog mode from the mockup's dark option.
 
 Do not implement the other prototype directions or dark variants in the first pass:
 
@@ -57,14 +57,14 @@ Do not implement the other prototype directions or dark variants in the first pa
 - no `modern` theme
 - no `midnight`
 - no `graphite`
-- no broad theme picker beyond `Light` and `Ink`
+- no broad theme picker beyond `Light` and `Dark`
 
 The first Compose implementation should introduce a small app theme layer with explicit design tokens for background, elevated surface, primary text, muted text, faint text, line, accent, accent-soft, success, and success-soft. The theme choice should be persisted locally once the Settings UI exposes it.
 
 Default behavior:
 
 - Use `Light` as the default alpha theme.
-- Add `Ink` as an explicit user setting.
+- Add `Dark` as an explicit user setting.
 - A future `Use system setting` option can be considered later, but it is not required for the first UI pass.
 
 ## Screen Priorities
@@ -110,7 +110,7 @@ Implementation requirements:
 Settings theme scope:
 
 - `Light`
-- `Ink`
+- `Dark`
 
 ### P2: Progress
 
@@ -145,11 +145,10 @@ Implementation requirements:
 
 ## Acceptance Criteria for the Future UI Pass
 
-- Light and Ink themes are available and visually coherent across the main app surfaces.
+- Light and Dark themes are available and visually coherent across the main app surfaces.
 - Intervention remains one primary plus two backups.
 - Add Link UI matches the new design direction without changing Sprint 4 scope.
 - Permission/readiness copy remains technically accurate.
 - Progress uses constructive replacement metrics.
 - Existing unit, lint, and emulator instrumentation suites remain green.
 - A Pro review validates that the redesign preserves the PRD constraints and does not introduce feed-like or blocker-first behavior.
-

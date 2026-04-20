@@ -20,7 +20,7 @@ The target is the mockup's calm `analog` direction: warm, editorial, quiet, fini
 
 In scope:
 
-- Light and Ink theme foundation with explicit design tokens.
+- Light and Dark theme foundation with explicit design tokens.
 - Theme selection persisted locally.
 - Restyled intervention surface.
 - Restyled home, add-link, library, reader, external handoff, feedback, and progress/history surfaces.
@@ -45,9 +45,9 @@ Out of scope:
 Acceptance criteria:
 
 - `Light` is the default warm paper theme.
-- `Ink` is available as an explicit dark analog option.
+- `Dark` is available as an explicit dark analog option.
 - Theme choice persists locally.
-- A visible settings surface exposes only `Light` and `Ink`.
+- A visible settings surface exposes only `Light` and `Dark`.
 - Existing tests remain green.
 
 ### 5.2 Core Intervention Restyle

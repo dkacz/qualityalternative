@@ -46,7 +46,7 @@ private val LightColors = QualityAlternativeColors(
     successSoft = Color(0xFFDDE9D6),
 )
 
-private val InkColors = QualityAlternativeColors(
+private val DarkColors = QualityAlternativeColors(
     background = Color(0xFF151514),
     elevatedSurface = Color(0xFF211F1B),
     primaryText = Color(0xFFEFE9DD),
@@ -75,7 +75,7 @@ fun QualityAlternativeAppTheme(
 ) {
     val tokens = when (themeMode) {
         AppThemeMode.LIGHT -> LightColors
-        AppThemeMode.INK -> InkColors
+        AppThemeMode.DARK -> DarkColors
     }
     val colorScheme = when (themeMode) {
         AppThemeMode.LIGHT -> lightColorScheme(
@@ -97,7 +97,7 @@ fun QualityAlternativeAppTheme(
             error = Color(0xFF9B3528),
         )
 
-        AppThemeMode.INK -> darkColorScheme(
+        AppThemeMode.DARK -> darkColorScheme(
             primary = tokens.accent,
             onPrimary = Color(0xFF21140E),
             primaryContainer = tokens.accentSoft,

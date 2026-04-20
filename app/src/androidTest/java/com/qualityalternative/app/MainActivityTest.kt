@@ -213,20 +213,20 @@ class MainActivityTest {
     }
 
     @Test
-    fun themeSettingSwitchesToInkMode() {
+    fun themeSettingSwitchesToDarkMode() {
         launchOnboardedApp()
 
         composeRule.onNodeWithText("Theme: Light")
             .assertIsDisplayed()
-        composeRule.onNodeWithTag("theme-INK")
+        composeRule.onNodeWithTag("theme-DARK")
             .performClick()
 
         composeRule.waitUntil(timeoutMillis = 10_000) {
-            hasNode("Theme: Ink")
+            hasNode("Theme: Dark")
         }
-        composeRule.onNodeWithTag("theme-INK")
+        composeRule.onNodeWithTag("theme-DARK")
             .assertIsSelected()
-        composeRule.onNodeWithText("Theme: Ink")
+        composeRule.onNodeWithText("Theme: Dark")
             .assertIsDisplayed()
     }
 

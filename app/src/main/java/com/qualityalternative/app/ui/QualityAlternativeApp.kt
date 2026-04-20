@@ -497,7 +497,7 @@ private fun ThemeSettingsCard(
                 color = colors.mutedText,
             )
             Text(
-                text = "Light keeps the warm paper feel. Ink is the calmer dark mode for night testing.",
+                text = "Light keeps the warm paper feel. Dark is the calmer mode for night testing.",
                 color = colors.mutedText,
                 style = MaterialTheme.typography.bodySmall,
             )
@@ -1127,7 +1127,7 @@ private fun ContentItem.isUserLink(): Boolean = sourceType == ContentSourceType.
 
 private fun AppThemeMode.displayName(): String = when (this) {
     AppThemeMode.LIGHT -> "Light"
-    AppThemeMode.INK -> "Ink"
+    AppThemeMode.DARK -> "Dark"
 }
 
 private fun launchExternalLink(

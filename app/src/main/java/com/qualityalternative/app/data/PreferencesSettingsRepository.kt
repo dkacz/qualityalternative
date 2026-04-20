@@ -44,9 +44,7 @@ class PreferencesSettingsRepository(
                         DurationBucket.valueOf(preferences[PreferredDurationBucket] ?: DurationBucket.FOCUS.name)
                     }.getOrDefault(DurationBucket.FOCUS),
                     selectedPackIds = preferences[SelectedPackIds].orEmpty(),
-                    themeMode = runCatching {
-                        AppThemeMode.valueOf(preferences[ThemeMode] ?: AppThemeMode.LIGHT.name)
-                    }.getOrDefault(AppThemeMode.LIGHT),
+                    themeMode = parseThemeMode(preferences[ThemeMode]),
                 )
             }
     }
@@ -76,6 +74,13 @@ class PreferencesSettingsRepository(
     }
 
     private companion object {
+        fun parseThemeMode(raw: String?): AppThemeMode {
+            if (raw == "INK") return AppThemeMode.DARK
+            return runCatching {
+                AppThemeMode.valueOf(raw ?: AppThemeMode.LIGHT.name)
+            }.getOrDefault(AppThemeMode.LIGHT)
+        }
+
         val HasCompletedOnboarding = booleanPreferencesKey("has_completed_onboarding")
         val SelectedAppPackages = stringSetPreferencesKey("selected_app_packages")
         val PreferredTopics = stringSetPreferencesKey("preferred_topics")

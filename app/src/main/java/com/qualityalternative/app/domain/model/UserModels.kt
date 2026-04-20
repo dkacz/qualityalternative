@@ -14,7 +14,7 @@ data class UserPreferences(
 
 enum class AppThemeMode {
     LIGHT,
-    INK,
+    DARK,
 }
 
 data class AppSettings(

@@ -101,11 +101,11 @@ class MainViewModelTest {
         advanceUntilIdle()
         assertEquals(AppThemeMode.LIGHT, viewModel.uiState.themeMode)
 
-        viewModel.selectThemeMode(AppThemeMode.INK)
+        viewModel.selectThemeMode(AppThemeMode.DARK)
         advanceUntilIdle()
 
-        assertEquals(AppThemeMode.INK, viewModel.uiState.themeMode)
-        assertEquals(AppThemeMode.INK, settingsRepository.state.value.themeMode)
+        assertEquals(AppThemeMode.DARK, viewModel.uiState.themeMode)
+        assertEquals(AppThemeMode.DARK, settingsRepository.state.value.themeMode)
     }
 
     @Test

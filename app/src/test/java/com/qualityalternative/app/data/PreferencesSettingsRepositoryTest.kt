@@ -3,6 +3,8 @@ package com.qualityalternative.app.data
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
 import com.qualityalternative.app.domain.model.AppThemeMode
 import com.qualityalternative.app.domain.model.DurationBucket
 import com.qualityalternative.app.domain.model.OnboardingSelection
@@ -58,12 +60,28 @@ class PreferencesSettingsRepositoryTest {
         )
 
         repository.saveOnboardingSelection(selection)
-        repository.saveThemeMode(AppThemeMode.INK)
+        repository.saveThemeMode(AppThemeMode.DARK)
 
         val restored = repository.observeAppSettings().first()
         assertTrue(restored.hasCompletedOnboarding)
         assertEquals(selection.selectedAppPackages, restored.selectedAppPackages)
-        assertEquals(AppThemeMode.INK, restored.themeMode)
+        assertEquals(AppThemeMode.DARK, restored.themeMode)
+    }
+
+    @Test
+    fun observeAppSettings_mapsLegacyInkThemeToDark() = runBlocking {
+        val dataStore = testDataStore()
+        val repository = PreferencesSettingsRepository(
+            dataStore = dataStore,
+            supportedApps = SupportedCatalog.distractingApps,
+        )
+        dataStore.edit { preferences ->
+            preferences[stringPreferencesKey("theme_mode")] = "INK"
+        }
+
+        val restored = repository.observeAppSettings().first()
+
+        assertEquals(AppThemeMode.DARK, restored.themeMode)
     }
 
     private fun testDataStore(): DataStore<Preferences> {
