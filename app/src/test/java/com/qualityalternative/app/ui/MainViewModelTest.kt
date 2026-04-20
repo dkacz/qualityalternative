@@ -112,7 +112,7 @@ class MainViewModelTest {
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
-    fun interventionInventoryIncludesUserLinksOutsideSelectedEditorialPacks() = runTest {
+    fun interventionInventoryExcludesUserLinksUntilFallbackFlowExists() = runTest {
         val contentRepository = FakeContentRepository(
             extraItems = listOf(
                 ContentItem(
@@ -142,7 +142,7 @@ class MainViewModelTest {
         advanceUntilIdle()
 
         assertEquals(
-            setOf("p1", "user-link"),
+            setOf("p1"),
             recommendationEngine.lastInventory.mapTo(mutableSetOf(), ContentItem::id),
         )
     }
@@ -206,6 +206,32 @@ class MainViewModelTest {
 
         assertEquals(MainScreen.AddLink, viewModel.uiState.screen)
         assertTrue(UserLinkValidationError.UNSUPPORTED_SCHEME in viewModel.uiState.addLinkForm.validationErrors)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun saveUserLinkWithRepositoryFailure_keepsAddLinkOpenAndClearsSaving() = runTest {
+        val viewModel = createViewModel(
+            userLinkRepository = FakeUserLinkRepository(throwOnAdd = true),
+        )
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+
+        viewModel.openAddLink()
+        viewModel.updateAddLinkUrl("https://example.com/essay")
+        viewModel.updateAddLinkTitle("Saved essay")
+        viewModel.updateAddLinkDuration("7")
+        viewModel.toggleAddLinkTopic(TopicTag.SCIENCE)
+        advanceUntilIdle()
+
+        viewModel.saveUserLink(nowMillis = 2_000L)
+        advanceUntilIdle()
+
+        assertEquals(MainScreen.AddLink, viewModel.uiState.screen)
+        assertFalse(viewModel.uiState.addLinkForm.isSaving)
+        assertEquals("The link could not be saved locally. Try again.", viewModel.uiState.latestMessage)
     }
 
     @Test
@@ -942,7 +968,9 @@ class MainViewModelTest {
         )
     }
 
-    private class FakeUserLinkRepository : UserLinkRepository {
+    private class FakeUserLinkRepository(
+        private val throwOnAdd: Boolean = false,
+    ) : UserLinkRepository {
         val links = MutableStateFlow<List<ContentItem>>(emptyList())
         private var nextId = 0
 
@@ -954,6 +982,9 @@ class MainViewModelTest {
             draft: UserLinkDraft,
             nowMillis: Long,
         ): AddUserLinkResult {
+            if (throwOnAdd) {
+                error("Simulated local persistence failure")
+            }
             if (!draft.url.startsWith("http://") && !draft.url.startsWith("https://")) {
                 return AddUserLinkResult.Rejected(setOf(UserLinkValidationError.UNSUPPORTED_SCHEME))
             }

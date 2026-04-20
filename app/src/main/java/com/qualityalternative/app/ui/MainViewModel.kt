@@ -44,6 +44,7 @@ import com.qualityalternative.app.domain.service.SettingsRepository
 import com.qualityalternative.app.domain.service.UserLinkRepository
 import com.qualityalternative.app.interception.InterceptionRuntimeGate
 import java.util.UUID
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
@@ -335,38 +336,47 @@ class MainViewModel(
 
         uiState = uiState.copy(addLinkForm = uiState.addLinkForm.copy(isSaving = true))
         viewModelScope.launch {
-            when (val result = userLinkRepository.addLink(draft = draft, nowMillis = nowMillis)) {
-                is AddUserLinkResult.Added -> {
-                    recordEventDurably(
-                        AnalyticsEvent(
-                            type = AnalyticsEventType.USER_LINK_ADDED,
-                            timestampMillis = nowMillis,
-                            contentId = result.item.id,
-                            metadata = mapOf(
-                                "sourceType" to result.item.sourceType.name,
-                                "externalUrl" to result.item.externalUrl.orEmpty(),
-                                "durationMinutes" to result.item.durationMinutes.toString(),
-                                "topicCount" to result.item.topicTags.size.toString(),
+            try {
+                when (val result = userLinkRepository.addLink(draft = draft, nowMillis = nowMillis)) {
+                    is AddUserLinkResult.Added -> {
+                        recordEventDurably(
+                            AnalyticsEvent(
+                                type = AnalyticsEventType.USER_LINK_ADDED,
+                                timestampMillis = nowMillis,
+                                contentId = result.item.id,
+                                metadata = mapOf(
+                                    "sourceType" to result.item.sourceType.name,
+                                    "externalUrl" to result.item.externalUrl.orEmpty(),
+                                    "durationMinutes" to result.item.durationMinutes.toString(),
+                                    "topicCount" to result.item.topicTags.size.toString(),
+                                ),
                             ),
-                        ),
-                    )
-                    uiState = uiState.copy(
-                        screen = MainScreen.Home,
-                        addLinkForm = AddLinkFormState(),
-                        latestMessage = "Link saved for future replacement moments.",
-                    )
-                }
+                        )
+                        uiState = uiState.copy(
+                            screen = MainScreen.Home,
+                            addLinkForm = AddLinkFormState(),
+                            latestMessage = "Link saved for future replacement moments.",
+                        )
+                    }
 
-                is AddUserLinkResult.Rejected -> {
-                    uiState = uiState.copy(
-                        addLinkForm = uiState.addLinkForm.copy(
-                            validationErrors = result.errors,
-                            canSave = false,
-                            isSaving = false,
-                        ),
-                        latestMessage = "This link needs a little cleanup before saving.",
-                    )
+                    is AddUserLinkResult.Rejected -> {
+                        uiState = uiState.copy(
+                            addLinkForm = uiState.addLinkForm.copy(
+                                validationErrors = result.errors,
+                                canSave = false,
+                                isSaving = false,
+                            ),
+                            latestMessage = "This link needs a little cleanup before saving.",
+                        )
+                    }
                 }
+            } catch (error: Throwable) {
+                if (error is CancellationException) throw error
+                uiState = uiState.copy(
+                    screen = MainScreen.AddLink,
+                    addLinkForm = uiState.addLinkForm.copy(isSaving = false),
+                    latestMessage = "The link could not be saved locally. Try again.",
+                )
             }
         }
     }
@@ -448,7 +458,7 @@ class MainViewModel(
 
             val interventionId = UUID.randomUUID().toString()
             val filteredInventory = contentRepository.inventory().filter { item ->
-                item.sourceType == ContentSourceType.USER_LINK || item.packId in preferences.selectedPackIds
+                item.sourceType != ContentSourceType.USER_LINK && item.packId in preferences.selectedPackIds
             }
             val signals = buildRecommendationSignals(nowMillis = processingNowMillis)
             val recommendationSet = recommendationEngine.generate(
