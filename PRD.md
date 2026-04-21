@@ -156,7 +156,7 @@ The user taps Instagram on Android during an unplanned idle moment. Instead of e
   - estimated time for each recommendation
   - three actions:
     - Read now
-    - Delay for 15 minutes
+    - Pause 15 min
     - Open anyway
 
 ### 4. Replacement Session
@@ -167,7 +167,7 @@ The user taps Instagram on Android during an unplanned idle moment. Instead of e
 
 ### 5. Delay Flow
 
-- If the user chooses Delay for 15 minutes, the product records the delay and suppresses repeated prompts for the same distracting app during that period.
+- If the user chooses Pause 15 min, the product records a delay window and suppresses repeated prompts for the same distracting app during that period.
 - If the user tries again during the delay window, the system may either re-show a lighter reminder or respect the delay silently, depending on implementation constraints. MVP should default to respecting the delay silently after confirmation.
 
 ### 6. Override Flow
@@ -273,7 +273,7 @@ The intervention must provide three clear actions that map to the MVP value prop
 
 - User can choose Read now for the primary recommendation.
 - User can choose one of the backup recommendations instead of the primary item.
-- User can choose Delay for 15 minutes.
+- User can choose Pause 15 min, which creates a 15-minute delay window.
 - User can choose Open anyway.
 - No additional mandatory step is inserted after the user chooses Open anyway.
 
@@ -295,7 +295,7 @@ The system must allow the user to consciously postpone access to the distracting
 
 #### Acceptance Criteria
 
-- When Delay for 15 minutes is selected, the system records the delay window.
+- When Pause 15 min is selected, the system records the delay window.
 - During the delay window, repeated attempts to open the same app do not create a full repeated intervention by default.
 - The delay expires automatically after 15 minutes.
 - The app logs whether the user returned after the delay window ended.

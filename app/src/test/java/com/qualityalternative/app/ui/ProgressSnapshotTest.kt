@@ -92,6 +92,84 @@ class ProgressSnapshotTest {
     }
 
     @Test
+    fun progressSnapshotLetsConvertedDayWinOverPartialDelayDay() {
+        val today = LocalDate.of(2026, 4, 21)
+        val entries = listOf(
+            replacementEntry(
+                sessionId = "converted",
+                acceptedAtMillis = today.toMillis(),
+            ),
+        )
+        val events = listOf(
+            event(
+                AnalyticsEventType.DELAY_SELECTED,
+                interventionId = "delay-intervention",
+                timestampMillis = today.toMillis(),
+                metadata = mapOf("delayId" to "delay-1"),
+            ),
+        )
+
+        val snapshot = progressSnapshot(
+            entries = entries,
+            events = events,
+            zoneId = ZoneOffset.UTC,
+            nowMillis = today.toMillis(),
+        )
+
+        assertEquals(1, snapshot.daysConverted)
+        assertEquals(ProgressDayState.CONVERTED, snapshot.dayBars.last().state)
+    }
+
+    @Test
+    fun progressSnapshotKeepsDaysConvertedAlignedToTwentyOneDayStrip() {
+        val today = LocalDate.of(2026, 4, 21)
+        val entries = listOf(
+            replacementEntry(
+                sessionId = "older-than-strip",
+                acceptedAtMillis = today.minusDays(22).toMillis(),
+            ),
+        )
+
+        val snapshot = progressSnapshot(
+            entries = entries,
+            events = emptyList(),
+            zoneId = ZoneOffset.UTC,
+            nowMillis = today.toMillis(),
+        )
+
+        assertEquals(0, snapshot.daysConverted)
+        assertEquals(false, snapshot.dayBars.any { it.state == ProgressDayState.CONVERTED })
+    }
+
+    @Test
+    fun progressSnapshotShowsOnlyRecentSevenDayReplacements() {
+        val today = LocalDate.of(2026, 4, 21)
+        val entries = listOf(
+            replacementEntry(
+                sessionId = "today",
+                acceptedAtMillis = today.toMillis(),
+            ),
+            replacementEntry(
+                sessionId = "last-week",
+                acceptedAtMillis = today.minusDays(6).toMillis(),
+            ),
+            replacementEntry(
+                sessionId = "too-old",
+                acceptedAtMillis = today.minusDays(7).toMillis(),
+            ),
+        )
+
+        val snapshot = progressSnapshot(
+            entries = entries,
+            events = emptyList(),
+            zoneId = ZoneOffset.UTC,
+            nowMillis = today.toMillis(),
+        )
+
+        assertEquals(listOf("today", "last-week"), snapshot.recentReplacements.map { it.sessionId })
+    }
+
+    @Test
     fun finiteReaderParagraphsReturnsOnlyRealParagraphs() {
         assertEquals(
             listOf("First paragraph.", "Second paragraph.", "Third paragraph."),

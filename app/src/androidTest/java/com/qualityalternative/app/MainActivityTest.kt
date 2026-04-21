@@ -104,7 +104,7 @@ class MainActivityTest {
 
         waitForHome()
         composeRule.onNodeWithTag("home-list")
-            .performScrollToNode(hasText("FIXTURE FEED ONE DELAYED", substring = true))
+            .performScrollToNode(hasText("FIXTURE FEED ONE PAUSED", substring = true))
         composeRule.onNodeWithText("min alternative", substring = true)
             .assertIsDisplayed()
             .assertIsEnabled()

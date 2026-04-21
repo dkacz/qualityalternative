@@ -18,7 +18,7 @@ The most important retained choices are:
 
 - The intervention is soft by default and avoids guilt-heavy language.
 - The core moment shows one primary replacement and two lighter backup choices.
-- `Delay 15 min` and `Open anyway` remain visible and non-punitive.
+- `Pause 15 min` and `Open anyway` remain visible and non-punitive.
 - The reading surface feels finite and book-like rather than feed-like.
 - Progress is framed as days converted or impulses redirected, not generic abstinence.
 - Personal content is presented as a small quality library, not a bookmark dump.

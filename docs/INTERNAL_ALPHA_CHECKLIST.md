@@ -18,7 +18,7 @@ This checklist tracks the Android-first internal alpha defined in Sprint 0-3.
 - [x] Onboarding persists selected apps, topics, duration, and starter packs
 - [x] Intervention shows one primary replacement and two backups
 - [x] Reader and feedback flows are wired to analytics
-- [x] Delay for 15 minutes works in the real intervention flow
+- [x] Pause 15 min works in the real intervention flow
 - [x] `Open anyway` returns the user to the target-app path without looping
 - [x] Accessibility readiness guidance is visible in the app
 - [x] Fixture distractor apps exist for repeatable cross-app automation
@@ -34,5 +34,5 @@ This checklist tracks the Android-first internal alpha defined in Sprint 0-3.
 ## Notes
 
 - Real-device smoke passed on a Samsung `SM-S721B` for YouTube, X, and Facebook.
-- Confirmed on device: real-app interception, `Open anyway` without immediate loop, and `Delay for 15 minutes`.
+- Confirmed on device: real-app interception, `Open anyway` without immediate loop, and `Pause 15 min`.
 - Sprint 0-3 internal alpha is validated for the current Android-first scope.

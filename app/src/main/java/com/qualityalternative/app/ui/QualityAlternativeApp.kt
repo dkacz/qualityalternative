@@ -1344,7 +1344,7 @@ private fun ProgressTab(snapshot: ProgressSnapshot) {
                 modifier = Modifier.testTag("progress-card"),
                 padding = 24.dp,
             ) {
-                MonoText("This month", modifier = Modifier.padding(bottom = 12.dp))
+                MonoText("Last 21 days", modifier = Modifier.padding(bottom = 12.dp))
                 Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
                         text = snapshot.daysConverted.toString(),
@@ -1371,7 +1371,7 @@ private fun ProgressTab(snapshot: ProgressSnapshot) {
                 HorizontalDivider(color = colors.line)
                 SmallStatRow("Chose the alternative", "${snapshot.alternativesChosen}")
                 HorizontalDivider(color = colors.line)
-                SmallStatRow("Delayed social", snapshot.delayedOpens.toString())
+                SmallStatRow("Paused social", snapshot.delayedOpens.toString())
                 HorizontalDivider(color = colors.line)
                 SmallStatRow("Opened anyway", snapshot.consciousOverrides.toString(), subtle = true)
             }
@@ -1641,7 +1641,7 @@ private fun ActiveDelayCard(
     onReadAlternative: () -> Unit,
 ) {
     QaCard(padding = 14.dp) {
-        MonoText("${targetApp?.displayName ?: delayWindow.targetAppPackage} delayed")
+        MonoText("${targetApp?.displayName ?: delayWindow.targetAppPackage} paused")
         BodyText(
             text = "We'll keep the social prompt quiet until ${formatTimestamp(delayWindow.endsAtMillis)}.",
             color = QualityAlternativeThemeTokens.colors.mutedText,
@@ -2644,14 +2644,21 @@ internal fun progressSnapshot(
     }
 
     return ProgressSnapshot(
-        daysConverted = convertedDays.size,
+        daysConverted = dayBars.count { it.state == ProgressDayState.CONVERTED },
         dayBars = dayBars,
         interventionsShown = events.distinctProgressEventCount(AnalyticsEventType.INTERVENTION_SHOWN),
         alternativesChosen = entries.size,
         delayedOpens = events.distinctProgressEventCount(AnalyticsEventType.DELAY_SELECTED),
         consciousOverrides = events.distinctProgressEventCount(AnalyticsEventType.OPEN_ANYWAY_SELECTED),
         completedReads = entries.count(ReplacementHistoryEntry::isCompleted),
-        recentReplacements = entries.take(MAX_RECENT_PROGRESS_REPLACEMENTS),
+        recentReplacements = entries
+            .filter { entry ->
+                val acceptedDate = Instant.ofEpochMilli(entry.acceptedAtMillis)
+                    .atZone(zoneId)
+                    .toLocalDate()
+                acceptedDate in today.minusDays((RECENT_REPLACEMENTS_DAYS - 1).toLong())..today
+            }
+            .take(MAX_RECENT_PROGRESS_REPLACEMENTS),
     )
 }
 
@@ -2834,6 +2841,7 @@ private fun launchExternalLink(
 
 private const val MAX_BACKUP_RECOMMENDATIONS = 2
 private const val MAX_RECENT_PROGRESS_REPLACEMENTS = 3
+private const val RECENT_REPLACEMENTS_DAYS = 7
 private const val PROGRESS_STRIP_DAYS = 21
 private const val DEBUG_PARITY_VIEWPORT_WIDTH_DP = 340f
 private const val DEBUG_PARITY_VIEWPORT_HEIGHT_DP = 740f

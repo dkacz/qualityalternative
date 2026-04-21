@@ -17,7 +17,7 @@ Use this checklist to validate the Android interception alpha on one physical de
 3. Confirm the intervention surface appears within roughly two seconds.
 4. Tap `Open anyway` and confirm the user can continue into the target app without an immediate loop.
 5. Re-open the same app and confirm the suppression window prevents a second instant re-prompt.
-6. Trigger another intervention and choose `Delay for 15 minutes`.
+6. Trigger another intervention and choose `Pause 15 min`.
 7. Re-open the same app during the delay window and confirm the app does not show the full intervention again.
 8. After the delay expires, re-open the same app and confirm a fresh intervention appears.
 9. Repeat the core flow on a second supported app from the launch list.

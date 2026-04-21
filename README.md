@@ -16,7 +16,7 @@ For testers, the shortest path is:
 4. Enable the app in Android Accessibility settings when prompted.
 5. Select distracting apps such as YouTube, X, Facebook, Instagram, Reddit, or TikTok.
 6. Open one selected app and verify that the intervention appears.
-7. Test `Read now`, `Open anyway`, and `Delay for 15 minutes`.
+7. Test `Read now`, `Open anyway`, and `Pause 15 min`.
 
 Important: this is a debug/internal alpha build. It is Android-only, requires Accessibility permission for interception, and is not a Play Store production release.
 
@@ -99,5 +99,5 @@ Use `JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home` a
 - Sprint 0-5 implementation is complete on Android.
 - Emulator validation is green for unit, lint, and instrumentation suites.
 - Internal alpha has been validated on a real Samsung `SM-S721B`.
-- Manual smoke passed for YouTube, X, and Facebook, including real interception, `Open anyway`, and `Delay for 15 minutes`.
+- Manual smoke passed for YouTube, X, and Facebook, including real interception, `Open anyway`, and `Pause 15 min`.
 - Latest UI-alpha tester build: `v0.2.0-ui-alpha`.

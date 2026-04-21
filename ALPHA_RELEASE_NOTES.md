@@ -10,7 +10,7 @@ This release keeps the Android-first interception thesis from `v0.1.0-alpha` and
 
 - Android onboarding for selecting distracting apps, topics, preferred reading length, and starter packs.
 - Accessibility-driven app interception for the launch support list.
-- Soft intervention with one primary recommendation, two backups, `Open anyway`, and `Delay for 15 minutes`.
+- Soft intervention with one primary recommendation, two backups, `Open anyway`, and `Pause 15 min`.
 - Local in-app reader, feedback flow, replacement history, delay state, and analytics ledger.
 - User-added links with local persistence, source-aware recommendation ranking, and a clear saved-link handoff before opening the browser.
 - Light and Dark analog themes with persisted theme choice.

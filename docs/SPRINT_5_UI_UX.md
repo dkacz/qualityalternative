@@ -62,7 +62,7 @@ Acceptance criteria:
 - Intervention remains exactly one primary recommendation plus up to two backups.
 - The triggering app is clear.
 - The primary replacement feels editorial and prominent.
-- `Delay 15 min` and `Open anyway` remain visible, calm, and non-shaming.
+- `Pause 15 min` and `Open anyway` remain visible, calm, and non-shaming.
 - No feed-like discovery surface is introduced.
 
 ### 5.3 Home, Library, Add Link

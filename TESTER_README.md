@@ -74,7 +74,7 @@ Najlepiej zacząć od YouTube, X albo Facebooka, bo te przepływy były już pot
 4. Sprawdź, czy widzisz jedną główną rekomendację i dwie alternatywy.
 5. Kliknij `Read now` i sprawdź, czy otwiera się czytnik.
 6. Wróć i sprawdź `Open anyway`, czyli świadome wejście do oryginalnej aplikacji.
-7. Sprawdź `Delay for 15 minutes`.
+7. Sprawdź `Pause 15 min`.
 8. Po wybraniu opóźnienia otwórz tę samą aplikację ponownie i upewnij się, że pełna interwencja nie pojawia się natychmiast drugi raz.
 9. Opcjonalnie dodaj własny link w bibliotece i sprawdź, czy jako alternatywa otwiera się przez ekran `Saved link handoff`.
 
@@ -89,7 +89,7 @@ Wyślij proszę krótką informację:
 - jakie aplikacje testowałeś
 - czy interwencja pojawiła się po otwarciu aplikacji
 - czy `Open anyway` działa bez zapętlenia
-- czy `Delay for 15 minutes` faktycznie wstrzymuje ponowną interwencję
+- czy `Pause 15 min` faktycznie wstrzymuje ponowną interwencję
 - czy aplikacja crashuje, zawiesza się albo pokazuje pusty ekran
 - czy rekomendacje treści wyglądają sensownie
 - czy zapisany własny link pojawia się w bibliotece i może zostać otwarty jako alternatywa

@@ -295,13 +295,15 @@ class MainViewModel(
         val selectedTargetApp = uiState.selectedTargetApp
             ?.takeIf { it.packageName in selectedPackages }
             ?: selectedApps.firstOrNull()
+        val activeDelayWindow = selectedTargetApp?.takeIf { delayReady }?.let { delayGate.activeDelay(it) }
 
         uiState = uiState.copy(
             availableTargetApps = selectedApps,
             selectedTargetApp = selectedTargetApp,
             preferences = preferences.copy(selectedApps = selectedApps),
             onboardingSelection = uiState.onboardingSelection.copy(selectedAppPackages = selectedPackages),
-            activeDelayWindow = selectedTargetApp?.takeIf { delayReady }?.let { delayGate.activeDelay(it) },
+            activeDelayWindow = activeDelayWindow,
+            activeDelaySuggestion = activeDelaySuggestionFor(activeDelayWindow),
             latestMessage = null,
         )
         viewModelScope.launch {
@@ -548,14 +550,16 @@ class MainViewModel(
                     selectedTargetApp = targetApp,
                     activeDelayWindow = activeDelayWindow,
                     activeDelaySuggestion = activeDelaySuggestionFor(activeDelayWindow),
-                    latestMessage = "${targetApp.displayName} is delayed for 15 minutes.",
+                    latestMessage = "${targetApp.displayName} is paused for 15 minutes.",
                     screen = MainScreen.Home,
                     currentInterventionOrigin = null,
                 )
                 return@launch
             }
 
+            var delayReturnHandled = false
             delayInspection.expiredWindow?.let { expiredWindow ->
+                delayReturnHandled = true
                 recordDelayReturnAfterExpiry(expiredWindow = expiredWindow, nowMillis = processingNowMillis)
                 delayGate.consumeExpiredDelay(
                     targetApp = targetApp,
@@ -564,7 +568,9 @@ class MainViewModel(
                 )
             }
 
-            recordReturnSignalIfNeeded(targetApp = targetApp, nowMillis = processingNowMillis)
+            if (!delayReturnHandled) {
+                recordReturnSignalIfNeeded(targetApp = targetApp, nowMillis = processingNowMillis)
+            }
 
             val interventionId = UUID.randomUUID().toString()
             val rawInventory = contentRepository.inventory()
@@ -758,11 +764,28 @@ class MainViewModel(
     fun startActiveDelayAlternative() {
         val targetApp = uiState.selectedTargetApp ?: return
         val delayWindow = uiState.activeDelayWindow ?: return
-        val content = uiState.activeDelaySuggestion ?: return
-        val recommendationSet = recommendationSetForDelayWindow(delayWindow = delayWindow, fallbackContent = content)
-        val interventionId = delayWindow.interventionId ?: "delay-${delayWindow.id}"
-        val interventionShownAtMillis = delayWindow.interventionShownAtMillis ?: delayWindow.startsAtMillis
-        val nowMillis = System.currentTimeMillis()
+        val nowMillis = nowProvider()
+        val activeDelayWindow = if (delayWindow.targetAppPackage == targetApp.packageName) {
+            delayGate.activeDelay(targetApp = targetApp, nowMillis = nowMillis)
+        } else {
+            null
+        }
+        if (activeDelayWindow == null || activeDelayWindow.id != delayWindow.id || !activeDelayWindow.isActive(nowMillis)) {
+            refreshActiveDelayWindow(nowMillis = nowMillis)
+            return
+        }
+        val content = activeDelaySuggestionFor(activeDelayWindow, nowMillis = nowMillis)
+        if (content == null) {
+            uiState = uiState.copy(
+                activeDelayWindow = activeDelayWindow,
+                activeDelaySuggestion = null,
+                latestMessage = "No paused alternative is available right now.",
+            )
+            return
+        }
+        val recommendationSet = recommendationSetForDelayWindow(delayWindow = activeDelayWindow, fallbackContent = content)
+        val interventionId = activeDelayWindow.interventionId ?: "delay-${activeDelayWindow.id}"
+        val interventionShownAtMillis = activeDelayWindow.interventionShownAtMillis ?: activeDelayWindow.startsAtMillis
 
         viewModelScope.launch {
             val source = if (content.id == recommendationSet.primary.id) {
@@ -785,7 +808,7 @@ class MainViewModel(
                     type = AnalyticsEventType.DELAY_ALTERNATIVE_STARTED,
                     timestampMillis = nowMillis,
                     semanticKey = AnalyticsSemanticKeys.delayAlternativeStarted(
-                        delayId = delayWindow.id,
+                        delayId = activeDelayWindow.id,
                         sessionId = sessionId,
                     ),
                     interventionId = interventionId,
@@ -795,7 +818,7 @@ class MainViewModel(
                     backupContentIds = recommendationSet.backups.map(ContentItem::id),
                     contentId = content.id,
                     metadata = content.analyticsMetadata() + mapOf(
-                        "delayId" to delayWindow.id,
+                        "delayId" to activeDelayWindow.id,
                         "origin" to "active_delay_card",
                     ),
                 ),
@@ -1080,6 +1103,7 @@ class MainViewModel(
                 metadata = mapOf(
                     "delayId" to expiredWindow.id,
                     "delayReturnOrigin" to "after_delay_expired",
+                    "returnAttribution" to "delay",
                     "delayStartedAtMillis" to expiredWindow.startsAtMillis.toString(),
                     "delayEndedAtMillis" to expiredWindow.endsAtMillis.toString(),
                     "hadActiveDelayReturn" to (expiredWindow.firstReturnAttemptAtMillis != null).toString(),
@@ -1125,6 +1149,7 @@ class MainViewModel(
         val metadata = mapOf(
             "delayId" to window.id,
             "delayReturnOrigin" to origin,
+            "returnAttribution" to "delay",
             "delayStartedAtMillis" to window.startsAtMillis.toString(),
             "delayEndedAtMillis" to window.endsAtMillis.toString(),
         )
@@ -1185,6 +1210,7 @@ class MainViewModel(
                     primaryContentId = signal.primaryContentId,
                     backupContentIds = signal.backupContentIds,
                     contentId = signal.contentId,
+                    metadata = mapOf("returnAttribution" to "session"),
                 ),
             )
         }
@@ -1204,6 +1230,7 @@ class MainViewModel(
                     primaryContentId = signal.primaryContentId,
                     backupContentIds = signal.backupContentIds,
                     contentId = signal.contentId,
+                    metadata = mapOf("returnAttribution" to "session"),
                 ),
             )
         }
@@ -1365,8 +1392,14 @@ class MainViewModel(
         }
     }
 
-    private fun activeDelaySuggestionFor(delayWindow: DelayWindow?): ContentItem? {
+    private fun activeDelaySuggestionFor(
+        delayWindow: DelayWindow?,
+        nowMillis: Long = nowProvider(),
+    ): ContentItem? {
         delayWindow ?: return null
+        if (!delayWindow.isActive(nowMillis)) {
+            return null
+        }
         val candidateIds = (delayWindow.backupContentIds + listOfNotNull(delayWindow.primaryContentId)).toSet()
         if (candidateIds.isEmpty()) {
             return null

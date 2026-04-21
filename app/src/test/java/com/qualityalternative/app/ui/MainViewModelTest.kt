@@ -476,6 +476,10 @@ class MainViewModelTest {
 
         val types = analyticsTracker.allEvents().map { it.type }
         assertTrue(types.contains(com.qualityalternative.app.domain.model.AnalyticsEventType.RETURN_TO_APP_WITHIN_15_MINUTES))
+        val returnEvent = analyticsTracker.allEvents().first {
+            it.type == AnalyticsEventType.RETURN_TO_APP_WITHIN_15_MINUTES
+        }
+        assertEquals("session", returnEvent.metadata["returnAttribution"])
         assertTrue(viewModel.uiState.historyEntries.first().returnedToTarget())
     }
 
@@ -641,6 +645,119 @@ class MainViewModelTest {
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
+    fun toggleSettingsAppRecalculatesActiveDelaySuggestionForNewSelectedApp() = runTest {
+        val delayGate = InMemoryDelayGate()
+        val viewModel = createViewModel(delayGate = delayGate)
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+
+        val firstTarget = viewModel.uiState.selectedTargetApp!!
+        val remainingPackages = viewModel.uiState.availableTargetApps
+            .mapTo(mutableSetOf(), DistractingApp::packageName)
+            .minus(firstTarget.packageName)
+        val nextTarget = SupportedCatalog.distractingApps.first { it.packageName in remainingPackages }
+        val nowMillis = System.currentTimeMillis()
+        delayGate.storeDelay(
+            targetApp = firstTarget,
+            nowMillis = nowMillis,
+            primaryContentId = "p1",
+            backupContentIds = listOf("s1"),
+        )
+        delayGate.storeDelay(
+            targetApp = nextTarget,
+            nowMillis = nowMillis,
+            primaryContentId = "p1",
+        )
+
+        viewModel.selectTargetApp(firstTarget)
+        advanceUntilIdle()
+
+        assertEquals("s1", viewModel.uiState.activeDelaySuggestion?.id)
+
+        viewModel.toggleSettingsApp(firstTarget)
+        advanceUntilIdle()
+
+        assertEquals(nextTarget.packageName, viewModel.uiState.selectedTargetApp?.packageName)
+        assertEquals(nextTarget.packageName, viewModel.uiState.activeDelayWindow?.targetAppPackage)
+        assertEquals("p1", viewModel.uiState.activeDelaySuggestion?.id)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun startActiveDelayAlternativeRefusesExpiredDelayWindow() = runTest {
+        var nowMillis = System.currentTimeMillis()
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val viewModel = createViewModel(
+            analyticsTracker = analyticsTracker,
+            nowProvider = { nowMillis },
+        )
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+        viewModel.triggerDebugIntervention(nowMillis = nowMillis)
+        advanceUntilIdle()
+        viewModel.delayFor15Minutes()
+        advanceUntilIdle()
+
+        nowMillis = viewModel.uiState.activeDelayWindow!!.endsAtMillis
+        viewModel.startActiveDelayAlternative()
+        advanceUntilIdle()
+
+        assertEquals(MainScreen.Home, viewModel.uiState.screen)
+        assertEquals(null, viewModel.uiState.currentContent)
+        assertEquals(null, viewModel.uiState.activeDelayWindow)
+        assertFalse(analyticsTracker.allEvents().any { it.type == AnalyticsEventType.DELAY_ALTERNATIVE_STARTED })
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun startActiveDelayAlternativeRefusesUnavailableSuggestion() = runTest {
+        val primary = savedUserLink(id = "long-link", durationMinutes = 12)
+        val backup = savedUserLink(id = "short-link", durationMinutes = 4)
+        val contentRepository = FakeContentRepository(extraItems = listOf(primary, backup))
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val viewModel = createViewModel(
+            contentRepository = contentRepository,
+            recommendationEngine = FixedRecommendationEngine(
+                RecommendationSet(
+                    primary = primary,
+                    backups = listOf(backup),
+                    inventoryShortage = true,
+                    generatedAtMillis = 1_000L,
+                ),
+            ),
+            analyticsTracker = analyticsTracker,
+        )
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+        viewModel.triggerDebugIntervention(nowMillis = 1_000L)
+        advanceUntilIdle()
+        viewModel.delayFor15Minutes()
+        advanceUntilIdle()
+
+        contentRepository.setExtraItems(
+            listOf(
+                primary.copy(availability = ContentAvailability.UNAVAILABLE),
+                backup.copy(availability = ContentAvailability.UNAVAILABLE),
+            ),
+        )
+        viewModel.startActiveDelayAlternative()
+        advanceUntilIdle()
+
+        assertEquals(MainScreen.Home, viewModel.uiState.screen)
+        assertEquals(null, viewModel.uiState.currentContent)
+        assertEquals(null, viewModel.uiState.activeDelaySuggestion)
+        assertEquals("No paused alternative is available right now.", viewModel.uiState.latestMessage)
+        assertFalse(analyticsTracker.allEvents().any { it.type == AnalyticsEventType.DELAY_ALTERNATIVE_STARTED })
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
     fun triggerDebugIntervention_preservesExpiredDelayProvenanceAcrossActiveDelayReads() = runTest {
         val delayGate = InMemoryDelayGate()
         val analyticsTracker = InMemoryAnalyticsTracker()
@@ -677,7 +794,58 @@ class MainViewModelTest {
         assertNotNull(expiredDelayEvent)
         assertEquals("delay-intervention", expiredDelayEvent?.interventionId)
         assertEquals("after_delay_expired", within60?.metadata?.get("delayReturnOrigin"))
+        assertEquals("delay", within60?.metadata?.get("returnAttribution"))
         assertEquals(MainScreen.Intervention, viewModel.uiState.screen)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun expiredDelayReturnDoesNotAlsoRecordSessionReturnForSameAttempt() = runTest {
+        val delayGate = InMemoryDelayGate()
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val historyRepository = FakeHistoryRepository().apply {
+            recordAcceptedSession(
+                targetApp = SupportedCatalog.distractingApps.first(),
+                interventionId = "session-intervention",
+                interventionShownAtMillis = 1_000L,
+                primaryContentId = "p1",
+                backupContentIds = listOf("s1"),
+                content = FakeContentRepository().inventory().first(),
+                source = RecommendationSource.PRIMARY,
+                acceptedAtMillis = 1_000L,
+            )
+        }
+        val viewModel = createViewModel(
+            analyticsTracker = analyticsTracker,
+            delayGate = delayGate,
+            historyRepository = historyRepository,
+        )
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+
+        val targetApp = viewModel.uiState.selectedTargetApp!!
+        delayGate.storeDelay(
+            targetApp = targetApp,
+            nowMillis = 2_000L,
+            durationMinutes = 15,
+            interventionId = "delay-intervention",
+            interventionShownAtMillis = 1_900L,
+            primaryContentId = "p1",
+            backupContentIds = listOf("s1"),
+        )
+        val expiredAt = 2_000L + 16 * 60_000L
+
+        viewModel.triggerDebugIntervention(nowMillis = expiredAt)
+        advanceUntilIdle()
+
+        val within60Events = analyticsTracker.allEvents().filter {
+            it.type == AnalyticsEventType.RETURN_TO_APP_WITHIN_60_MINUTES
+        }
+        assertEquals(1, within60Events.size)
+        assertEquals("delay", within60Events.single().metadata["returnAttribution"])
+        assertEquals("after_delay_expired", within60Events.single().metadata["delayReturnOrigin"])
     }
 
     @Test
@@ -775,6 +943,7 @@ class MainViewModelTest {
         assertNotNull(expiredDelayEvent)
         assertEquals("delay-intervention", expiredDelayEvent?.interventionId)
         assertEquals("after_delay_expired", within60?.metadata?.get("delayReturnOrigin"))
+        assertEquals("delay", within60?.metadata?.get("returnAttribution"))
         assertEquals(null, postConsumeInspection.activeWindow)
         assertEquals(null, postConsumeInspection.expiredWindow)
         assertEquals(false, delayGate.consumeExpiredDelay(targetApp = targetApp, delayId = created.id, nowMillis = expiredAt))
@@ -1117,6 +1286,7 @@ class MainViewModelTest {
         isReady: Boolean = true,
     ) : ContentRepository {
         private val ready = MutableStateFlow(isReady)
+        private var extraItems = extraItems
         private val packs = listOf(
             EditorialPack(
                 id = "philosophy",
@@ -1145,11 +1315,10 @@ class MainViewModelTest {
                 ),
             ),
         )
-        private val inventory = packs.flatMap(EditorialPack::items) + extraItems
 
         override fun starterPacks(): List<EditorialPack> = packs
 
-        override fun inventory(): List<ContentItem> = inventory
+        override fun inventory(): List<ContentItem> = packs.flatMap(EditorialPack::items) + extraItems
 
         override fun contentBody(item: ContentItem): String = item.title
 
@@ -1159,6 +1328,10 @@ class MainViewModelTest {
 
         fun setReady(value: Boolean) {
             ready.value = value
+        }
+
+        fun setExtraItems(items: List<ContentItem>) {
+            extraItems = items
         }
 
         private fun contentItem(

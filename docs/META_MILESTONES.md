@@ -13,7 +13,7 @@ Completed:
 - Android app foundation in Kotlin + Jetpack Compose.
 - Local-first onboarding, settings, delay logic, history, and analytics.
 - Accessibility-driven app interception for the alpha support list.
-- Soft intervention with one primary replacement, two backups, `Open anyway`, and `Delay for 15 minutes`.
+- Soft intervention with one primary replacement, two backups, `Open anyway`, and `Pause 15 min`.
 - Real-device alpha smoke on YouTube, X, and Facebook.
 - Public GitHub repo and internal alpha APK release.
 
