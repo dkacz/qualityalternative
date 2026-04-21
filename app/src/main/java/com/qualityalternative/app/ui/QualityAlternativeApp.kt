@@ -5,28 +5,37 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -39,12 +48,23 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.qualityalternative.app.domain.model.AnalyticsEvent
 import com.qualityalternative.app.domain.model.AnalyticsEventType
 import com.qualityalternative.app.domain.model.AppThemeMode
@@ -62,9 +82,12 @@ import com.qualityalternative.app.domain.model.TopicTag
 import com.qualityalternative.app.domain.model.UserLinkValidationError
 import com.qualityalternative.app.ui.theme.QualityAlternativeAppTheme
 import com.qualityalternative.app.ui.theme.QualityAlternativeThemeTokens
+import com.qualityalternative.app.ui.theme.QualityDisplayFontFamily
+import com.qualityalternative.app.ui.theme.QualityMonoFontFamily
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 @Composable
 fun QualityAlternativeApp(
@@ -85,93 +108,148 @@ fun QualityAlternativeApp(
         Scaffold(
             modifier = Modifier.fillMaxSize(),
             snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+            containerColor = QualityAlternativeThemeTokens.colors.background,
         ) { paddingValues ->
             Surface(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(paddingValues)
-                    .safeDrawingPadding(),
-                color = MaterialTheme.colorScheme.background,
+                    .padding(paddingValues),
+                color = QualityAlternativeThemeTokens.colors.background,
             ) {
                 when {
                     uiState.isLoadingSettings -> LoadingScreen()
-                    !uiState.hasCompletedOnboarding -> OnboardingScreen(
+                    !uiState.hasCompletedOnboarding -> OnboardingFlow(
                         selection = uiState.onboardingSelection,
                         supportedApps = uiState.allSupportedApps,
-                        starterPacks = uiState.starterPacks,
                         onToggleApp = viewModel::toggleOnboardingApp,
                         onToggleTopic = viewModel::toggleOnboardingTopic,
                         onSelectDuration = viewModel::setOnboardingDuration,
-                        onTogglePack = viewModel::toggleOnboardingPack,
                         onComplete = viewModel::completeOnboarding,
                     )
 
-                    else -> when (uiState.screen) {
-                        MainScreen.Onboarding -> OnboardingScreen(
-                            selection = uiState.onboardingSelection,
-                            supportedApps = uiState.allSupportedApps,
-                            starterPacks = uiState.starterPacks,
-                            onToggleApp = viewModel::toggleOnboardingApp,
-                            onToggleTopic = viewModel::toggleOnboardingTopic,
-                            onSelectDuration = viewModel::setOnboardingDuration,
-                            onTogglePack = viewModel::toggleOnboardingPack,
-                            onComplete = viewModel::completeOnboarding,
-                        )
-
-                        MainScreen.Home -> HomeScreen(
-                            state = uiState,
-                            onSelectTargetApp = viewModel::selectTargetApp,
-                            onTriggerIntervention = viewModel::triggerDebugIntervention,
-                            onRefreshReadiness = viewModel::refreshPermissionReadiness,
-                            onOpenAddLink = viewModel::openAddLink,
-                            onSelectTheme = viewModel::selectThemeMode,
-                        )
-
-                        MainScreen.AddLink -> AddLinkScreen(
-                            form = uiState.addLinkForm,
-                            onUrlChange = viewModel::updateAddLinkUrl,
-                            onTitleChange = viewModel::updateAddLinkTitle,
-                            onDurationChange = viewModel::updateAddLinkDuration,
-                            onToggleTopic = viewModel::toggleAddLinkTopic,
-                            onSave = viewModel::saveUserLink,
-                            onCancel = viewModel::cancelAddLink,
-                        )
-
-                        MainScreen.Intervention -> InterventionScreen(
-                            state = uiState,
-                            onAcceptPrimary = viewModel::acceptPrimary,
-                            onAcceptBackup = viewModel::acceptBackup,
-                            onDelay = viewModel::delayFor15Minutes,
-                            onOpenAnyway = {
-                                if (viewModel.openAnyway()) {
-                                    onExitToTarget()
-                                }
-                            },
-                        )
-
-                        MainScreen.Reader -> ReaderScreen(
-                            state = uiState,
-                            onFinishReading = viewModel::finishReading,
-                            onSkipReading = viewModel::skipReading,
-                        )
-
-                        MainScreen.ExternalHandoff -> ExternalLinkHandoffScreen(
-                            state = uiState,
-                            onOpenLink = {
-                                launchExternalLink(context = it, viewModel = viewModel)
-                            },
-                            onFinishSession = viewModel::finishReading,
-                            onSkipSession = viewModel::skipReading,
-                        )
-
-                        MainScreen.Feedback -> FeedbackScreen(
-                            onSubmit = viewModel::submitFeedback,
-                            onSkip = viewModel::skipFeedback,
-                        )
-                    }
+                    else -> MainRoute(
+                        state = uiState,
+                        viewModel = viewModel,
+                        onExitToTarget = onExitToTarget,
+                    )
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun MainRoute(
+    state: MainUiState,
+    viewModel: MainViewModel,
+    onExitToTarget: () -> Unit,
+) {
+    when (state.screen) {
+        MainScreen.Onboarding -> OnboardingFlow(
+            selection = state.onboardingSelection,
+            supportedApps = state.allSupportedApps,
+            onToggleApp = viewModel::toggleOnboardingApp,
+            onToggleTopic = viewModel::toggleOnboardingTopic,
+            onSelectDuration = viewModel::setOnboardingDuration,
+            onComplete = viewModel::completeOnboarding,
+        )
+
+        MainScreen.Home -> TabScaffold(
+            active = MainScreen.Home,
+            onHome = viewModel::openHome,
+            onLibrary = viewModel::openLibrary,
+            onProgress = viewModel::openProgress,
+            onSettings = viewModel::openSettings,
+        ) {
+            HomeTab(
+                state = state,
+                onSelectTargetApp = viewModel::selectTargetApp,
+                onTriggerIntervention = viewModel::triggerDebugIntervention,
+                onOpenAddLink = viewModel::openAddLink,
+                onOpenSettings = viewModel::openSettings,
+            )
+        }
+
+        MainScreen.Library -> TabScaffold(
+            active = MainScreen.Library,
+            onHome = viewModel::openHome,
+            onLibrary = viewModel::openLibrary,
+            onProgress = viewModel::openProgress,
+            onSettings = viewModel::openSettings,
+        ) {
+            LibraryTab(
+                state = state,
+                onAddLink = viewModel::openAddLink,
+                onOpen = viewModel::openLibraryItem,
+            )
+        }
+
+        MainScreen.Progress -> TabScaffold(
+            active = MainScreen.Progress,
+            onHome = viewModel::openHome,
+            onLibrary = viewModel::openLibrary,
+            onProgress = viewModel::openProgress,
+            onSettings = viewModel::openSettings,
+        ) {
+            ProgressTab(snapshot = progressSnapshot(state.historyEntries, state.events))
+        }
+
+        MainScreen.Settings -> TabScaffold(
+            active = MainScreen.Settings,
+            onHome = viewModel::openHome,
+            onLibrary = viewModel::openLibrary,
+            onProgress = viewModel::openProgress,
+            onSettings = viewModel::openSettings,
+        ) {
+            SettingsTab(
+                state = state,
+                onToggleApp = viewModel::selectTargetApp,
+                onSelectDuration = viewModel::setOnboardingDuration,
+                onSelectTheme = viewModel::selectThemeMode,
+                onRefreshReadiness = viewModel::refreshPermissionReadiness,
+            )
+        }
+
+        MainScreen.AddLink -> AddLinkScreen(
+            form = state.addLinkForm,
+            onUrlChange = viewModel::updateAddLinkUrl,
+            onTitleChange = viewModel::updateAddLinkTitle,
+            onDurationChange = viewModel::updateAddLinkDuration,
+            onToggleTopic = viewModel::toggleAddLinkTopic,
+            onSave = viewModel::saveUserLink,
+            onCancel = viewModel::cancelAddLink,
+        )
+
+        MainScreen.Intervention -> InterventionScreen(
+            state = state,
+            onAcceptPrimary = viewModel::acceptPrimary,
+            onAcceptBackup = viewModel::acceptBackup,
+            onDelay = viewModel::delayFor15Minutes,
+            onOpenAnyway = {
+                if (viewModel.openAnyway()) {
+                    onExitToTarget()
+                }
+            },
+        )
+
+        MainScreen.Reader -> ReaderScreen(
+            state = state,
+            onDone = viewModel::finishReading,
+            onBack = viewModel::skipReading,
+        )
+
+        MainScreen.ExternalHandoff -> ExternalLinkHandoffScreen(
+            state = state,
+            onOpenLink = { launchExternalLink(context = it, viewModel = viewModel) },
+            onDone = viewModel::finishReading,
+            onBack = viewModel::skipReading,
+        )
+
+        MainScreen.Feedback -> FeedbackScreen(
+            state = state,
+            onSubmit = viewModel::submitFeedback,
+            onSkip = viewModel::skipFeedback,
+        )
     }
 }
 
@@ -180,273 +258,1905 @@ private fun LoadingScreen() {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp),
+            .padding(26.dp),
         verticalArrangement = Arrangement.Center,
     ) {
-        CircularProgressIndicator()
+        CircularProgressIndicator(color = QualityAlternativeThemeTokens.colors.accent)
         Text(
-            text = "Loading local replacement state…",
+            text = "Loading local replacement state...",
             modifier = Modifier.padding(top = 16.dp),
             style = MaterialTheme.typography.bodyLarge,
+            color = QualityAlternativeThemeTokens.colors.mutedText,
         )
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun OnboardingScreen(
+private fun TabScaffold(
+    active: MainScreen,
+    onHome: () -> Unit,
+    onLibrary: () -> Unit,
+    onProgress: () -> Unit,
+    onSettings: () -> Unit,
+    content: @Composable BoxScope.() -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(),
+            content = content,
+        )
+        TabBar(
+            active = active,
+            onHome = onHome,
+            onLibrary = onLibrary,
+            onProgress = onProgress,
+            onSettings = onSettings,
+        )
+    }
+}
+
+@Composable
+private fun TabBar(
+    active: MainScreen,
+    onHome: () -> Unit,
+    onLibrary: () -> Unit,
+    onProgress: () -> Unit,
+    onSettings: () -> Unit,
+) {
+    val colors = QualityAlternativeThemeTokens.colors
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(colors.elevatedSurface),
+    ) {
+        HorizontalDivider(color = colors.line)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            TabItem("Home", "H", active == MainScreen.Home, onHome, Modifier.weight(1f), "tab-home")
+            TabItem("Library", "L", active == MainScreen.Library, onLibrary, Modifier.weight(1f), "tab-library")
+            TabItem("Progress", "P", active == MainScreen.Progress, onProgress, Modifier.weight(1f), "tab-progress")
+            TabItem("Settings", "S", active == MainScreen.Settings, onSettings, Modifier.weight(1f), "tab-settings")
+        }
+    }
+}
+
+@Composable
+private fun TabItem(
+    label: String,
+    icon: String,
+    active: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    testTag: String,
+) {
+    val colors = QualityAlternativeThemeTokens.colors
+    val color = if (active) colors.primaryText else colors.faintText
+    Surface(
+        modifier = modifier.testTag(testTag),
+        onClick = onClick,
+        shape = RoundedCornerShape(10.dp),
+        color = Color.Transparent,
+        contentColor = color,
+    ) {
+        Column(
+            modifier = Modifier.padding(vertical = 7.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
+            Text(
+                text = icon,
+                style = MaterialTheme.typography.labelMedium,
+                color = color,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                color = color,
+                fontSize = 10.5.sp,
+            )
+        }
+    }
+}
+
+@Composable
+private fun OnboardingFlow(
     selection: OnboardingSelection,
     supportedApps: List<DistractingApp>,
-    starterPacks: List<EditorialPack>,
     onToggleApp: (DistractingApp) -> Unit,
     onToggleTopic: (TopicTag) -> Unit,
     onSelectDuration: (DurationBucket) -> Unit,
-    onTogglePack: (EditorialPack) -> Unit,
     onComplete: () -> Unit,
 ) {
+    var step by remember { mutableStateOf(0) }
+    when (step) {
+        0 -> OnboardingWelcome(onNext = { step = 1 })
+        1 -> OnboardingApps(
+            selection = selection,
+            supportedApps = supportedApps,
+            onToggleApp = onToggleApp,
+            onBack = { step = 0 },
+            onNext = { step = 2 },
+        )
+        2 -> OnboardingTopics(
+            selection = selection,
+            onToggleTopic = onToggleTopic,
+            onBack = { step = 1 },
+            onNext = { step = 3 },
+        )
+        3 -> OnboardingDuration(
+            selection = selection,
+            onSelectDuration = onSelectDuration,
+            onBack = { step = 2 },
+            onNext = { step = 4 },
+        )
+        else -> OnboardingPermissions(
+            onBack = { step = 3 },
+            onNext = onComplete,
+        )
+    }
+}
+
+@Composable
+private fun OnboardingWelcome(onNext: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(18.dp),
+            .padding(horizontal = 28.dp, vertical = 30.dp),
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                text = "Let’s set up your replacement loop",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                text = "Choose at least 3 distracting apps, 3 topics, a preferred session length, and at least 1 starter pack.",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        SelectionSection(title = "Distracting apps") {
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                supportedApps.forEach { app ->
-                    FilterChip(
-                        selected = app.packageName in selection.selectedAppPackages,
-                        onClick = { onToggleApp(app) },
-                        label = { Text(app.displayName) },
-                    )
-                }
-            }
-            Text(
-                text = "${selection.selectedAppPackages.size} selected",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        SelectionSection(title = "Topics") {
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                TopicTag.entries.forEach { topic ->
-                    FilterChip(
-                        selected = topic in selection.preferredTopics,
-                        onClick = { onToggleTopic(topic) },
-                        label = { Text(topic.displayName()) },
-                    )
-                }
-            }
-            Text(
-                text = "${selection.preferredTopics.size} selected",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        SelectionSection(title = "Preferred session length") {
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                DurationBucket.entries.forEach { bucket ->
-                    FilterChip(
-                        selected = bucket == selection.preferredDurationBucket,
-                        onClick = { onSelectDuration(bucket) },
-                        label = { Text(bucket.displayName()) },
-                    )
-                }
-            }
-        }
-
-        SelectionSection(title = "Starter packs") {
-            starterPacks.forEach { pack ->
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        FilterChip(
-                            selected = pack.id in selection.selectedPackIds,
-                            onClick = { onTogglePack(pack) },
-                            label = { Text(if (pack.id in selection.selectedPackIds) "Selected" else "Select") },
-                        )
-                        Text(text = pack.title, fontWeight = FontWeight.SemiBold)
-                        Text(text = pack.description, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(text = "${pack.items.size} items", style = MaterialTheme.typography.labelMedium)
-                    }
-                }
-            }
-        }
-
-        Button(
-            onClick = onComplete,
-            enabled = selection.isValid(),
+        Column(
+            verticalArrangement = Arrangement.Top,
         ) {
-            Text("Complete setup")
+            MonoText("Quality Alternative", modifier = Modifier.padding(top = 10.dp, bottom = 18.dp))
+            DisplayText(
+                text = "Turn an impulse\ninto a better\nchoice.",
+                fontSize = 43.sp,
+                lineHeight = 45.sp,
+                modifier = Modifier.padding(bottom = 24.dp),
+            )
+            BodyText(
+                text = "When you reach for a distracting app, we offer something you actually wanted to read. No blocking. No guilt. Just a brief detour, if you'd like one.",
+                fontSize = 18.sp,
+                lineHeight = 27.sp,
+                color = QualityAlternativeThemeTokens.colors.mutedText,
+            )
+        }
+        Spacer(modifier = Modifier.height(140.dp))
+        FlowRow(
+            modifier = Modifier.padding(bottom = 28.dp),
+            horizontalArrangement = Arrangement.spacedBy(18.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp),
+        ) {
+            WelcomeValue("Pause", "A single gentle prompt.")
+            WelcomeValue("Choose", "Always your call.")
+            WelcomeValue("Read", "One thing. Finish it.")
+            WelcomeValue("Return", "Back to your day.")
+        }
+        QaButton(text = "Begin", onClick = onNext, variant = QaButtonVariant.Primary)
+        QaButton(text = "I have an account", onClick = {}, variant = QaButtonVariant.Ghost)
+        Spacer(modifier = Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun WelcomeValue(label: String, value: String) {
+    Column(modifier = Modifier.width(142.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        MonoText(label)
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleMedium,
+            fontSize = 15.sp,
+            lineHeight = 19.sp,
+            color = QualityAlternativeThemeTokens.colors.primaryText,
+        )
+    }
+}
+
+@Composable
+private fun OnboardingApps(
+    selection: OnboardingSelection,
+    supportedApps: List<DistractingApp>,
+    onToggleApp: (DistractingApp) -> Unit,
+    onBack: () -> Unit,
+    onNext: () -> Unit,
+) {
+    StepScreen(
+        step = 1,
+        onBack = onBack,
+        bottom = {
+            QaButton(
+                text = "Continue",
+                onClick = onNext,
+                enabled = selection.selectedAppPackages.size >= 3,
+                variant = QaButtonVariant.Primary,
+            )
+        },
+    ) {
+        DisplayText("Which apps pull at you?", fontSize = 28.sp, lineHeight = 31.sp)
+        BodyText(
+            text = "We'll gently intercept these. Pick at least three that feel honest.",
+            color = QualityAlternativeThemeTokens.colors.mutedText,
+            modifier = Modifier.padding(top = 10.dp, bottom = 22.dp),
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            supportedApps.forEach { app ->
+                AppSelectionRow(
+                    app = app,
+                    selected = app.packageName in selection.selectedAppPackages,
+                    onClick = { onToggleApp(app) },
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun SelectionSection(
-    title: String,
+private fun OnboardingTopics(
+    selection: OnboardingSelection,
+    onToggleTopic: (TopicTag) -> Unit,
+    onBack: () -> Unit,
+    onNext: () -> Unit,
+) {
+    StepScreen(
+        step = 2,
+        onBack = onBack,
+        bottom = {
+            QaButton(
+                text = "Continue",
+                onClick = onNext,
+                enabled = selection.preferredTopics.size >= 3,
+                variant = QaButtonVariant.Primary,
+            )
+        },
+    ) {
+        DisplayText("What would you rather read?", fontSize = 28.sp, lineHeight = 31.sp)
+        BodyText(
+            text = "We'll draw editorial picks from these. You can change this anytime.",
+            color = QualityAlternativeThemeTokens.colors.mutedText,
+            modifier = Modifier.padding(top = 10.dp, bottom = 22.dp),
+        )
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            TopicTag.entries.forEach { topic ->
+                QaChip(
+                    text = topic.displayName(),
+                    selected = topic in selection.preferredTopics,
+                    onClick = { onToggleTopic(topic) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun OnboardingDuration(
+    selection: OnboardingSelection,
+    onSelectDuration: (DurationBucket) -> Unit,
+    onBack: () -> Unit,
+    onNext: () -> Unit,
+) {
+    StepScreen(step = 3, onBack = onBack, bottom = {
+        QaButton(text = "Continue", onClick = onNext, variant = QaButtonVariant.Primary)
+    }) {
+        DisplayText("How long should a session feel?", fontSize = 28.sp, lineHeight = 31.sp)
+        BodyText(
+            text = "A default length for each intervention. You can always pick something longer in the moment.",
+            color = QualityAlternativeThemeTokens.colors.mutedText,
+            modifier = Modifier.padding(top = 10.dp, bottom = 22.dp),
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            DurationOption(DurationBucket.QUICK, "5 minutes", "A quick detour", selection, onSelectDuration)
+            DurationOption(DurationBucket.FOCUS, "10 minutes", "One short piece", selection, onSelectDuration)
+            DurationOption(DurationBucket.DEEP, "20 minutes", "A proper read", selection, onSelectDuration)
+        }
+    }
+}
+
+@Composable
+private fun OnboardingPermissions(
+    onBack: () -> Unit,
+    onNext: () -> Unit,
+) {
+    StepScreen(
+        step = 4,
+        onBack = onBack,
+        bottom = {
+            QaButton(text = "Grant & finish", onClick = onNext, variant = QaButtonVariant.Primary)
+            QaButton(text = "Skip - I'll set this up later", onClick = onNext, variant = QaButtonVariant.Ghost)
+        },
+    ) {
+        DisplayText("Two small permissions.", fontSize = 28.sp, lineHeight = 31.sp)
+        BodyText(
+            text = "Needed so we can notice when you open a distracting app. We do not collect screen text, messages, or browsing history.",
+            color = QualityAlternativeThemeTokens.colors.mutedText,
+            modifier = Modifier.padding(top = 10.dp, bottom = 22.dp),
+        )
+        QaCard(modifier = Modifier.padding(bottom = 10.dp)) {
+            PermissionIntroRow("Usage access", "To detect when a chosen app comes to the foreground.")
+        }
+        QaCard(modifier = Modifier.padding(bottom = 18.dp)) {
+            PermissionIntroRow("Display over other apps", "To show a single prompt on top, then step out of the way.")
+        }
+        MonoText("Nothing leaves your phone.\nYou can revoke either one anytime.", lineHeight = 18.sp)
+    }
+}
+
+@Composable
+private fun StepScreen(
+    step: Int,
+    onBack: () -> Unit,
+    bottom: @Composable ColumnScope.() -> Unit,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Card {
+    Column(modifier = Modifier.fillMaxSize()) {
+        ScreenHead(onBack = onBack, step = step, total = 4)
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-            content()
-        }
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 28.dp),
+            content = content,
+        )
+        Column(
+            modifier = Modifier.padding(28.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+            content = bottom,
+        )
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun HomeScreen(
+private fun ScreenHead(
+    onBack: (() -> Unit)? = null,
+    step: Int? = null,
+    total: Int? = null,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 18.dp, top = 10.dp, end = 18.dp, bottom = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (onBack != null) {
+            QaIconButton(text = "<", onClick = onBack)
+        } else {
+            Spacer(modifier = Modifier.width(34.dp))
+        }
+        Box(
+            modifier = Modifier.weight(1f),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (step != null && total != null) {
+                Dots(total = total, active = step - 1)
+            }
+        }
+        Spacer(modifier = Modifier.width(34.dp))
+    }
+}
+
+@Composable
+private fun HomeTab(
     state: MainUiState,
     onSelectTargetApp: (DistractingApp) -> Unit,
     onTriggerIntervention: () -> Unit,
-    onRefreshReadiness: () -> Unit,
     onOpenAddLink: () -> Unit,
-    onSelectTheme: (AppThemeMode) -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
-    val colors = QualityAlternativeThemeTokens.colors
-    val selectedPacks = state.starterPacks.filter { pack ->
-        pack.id in state.preferences?.selectedPackIds.orEmpty()
+    val selectedPacks = state.starterPacks.filter { it.id in state.preferences?.selectedPackIds.orEmpty() }
+    val editorialItems = selectedPacks.flatMap { it.items }
+    val totalItems = editorialItems.size + state.userLinks.size
+    val totalMins = editorialItems.sumOf(ContentItem::durationMinutes) + state.userLinks.sumOf(ContentItem::durationMinutes)
+    val permOk = state.permissionReadiness.interceptionReady
+    val todayLabel = remember {
+        DateTimeFormatter.ofPattern("EEE, MMM d", Locale.US)
+            .format(Instant.now().atZone(ZoneId.systemDefault()))
     }
-    val hero = homeHeroCopy(state.permissionReadiness)
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .testTag("home-list"),
-        contentPadding = PaddingValues(start = 22.dp, top = 22.dp, end = 22.dp, bottom = 96.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        contentPadding = PaddingValues(start = 24.dp, top = 16.dp, end = 24.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                Text(
-                    text = "Quality Alternative",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = colors.faintText,
+            Column(modifier = Modifier.padding(top = 10.dp, bottom = 6.dp)) {
+                MonoText("$todayLabel · Good morning", modifier = Modifier.padding(bottom = 8.dp))
+                DisplayText("You're set up for quieter reading today.", fontSize = 30.sp, lineHeight = 34.sp)
+            }
+        }
+        if (!permOk) {
+            item {
+                PermissionWarningCard(onOpenSettings = onOpenSettings)
+            }
+        }
+        state.activeDelayWindow?.let { delayWindow ->
+            item {
+                ActiveDelayCard(targetApp = state.selectedTargetApp, delayWindow = delayWindow)
+            }
+        }
+        item {
+            SectionLabel("Setup")
+            QaCard {
+                Row(horizontalArrangement = Arrangement.spacedBy(18.dp), modifier = Modifier.fillMaxWidth()) {
+                    StatCell("Intercepting", "${state.availableTargetApps.size} apps", Modifier.weight(1f))
+                    StatCell("Session length", state.preferences?.preferredDurationBucket?.prototypeMinutesLabel() ?: "10 min", Modifier.weight(1f))
+                }
+                Spacer(Modifier.height(18.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(18.dp), modifier = Modifier.fillMaxWidth()) {
+                    StatCell("Topics", "${state.preferences?.preferredTopics?.size ?: 0}", Modifier.weight(1f))
+                    StatCell(
+                        label = "Status",
+                        value = if (permOk) "Active" else "Paused",
+                        modifier = Modifier.weight(1f),
+                        color = if (permOk) QualityAlternativeThemeTokens.colors.success else QualityAlternativeThemeTokens.colors.accent,
+                    )
+                }
+                HorizontalDivider(color = QualityAlternativeThemeTokens.colors.line, modifier = Modifier.padding(vertical = 16.dp))
+                AppPills(apps = state.availableTargetApps, selectedApp = state.selectedTargetApp, onSelect = onSelectTargetApp)
+            }
+        }
+        item {
+            SectionLabel("Your library", right = "$totalItems items · $totalMins min")
+            QaCard(padding = 0.dp) {
+                LibrarySummaryRow("Editorial picks", "${editorialItems.size} curated", ContentSourceType.EDITORIAL)
+                HorizontalDivider(color = QualityAlternativeThemeTokens.colors.line)
+                LibrarySummaryRow("Your added links", "${state.userLinks.size} saved", ContentSourceType.USER_LINK)
+            }
+        }
+        item {
+            QaButton(
+                text = "Add a link",
+                onClick = onOpenAddLink,
+                variant = QaButtonVariant.Outline,
+                modifier = Modifier.testTag("home-add-link"),
+            )
+        }
+        item {
+            SectionLabel("Try the intervention")
+            QaCard {
+                BodyText(
+                    text = "Normally this appears automatically. Tap to preview what happens when you open a chosen app.",
+                    color = QualityAlternativeThemeTokens.colors.mutedText,
+                    modifier = Modifier.padding(bottom = 14.dp),
                 )
-                Text(
-                    text = hero.title,
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
+                QaButton(text = "Preview intervention", onClick = onTriggerIntervention, variant = QaButtonVariant.Accent)
+            }
+        }
+    }
+}
+
+@Composable
+private fun LibraryTab(
+    state: MainUiState,
+    onAddLink: () -> Unit,
+    onOpen: (ContentItem) -> Unit,
+) {
+    var filter by remember { mutableStateOf("all") }
+    val editorial = state.starterPacks
+        .filter { it.id in state.preferences?.selectedPackIds.orEmpty() }
+        .flatMap { it.items }
+    val list = when (filter) {
+        "editorial" -> editorial
+        "yours" -> state.userLinks
+        else -> editorial + state.userLinks
+    }
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .testTag("library-list"),
+        contentPadding = PaddingValues(start = 24.dp, top = 16.dp, end = 24.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        item {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                DisplayText("Library", modifier = Modifier.weight(1f), fontSize = 26.sp)
+                QaButton(
+                    text = "Add",
+                    onClick = onAddLink,
+                    variant = QaButtonVariant.Outline,
+                    size = QaButtonSize.Small,
+                    fullWidth = false,
                 )
-                Text(
-                    text = hero.body,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = colors.mutedText,
-                )
-                if (hero.showAddLinkAction) {
-                    Button(onClick = onOpenAddLink) {
-                        Text("Add link")
-                    }
-                } else {
-                    OutlinedButton(onClick = onRefreshReadiness) {
-                        Text("Refresh setup status")
-                    }
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(bottom = 8.dp)) {
+                QaChip("All", selected = filter == "all", onClick = { filter = "all" })
+                QaChip("Editorial", selected = filter == "editorial", onClick = { filter = "editorial" })
+                QaChip("Your links", selected = filter == "yours", onClick = { filter = "yours" })
+            }
+        }
+        if (list.isEmpty()) {
+            item {
+                QaCard {
+                    BodyText(
+                        text = "Nothing here yet. Add one piece you'd actually read instead of scrolling.",
+                        color = QualityAlternativeThemeTokens.colors.mutedText,
+                    )
                 }
             }
-        }
-
-        if (!state.permissionReadiness.interceptionReady) {
-            item {
-                PermissionReadinessCard(
-                    readiness = state.permissionReadiness,
-                    onRefresh = onRefreshReadiness,
-                )
+        } else {
+            items(list, key = ContentItem::id) { item ->
+                LibraryItemCard(item = item, onOpen = { onOpen(item) })
             }
         }
+    }
+}
 
-        item {
-            SetupSnapshotCard(
-                state = state,
-                onSelectTargetApp = onSelectTargetApp,
+@Composable
+private fun AddLinkScreen(
+    form: AddLinkFormState,
+    onUrlChange: (String) -> Unit,
+    onTitleChange: (String) -> Unit,
+    onDurationChange: (String) -> Unit,
+    onToggleTopic: (TopicTag) -> Unit,
+    onSave: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    var savedPreview by remember { mutableStateOf(false) }
+    val host = form.url.hostLabel()
+    if (savedPreview) {
+        AddLinkSuccess(form = form, host = host, onDone = onSave)
+        return
+    }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        ScreenHead(onBack = onCancel)
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 28.dp),
+        ) {
+            DisplayText("Add to your quality\nalternative.", fontSize = 30.sp, lineHeight = 33.sp)
+            BodyText(
+                text = "One piece you'd rather read than scroll. Not a bookmark graveyard - only things you'd actually open.",
+                color = QualityAlternativeThemeTokens.colors.mutedText,
+                modifier = Modifier.padding(top = 6.dp, bottom = 22.dp),
             )
-        }
-
-        item {
-            PersonalLibraryCard(
-                userLinks = state.userLinks,
-                selectedStarterPacks = selectedPacks,
-                onOpenAddLink = onOpenAddLink,
+            InputLabel("Link")
+            QaTextField(
+                value = form.url,
+                onValueChange = onUrlChange,
+                placeholder = "https://...",
+                modifier = Modifier.testTag("add-link-url"),
+                isError = form.validationErrors.any { it.isUrlError() },
             )
-        }
-
-        item {
-            ProgressCard(
-                snapshot = progressSnapshot(
-                    entries = state.historyEntries,
-                    events = state.events,
-                ),
+            AddLinkValidationLine(form = form, host = host)
+            InputLabel("Title", Modifier.padding(top = 18.dp))
+            QaTextField(
+                value = form.title,
+                onValueChange = onTitleChange,
+                placeholder = "How you'd recognize it",
+                modifier = Modifier.testTag("add-link-title"),
+                isError = UserLinkValidationError.BLANK_TITLE in form.validationErrors,
             )
+            InputLabel("Estimated read", Modifier.padding(top = 18.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                listOf("3", "5", "8", "12", "20").forEach { mins ->
+                    QaChip("$mins min", selected = form.durationMinutes == mins, onClick = { onDurationChange(mins) })
+                }
+            }
+            InputLabel("Topic", Modifier.padding(top = 18.dp))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                TopicTag.entries.forEach { topic ->
+                    QaChip(
+                        text = topic.displayName(),
+                        selected = topic in form.selectedTopics,
+                        accentSelected = true,
+                        onClick = { onToggleTopic(topic) },
+                        modifier = Modifier.testTag("add-link-topic-${topic.name}"),
+                    )
+                }
+            }
+            if (UserLinkValidationError.NO_TOPICS in form.validationErrors) {
+                BodyText(
+                    text = UserLinkValidationError.NO_TOPICS.displayMessage(),
+                    color = QualityAlternativeThemeTokens.colors.accent,
+                    fontSize = 12.5.sp,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
+            Spacer(modifier = Modifier.height(30.dp))
         }
-
-        item {
-            PreviewInterventionCard(
-                state = state,
-                onSelectTargetApp = onSelectTargetApp,
-                onTriggerIntervention = onTriggerIntervention,
-            )
-        }
-
-        item {
-            ThemeSettingsCard(
-                themeMode = state.themeMode,
-                onSelectTheme = onSelectTheme,
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(BorderStroke(1.dp, QualityAlternativeThemeTokens.colors.line))
+                .padding(horizontal = 28.dp, vertical = 14.dp),
+        ) {
+            QaButton(
+                text = "Add to library",
+                onClick = { savedPreview = true },
+                enabled = form.canSave && !form.isSaving,
+                variant = QaButtonVariant.Primary,
+                modifier = Modifier.testTag("add-link-save"),
             )
         }
     }
 }
 
-internal data class HomeHeroCopy(
-    val title: String,
-    val body: String,
-    val showAddLinkAction: Boolean,
-)
-
-internal fun homeHeroCopy(readiness: PermissionReadiness): HomeHeroCopy {
-    return if (readiness.interceptionReady) {
-        HomeHeroCopy(
-            title = "You're set up for quieter reading today.",
-            body = "When an impulse opens a selected app, the Android alpha can pause it and offer one finite alternative.",
-            showAddLinkAction = true,
+@Composable
+private fun AddLinkSuccess(
+    form: AddLinkFormState,
+    host: String,
+    onDone: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 28.dp, vertical = 80.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(72.dp)
+                .clip(CircleShape)
+                .background(QualityAlternativeThemeTokens.colors.successSoft),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("OK", color = QualityAlternativeThemeTokens.colors.success, fontWeight = FontWeight.SemiBold)
+        }
+        DisplayText(
+            text = "Ready when you are",
+            fontSize = 28.sp,
+            modifier = Modifier.padding(top = 24.dp, bottom = 10.dp),
+            textAlign = TextAlign.Center,
         )
-    } else {
-        HomeHeroCopy(
-            title = "Interception needs one more step.",
-            body = "Finish the Android setup first, so the app can meet the impulse before a social feed opens.",
-            showAddLinkAction = false,
+        BodyText(
+            text = "We'll offer this next time you reach for one of your chosen apps.",
+            color = QualityAlternativeThemeTokens.colors.mutedText,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.widthIn(max = 280.dp),
+        )
+        QaCard(modifier = Modifier.padding(top = 32.dp, bottom = 24.dp), padding = 16.dp) {
+            MonoText("${host.ifBlank { "your link" }} - ${form.durationMinutes} min - ${form.selectedTopics.firstOrNull()?.displayName().orEmpty()}")
+            Text(
+                text = form.title,
+                style = MaterialTheme.typography.titleMedium,
+                fontSize = 17.sp,
+                lineHeight = 20.sp,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
+        QaButton(
+            text = "Done",
+            onClick = onDone,
+            variant = QaButtonVariant.Primary,
+            modifier = Modifier.testTag("add-link-done"),
         )
     }
+}
+
+@Composable
+private fun InterventionScreen(
+    state: MainUiState,
+    onAcceptPrimary: () -> Unit,
+    onAcceptBackup: (ContentItem) -> Unit,
+    onDelay: () -> Unit,
+    onOpenAnyway: () -> Unit,
+) {
+    val recommendationSet = state.currentRecommendationSet ?: return
+    val targetApp = state.selectedTargetApp ?: return
+    val colors = QualityAlternativeThemeTokens.colors
+    val primary = recommendationSet.primary
+    val backups = recommendationSet.backups.take(MAX_BACKUP_RECOMMENDATIONS)
+    val backgroundBrush = Brush.verticalGradient(
+        colors = listOf(
+            colors.accentSoft,
+            colors.background,
+            colors.background,
+        ),
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(backgroundBrush)
+            .padding(horizontal = 24.dp, vertical = 26.dp),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 28.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            AppDot(app = targetApp, size = 26.dp)
+            BodyText(
+                text = "You reached for ${targetApp.displayName}",
+                color = colors.mutedText,
+                modifier = Modifier.weight(1f),
+                fontSize = 13.5.sp,
+            )
+            QaIconButton(text = "x", onClick = onOpenAnyway)
+        }
+        MonoText("A brief detour, if you'd like one", modifier = Modifier.padding(bottom = 14.dp))
+        QaCard(
+            borderColor = colors.lineStrong,
+            padding = 22.dp,
+            modifier = Modifier.padding(bottom = 18.dp),
+        ) {
+            ContentMetaRow(primary)
+            DisplayText(
+                text = primary.title,
+                fontSize = 32.sp,
+                lineHeight = 35.sp,
+                modifier = Modifier.padding(top = 14.dp, bottom = 12.dp),
+            )
+            Text(
+                text = "\"${primary.description}\"",
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontFamily = QualityDisplayFontFamily,
+                    fontStyle = FontStyle.Italic,
+                    fontSize = 15.sp,
+                    lineHeight = 22.sp,
+                ),
+                color = colors.mutedText,
+            )
+        }
+        QaButton(
+            text = "Read this · ${primary.durationMinutes} min",
+            onClick = onAcceptPrimary,
+            variant = QaButtonVariant.Accent,
+            modifier = Modifier.padding(bottom = 16.dp),
+        )
+        MonoText("Or", modifier = Modifier.padding(bottom = 6.dp))
+        Column(modifier = Modifier.padding(bottom = 18.dp)) {
+            backups.forEachIndexed { index, backup ->
+                BackupRow(
+                    item = backup,
+                    onClick = { onAcceptBackup(backup) },
+                    modifier = Modifier.testTag("intervention-backup-action-$index"),
+                )
+            }
+            if (backups.isEmpty()) {
+                BodyText("No extra choices are available right now.", color = colors.mutedText)
+            }
+        }
+        Spacer(modifier = Modifier.weight(1f))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            QaButton(
+                text = "Delay 15 min",
+                onClick = onDelay,
+                variant = QaButtonVariant.Outline,
+                modifier = Modifier.weight(1f),
+                fullWidth = false,
+                size = QaButtonSize.Compact,
+            )
+            QaButton(
+                text = "Open ${targetApp.displayName}",
+                onClick = onOpenAnyway,
+                variant = QaButtonVariant.Ghost,
+                modifier = Modifier.weight(1f),
+                fullWidth = false,
+                size = QaButtonSize.Compact,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ReaderScreen(
+    state: MainUiState,
+    onDone: () -> Unit,
+    onBack: () -> Unit,
+) {
+    val content = state.currentContent ?: return
+    val paragraphs = finiteReaderParagraphs(state.currentContentBody).ifEmpty { listOf(content.description) }
+    var progress by remember(content.id) { mutableStateOf(18) }
+
+    LaunchedEffect(content.id) {
+        while (progress < 100) {
+            kotlinx.coroutines.delay(350)
+            progress = (progress + 4).coerceAtMost(100)
+        }
+    }
+
+    Column(modifier = Modifier.fillMaxSize().testTag("reader-screen")) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 18.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            QaIconButton(text = "x", onClick = onBack)
+            ProgressLine(progress = progress, modifier = Modifier.weight(1f))
+            MonoText("${remainingMinutes(content.durationMinutes, progress)} min left")
+        }
+        LazyColumn(
+            modifier = Modifier
+                .weight(1f)
+                .testTag("reader-list"),
+            contentPadding = PaddingValues(start = 28.dp, top = 18.dp, end = 28.dp, bottom = 24.dp),
+        ) {
+            item {
+                MonoText("${content.sourceLabel()} - ${content.topicLine()}", modifier = Modifier.padding(bottom = 10.dp))
+                DisplayText(content.title, fontSize = 30.sp, lineHeight = 34.sp, modifier = Modifier.padding(bottom = 18.dp))
+                PlaceholderImage(modifier = Modifier.padding(bottom = 22.dp))
+            }
+            items(paragraphs.take(5)) { paragraph ->
+                Text(
+                    text = paragraph,
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        fontFamily = QualityDisplayFontFamily,
+                        fontSize = 17.sp,
+                        lineHeight = 27.sp,
+                    ),
+                    color = QualityAlternativeThemeTokens.colors.primaryText,
+                    modifier = Modifier.padding(bottom = 16.dp),
+                )
+            }
+            item {
+                QaButton(
+                    text = "I'm done reading",
+                    onClick = onDone,
+                    variant = QaButtonVariant.Primary,
+                    modifier = Modifier.padding(top = 24.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ExternalLinkHandoffScreen(
+    state: MainUiState,
+    onOpenLink: (android.content.Context) -> Unit,
+    onDone: () -> Unit,
+    onBack: () -> Unit,
+) {
+    val content = state.currentContent ?: return
+    val context = LocalContext.current
+
+    Column(modifier = Modifier.fillMaxSize().testTag("external-handoff-screen")) {
+        ScreenHead(onBack = onBack)
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 28.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.Center,
+        ) {
+            MonoText("External reading", modifier = Modifier.padding(bottom = 14.dp))
+            DisplayText(content.title, fontSize = 26.sp, lineHeight = 30.sp, modifier = Modifier.padding(bottom = 12.dp))
+            QaCard(modifier = Modifier.padding(bottom = 20.dp), padding = 16.dp) {
+                BodyText("Opens in your browser", color = QualityAlternativeThemeTokens.colors.mutedText, modifier = Modifier.padding(bottom = 10.dp))
+                BodyText(
+                    text = "We'll start a ${content.durationMinutes}-minute timer. When you come back, we'll ask one quick question.",
+                    color = QualityAlternativeThemeTokens.colors.mutedText,
+                )
+            }
+            MonoText("Link", modifier = Modifier.padding(bottom = 6.dp))
+            BodyText(
+                text = content.externalUrl ?: content.description,
+                color = QualityAlternativeThemeTokens.colors.primaryText,
+                modifier = Modifier.padding(bottom = 28.dp),
+            )
+            QaButton(
+                text = "Open & start ${content.durationMinutes}-min session",
+                onClick = {
+                    onOpenLink(context)
+                    onDone()
+                },
+                variant = QaButtonVariant.Accent,
+                modifier = Modifier.testTag("external-link-open"),
+            )
+            QaButton(text = "Not now", onClick = onBack, variant = QaButtonVariant.Ghost)
+        }
+    }
+}
+
+@Composable
+private fun FeedbackScreen(
+    state: MainUiState,
+    onSubmit: (Boolean, Boolean) -> Unit,
+    onSkip: () -> Unit,
+) {
+    val content = state.currentContent
+    var fit by remember { mutableStateOf<String?>(null) }
+    var helped by remember { mutableStateOf<String?>(null) }
+    val done = fit != null && helped != null
+    val minutes = content?.durationMinutes ?: state.preferences?.preferredDurationBucket?.prototypeMinutes() ?: 10
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .testTag("feedback-screen")
+            .padding(horizontal = 28.dp, vertical = 50.dp),
+    ) {
+        MonoText("$minutes minutes - well spent", modifier = Modifier.padding(bottom = 14.dp))
+        DisplayText("Two quick questions.", fontSize = 28.sp, lineHeight = 31.sp, modifier = Modifier.padding(bottom = 26.dp))
+        FeedbackQuestion(
+            title = "Was this a good fit?",
+            selected = fit,
+            options = listOf("not" to "Not really", "ok" to "It was okay", "great" to "Yes, more like this"),
+            onSelect = { fit = it },
+            modifier = Modifier.padding(bottom = 24.dp),
+        )
+        FeedbackQuestion(
+            title = "Did it help you skip the scroll?",
+            selected = helped,
+            options = listOf("no" to "No", "maybe" to "Maybe", "yes" to "Yes"),
+            onSelect = { helped = it },
+            modifier = Modifier.padding(bottom = 30.dp),
+        )
+        Spacer(modifier = Modifier.weight(1f))
+        QaButton(
+            text = "Log session",
+            onClick = { onSubmit(fit != "not", helped != "no") },
+            enabled = done,
+            variant = QaButtonVariant.Primary,
+            modifier = Modifier.testTag("feedback-log"),
+        )
+        QaButton(text = "Skip", onClick = onSkip, variant = QaButtonVariant.Ghost)
+    }
+}
+
+@Composable
+private fun ProgressTab(snapshot: ProgressSnapshot) {
+    val colors = QualityAlternativeThemeTokens.colors
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .testTag("progress-list"),
+        contentPadding = PaddingValues(start = 24.dp, top = 16.dp, end = 24.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp),
+    ) {
+        item {
+            DisplayText("Progress", fontSize = 26.sp, modifier = Modifier.padding(bottom = 4.dp))
+            QaCard(
+                modifier = Modifier.testTag("progress-card"),
+                padding = 24.dp,
+            ) {
+                MonoText("This month", modifier = Modifier.padding(bottom = 12.dp))
+                Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = snapshot.daysConverted.toString(),
+                        style = TextStyle(
+                            fontFamily = QualityDisplayFontFamily,
+                            fontSize = 62.sp,
+                            lineHeight = 62.sp,
+                            color = colors.primaryText,
+                        ),
+                    )
+                    BodyText("days converted", color = colors.mutedText, modifier = Modifier.padding(bottom = 10.dp))
+                }
+                BodyText(
+                    text = "Days you replaced an impulse with a real read. Missed days aren't tracked - come back when you can.",
+                    color = colors.mutedText,
+                    modifier = Modifier.padding(top = 10.dp, bottom = 20.dp),
+                )
+                CalendarStrip()
+            }
+        }
+        item {
+            QaCard(padding = 0.dp) {
+                SmallStatRow("Interventions shown", snapshot.interventionsShown.toString())
+                HorizontalDivider(color = colors.line)
+                SmallStatRow("Chose the alternative", "${snapshot.alternativesChosen}")
+                HorizontalDivider(color = colors.line)
+                SmallStatRow("Delayed social", snapshot.delayedOpens.toString())
+                HorizontalDivider(color = colors.line)
+                SmallStatRow("Opened anyway", snapshot.consciousOverrides.toString(), subtle = true)
+            }
+        }
+        item {
+            SectionLabel("Recent replacements")
+            QaCard(padding = 0.dp) {
+                if (snapshot.recentReplacements.isEmpty()) {
+                    BodyText(
+                        text = "No converted impulses yet. Once you choose a replacement, it appears here as history.",
+                        color = colors.mutedText,
+                        modifier = Modifier.padding(18.dp),
+                    )
+                } else {
+                    snapshot.recentReplacements.forEachIndexed { index, entry ->
+                        if (index > 0) HorizontalDivider(color = colors.line)
+                        RecentReplacementRow(entry = entry)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingsTab(
+    state: MainUiState,
+    onToggleApp: (DistractingApp) -> Unit,
+    onSelectDuration: (DurationBucket) -> Unit,
+    onSelectTheme: (AppThemeMode) -> Unit,
+    onRefreshReadiness: () -> Unit,
+) {
+    val context = LocalContext.current
+    val colors = QualityAlternativeThemeTokens.colors
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .testTag("settings-list"),
+        contentPadding = PaddingValues(start = 24.dp, top = 16.dp, end = 24.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp),
+    ) {
+        item { DisplayText("Settings", fontSize = 26.sp) }
+        item {
+            SectionLabel("Permission readiness")
+            QaCard(padding = 0.dp) {
+                PermissionRow("Usage access", "Detect a chosen app opening", state.permissionReadiness.accessibilityStatus == PermissionStatus.READY) {
+                    context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                }
+                HorizontalDivider(color = colors.line)
+                PermissionRow("Display over apps", "Show the prompt on top", state.permissionReadiness.overlayStatus == PermissionStatus.READY) {
+                    context.startActivity(
+                        Intent(
+                            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                            Uri.parse("package:${context.packageName}"),
+                        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                    )
+                }
+                HorizontalDivider(color = colors.line)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = onRefreshReadiness)
+                        .padding(horizontal = 18.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(if (state.permissionReadiness.interceptionReady) colors.success else colors.accent),
+                    )
+                    BodyText(
+                        text = if (state.permissionReadiness.interceptionReady) "Interception is fully active" else "Interception is degraded",
+                        color = if (state.permissionReadiness.interceptionReady) colors.success else colors.accent,
+                    )
+                }
+            }
+        }
+        item {
+            SectionLabel("Intercepting")
+            QaCard {
+                AppPills(
+                    apps = state.allSupportedApps,
+                    selectedApp = state.selectedTargetApp,
+                    selectedPackages = state.availableTargetApps.mapTo(mutableSetOf(), DistractingApp::packageName),
+                    onSelect = onToggleApp,
+                    dimUnselected = true,
+                )
+            }
+        }
+        item {
+            SectionLabel("Default session length")
+            QaCard {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    DurationBucket.entries.forEach { bucket ->
+                        QaChip(
+                            text = "${bucket.prototypeMinutes()} min",
+                            selected = bucket == state.preferences?.preferredDurationBucket,
+                            onClick = { onSelectDuration(bucket) },
+                            modifier = Modifier.weight(1f),
+                            centered = true,
+                        )
+                    }
+                }
+            }
+        }
+        item {
+            SectionLabel("Theme")
+            QaCard {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    QaChip(
+                        text = "Light",
+                        selected = state.themeMode == AppThemeMode.LIGHT,
+                        onClick = { onSelectTheme(AppThemeMode.LIGHT) },
+                        modifier = Modifier.weight(1f).testTag("theme-LIGHT"),
+                        centered = true,
+                    )
+                    QaChip(
+                        text = "Dark",
+                        selected = state.themeMode == AppThemeMode.DARK,
+                        onClick = { onSelectTheme(AppThemeMode.DARK) },
+                        modifier = Modifier.weight(1f).testTag("theme-DARK"),
+                        centered = true,
+                    )
+                }
+            }
+        }
+        item {
+            SectionLabel("Mode")
+            QaCard(padding = 0.dp) {
+                ModeRow("Soft intervention", "Offer an alternative. You always have an override.", selected = true)
+                HorizontalDivider(color = colors.line)
+                ModeRow("Firm intervention", "Add a small friction step before opening anyway.", selected = false)
+            }
+        }
+        item {
+            MonoText(
+                text = "Quality Alternative - v0.1 MVP",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 20.dp),
+                textAlign = TextAlign.Center,
+            )
+        }
+    }
+}
+
+@Composable
+private fun AppSelectionRow(
+    app: DistractingApp,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val colors = QualityAlternativeThemeTokens.colors
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .border(
+                BorderStroke(1.dp, if (selected) colors.primaryText else colors.line),
+                RoundedCornerShape(10.dp),
+            )
+            .background(if (selected) colors.elevatedSurface else Color.Transparent)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        AppDot(app = app)
+        Text(
+            text = app.displayName,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium,
+            color = colors.primaryText,
+        )
+        Box(
+            modifier = Modifier
+                .size(22.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .border(BorderStroke(1.5.dp, if (selected) colors.primaryText else colors.lineStrong), RoundedCornerShape(6.dp))
+                .background(if (selected) colors.primaryText else Color.Transparent),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (selected) Text("✓", color = colors.background, fontSize = 13.sp)
+        }
+    }
+}
+
+@Composable
+private fun DurationOption(
+    bucket: DurationBucket,
+    label: String,
+    description: String,
+    selection: OnboardingSelection,
+    onSelectDuration: (DurationBucket) -> Unit,
+) {
+    val colors = QualityAlternativeThemeTokens.colors
+    val selected = selection.preferredDurationBucket == bucket
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .border(BorderStroke(1.dp, if (selected) colors.primaryText else colors.line), RoundedCornerShape(10.dp))
+            .background(if (selected) colors.elevatedSurface else Color.Transparent)
+            .clickable { onSelectDuration(bucket) }
+            .padding(horizontal = 20.dp, vertical = 18.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Text(
+            text = bucket.prototypeMinutes().toString(),
+            style = TextStyle(
+                fontFamily = QualityDisplayFontFamily,
+                fontSize = 30.sp,
+                lineHeight = 30.sp,
+                color = if (selected) colors.accent else colors.primaryText,
+            ),
+            modifier = Modifier.width(56.dp),
+        )
+        Column {
+            Text(label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+            BodyText(description, color = colors.mutedText, fontSize = 13.sp)
+        }
+    }
+}
+
+@Composable
+private fun PermissionIntroRow(name: String, why: String) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.padding(bottom = 8.dp)) {
+        SourceBadge(sourceType = ContentSourceType.EDITORIAL)
+        Text(name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+    }
+    BodyText(why, color = QualityAlternativeThemeTokens.colors.mutedText)
+}
+
+@Composable
+private fun PermissionWarningCard(onOpenSettings: () -> Unit) {
+    val colors = QualityAlternativeThemeTokens.colors
+    QaCard(
+        background = colors.accentSoft,
+        borderColor = colors.accent,
+        padding = 16.dp,
+    ) {
+        Text("Interception is paused", style = MaterialTheme.typography.bodySmall, color = colors.accent, fontWeight = FontWeight.Medium)
+        BodyText(
+            text = "A permission is missing. Without it, we can't offer you something better when you open a distracting app.",
+            color = colors.primaryText,
+            modifier = Modifier.padding(top = 6.dp, bottom = 10.dp),
+        )
+        QaButton("Fix in Settings", onClick = onOpenSettings, variant = QaButtonVariant.Outline, size = QaButtonSize.Small, fullWidth = false)
+    }
+}
+
+@Composable
+private fun ActiveDelayCard(
+    targetApp: DistractingApp?,
+    delayWindow: DelayWindow,
+) {
+    QaCard(padding = 14.dp) {
+        MonoText("${targetApp?.displayName ?: delayWindow.targetAppPackage} delayed")
+        BodyText(
+            text = "We'll step aside until ${formatTimestamp(delayWindow.endsAtMillis)}.",
+            color = QualityAlternativeThemeTokens.colors.mutedText,
+        )
+    }
+}
+
+@Composable
+private fun SectionLabel(text: String, right: String? = null) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 0.dp, end = 0.dp, bottom = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        LabelText(text, modifier = Modifier.weight(1f))
+        if (right != null) MonoText(right)
+    }
+}
+
+@Composable
+private fun StatCell(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    color: Color = QualityAlternativeThemeTokens.colors.primaryText,
+) {
+    Column(modifier = modifier) {
+        MonoText(label, modifier = Modifier.padding(bottom = 4.dp))
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleLarge,
+            fontSize = 22.sp,
+            lineHeight = 24.sp,
+            color = color,
+        )
+    }
+}
+
+@Composable
+private fun AppPills(
+    apps: List<DistractingApp>,
+    selectedApp: DistractingApp?,
+    onSelect: (DistractingApp) -> Unit,
+    selectedPackages: Set<String> = apps.mapTo(mutableSetOf(), DistractingApp::packageName),
+    dimUnselected: Boolean = false,
+) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        apps.forEach { app ->
+            val selected = app.packageName in selectedPackages
+            Row(
+                modifier = Modifier
+                    .alpha(if (!selected && dimUnselected) 0.55f else 1f)
+                    .clip(RoundedCornerShape(100.dp))
+                    .border(
+                        BorderStroke(1.dp, if (selectedApp?.packageName == app.packageName) QualityAlternativeThemeTokens.colors.primaryText else QualityAlternativeThemeTokens.colors.line),
+                        RoundedCornerShape(100.dp),
+                    )
+                    .clickable { onSelect(app) }
+                    .padding(start = 6.dp, top = 6.dp, end = 12.dp, bottom = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                AppDot(app = app, size = 20.dp)
+                Text(app.displayName, style = MaterialTheme.typography.bodySmall, fontSize = 12.5.sp)
+            }
+        }
+    }
+}
+
+@Composable
+private fun LibrarySummaryRow(label: String, value: String, sourceType: ContentSourceType) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 19.dp, vertical = 17.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        SourceBadge(sourceType = sourceType)
+        Column(modifier = Modifier.weight(1f)) {
+            Text(label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+            MonoText(value, modifier = Modifier.padding(top = 2.dp))
+        }
+        Text(">", color = QualityAlternativeThemeTokens.colors.faintText)
+    }
+}
+
+@Composable
+private fun LibraryItemCard(item: ContentItem, onOpen: () -> Unit) {
+    QaCard(
+        modifier = Modifier.clickable(onClick = onOpen),
+        padding = 16.dp,
+    ) {
+        ContentMetaRow(item)
+        Text(
+            text = item.title,
+            style = MaterialTheme.typography.titleMedium,
+            fontSize = 17.sp,
+            lineHeight = 20.sp,
+            modifier = Modifier.padding(top = 6.dp),
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        BodyText(item.sourceLabel(), color = QualityAlternativeThemeTokens.colors.mutedText, fontSize = 12.5.sp, modifier = Modifier.padding(top = 4.dp))
+    }
+}
+
+@Composable
+private fun ContentMetaRow(item: ContentItem) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+        MonoText(item.sourceLabel())
+        MonoText("-")
+        MonoText(item.topicLine(), modifier = Modifier.weight(1f))
+        MonoText("${item.durationMinutes} min")
+    }
+}
+
+@Composable
+private fun BackupRow(
+    item: ContentItem,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+    ) {
+        HorizontalDivider(color = QualityAlternativeThemeTokens.colors.line)
+        Row(
+            modifier = Modifier.padding(vertical = 14.dp, horizontal = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(item.title, style = MaterialTheme.typography.titleMedium, fontSize = 16.sp, lineHeight = 19.sp, maxLines = 2)
+                MonoText("${item.sourceLabel()} - ${item.durationMinutes} min - ${item.topicLine()}", modifier = Modifier.padding(top = 3.dp))
+            }
+            Text(">", color = QualityAlternativeThemeTokens.colors.faintText)
+        }
+    }
+}
+
+@Composable
+private fun AddLinkValidationLine(form: AddLinkFormState, host: String) {
+    val urlError = form.validationErrors.firstOrNull { it.isUrlError() }
+    if (urlError != null) {
+        BodyText(urlError.displayMessage(), color = QualityAlternativeThemeTokens.colors.accent, fontSize = 12.5.sp, modifier = Modifier.padding(top = 6.dp))
+    } else if (host.isNotBlank()) {
+        Row(
+            modifier = Modifier
+                .padding(top = 8.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(QualityAlternativeThemeTokens.colors.successSoft)
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text("OK", color = QualityAlternativeThemeTokens.colors.success, style = MaterialTheme.typography.labelMedium)
+            BodyText("Found - $host", color = QualityAlternativeThemeTokens.colors.success, fontSize = 12.5.sp)
+        }
+    }
+}
+
+@Composable
+private fun FeedbackQuestion(
+    title: String,
+    selected: String?,
+    options: List<Pair<String, String>>,
+    onSelect: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier) {
+        Text(title, style = MaterialTheme.typography.bodyMedium, fontSize = 15.sp, modifier = Modifier.padding(bottom = 12.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            options.forEach { (id, label) ->
+                QaChip(
+                    text = label,
+                    selected = selected == id,
+                    onClick = { onSelect(id) },
+                    modifier = Modifier.weight(1f),
+                    centered = true,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CalendarStrip() {
+    val colors = QualityAlternativeThemeTokens.colors
+    val days = listOf(1f, 1f, 0f, 1f, 1f, 1f, .5f, 0f, 1f, 1f, 1f, 1f, 0f, 1f, 1f, .5f, 1f, 1f, 1f, 1f, 1f)
+    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
+        days.forEach { value ->
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(28.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(
+                        when (value) {
+                            1f -> colors.accent
+                            .5f -> colors.accentSoft
+                            else -> colors.line
+                        },
+                    )
+                    .alpha(if (value == 0f) 0.5f else 1f),
+            )
+        }
+    }
+    Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+        MonoText("3 weeks ago")
+        MonoText("today")
+    }
+}
+
+@Composable
+private fun SmallStatRow(label: String, value: String, subtle: Boolean = false) {
+    val colors = QualityAlternativeThemeTokens.colors
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 18.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        BodyText(label, color = if (subtle) colors.mutedText else colors.primaryText, modifier = Modifier.weight(1f))
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleMedium,
+            fontSize = 16.sp,
+            color = if (subtle) colors.mutedText else colors.primaryText,
+        )
+    }
+}
+
+@Composable
+private fun RecentReplacementRow(entry: ReplacementHistoryEntry) {
+    Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+            MonoText(formatRelativeDay(entry.acceptedAtMillis), modifier = Modifier.weight(1f))
+            MonoText("${entry.contentMinutesGuess()} min")
+        }
+        Text(
+            entry.contentTitle,
+            style = MaterialTheme.typography.titleMedium,
+            fontSize = 15.5.sp,
+            lineHeight = 19.sp,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+        BodyText("instead of ${entry.targetAppDisplayName}", color = QualityAlternativeThemeTokens.colors.mutedText, fontSize = 12.5.sp, modifier = Modifier.padding(top = 3.dp))
+    }
+}
+
+@Composable
+private fun PermissionRow(name: String, desc: String, granted: Boolean, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 18.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+            BodyText(desc, color = QualityAlternativeThemeTokens.colors.mutedText, fontSize = 12.5.sp)
+        }
+        ToggleVisual(granted)
+    }
+}
+
+@Composable
+private fun ModeRow(title: String, desc: String, selected: Boolean) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 18.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        RadioVisual(selected)
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+            BodyText(desc, color = QualityAlternativeThemeTokens.colors.mutedText, fontSize = 12.5.sp)
+        }
+    }
+}
+
+@Composable
+private fun ToggleVisual(granted: Boolean) {
+    val colors = QualityAlternativeThemeTokens.colors
+    Box(
+        modifier = Modifier
+            .size(width = 40.dp, height = 22.dp)
+            .clip(RoundedCornerShape(11.dp))
+            .background(if (granted) colors.success else colors.lineStrong)
+            .padding(2.dp),
+        contentAlignment = if (granted) Alignment.CenterEnd else Alignment.CenterStart,
+    ) {
+        Box(modifier = Modifier.size(18.dp).clip(CircleShape).background(Color.White))
+    }
+}
+
+@Composable
+private fun RadioVisual(selected: Boolean) {
+    val colors = QualityAlternativeThemeTokens.colors
+    Box(
+        modifier = Modifier
+            .size(18.dp)
+            .clip(CircleShape)
+            .border(BorderStroke(1.5.dp, if (selected) colors.accent else colors.lineStrong), CircleShape)
+            .background(if (selected) colors.accent else Color.Transparent)
+            .padding(4.dp),
+    ) {
+        if (selected) Box(modifier = Modifier.fillMaxSize().clip(CircleShape).background(colors.elevatedSurface))
+    }
+}
+
+@Composable
+private fun QaCard(
+    modifier: Modifier = Modifier,
+    padding: androidx.compose.ui.unit.Dp = 21.dp,
+    background: Color = QualityAlternativeThemeTokens.colors.elevatedSurface,
+    borderColor: Color = QualityAlternativeThemeTokens.colors.line,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = background,
+        contentColor = QualityAlternativeThemeTokens.colors.primaryText,
+        border = BorderStroke(1.dp, borderColor),
+    ) {
+        Column(
+            modifier = Modifier.padding(padding),
+            content = content,
+        )
+    }
+}
+
+private enum class QaButtonVariant { Primary, Accent, Outline, Ghost }
+private enum class QaButtonSize { Normal, Small, Compact }
+
+@Composable
+private fun QaButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    variant: QaButtonVariant = QaButtonVariant.Primary,
+    size: QaButtonSize = QaButtonSize.Normal,
+    enabled: Boolean = true,
+    fullWidth: Boolean = true,
+) {
+    val colors = QualityAlternativeThemeTokens.colors
+    val background = when (variant) {
+        QaButtonVariant.Primary -> colors.primaryText
+        QaButtonVariant.Accent -> colors.accent
+        QaButtonVariant.Outline -> colors.elevatedSurface
+        QaButtonVariant.Ghost -> Color.Transparent
+    }
+    val foreground = when (variant) {
+        QaButtonVariant.Primary -> colors.background
+        QaButtonVariant.Accent -> Color.White
+        QaButtonVariant.Outline -> colors.primaryText
+        QaButtonVariant.Ghost -> colors.mutedText
+    }
+    val border = when (variant) {
+        QaButtonVariant.Outline -> BorderStroke(1.dp, colors.lineStrong)
+        QaButtonVariant.Primary -> BorderStroke(1.dp, colors.primaryText)
+        QaButtonVariant.Accent -> BorderStroke(1.dp, colors.accent)
+        QaButtonVariant.Ghost -> null
+    }
+    val padding = when (size) {
+        QaButtonSize.Normal -> PaddingValues(horizontal = 19.dp, vertical = 15.dp)
+        QaButtonSize.Small -> PaddingValues(horizontal = 15.dp, vertical = 11.dp)
+        QaButtonSize.Compact -> PaddingValues(horizontal = 13.dp, vertical = 13.dp)
+    }
+    Surface(
+        modifier = modifier
+            .then(if (fullWidth) Modifier.fillMaxWidth() else Modifier)
+            .alpha(if (enabled) 1f else 0.4f),
+        onClick = onClick,
+        enabled = enabled,
+        shape = RoundedCornerShape(10.dp),
+        color = background,
+        contentColor = foreground,
+        border = border,
+    ) {
+        Box(
+            modifier = Modifier.padding(padding),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+                textAlign = TextAlign.Center,
+                fontSize = if (size == QaButtonSize.Small || size == QaButtonSize.Compact) 14.sp else 16.sp,
+            )
+        }
+    }
+}
+
+@Composable
+private fun QaIconButton(text: String, onClick: () -> Unit) {
+    Surface(
+        modifier = Modifier.size(34.dp),
+        onClick = onClick,
+        shape = RoundedCornerShape(10.dp),
+        color = Color.Transparent,
+        contentColor = QualityAlternativeThemeTokens.colors.mutedText,
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(text = text, fontWeight = FontWeight.Medium)
+        }
+    }
+}
+
+@Composable
+private fun QaChip(
+    text: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    accentSelected: Boolean = false,
+    centered: Boolean = false,
+) {
+    val colors = QualityAlternativeThemeTokens.colors
+    val selectedColor = if (accentSelected) colors.accent else colors.primaryText
+    Surface(
+        modifier = modifier,
+        onClick = onClick,
+        shape = RoundedCornerShape(100.dp),
+        color = if (selected) selectedColor else colors.elevatedSurface,
+        contentColor = if (selected) colors.background else colors.mutedText,
+        border = BorderStroke(1.dp, if (selected) selectedColor else colors.lineStrong),
+    ) {
+        Box(
+            modifier = Modifier
+                .then(if (centered) Modifier.fillMaxWidth() else Modifier)
+                .padding(horizontal = 15.dp, vertical = 9.dp),
+            contentAlignment = if (centered) Alignment.Center else Alignment.CenterStart,
+        ) {
+            Text(text, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
+        }
+    }
+}
+
+@Composable
+private fun QaTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    modifier: Modifier = Modifier,
+    isError: Boolean = false,
+) {
+    OutlinedTextField(
+        modifier = modifier.fillMaxWidth(),
+        value = value,
+        onValueChange = onValueChange,
+        placeholder = { Text(placeholder, color = QualityAlternativeThemeTokens.colors.faintText) },
+        singleLine = true,
+        isError = isError,
+        textStyle = MaterialTheme.typography.bodyMedium,
+        shape = RoundedCornerShape(10.dp),
+    )
+}
+
+@Composable
+private fun AppDot(app: DistractingApp, size: androidx.compose.ui.unit.Dp = 28.dp) {
+    Box(
+        modifier = Modifier
+            .size(size)
+            .clip(RoundedCornerShape(8.dp))
+            .background(app.dotColor()),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = app.displayName.firstOrNull()?.uppercaseChar()?.toString().orEmpty(),
+            color = Color.White,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.SemiBold,
+        )
+    }
+}
+
+@Composable
+private fun SourceBadge(sourceType: ContentSourceType) {
+    val colors = QualityAlternativeThemeTokens.colors
+    val background = if (sourceType == ContentSourceType.USER_LINK) colors.successSoft else colors.accentSoft
+    val foreground = if (sourceType == ContentSourceType.USER_LINK) colors.success else colors.accent
+    Box(
+        modifier = Modifier
+            .size(34.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(background),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(if (sourceType == ContentSourceType.USER_LINK) "L" else "E", color = foreground, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+private fun Dots(total: Int, active: Int) {
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+        repeat(total) { index ->
+            Box(
+                modifier = Modifier
+                    .size(width = if (index == active) 20.dp else 6.dp, height = 6.dp)
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(if (index == active) QualityAlternativeThemeTokens.colors.primaryText else QualityAlternativeThemeTokens.colors.lineStrong),
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProgressLine(progress: Int, modifier: Modifier = Modifier) {
+    val colors = QualityAlternativeThemeTokens.colors
+    Box(
+        modifier = modifier
+            .height(5.dp)
+            .clip(RoundedCornerShape(3.dp))
+            .background(colors.line),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxHeight()
+                .fillMaxWidth((progress / 100f).coerceIn(0f, 1f))
+                .background(colors.accent),
+        )
+    }
+}
+
+@Composable
+private fun PlaceholderImage(modifier: Modifier = Modifier) {
+    val colors = QualityAlternativeThemeTokens.colors
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(160.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(colors.line)
+            .drawBehind {
+                val stripeGap = 20.dp.toPx()
+                val stripeWidth = 8.dp.toPx()
+                var x = -size.height
+                while (x < size.width) {
+                    drawLine(
+                        color = colors.elevatedSurface,
+                        start = Offset(x, size.height),
+                        end = Offset(x + size.height, 0f),
+                        strokeWidth = stripeWidth,
+                    )
+                    x += stripeGap
+                }
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        MonoText("figure - editorial image")
+    }
+}
+
+@Composable
+private fun InputLabel(text: String, modifier: Modifier = Modifier) {
+    LabelText(text, modifier = modifier.padding(bottom = 6.dp))
+}
+
+@Composable
+private fun DisplayText(
+    text: String,
+    modifier: Modifier = Modifier,
+    fontSize: androidx.compose.ui.unit.TextUnit = 28.sp,
+    lineHeight: androidx.compose.ui.unit.TextUnit = 31.sp,
+    textAlign: TextAlign? = null,
+) {
+    Text(
+        text = text,
+        modifier = modifier,
+        style = TextStyle(
+            fontFamily = QualityDisplayFontFamily,
+            fontWeight = FontWeight.Medium,
+            fontSize = fontSize,
+            lineHeight = lineHeight,
+            letterSpacing = (-0.15).sp,
+            color = QualityAlternativeThemeTokens.colors.primaryText,
+        ),
+        textAlign = textAlign,
+    )
+}
+
+@Composable
+private fun BodyText(
+    text: String,
+    modifier: Modifier = Modifier,
+    color: Color = QualityAlternativeThemeTokens.colors.primaryText,
+    fontSize: androidx.compose.ui.unit.TextUnit = 14.5.sp,
+    lineHeight: androidx.compose.ui.unit.TextUnit = 21.sp,
+    textAlign: TextAlign? = null,
+) {
+    Text(
+        text = text,
+        modifier = modifier,
+        style = MaterialTheme.typography.bodyMedium.copy(fontSize = fontSize, lineHeight = lineHeight, color = color),
+        textAlign = textAlign,
+    )
+}
+
+@Composable
+private fun MonoText(
+    text: String,
+    modifier: Modifier = Modifier,
+    color: Color = QualityAlternativeThemeTokens.colors.faintText,
+    lineHeight: androidx.compose.ui.unit.TextUnit = 14.sp,
+    textAlign: TextAlign? = null,
+) {
+    Text(
+        text = text.uppercase(Locale.US),
+        modifier = modifier,
+        style = TextStyle(
+            fontFamily = QualityMonoFontFamily,
+            fontSize = 11.sp,
+            lineHeight = lineHeight,
+            letterSpacing = 0.4.sp,
+            color = color,
+        ),
+        textAlign = textAlign,
+    )
+}
+
+@Composable
+private fun LabelText(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text = text.uppercase(Locale.US),
+        modifier = modifier,
+        style = TextStyle(
+            fontFamily = MaterialTheme.typography.labelMedium.fontFamily,
+            fontWeight = FontWeight.Medium,
+            fontSize = 11.sp,
+            letterSpacing = 0.8.sp,
+            color = QualityAlternativeThemeTokens.colors.mutedText,
+        ),
+    )
 }
 
 internal data class ProgressSnapshot(
@@ -483,1136 +2193,25 @@ internal fun progressSnapshot(
     )
 }
 
-@Composable
-private fun SetupSnapshotCard(
-    state: MainUiState,
-    onSelectTargetApp: (DistractingApp) -> Unit,
-) {
-    val colors = QualityAlternativeThemeTokens.colors
-    AnalogCard {
-        HomeSectionLabel(text = "Setup")
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(18.dp),
-        ) {
-            StatCell(
-                modifier = Modifier.weight(1f),
-                label = "Selected apps",
-                value = "${state.availableTargetApps.size} apps",
-            )
-            StatCell(
-                modifier = Modifier.weight(1f),
-                label = "Session length",
-                value = state.preferences?.preferredDurationBucket?.displayName() ?: "Unset",
-            )
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(18.dp),
-        ) {
-            StatCell(
-                modifier = Modifier.weight(1f),
-                label = "Topics",
-                value = "${state.preferences?.preferredTopics?.size ?: 0}",
-            )
-            StatCell(
-                modifier = Modifier.weight(1f),
-                label = "Status",
-                value = if (state.permissionReadiness.interceptionReady) "Active" else "Paused",
-                accent = if (state.permissionReadiness.interceptionReady) colors.success else colors.accent,
-            )
-        }
-        if (state.availableTargetApps.isNotEmpty()) {
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                state.availableTargetApps.forEach { app ->
-                    FilterChip(
-                        selected = state.selectedTargetApp == app,
-                        onClick = { onSelectTargetApp(app) },
-                        label = { Text(app.displayName) },
-                    )
-                }
-            }
-        }
-        state.activeDelayWindow?.let { delayWindow ->
-            ActiveDelayNotice(
-                targetApp = state.selectedTargetApp,
-                delayWindow = delayWindow,
-            )
-        }
-    }
-}
+internal data class HomeHeroCopy(
+    val title: String,
+    val body: String,
+    val showAddLinkAction: Boolean,
+)
 
-@Composable
-private fun StatCell(
-    modifier: Modifier = Modifier,
-    label: String,
-    value: String,
-    accent: androidx.compose.ui.graphics.Color = QualityAlternativeThemeTokens.colors.primaryText,
-) {
-    Column(
-        modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium,
-            color = QualityAlternativeThemeTokens.colors.faintText,
+internal fun homeHeroCopy(readiness: PermissionReadiness): HomeHeroCopy {
+    return if (readiness.interceptionReady) {
+        HomeHeroCopy(
+            title = "You're set up for quieter reading today.",
+            body = "When an impulse opens a selected app, the Android alpha can pause it and offer one finite alternative.",
+            showAddLinkAction = true,
         )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.titleLarge,
-            color = accent,
-            fontWeight = FontWeight.SemiBold,
+    } else {
+        HomeHeroCopy(
+            title = "Interception needs one more step.",
+            body = "Finish the Android setup first, so the app can meet the impulse before a social feed opens.",
+            showAddLinkAction = false,
         )
-    }
-}
-
-@Composable
-private fun ProgressCard(snapshot: ProgressSnapshot) {
-    val colors = QualityAlternativeThemeTokens.colors
-    AnalogCard(modifier = Modifier.testTag("progress-card")) {
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            HomeSectionLabel(text = "Progress")
-            Text(
-                text = "Days converted, not streaks broken.",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                text = "This is a quiet record of impulses redirected into finite alternatives.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = colors.mutedText,
-            )
-        }
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            ProgressMetric(label = "Days converted", value = snapshot.daysConverted.toString())
-            ProgressMetric(label = "Shown", value = snapshot.interventionsShown.toString())
-            ProgressMetric(label = "Chose", value = snapshot.alternativesChosen.toString())
-            ProgressMetric(label = "Delayed", value = snapshot.delayedOpens.toString())
-            ProgressMetric(label = "Overrides", value = snapshot.consciousOverrides.toString())
-        }
-        Text(
-            text = "${snapshot.completedReads} completed ${if (snapshot.completedReads == 1) "read" else "reads"}",
-            style = MaterialTheme.typography.bodySmall,
-            color = colors.mutedText,
-        )
-        if (snapshot.recentReplacements.isEmpty()) {
-            Text(
-                text = "No converted impulses yet. Once you choose a replacement, it appears here as history.",
-                style = MaterialTheme.typography.bodySmall,
-                color = colors.mutedText,
-            )
-        } else {
-            Text(
-                text = "Recent replacements",
-                style = MaterialTheme.typography.labelMedium,
-                color = colors.faintText,
-            )
-            snapshot.recentReplacements.forEach { entry ->
-                RecentReplacementRow(entry = entry)
-            }
-        }
-    }
-}
-
-@Composable
-private fun ProgressMetric(
-    label: String,
-    value: String,
-) {
-    val colors = QualityAlternativeThemeTokens.colors
-    Card(
-        colors = CardDefaults.cardColors(containerColor = colors.accentSoft),
-        shape = RoundedCornerShape(16.dp),
-    ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 13.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
-        ) {
-            Text(
-                text = value,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = colors.accent,
-            )
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelMedium,
-                color = colors.mutedText,
-            )
-        }
-    }
-}
-
-@Composable
-private fun RecentReplacementRow(entry: ReplacementHistoryEntry) {
-    val colors = QualityAlternativeThemeTokens.colors
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(
-            text = entry.contentTitle,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-            text = "${entry.targetAppDisplayName} • ${entry.progressOutcomeLabel()}",
-            style = MaterialTheme.typography.bodySmall,
-            color = colors.mutedText,
-        )
-    }
-}
-
-@Composable
-private fun PreviewInterventionCard(
-    state: MainUiState,
-    onSelectTargetApp: (DistractingApp) -> Unit,
-    onTriggerIntervention: () -> Unit,
-) {
-    val colors = QualityAlternativeThemeTokens.colors
-    AnalogCard {
-        HomeSectionLabel(text = "Preview intervention")
-        Text(
-            text = "Normally this appears automatically. Use this internal shortcut to rehearse the moment without opening a social app.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = colors.mutedText,
-        )
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            state.availableTargetApps.forEach { app ->
-                FilterChip(
-                    selected = state.selectedTargetApp == app,
-                    onClick = { onSelectTargetApp(app) },
-                    label = { Text(app.displayName) },
-                )
-            }
-        }
-        Button(
-            onClick = onTriggerIntervention,
-            enabled = state.selectedTargetApp != null,
-        ) {
-            Text("Preview intervention")
-        }
-    }
-}
-
-@Composable
-private fun AnalogCard(
-    modifier: Modifier = Modifier,
-    content: @Composable ColumnScope.() -> Unit,
-) {
-    val colors = QualityAlternativeThemeTokens.colors
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = colors.elevatedSurface),
-        shape = RoundedCornerShape(24.dp),
-        border = BorderStroke(width = 1.dp, color = colors.line),
-    ) {
-        Column(
-            modifier = Modifier.padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            content = content,
-        )
-    }
-}
-
-@Composable
-private fun HomeSectionLabel(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.labelMedium,
-        color = QualityAlternativeThemeTokens.colors.faintText,
-    )
-}
-
-@Composable
-private fun PersonalLibraryCard(
-    userLinks: List<ContentItem>,
-    selectedStarterPacks: List<EditorialPack>,
-    onOpenAddLink: () -> Unit,
-) {
-    val colors = QualityAlternativeThemeTokens.colors
-    val editorialItems = selectedStarterPacks.sumOf { it.items.size }
-    val editorialMinutes = selectedStarterPacks.flatMap { it.items }.sumOf(ContentItem::durationMinutes)
-
-    AnalogCard {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                HomeSectionLabel(text = "Your library")
-                Text(
-                    text = "A small shelf for impulse moments.",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-            Text(
-                text = "${editorialItems + userLinks.size} items",
-                style = MaterialTheme.typography.labelMedium,
-                color = colors.faintText,
-            )
-        }
-
-        LibrarySummaryRow(
-            label = "Editorial picks",
-            value = "$editorialItems curated • $editorialMinutes min",
-            sourceType = ContentSourceType.EDITORIAL,
-        )
-        LibrarySummaryRow(
-            label = "Your added links",
-            value = "Personal library: ${userLinks.size} ${if (userLinks.size == 1) "link" else "links"} saved.",
-            sourceType = ContentSourceType.USER_LINK,
-        )
-        userLinks.take(2).forEach { link ->
-            SavedLinkRow(link = link)
-        }
-        if (userLinks.isEmpty()) {
-            Text(
-                text = "Add one piece you would genuinely read instead of scrolling.",
-                style = MaterialTheme.typography.bodySmall,
-                color = colors.mutedText,
-            )
-        }
-        Button(
-            modifier = Modifier.testTag("home-add-link"),
-            onClick = onOpenAddLink,
-        ) {
-            Text("Add link")
-        }
-    }
-}
-
-@Composable
-private fun LibrarySummaryRow(
-    label: String,
-    value: String,
-    sourceType: ContentSourceType,
-) {
-    val colors = QualityAlternativeThemeTokens.colors
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        SourceBadge(sourceType = sourceType)
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
-        ) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                text = value,
-                style = MaterialTheme.typography.bodySmall,
-                color = colors.mutedText,
-            )
-        }
-    }
-}
-
-@Composable
-private fun SavedLinkRow(link: ContentItem) {
-    val colors = QualityAlternativeThemeTokens.colors
-    Column(
-        verticalArrangement = Arrangement.spacedBy(3.dp),
-    ) {
-        Text(
-            text = "Saved link • ${link.durationMinutes} min",
-            style = MaterialTheme.typography.labelMedium,
-            color = colors.faintText,
-        )
-        Text(
-            text = link.title,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
-}
-
-@Composable
-private fun SourceBadge(sourceType: ContentSourceType) {
-    val colors = QualityAlternativeThemeTokens.colors
-    val label = when (sourceType) {
-        ContentSourceType.EDITORIAL -> "E"
-        ContentSourceType.USER_LINK -> "L"
-    }
-    val background = when (sourceType) {
-        ContentSourceType.EDITORIAL -> colors.accentSoft
-        ContentSourceType.USER_LINK -> colors.successSoft
-    }
-    val foreground = when (sourceType) {
-        ContentSourceType.EDITORIAL -> colors.accent
-        ContentSourceType.USER_LINK -> colors.success
-    }
-    Card(
-        colors = CardDefaults.cardColors(containerColor = background),
-        shape = RoundedCornerShape(10.dp),
-    ) {
-        Text(
-            modifier = Modifier.padding(horizontal = 11.dp, vertical = 8.dp),
-            text = label,
-            color = foreground,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.Bold,
-        )
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ThemeSettingsCard(
-    themeMode: AppThemeMode,
-    onSelectTheme: (AppThemeMode) -> Unit,
-) {
-    val colors = QualityAlternativeThemeTokens.colors
-    Card(
-        colors = CardDefaults.cardColors(containerColor = colors.elevatedSurface),
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Text(
-                text = "Theme",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                text = "Theme: ${themeMode.displayName()}",
-                color = colors.mutedText,
-            )
-            Text(
-                text = "Light keeps the warm paper feel. Dark is the calmer mode for night testing.",
-                color = colors.mutedText,
-                style = MaterialTheme.typography.bodySmall,
-            )
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                AppThemeMode.entries.forEach { mode ->
-                    FilterChip(
-                        modifier = Modifier.testTag("theme-${mode.name}"),
-                        selected = themeMode == mode,
-                        onClick = { onSelectTheme(mode) },
-                        label = { Text(mode.displayName()) },
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun AddLinkScreen(
-    form: AddLinkFormState,
-    onUrlChange: (String) -> Unit,
-    onTitleChange: (String) -> Unit,
-    onDurationChange: (String) -> Unit,
-    onToggleTopic: (TopicTag) -> Unit,
-    onSave: () -> Unit,
-    onCancel: () -> Unit,
-) {
-    val colors = QualityAlternativeThemeTokens.colors
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(22.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
-            Text(
-                text = "Add a replacement link",
-                style = MaterialTheme.typography.labelMedium,
-                color = colors.faintText,
-            )
-            Text(
-                text = "Add to your quality alternative.",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                text = "One piece you would rather read than scroll. Keep the shelf small and intentional.",
-                style = MaterialTheme.typography.bodyLarge,
-                color = colors.mutedText,
-            )
-        }
-
-        AnalogCard {
-            HomeSectionLabel(text = "Link")
-            OutlinedTextField(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("add-link-url"),
-                value = form.url,
-                onValueChange = onUrlChange,
-                label = { Text("https://...") },
-                singleLine = true,
-                isError = form.validationErrors.any { it.isUrlError() },
-                supportingText = {
-                    if (form.validationErrors.any { it.isUrlError() }) {
-                        Text(form.validationErrors.first { it.isUrlError() }.displayMessage())
-                    } else {
-                        Text("Use a normal web link starting with http or https.")
-                    }
-                },
-            )
-
-            OutlinedTextField(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("add-link-title"),
-                value = form.title,
-                onValueChange = onTitleChange,
-                label = { Text("Title") },
-                singleLine = true,
-                isError = UserLinkValidationError.BLANK_TITLE in form.validationErrors,
-                supportingText = {
-                    if (UserLinkValidationError.BLANK_TITLE in form.validationErrors) {
-                        Text(UserLinkValidationError.BLANK_TITLE.displayMessage())
-                    } else {
-                        Text("Give it the name you would recognize in an impulse moment.")
-                    }
-                },
-            )
-        }
-
-        AnalogCard {
-            HomeSectionLabel(text = "Estimated read")
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                listOf("3", "5", "7", "12", "20").forEach { minutes ->
-                    FilterChip(
-                        selected = form.durationMinutes == minutes,
-                        onClick = { onDurationChange(minutes) },
-                        label = { Text("$minutes min") },
-                    )
-                }
-            }
-            OutlinedTextField(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("add-link-duration"),
-                value = form.durationMinutes,
-                onValueChange = { value -> onDurationChange(value.filter(Char::isDigit).take(2)) },
-                label = { Text("Custom minutes") },
-                singleLine = true,
-                isError = UserLinkValidationError.INVALID_DURATION in form.validationErrors,
-                supportingText = {
-                    if (UserLinkValidationError.INVALID_DURATION in form.validationErrors) {
-                        Text(UserLinkValidationError.INVALID_DURATION.displayMessage())
-                    } else {
-                        Text("Use 1-60 minutes. The replacement stays finite.")
-                    }
-                },
-            )
-        }
-
-        AnalogCard {
-            HomeSectionLabel(text = "Topics")
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                TopicTag.entries.forEach { topic ->
-                    FilterChip(
-                        modifier = Modifier.testTag("add-link-topic-${topic.name}"),
-                        selected = topic in form.selectedTopics,
-                        onClick = { onToggleTopic(topic) },
-                        label = { Text(topic.displayName()) },
-                    )
-                }
-            }
-            if (UserLinkValidationError.NO_TOPICS in form.validationErrors) {
-                Text(
-                    text = UserLinkValidationError.NO_TOPICS.displayMessage(),
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            } else {
-                Text(
-                    text = "Topics help the local ranking choose this only when it fits.",
-                    color = colors.mutedText,
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-        }
-
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Button(
-                modifier = Modifier.testTag("add-link-save"),
-                onClick = onSave,
-                enabled = form.canSave && !form.isSaving,
-            ) {
-                Text(if (form.isSaving) "Saving…" else "Add to library")
-            }
-            OutlinedButton(onClick = onCancel) {
-                Text("Cancel")
-            }
-        }
-    }
-}
-
-@Composable
-private fun ActiveDelayNotice(
-    targetApp: DistractingApp?,
-    delayWindow: DelayWindow,
-) {
-    Text(
-        text = "${targetApp?.displayName ?: delayWindow.targetAppPackage} delayed until ${formatTimestamp(delayWindow.endsAtMillis)}",
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        style = MaterialTheme.typography.bodyMedium,
-    )
-}
-
-@Composable
-private fun PermissionReadinessCard(
-    readiness: PermissionReadiness,
-    onRefresh: () -> Unit,
-) {
-    val context = LocalContext.current
-    Card {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Text(
-                text = "Interception readiness",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                text = readiness.summary,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                text = "Accessibility is the required path for the current Android alpha interception flow. Overlay permission is optional and reserved for future floating-surface experiments.",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodySmall,
-            )
-            Text("Overlay permission: ${readiness.overlayStatus.displayLabel()}")
-            Text("Accessibility interception: ${readiness.accessibilityStatus.displayLabel()}")
-            Text(
-                text = if (readiness.interceptionReady) "System intervention ready" else "Setup still in progress",
-                style = MaterialTheme.typography.labelLarge,
-            )
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                if (readiness.accessibilityStatus != PermissionStatus.READY) {
-                    OutlinedButton(
-                        onClick = {
-                            context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
-                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            })
-                        },
-                    ) {
-                        Text("Open Accessibility")
-                    }
-                }
-                if (readiness.overlayStatus != PermissionStatus.READY) {
-                    OutlinedButton(
-                        onClick = {
-                            context.startActivity(
-                                Intent(
-                                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                                    Uri.parse("package:${context.packageName}"),
-                                ).apply {
-                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                },
-                            )
-                        },
-                    ) {
-                        Text("Optional Overlay")
-                    }
-                }
-                OutlinedButton(onClick = onRefresh) {
-                    Text("Refresh status")
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun InterventionScreen(
-    state: MainUiState,
-    onAcceptPrimary: () -> Unit,
-    onAcceptBackup: (ContentItem) -> Unit,
-    onDelay: () -> Unit,
-    onOpenAnyway: () -> Unit,
-) {
-    val recommendationSet = state.currentRecommendationSet ?: return
-    val targetApp = state.selectedTargetApp ?: return
-    val colors = QualityAlternativeThemeTokens.colors
-    val backups = recommendationSet.backups.take(MAX_BACKUP_RECOMMENDATIONS)
-    val backupHeading = when (backups.size) {
-        0 -> "No backup choices"
-        1 -> "One backup choice"
-        else -> "Two backup choices"
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        InterventionHeaderCard(targetApp = targetApp)
-
-        PrimaryRecommendationCard(
-            content = recommendationSet.primary,
-            actionLabel = if (recommendationSet.primary.isUserLink()) "Open link" else "Read now",
-            onClick = onAcceptPrimary,
-        )
-
-        BackupRecommendationPanel(
-            heading = backupHeading,
-            backups = backups,
-            onAcceptBackup = onAcceptBackup,
-        )
-
-        InterventionDecisionCard(
-            onDelay = onDelay,
-            onOpenAnyway = onOpenAnyway,
-        )
-    }
-}
-
-@Composable
-private fun InterventionHeaderCard(targetApp: DistractingApp) {
-    val colors = QualityAlternativeThemeTokens.colors
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(
-            text = "Pause before ${targetApp.displayName}",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-        )
-        Text(
-            text = "One finite replacement. Override stays available.",
-            style = MaterialTheme.typography.bodySmall,
-            color = colors.mutedText,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
-}
-
-@Composable
-private fun PrimaryRecommendationCard(
-    content: ContentItem,
-    actionLabel: String,
-    onClick: () -> Unit,
-) {
-    val colors = QualityAlternativeThemeTokens.colors
-
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-        shape = RoundedCornerShape(24.dp),
-    ) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(5.dp),
-        ) {
-            Text(
-                text = "One thoughtful alternative",
-                style = MaterialTheme.typography.labelMedium,
-                color = colors.mutedText,
-            )
-            Text(
-                text = content.title,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = content.description,
-                color = colors.mutedText,
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = content.metaLine(),
-                style = MaterialTheme.typography.labelMedium,
-                color = colors.mutedText,
-            )
-            Button(onClick = onClick) {
-                Text(actionLabel)
-            }
-        }
-    }
-}
-
-@Composable
-private fun BackupRecommendationPanel(
-    heading: String,
-    backups: List<ContentItem>,
-    onAcceptBackup: (ContentItem) -> Unit,
-) {
-    val colors = QualityAlternativeThemeTokens.colors
-    Column(
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        Text(
-            text = heading,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-        )
-        Text(
-            text = "No feed: just two lighter ways out.",
-            style = MaterialTheme.typography.bodySmall,
-            color = colors.mutedText,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        backups.forEachIndexed { index, backup ->
-            BackupRecommendationRow(
-                content = backup,
-                actionLabel = if (backup.isUserLink()) "Open link" else "Choose backup",
-                testTag = "intervention-backup-action-$index",
-                onClick = { onAcceptBackup(backup) },
-            )
-        }
-        if (backups.isEmpty()) {
-            Text(
-                text = "No extra choices are available right now.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = colors.mutedText,
-            )
-        }
-    }
-}
-
-@Composable
-private fun BackupRecommendationRow(
-    content: ContentItem,
-    actionLabel: String,
-    testTag: String,
-    onClick: () -> Unit,
-) {
-    val colors = QualityAlternativeThemeTokens.colors
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(1.dp),
-        ) {
-            Text(
-                text = content.title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = content.metaLine(),
-                style = MaterialTheme.typography.labelMedium,
-                color = colors.faintText,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        OutlinedButton(
-            modifier = Modifier.testTag(testTag),
-            onClick = onClick,
-        ) {
-            Text(actionLabel)
-        }
-    }
-}
-
-@Composable
-private fun InterventionDecisionCard(
-    onDelay: () -> Unit,
-    onOpenAnyway: () -> Unit,
-) {
-    val colors = QualityAlternativeThemeTokens.colors
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(
-            text = "Your call, deliberately made",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-        )
-        Text(
-            text = "Delay the impulse, or continue on purpose.",
-            style = MaterialTheme.typography.bodySmall,
-            color = colors.mutedText,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            OutlinedButton(onClick = onDelay) {
-                Text("Delay for 15 minutes")
-            }
-            Button(onClick = onOpenAnyway) {
-                Text("Open anyway")
-            }
-        }
-    }
-}
-
-@Composable
-private fun ExternalLinkHandoffScreen(
-    state: MainUiState,
-    onOpenLink: (android.content.Context) -> Unit,
-    onFinishSession: () -> Unit,
-    onSkipSession: () -> Unit,
-) {
-    val content = state.currentContent ?: return
-    val context = LocalContext.current
-    val colors = QualityAlternativeThemeTokens.colors
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .testTag("external-handoff-screen")
-            .padding(20.dp)
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
-            Text(
-                text = "Saved link handoff",
-                style = MaterialTheme.typography.labelMedium,
-                color = colors.faintText,
-            )
-            Text(
-                text = content.title,
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                text = content.metaLine(),
-                style = MaterialTheme.typography.bodyMedium,
-                color = colors.mutedText,
-            )
-        }
-
-        AnalogCard {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                SourceBadge(sourceType = ContentSourceType.USER_LINK)
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    Text(
-                        text = "You are leaving the app for one saved link.",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Text(
-                        text = "Open it deliberately, then return here to finish or leave the session. No feed is created inside Quality Alternative.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = colors.mutedText,
-                    )
-                }
-            }
-            content.externalUrl?.let { url ->
-                Text(
-                    text = url,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = colors.faintText,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
-
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Button(
-                modifier = Modifier.testTag("external-link-open"),
-                onClick = { onOpenLink(context) },
-            ) {
-                Text("Open saved link")
-            }
-            OutlinedButton(onClick = onFinishSession) {
-                Text("I read it")
-            }
-            OutlinedButton(onClick = onSkipSession) {
-                Text("Leave session")
-            }
-        }
-    }
-}
-
-@Composable
-private fun ReaderScreen(
-    state: MainUiState,
-    onFinishReading: () -> Unit,
-    onSkipReading: () -> Unit,
-) {
-    val content = state.currentContent ?: return
-    val colors = QualityAlternativeThemeTokens.colors
-    val paragraphs = finiteReaderParagraphs(state.currentContentBody)
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .testTag("reader-screen")
-            .padding(20.dp)
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
-            Text(
-                text = "Finite reader",
-                style = MaterialTheme.typography.labelMedium,
-                color = colors.faintText,
-            )
-            Text(
-                text = content.title,
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                text = content.metaLine(),
-                style = MaterialTheme.typography.bodyMedium,
-                color = colors.mutedText,
-            )
-        }
-
-        AnalogCard {
-            HomeSectionLabel(text = "One piece, then done")
-            paragraphs.forEach { paragraph ->
-                Text(
-                    text = paragraph,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = colors.primaryText,
-                )
-            }
-        }
-
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Button(onClick = onFinishReading) {
-                Text("Finish session")
-            }
-            OutlinedButton(onClick = onSkipReading) {
-                Text("Leave session")
-            }
-        }
-    }
-}
-
-@Composable
-private fun FeedbackScreen(
-    onSubmit: (Boolean, Boolean) -> Unit,
-    onSkip: () -> Unit,
-) {
-    var wasGoodFit by remember { mutableStateOf(true) }
-    var helped by remember { mutableStateOf(true) }
-    val colors = QualityAlternativeThemeTokens.colors
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .testTag("feedback-screen")
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp),
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
-            Text(
-                text = "Two-tap feedback",
-                style = MaterialTheme.typography.labelMedium,
-                color = colors.faintText,
-            )
-            Text(
-                text = "Help the next impulse land better.",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                text = "No scoring, no streak pressure. Just tune fit and usefulness.",
-                style = MaterialTheme.typography.bodyLarge,
-                color = colors.mutedText,
-            )
-        }
-        AnalogCard {
-            BinaryQuestion(
-                title = "Was this a good fit?",
-                selected = wasGoodFit,
-                onSelect = { wasGoodFit = it },
-            )
-            BinaryQuestion(
-                title = "Did it help you avoid mindless scrolling?",
-                selected = helped,
-                onSelect = { helped = it },
-            )
-        }
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Button(onClick = { onSubmit(wasGoodFit, helped) }) {
-                Text("Submit feedback")
-            }
-            OutlinedButton(onClick = onSkip) {
-                Text("Skip feedback")
-            }
-        }
-    }
-}
-
-@Composable
-private fun BinaryQuestion(
-    title: String,
-    selected: Boolean,
-    onSelect: (Boolean) -> Unit,
-) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Text(text = title, style = MaterialTheme.typography.titleMedium)
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            FilterChip(
-                selected = selected,
-                onClick = { onSelect(true) },
-                label = { Text("Yes") },
-            )
-            FilterChip(
-                selected = !selected,
-                onClick = { onSelect(false) },
-                label = { Text("No") },
-            )
-        }
     }
 }
 
@@ -1624,73 +2223,81 @@ internal fun finiteReaderParagraphs(body: String): List<String> {
 }
 
 private fun formatTimestamp(timestampMillis: Long): String {
-    val formatter = DateTimeFormatter.ofPattern("HH:mm:ss")
-    return formatter.format(
-        Instant.ofEpochMilli(timestampMillis).atZone(ZoneId.systemDefault()),
-    )
+    val formatter = DateTimeFormatter.ofPattern("HH:mm")
+    return formatter.format(Instant.ofEpochMilli(timestampMillis).atZone(ZoneId.systemDefault()))
 }
 
-private fun TopicTag.displayName(): String = name.lowercase().replaceFirstChar(Char::uppercase)
+private fun formatRelativeDay(timestampMillis: Long): String {
+    val formatter = DateTimeFormatter.ofPattern("EEE, h:mm a")
+    return formatter.format(Instant.ofEpochMilli(timestampMillis).atZone(ZoneId.systemDefault()))
+}
+
+private fun TopicTag.displayName(): String {
+    return when (this) {
+        TopicTag.PHILOSOPHY -> "Philosophy"
+        TopicTag.SCIENCE -> "Science"
+        TopicTag.HISTORY -> "History"
+        TopicTag.ECONOMICS -> "Economics"
+        TopicTag.CREATIVITY -> "Design"
+        TopicTag.PSYCHOLOGY -> "Psychology"
+    }
+}
+
+private fun DurationBucket.prototypeMinutes(): Int {
+    return when (this) {
+        DurationBucket.QUICK -> 5
+        DurationBucket.FOCUS -> 10
+        DurationBucket.DEEP -> 20
+    }
+}
+
+private fun DurationBucket.prototypeMinutesLabel(): String = "${prototypeMinutes()} min"
 
 private fun ContentItem.isUserLink(): Boolean = sourceType == ContentSourceType.USER_LINK
 
-private fun ContentItem.metaLine(): String {
-    val sourceLabel = if (isUserLink()) "Saved link" else "Editorial"
-    val topicLabel = topicTags.joinToString { it.displayName() }
-    return "$durationMinutes min • $sourceLabel • $topicLabel"
-}
+private fun ContentItem.topicLine(): String = topicTags.joinToString { it.displayName() }.ifBlank { "Essays" }
 
-private fun AppThemeMode.displayName(): String = when (this) {
-    AppThemeMode.LIGHT -> "Light"
-    AppThemeMode.DARK -> "Dark"
-}
-
-private const val MAX_BACKUP_RECOMMENDATIONS = 2
-private const val MAX_RECENT_PROGRESS_REPLACEMENTS = 3
-
-private fun launchExternalLink(
-    context: android.content.Context,
-    viewModel: MainViewModel,
-) {
-    val url = viewModel.currentExternalLinkUrl()
-    if (url == null) {
-        viewModel.recordExternalLinkHandoffFailed(reason = "missing_url")
-        return
-    }
-    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-    runCatching {
-        context.startActivity(intent)
-    }.onSuccess {
-        viewModel.recordExternalLinkOpened()
-    }.onFailure { error ->
-        val reason = if (error is ActivityNotFoundException) "no_handler" else "start_activity_failed"
-        viewModel.recordExternalLinkHandoffFailed(reason = reason)
+private fun ContentItem.sourceLabel(): String {
+    return if (isUserLink()) {
+        externalUrl?.hostLabel()?.ifBlank { "Your link" } ?: "Your link"
+    } else {
+        packId.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.US) else it.toString() }
     }
 }
 
-private fun DurationBucket.displayName(): String = when (this) {
-    DurationBucket.QUICK -> "3-5 minutes"
-    DurationBucket.FOCUS -> "5-10 minutes"
-    DurationBucket.DEEP -> "10-20 minutes"
+private fun remainingMinutes(totalMinutes: Int, progress: Int): Int {
+    return kotlin.math.ceil(totalMinutes * (1 - progress.coerceIn(0, 100) / 100f).toDouble())
+        .toInt()
+        .coerceAtLeast(0)
 }
 
-private fun PermissionStatus.displayLabel(): String = when (this) {
-    PermissionStatus.READY -> "Ready"
-    PermissionStatus.MISSING -> "Missing"
-    PermissionStatus.UNAVAILABLE_IN_BUILD -> "Not available in this build"
+private fun String.hostLabel(): String {
+    return runCatching {
+        val normalized = if (startsWith("http://") || startsWith("https://")) this else "https://$this"
+        Uri.parse(normalized).host.orEmpty().removePrefix("www.")
+    }.getOrDefault("")
 }
 
-private fun ReplacementHistoryEntry.progressOutcomeLabel(): String {
-    val labels = mutableListOf<String>()
-    labels += when {
-        isCompleted() -> "Read"
-        isSkipped() -> "Left early"
-        else -> "Started"
+private fun DistractingApp.dotColor(): Color {
+    return when (packageName) {
+        "com.instagram.android" -> Color(0xFFE1306C)
+        "com.zhiliaoapp.musically" -> Color(0xFF010101)
+        "com.twitter.android" -> Color(0xFF222222)
+        "com.reddit.frontpage" -> Color(0xFFFF4500)
+        "com.facebook.katana" -> Color(0xFF1877F2)
+        "com.google.android.youtube" -> Color(0xFFFF0033)
+        else -> Color(0xFF965630)
     }
-    if (feedbackGoodFit != null && feedbackHelpedAvoidScrolling != null) {
-        labels += if (feedbackHelpedAvoidScrolling == true) "Helped" else "Needs tuning"
+}
+
+private fun ReplacementHistoryEntry.contentMinutesGuess(): Int {
+    return when {
+        contentDescription.contains("seven", ignoreCase = true) -> 7
+        contentDescription.contains("five", ignoreCase = true) -> 5
+        contentDescription.contains("six", ignoreCase = true) -> 6
+        contentDescription.contains("eight", ignoreCase = true) -> 8
+        else -> 10
     }
-    return labels.joinToString(" • ")
 }
 
 private fun List<AnalyticsEvent>.distinctProgressEventCount(type: AnalyticsEventType): Int {
@@ -1721,3 +2328,26 @@ private fun UserLinkValidationError.displayMessage(): String {
         UserLinkValidationError.NO_TOPICS -> "Choose at least one topic so the app can rank this link."
     }
 }
+
+private fun launchExternalLink(
+    context: android.content.Context,
+    viewModel: MainViewModel,
+) {
+    val url = viewModel.currentExternalLinkUrl()
+    if (url == null) {
+        viewModel.recordExternalLinkHandoffFailed(reason = "missing_url")
+        return
+    }
+    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+    runCatching {
+        context.startActivity(intent)
+    }.onSuccess {
+        viewModel.recordExternalLinkOpened()
+    }.onFailure { error ->
+        val reason = if (error is ActivityNotFoundException) "no_handler" else "start_activity_failed"
+        viewModel.recordExternalLinkHandoffFailed(reason = reason)
+    }
+}
+
+private const val MAX_BACKUP_RECOMMENDATIONS = 2
+private const val MAX_RECENT_PROGRESS_REPLACEMENTS = 3

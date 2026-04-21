@@ -88,7 +88,7 @@ class MainViewModelTest {
 
         assertTrue(viewModel.uiState.hasCompletedOnboarding)
         assertEquals(MainScreen.Home, viewModel.uiState.screen)
-        assertEquals(3, viewModel.uiState.availableTargetApps.size)
+        assertEquals(4, viewModel.uiState.availableTargetApps.size)
         assertEquals(setOf("philosophy"), viewModel.uiState.preferences?.selectedPackIds)
     }
 
@@ -264,7 +264,7 @@ class MainViewModelTest {
         viewModel.saveUserLink(nowMillis = 2_000L)
         advanceUntilIdle()
 
-        assertEquals(MainScreen.Home, viewModel.uiState.screen)
+        assertEquals(MainScreen.Library, viewModel.uiState.screen)
         assertEquals("Saved essay", userLinkRepository.links.value.single().title)
         assertEquals("Saved essay", viewModel.uiState.userLinks.single().title)
         val event = analyticsTracker.allEvents().first { it.type == AnalyticsEventType.USER_LINK_ADDED }

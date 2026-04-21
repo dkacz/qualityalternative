@@ -91,7 +91,7 @@ data class MainUiState(
 data class AddLinkFormState(
     val url: String = "",
     val title: String = "",
-    val durationMinutes: String = "7",
+    val durationMinutes: String = "8",
     val selectedTopics: Set<TopicTag> = emptySet(),
     val validationErrors: Set<UserLinkValidationError> = emptySet(),
     val canSave: Boolean = false,
@@ -101,6 +101,9 @@ data class AddLinkFormState(
 enum class MainScreen {
     Onboarding,
     Home,
+    Library,
+    Progress,
+    Settings,
     AddLink,
     Intervention,
     Reader,
@@ -296,6 +299,41 @@ class MainViewModel(
         )
     }
 
+    fun openHome() {
+        uiState = uiState.copy(screen = MainScreen.Home, latestMessage = null)
+    }
+
+    fun openLibrary() {
+        uiState = uiState.copy(screen = MainScreen.Library, latestMessage = null)
+    }
+
+    fun openProgress() {
+        uiState = uiState.copy(screen = MainScreen.Progress, latestMessage = null)
+    }
+
+    fun openSettings() {
+        uiState = uiState.copy(screen = MainScreen.Settings, latestMessage = null)
+    }
+
+    fun openLibraryItem(content: ContentItem) {
+        uiState = uiState.copy(
+            currentInterventionId = null,
+            currentInterventionShownAtMillis = null,
+            currentRecommendationSet = null,
+            currentInterventionOrigin = null,
+            currentContent = content,
+            currentContentBody = contentRepository.contentBody(content),
+            currentSessionId = null,
+            currentSessionStartedAtMillis = nowProvider(),
+            screen = if (content.sourceType == ContentSourceType.USER_LINK) {
+                MainScreen.ExternalHandoff
+            } else {
+                MainScreen.Reader
+            },
+            latestMessage = null,
+        )
+    }
+
     fun cancelAddLink() {
         uiState = uiState.copy(
             screen = MainScreen.Home,
@@ -357,7 +395,7 @@ class MainViewModel(
                             ),
                         )
                         uiState = uiState.copy(
-                            screen = MainScreen.Home,
+                            screen = MainScreen.Library,
                             addLinkForm = AddLinkFormState(),
                             latestMessage = "Link saved for future replacement moments.",
                         )
@@ -680,23 +718,25 @@ class MainViewModel(
 
     fun finishReading() {
         val content = uiState.currentContent ?: return
-        val sessionId = uiState.currentSessionId ?: return
+        val sessionId = uiState.currentSessionId
         val nowMillis = System.currentTimeMillis()
         viewModelScope.launch {
-            historyRepository.markCompleted(sessionId = sessionId, completedAtMillis = nowMillis)
-            recordEvent(
-                AnalyticsEvent(
-                    type = AnalyticsEventType.READER_COMPLETED,
-                    timestampMillis = nowMillis,
-                    interventionId = uiState.currentInterventionId,
-                    sessionId = sessionId,
-                    targetAppPackage = uiState.selectedTargetApp?.packageName,
-                    primaryContentId = uiState.currentRecommendationSet?.primary?.id,
-                    backupContentIds = uiState.currentRecommendationSet?.backups.orEmpty().map(ContentItem::id),
-                    contentId = content.id,
-                    metadata = sessionDurationMetadata(nowMillis) + content.analyticsMetadata(),
-                ),
-            )
+            if (sessionId != null) {
+                historyRepository.markCompleted(sessionId = sessionId, completedAtMillis = nowMillis)
+                recordEvent(
+                    AnalyticsEvent(
+                        type = AnalyticsEventType.READER_COMPLETED,
+                        timestampMillis = nowMillis,
+                        interventionId = uiState.currentInterventionId,
+                        sessionId = sessionId,
+                        targetAppPackage = uiState.selectedTargetApp?.packageName,
+                        primaryContentId = uiState.currentRecommendationSet?.primary?.id,
+                        backupContentIds = uiState.currentRecommendationSet?.backups.orEmpty().map(ContentItem::id),
+                        contentId = content.id,
+                        metadata = sessionDurationMetadata(nowMillis) + content.analyticsMetadata(),
+                    ),
+                )
+            }
             uiState = uiState.copy(
                 screen = MainScreen.Feedback,
             )
@@ -705,23 +745,25 @@ class MainViewModel(
 
     fun skipReading() {
         val content = uiState.currentContent ?: return
-        val sessionId = uiState.currentSessionId ?: return
+        val sessionId = uiState.currentSessionId
         val nowMillis = System.currentTimeMillis()
         viewModelScope.launch {
-            historyRepository.markSkipped(sessionId = sessionId, skippedAtMillis = nowMillis)
-            recordEvent(
-                AnalyticsEvent(
-                    type = AnalyticsEventType.READER_SKIPPED,
-                    timestampMillis = nowMillis,
-                    interventionId = uiState.currentInterventionId,
-                    sessionId = sessionId,
-                    targetAppPackage = uiState.selectedTargetApp?.packageName,
-                    primaryContentId = uiState.currentRecommendationSet?.primary?.id,
-                    backupContentIds = uiState.currentRecommendationSet?.backups.orEmpty().map(ContentItem::id),
-                    contentId = content.id,
-                    metadata = sessionDurationMetadata(nowMillis) + content.analyticsMetadata(),
-                ),
-            )
+            if (sessionId != null) {
+                historyRepository.markSkipped(sessionId = sessionId, skippedAtMillis = nowMillis)
+                recordEvent(
+                    AnalyticsEvent(
+                        type = AnalyticsEventType.READER_SKIPPED,
+                        timestampMillis = nowMillis,
+                        interventionId = uiState.currentInterventionId,
+                        sessionId = sessionId,
+                        targetAppPackage = uiState.selectedTargetApp?.packageName,
+                        primaryContentId = uiState.currentRecommendationSet?.primary?.id,
+                        backupContentIds = uiState.currentRecommendationSet?.backups.orEmpty().map(ContentItem::id),
+                        contentId = content.id,
+                        metadata = sessionDurationMetadata(nowMillis) + content.analyticsMetadata(),
+                    ),
+                )
+            }
             clearActiveSession(
                 latestMessage = "Replacement session skipped.",
             )
@@ -756,13 +798,17 @@ class MainViewModel(
             )
             clearActiveSession(
                 lastFeedback = feedback,
+                screen = MainScreen.Progress,
                 latestMessage = "Feedback captured for the replacement session.",
             )
         }
     }
 
     fun skipFeedback() {
-        clearActiveSession(latestMessage = "Feedback skipped for this session.")
+        clearActiveSession(
+            screen = MainScreen.Progress,
+            latestMessage = "Feedback skipped for this session.",
+        )
     }
 
     fun selectThemeMode(themeMode: AppThemeMode) {
@@ -807,6 +853,9 @@ class MainViewModel(
                 !settings.hasCompletedOnboarding -> MainScreen.Onboarding
                 uiState.screen == MainScreen.Onboarding -> MainScreen.Home
                 uiState.screen == MainScreen.AddLink -> MainScreen.AddLink
+                uiState.screen == MainScreen.Library -> MainScreen.Library
+                uiState.screen == MainScreen.Progress -> MainScreen.Progress
+                uiState.screen == MainScreen.Settings -> MainScreen.Settings
                 else -> uiState.screen
             },
         )
@@ -1128,10 +1177,11 @@ class MainViewModel(
 
     private fun clearActiveSession(
         lastFeedback: SessionFeedback? = uiState.lastFeedback,
+        screen: MainScreen = MainScreen.Home,
         latestMessage: String,
     ) {
         uiState = uiState.copy(
-            screen = MainScreen.Home,
+            screen = screen,
             currentInterventionId = null,
             currentInterventionShownAtMillis = null,
             currentContent = null,
@@ -1228,8 +1278,21 @@ private fun defaultOnboardingSelection(
     supportedApps: List<DistractingApp>,
     starterPacks: List<EditorialPack>,
 ): OnboardingSelection {
+    val defaultSocialPackages = listOf(
+        "com.instagram.android",
+        "com.zhiliaoapp.musically",
+        "com.twitter.android",
+        "com.reddit.frontpage",
+    )
+    val defaultSelectedPackages = defaultSocialPackages
+        .filterTo(mutableSetOf()) { candidate ->
+            supportedApps.any { app -> app.packageName == candidate }
+        }
+        .ifEmpty {
+            supportedApps.take(3).mapTo(mutableSetOf(), DistractingApp::packageName)
+        }
     return OnboardingSelection(
-        selectedAppPackages = supportedApps.take(3).mapTo(mutableSetOf(), DistractingApp::packageName),
+        selectedAppPackages = defaultSelectedPackages,
         preferredTopics = TopicTag.entries.take(3).toSet(),
         preferredDurationBucket = DurationBucket.FOCUS,
         selectedPackIds = starterPacks.take(1).mapTo(mutableSetOf(), EditorialPack::id),

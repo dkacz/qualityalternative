@@ -15,8 +15,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.qualityalternative.app.R
 import com.qualityalternative.app.domain.model.AppThemeMode
 
 @Immutable
@@ -27,6 +30,7 @@ data class QualityAlternativeColors(
     val mutedText: Color,
     val faintText: Color,
     val line: Color,
+    val lineStrong: Color,
     val accent: Color,
     val accentSoft: Color,
     val success: Color,
@@ -34,29 +38,31 @@ data class QualityAlternativeColors(
 )
 
 private val LightColors = QualityAlternativeColors(
-    background = Color(0xFFF6F0E6),
-    elevatedSurface = Color(0xFFFFFAF0),
-    primaryText = Color(0xFF28231C),
-    mutedText = Color(0xFF6F6558),
-    faintText = Color(0xFF9B8F7D),
-    line = Color(0xFFE1D5C2),
-    accent = Color(0xFF8B4A2F),
-    accentSoft = Color(0xFFEED7C4),
-    success = Color(0xFF527A54),
-    successSoft = Color(0xFFDDE9D6),
+    background = Color(0xFFF2EADE),
+    elevatedSurface = Color(0xFFFBF4EA),
+    primaryText = Color(0xFF271D17),
+    mutedText = Color(0xFF64554B),
+    faintText = Color(0xFF9C9086),
+    line = Color(0xFFDACFC3),
+    lineStrong = Color(0xFFBDAEA1),
+    accent = Color(0xFF965630),
+    accentSoft = Color(0xFFF4D8C5),
+    success = Color(0xFF647A4E),
+    successSoft = Color(0xFFDAE2C5),
 )
 
 private val DarkColors = QualityAlternativeColors(
-    background = Color(0xFF151514),
-    elevatedSurface = Color(0xFF211F1B),
-    primaryText = Color(0xFFEFE9DD),
-    mutedText = Color(0xFFB7AA98),
-    faintText = Color(0xFF7E7467),
-    line = Color(0xFF3A352E),
-    accent = Color(0xFFD89B72),
-    accentSoft = Color(0xFF3A2A22),
-    success = Color(0xFF9DBB8B),
-    successSoft = Color(0xFF253323),
+    background = Color(0xFF463B33),
+    elevatedSurface = Color(0xFF54473F),
+    primaryText = Color(0xFFEFE6DB),
+    mutedText = Color(0xFFBAAFA4),
+    faintText = Color(0xFF8A7E73),
+    line = Color(0xFF685B50),
+    lineStrong = Color(0xFF807165),
+    accent = Color(0xFFE9A679),
+    accentSoft = Color(0xFF6C4932),
+    success = Color(0xFFA9C192),
+    successSoft = Color(0xFF445335),
 )
 
 private val LocalQualityAlternativeColors = staticCompositionLocalOf { LightColors }
@@ -127,51 +133,70 @@ fun QualityAlternativeAppTheme(
     }
 }
 
+val QualityDisplayFontFamily = FontFamily(
+    Font(resId = R.font.newsreader, weight = FontWeight.Normal),
+    Font(resId = R.font.newsreader, weight = FontWeight.Medium),
+    Font(resId = R.font.newsreader, weight = FontWeight.SemiBold),
+    Font(resId = R.font.newsreader_italic, weight = FontWeight.Normal, style = FontStyle.Italic),
+)
+
+val QualityBodyFontFamily = FontFamily(
+    Font(resId = R.font.work_sans, weight = FontWeight.Normal),
+    Font(resId = R.font.work_sans, weight = FontWeight.Medium),
+    Font(resId = R.font.work_sans, weight = FontWeight.SemiBold),
+    Font(resId = R.font.work_sans, weight = FontWeight.Bold),
+)
+
+val QualityMonoFontFamily = FontFamily(
+    Font(resId = R.font.jetbrains_mono, weight = FontWeight.Normal),
+    Font(resId = R.font.jetbrains_mono, weight = FontWeight.Medium),
+)
+
 private val QualityTypography = Typography(
     headlineMedium = TextStyle(
-        fontFamily = FontFamily.Serif,
-        fontWeight = FontWeight.SemiBold,
+        fontFamily = QualityDisplayFontFamily,
+        fontWeight = FontWeight.Medium,
         fontSize = 30.sp,
-        lineHeight = 36.sp,
+        lineHeight = 34.sp,
     ),
     titleLarge = TextStyle(
-        fontFamily = FontFamily.Serif,
-        fontWeight = FontWeight.SemiBold,
+        fontFamily = QualityDisplayFontFamily,
+        fontWeight = FontWeight.Medium,
         fontSize = 22.sp,
-        lineHeight = 28.sp,
+        lineHeight = 25.sp,
     ),
     titleMedium = TextStyle(
-        fontFamily = FontFamily.Serif,
-        fontWeight = FontWeight.SemiBold,
+        fontFamily = QualityDisplayFontFamily,
+        fontWeight = FontWeight.Medium,
         fontSize = 18.sp,
-        lineHeight = 24.sp,
+        lineHeight = 22.sp,
     ),
     bodyLarge = TextStyle(
-        fontFamily = FontFamily.SansSerif,
+        fontFamily = QualityBodyFontFamily,
         fontWeight = FontWeight.Normal,
         fontSize = 17.sp,
         lineHeight = 25.sp,
     ),
     bodyMedium = TextStyle(
-        fontFamily = FontFamily.SansSerif,
+        fontFamily = QualityBodyFontFamily,
         fontWeight = FontWeight.Normal,
         fontSize = 15.sp,
         lineHeight = 22.sp,
     ),
     bodySmall = TextStyle(
-        fontFamily = FontFamily.SansSerif,
+        fontFamily = QualityBodyFontFamily,
         fontWeight = FontWeight.Normal,
         fontSize = 13.sp,
         lineHeight = 18.sp,
     ),
     labelLarge = TextStyle(
-        fontFamily = FontFamily.SansSerif,
+        fontFamily = QualityBodyFontFamily,
         fontWeight = FontWeight.SemiBold,
         fontSize = 14.sp,
         lineHeight = 18.sp,
     ),
     labelMedium = TextStyle(
-        fontFamily = FontFamily.SansSerif,
+        fontFamily = QualityBodyFontFamily,
         fontWeight = FontWeight.Medium,
         fontSize = 12.sp,
         lineHeight = 16.sp,
@@ -179,8 +204,8 @@ private val QualityTypography = Typography(
 )
 
 private val QualityShapes = Shapes(
-    small = RoundedCornerShape(12.dp),
-    medium = RoundedCornerShape(20.dp),
-    large = RoundedCornerShape(28.dp),
-    extraLarge = RoundedCornerShape(32.dp),
+    small = RoundedCornerShape(10.dp),
+    medium = RoundedCornerShape(14.dp),
+    large = RoundedCornerShape(16.dp),
+    extraLarge = RoundedCornerShape(18.dp),
 )

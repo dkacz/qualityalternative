@@ -9,6 +9,7 @@ build/
 app/build/
 local.properties
 captures/
+output/
 
 # Kotlin / Java
 out/

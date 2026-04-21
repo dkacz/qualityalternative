@@ -49,7 +49,7 @@ class AccessibilityInterceptionTest {
 
         assertTrue(
             device.wait(
-                Until.hasObject(By.text("Pause before Fixture Feed One")),
+                Until.hasObject(By.text("You reached for Fixture Feed One")),
                 10_000L,
             ),
         )

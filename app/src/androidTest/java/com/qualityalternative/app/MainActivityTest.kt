@@ -5,7 +5,6 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
-import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
@@ -50,22 +49,9 @@ class MainActivityTest {
     @Test
     fun onboardingCompletesAndPersistsAfterColdRelaunch() {
         launchApp()
-        composeRule.waitUntil(timeoutMillis = 10_000) {
-            hasNode("Let’s set up your replacement loop") || hasNode("Quality Alternative")
-        }
-
-        if (hasNode("Let’s set up your replacement loop")) {
-            composeRule.onNodeWithText("Let’s set up your replacement loop").assertIsDisplayed()
-            composeRule.onNodeWithText("Complete setup", useUnmergedTree = true)
-                .performScrollTo()
-                .performClick()
-        }
-
-        composeRule.waitUntil(timeoutMillis = 10_000) {
-            hasNode("Quality Alternative")
-        }
-
-        composeRule.onNodeWithText("Quality Alternative").assertIsDisplayed()
+        completeOnboardingIfNeeded()
+        waitForHome()
+        composeRule.onNodeWithText("You're set up for quieter reading today.").assertIsDisplayed()
 
         scenario?.close()
         scenario = null
@@ -73,42 +59,33 @@ class MainActivityTest {
         Thread.sleep(250)
         launchApp()
 
-        composeRule.waitUntil(timeoutMillis = 10_000) {
-            hasNode("Quality Alternative")
-        }
-
-        composeRule.onNodeWithText("Quality Alternative").assertIsDisplayed()
+        waitForHome()
+        composeRule.onNodeWithText("You're set up for quieter reading today.").assertIsDisplayed()
     }
 
     @Test
     fun systemInterceptionIntentShowsLiveInterventionForFixtureTarget() {
         launchFixtureSystemIntervention()
 
-        composeRule.onNodeWithText("Pause before Fixture Feed One").assertIsDisplayed()
-        composeRule.onNodeWithText("One thoughtful alternative")
+        composeRule.onNodeWithText("You reached for Fixture Feed One").assertIsDisplayed()
+        composeRule.onNodeWithText("A BRIEF DETOUR, IF YOU'D LIKE ONE")
             .assertIsDisplayed()
-        composeRule.onNodeWithText("Two backup choices")
-            .assertIsDisplayed()
-        assertEquals(2, composeRule.onAllNodesWithText("Choose backup").fetchSemanticsNodes().size)
         composeRule.onNodeWithTag("intervention-backup-action-0")
             .assertIsDisplayed()
             .assertIsEnabled()
         composeRule.onNodeWithTag("intervention-backup-action-1")
             .assertIsDisplayed()
             .assertIsEnabled()
-        composeRule.onNodeWithText("Your call, deliberately made")
-            .assertIsDisplayed()
         composeRule.waitUntil(timeoutMillis = 10_000) {
-            hasNode("Read now") || hasNode("Open link")
+            hasNodeContaining("Read this")
         }
-        val primaryActionLabel = if (hasNode("Read now")) "Read now" else "Open link"
-        composeRule.onAllNodesWithText(primaryActionLabel)[0]
+        composeRule.onNodeWithText("Read this", substring = true)
             .assertIsDisplayed()
             .assertIsEnabled()
-        composeRule.onNodeWithText("Delay for 15 minutes")
+        composeRule.onNodeWithText("Delay 15 min")
             .assertIsDisplayed()
             .assertIsEnabled()
-        composeRule.onNodeWithText("Open anyway")
+        composeRule.onNodeWithText("Open Fixture Feed One")
             .assertIsDisplayed()
             .assertIsEnabled()
     }
@@ -117,23 +94,21 @@ class MainActivityTest {
     fun systemInterventionDelayActionIsClickableWithoutScrolling() {
         launchFixtureSystemIntervention()
 
-        composeRule.onNodeWithText("Delay for 15 minutes")
+        composeRule.onNodeWithText("Delay 15 min")
             .assertIsDisplayed()
             .assertIsEnabled()
             .performClick()
 
-        composeRule.waitUntil(timeoutMillis = 10_000) {
-            hasNode("Quality Alternative")
-        }
+        waitForHome()
         composeRule.onNodeWithTag("home-list")
-            .performScrollToNode(hasText("Fixture Feed One delayed until", substring = true))
+            .performScrollToNode(hasText("FIXTURE FEED ONE DELAYED", substring = true))
     }
 
     @Test
     fun systemInterventionOpenAnywayActionIsClickableWithoutScrolling() {
         launchFixtureSystemIntervention()
 
-        composeRule.onNodeWithText("Open anyway")
+        composeRule.onNodeWithText("Open Fixture Feed One")
             .assertIsDisplayed()
             .assertIsEnabled()
             .performClick()
@@ -153,7 +128,7 @@ class MainActivityTest {
             .performClick()
 
         composeRule.waitUntil(timeoutMillis = 10_000) {
-            hasNode("Finish session") || hasNode("Open external link")
+            hasTag("reader-screen") || hasTag("external-handoff-screen")
         }
     }
 
@@ -161,30 +136,29 @@ class MainActivityTest {
     fun homeShowsReadinessAndCompactLibrarySummary() {
         launchOnboardedApp()
 
-        composeRule.onNodeWithText("Quality Alternative")
+        composeRule.onNodeWithText("You're set up for quieter reading today.")
             .assertIsDisplayed()
         composeRule.onNodeWithTag("home-list")
-            .performScrollToNode(hasText("Setup"))
-        composeRule.onNodeWithText("Setup")
+            .performScrollToNode(hasText("SETUP"))
+        composeRule.onNodeWithText("SETUP")
             .assertIsDisplayed()
-        composeRule.onNodeWithText("Selected apps")
+        composeRule.onNodeWithText("INTERCEPTING")
             .assertIsDisplayed()
-        assertFalse(hasNode("Intercepting"))
         composeRule.onNodeWithTag("home-list")
-            .performScrollToNode(hasText("Your library"))
-        composeRule.onNodeWithText("Your library")
+            .performScrollToNode(hasText("YOUR LIBRARY"))
+        composeRule.onNodeWithText("YOUR LIBRARY")
             .assertIsDisplayed()
+        composeRule.onNodeWithTag("home-list")
+            .performScrollToNode(hasText("Editorial picks"))
         composeRule.onNodeWithText("Editorial picks")
             .assertIsDisplayed()
+        composeRule.onNodeWithTag("home-list")
+            .performScrollToNode(hasText("Your added links"))
         composeRule.onNodeWithText("Your added links")
             .assertIsDisplayed()
         assertFalse(hasNode("Local analytics ledger"))
         assertFalse(hasNode("Local preferences"))
         assertFalse(hasNode("Recent replacement history"))
-        composeRule.onNodeWithTag("home-list")
-            .performScrollToNode(hasTestTag("progress-card"))
-        composeRule.onNodeWithText("Days converted, not streaks broken.")
-            .assertIsDisplayed()
         composeRule.onNodeWithTag("home-list")
             .performScrollToNode(hasTestTag("home-add-link"))
         composeRule.onNodeWithTag("home-add-link").assertIsDisplayed()
@@ -192,7 +166,7 @@ class MainActivityTest {
             .performScrollToNode(hasText("Preview intervention"))
         composeRule.onAllNodesWithText("Preview intervention")
             .fetchSemanticsNodes()
-            .also { nodes -> assertEquals(2, nodes.size) }
+            .also { nodes -> assertEquals(1, nodes.size) }
     }
 
     @Test
@@ -201,10 +175,8 @@ class MainActivityTest {
 
         openAddLinkFromHome()
 
-        composeRule.waitUntil(timeoutMillis = 10_000) {
-            hasNode("Add a replacement link")
-        }
-        composeRule.onNodeWithText("Add to your quality alternative.")
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasNodeContaining("Add to your quality") }
+        composeRule.onNodeWithText("Add to your quality", substring = true)
             .assertIsDisplayed()
         composeRule.onNodeWithTag("add-link-url").performTextInput("quality://bad")
         composeRule.onNodeWithTag("add-link-title").performTextInput("Saved essay")
@@ -216,7 +188,6 @@ class MainActivityTest {
             .assertIsDisplayed()
 
         composeRule.onNodeWithTag("add-link-save")
-            .performScrollTo()
             .assertIsNotEnabled()
     }
 
@@ -226,9 +197,7 @@ class MainActivityTest {
 
         openAddLinkFromHome()
 
-        composeRule.waitUntil(timeoutMillis = 10_000) {
-            hasNode("Add a replacement link")
-        }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasNodeContaining("Add to your quality") }
         composeRule.onNodeWithTag("add-link-url").performTextInput("https://example.com/essay")
         composeRule.onNodeWithTag("add-link-title").performTextInput("Saved essay")
         composeRule.onNodeWithText("Choose at least one topic so the app can rank this link.")
@@ -236,7 +205,6 @@ class MainActivityTest {
             .assertIsDisplayed()
 
         composeRule.onNodeWithTag("add-link-save")
-            .performScrollTo()
             .assertIsNotEnabled()
     }
 
@@ -246,9 +214,7 @@ class MainActivityTest {
 
         openAddLinkFromHome()
 
-        composeRule.waitUntil(timeoutMillis = 10_000) {
-            hasNode("Add a replacement link")
-        }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasNodeContaining("Add to your quality") }
         composeRule.onNodeWithTag("add-link-title").performTextInput("Saved essay")
         composeRule.onNodeWithTag("add-link-topic-SCIENCE")
             .performScrollTo()
@@ -258,40 +224,29 @@ class MainActivityTest {
             .assertIsDisplayed()
 
         composeRule.onNodeWithTag("add-link-save")
-            .performScrollTo()
             .assertIsNotEnabled()
     }
 
     @Test
-    fun addLinkSavesValidLinkAndReturnsHome() {
+    fun addLinkSavesValidLinkAndReturnsLibrary() {
         launchOnboardedApp()
 
         openAddLinkFromHome()
 
-        composeRule.waitUntil(timeoutMillis = 10_000) {
-            hasNode("Add a replacement link")
-        }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasNodeContaining("Add to your quality") }
         composeRule.onNodeWithTag("add-link-url").performTextInput("https://example.com/essay")
         composeRule.onNodeWithTag("add-link-title").performTextInput("Saved essay")
         composeRule.onNodeWithTag("add-link-topic-SCIENCE")
             .performScrollTo()
             .performClick()
         composeRule.onNodeWithTag("add-link-save")
-            .performScrollTo()
             .assertIsEnabled()
         composeRule.onNodeWithTag("add-link-save")
-            .performScrollTo()
             .performClick()
 
-        composeRule.waitUntil(timeoutMillis = 10_000) {
-            hasNode("Quality Alternative")
-        }
-
-        composeRule.onNodeWithTag("home-list")
-            .performScrollToNode(hasText("Personal library: 1 link saved."))
-        composeRule.onNodeWithText("Personal library: 1 link saved.").assertIsDisplayed()
-        composeRule.onNodeWithTag("home-list")
-            .performScrollToNode(hasText("Saved essay"))
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasNode("Ready when you are") }
+        composeRule.onNodeWithTag("add-link-done").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasNode("Library") || hasNode("Saved essay") }
         composeRule.onNodeWithText("Saved essay").assertIsDisplayed()
     }
 
@@ -299,23 +254,20 @@ class MainActivityTest {
     fun themeSettingSwitchesToDarkMode() {
         launchOnboardedApp()
 
-        composeRule.onNodeWithTag("home-list")
-            .performScrollToNode(hasText("Theme: Light"))
-        composeRule.onNodeWithText("Theme: Light").assertIsDisplayed()
-        composeRule.onNodeWithTag("home-list")
+        if (hasNode("Fix in Settings")) {
+            composeRule.onNodeWithText("Fix in Settings").performClick()
+        } else {
+            composeRule.onNodeWithTag("tab-settings").performClick()
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("settings-list") }
+        composeRule.onNodeWithTag("settings-list")
             .performScrollToNode(hasTestTag("theme-DARK"))
         composeRule.onNodeWithTag("theme-DARK")
-            .performScrollTo()
             .assertIsDisplayed()
             .performSemanticsAction(SemanticsActions.OnClick)
         composeRule.waitForIdle()
-        composeRule.onNodeWithTag("theme-DARK")
-            .performScrollTo()
-            .assertIsSelected()
 
-        composeRule.onNodeWithTag("home-list")
-            .performScrollToNode(hasText("Theme: Dark"))
-        composeRule.onNodeWithText("Theme: Dark")
+        composeRule.onNodeWithText("Dark")
             .assertIsDisplayed()
     }
 
@@ -323,38 +275,40 @@ class MainActivityTest {
     fun readerFeedbackAndProgressUseFiniteReplacementCopy() {
         launchFixtureSystemIntervention()
 
-        composeRule.onNodeWithText("Read now")
+        composeRule.onNodeWithText("Read this", substring = true)
             .assertIsDisplayed()
             .assertIsEnabled()
             .performClick()
 
         composeRule.waitUntil(timeoutMillis = 10_000) {
-            hasNode("Finite reader")
+            hasTag("reader-screen")
         }
         composeRule.onNodeWithTag("reader-screen").assertIsDisplayed()
-        composeRule.onNodeWithText("One piece, then done").assertIsDisplayed()
-        composeRule.onNodeWithText("Finish session")
-            .performScrollTo()
+        composeRule.onNodeWithText("figure - editorial image", ignoreCase = true)
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag("reader-list")
+            .performScrollToNode(hasText("I'm done reading"))
+        composeRule.onNodeWithText("I'm done reading")
             .assertIsDisplayed()
             .performClick()
 
         composeRule.waitUntil(timeoutMillis = 10_000) {
-            hasNode("Two-tap feedback")
+            hasNode("Two quick questions.")
         }
         composeRule.onNodeWithTag("feedback-screen").assertIsDisplayed()
         composeRule.onNodeWithText("Was this a good fit?").assertIsDisplayed()
-        composeRule.onNodeWithText("Did it help you avoid mindless scrolling?").assertIsDisplayed()
-        composeRule.onNodeWithText("Submit feedback")
+        composeRule.onNodeWithText("Did it help you skip the scroll?").assertIsDisplayed()
+        composeRule.onNodeWithText("Yes, more like this").performClick()
+        composeRule.onNodeWithText("Yes").performClick()
+        composeRule.onNodeWithTag("feedback-log")
             .assertIsDisplayed()
             .performClick()
 
         composeRule.waitUntil(timeoutMillis = 10_000) {
-            hasNode("Quality Alternative")
+            hasTag("progress-card") || hasNode("Progress")
         }
-        composeRule.onNodeWithTag("home-list")
-            .performScrollToNode(hasTestTag("progress-card"))
-        composeRule.onNodeWithText("Days converted, not streaks broken.").assertIsDisplayed()
-        composeRule.onNodeWithText("1 completed read").assertIsDisplayed()
+        composeRule.onNodeWithTag("progress-card").assertIsDisplayed()
+        composeRule.onNodeWithText("days converted").assertIsDisplayed()
     }
 
     private fun hasNode(text: String): Boolean {
@@ -371,11 +325,24 @@ class MainActivityTest {
         }.getOrDefault(false)
     }
 
+    private fun hasTag(tag: String): Boolean {
+        return runCatching {
+            composeRule.onNodeWithTag(tag).fetchSemanticsNode()
+            true
+        }.getOrDefault(false)
+    }
+
     private fun openAddLinkFromHome() {
         composeRule.onNodeWithTag("home-list")
             .performScrollToNode(hasTestTag("home-add-link"))
         composeRule.onNodeWithTag("home-add-link")
             .performClick()
+    }
+
+    private fun waitForHome() {
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasNode("You're set up for quieter reading today.")
+        }
     }
 
     private fun launchApp(intent: Intent? = null) {
@@ -391,17 +358,27 @@ class MainActivityTest {
 
     private fun launchOnboardedApp() {
         launchApp()
+        completeOnboardingIfNeeded()
+        waitForHome()
+    }
+
+    private fun completeOnboardingIfNeeded() {
         composeRule.waitUntil(timeoutMillis = 10_000) {
-            hasNode("Let’s set up your replacement loop") || hasNode("Quality Alternative")
+            hasNodeContaining("Turn an impulse") ||
+                hasNode("You're set up for quieter reading today.")
         }
-        if (hasNode("Let’s set up your replacement loop")) {
-            composeRule.onNodeWithText("Complete setup", useUnmergedTree = true)
-                .performScrollTo()
-                .performClick()
+        if (!hasNodeContaining("Turn an impulse")) {
+            return
         }
-        composeRule.waitUntil(timeoutMillis = 10_000) {
-            hasNode("Quality Alternative")
-        }
+        composeRule.onNodeWithText("Begin").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasNode("Which apps pull at you?") }
+        composeRule.onNodeWithText("Continue").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasNode("What would you rather read?") }
+        composeRule.onNodeWithText("Continue").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasNode("How long should a session feel?") }
+        composeRule.onNodeWithText("Continue").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasNode("Two small permissions.") }
+        composeRule.onNodeWithText("Grant & finish").performClick()
     }
 
     private fun launchFixtureSystemIntervention() {
@@ -421,7 +398,7 @@ class MainActivityTest {
         )
 
         composeRule.waitUntil(timeoutMillis = 10_000) {
-            hasNode("Pause before Fixture Feed One")
+            hasNode("You reached for Fixture Feed One")
         }
     }
 
