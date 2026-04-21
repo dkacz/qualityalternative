@@ -30,6 +30,8 @@ This repository now contains:
 - a first local replacement-loop prototype for Sprint 1, triggered manually from inside the app
 - a completed Sprint 2 local-state slice with onboarding, persisted delay logic, history, and readiness signaling
 - a completed Sprint 3 Android interception alpha slice with live system-intent intervention, fixture distractor apps, and cross-app automation coverage
+- a completed Sprint 4 user-added links slice with local link persistence, source-aware ranking, and external handoff
+- a completed Sprint 5 UI/UX pass with Light/Dark analog themes, restyled intervention, home, library, reader, feedback, and progress surfaces
 
 ## Source of Truth
 
@@ -52,6 +54,7 @@ This repository now contains:
 
 - `app/` contains the Android client prototype.
 - The current build is local-first and uses editorial starter packs from app assets.
+- User-added links are stored locally and can participate in the same finite recommendation set.
 - User settings and delay windows are persisted with `DataStore`.
 - Analytics and replacement history are persisted with `Room`.
 - The prototype already supports:
@@ -66,6 +69,9 @@ This repository now contains:
   - persisted onboarding and target-app preferences after restart
   - persisted delay windows across sessions
   - live system-interception routing from the accessibility service into the in-app intervention surface
+  - user-added link capture and saved-link handoff
+  - Light and Dark analog themes
+  - constructive progress framing around converted impulses
   - internal fixture distractor apps for cross-app automation tests
   - cross-app instrumentation coverage for fixture-to-intervention transitions
   - internal alpha readiness docs in `docs/INTERNAL_ALPHA_CHECKLIST.md` and `docs/REAL_DEVICE_SMOKE.md`
@@ -90,7 +96,8 @@ Use `JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home` a
 
 ## Alpha Status
 
-- Sprint 0-3 implementation is complete on Android.
+- Sprint 0-5 implementation is complete on Android.
 - Emulator validation is green for unit, lint, and instrumentation suites.
 - Internal alpha has been validated on a real Samsung `SM-S721B`.
 - Manual smoke passed for YouTube, X, and Facebook, including real interception, `Open anyway`, and `Delay for 15 minutes`.
+- Latest UI-alpha tester build: `v0.2.0-ui-alpha`.

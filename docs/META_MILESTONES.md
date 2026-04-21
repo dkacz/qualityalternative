@@ -104,7 +104,7 @@ Release stance:
 
 ## Milestone 3: Sprint 5 UI/UX Pass
 
-Status: `active`
+Status: `complete`
 
 Goal:
 
@@ -133,7 +133,7 @@ Sprint plan:
 
 ## Milestone 4: PDF and Pilot Readiness
 
-Status: `planned, after Sprint 5 UI/UX`
+Status: `next`
 
 Goal:
 
@@ -160,6 +160,10 @@ Out of scope:
 Gate to start:
 
 - Sprint 4 must prove that user-owned content can enter the intervention loop cleanly.
+
+Sprint plan:
+
+- See `docs/SPRINT_6_PDF_PILOT_READINESS.md`.
 
 ## Milestone 5: Small External Pilot
 

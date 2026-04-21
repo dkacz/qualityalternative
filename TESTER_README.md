@@ -12,7 +12,7 @@ Wejdź w najnowszy release:
 
 Pobierz plik:
 
-`quality-alternative-v0.1.0-alpha-debug.apk`
+`quality-alternative-v0.2.0-ui-alpha-debug.apk`
 
 Opcjonalnie możesz pobrać też plik `.sha256`, ale do zwykłego testu nie jest potrzebny.
 
@@ -34,7 +34,7 @@ W aplikacji wybierz:
 3. Preferowaną długość sesji czytania.
 4. Starter packi z treściami.
 
-Wersja alpha obsługuje lokalne editorial starter packi oraz proste dodawanie własnych linków. Nie ma jeszcze PDF-ów.
+Wersja alpha obsługuje lokalne editorial starter packi, proste dodawanie własnych linków, tryb jasny i ciemny oraz odświeżony czytnik/progress. Nie ma jeszcze PDF-ów.
 
 ## 4. Włącz Accessibility
 
@@ -76,6 +76,7 @@ Najlepiej zacząć od YouTube, X albo Facebooka, bo te przepływy były już pot
 6. Wróć i sprawdź `Open anyway`, czyli świadome wejście do oryginalnej aplikacji.
 7. Sprawdź `Delay for 15 minutes`.
 8. Po wybraniu opóźnienia otwórz tę samą aplikację ponownie i upewnij się, że pełna interwencja nie pojawia się natychmiast drugi raz.
+9. Opcjonalnie dodaj własny link w bibliotece i sprawdź, czy jako alternatywa otwiera się przez ekran `Saved link handoff`.
 
 Właśnie ten moment jest najważniejszy w alphie: aplikacja ma zatrzymać impuls, zaproponować skończoną alternatywę i nie zamienić się w kolejny feed.
 
@@ -92,6 +93,8 @@ Wyślij proszę krótką informację:
 - czy aplikacja crashuje, zawiesza się albo pokazuje pusty ekran
 - czy rekomendacje treści wyglądają sensownie
 - czy zapisany własny link pojawia się w bibliotece i może zostać otwarty jako alternatywa
+- czy tryb `Light` / `Dark` wygląda czytelnie na twoim telefonie
+- czy nowy ekran progressu motywuje bez poczucia karania albo wstydu
 
 Przykładowy raport:
 

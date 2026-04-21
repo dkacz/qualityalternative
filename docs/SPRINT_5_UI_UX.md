@@ -1,11 +1,11 @@
 # Sprint 5 UI/UX Pass
 
-Status: `active`
+Status: `complete`
 
-Current slice:
+Final state:
 
 - `5.4 Reader, Handoff, Feedback, Progress`
-  Status: implemented, validated locally, under Pro review.
+  Status: implemented, validated locally, Pro review passed.
 
 ## Goal
 
@@ -93,4 +93,10 @@ Automated:
 
 Review:
 
-- Pro review after meaningful UI slices, focused on preserving PRD constraints and avoiding feed-like or blocker-first drift.
+- Pro review passed for each meaningful UI slice, focused on preserving PRD constraints and avoiding feed-like or blocker-first drift.
+
+Release stance:
+
+- Sprint 5 is ready to merge into `main` as the UI/UX alpha baseline.
+- A fresh tester APK can be distributed as `v0.2.0-ui-alpha`.
+- This remains a debug/internal alpha build, not a Play Store production release.
