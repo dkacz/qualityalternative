@@ -19,40 +19,33 @@ Completed:
 
 Current active track:
 
-- Sprint 5: UI/UX pass.
-- Work mode: preserve the Android-first MVP scope while implementing the reviewed analog mockup direction.
-- Gate: meaningful UI slices should pass automated validation and Pro review for PRD/scope drift.
+- Sprint 6: Content governance and starter-library readiness.
+- Work mode: classify content by rights/renderability before scaling the library, PDFs, or premium packaging.
+- Gate: no expanded content inventory ships unless it is `renderable`, `link_only`, or `user_private` with explicit metadata.
 
 ## UI Timing
 
-The current product UI work is **Sprint 4 Slice 4.2: Add Link UI**.
+The first major UI/UX pass is complete and should be treated as the current Android alpha visual baseline.
 
-We do not build that UI until **Slice 4.1 Domain and Persistence Foundation** passes Pro review. The reason is intentional: the Add Link screen should sit on stable URL validation, stable content identity, safe Room persistence, and source-aware inventory behavior. Otherwise we risk building a nice-looking UI on a shaky model.
-
-UI already exists for:
+UI exists for:
 
 - onboarding
-- home/debug trigger
+- home
 - intervention
 - reader
+- add link
+- library
+- external handoff
 - feedback
-- history/readiness surfaces
+- progress/history
+- settings/readiness surfaces
 
-UI still to build in Sprint 4:
-
-- `Add link` entry point on the home screen
-- add-link form with URL, title, duration, and topic tags
-- validation errors for bad or incomplete input
-- saved-link visibility without creating a feed
-- clear distinction between editorial content and external links
-- external-link fallback/handoff state when a recommended link is accepted
-
-The broader visual redesign should happen as a separate UI/UX pass after Sprint 4 functionality is stable. The reviewed mockups are captured in `docs/UI_UX_MOCKUP_INTAKE.md`. That pass should implement the mockup's calm analog direction with exactly two first-pass themes:
+The reviewed mockups are captured in `docs/UI_UX_MOCKUP_INTAKE.md`. The implemented first-pass themes are:
 
 - `Light`
 - `Dark` mode
 
-Other mockup directions and dark variants should remain out of scope until the core UI pass is validated.
+Future UI work should improve parity or usability without changing the product scope unless the PRD is explicitly updated.
 
 ## Milestone 1: Internal Alpha Baseline
 
@@ -131,9 +124,44 @@ Sprint plan:
 
 - See `docs/SPRINT_5_UI_UX.md`.
 
-## Milestone 4: PDF and Pilot Readiness
+## Milestone 4: Sprint 6 Content Governance and Starter Library
 
 Status: `next`
+
+Goal:
+
+- Make content sourcing safe, explicit, and scalable before adding more formats or premium-facing inventory.
+
+Likely scope:
+
+- classify all shared content as `renderable`, `link_only`, or `user_private`
+- add rights/render metadata to content models and starter-pack assets
+- audit current starter-pack source labels
+- add attribution ledger format for public-domain and Creative Commons content
+- keep Substack/blog/media recommendations as link-only handoffs unless separately licensed
+- document premium packaging boundaries around free/public-domain material
+
+Out of scope:
+
+- PDF upload or PDF reader
+- EPUB support
+- RSS/newsletter ingestion
+- open-web crawling
+- AI summarization of third-party works
+- monetization implementation
+- legal terms generation
+
+Gate to start:
+
+- Sprint 5 UI/UX baseline is merged and the team agrees that content provenance is now the next risk to remove.
+
+Sprint plan:
+
+- See `docs/SPRINT_6_CONTENT_GOVERNANCE.md`.
+
+## Milestone 5: PDF and Pilot Readiness
+
+Status: `planned, after content governance`
 
 Goal:
 
@@ -159,13 +187,13 @@ Out of scope:
 
 Gate to start:
 
-- Sprint 4 must prove that user-owned content can enter the intervention loop cleanly.
+- Sprint 6 must establish the rights/rendering model so PDFs enter as `user_private`, not shared editorial inventory.
 
 Sprint plan:
 
-- See `docs/SPRINT_6_PDF_PILOT_READINESS.md`.
+- See `docs/SPRINT_6_PDF_PILOT_READINESS.md`; this document should be renumbered or refreshed before implementation starts.
 
-## Milestone 5: Small External Pilot
+## Milestone 6: Small External Pilot
 
 Status: `planned, after UI/UX and PDF readiness`
 
@@ -188,7 +216,7 @@ Decision signals:
 - feedback saying the recommendation was a good fit
 - return to target app within 15 and 60 minutes
 
-## Milestone 6: iOS Discovery
+## Milestone 7: iOS Discovery
 
 Status: `later discovery, not implementation`
 
@@ -208,7 +236,7 @@ Gate to start:
 
 - Android pilot should show enough behavioral value to justify platform risk.
 
-## Milestone 7: Post-Pilot Product Bet
+## Milestone 8: Post-Pilot Product Bet
 
 Status: `future`
 

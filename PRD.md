@@ -363,16 +363,28 @@ The MVP should not depend on a large-scale AI recommendation system. Instead, it
 
 ### Content Sources
 
-- Editorial starter packs created by the product team
-- User-saved links
-- User-uploaded PDFs
-- Lightweight in-app saved queue
+- Renderable editorial starter packs created, licensed, public-domain verified, or Creative Commons-cleared for product use
+- Link-only external recommendations where the product stores metadata and opens the canonical source without reproducing the full work
+- User-private saved links and user-uploaded PDFs that are available only to the user who added them
+- Lightweight in-app saved queue with source and rights status attached to each item
+
+### Content Rights and Rendering Policy
+
+- Every shared content item must be classified before external pilot as `renderable`, `link_only`, or `user_private`.
+- `renderable` content may be shown in the in-app reader only when the product has a clear basis to reproduce and display it, such as first-party authorship, written license, verified public-domain status, CC0, or a Creative Commons license compatible with commercial reuse and attribution.
+- `link_only` content may be recommended and opened at the original source, but should not be scraped, cached, rehosted, summarized as a substitute, or displayed in reader mode without permission.
+- `user_private` content may be displayed only to the user who added it and should not become shared inventory.
+- Non-commercial Creative Commons content should not be used as shared renderable inventory for a product that may later monetize unless separate permission is obtained.
+- Public-domain status must be checked by jurisdiction and edition. Modern translations, introductions, annotations, recordings, or publisher editions can have separate rights.
+- The operating policy for content sourcing is `docs/CONTENT_POLICY.md`.
 
 ### Editorial Inventory Requirement
 
 - MVP launch should include at least 50 editorial items across at least 5 starter packs.
 - Each starter pack should contain at least 10 items.
 - Every editorial item should have topic tags, estimated duration, and a readable title and description.
+- Before external pilot, every editorial item should have source URL, author/source attribution, rights status, render mode, and review date.
+- Starter-pack metadata must not imply affiliation with real publications unless the product has the right to use that source relationship.
 
 ### Ranking Inputs
 

@@ -1,6 +1,8 @@
-# Sprint 6 PDF and Pilot Readiness
+# Deferred Sprint: PDF and Pilot Readiness
 
-Status: `planned`
+Status: `planned after Sprint 6 Content Governance`
+
+Note: this plan was originally drafted as Sprint 6. It is intentionally deferred until the content rights/rendering model from `docs/SPRINT_6_CONTENT_GOVERNANCE.md` is implemented, because PDFs should enter the product as `user_private` content rather than shared editorial inventory.
 
 ## Goal
 
@@ -89,5 +91,5 @@ Review:
 
 Release stance:
 
-- Sprint 6 may produce a pilot-readiness APK only after emulator validation and Pro review pass.
+- This deferred PDF sprint may produce a pilot-readiness APK only after emulator validation and Pro review pass.
 - Real-device validation should cover at least one local PDF add/open path before any external pilot signoff.
