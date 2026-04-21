@@ -447,9 +447,7 @@ class MainViewModel(
                                 type = AnalyticsEventType.USER_LINK_ADDED,
                                 timestampMillis = nowMillis,
                                 contentId = result.item.id,
-                                metadata = mapOf(
-                                    "sourceType" to result.item.sourceType.name,
-                                    "externalUrl" to result.item.externalUrl.orEmpty(),
+                                metadata = result.item.analyticsMetadata() + mapOf(
                                     "durationMinutes" to result.item.durationMinutes.toString(),
                                     "topicCount" to result.item.topicTags.size.toString(),
                                 ),

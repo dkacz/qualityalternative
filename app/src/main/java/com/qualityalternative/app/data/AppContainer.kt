@@ -2,7 +2,6 @@ package com.qualityalternative.app.data
 
 import android.content.Context
 import androidx.datastore.preferences.preferencesDataStore
-import com.qualityalternative.app.BuildConfig
 import com.qualityalternative.app.data.local.QualityAlternativeDatabase
 import com.qualityalternative.app.domain.service.AnalyticsTracker
 import com.qualityalternative.app.domain.service.ContentRepository
@@ -34,7 +33,6 @@ class AppContainer(context: Context) {
     val userLinkRepository: UserLinkRepository = RoomUserLinkRepository(
         dao = database.userLinkDao(),
         scope = appScope,
-        seedSampleLinks = BuildConfig.DEBUG,
     )
     val contentRepository: ContentRepository = CompositeContentRepository(
         editorialRepository = AssetContentRepository(context = context),

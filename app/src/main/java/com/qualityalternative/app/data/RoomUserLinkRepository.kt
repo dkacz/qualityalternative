@@ -22,11 +22,9 @@ import kotlinx.coroutines.launch
 class RoomUserLinkRepository(
     private val dao: UserLinkDao,
     private val scope: CoroutineScope,
-    private val seedSampleLinks: Boolean = false,
     private val idProvider: (String) -> String = ::stableUserLinkId,
 ) : UserLinkRepository {
-    private val sampleLinks = if (seedSampleLinks) sampleUserLinks() else emptyList()
-    private val links = MutableStateFlow(sampleLinks)
+    private val links = MutableStateFlow(emptyList<ContentItem>())
     private val ready = MutableStateFlow(false)
 
     init {
@@ -34,7 +32,7 @@ class RoomUserLinkRepository(
             dao.observeAll()
                 .map { rows -> rows.map(UserLinkEntity::toContentItem) }
                 .collect { loadedLinks ->
-                    links.value = loadedLinks.ifEmpty { sampleLinks }
+                    links.value = loadedLinks
                     ready.value = true
                 }
         }
@@ -149,60 +147,6 @@ private fun String.toTopicTags(): Set<TopicTag> {
         runCatching { TopicTag.valueOf(raw) }.getOrNull()
     }
 }
-
-private fun sampleUserLinks(): List<ContentItem> = listOf(
-    ContentItem(
-        id = "sample-link:notes-on-taste",
-        packId = "user-links",
-        title = "Notes on taste",
-        description = "https://paulgraham.com/taste.html",
-        durationMinutes = 8,
-        format = ContentFormat.HTML,
-        topicTags = setOf(TopicTag.ESSAYS),
-        bodyAssetPath = null,
-        externalUrl = "https://paulgraham.com/taste.html",
-        sourceLabel = "paulgraham.com",
-        sourceType = ContentSourceType.USER_LINK,
-        availability = ContentAvailability.NEEDS_FALLBACK,
-        rights = ContentRightsMetadata.userPrivateExternal(
-            sourceUrl = "https://paulgraham.com/taste.html",
-        ),
-    ),
-    ContentItem(
-        id = "sample-link:tyranny-of-convenience",
-        packId = "user-links",
-        title = "The tyranny of convenience",
-        description = "https://nytimes.com/interactive/tyranny-of-convenience",
-        durationMinutes = 6,
-        format = ContentFormat.HTML,
-        topicTags = setOf(TopicTag.ESSAYS),
-        bodyAssetPath = null,
-        externalUrl = "https://nytimes.com/interactive/tyranny-of-convenience",
-        sourceLabel = "nytimes.com",
-        sourceType = ContentSourceType.USER_LINK,
-        availability = ContentAvailability.NEEDS_FALLBACK,
-        rights = ContentRightsMetadata.userPrivateExternal(
-            sourceUrl = "https://nytimes.com/interactive/tyranny-of-convenience",
-        ),
-    ),
-    ContentItem(
-        id = "sample-link:designing-for-100-years",
-        packId = "user-links",
-        title = "Designing for 100 years",
-        description = "https://longnow.org/ideas/designing-for-100-years",
-        durationMinutes = 11,
-        format = ContentFormat.HTML,
-        topicTags = setOf(TopicTag.DESIGN),
-        bodyAssetPath = null,
-        externalUrl = "https://longnow.org/ideas/designing-for-100-years",
-        sourceLabel = "longnow.org",
-        sourceType = ContentSourceType.USER_LINK,
-        availability = ContentAvailability.NEEDS_FALLBACK,
-        rights = ContentRightsMetadata.userPrivateExternal(
-            sourceUrl = "https://longnow.org/ideas/designing-for-100-years",
-        ),
-    ),
-)
 
 private fun String.hostLabel(): String {
     val normalized = if (startsWith("http://") || startsWith("https://")) this else "https://$this"

@@ -13,6 +13,9 @@ import com.qualityalternative.app.domain.model.ContentAvailability
 import com.qualityalternative.app.domain.model.AppThemeMode
 import com.qualityalternative.app.domain.model.ContentFormat
 import com.qualityalternative.app.domain.model.ContentItem
+import com.qualityalternative.app.domain.model.ContentRenderMode
+import com.qualityalternative.app.domain.model.ContentRightsClass
+import com.qualityalternative.app.domain.model.ContentRightsMetadata
 import com.qualityalternative.app.domain.model.ContentSourceType
 import com.qualityalternative.app.domain.model.DistractingApp
 import com.qualityalternative.app.domain.model.DurationBucket
@@ -271,10 +274,39 @@ class MainViewModelTest {
         val event = analyticsTracker.allEvents().first { it.type == AnalyticsEventType.USER_LINK_ADDED }
         assertEquals("user-link:1", event.contentId)
         assertEquals("USER_LINK", event.metadata["sourceType"])
+        assertEquals("USER_PRIVATE", event.metadata["rightsClass"])
+        assertEquals("EXTERNAL_HANDOFF", event.metadata["renderMode"])
         assertEquals("https://example.com/essay", event.metadata["externalUrl"])
 
         viewModel.finishAddLinkSuccess()
         assertEquals(MainScreen.Library, viewModel.uiState.screen)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun malformedLinkOnlyInAppItemRoutesToHandoffWithoutLoadingBody() = runTest {
+        val malformed = ContentItem(
+            id = "malformed-link-only",
+            packId = "philosophy",
+            title = "Malformed link-only item",
+            description = "This should fail closed.",
+            durationMinutes = 7,
+            format = ContentFormat.MARKDOWN,
+            topicTags = setOf(TopicTag.PHILOSOPHY),
+            bodyAssetPath = "unused",
+            externalUrl = "https://example.com/malformed",
+            rights = ContentRightsMetadata(
+                rightsClass = ContentRightsClass.LINK_ONLY,
+                renderMode = ContentRenderMode.IN_APP_READER,
+            ),
+        )
+        val viewModel = createViewModel(contentRepository = FakeContentRepository(extraItems = listOf(malformed)))
+
+        advanceUntilIdle()
+        viewModel.openLibraryItem(malformed)
+
+        assertEquals(MainScreen.ExternalHandoff, viewModel.uiState.screen)
+        assertEquals("", viewModel.uiState.currentContentBody)
     }
 
     @Test
@@ -1384,6 +1416,7 @@ class MainViewModelTest {
                 externalUrl = draft.url.trim(),
                 sourceType = ContentSourceType.USER_LINK,
                 availability = ContentAvailability.NEEDS_FALLBACK,
+                rights = ContentRightsMetadata.userPrivateExternal(sourceUrl = draft.url.trim()),
             )
             links.value = links.value + item
             return AddUserLinkResult.Added(item)
@@ -1463,6 +1496,7 @@ class MainViewModelTest {
             externalUrl = "https://example.com/essay",
             sourceType = ContentSourceType.USER_LINK,
             availability = ContentAvailability.NEEDS_FALLBACK,
+            rights = ContentRightsMetadata.userPrivateExternal(sourceUrl = "https://example.com/essay"),
         )
     }
 

@@ -1,6 +1,6 @@
 # Sprint 6 Content Governance and Starter Library
 
-Status: `planned`
+Status: `in progress`
 
 ## Goal
 
