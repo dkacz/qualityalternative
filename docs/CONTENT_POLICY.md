@@ -4,6 +4,8 @@ Status: `active product decision`
 
 This document defines how Quality Alternative can source, store, render, and recommend replacement content. It is a product and implementation policy, not legal advice. Before a public paid launch, the policy should be reviewed by an IP lawyer in the target launch jurisdictions.
 
+This policy is enforced at content selection, triage, metadata review, and inventory audit time. The app should not contain hidden runtime copyright blockers that override the configured reading flow for a user; runtime should follow explicit item metadata and log enough context for audit.
+
 ## Core Principle
 
 The product should separate content rights from recommendation value.

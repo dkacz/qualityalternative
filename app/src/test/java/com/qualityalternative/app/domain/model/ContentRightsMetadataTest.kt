@@ -20,18 +20,18 @@ class ContentRightsMetadataTest {
 
         assertEquals(ContentRightsClass.LINK_ONLY, item.rights.rightsClass)
         assertEquals(ContentRenderMode.EXTERNAL_HANDOFF, item.rights.renderMode)
-        assertFalse(item.rights.canUseInAppReader)
+        assertFalse(item.rights.usesInAppReader)
         assertTrue(item.usesExternalHandoff())
         assertFalse(item.usesRepositoryBody())
     }
 
     @Test
-    fun linkOnlyItemWithInAppRenderModeFailsClosedToHandoff() {
+    fun renderModeDrivesInAppReaderWithoutRuntimeRightsBlocking() {
         val item = ContentItem(
             id = "malformed-link-only",
             packId = "starter",
             title = "Malformed",
-            description = "Claims in-app render mode without renderable rights",
+            description = "Inventory audit should catch this, runtime should not act as a copyright gate",
             durationMinutes = 5,
             format = ContentFormat.MARKDOWN,
             topicTags = setOf(TopicTag.ESSAYS),
@@ -42,18 +42,18 @@ class ContentRightsMetadataTest {
             ),
         )
 
-        assertFalse(item.rights.canUseInAppReader)
-        assertFalse(item.usesRepositoryBody())
-        assertTrue(item.usesExternalHandoff())
+        assertTrue(item.rights.usesInAppReader)
+        assertTrue(item.usesRepositoryBody())
+        assertFalse(item.usesExternalHandoff())
     }
 
     @Test
-    fun userPrivateItemCannotUseSharedInAppReaderMode() {
+    fun userPrivateItemFollowsConfiguredRenderMode() {
         val item = ContentItem(
             id = "malformed-private",
             packId = "user-links",
             title = "Malformed private",
-            description = "Private content with the wrong reader mode",
+            description = "Runtime follows render mode; triage owns copyright validation",
             durationMinutes = 5,
             format = ContentFormat.HTML,
             topicTags = setOf(TopicTag.ESSAYS),
@@ -63,8 +63,8 @@ class ContentRightsMetadataTest {
             ),
         )
 
-        assertFalse(item.usesRepositoryBody())
-        assertTrue(item.usesExternalHandoff())
+        assertTrue(item.usesRepositoryBody())
+        assertFalse(item.usesExternalHandoff())
     }
 
     @Test
@@ -83,7 +83,7 @@ class ContentRightsMetadataTest {
             ),
         )
 
-        assertTrue(item.rights.canUseUserPrivateReader)
+        assertTrue(item.rights.usesUserPrivateReader)
         assertTrue(item.usesRepositoryBody())
         assertFalse(item.usesExternalHandoff())
     }
@@ -98,7 +98,7 @@ class ContentRightsMetadataTest {
 
         assertEquals(ContentRightsClass.RENDERABLE, rights.rightsClass)
         assertEquals(ContentRenderMode.IN_APP_READER, rights.renderMode)
-        assertTrue(rights.canUseInAppReader)
+        assertTrue(rights.usesInAppReader)
         assertFalse(rights.usesExternalHandoff)
     }
 
@@ -108,7 +108,7 @@ class ContentRightsMetadataTest {
 
         assertEquals(ContentRightsClass.USER_PRIVATE, rights.rightsClass)
         assertEquals(ContentRenderMode.EXTERNAL_HANDOFF, rights.renderMode)
-        assertFalse(rights.canUseInAppReader)
+        assertFalse(rights.usesInAppReader)
         assertTrue(rights.usesExternalHandoff)
     }
 }

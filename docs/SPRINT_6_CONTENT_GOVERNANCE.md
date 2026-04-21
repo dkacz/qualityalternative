@@ -13,7 +13,7 @@ The sprint should protect the product thesis: replacement quality matters, but t
 - `FR3 Replacement Source Setup`: replacement sources must distinguish editorial, user-owned, and external content.
 - `FR4 Content Item Model`: content items need rights-aware metadata before the inventory grows.
 - `FR5/FR6 Recommendation Flow`: recommendations can include renderable items and link-only handoffs without expanding beyond one primary plus two backups.
-- `FR8 Replacement Session Experience`: the reader/handoff must match what the product is allowed to display.
+- `FR8 Replacement Session Experience`: the reader/handoff must follow explicit inventory metadata; copyright compliance is handled during content selection, triage, and audit, not by hidden runtime blocking.
 - `FR12 Analytics Instrumentation`: analytics should distinguish renderable editorial, link-only handoff, and user-private content.
 - `NFR2 Calm Interaction Model`: content sourcing must not introduce feeds, discovery browsing, or infinite lists.
 
@@ -54,7 +54,7 @@ Acceptance criteria:
 
 Test expectations:
 
-- Unit tests cover mapping from rights class to render mode.
+- Unit tests cover render-mode helpers without treating rights class as a runtime blocker.
 - Unit tests cover safe defaults for missing rights metadata.
 
 ### 6.2 Starter Inventory Audit
@@ -90,7 +90,7 @@ Test expectations:
 Acceptance criteria:
 
 - Curated external recommendations and user-added web links remain external handoff unless separately cleared.
-- The app does not scrape, cache, or reader-mode third-party web pages.
+- The app does not scrape, cache, or reader-mode third-party web pages as part of shared editorial inventory.
 - Handoff copy makes it clear when the user is leaving the in-app reader.
 - Analytics distinguishes `renderable_started`, `link_handoff_started`, and `user_private_started` semantics.
 
@@ -115,4 +115,4 @@ Review:
 Release stance:
 
 - Sprint 6 can ship as a content-governance release only after the starter library no longer carries misleading source labels and all automated validation passes.
-- PDF work should not start until the content rights model is stable.
+- PDF work should not start until the content triage and attribution model is stable.

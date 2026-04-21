@@ -284,29 +284,31 @@ class MainViewModelTest {
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
-    fun malformedLinkOnlyInAppItemRoutesToHandoffWithoutLoadingBody() = runTest {
-        val malformed = ContentItem(
-            id = "malformed-link-only",
+    fun inAppRenderModeRoutesToReaderWithoutRuntimeRightsBlocking() = runTest {
+        val inAppItem = ContentItem(
+            id = "link-only-in-app-mode",
             packId = "philosophy",
-            title = "Malformed link-only item",
-            description = "This should fail closed.",
+            title = "In-app mode item",
+            description = "Inventory audit owns rights validation; runtime follows render mode.",
             durationMinutes = 7,
             format = ContentFormat.MARKDOWN,
             topicTags = setOf(TopicTag.PHILOSOPHY),
-            bodyAssetPath = "unused",
+            bodyAssetPath = "example.md",
             externalUrl = "https://example.com/malformed",
             rights = ContentRightsMetadata(
                 rightsClass = ContentRightsClass.LINK_ONLY,
                 renderMode = ContentRenderMode.IN_APP_READER,
             ),
         )
-        val viewModel = createViewModel(contentRepository = FakeContentRepository(extraItems = listOf(malformed)))
+        val viewModel = createViewModel(
+            contentRepository = FakeContentRepository(extraItems = listOf(inAppItem)),
+        )
 
         advanceUntilIdle()
-        viewModel.openLibraryItem(malformed)
+        viewModel.openLibraryItem(inAppItem)
 
-        assertEquals(MainScreen.ExternalHandoff, viewModel.uiState.screen)
-        assertEquals("", viewModel.uiState.currentContentBody)
+        assertEquals(MainScreen.Reader, viewModel.uiState.screen)
+        assertEquals("In-app mode item", viewModel.uiState.currentContentBody)
     }
 
     @Test

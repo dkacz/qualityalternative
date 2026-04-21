@@ -377,6 +377,7 @@ The MVP should not depend on a large-scale AI recommendation system. Instead, it
 - Non-commercial Creative Commons content should not be used as shared renderable inventory for a product that may later monetize unless separate permission is obtained.
 - Public-domain status must be checked by jurisdiction and edition. Modern translations, introductions, annotations, recordings, or publisher editions can have separate rights.
 - The operating policy for content sourcing is `docs/CONTENT_POLICY.md`.
+- Rights and source checks are a selection, triage, and inventory-audit responsibility. Runtime should follow explicit item metadata rather than acting as a hidden copyright-blocking engine.
 
 ### Editorial Inventory Requirement
 

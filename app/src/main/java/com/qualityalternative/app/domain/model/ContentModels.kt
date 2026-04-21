@@ -37,19 +37,17 @@ data class ContentRightsMetadata(
     val attribution: String? = null,
     val rightsReviewedAt: String? = null,
 ) {
-    val canUseInAppReader: Boolean
-        get() = rightsClass == ContentRightsClass.RENDERABLE &&
-            renderMode == ContentRenderMode.IN_APP_READER
+    val usesInAppReader: Boolean
+        get() = renderMode == ContentRenderMode.IN_APP_READER
 
-    val canUseUserPrivateReader: Boolean
-        get() = rightsClass == ContentRightsClass.USER_PRIVATE &&
-            renderMode == ContentRenderMode.USER_PRIVATE_READER
+    val usesUserPrivateReader: Boolean
+        get() = renderMode == ContentRenderMode.USER_PRIVATE_READER
 
-    val canLoadRepositoryBody: Boolean
-        get() = canUseInAppReader || canUseUserPrivateReader
+    val usesRepositoryBody: Boolean
+        get() = usesInAppReader || usesUserPrivateReader
 
     val usesExternalHandoff: Boolean
-        get() = !canLoadRepositoryBody
+        get() = renderMode == ContentRenderMode.EXTERNAL_HANDOFF
 
     companion object {
         fun safeDefault(): ContentRightsMetadata = ContentRightsMetadata(
@@ -134,7 +132,7 @@ data class ContentItem(
 
 fun ContentItem.usesExternalHandoff(): Boolean = rights.usesExternalHandoff
 
-fun ContentItem.usesRepositoryBody(): Boolean = rights.canLoadRepositoryBody
+fun ContentItem.usesRepositoryBody(): Boolean = rights.usesRepositoryBody
 
 data class EditorialPack(
     val id: String,
