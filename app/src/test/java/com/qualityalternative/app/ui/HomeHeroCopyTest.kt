@@ -25,7 +25,7 @@ class HomeHeroCopyTest {
     }
 
     @Test
-    fun missingInterceptionDoesNotClaimSetupIsReady() {
+    fun missingInterceptionKeepsBrandHeadlineAndMarksSetupActionUnavailable() {
         val copy = homeHeroCopy(
             PermissionReadiness(
                 overlayStatus = PermissionStatus.MISSING,
@@ -35,7 +35,7 @@ class HomeHeroCopyTest {
             ),
         )
 
-        assertEquals("Interception needs one more step.", copy.title)
+        assertEquals("You're set up for quieter reading today.", copy.title)
         assertTrue(copy.body.contains("Finish the Android setup"))
         assertFalse(copy.showAddLinkAction)
     }

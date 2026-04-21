@@ -18,6 +18,9 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
+import com.qualityalternative.app.domain.model.DurationBucket
+import com.qualityalternative.app.domain.model.OnboardingSelection
+import com.qualityalternative.app.domain.model.TopicTag
 import com.qualityalternative.app.interception.FixtureTargetRegistry
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -51,7 +54,7 @@ class MainActivityTest {
         launchApp()
         completeOnboardingIfNeeded()
         waitForHome()
-        composeRule.onNodeWithText("You're set up for quieter reading today.").assertIsDisplayed()
+        assertHomeHeroIsDisplayed()
 
         scenario?.close()
         scenario = null
@@ -60,7 +63,7 @@ class MainActivityTest {
         launchApp()
 
         waitForHome()
-        composeRule.onNodeWithText("You're set up for quieter reading today.").assertIsDisplayed()
+        assertHomeHeroIsDisplayed()
     }
 
     @Test
@@ -136,8 +139,7 @@ class MainActivityTest {
     fun homeShowsReadinessAndCompactLibrarySummary() {
         launchOnboardedApp()
 
-        composeRule.onNodeWithText("You're set up for quieter reading today.")
-            .assertIsDisplayed()
+        assertHomeHeroIsDisplayed()
         composeRule.onNodeWithTag("home-list")
             .performScrollToNode(hasText("SETUP"))
         composeRule.onNodeWithText("SETUP")
@@ -254,11 +256,9 @@ class MainActivityTest {
     fun themeSettingSwitchesToDarkMode() {
         launchOnboardedApp()
 
-        if (hasNode("Fix in Settings")) {
-            composeRule.onNodeWithText("Fix in Settings").performClick()
-        } else {
-            composeRule.onNodeWithTag("tab-settings").performClick()
-        }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("tab-settings") }
+        composeRule.onNodeWithTag("tab-settings", useUnmergedTree = true)
+            .performSemanticsAction(SemanticsActions.OnClick)
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("settings-list") }
         composeRule.onNodeWithTag("settings-list")
             .performScrollToNode(hasTestTag("theme-DARK"))
@@ -284,7 +284,7 @@ class MainActivityTest {
             hasTag("reader-screen")
         }
         composeRule.onNodeWithTag("reader-screen").assertIsDisplayed()
-        composeRule.onNodeWithText("figure - editorial image", ignoreCase = true)
+        composeRule.onNodeWithText("figure · editorial image", ignoreCase = true)
             .assertIsDisplayed()
         composeRule.onNodeWithTag("reader-list")
             .performScrollToNode(hasText("I'm done reading"))
@@ -341,7 +341,7 @@ class MainActivityTest {
 
     private fun waitForHome() {
         composeRule.waitUntil(timeoutMillis = 10_000) {
-            hasNode("You're set up for quieter reading today.")
+            hasNode("You're set up for quieter reading today.") || hasNode("Interception needs one more step.")
         }
     }
 
@@ -365,7 +365,8 @@ class MainActivityTest {
     private fun completeOnboardingIfNeeded() {
         composeRule.waitUntil(timeoutMillis = 10_000) {
             hasNodeContaining("Turn an impulse") ||
-                hasNode("You're set up for quieter reading today.")
+                hasNode("You're set up for quieter reading today.") ||
+                hasNode("Interception needs one more step.")
         }
         if (!hasNodeContaining("Turn an impulse")) {
             return
@@ -383,6 +384,7 @@ class MainActivityTest {
 
     private fun launchFixtureSystemIntervention() {
         launchOnboardedApp()
+        seedFixtureSelection()
 
         scenario?.close()
         scenario = null
@@ -400,6 +402,26 @@ class MainActivityTest {
         composeRule.waitUntil(timeoutMillis = 10_000) {
             hasNode("You reached for Fixture Feed One")
         }
+    }
+
+    private fun assertHomeHeroIsDisplayed() {
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasNode("You're set up for quieter reading today.") || hasNode("Interception needs one more step.")
+        }
+    }
+
+    private fun seedFixtureSelection() = runBlocking {
+        val repository = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication)
+            .appContainer
+            .settingsRepository
+        repository.saveOnboardingSelection(
+            OnboardingSelection(
+                selectedAppPackages = setOf(FixtureTargetRegistry.fixtureDistractors.first().packageName),
+                preferredTopics = setOf(TopicTag.PHILOSOPHY, TopicTag.SCIENCE, TopicTag.HISTORY),
+                preferredDurationBucket = DurationBucket.FOCUS,
+                selectedPackIds = setOf("philosophy"),
+            ),
+        )
     }
 
     private fun resetPersistentState() = runBlocking {

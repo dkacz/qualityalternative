@@ -55,6 +55,8 @@ data class ReplacementHistoryEntry(
     val returnedToTargetAtMillis: Long? = null,
     val feedbackGoodFit: Boolean? = null,
     val feedbackHelpedAvoidScrolling: Boolean? = null,
+    val feedbackFitRating: String? = null,
+    val feedbackScrollRating: String? = null,
 ) {
     fun isCompleted(): Boolean = completedAtMillis != null
 

@@ -81,11 +81,19 @@ data class MainUiState(
     val completedContentIds: Set<String> = emptySet(),
     val userLinks: List<ContentItem> = emptyList(),
     val addLinkForm: AddLinkFormState = AddLinkFormState(),
+    val savedLinkConfirmation: AddLinkConfirmation? = null,
     val themeMode: AppThemeMode = AppThemeMode.LIGHT,
     val latestMessage: String? = null,
     val events: List<AnalyticsEvent> = emptyList(),
     val screen: MainScreen = MainScreen.Onboarding,
     val lastFeedback: SessionFeedback? = null,
+)
+
+data class AddLinkConfirmation(
+    val title: String,
+    val host: String,
+    val durationMinutes: Int,
+    val topicLabel: String,
 )
 
 data class AddLinkFormState(
@@ -105,6 +113,7 @@ enum class MainScreen {
     Progress,
     Settings,
     AddLink,
+    AddLinkSuccess,
     Intervention,
     Reader,
     ExternalHandoff,
@@ -266,6 +275,49 @@ class MainViewModel(
         )
     }
 
+    fun toggleSettingsApp(app: DistractingApp) {
+        val preferences = uiState.preferences ?: return
+        val selectedPackages = preferences.selectedApps.mapTo(mutableSetOf(), DistractingApp::packageName)
+        if (!selectedPackages.add(app.packageName)) {
+            selectedPackages.remove(app.packageName)
+        }
+        if (selectedPackages.size < MIN_SELECTED_DISTRACTING_APPS) {
+            uiState = uiState.copy(latestMessage = "Keep at least 3 apps selected for the alpha.")
+            return
+        }
+
+        val selectedApps = supportedApps.filter { supportedApp ->
+            supportedApp.packageName in selectedPackages
+        }
+        val selectedTargetApp = uiState.selectedTargetApp
+            ?.takeIf { it.packageName in selectedPackages }
+            ?: selectedApps.firstOrNull()
+
+        uiState = uiState.copy(
+            availableTargetApps = selectedApps,
+            selectedTargetApp = selectedTargetApp,
+            preferences = preferences.copy(selectedApps = selectedApps),
+            onboardingSelection = uiState.onboardingSelection.copy(selectedAppPackages = selectedPackages),
+            activeDelayWindow = selectedTargetApp?.takeIf { delayReady }?.let { delayGate.activeDelay(it) },
+            latestMessage = null,
+        )
+        viewModelScope.launch {
+            settingsRepository.saveSelectedAppPackages(selectedPackages)
+        }
+    }
+
+    fun setPreferredDuration(durationBucket: DurationBucket) {
+        val preferences = uiState.preferences
+        uiState = uiState.copy(
+            preferences = preferences?.copy(preferredDurationBucket = durationBucket),
+            onboardingSelection = uiState.onboardingSelection.copy(preferredDurationBucket = durationBucket),
+            latestMessage = null,
+        )
+        viewModelScope.launch {
+            settingsRepository.savePreferredDurationBucket(durationBucket)
+        }
+    }
+
     fun toggleOnboardingPack(pack: EditorialPack) {
         val selected = uiState.onboardingSelection.selectedPackIds.toMutableSet()
         if (!selected.add(pack.id)) {
@@ -287,7 +339,7 @@ class MainViewModel(
 
         viewModelScope.launch {
             settingsRepository.saveOnboardingSelection(selection)
-            uiState = uiState.copy(latestMessage = "Onboarding saved locally.")
+            uiState = uiState.copy(latestMessage = null)
         }
     }
 
@@ -295,6 +347,7 @@ class MainViewModel(
         uiState = uiState.copy(
             screen = MainScreen.AddLink,
             addLinkForm = AddLinkFormState(),
+            savedLinkConfirmation = null,
             latestMessage = null,
         )
     }
@@ -322,7 +375,7 @@ class MainViewModel(
             currentRecommendationSet = null,
             currentInterventionOrigin = null,
             currentContent = content,
-            currentContentBody = contentRepository.contentBody(content),
+            currentContentBody = if (content.sourceType == ContentSourceType.USER_LINK) "" else contentRepository.contentBody(content),
             currentSessionId = null,
             currentSessionStartedAtMillis = nowProvider(),
             screen = if (content.sourceType == ContentSourceType.USER_LINK) {
@@ -338,6 +391,7 @@ class MainViewModel(
         uiState = uiState.copy(
             screen = MainScreen.Home,
             addLinkForm = AddLinkFormState(),
+            savedLinkConfirmation = null,
             latestMessage = null,
         )
     }
@@ -395,9 +449,10 @@ class MainViewModel(
                             ),
                         )
                         uiState = uiState.copy(
-                            screen = MainScreen.Library,
+                            screen = MainScreen.AddLinkSuccess,
                             addLinkForm = AddLinkFormState(),
-                            latestMessage = "Link saved for future replacement moments.",
+                            savedLinkConfirmation = result.item.toAddLinkConfirmation(),
+                            latestMessage = null,
                         )
                     }
 
@@ -421,6 +476,14 @@ class MainViewModel(
                 )
             }
         }
+    }
+
+    fun finishAddLinkSuccess() {
+        uiState = uiState.copy(
+            screen = MainScreen.Library,
+            savedLinkConfirmation = null,
+            latestMessage = "Link saved for future replacement moments.",
+        )
     }
 
     fun triggerDebugIntervention(nowMillis: Long = System.currentTimeMillis()) {
@@ -770,10 +833,14 @@ class MainViewModel(
         }
     }
 
-    fun submitFeedback(wasGoodFit: Boolean, helpedAvoidScrolling: Boolean) {
+    fun submitFeedback(fitRating: String, scrollRating: String) {
+        val wasGoodFit = fitRating != FEEDBACK_FIT_NOT
+        val helpedAvoidScrolling = scrollRating != FEEDBACK_SCROLL_NO
         val feedback = SessionFeedback(
             wasGoodFit = wasGoodFit,
             helpedAvoidScrolling = helpedAvoidScrolling,
+            fitRating = fitRating,
+            scrollRating = scrollRating,
             submittedAtMillis = System.currentTimeMillis(),
         )
         viewModelScope.launch {
@@ -793,6 +860,8 @@ class MainViewModel(
                     metadata = mapOf(
                         "goodFit" to wasGoodFit.toString(),
                         "helpedAvoidScrolling" to helpedAvoidScrolling.toString(),
+                        "fitRating" to fitRating,
+                        "scrollRating" to scrollRating,
                     ),
                 ),
             )
@@ -853,6 +922,7 @@ class MainViewModel(
                 !settings.hasCompletedOnboarding -> MainScreen.Onboarding
                 uiState.screen == MainScreen.Onboarding -> MainScreen.Home
                 uiState.screen == MainScreen.AddLink -> MainScreen.AddLink
+                uiState.screen == MainScreen.AddLinkSuccess -> MainScreen.AddLinkSuccess
                 uiState.screen == MainScreen.Library -> MainScreen.Library
                 uiState.screen == MainScreen.Progress -> MainScreen.Progress
                 uiState.screen == MainScreen.Settings -> MainScreen.Settings
@@ -1166,9 +1236,14 @@ class MainViewModel(
         } else {
             MainScreen.Reader
         }
+        val contentBody = if (content.sourceType == ContentSourceType.USER_LINK) {
+            ""
+        } else {
+            contentRepository.contentBody(content)
+        }
         uiState = uiState.copy(
             currentContent = content,
-            currentContentBody = contentRepository.contentBody(content),
+            currentContentBody = contentBody,
             currentSessionId = sessionId,
             currentSessionStartedAtMillis = startedAtMillis,
             screen = screen,
@@ -1241,7 +1316,6 @@ class MainViewModel(
 
     private fun findTargetApp(targetAppPackage: String): DistractingApp? {
         return uiState.availableTargetApps.firstOrNull { it.packageName == targetAppPackage }
-            ?: SupportedCatalog.findByPackage(targetAppPackage)
     }
 
     private fun updateAddLinkForm(form: AddLinkFormState) {
@@ -1251,6 +1325,7 @@ class MainViewModel(
                 canSave = form.localValidationErrors().isEmpty(),
                 isSaving = false,
             ),
+            savedLinkConfirmation = null,
         )
     }
 }
@@ -1290,10 +1365,10 @@ private fun defaultOnboardingSelection(
         }
         .ifEmpty {
             supportedApps.take(3).mapTo(mutableSetOf(), DistractingApp::packageName)
-        }
+    }
     return OnboardingSelection(
         selectedAppPackages = defaultSelectedPackages,
-        preferredTopics = TopicTag.entries.take(3).toSet(),
+        preferredTopics = defaultPrototypeTopics(),
         preferredDurationBucket = DurationBucket.FOCUS,
         selectedPackIds = starterPacks.take(1).mapTo(mutableSetOf(), EditorialPack::id),
     )
@@ -1303,9 +1378,9 @@ private fun AppSettings.toUserPreferences(
     supportedApps: List<DistractingApp>,
     fallbackPackIds: Set<String>,
 ): UserPreferences {
-    val selectedApps = supportedApps.filter { it.packageName in selectedAppPackages }
+    val selectedApps = selectedAppPackages.mapNotNull(SupportedCatalog::findByPackage)
         .ifEmpty { supportedApps.take(3) }
-    val selectedTopics = preferredTopics.ifEmpty { TopicTag.entries.take(3).toSet() }
+    val selectedTopics = preferredTopics.ifEmpty { defaultPrototypeTopics() }
     val packs = selectedPackIds.ifEmpty { fallbackPackIds.take(1).toSet() }
     return UserPreferences(
         selectedApps = selectedApps,
@@ -1314,6 +1389,47 @@ private fun AppSettings.toUserPreferences(
         selectedPackIds = packs,
     )
 }
+
+private fun ContentItem.toAddLinkConfirmation(): AddLinkConfirmation {
+    return AddLinkConfirmation(
+        title = title,
+        host = externalUrl?.hostLabel().orEmpty().ifBlank { "your link" },
+        durationMinutes = durationMinutes,
+        topicLabel = topicTags.firstOrNull()?.displayName().orEmpty().ifBlank { "Reading" },
+    )
+}
+
+private fun String.hostLabel(): String {
+    return runCatching {
+        val normalized = if (startsWith("http://") || startsWith("https://")) this else "https://$this"
+        java.net.URI.create(normalized).host.orEmpty().removePrefix("www.")
+    }.getOrDefault("")
+}
+
+private fun TopicTag.displayName(): String {
+    return when (this) {
+        TopicTag.ESSAYS -> "Essays"
+        TopicTag.PHILOSOPHY -> "Philosophy"
+        TopicTag.SCIENCE -> "Science"
+        TopicTag.DESIGN -> "Design"
+        TopicTag.POETRY -> "Poetry"
+        TopicTag.HISTORY -> "History"
+        TopicTag.TECH -> "Tech"
+        TopicTag.FICTION -> "Fiction"
+        TopicTag.CLIMATE -> "Climate"
+        TopicTag.ECONOMICS -> "Economics"
+        TopicTag.FOOD -> "Food"
+        TopicTag.ARCHITECTURE -> "Architecture"
+        TopicTag.CREATIVITY -> "Design"
+        TopicTag.PSYCHOLOGY -> "Psychology"
+    }
+}
+
+private fun defaultPrototypeTopics(): Set<TopicTag> = setOf(
+    TopicTag.ESSAYS,
+    TopicTag.SCIENCE,
+    TopicTag.DESIGN,
+)
 
 private fun AppSettings.toOnboardingSelection(
     supportedApps: List<DistractingApp>,
@@ -1346,6 +1462,9 @@ private fun unavailablePermissionReadiness(): PermissionReadiness {
 private const val ACTIVE_DELAY_REFRESH_INTERVAL_MILLIS = 1_000L
 private const val OPEN_ANYWAY_SUPPRESSION_WINDOW_MILLIS = 60_000L
 private const val INTERVENTION_DEGRADED_THRESHOLD_MILLIS = 2_000L
+private const val MIN_SELECTED_DISTRACTING_APPS = 3
+private const val FEEDBACK_FIT_NOT = "not"
+private const val FEEDBACK_SCROLL_NO = "no"
 
 private data class PendingSystemInterception(
     val targetAppPackage: String,

@@ -6,31 +6,44 @@
       "description": "Short long-form pieces designed to slow down impulse and sharpen intent.",
       "items": [
         {
-          "id": "stoic-morning",
-          "title": "Use the morning before the scroll uses you",
-          "description": "A seven-minute reflection on how intention changes the emotional shape of the day.",
+          "id": "quiet-hours",
+          "title": "The Quiet Hours",
+          "description": "Most of what we remember about our own lives happens in the margins — the hours no one was watching, including us. What we call attention is usually the absence of its opposite.",
           "durationMinutes": 7,
           "format": "MARKDOWN",
-          "topics": ["PHILOSOPHY", "PSYCHOLOGY"],
-          "bodyAssetPath": "editorial/items/stoic_morning.md"
+          "source": "The Paris Review",
+          "topics": ["ESSAYS"],
+          "bodyAssetPath": "editorial/items/quiet_hours.md"
         },
         {
-          "id": "attention-commons",
-          "title": "Treat your attention like a common resource",
-          "description": "A compact argument for protecting attention before it gets fragmented.",
-          "durationMinutes": 5,
+          "id": "how-bees-decide",
+          "title": "How Bees Decide",
+          "description": "A single scout bee returns to the hive with news of a flower. What happens next is a small democracy — one that turns out to look remarkably like human deliberation.",
+          "durationMinutes": 9,
           "format": "MARKDOWN",
-          "topics": ["PHILOSOPHY", "ECONOMICS"],
-          "bodyAssetPath": "editorial/items/attention_commons.md"
+          "source": "Nautilus",
+          "topics": ["SCIENCE"],
+          "bodyAssetPath": "editorial/items/how_bees_decide.md"
         },
         {
-          "id": "history-of-waiting",
-          "title": "The history of waiting on purpose",
-          "description": "A short historical essay on delay as a deliberate human practice.",
+          "id": "letter-about-rain",
+          "title": "A Letter About Rain",
+          "description": "My grandmother kept a rain journal. Thirty-one years of weather in tidy columns. It was the most useful and the most useless book I have ever read.",
           "durationMinutes": 4,
           "format": "MARKDOWN",
-          "topics": ["HISTORY", "PHILOSOPHY"],
-          "bodyAssetPath": "editorial/items/history_of_waiting.md"
+          "source": "Letters of Note",
+          "topics": ["ESSAYS"],
+          "bodyAssetPath": "editorial/items/letter_about_rain.md"
+        },
+        {
+          "id": "map-is-not-city",
+          "title": "The Map Is Not the City",
+          "description": "Urban designers draw with certainty. Residents live with doubt. The gap between the two is where a city either becomes habitable or doesn't.",
+          "durationMinutes": 12,
+          "format": "MARKDOWN",
+          "source": "Places Journal",
+          "topics": ["DESIGN"],
+          "bodyAssetPath": "editorial/items/map_is_not_city.md"
         }
       ]
     },

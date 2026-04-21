@@ -24,4 +24,6 @@ data class ReplacementSessionEntity(
     val returnedToTargetAtMillis: Long?,
     val feedbackGoodFit: Boolean?,
     val feedbackHelpedAvoidScrolling: Boolean?,
+    val feedbackFitRating: String?,
+    val feedbackScrollRating: String?,
 )

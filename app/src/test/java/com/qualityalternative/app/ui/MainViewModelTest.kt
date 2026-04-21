@@ -264,13 +264,17 @@ class MainViewModelTest {
         viewModel.saveUserLink(nowMillis = 2_000L)
         advanceUntilIdle()
 
-        assertEquals(MainScreen.Library, viewModel.uiState.screen)
+        assertEquals(MainScreen.AddLinkSuccess, viewModel.uiState.screen)
+        assertEquals("Saved essay", viewModel.uiState.savedLinkConfirmation?.title)
         assertEquals("Saved essay", userLinkRepository.links.value.single().title)
         assertEquals("Saved essay", viewModel.uiState.userLinks.single().title)
         val event = analyticsTracker.allEvents().first { it.type == AnalyticsEventType.USER_LINK_ADDED }
         assertEquals("user-link:1", event.contentId)
         assertEquals("USER_LINK", event.metadata["sourceType"])
         assertEquals("https://example.com/essay", event.metadata["externalUrl"])
+
+        viewModel.finishAddLinkSuccess()
+        assertEquals(MainScreen.Library, viewModel.uiState.screen)
     }
 
     @Test
@@ -738,13 +742,15 @@ class MainViewModelTest {
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
     fun requestSystemInterception_opensFixtureTargetAndOpenAnywayReturnsTrue() = runTest {
-        val viewModel = createViewModel()
-
-        advanceUntilIdle()
-        viewModel.completeOnboarding()
-        advanceUntilIdle()
-
         val fixtureTarget = FixtureTargetRegistry.fixtureDistractors.first()
+        val viewModel = createViewModel(
+            settingsRepository = FakeSettingsRepository(
+                initial = completedSettings(selectedAppPackages = setOf(fixtureTarget.packageName)),
+            ),
+        )
+
+        advanceUntilIdle()
+
         viewModel.requestSystemInterception(targetAppPackage = fixtureTarget.packageName, nowMillis = 5_000L)
         advanceUntilIdle()
 
@@ -765,16 +771,34 @@ class MainViewModelTest {
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
+    fun requestSystemInterception_ignoresUnselectedTargetPackage() = runTest {
+        val viewModel = createViewModel()
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+
+        val fixtureTarget = FixtureTargetRegistry.fixtureDistractors.first()
+        viewModel.requestSystemInterception(targetAppPackage = fixtureTarget.packageName, nowMillis = 5_000L)
+        advanceUntilIdle()
+
+        assertEquals(MainScreen.Home, viewModel.uiState.screen)
+        assertEquals(null, viewModel.uiState.currentInterventionOrigin)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
     fun requestSystemInterception_recordsDegradedPerformanceWhenShownTooLate() = runTest {
         val analyticsTracker = InMemoryAnalyticsTracker()
         val fixtureTarget = FixtureTargetRegistry.fixtureDistractors.first()
         val viewModel = createViewModel(
+            settingsRepository = FakeSettingsRepository(
+                initial = completedSettings(selectedAppPackages = setOf(fixtureTarget.packageName)),
+            ),
             analyticsTracker = analyticsTracker,
             nowProvider = { 5_000L },
         )
 
-        advanceUntilIdle()
-        viewModel.completeOnboarding()
         advanceUntilIdle()
 
         viewModel.requestSystemInterception(targetAppPackage = fixtureTarget.packageName, nowMillis = 1_000L)
@@ -790,7 +814,10 @@ class MainViewModelTest {
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
     fun requestSystemInterception_waitsUntilHydrationCompletes() = runTest {
-        val settingsRepository = FakeSettingsRepository()
+        val fixtureTarget = FixtureTargetRegistry.fixtureDistractors.first()
+        val settingsRepository = FakeSettingsRepository(
+            initial = completedSettings(selectedAppPackages = setOf(fixtureTarget.packageName)),
+        )
         val historyRepository = FakeHistoryRepository(isReady = false)
         val delayGate = FakeDelayGate(isReady = false)
         val viewModel = createViewModel(
@@ -800,14 +827,13 @@ class MainViewModelTest {
         )
 
         viewModel.requestSystemInterception(
-            targetAppPackage = FixtureTargetRegistry.fixtureDistractors.first().packageName,
+            targetAppPackage = fixtureTarget.packageName,
             nowMillis = 7_000L,
         )
         advanceUntilIdle()
         assertTrue(viewModel.uiState.isLoadingSettings)
-        assertEquals(MainScreen.Onboarding, viewModel.uiState.screen)
+        assertEquals(MainScreen.Home, viewModel.uiState.screen)
 
-        viewModel.completeOnboarding()
         historyRepository.setReady(true)
         delayGate.setReady(true)
         advanceUntilIdle()
@@ -815,6 +841,16 @@ class MainViewModelTest {
         assertFalse(viewModel.uiState.isLoadingSettings)
         assertEquals(MainScreen.Intervention, viewModel.uiState.screen)
         assertEquals(InterventionOrigin.SYSTEM, viewModel.uiState.currentInterventionOrigin)
+    }
+
+    private fun completedSettings(selectedAppPackages: Set<String>): AppSettings {
+        return AppSettings(
+            hasCompletedOnboarding = true,
+            selectedAppPackages = selectedAppPackages,
+            preferredTopics = setOf(TopicTag.PHILOSOPHY, TopicTag.SCIENCE, TopicTag.HISTORY),
+            preferredDurationBucket = DurationBucket.FOCUS,
+            selectedPackIds = setOf("philosophy"),
+        )
     }
 
     private fun createViewModel(
@@ -872,6 +908,14 @@ class MainViewModelTest {
                 selectedPackIds = selection.selectedPackIds,
                 themeMode = state.value.themeMode,
             )
+        }
+
+        override suspend fun saveSelectedAppPackages(packages: Set<String>) {
+            state.value = state.value.copy(selectedAppPackages = packages)
+        }
+
+        override suspend fun savePreferredDurationBucket(bucket: DurationBucket) {
+            state.value = state.value.copy(preferredDurationBucket = bucket)
         }
 
         override suspend fun saveThemeMode(themeMode: AppThemeMode) {
@@ -952,6 +996,8 @@ class MainViewModelTest {
                     entry.copy(
                         feedbackGoodFit = feedback.wasGoodFit,
                         feedbackHelpedAvoidScrolling = feedback.helpedAvoidScrolling,
+                        feedbackFitRating = feedback.fitRating,
+                        feedbackScrollRating = feedback.scrollRating,
                     )
                 } else {
                     entry

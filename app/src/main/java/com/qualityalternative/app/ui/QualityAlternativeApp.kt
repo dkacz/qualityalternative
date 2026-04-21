@@ -5,12 +5,15 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -22,6 +25,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -36,13 +40,13 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -56,7 +60,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontStyle
@@ -64,7 +72,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.sp
+import com.qualityalternative.app.BuildConfig
 import com.qualityalternative.app.domain.model.AnalyticsEvent
 import com.qualityalternative.app.domain.model.AnalyticsEventType
 import com.qualityalternative.app.domain.model.AppThemeMode
@@ -88,6 +98,8 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlin.math.min
+import kotlinx.coroutines.delay
 
 @Composable
 fun QualityAlternativeApp(
@@ -97,43 +109,71 @@ fun QualityAlternativeApp(
     val uiState = viewModel.uiState
 
     QualityAlternativeAppTheme(themeMode = uiState.themeMode) {
-        val snackbarHostState = remember { SnackbarHostState() }
+        DebugVisualParityDensityScale {
+            val snackbarHostState = remember { SnackbarHostState() }
 
-        LaunchedEffect(uiState.latestMessage) {
-            val message = uiState.latestMessage ?: return@LaunchedEffect
-            snackbarHostState.showSnackbar(message)
-            viewModel.dismissMessage()
-        }
+            LaunchedEffect(uiState.latestMessage) {
+                val message = uiState.latestMessage ?: return@LaunchedEffect
+                snackbarHostState.showSnackbar(message)
+                viewModel.dismissMessage()
+            }
 
-        Scaffold(
-            modifier = Modifier.fillMaxSize(),
-            snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
-            containerColor = QualityAlternativeThemeTokens.colors.background,
-        ) { paddingValues ->
-            Surface(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues),
-                color = QualityAlternativeThemeTokens.colors.background,
-            ) {
-                when {
-                    uiState.isLoadingSettings -> LoadingScreen()
-                    !uiState.hasCompletedOnboarding -> OnboardingFlow(
-                        selection = uiState.onboardingSelection,
-                        supportedApps = uiState.allSupportedApps,
-                        onToggleApp = viewModel::toggleOnboardingApp,
-                        onToggleTopic = viewModel::toggleOnboardingTopic,
-                        onSelectDuration = viewModel::setOnboardingDuration,
-                        onComplete = viewModel::completeOnboarding,
-                    )
+            Scaffold(
+                modifier = Modifier.fillMaxSize(),
+                snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+                containerColor = QualityAlternativeThemeTokens.colors.background,
+            ) { paddingValues ->
+                Surface(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues),
+                    color = QualityAlternativeThemeTokens.colors.background,
+                ) {
+                    when {
+                        uiState.isLoadingSettings -> LoadingScreen()
+                        !uiState.hasCompletedOnboarding -> OnboardingFlow(
+                            selection = uiState.onboardingSelection,
+                            supportedApps = uiState.allSupportedApps,
+                            onToggleApp = viewModel::toggleOnboardingApp,
+                            onToggleTopic = viewModel::toggleOnboardingTopic,
+                            onSelectDuration = viewModel::setOnboardingDuration,
+                            onComplete = viewModel::completeOnboarding,
+                        )
 
-                    else -> MainRoute(
-                        state = uiState,
-                        viewModel = viewModel,
-                        onExitToTarget = onExitToTarget,
-                    )
+                        else -> MainRoute(
+                            state = uiState,
+                            viewModel = viewModel,
+                            onExitToTarget = onExitToTarget,
+                        )
+                    }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun DebugVisualParityDensityScale(content: @Composable () -> Unit) {
+    if (!BuildConfig.DEBUG) {
+        content()
+        return
+    }
+
+    // Debug-only bridge for fixed 340x740 handoff screenshots; release builds use platform density.
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val baseDensity = LocalDensity.current
+        val scale = min(
+            maxWidth.value / DEBUG_PARITY_VIEWPORT_WIDTH_DP,
+            maxHeight.value / DEBUG_PARITY_VIEWPORT_HEIGHT_DP,
+        )
+            .coerceIn(MIN_DEBUG_PARITY_SCALE, MAX_DEBUG_PARITY_SCALE)
+        CompositionLocalProvider(
+            LocalDensity provides Density(
+                density = baseDensity.density * scale,
+                fontScale = baseDensity.fontScale,
+            ),
+        ) {
+            content()
         }
     }
 }
@@ -203,8 +243,8 @@ private fun MainRoute(
         ) {
             SettingsTab(
                 state = state,
-                onToggleApp = viewModel::selectTargetApp,
-                onSelectDuration = viewModel::setOnboardingDuration,
+                onToggleApp = viewModel::toggleSettingsApp,
+                onSelectDuration = viewModel::setPreferredDuration,
                 onSelectTheme = viewModel::selectThemeMode,
                 onRefreshReadiness = viewModel::refreshPermissionReadiness,
             )
@@ -218,6 +258,11 @@ private fun MainRoute(
             onToggleTopic = viewModel::toggleAddLinkTopic,
             onSave = viewModel::saveUserLink,
             onCancel = viewModel::cancelAddLink,
+        )
+
+        MainScreen.AddLinkSuccess -> AddLinkSuccess(
+            confirmation = state.savedLinkConfirmation,
+            onDone = viewModel::finishAddLinkSuccess,
         )
 
         MainScreen.Intervention -> InterventionScreen(
@@ -318,18 +363,43 @@ private fun TabBar(
                 .padding(horizontal = 8.dp, vertical = 6.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            TabItem("Home", "H", active == MainScreen.Home, onHome, Modifier.weight(1f), "tab-home")
-            TabItem("Library", "L", active == MainScreen.Library, onLibrary, Modifier.weight(1f), "tab-library")
-            TabItem("Progress", "P", active == MainScreen.Progress, onProgress, Modifier.weight(1f), "tab-progress")
-            TabItem("Settings", "S", active == MainScreen.Settings, onSettings, Modifier.weight(1f), "tab-settings")
+            TabItem("Home", TabGlyph.Home, active == MainScreen.Home, onHome, Modifier.weight(1f), "tab-home")
+            TabItem("Library", TabGlyph.Library, active == MainScreen.Library, onLibrary, Modifier.weight(1f), "tab-library")
+            TabItem("Progress", TabGlyph.Progress, active == MainScreen.Progress, onProgress, Modifier.weight(1f), "tab-progress")
+            TabItem("Settings", TabGlyph.Settings, active == MainScreen.Settings, onSettings, Modifier.weight(1f), "tab-settings")
         }
     }
+}
+
+private enum class TabGlyph { Home, Library, Progress, Settings }
+
+private enum class QaIconKind {
+    Plus,
+    Check,
+    ArrowRight,
+    ArrowLeft,
+    Close,
+    Clock,
+    Book,
+    Link,
+    Home,
+    Library,
+    History,
+    Settings,
+    Sparkle,
+    Shield,
+    Eye,
+    Pause,
+    External,
+    Bell,
+    ChevronRight,
+    Dot,
 }
 
 @Composable
 private fun TabItem(
     label: String,
-    icon: String,
+    icon: TabGlyph,
     active: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -349,12 +419,7 @@ private fun TabItem(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(3.dp),
         ) {
-            Text(
-                text = icon,
-                style = MaterialTheme.typography.labelMedium,
-                color = color,
-                fontWeight = FontWeight.SemiBold,
-            )
+            TabGlyphIcon(icon = icon, color = color)
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelMedium,
@@ -363,6 +428,17 @@ private fun TabItem(
             )
         }
     }
+}
+
+@Composable
+private fun TabGlyphIcon(icon: TabGlyph, color: Color) {
+    val kind = when (icon) {
+        TabGlyph.Home -> QaIconKind.Home
+        TabGlyph.Library -> QaIconKind.Library
+        TabGlyph.Progress -> QaIconKind.History
+        TabGlyph.Settings -> QaIconKind.Settings
+    }
+    QaIcon(kind = kind, color = color, size = 22.dp)
 }
 
 @Composable
@@ -408,26 +484,27 @@ private fun OnboardingWelcome(onNext: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 28.dp, vertical = 30.dp),
+            .padding(start = 26.dp, top = 40.dp, end = 26.dp, bottom = 26.dp),
     ) {
         Column(
+            modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.Top,
         ) {
-            MonoText("Quality Alternative", modifier = Modifier.padding(top = 10.dp, bottom = 18.dp))
+            MonoText("Quality Alternative", modifier = Modifier.padding(bottom = 18.dp))
             DisplayText(
                 text = "Turn an impulse\ninto a better\nchoice.",
-                fontSize = 43.sp,
-                lineHeight = 45.sp,
+                fontSize = 40.sp,
+                lineHeight = 42.sp,
                 modifier = Modifier.padding(bottom = 24.dp),
             )
             BodyText(
                 text = "When you reach for a distracting app, we offer something you actually wanted to read. No blocking. No guilt. Just a brief detour, if you'd like one.",
-                fontSize = 18.sp,
-                lineHeight = 27.sp,
+                fontSize = 16.sp,
+                lineHeight = 25.sp,
                 color = QualityAlternativeThemeTokens.colors.mutedText,
+                modifier = Modifier.widthIn(max = 320.dp),
             )
         }
-        Spacer(modifier = Modifier.height(140.dp))
         FlowRow(
             modifier = Modifier.padding(bottom = 28.dp),
             horizontalArrangement = Arrangement.spacedBy(18.dp),
@@ -438,9 +515,8 @@ private fun OnboardingWelcome(onNext: () -> Unit) {
             WelcomeValue("Read", "One thing. Finish it.")
             WelcomeValue("Return", "Back to your day.")
         }
-        QaButton(text = "Begin", onClick = onNext, variant = QaButtonVariant.Primary)
+        QaButton(text = "Begin", onClick = onNext, variant = QaButtonVariant.Primary, trailingIcon = QaIconKind.ArrowRight)
         QaButton(text = "I have an account", onClick = {}, variant = QaButtonVariant.Ghost)
-        Spacer(modifier = Modifier.weight(1f))
     }
 }
 
@@ -475,6 +551,7 @@ private fun OnboardingApps(
                 onClick = onNext,
                 enabled = selection.selectedAppPackages.size >= 3,
                 variant = QaButtonVariant.Primary,
+                trailingIcon = QaIconKind.ArrowRight,
             )
         },
     ) {
@@ -512,6 +589,7 @@ private fun OnboardingTopics(
                 onClick = onNext,
                 enabled = selection.preferredTopics.size >= 3,
                 variant = QaButtonVariant.Primary,
+                trailingIcon = QaIconKind.ArrowRight,
             )
         },
     ) {
@@ -522,7 +600,7 @@ private fun OnboardingTopics(
             modifier = Modifier.padding(top = 10.dp, bottom = 22.dp),
         )
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            TopicTag.entries.forEach { topic ->
+            prototypeTopics().forEach { topic ->
                 QaChip(
                     text = topic.displayName(),
                     selected = topic in selection.preferredTopics,
@@ -541,7 +619,7 @@ private fun OnboardingDuration(
     onNext: () -> Unit,
 ) {
     StepScreen(step = 3, onBack = onBack, bottom = {
-        QaButton(text = "Continue", onClick = onNext, variant = QaButtonVariant.Primary)
+        QaButton(text = "Continue", onClick = onNext, variant = QaButtonVariant.Primary, trailingIcon = QaIconKind.ArrowRight)
     }) {
         DisplayText("How long should a session feel?", fontSize = 28.sp, lineHeight = 31.sp)
         BodyText(
@@ -566,7 +644,7 @@ private fun OnboardingPermissions(
         step = 4,
         onBack = onBack,
         bottom = {
-            QaButton(text = "Grant & finish", onClick = onNext, variant = QaButtonVariant.Primary)
+            QaButton(text = "Grant & finish", onClick = onNext, variant = QaButtonVariant.Primary, trailingIcon = QaIconKind.ArrowRight)
             QaButton(text = "Skip - I'll set this up later", onClick = onNext, variant = QaButtonVariant.Ghost)
         },
     ) {
@@ -623,7 +701,7 @@ private fun ScreenHead(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (onBack != null) {
-            QaIconButton(text = "<", onClick = onBack)
+            QaIconButton(icon = QaIconKind.ArrowLeft, onClick = onBack)
         } else {
             Spacer(modifier = Modifier.width(34.dp))
         }
@@ -652,6 +730,7 @@ private fun HomeTab(
     val totalItems = editorialItems.size + state.userLinks.size
     val totalMins = editorialItems.sumOf(ContentItem::durationMinutes) + state.userLinks.sumOf(ContentItem::durationMinutes)
     val permOk = state.permissionReadiness.interceptionReady
+    val hero = homeHeroCopy(state.permissionReadiness)
     val todayLabel = remember {
         DateTimeFormatter.ofPattern("EEE, MMM d", Locale.US)
             .format(Instant.now().atZone(ZoneId.systemDefault()))
@@ -667,7 +746,7 @@ private fun HomeTab(
         item {
             Column(modifier = Modifier.padding(top = 10.dp, bottom = 6.dp)) {
                 MonoText("$todayLabel · Good morning", modifier = Modifier.padding(bottom = 8.dp))
-                DisplayText("You're set up for quieter reading today.", fontSize = 30.sp, lineHeight = 34.sp)
+                DisplayText(hero.title, fontSize = 30.sp, lineHeight = 34.sp)
             }
         }
         if (!permOk) {
@@ -714,6 +793,7 @@ private fun HomeTab(
                 text = "Add a link",
                 onClick = onOpenAddLink,
                 variant = QaButtonVariant.Outline,
+                leadingIcon = QaIconKind.Plus,
                 modifier = Modifier.testTag("home-add-link"),
             )
         }
@@ -768,6 +848,7 @@ private fun LibraryTab(
                     variant = QaButtonVariant.Outline,
                     size = QaButtonSize.Small,
                     fullWidth = false,
+                    leadingIcon = QaIconKind.Plus,
                 )
             }
         }
@@ -805,14 +886,13 @@ private fun AddLinkScreen(
     onSave: () -> Unit,
     onCancel: () -> Unit,
 ) {
-    var savedPreview by remember { mutableStateOf(false) }
     val host = form.url.hostLabel()
-    if (savedPreview) {
-        AddLinkSuccess(form = form, host = host, onDone = onSave)
-        return
-    }
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .testTag("add-link-screen"),
+    ) {
         ScreenHead(onBack = onCancel)
         Column(
             modifier = Modifier
@@ -822,20 +902,20 @@ private fun AddLinkScreen(
         ) {
             DisplayText("Add to your quality\nalternative.", fontSize = 30.sp, lineHeight = 33.sp)
             BodyText(
-                text = "One piece you'd rather read than scroll. Not a bookmark graveyard - only things you'd actually open.",
+                text = "One piece you'd rather read than scroll. Not a bookmark graveyard — only things you'd actually open.",
                 color = QualityAlternativeThemeTokens.colors.mutedText,
-                modifier = Modifier.padding(top = 6.dp, bottom = 22.dp),
+                modifier = Modifier.padding(top = 6.dp, bottom = 16.dp),
             )
             InputLabel("Link")
             QaTextField(
                 value = form.url,
                 onValueChange = onUrlChange,
-                placeholder = "https://...",
+                placeholder = "https://…",
                 modifier = Modifier.testTag("add-link-url"),
                 isError = form.validationErrors.any { it.isUrlError() },
             )
             AddLinkValidationLine(form = form, host = host)
-            InputLabel("Title", Modifier.padding(top = 18.dp))
+            InputLabel("Title", Modifier.padding(top = 14.dp))
             QaTextField(
                 value = form.title,
                 onValueChange = onTitleChange,
@@ -843,21 +923,34 @@ private fun AddLinkScreen(
                 modifier = Modifier.testTag("add-link-title"),
                 isError = UserLinkValidationError.BLANK_TITLE in form.validationErrors,
             )
-            InputLabel("Estimated read", Modifier.padding(top = 18.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            InputLabel("Estimated read", Modifier.padding(top = 14.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 listOf("3", "5", "8", "12", "20").forEach { mins ->
-                    QaChip("$mins min", selected = form.durationMinutes == mins, onClick = { onDurationChange(mins) })
+                    QaChip(
+                        "$mins min",
+                        selected = form.durationMinutes == mins,
+                        onClick = { onDurationChange(mins) },
+                        modifier = Modifier.weight(1f),
+                        centered = true,
+                        minHeight = 32.dp,
+                        horizontalPadding = 0.dp,
+                        verticalPadding = 6.dp,
+                        fontSize = 11.sp,
+                    )
                 }
             }
-            InputLabel("Topic", Modifier.padding(top = 18.dp))
+            InputLabel("Topic", Modifier.padding(top = 14.dp))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                TopicTag.entries.forEach { topic ->
+                prototypeTopics().forEach { topic ->
                     QaChip(
                         text = topic.displayName(),
                         selected = topic in form.selectedTopics,
                         accentSelected = true,
                         onClick = { onToggleTopic(topic) },
                         modifier = Modifier.testTag("add-link-topic-${topic.name}"),
+                        minHeight = 32.dp,
+                        horizontalPadding = 12.dp,
+                        verticalPadding = 7.dp,
                     )
                 }
             }
@@ -875,11 +968,11 @@ private fun AddLinkScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .border(BorderStroke(1.dp, QualityAlternativeThemeTokens.colors.line))
-                .padding(horizontal = 28.dp, vertical = 14.dp),
+                .padding(horizontal = 28.dp, vertical = 10.dp),
         ) {
             QaButton(
-                text = "Add to library",
-                onClick = { savedPreview = true },
+                text = if (form.isSaving) "Saving..." else "Add to library",
+                onClick = onSave,
                 enabled = form.canSave && !form.isSaving,
                 variant = QaButtonVariant.Primary,
                 modifier = Modifier.testTag("add-link-save"),
@@ -890,13 +983,19 @@ private fun AddLinkScreen(
 
 @Composable
 private fun AddLinkSuccess(
-    form: AddLinkFormState,
-    host: String,
+    confirmation: AddLinkConfirmation?,
     onDone: () -> Unit,
 ) {
+    val saved = confirmation ?: AddLinkConfirmation(
+        title = "Saved link",
+        host = "your link",
+        durationMinutes = 8,
+        topicLabel = "Reading",
+    )
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .testTag("add-link-success-screen")
             .padding(horizontal = 28.dp, vertical = 80.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
@@ -908,7 +1007,7 @@ private fun AddLinkSuccess(
                 .background(QualityAlternativeThemeTokens.colors.successSoft),
             contentAlignment = Alignment.Center,
         ) {
-            Text("OK", color = QualityAlternativeThemeTokens.colors.success, fontWeight = FontWeight.SemiBold)
+            QaIcon(kind = QaIconKind.Check, color = QualityAlternativeThemeTokens.colors.success, size = 28.dp)
         }
         DisplayText(
             text = "Ready when you are",
@@ -923,9 +1022,9 @@ private fun AddLinkSuccess(
             modifier = Modifier.widthIn(max = 280.dp),
         )
         QaCard(modifier = Modifier.padding(top = 32.dp, bottom = 24.dp), padding = 16.dp) {
-            MonoText("${host.ifBlank { "your link" }} - ${form.durationMinutes} min - ${form.selectedTopics.firstOrNull()?.displayName().orEmpty()}")
+            MonoText("${saved.host} · ${saved.durationMinutes} min · ${saved.topicLabel}")
             Text(
-                text = form.title,
+                text = saved.title,
                 style = MaterialTheme.typography.titleMedium,
                 fontSize = 17.sp,
                 lineHeight = 20.sp,
@@ -965,6 +1064,7 @@ private fun InterventionScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .testTag("intervention-screen")
             .background(backgroundBrush)
             .padding(horizontal = 24.dp, vertical = 26.dp),
     ) {
@@ -982,15 +1082,15 @@ private fun InterventionScreen(
                 modifier = Modifier.weight(1f),
                 fontSize = 13.5.sp,
             )
-            QaIconButton(text = "x", onClick = onOpenAnyway)
+            QaIconButton(icon = QaIconKind.Close, onClick = onOpenAnyway)
         }
         MonoText("A brief detour, if you'd like one", modifier = Modifier.padding(bottom = 14.dp))
         QaCard(
             borderColor = colors.lineStrong,
-            padding = 22.dp,
+            padding = 25.dp,
             modifier = Modifier.padding(bottom = 18.dp),
         ) {
-            ContentMetaRow(primary)
+            ContentMetaRow(primary, stacked = true)
             DisplayText(
                 text = primary.title,
                 fontSize = 32.sp,
@@ -1003,7 +1103,7 @@ private fun InterventionScreen(
                     fontFamily = QualityDisplayFontFamily,
                     fontStyle = FontStyle.Italic,
                     fontSize = 15.sp,
-                    lineHeight = 22.sp,
+                    lineHeight = 24.sp,
                 ),
                 color = colors.mutedText,
             )
@@ -1013,6 +1113,7 @@ private fun InterventionScreen(
             onClick = onAcceptPrimary,
             variant = QaButtonVariant.Accent,
             modifier = Modifier.padding(bottom = 16.dp),
+            leadingIcon = QaIconKind.Book,
         )
         MonoText("Or", modifier = Modifier.padding(bottom = 6.dp))
         Column(modifier = Modifier.padding(bottom = 18.dp)) {
@@ -1036,6 +1137,7 @@ private fun InterventionScreen(
                 modifier = Modifier.weight(1f),
                 fullWidth = false,
                 size = QaButtonSize.Compact,
+                leadingIcon = QaIconKind.Pause,
             )
             QaButton(
                 text = "Open ${targetApp.displayName}",
@@ -1057,12 +1159,15 @@ private fun ReaderScreen(
 ) {
     val content = state.currentContent ?: return
     val paragraphs = finiteReaderParagraphs(state.currentContentBody).ifEmpty { listOf(content.description) }
-    var progress by remember(content.id) { mutableStateOf(18) }
+    var progress by remember(content.id, state.currentSessionStartedAtMillis) { mutableStateOf(0) }
 
-    LaunchedEffect(content.id) {
-        while (progress < 100) {
-            kotlinx.coroutines.delay(350)
-            progress = (progress + 4).coerceAtMost(100)
+    LaunchedEffect(content.id, state.currentSessionStartedAtMillis, content.durationMinutes) {
+        val startedAtMillis = state.currentSessionStartedAtMillis ?: System.currentTimeMillis()
+        val totalMillis = (content.durationMinutes * 60_000L).coerceAtLeast(1L)
+        while (true) {
+            val elapsedMillis = (System.currentTimeMillis() - startedAtMillis).coerceAtLeast(0L)
+            progress = ((elapsedMillis * 100L) / totalMillis).toInt().coerceIn(0, 100)
+            delay(1_000L)
         }
     }
 
@@ -1074,7 +1179,7 @@ private fun ReaderScreen(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            QaIconButton(text = "x", onClick = onBack)
+            QaIconButton(icon = QaIconKind.Close, onClick = onBack)
             ProgressLine(progress = progress, modifier = Modifier.weight(1f))
             MonoText("${remainingMinutes(content.durationMinutes, progress)} min left")
         }
@@ -1085,13 +1190,13 @@ private fun ReaderScreen(
             contentPadding = PaddingValues(start = 28.dp, top = 18.dp, end = 28.dp, bottom = 24.dp),
         ) {
             item {
-                MonoText("${content.sourceLabel()} - ${content.topicLine()}", modifier = Modifier.padding(bottom = 10.dp))
-                DisplayText(content.title, fontSize = 30.sp, lineHeight = 34.sp, modifier = Modifier.padding(bottom = 18.dp))
+                MonoText("${content.sourceLabel()} · ${content.topicLine()}", modifier = Modifier.padding(bottom = 10.dp))
+                DisplayText(content.title, fontSize = 27.sp, lineHeight = 31.sp, modifier = Modifier.padding(bottom = 18.dp))
                 PlaceholderImage(modifier = Modifier.padding(bottom = 22.dp))
             }
-            items(paragraphs.take(5)) { paragraph ->
+            items(paragraphs.take(5).withIndex().toList()) { indexedParagraph ->
                 Text(
-                    text = paragraph,
+                    text = indexedParagraph.value,
                     style = MaterialTheme.typography.bodyLarge.copy(
                         fontFamily = QualityDisplayFontFamily,
                         fontSize = 17.sp,
@@ -1122,6 +1227,7 @@ private fun ExternalLinkHandoffScreen(
 ) {
     val content = state.currentContent ?: return
     val context = LocalContext.current
+    var hasOpenedLink by remember(content.id) { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxSize().testTag("external-handoff-screen")) {
         ScreenHead(onBack = onBack)
@@ -1137,8 +1243,8 @@ private fun ExternalLinkHandoffScreen(
             QaCard(modifier = Modifier.padding(bottom = 20.dp), padding = 16.dp) {
                 BodyText("Opens in your browser", color = QualityAlternativeThemeTokens.colors.mutedText, modifier = Modifier.padding(bottom = 10.dp))
                 BodyText(
-                    text = "We'll start a ${content.durationMinutes}-minute timer. When you come back, we'll ask one quick question.",
-                    color = QualityAlternativeThemeTokens.colors.mutedText,
+                text = "We'll start a ${content.durationMinutes}-minute timer. When you come back, we'll ask one quick question.",
+                color = QualityAlternativeThemeTokens.colors.mutedText,
                 )
             }
             MonoText("Link", modifier = Modifier.padding(bottom = 6.dp))
@@ -1150,11 +1256,18 @@ private fun ExternalLinkHandoffScreen(
             QaButton(
                 text = "Open & start ${content.durationMinutes}-min session",
                 onClick = {
+                    hasOpenedLink = true
                     onOpenLink(context)
-                    onDone()
                 },
                 variant = QaButtonVariant.Accent,
+                leadingIcon = QaIconKind.External,
                 modifier = Modifier.testTag("external-link-open"),
+            )
+            QaButton(
+                text = if (hasOpenedLink) "I'm back from reading" else "I've finished this link",
+                onClick = onDone,
+                variant = QaButtonVariant.Outline,
+                modifier = Modifier.testTag("external-link-done"),
             )
             QaButton(text = "Not now", onClick = onBack, variant = QaButtonVariant.Ghost)
         }
@@ -1164,7 +1277,7 @@ private fun ExternalLinkHandoffScreen(
 @Composable
 private fun FeedbackScreen(
     state: MainUiState,
-    onSubmit: (Boolean, Boolean) -> Unit,
+    onSubmit: (String, String) -> Unit,
     onSkip: () -> Unit,
 ) {
     val content = state.currentContent
@@ -1179,7 +1292,7 @@ private fun FeedbackScreen(
             .testTag("feedback-screen")
             .padding(horizontal = 28.dp, vertical = 50.dp),
     ) {
-        MonoText("$minutes minutes - well spent", modifier = Modifier.padding(bottom = 14.dp))
+        MonoText("$minutes minutes · well spent", modifier = Modifier.padding(bottom = 14.dp))
         DisplayText("Two quick questions.", fontSize = 28.sp, lineHeight = 31.sp, modifier = Modifier.padding(bottom = 26.dp))
         FeedbackQuestion(
             title = "Was this a good fit?",
@@ -1198,7 +1311,7 @@ private fun FeedbackScreen(
         Spacer(modifier = Modifier.weight(1f))
         QaButton(
             text = "Log session",
-            onClick = { onSubmit(fit != "not", helped != "no") },
+            onClick = { onSubmit(requireNotNull(fit), requireNotNull(helped)) },
             enabled = done,
             variant = QaButtonVariant.Primary,
             modifier = Modifier.testTag("feedback-log"),
@@ -1436,7 +1549,7 @@ private fun AppSelectionRow(
                 .background(if (selected) colors.primaryText else Color.Transparent),
             contentAlignment = Alignment.Center,
         ) {
-            if (selected) Text("✓", color = colors.background, fontSize = 13.sp)
+            if (selected) QaIcon(kind = QaIconKind.Check, color = colors.background, size = 14.dp)
         }
     }
 }
@@ -1482,7 +1595,10 @@ private fun DurationOption(
 @Composable
 private fun PermissionIntroRow(name: String, why: String) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.padding(bottom = 8.dp)) {
-        SourceBadge(sourceType = ContentSourceType.EDITORIAL)
+        SourceBadge(
+            sourceType = ContentSourceType.EDITORIAL,
+            icon = if (name.startsWith("Usage")) QaIconKind.Eye else QaIconKind.Shield,
+        )
         Text(name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
     }
     BodyText(why, color = QualityAlternativeThemeTokens.colors.mutedText)
@@ -1496,7 +1612,10 @@ private fun PermissionWarningCard(onOpenSettings: () -> Unit) {
         borderColor = colors.accent,
         padding = 16.dp,
     ) {
-        Text("Interception is paused", style = MaterialTheme.typography.bodySmall, color = colors.accent, fontWeight = FontWeight.Medium)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(bottom = 6.dp)) {
+            QaIcon(kind = QaIconKind.Bell, color = colors.accent, size = 16.dp)
+            Text("Interception is paused", style = MaterialTheme.typography.bodySmall, color = colors.accent, fontWeight = FontWeight.Medium)
+        }
         BodyText(
             text = "A permission is missing. Without it, we can't offer you something better when you open a distracting app.",
             color = colors.primaryText,
@@ -1563,12 +1682,17 @@ private fun AppPills(
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         apps.forEach { app ->
             val selected = app.packageName in selectedPackages
+            val isActiveTarget = selectedApp?.packageName == app.packageName
+            val borderColor = when {
+                isActiveTarget && dimUnselected -> QualityAlternativeThemeTokens.colors.primaryText
+                else -> QualityAlternativeThemeTokens.colors.line
+            }
             Row(
                 modifier = Modifier
                     .alpha(if (!selected && dimUnselected) 0.55f else 1f)
                     .clip(RoundedCornerShape(100.dp))
                     .border(
-                        BorderStroke(1.dp, if (selectedApp?.packageName == app.packageName) QualityAlternativeThemeTokens.colors.primaryText else QualityAlternativeThemeTokens.colors.line),
+                        BorderStroke(1.dp, borderColor),
                         RoundedCornerShape(100.dp),
                     )
                     .clickable { onSelect(app) }
@@ -1597,7 +1721,7 @@ private fun LibrarySummaryRow(label: String, value: String, sourceType: ContentS
             Text(label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
             MonoText(value, modifier = Modifier.padding(top = 2.dp))
         }
-        Text(">", color = QualityAlternativeThemeTokens.colors.faintText)
+        QaIcon(kind = QaIconKind.ChevronRight, color = QualityAlternativeThemeTokens.colors.faintText, size = 18.dp)
     }
 }
 
@@ -1622,12 +1746,21 @@ private fun LibraryItemCard(item: ContentItem, onOpen: () -> Unit) {
 }
 
 @Composable
-private fun ContentMetaRow(item: ContentItem) {
+private fun ContentMetaRow(item: ContentItem, stacked: Boolean = false) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-        MonoText(item.sourceLabel())
-        MonoText("-")
-        MonoText(item.topicLine(), modifier = Modifier.weight(1f))
-        MonoText("${item.durationMinutes} min")
+        if (stacked) {
+            MonoText(item.sourceLabel(), modifier = Modifier.width(76.dp), lineHeight = 12.sp)
+            MonoText("·")
+            MonoText(item.topicLine(), modifier = Modifier.weight(1f))
+        } else {
+            MonoText(item.sourceLabel())
+            MonoText("·")
+            MonoText(item.topicLine(), modifier = Modifier.weight(1f))
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            QaIcon(kind = QaIconKind.Clock, color = QualityAlternativeThemeTokens.colors.faintText, size = 14.dp)
+            MonoText("${item.durationMinutes} min")
+        }
     }
 }
 
@@ -1650,9 +1783,9 @@ private fun BackupRow(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(item.title, style = MaterialTheme.typography.titleMedium, fontSize = 16.sp, lineHeight = 19.sp, maxLines = 2)
-                MonoText("${item.sourceLabel()} - ${item.durationMinutes} min - ${item.topicLine()}", modifier = Modifier.padding(top = 3.dp))
+                MonoText("${item.sourceLabel()} · ${item.durationMinutes} min · ${item.topicLine()}", modifier = Modifier.padding(top = 3.dp))
             }
-            Text(">", color = QualityAlternativeThemeTokens.colors.faintText)
+            QaIcon(kind = QaIconKind.ChevronRight, color = QualityAlternativeThemeTokens.colors.faintText, size = 18.dp)
         }
     }
 }
@@ -1672,8 +1805,8 @@ private fun AddLinkValidationLine(form: AddLinkFormState, host: String) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text("OK", color = QualityAlternativeThemeTokens.colors.success, style = MaterialTheme.typography.labelMedium)
-            BodyText("Found - $host", color = QualityAlternativeThemeTokens.colors.success, fontSize = 12.5.sp)
+            QaIcon(kind = QaIconKind.Check, color = QualityAlternativeThemeTokens.colors.success, size = 14.dp)
+            BodyText("Found · $host", color = QualityAlternativeThemeTokens.colors.success, fontSize = 12.5.sp)
         }
     }
 }
@@ -1687,7 +1820,7 @@ private fun FeedbackQuestion(
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier) {
-        Text(title, style = MaterialTheme.typography.bodyMedium, fontSize = 15.sp, modifier = Modifier.padding(bottom = 12.dp))
+        Text(title, style = MaterialTheme.typography.bodyMedium, fontSize = 15.sp, modifier = Modifier.padding(bottom = 10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             options.forEach { (id, label) ->
                 QaChip(
@@ -1696,6 +1829,10 @@ private fun FeedbackQuestion(
                     onClick = { onSelect(id) },
                     modifier = Modifier.weight(1f),
                     centered = true,
+                    minHeight = 34.dp,
+                    horizontalPadding = 6.dp,
+                    verticalPadding = 6.dp,
+                    fontSize = 12.sp,
                 )
             }
         }
@@ -1866,6 +2003,8 @@ private fun QaButton(
     size: QaButtonSize = QaButtonSize.Normal,
     enabled: Boolean = true,
     fullWidth: Boolean = true,
+    leadingIcon: QaIconKind? = null,
+    trailingIcon: QaIconKind? = null,
 ) {
     val colors = QualityAlternativeThemeTokens.colors
     val background = when (variant) {
@@ -1902,10 +2041,19 @@ private fun QaButton(
         contentColor = foreground,
         border = border,
     ) {
-        Box(
+        Row(
             modifier = Modifier.padding(padding),
-            contentAlignment = Alignment.Center,
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
         ) {
+            if (leadingIcon != null) {
+                QaIcon(
+                    kind = leadingIcon,
+                    color = foreground,
+                    size = if (size == QaButtonSize.Small || size == QaButtonSize.Compact) 14.dp else 16.dp,
+                    modifier = Modifier.padding(end = 8.dp),
+                )
+            }
             Text(
                 text = text,
                 style = MaterialTheme.typography.bodyMedium,
@@ -1913,12 +2061,233 @@ private fun QaButton(
                 textAlign = TextAlign.Center,
                 fontSize = if (size == QaButtonSize.Small || size == QaButtonSize.Compact) 14.sp else 16.sp,
             )
+            if (trailingIcon != null) {
+                QaIcon(
+                    kind = trailingIcon,
+                    color = foreground,
+                    size = if (size == QaButtonSize.Small || size == QaButtonSize.Compact) 14.dp else 16.dp,
+                    modifier = Modifier
+                        .padding(start = 8.dp),
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun QaIconButton(text: String, onClick: () -> Unit) {
+private fun QaIcon(
+    kind: QaIconKind,
+    color: Color,
+    modifier: Modifier = Modifier,
+    size: androidx.compose.ui.unit.Dp = 18.dp,
+) {
+    Canvas(modifier = modifier.size(size)) {
+        fun x(value: Float) = this.size.width * value / 24f
+        fun y(value: Float) = this.size.height * value / 24f
+        fun p(xValue: Float, yValue: Float) = Offset(x(xValue), y(yValue))
+        fun line(x1: Float, y1: Float, x2: Float, y2: Float) {
+            drawLine(color, p(x1, y1), p(x2, y2), 1.5.dp.toPx(), StrokeCap.Round)
+        }
+        fun path(block: Path.() -> Unit) {
+            val iconPath = Path().apply(block)
+            drawPath(iconPath, color = color, style = Stroke(width = 1.5.dp.toPx(), cap = StrokeCap.Round))
+        }
+
+        when (kind) {
+            QaIconKind.Plus -> {
+                line(12f, 5f, 12f, 19f)
+                line(5f, 12f, 19f, 12f)
+            }
+
+            QaIconKind.Check -> path {
+                moveTo(x(5f), y(12f))
+                lineTo(x(9f), y(16f))
+                lineTo(x(19f), y(7f))
+            }
+
+            QaIconKind.ArrowRight -> {
+                line(5f, 12f, 19f, 12f)
+                line(13f, 5f, 20f, 12f)
+                line(13f, 19f, 20f, 12f)
+            }
+
+            QaIconKind.ArrowLeft -> {
+                line(19f, 12f, 5f, 12f)
+                line(11f, 5f, 4f, 12f)
+                line(11f, 19f, 4f, 12f)
+            }
+
+            QaIconKind.Close -> {
+                line(6f, 6f, 18f, 18f)
+                line(6f, 18f, 18f, 6f)
+            }
+
+            QaIconKind.Clock -> {
+                drawCircle(color = color, radius = x(9f), center = p(12f, 12f), style = Stroke(1.5.dp.toPx()))
+                line(12f, 7f, 12f, 12f)
+                line(12f, 12f, 15f, 14f)
+            }
+
+            QaIconKind.Book -> {
+                path {
+                    moveTo(x(4f), y(5.5f))
+                    quadraticTo(x(4f), y(3.8f), x(6.5f), y(3f))
+                    lineTo(x(20f), y(3f))
+                    lineTo(x(20f), y(18f))
+                    lineTo(x(6.5f), y(18f))
+                    quadraticTo(x(4f), y(18f), x(4f), y(20.5f))
+                    lineTo(x(4f), y(5.5f))
+                }
+                line(4f, 20.5f, 20f, 20.5f)
+            }
+
+            QaIconKind.Link -> {
+                path {
+                    moveTo(x(10f), y(14f))
+                    quadraticTo(x(12f), y(16f), x(15f), y(14f))
+                    lineTo(x(18f), y(11f))
+                    quadraticTo(x(21f), y(8f), x(18f), y(5.5f))
+                    quadraticTo(x(15.5f), y(3f), x(13f), y(6f))
+                    lineTo(x(11.5f), y(7.5f))
+                }
+                path {
+                    moveTo(x(14f), y(10f))
+                    quadraticTo(x(12f), y(8f), x(9f), y(10f))
+                    lineTo(x(6f), y(13f))
+                    quadraticTo(x(3f), y(16f), x(6f), y(18.5f))
+                    quadraticTo(x(8.5f), y(21f), x(11f), y(18f))
+                    lineTo(x(12.5f), y(16.5f))
+                }
+            }
+
+            QaIconKind.Home -> path {
+                moveTo(x(3f), y(11f))
+                lineTo(x(12f), y(4f))
+                lineTo(x(21f), y(11f))
+                lineTo(x(21f), y(20f))
+                lineTo(x(15f), y(20f))
+                lineTo(x(15f), y(14f))
+                lineTo(x(9f), y(14f))
+                lineTo(x(9f), y(20f))
+                lineTo(x(3f), y(20f))
+                close()
+            }
+
+            QaIconKind.Library -> {
+                line(4f, 5f, 4f, 19f)
+                line(9f, 5f, 9f, 19f)
+                line(14f, 6f, 16f, 19f)
+                line(19f, 6f, 21f, 19f)
+            }
+
+            QaIconKind.History -> {
+                drawArc(
+                    color = color,
+                    startAngle = -210f,
+                    sweepAngle = 285f,
+                    useCenter = false,
+                    style = Stroke(1.5.dp.toPx(), cap = StrokeCap.Round),
+                    topLeft = Offset(x(3f), y(3f)),
+                    size = androidx.compose.ui.geometry.Size(x(18f), y(18f)),
+                )
+                line(3f, 3f, 3f, 8f)
+                line(3f, 8f, 8f, 8f)
+                line(12f, 7f, 12f, 12f)
+                line(12f, 12f, 15f, 14f)
+            }
+
+            QaIconKind.Settings -> {
+                drawCircle(color = color, radius = x(8.3f), center = p(12f, 12f), style = Stroke(1.5.dp.toPx()))
+                drawCircle(color = color, radius = x(3f), center = p(12f, 12f), style = Stroke(1.5.dp.toPx()))
+                repeat(8) { index ->
+                    val radians = Math.toRadians((index * 45).toDouble())
+                    val dx = kotlin.math.cos(radians).toFloat()
+                    val dy = kotlin.math.sin(radians).toFloat()
+                    drawLine(
+                        color,
+                        Offset(x(12f) + dx * x(7.4f), y(12f) + dy * y(7.4f)),
+                        Offset(x(12f) + dx * x(10.2f), y(12f) + dy * y(10.2f)),
+                        1.5.dp.toPx(),
+                        StrokeCap.Round,
+                    )
+                }
+            }
+
+            QaIconKind.Sparkle -> path {
+                moveTo(x(12f), y(3f))
+                lineTo(x(14f), y(8f))
+                lineTo(x(19f), y(10f))
+                lineTo(x(14f), y(12f))
+                lineTo(x(12f), y(17f))
+                lineTo(x(10f), y(12f))
+                lineTo(x(5f), y(10f))
+                lineTo(x(10f), y(8f))
+                close()
+            }
+
+            QaIconKind.Shield -> path {
+                moveTo(x(12f), y(3f))
+                lineTo(x(20f), y(6f))
+                lineTo(x(20f), y(12f))
+                quadraticTo(x(20f), y(18f), x(12f), y(21f))
+                quadraticTo(x(4f), y(18f), x(4f), y(12f))
+                lineTo(x(4f), y(6f))
+                close()
+            }
+
+            QaIconKind.Eye -> {
+                path {
+                    moveTo(x(1f), y(12f))
+                    quadraticTo(x(6f), y(5f), x(12f), y(5f))
+                    quadraticTo(x(18f), y(5f), x(23f), y(12f))
+                    quadraticTo(x(18f), y(19f), x(12f), y(19f))
+                    quadraticTo(x(6f), y(19f), x(1f), y(12f))
+                }
+                drawCircle(color = color, radius = x(3f), center = p(12f, 12f), style = Stroke(1.5.dp.toPx()))
+            }
+
+            QaIconKind.Pause -> {
+                line(8f, 5f, 8f, 19f)
+                line(16f, 5f, 16f, 19f)
+            }
+
+            QaIconKind.External -> {
+                path {
+                    moveTo(x(18f), y(13f))
+                    lineTo(x(18f), y(21f))
+                    lineTo(x(3f), y(21f))
+                    lineTo(x(3f), y(6f))
+                    lineTo(x(11f), y(6f))
+                }
+                line(15f, 3f, 21f, 3f)
+                line(21f, 3f, 21f, 9f)
+                line(10f, 14f, 21f, 3f)
+            }
+
+            QaIconKind.Bell -> path {
+                moveTo(x(6f), y(8f))
+                quadraticTo(x(6f), y(4f), x(12f), y(4f))
+                quadraticTo(x(18f), y(4f), x(18f), y(8f))
+                quadraticTo(x(18f), y(15f), x(21f), y(17f))
+                lineTo(x(3f), y(17f))
+                quadraticTo(x(6f), y(15f), x(6f), y(8f))
+                moveTo(x(10f), y(21f))
+                quadraticTo(x(12f), y(22f), x(14f), y(21f))
+            }
+
+            QaIconKind.ChevronRight -> path {
+                moveTo(x(9f), y(6f))
+                lineTo(x(15f), y(12f))
+                lineTo(x(9f), y(18f))
+            }
+
+            QaIconKind.Dot -> drawCircle(color = color, radius = x(2f), center = p(12f, 12f))
+        }
+    }
+}
+
+@Composable
+private fun QaIconButton(icon: QaIconKind, onClick: () -> Unit) {
     Surface(
         modifier = Modifier.size(34.dp),
         onClick = onClick,
@@ -1927,7 +2296,7 @@ private fun QaIconButton(text: String, onClick: () -> Unit) {
         contentColor = QualityAlternativeThemeTokens.colors.mutedText,
     ) {
         Box(contentAlignment = Alignment.Center) {
-            Text(text = text, fontWeight = FontWeight.Medium)
+            QaIcon(kind = icon, color = QualityAlternativeThemeTokens.colors.mutedText, size = 18.dp)
         }
     }
 }
@@ -1940,6 +2309,10 @@ private fun QaChip(
     modifier: Modifier = Modifier,
     accentSelected: Boolean = false,
     centered: Boolean = false,
+    minHeight: androidx.compose.ui.unit.Dp = 0.dp,
+    horizontalPadding: androidx.compose.ui.unit.Dp = 15.dp,
+    verticalPadding: androidx.compose.ui.unit.Dp = 9.dp,
+    fontSize: androidx.compose.ui.unit.TextUnit = 12.sp,
 ) {
     val colors = QualityAlternativeThemeTokens.colors
     val selectedColor = if (accentSelected) colors.accent else colors.primaryText
@@ -1953,11 +2326,20 @@ private fun QaChip(
     ) {
         Box(
             modifier = Modifier
+                .then(if (minHeight.value > 0f) Modifier.heightIn(min = minHeight) else Modifier)
                 .then(if (centered) Modifier.fillMaxWidth() else Modifier)
-                .padding(horizontal = 15.dp, vertical = 9.dp),
+                .padding(horizontal = horizontalPadding, vertical = verticalPadding),
             contentAlignment = if (centered) Alignment.Center else Alignment.CenterStart,
         ) {
-            Text(text, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
+            Text(
+                text = text,
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.Medium,
+                fontSize = fontSize,
+                textAlign = if (centered) TextAlign.Center else TextAlign.Start,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
@@ -1970,15 +2352,38 @@ private fun QaTextField(
     modifier: Modifier = Modifier,
     isError: Boolean = false,
 ) {
-    OutlinedTextField(
-        modifier = modifier.fillMaxWidth(),
+    val colors = QualityAlternativeThemeTokens.colors
+    BasicTextField(
         value = value,
         onValueChange = onValueChange,
-        placeholder = { Text(placeholder, color = QualityAlternativeThemeTokens.colors.faintText) },
         singleLine = true,
-        isError = isError,
-        textStyle = MaterialTheme.typography.bodyMedium,
-        shape = RoundedCornerShape(10.dp),
+        textStyle = MaterialTheme.typography.bodyMedium.copy(
+            color = colors.primaryText,
+            fontSize = 15.sp,
+            lineHeight = 19.sp,
+        ),
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = 44.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(colors.elevatedSurface)
+            .border(
+                BorderStroke(1.dp, if (isError) colors.accent else colors.lineStrong),
+                RoundedCornerShape(10.dp),
+            )
+            .padding(horizontal = 15.dp, vertical = 12.dp),
+        decorationBox = { innerTextField ->
+            Box(contentAlignment = Alignment.CenterStart) {
+                if (value.isBlank()) {
+                    Text(
+                        text = placeholder,
+                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 15.sp, lineHeight = 19.sp),
+                        color = colors.faintText,
+                    )
+                }
+                innerTextField()
+            }
+        },
     )
 }
 
@@ -2001,18 +2406,19 @@ private fun AppDot(app: DistractingApp, size: androidx.compose.ui.unit.Dp = 28.d
 }
 
 @Composable
-private fun SourceBadge(sourceType: ContentSourceType) {
+private fun SourceBadge(
+    sourceType: ContentSourceType,
+    icon: QaIconKind = if (sourceType == ContentSourceType.USER_LINK) QaIconKind.Link else QaIconKind.Sparkle,
+) {
     val colors = QualityAlternativeThemeTokens.colors
-    val background = if (sourceType == ContentSourceType.USER_LINK) colors.successSoft else colors.accentSoft
-    val foreground = if (sourceType == ContentSourceType.USER_LINK) colors.success else colors.accent
     Box(
         modifier = Modifier
             .size(34.dp)
             .clip(RoundedCornerShape(8.dp))
-            .background(background),
+            .background(colors.accentSoft),
         contentAlignment = Alignment.Center,
     ) {
-        Text(if (sourceType == ContentSourceType.USER_LINK) "L" else "E", color = foreground, fontWeight = FontWeight.Bold)
+        QaIcon(kind = icon, color = colors.accent, size = 17.dp)
     }
 }
 
@@ -2035,8 +2441,8 @@ private fun ProgressLine(progress: Int, modifier: Modifier = Modifier) {
     val colors = QualityAlternativeThemeTokens.colors
     Box(
         modifier = modifier
-            .height(5.dp)
-            .clip(RoundedCornerShape(3.dp))
+            .height(2.dp)
+            .clip(RoundedCornerShape(1.dp))
             .background(colors.line),
     ) {
         Box(
@@ -2073,7 +2479,7 @@ private fun PlaceholderImage(modifier: Modifier = Modifier) {
             },
         contentAlignment = Alignment.Center,
     ) {
-        MonoText("figure - editorial image")
+        MonoText("figure · editorial image")
     }
 }
 
@@ -2208,7 +2614,7 @@ internal fun homeHeroCopy(readiness: PermissionReadiness): HomeHeroCopy {
         )
     } else {
         HomeHeroCopy(
-            title = "Interception needs one more step.",
+            title = "You're set up for quieter reading today.",
             body = "Finish the Android setup first, so the app can meet the impulse before a social feed opens.",
             showAddLinkAction = false,
         )
@@ -2234,14 +2640,33 @@ private fun formatRelativeDay(timestampMillis: Long): String {
 
 private fun TopicTag.displayName(): String {
     return when (this) {
+        TopicTag.ESSAYS -> "Essays"
         TopicTag.PHILOSOPHY -> "Philosophy"
         TopicTag.SCIENCE -> "Science"
+        TopicTag.DESIGN -> "Design"
+        TopicTag.POETRY -> "Poetry"
         TopicTag.HISTORY -> "History"
+        TopicTag.TECH -> "Tech"
+        TopicTag.FICTION -> "Fiction"
+        TopicTag.CLIMATE -> "Climate"
         TopicTag.ECONOMICS -> "Economics"
+        TopicTag.FOOD -> "Food"
+        TopicTag.ARCHITECTURE -> "Architecture"
         TopicTag.CREATIVITY -> "Design"
         TopicTag.PSYCHOLOGY -> "Psychology"
     }
 }
+
+private fun prototypeTopics(): List<TopicTag> = listOf(
+    TopicTag.ESSAYS,
+    TopicTag.SCIENCE,
+    TopicTag.DESIGN,
+    TopicTag.PHILOSOPHY,
+    TopicTag.POETRY,
+    TopicTag.HISTORY,
+    TopicTag.TECH,
+    TopicTag.FICTION,
+)
 
 private fun DurationBucket.prototypeMinutes(): Int {
     return when (this) {
@@ -2255,10 +2680,12 @@ private fun DurationBucket.prototypeMinutesLabel(): String = "${prototypeMinutes
 
 private fun ContentItem.isUserLink(): Boolean = sourceType == ContentSourceType.USER_LINK
 
-private fun ContentItem.topicLine(): String = topicTags.joinToString { it.displayName() }.ifBlank { "Essays" }
+private fun ContentItem.topicLine(): String {
+    return topicTags.joinToString { it.displayName() }.ifBlank { "Essays" }
+}
 
 private fun ContentItem.sourceLabel(): String {
-    return if (isUserLink()) {
+    return sourceLabel?.ifBlank { null } ?: if (isUserLink()) {
         externalUrl?.hostLabel()?.ifBlank { "Your link" } ?: "Your link"
     } else {
         packId.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.US) else it.toString() }
@@ -2351,3 +2778,7 @@ private fun launchExternalLink(
 
 private const val MAX_BACKUP_RECOMMENDATIONS = 2
 private const val MAX_RECENT_PROGRESS_REPLACEMENTS = 3
+private const val DEBUG_PARITY_VIEWPORT_WIDTH_DP = 340f
+private const val DEBUG_PARITY_VIEWPORT_HEIGHT_DP = 740f
+private const val MIN_DEBUG_PARITY_SCALE = 0.94f
+private const val MAX_DEBUG_PARITY_SCALE = 1.22f

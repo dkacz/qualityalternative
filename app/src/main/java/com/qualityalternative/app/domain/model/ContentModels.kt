@@ -17,10 +17,18 @@ enum class ContentAvailability {
 }
 
 enum class TopicTag {
+    ESSAYS,
     PHILOSOPHY,
     SCIENCE,
+    DESIGN,
+    POETRY,
     HISTORY,
+    TECH,
+    FICTION,
+    CLIMATE,
     ECONOMICS,
+    FOOD,
+    ARCHITECTURE,
     CREATIVITY,
     PSYCHOLOGY,
 }
@@ -47,6 +55,7 @@ data class ContentItem(
     val topicTags: Set<TopicTag>,
     val bodyAssetPath: String? = null,
     val externalUrl: String? = null,
+    val sourceLabel: String? = null,
     val sourceType: ContentSourceType = ContentSourceType.EDITORIAL,
     val availability: ContentAvailability = ContentAvailability.AVAILABLE,
 )

@@ -1,6 +1,7 @@
 package com.qualityalternative.app.domain.service
 
 import com.qualityalternative.app.domain.model.ContentItem
+import com.qualityalternative.app.domain.model.ContentSourceType
 import com.qualityalternative.app.domain.model.DistractingApp
 import com.qualityalternative.app.domain.model.DurationBucket
 import com.qualityalternative.app.domain.model.RecommendationSet
@@ -59,11 +60,14 @@ class DefaultRecommendationEngine : RecommendationEngine {
         scoredCandidates: List<ScoredCandidate>,
     ): List<ScoredCandidate> {
         return scoredCandidates
-            .filterNot { it.item.id == primary.item.id }
-            .filter { it.item.durationMinutes <= primary.item.durationMinutes }
+            .filter { candidate ->
+                candidate.item.id != primary.item.id &&
+                    candidate.item.durationMinutes <= primary.item.durationMinutes
+            }
             .sortedWith(
-                compareBy<ScoredCandidate> { abs(it.item.durationMinutes - DurationBucket.QUICK.midpoint) }
-                    .thenByDescending { it.score }
+                compareByDescending<ScoredCandidate> { it.score }
+                    .thenBy { it.item.sourceType.backupPriority() }
+                    .thenBy { abs(it.item.durationMinutes - DurationBucket.QUICK.midpoint) }
                     .thenBy { it.durationDistance }
                     .thenBy { it.item.title },
             )
@@ -109,4 +113,11 @@ class DefaultRecommendationEngine : RecommendationEngine {
         val primary: ScoredCandidate,
         val backups: List<ScoredCandidate>,
     )
+
+    private fun ContentSourceType.backupPriority(): Int {
+        return when (this) {
+            ContentSourceType.EDITORIAL -> 0
+            ContentSourceType.USER_LINK -> 1
+        }
+    }
 }

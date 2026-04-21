@@ -68,6 +68,8 @@ class RoomHistoryRepositoryTest {
                 feedback = SessionFeedback(
                     wasGoodFit = true,
                     helpedAvoidScrolling = true,
+                    fitRating = "great",
+                    scrollRating = "yes",
                     submittedAtMillis = 2_100L,
                 ),
             )
@@ -81,6 +83,8 @@ class RoomHistoryRepositoryTest {
             assertTrue(historyEntry.isCompleted())
             assertEquals(3_000L, historyEntry.returnedToTargetAtMillis)
             assertEquals(true, historyEntry.feedbackHelpedAvoidScrolling)
+            assertEquals("great", historyEntry.feedbackFitRating)
+            assertEquals("yes", historyEntry.feedbackScrollRating)
             assertEquals(setOf(content.id), completedIds)
         } finally {
             appScope.cancel()

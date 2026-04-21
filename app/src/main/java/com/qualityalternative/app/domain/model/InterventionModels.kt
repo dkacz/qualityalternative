@@ -17,6 +17,8 @@ data class InterventionDecision(
 data class SessionFeedback(
     val wasGoodFit: Boolean,
     val helpedAvoidScrolling: Boolean,
+    val fitRating: String? = null,
+    val scrollRating: String? = null,
     val submittedAtMillis: Long,
 )
 

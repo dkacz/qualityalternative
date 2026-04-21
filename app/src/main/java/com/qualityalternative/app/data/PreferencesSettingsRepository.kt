@@ -61,6 +61,18 @@ class PreferencesSettingsRepository(
         }
     }
 
+    override suspend fun saveSelectedAppPackages(packages: Set<String>) {
+        dataStore.edit { preferences ->
+            preferences[SelectedAppPackages] = packages
+        }
+    }
+
+    override suspend fun savePreferredDurationBucket(bucket: DurationBucket) {
+        dataStore.edit { preferences ->
+            preferences[PreferredDurationBucket] = bucket.name
+        }
+    }
+
     override suspend fun saveThemeMode(themeMode: AppThemeMode) {
         dataStore.edit { preferences ->
             preferences[ThemeMode] = themeMode.name

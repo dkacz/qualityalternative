@@ -13,7 +13,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ReplacementSessionEntity::class,
         UserLinkEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 abstract class QualityAlternativeDatabase : RoomDatabase() {
@@ -33,7 +33,7 @@ abstract class QualityAlternativeDatabase : RoomDatabase() {
                 QualityAlternativeDatabase::class.java,
                 databaseName,
             )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .build()
         }
 
@@ -173,6 +173,13 @@ abstract class QualityAlternativeDatabase : RoomDatabase() {
         val MIGRATION_3_4 = object : Migration(3, 4) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 createUserLinksTable(db)
+            }
+        }
+
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE replacement_sessions ADD COLUMN feedbackFitRating TEXT")
+                db.execSQL("ALTER TABLE replacement_sessions ADD COLUMN feedbackScrollRating TEXT")
             }
         }
 

@@ -19,7 +19,7 @@ class DefaultRecommendationEngineTest {
     private val engine = DefaultRecommendationEngine()
 
     @Test
-    fun generate_prefersMatchingDurationAndKeepsBackupsNoLongerThanPrimary() {
+    fun generate_prefersMatchingDurationAndKeepsExactlyTwoFiniteBackups() {
         val preferences = UserPreferences(
             selectedApps = listOf(DistractingApp(packageName = "pkg", displayName = "Instagram")),
             preferredTopics = setOf(TopicTag.PHILOSOPHY, TopicTag.PSYCHOLOGY),
@@ -46,7 +46,8 @@ class DefaultRecommendationEngineTest {
         assertNotNull(result)
         assertEquals("a", result?.primary?.id)
         assertEquals(2, result?.backups?.size)
-        assertTrue(result!!.backups.all { it.durationMinutes <= result.primary.durationMinutes })
+        assertEquals(setOf("b", "c"), result!!.backups.map(ContentItem::id).toSet())
+        assertTrue(result.backups.all { backup -> backup.durationMinutes <= result.primary.durationMinutes })
     }
 
     @Test
@@ -134,7 +135,7 @@ class DefaultRecommendationEngineTest {
     }
 
     @Test
-    fun generate_prefersPrimaryThatCanProduceTwoBackupsWhenInventoryAllowsIt() {
+    fun generate_prefersBestScoredPrimaryAndStillKeepsTwoBackupsWhenInventoryAllowsIt() {
         val preferences = UserPreferences(
             selectedApps = listOf(DistractingApp(packageName = "pkg", displayName = "Instagram")),
             preferredTopics = setOf(TopicTag.PHILOSOPHY),
@@ -160,6 +161,7 @@ class DefaultRecommendationEngineTest {
         assertEquals("longer-fit", result?.primary?.id)
         assertEquals(setOf("shorter-greedy", "quick-backup"), result?.backups?.map(ContentItem::id)?.toSet())
         assertEquals(false, result?.inventoryShortage)
+        assertTrue(result!!.backups.all { backup -> backup.durationMinutes <= result.primary.durationMinutes })
     }
 
     @Test
@@ -232,6 +234,54 @@ class DefaultRecommendationEngineTest {
 
         assertEquals("primary", result?.primary?.id)
         assertEquals(setOf("saved-backup", "editorial-backup"), result?.backups?.map(ContentItem::id)?.toSet())
+    }
+
+    @Test
+    fun generate_prefersEditorialBeforeUserLinksWhenBackupScoresTie() {
+        val preferences = UserPreferences(
+            selectedApps = listOf(DistractingApp(packageName = "pkg", displayName = "Instagram")),
+            preferredTopics = setOf(TopicTag.ESSAYS, TopicTag.SCIENCE),
+            preferredDurationBucket = DurationBucket.FOCUS,
+            selectedPackIds = setOf("pack", "user-links"),
+        )
+
+        val inventory = listOf(
+            item(id = "quiet-hours", minutes = 7, topics = setOf(TopicTag.ESSAYS)),
+            item(id = "how-bees-decide", minutes = 6, topics = setOf(TopicTag.SCIENCE)),
+            item(
+                id = "sample-link:notes-on-taste",
+                packId = "user-links",
+                minutes = 6,
+                topics = setOf(TopicTag.ECONOMICS),
+                format = ContentFormat.HTML,
+                sourceType = ContentSourceType.USER_LINK,
+                availability = ContentAvailability.NEEDS_FALLBACK,
+                externalUrl = "https://example.com/taste",
+            ),
+            item(
+                id = "fixture-link:short-convenience-essay",
+                packId = "user-links",
+                minutes = 6,
+                topics = setOf(TopicTag.ESSAYS),
+                format = ContentFormat.HTML,
+                sourceType = ContentSourceType.USER_LINK,
+                availability = ContentAvailability.NEEDS_FALLBACK,
+                externalUrl = "https://example.com/convenience",
+            ),
+        )
+
+        val result = engine.generate(
+            targetApp = DistractingApp(packageName = "pkg", displayName = "Instagram"),
+            preferences = preferences,
+            inventory = inventory,
+            primaryExcludedIds = emptySet(),
+            signals = RecommendationSignals(timeOfDay = TimeOfDayBucket.MIDDAY),
+            nowMillis = 0L,
+        )
+
+        assertEquals("quiet-hours", result?.primary?.id)
+        assertEquals(listOf("how-bees-decide", "fixture-link:short-convenience-essay"), result?.backups?.map(ContentItem::id))
+        assertTrue(result!!.backups.all { backup -> backup.durationMinutes <= result.primary.durationMinutes })
     }
 
     @Test

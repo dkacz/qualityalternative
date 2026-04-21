@@ -679,6 +679,14 @@ class RoomAnalyticsTrackerTest {
             )
         }
 
+        override suspend fun saveSelectedAppPackages(packages: Set<String>) {
+            state.value = state.value.copy(selectedAppPackages = packages)
+        }
+
+        override suspend fun savePreferredDurationBucket(bucket: DurationBucket) {
+            state.value = state.value.copy(preferredDurationBucket = bucket)
+        }
+
         override suspend fun saveThemeMode(themeMode: AppThemeMode) {
             state.value = state.value.copy(themeMode = themeMode)
         }

@@ -121,6 +121,8 @@ class RoomHistoryRepository(
                 entry.copy(
                     feedbackGoodFit = feedback.wasGoodFit,
                     feedbackHelpedAvoidScrolling = feedback.helpedAvoidScrolling,
+                    feedbackFitRating = feedback.fitRating,
+                    feedbackScrollRating = feedback.scrollRating,
                 )
             }
         }
@@ -219,6 +221,8 @@ private fun ReplacementHistoryEntry.toEntity(): ReplacementSessionEntity {
         returnedToTargetAtMillis = returnedToTargetAtMillis,
         feedbackGoodFit = feedbackGoodFit,
         feedbackHelpedAvoidScrolling = feedbackHelpedAvoidScrolling,
+        feedbackFitRating = feedbackFitRating,
+        feedbackScrollRating = feedbackScrollRating,
     )
 }
 
@@ -250,6 +254,8 @@ private fun ReplacementSessionEntity.toModel(): ReplacementHistoryEntry {
         returnedToTargetAtMillis = returnedToTargetAtMillis,
         feedbackGoodFit = feedbackGoodFit,
         feedbackHelpedAvoidScrolling = feedbackHelpedAvoidScrolling,
+        feedbackFitRating = feedbackFitRating,
+        feedbackScrollRating = feedbackScrollRating,
     )
 }
 

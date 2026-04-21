@@ -58,6 +58,7 @@ class AssetContentRepository(
                     format = ContentFormat.valueOf(item.getString("format")),
                     topicTags = item.getJSONArray("topics").toTopicTags(),
                     bodyAssetPath = item.getString("bodyAssetPath"),
+                    sourceLabel = item.optString("source").takeIf(String::isNotBlank),
                 ),
             )
         }
