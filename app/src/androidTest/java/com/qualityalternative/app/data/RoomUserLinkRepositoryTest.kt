@@ -6,6 +6,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.qualityalternative.app.data.local.QualityAlternativeDatabase
 import com.qualityalternative.app.domain.model.ContentAvailability
+import com.qualityalternative.app.domain.model.ContentRenderMode
+import com.qualityalternative.app.domain.model.ContentRightsClass
 import com.qualityalternative.app.domain.model.ContentSourceType
 import com.qualityalternative.app.domain.model.TopicTag
 import com.qualityalternative.app.domain.model.UserLinkDraft
@@ -64,6 +66,8 @@ class RoomUserLinkRepositoryTest {
             assertEquals("https://example.com/essay", saved.externalUrl)
             assertEquals(ContentSourceType.USER_LINK, saved.sourceType)
             assertEquals(ContentAvailability.NEEDS_FALLBACK, saved.availability)
+            assertEquals(ContentRightsClass.USER_PRIVATE, saved.rights.rightsClass)
+            assertEquals(ContentRenderMode.EXTERNAL_HANDOFF, saved.rights.renderMode)
             assertEquals(setOf(TopicTag.PSYCHOLOGY, TopicTag.SCIENCE), saved.topicTags)
 
             val reloadedScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)

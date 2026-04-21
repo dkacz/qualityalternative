@@ -3,6 +3,9 @@ package com.qualityalternative.app.data
 import android.content.Context
 import com.qualityalternative.app.domain.model.ContentFormat
 import com.qualityalternative.app.domain.model.ContentItem
+import com.qualityalternative.app.domain.model.ContentRenderMode
+import com.qualityalternative.app.domain.model.ContentRightsClass
+import com.qualityalternative.app.domain.model.ContentRightsMetadata
 import com.qualityalternative.app.domain.model.EditorialPack
 import com.qualityalternative.app.domain.model.TopicTag
 import com.qualityalternative.app.domain.service.ContentRepository
@@ -59,6 +62,7 @@ class AssetContentRepository(
                     topicTags = item.getJSONArray("topics").toTopicTags(),
                     bodyAssetPath = item.getString("bodyAssetPath"),
                     sourceLabel = item.optString("source").takeIf(String::isNotBlank),
+                    rights = item.toContentRightsMetadata(),
                 ),
             )
         }
@@ -68,5 +72,24 @@ class AssetContentRepository(
         for (index in 0 until length()) {
             add(TopicTag.valueOf(getString(index)))
         }
+    }
+
+    private fun JSONObject.toContentRightsMetadata(): ContentRightsMetadata {
+        return ContentRightsMetadata(
+            rightsClass = optEnum("rightsClass", ContentRightsClass.LINK_ONLY),
+            renderMode = optEnum("renderMode", ContentRenderMode.EXTERNAL_HANDOFF),
+            licenseName = optNonBlankString("licenseName"),
+            licenseUrl = optNonBlankString("licenseUrl"),
+            sourceUrl = optNonBlankString("sourceUrl"),
+            attribution = optNonBlankString("attribution"),
+            rightsReviewedAt = optNonBlankString("rightsReviewedAt"),
+        )
+    }
+
+    private fun JSONObject.optNonBlankString(name: String): String? = optString(name).takeIf(String::isNotBlank)
+
+    private inline fun <reified T : Enum<T>> JSONObject.optEnum(name: String, default: T): T {
+        val raw = optNonBlankString(name) ?: return default
+        return enumValueOf<T>(raw)
     }
 }

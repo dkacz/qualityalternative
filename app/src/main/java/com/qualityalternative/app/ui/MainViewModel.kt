@@ -35,6 +35,8 @@ import com.qualityalternative.app.domain.model.TopicTag
 import com.qualityalternative.app.domain.model.UserLinkDraft
 import com.qualityalternative.app.domain.model.UserLinkValidationError
 import com.qualityalternative.app.domain.model.UserPreferences
+import com.qualityalternative.app.domain.model.usesExternalHandoff
+import com.qualityalternative.app.domain.model.usesRepositoryBody
 import com.qualityalternative.app.domain.service.AddUserLinkResult
 import com.qualityalternative.app.domain.service.AnalyticsTracker
 import com.qualityalternative.app.domain.service.ContentRepository
@@ -380,10 +382,10 @@ class MainViewModel(
             currentRecommendationSet = null,
             currentInterventionOrigin = null,
             currentContent = content,
-            currentContentBody = if (content.sourceType == ContentSourceType.USER_LINK) "" else contentRepository.contentBody(content),
+            currentContentBody = if (content.usesRepositoryBody()) contentRepository.contentBody(content) else "",
             currentSessionId = null,
             currentSessionStartedAtMillis = nowProvider(),
-            screen = if (content.sourceType == ContentSourceType.USER_LINK) {
+            screen = if (content.usesExternalHandoff()) {
                 MainScreen.ExternalHandoff
             } else {
                 MainScreen.Reader
@@ -1315,24 +1317,30 @@ class MainViewModel(
                     metadata = content.analyticsMetadata() + mapOf("failureReason" to reason),
                 ),
             )
-            userLinkRepository.markUnavailable(contentId = content.id, nowMillis = nowMillis)
+            if (content.sourceType == ContentSourceType.USER_LINK) {
+                userLinkRepository.markUnavailable(contentId = content.id, nowMillis = nowMillis)
+            }
             historyRepository.markSkipped(sessionId = sessionId, skippedAtMillis = nowMillis)
             clearActiveSession(
-                latestMessage = "This saved link could not be opened and was removed from future recommendations.",
+                latestMessage = if (content.sourceType == ContentSourceType.USER_LINK) {
+                    "This saved link could not be opened and was removed from future recommendations."
+                } else {
+                    "This external recommendation could not be opened."
+                },
             )
         }
     }
 
     private fun openReplacementSession(content: ContentItem, sessionId: String, startedAtMillis: Long) {
-        val screen = if (content.sourceType == ContentSourceType.USER_LINK) {
+        val screen = if (content.usesExternalHandoff()) {
             MainScreen.ExternalHandoff
         } else {
             MainScreen.Reader
         }
-        val contentBody = if (content.sourceType == ContentSourceType.USER_LINK) {
-            ""
-        } else {
+        val contentBody = if (content.usesRepositoryBody()) {
             contentRepository.contentBody(content)
+        } else {
+            ""
         }
         uiState = uiState.copy(
             currentContent = content,
@@ -1709,6 +1717,8 @@ private fun ContentItem.analyticsMetadata(prefix: String? = null): Map<String, S
         put(key("availability"), availability.name)
         put(key("format"), format.name)
         put(key("packId"), packId)
+        put(key("rightsClass"), rights.rightsClass.name)
+        put(key("renderMode"), rights.renderMode.name)
         externalUrl?.let { url -> put(key("externalUrl"), url) }
     }
 }

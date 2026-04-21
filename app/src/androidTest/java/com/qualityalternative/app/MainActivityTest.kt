@@ -251,7 +251,9 @@ class MainActivityTest {
 
         composeRule.waitUntil(timeoutMillis = 10_000) { hasNode("Ready when you are") }
         composeRule.onNodeWithTag("add-link-done").performClick()
-        composeRule.waitUntil(timeoutMillis = 10_000) { hasNode("Library") || hasNode("Saved essay") }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("library-list") }
+        composeRule.onNodeWithTag("library-list")
+            .performScrollToNode(hasText("Saved essay"))
         composeRule.onNodeWithText("Saved essay").assertIsDisplayed()
     }
 

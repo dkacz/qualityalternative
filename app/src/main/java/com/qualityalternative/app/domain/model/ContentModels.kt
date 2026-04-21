@@ -16,6 +16,70 @@ enum class ContentAvailability {
     NEEDS_FALLBACK,
 }
 
+enum class ContentRightsClass {
+    RENDERABLE,
+    LINK_ONLY,
+    USER_PRIVATE,
+}
+
+enum class ContentRenderMode {
+    IN_APP_READER,
+    EXTERNAL_HANDOFF,
+    USER_PRIVATE_READER,
+}
+
+data class ContentRightsMetadata(
+    val rightsClass: ContentRightsClass,
+    val renderMode: ContentRenderMode,
+    val licenseName: String? = null,
+    val licenseUrl: String? = null,
+    val sourceUrl: String? = null,
+    val attribution: String? = null,
+    val rightsReviewedAt: String? = null,
+) {
+    val canUseInAppReader: Boolean
+        get() = rightsClass == ContentRightsClass.RENDERABLE &&
+            renderMode == ContentRenderMode.IN_APP_READER
+
+    val usesExternalHandoff: Boolean
+        get() = renderMode == ContentRenderMode.EXTERNAL_HANDOFF
+
+    companion object {
+        fun safeDefault(): ContentRightsMetadata = ContentRightsMetadata(
+            rightsClass = ContentRightsClass.LINK_ONLY,
+            renderMode = ContentRenderMode.EXTERNAL_HANDOFF,
+        )
+
+        fun renderableEditorial(
+            licenseName: String? = null,
+            licenseUrl: String? = null,
+            sourceUrl: String? = null,
+            attribution: String? = null,
+            rightsReviewedAt: String? = null,
+        ): ContentRightsMetadata = ContentRightsMetadata(
+            rightsClass = ContentRightsClass.RENDERABLE,
+            renderMode = ContentRenderMode.IN_APP_READER,
+            licenseName = licenseName,
+            licenseUrl = licenseUrl,
+            sourceUrl = sourceUrl,
+            attribution = attribution,
+            rightsReviewedAt = rightsReviewedAt,
+        )
+
+        fun userPrivateExternal(
+            sourceUrl: String? = null,
+            attribution: String? = null,
+            rightsReviewedAt: String? = null,
+        ): ContentRightsMetadata = ContentRightsMetadata(
+            rightsClass = ContentRightsClass.USER_PRIVATE,
+            renderMode = ContentRenderMode.EXTERNAL_HANDOFF,
+            sourceUrl = sourceUrl,
+            attribution = attribution,
+            rightsReviewedAt = rightsReviewedAt,
+        )
+    }
+}
+
 enum class TopicTag {
     ESSAYS,
     PHILOSOPHY,
@@ -58,7 +122,13 @@ data class ContentItem(
     val sourceLabel: String? = null,
     val sourceType: ContentSourceType = ContentSourceType.EDITORIAL,
     val availability: ContentAvailability = ContentAvailability.AVAILABLE,
+    val rights: ContentRightsMetadata = ContentRightsMetadata.safeDefault(),
 )
+
+fun ContentItem.usesExternalHandoff(): Boolean = rights.usesExternalHandoff
+
+fun ContentItem.usesRepositoryBody(): Boolean = rights.renderMode == ContentRenderMode.IN_APP_READER ||
+    rights.renderMode == ContentRenderMode.USER_PRIVATE_READER
 
 data class EditorialPack(
     val id: String,

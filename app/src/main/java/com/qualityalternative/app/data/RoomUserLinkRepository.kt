@@ -5,6 +5,7 @@ import com.qualityalternative.app.data.local.UserLinkEntity
 import com.qualityalternative.app.domain.model.ContentAvailability
 import com.qualityalternative.app.domain.model.ContentFormat
 import com.qualityalternative.app.domain.model.ContentItem
+import com.qualityalternative.app.domain.model.ContentRightsMetadata
 import com.qualityalternative.app.domain.model.ContentSourceType
 import com.qualityalternative.app.domain.model.TopicTag
 import com.qualityalternative.app.domain.model.UserLinkDraft
@@ -68,6 +69,7 @@ class RoomUserLinkRepository(
             sourceLabel = normalizedUrl.hostLabel().ifBlank { null },
             sourceType = ContentSourceType.USER_LINK,
             availability = ContentAvailability.NEEDS_FALLBACK,
+            rights = ContentRightsMetadata.userPrivateExternal(sourceUrl = normalizedUrl),
         )
 
         dao.insertOrReplace(item.toEntity(createdAtMillis = createdAtMillis, updatedAtMillis = nowMillis))
@@ -116,6 +118,7 @@ private fun UserLinkEntity.toContentItem(): ContentItem {
         sourceLabel = normalizedUrl.hostLabel().ifBlank { null },
         sourceType = ContentSourceType.USER_LINK,
         availability = ContentAvailability.valueOf(availability),
+        rights = ContentRightsMetadata.userPrivateExternal(sourceUrl = normalizedUrl),
     )
 }
 
@@ -161,6 +164,9 @@ private fun sampleUserLinks(): List<ContentItem> = listOf(
         sourceLabel = "paulgraham.com",
         sourceType = ContentSourceType.USER_LINK,
         availability = ContentAvailability.NEEDS_FALLBACK,
+        rights = ContentRightsMetadata.userPrivateExternal(
+            sourceUrl = "https://paulgraham.com/taste.html",
+        ),
     ),
     ContentItem(
         id = "sample-link:tyranny-of-convenience",
@@ -175,6 +181,9 @@ private fun sampleUserLinks(): List<ContentItem> = listOf(
         sourceLabel = "nytimes.com",
         sourceType = ContentSourceType.USER_LINK,
         availability = ContentAvailability.NEEDS_FALLBACK,
+        rights = ContentRightsMetadata.userPrivateExternal(
+            sourceUrl = "https://nytimes.com/interactive/tyranny-of-convenience",
+        ),
     ),
     ContentItem(
         id = "sample-link:designing-for-100-years",
@@ -189,6 +198,9 @@ private fun sampleUserLinks(): List<ContentItem> = listOf(
         sourceLabel = "longnow.org",
         sourceType = ContentSourceType.USER_LINK,
         availability = ContentAvailability.NEEDS_FALLBACK,
+        rights = ContentRightsMetadata.userPrivateExternal(
+            sourceUrl = "https://longnow.org/ideas/designing-for-100-years",
+        ),
     ),
 )
 
