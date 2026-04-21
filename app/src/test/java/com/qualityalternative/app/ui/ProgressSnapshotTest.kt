@@ -5,6 +5,7 @@ import com.qualityalternative.app.domain.model.AnalyticsEventType
 import com.qualityalternative.app.domain.model.RecommendationSource
 import com.qualityalternative.app.domain.model.ReplacementHistoryEntry
 import com.qualityalternative.app.domain.model.TopicTag
+import java.time.LocalDate
 import java.time.ZoneOffset
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -43,15 +44,51 @@ class ProgressSnapshotTest {
             entries = entries,
             events = events,
             zoneId = ZoneOffset.UTC,
+            nowMillis = 3_000L,
         )
 
         assertEquals(1, snapshot.daysConverted)
+        assertEquals(21, snapshot.dayBars.size)
         assertEquals(2, snapshot.interventionsShown)
         assertEquals(2, snapshot.alternativesChosen)
         assertEquals(1, snapshot.delayedOpens)
         assertEquals(1, snapshot.consciousOverrides)
         assertEquals(1, snapshot.completedReads)
         assertEquals(listOf("session-1", "session-2"), snapshot.recentReplacements.map { it.sessionId })
+    }
+
+    @Test
+    fun progressSnapshotBuildsDynamicCalendarStripFromReplacementsAndDelays() {
+        val today = LocalDate.of(2026, 4, 21)
+        val convertedDate = today.minusDays(2)
+        val partialDate = today.minusDays(1)
+        val entries = listOf(
+            replacementEntry(
+                sessionId = "converted",
+                acceptedAtMillis = convertedDate.toMillis(),
+            ),
+        )
+        val events = listOf(
+            event(
+                AnalyticsEventType.DELAY_SELECTED,
+                interventionId = "delay-intervention",
+                timestampMillis = partialDate.toMillis(),
+                metadata = mapOf("delayId" to "delay-1"),
+            ),
+        )
+
+        val snapshot = progressSnapshot(
+            entries = entries,
+            events = events,
+            zoneId = ZoneOffset.UTC,
+            nowMillis = today.toMillis(),
+        )
+
+        assertEquals(today.minusDays(20), snapshot.dayBars.first().date)
+        assertEquals(today, snapshot.dayBars.last().date)
+        assertEquals(ProgressDayState.CONVERTED, snapshot.dayBars.first { it.date == convertedDate }.state)
+        assertEquals(ProgressDayState.PARTIAL, snapshot.dayBars.first { it.date == partialDate }.state)
+        assertEquals(ProgressDayState.EMPTY, snapshot.dayBars.first { it.date == today.minusDays(3) }.state)
     }
 
     @Test
@@ -65,11 +102,12 @@ class ProgressSnapshotTest {
     private fun event(
         type: AnalyticsEventType,
         interventionId: String,
+        timestampMillis: Long = 1_000L,
         metadata: Map<String, String> = emptyMap(),
     ): AnalyticsEvent {
         return AnalyticsEvent(
             type = type,
-            timestampMillis = 1_000L,
+            timestampMillis = timestampMillis,
             interventionId = interventionId,
             targetAppPackage = "com.fixture",
             metadata = metadata,
@@ -98,5 +136,9 @@ class ProgressSnapshotTest {
             acceptedAtMillis = acceptedAtMillis,
             completedAtMillis = completedAtMillis,
         )
+    }
+
+    private fun LocalDate.toMillis(): Long {
+        return atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
     }
 }

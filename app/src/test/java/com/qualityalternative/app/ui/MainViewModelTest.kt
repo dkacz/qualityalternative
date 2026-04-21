@@ -600,6 +600,47 @@ class MainViewModelTest {
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
+    fun delayActionKeepsShortAlternativeAvailableWithSeparateAnalytics() = runTest {
+        val primary = savedUserLink(id = "long-link", durationMinutes = 12)
+        val backup = savedUserLink(id = "short-link", durationMinutes = 4)
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val viewModel = createViewModel(
+            contentRepository = FakeContentRepository(extraItems = listOf(primary, backup)),
+            recommendationEngine = FixedRecommendationEngine(
+                RecommendationSet(
+                    primary = primary,
+                    backups = listOf(backup),
+                    inventoryShortage = true,
+                    generatedAtMillis = 1_000L,
+                ),
+            ),
+            analyticsTracker = analyticsTracker,
+        )
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+        viewModel.triggerDebugIntervention(nowMillis = 1_000L)
+        advanceUntilIdle()
+        viewModel.delayFor15Minutes()
+        advanceUntilIdle()
+
+        assertEquals(MainScreen.Home, viewModel.uiState.screen)
+        assertEquals("short-link", viewModel.uiState.activeDelaySuggestion?.id)
+
+        viewModel.startActiveDelayAlternative()
+        advanceUntilIdle()
+
+        assertEquals(MainScreen.ExternalHandoff, viewModel.uiState.screen)
+        assertEquals("short-link", viewModel.uiState.currentContent?.id)
+        val event = analyticsTracker.allEvents().first { it.type == AnalyticsEventType.DELAY_ALTERNATIVE_STARTED }
+        assertEquals("short-link", event.contentId)
+        assertEquals("active_delay_card", event.metadata["origin"])
+        assertNotNull(event.semanticKey)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
     fun triggerDebugIntervention_preservesExpiredDelayProvenanceAcrossActiveDelayReads() = runTest {
         val delayGate = InMemoryDelayGate()
         val analyticsTracker = InMemoryAnalyticsTracker()

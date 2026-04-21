@@ -76,6 +76,7 @@ data class MainUiState(
     val currentSessionId: String? = null,
     val currentSessionStartedAtMillis: Long? = null,
     val activeDelayWindow: DelayWindow? = null,
+    val activeDelaySuggestion: ContentItem? = null,
     val permissionReadiness: PermissionReadiness = unavailablePermissionReadiness(),
     val historyEntries: List<ReplacementHistoryEntry> = emptyList(),
     val completedContentIds: Set<String> = emptySet(),
@@ -193,7 +194,7 @@ class MainViewModel(
             }
         }
         viewModelScope.launch {
-            historyRepository.observeRecentHistory().collect { history ->
+            historyRepository.observeRecentHistory(windowDays = PROGRESS_HISTORY_WINDOW_DAYS).collect { history ->
                 uiState = uiState.copy(
                     historyEntries = history,
                 )
@@ -233,9 +234,11 @@ class MainViewModel(
     }
 
     fun selectTargetApp(app: DistractingApp) {
+        val activeDelayWindow = if (delayReady) delayGate.activeDelay(app) else null
         uiState = uiState.copy(
             selectedTargetApp = app,
-            activeDelayWindow = if (delayReady) delayGate.activeDelay(app) else null,
+            activeDelayWindow = activeDelayWindow,
+            activeDelaySuggestion = activeDelaySuggestionFor(activeDelayWindow),
             latestMessage = null,
         )
         if (delayReady) {
@@ -540,9 +543,11 @@ class MainViewModel(
             val delayInspection = delayGate.inspectDelay(targetApp = targetApp, nowMillis = processingNowMillis)
             if (delayInspection.activeWindow != null) {
                 recordDelayReturnDuringActiveWindow(targetApp = targetApp, nowMillis = processingNowMillis)
+                val activeDelayWindow = delayGate.activeDelay(targetApp = targetApp, nowMillis = processingNowMillis)
                 uiState = uiState.copy(
                     selectedTargetApp = targetApp,
-                    activeDelayWindow = delayGate.activeDelay(targetApp = targetApp, nowMillis = processingNowMillis),
+                    activeDelayWindow = activeDelayWindow,
+                    activeDelaySuggestion = activeDelaySuggestionFor(activeDelayWindow),
                     latestMessage = "${targetApp.displayName} is delayed for 15 minutes.",
                     screen = MainScreen.Home,
                     currentInterventionOrigin = null,
@@ -602,6 +607,7 @@ class MainViewModel(
                     currentInterventionShownAtMillis = null,
                     currentRecommendationSet = null,
                     activeDelayWindow = null,
+                    activeDelaySuggestion = null,
                     currentInterventionOrigin = null,
                     latestMessage = "No replacement inventory is available yet.",
                     screen = MainScreen.Home,
@@ -646,6 +652,7 @@ class MainViewModel(
                 currentRecommendationSet = recommendationSet,
                 currentInterventionOrigin = origin,
                 activeDelayWindow = null,
+                activeDelaySuggestion = null,
                 latestMessage = null,
                 screen = MainScreen.Intervention,
             )
@@ -742,8 +749,64 @@ class MainViewModel(
                 currentRecommendationSet = null,
                 currentInterventionOrigin = null,
                 activeDelayWindow = window,
-                latestMessage = "${targetApp.displayName} delayed for 15 minutes.",
+                activeDelaySuggestion = recommendationSet.shortestDelaySuggestion(),
+                latestMessage = "${targetApp.displayName} paused for 15 minutes.",
             )
+        }
+    }
+
+    fun startActiveDelayAlternative() {
+        val targetApp = uiState.selectedTargetApp ?: return
+        val delayWindow = uiState.activeDelayWindow ?: return
+        val content = uiState.activeDelaySuggestion ?: return
+        val recommendationSet = recommendationSetForDelayWindow(delayWindow = delayWindow, fallbackContent = content)
+        val interventionId = delayWindow.interventionId ?: "delay-${delayWindow.id}"
+        val interventionShownAtMillis = delayWindow.interventionShownAtMillis ?: delayWindow.startsAtMillis
+        val nowMillis = System.currentTimeMillis()
+
+        viewModelScope.launch {
+            val source = if (content.id == recommendationSet.primary.id) {
+                RecommendationSource.PRIMARY
+            } else {
+                RecommendationSource.BACKUP
+            }
+            val sessionId = historyRepository.recordAcceptedSession(
+                targetApp = targetApp,
+                interventionId = interventionId,
+                interventionShownAtMillis = interventionShownAtMillis,
+                primaryContentId = recommendationSet.primary.id,
+                backupContentIds = recommendationSet.backups.map(ContentItem::id),
+                content = content,
+                source = source,
+                acceptedAtMillis = nowMillis,
+            )
+            recordEvent(
+                AnalyticsEvent(
+                    type = AnalyticsEventType.DELAY_ALTERNATIVE_STARTED,
+                    timestampMillis = nowMillis,
+                    semanticKey = AnalyticsSemanticKeys.delayAlternativeStarted(
+                        delayId = delayWindow.id,
+                        sessionId = sessionId,
+                    ),
+                    interventionId = interventionId,
+                    sessionId = sessionId,
+                    targetAppPackage = targetApp.packageName,
+                    primaryContentId = recommendationSet.primary.id,
+                    backupContentIds = recommendationSet.backups.map(ContentItem::id),
+                    contentId = content.id,
+                    metadata = content.analyticsMetadata() + mapOf(
+                        "delayId" to delayWindow.id,
+                        "origin" to "active_delay_card",
+                    ),
+                ),
+            )
+            uiState = uiState.copy(
+                currentInterventionId = interventionId,
+                currentInterventionShownAtMillis = interventionShownAtMillis,
+                currentRecommendationSet = recommendationSet,
+                currentInterventionOrigin = null,
+            )
+            openReplacementSession(content = content, sessionId = sessionId, startedAtMillis = nowMillis)
         }
     }
 
@@ -774,6 +837,7 @@ class MainViewModel(
             currentInterventionShownAtMillis = null,
             currentRecommendationSet = null,
             currentInterventionOrigin = null,
+            activeDelaySuggestion = null,
             latestMessage = "Prototype override recorded for ${targetApp.displayName}.",
         )
         return shouldExitToTarget
@@ -905,6 +969,7 @@ class MainViewModel(
         } else {
             null
         }
+        val activeDelayWindow = selectedTargetApp?.takeIf { delayReady }?.let { delayGate.activeDelay(it) }
 
         uiState = uiState.copy(
             hasCompletedOnboarding = settings.hasCompletedOnboarding,
@@ -916,7 +981,8 @@ class MainViewModel(
                 supportedApps = supportedApps,
                 starterPacks = starterPacks,
             ),
-            activeDelayWindow = selectedTargetApp?.takeIf { delayReady }?.let { delayGate.activeDelay(it) },
+            activeDelayWindow = activeDelayWindow,
+            activeDelaySuggestion = activeDelaySuggestionFor(activeDelayWindow),
             permissionReadiness = interceptionMonitor.currentReadiness(),
             screen = when {
                 !settings.hasCompletedOnboarding -> MainScreen.Onboarding
@@ -1290,9 +1356,51 @@ class MainViewModel(
             return
         }
         val activeDelayWindow = delayGate.activeDelay(targetApp = selectedTargetApp, nowMillis = nowMillis)
-        if (uiState.activeDelayWindow != activeDelayWindow) {
-            uiState = uiState.copy(activeDelayWindow = activeDelayWindow)
+        val activeDelaySuggestion = activeDelaySuggestionFor(activeDelayWindow)
+        if (uiState.activeDelayWindow != activeDelayWindow || uiState.activeDelaySuggestion != activeDelaySuggestion) {
+            uiState = uiState.copy(
+                activeDelayWindow = activeDelayWindow,
+                activeDelaySuggestion = activeDelaySuggestion,
+            )
         }
+    }
+
+    private fun activeDelaySuggestionFor(delayWindow: DelayWindow?): ContentItem? {
+        delayWindow ?: return null
+        val candidateIds = (delayWindow.backupContentIds + listOfNotNull(delayWindow.primaryContentId)).toSet()
+        if (candidateIds.isEmpty()) {
+            return null
+        }
+        return contentRepository.inventory()
+            .asSequence()
+            .filter { item ->
+                item.id in candidateIds &&
+                    item.availability != ContentAvailability.UNAVAILABLE
+            }
+            .minWithOrNull(compareBy<ContentItem> { it.durationMinutes }.thenBy { it.title })
+    }
+
+    private fun RecommendationSet.shortestDelaySuggestion(): ContentItem {
+        return (backups + primary).minWith(compareBy<ContentItem> { it.durationMinutes }.thenBy { it.title })
+    }
+
+    private fun recommendationSetForDelayWindow(
+        delayWindow: DelayWindow,
+        fallbackContent: ContentItem,
+    ): RecommendationSet {
+        val candidatesById = contentRepository.inventory().associateBy(ContentItem::id)
+        val primary = delayWindow.primaryContentId
+            ?.let(candidatesById::get)
+            ?: fallbackContent
+        val backups = delayWindow.backupContentIds
+            .mapNotNull(candidatesById::get)
+            .filterNot { it.id == primary.id }
+        return RecommendationSet(
+            primary = primary,
+            backups = backups,
+            inventoryShortage = backups.size < 2,
+            generatedAtMillis = delayWindow.startsAtMillis,
+        )
     }
 
     private fun updateHydrationState() {
@@ -1463,6 +1571,7 @@ private const val ACTIVE_DELAY_REFRESH_INTERVAL_MILLIS = 1_000L
 private const val OPEN_ANYWAY_SUPPRESSION_WINDOW_MILLIS = 60_000L
 private const val INTERVENTION_DEGRADED_THRESHOLD_MILLIS = 2_000L
 private const val MIN_SELECTED_DISTRACTING_APPS = 3
+private const val PROGRESS_HISTORY_WINDOW_DAYS = 31
 private const val FEEDBACK_FIT_NOT = "not"
 private const val FEEDBACK_SCROLL_NO = "no"
 

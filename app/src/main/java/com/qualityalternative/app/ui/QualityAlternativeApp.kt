@@ -95,6 +95,7 @@ import com.qualityalternative.app.ui.theme.QualityAlternativeThemeTokens
 import com.qualityalternative.app.ui.theme.QualityDisplayFontFamily
 import com.qualityalternative.app.ui.theme.QualityMonoFontFamily
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -207,6 +208,7 @@ private fun MainRoute(
                 onTriggerIntervention = viewModel::triggerDebugIntervention,
                 onOpenAddLink = viewModel::openAddLink,
                 onOpenSettings = viewModel::openSettings,
+                onStartDelayAlternative = viewModel::startActiveDelayAlternative,
             )
         }
 
@@ -724,6 +726,7 @@ private fun HomeTab(
     onTriggerIntervention: () -> Unit,
     onOpenAddLink: () -> Unit,
     onOpenSettings: () -> Unit,
+    onStartDelayAlternative: () -> Unit,
 ) {
     val selectedPacks = state.starterPacks.filter { it.id in state.preferences?.selectedPackIds.orEmpty() }
     val editorialItems = selectedPacks.flatMap { it.items }
@@ -756,7 +759,12 @@ private fun HomeTab(
         }
         state.activeDelayWindow?.let { delayWindow ->
             item {
-                ActiveDelayCard(targetApp = state.selectedTargetApp, delayWindow = delayWindow)
+                ActiveDelayCard(
+                    targetApp = state.selectedTargetApp,
+                    delayWindow = delayWindow,
+                    suggestion = state.activeDelaySuggestion,
+                    onReadAlternative = onStartDelayAlternative,
+                )
             }
         }
         item {
@@ -1131,7 +1139,7 @@ private fun InterventionScreen(
         Spacer(modifier = Modifier.weight(1f))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             QaButton(
-                text = "Delay 15 min",
+                text = "Pause 15 min",
                 onClick = onDelay,
                 variant = QaButtonVariant.Outline,
                 modifier = Modifier.weight(1f),
@@ -1354,7 +1362,7 @@ private fun ProgressTab(snapshot: ProgressSnapshot) {
                     color = colors.mutedText,
                     modifier = Modifier.padding(top = 10.dp, bottom = 20.dp),
                 )
-                CalendarStrip()
+                CalendarStrip(days = snapshot.dayBars)
             }
         }
         item {
@@ -1629,13 +1637,26 @@ private fun PermissionWarningCard(onOpenSettings: () -> Unit) {
 private fun ActiveDelayCard(
     targetApp: DistractingApp?,
     delayWindow: DelayWindow,
+    suggestion: ContentItem?,
+    onReadAlternative: () -> Unit,
 ) {
     QaCard(padding = 14.dp) {
         MonoText("${targetApp?.displayName ?: delayWindow.targetAppPackage} delayed")
         BodyText(
-            text = "We'll step aside until ${formatTimestamp(delayWindow.endsAtMillis)}.",
+            text = "We'll keep the social prompt quiet until ${formatTimestamp(delayWindow.endsAtMillis)}.",
             color = QualityAlternativeThemeTokens.colors.mutedText,
         )
+        suggestion?.let { content ->
+            QaButton(
+                text = "Read a ${content.durationMinutes} min alternative",
+                onClick = onReadAlternative,
+                variant = QaButtonVariant.Outline,
+                size = QaButtonSize.Small,
+                fullWidth = false,
+                leadingIcon = QaIconKind.Book,
+                modifier = Modifier.padding(top = 12.dp),
+            )
+        }
     }
 }
 
@@ -1840,24 +1861,24 @@ private fun FeedbackQuestion(
 }
 
 @Composable
-private fun CalendarStrip() {
+private fun CalendarStrip(days: List<ProgressDayBar>) {
     val colors = QualityAlternativeThemeTokens.colors
-    val days = listOf(1f, 1f, 0f, 1f, 1f, 1f, .5f, 0f, 1f, 1f, 1f, 1f, 0f, 1f, 1f, .5f, 1f, 1f, 1f, 1f, 1f)
     Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
-        days.forEach { value ->
+        days.forEach { day ->
             Box(
                 modifier = Modifier
                     .weight(1f)
                     .height(28.dp)
                     .clip(RoundedCornerShape(4.dp))
                     .background(
-                        when (value) {
-                            1f -> colors.accent
-                            .5f -> colors.accentSoft
-                            else -> colors.line
+                        when (day.state) {
+                            ProgressDayState.CONVERTED -> colors.accent
+                            ProgressDayState.PARTIAL -> colors.accentSoft
+                            ProgressDayState.EMPTY -> colors.line
                         },
                     )
-                    .alpha(if (value == 0f) 0.5f else 1f),
+                    .alpha(if (day.state == ProgressDayState.EMPTY) 0.5f else 1f)
+                    .testTag("progress-day-${day.state.name.lowercase(Locale.US)}"),
             )
         }
     }
@@ -2567,6 +2588,7 @@ private fun LabelText(text: String, modifier: Modifier = Modifier) {
 
 internal data class ProgressSnapshot(
     val daysConverted: Int,
+    val dayBars: List<ProgressDayBar>,
     val interventionsShown: Int,
     val alternativesChosen: Int,
     val delayedOpens: Int,
@@ -2575,10 +2597,22 @@ internal data class ProgressSnapshot(
     val recentReplacements: List<ReplacementHistoryEntry>,
 )
 
+internal data class ProgressDayBar(
+    val date: LocalDate,
+    val state: ProgressDayState,
+)
+
+internal enum class ProgressDayState {
+    EMPTY,
+    PARTIAL,
+    CONVERTED,
+}
+
 internal fun progressSnapshot(
     entries: List<ReplacementHistoryEntry>,
     events: List<AnalyticsEvent>,
     zoneId: ZoneId = ZoneId.systemDefault(),
+    nowMillis: Long = System.currentTimeMillis(),
 ): ProgressSnapshot {
     val convertedDays = entries
         .map { entry ->
@@ -2587,9 +2621,31 @@ internal fun progressSnapshot(
                 .toLocalDate()
         }
         .toSet()
+    val delayedDays = events
+        .filter { it.type == AnalyticsEventType.DELAY_SELECTED }
+        .map { event ->
+            Instant.ofEpochMilli(event.timestampMillis)
+                .atZone(zoneId)
+                .toLocalDate()
+        }
+        .toSet()
+    val today = Instant.ofEpochMilli(nowMillis).atZone(zoneId).toLocalDate()
+    val firstDay = today.minusDays((PROGRESS_STRIP_DAYS - 1).toLong())
+    val dayBars = (0 until PROGRESS_STRIP_DAYS).map { offset ->
+        val date = firstDay.plusDays(offset.toLong())
+        ProgressDayBar(
+            date = date,
+            state = when {
+                date in convertedDays -> ProgressDayState.CONVERTED
+                date in delayedDays -> ProgressDayState.PARTIAL
+                else -> ProgressDayState.EMPTY
+            },
+        )
+    }
 
     return ProgressSnapshot(
         daysConverted = convertedDays.size,
+        dayBars = dayBars,
         interventionsShown = events.distinctProgressEventCount(AnalyticsEventType.INTERVENTION_SHOWN),
         alternativesChosen = entries.size,
         delayedOpens = events.distinctProgressEventCount(AnalyticsEventType.DELAY_SELECTED),
@@ -2778,6 +2834,7 @@ private fun launchExternalLink(
 
 private const val MAX_BACKUP_RECOMMENDATIONS = 2
 private const val MAX_RECENT_PROGRESS_REPLACEMENTS = 3
+private const val PROGRESS_STRIP_DAYS = 21
 private const val DEBUG_PARITY_VIEWPORT_WIDTH_DP = 340f
 private const val DEBUG_PARITY_VIEWPORT_HEIGHT_DP = 740f
 private const val MIN_DEBUG_PARITY_SCALE = 0.94f

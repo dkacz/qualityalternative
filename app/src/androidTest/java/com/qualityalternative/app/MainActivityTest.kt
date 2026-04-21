@@ -85,7 +85,7 @@ class MainActivityTest {
         composeRule.onNodeWithText("Read this", substring = true)
             .assertIsDisplayed()
             .assertIsEnabled()
-        composeRule.onNodeWithText("Delay 15 min")
+        composeRule.onNodeWithText("Pause 15 min")
             .assertIsDisplayed()
             .assertIsEnabled()
         composeRule.onNodeWithText("Open Fixture Feed One")
@@ -97,7 +97,7 @@ class MainActivityTest {
     fun systemInterventionDelayActionIsClickableWithoutScrolling() {
         launchFixtureSystemIntervention()
 
-        composeRule.onNodeWithText("Delay 15 min")
+        composeRule.onNodeWithText("Pause 15 min")
             .assertIsDisplayed()
             .assertIsEnabled()
             .performClick()
@@ -105,6 +105,9 @@ class MainActivityTest {
         waitForHome()
         composeRule.onNodeWithTag("home-list")
             .performScrollToNode(hasText("FIXTURE FEED ONE DELAYED", substring = true))
+        composeRule.onNodeWithText("min alternative", substring = true)
+            .assertIsDisplayed()
+            .assertIsEnabled()
     }
 
     @Test
