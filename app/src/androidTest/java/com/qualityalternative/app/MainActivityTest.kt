@@ -255,6 +255,10 @@ class MainActivityTest {
         composeRule.onNodeWithTag("library-list")
             .performScrollToNode(hasText("Saved essay"))
         composeRule.onNodeWithText("Saved essay").assertIsDisplayed()
+        composeRule.onNodeWithTag("library-list")
+            .performScrollToNode(hasText("Your link · example.com", substring = true))
+        composeRule.onNodeWithText("Your link · example.com", substring = true)
+            .assertIsDisplayed()
     }
 
     @Test

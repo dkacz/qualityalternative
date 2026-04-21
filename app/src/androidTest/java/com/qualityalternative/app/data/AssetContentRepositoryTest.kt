@@ -4,6 +4,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.qualityalternative.app.domain.model.ContentRenderMode
 import com.qualityalternative.app.domain.model.ContentRightsClass
+import com.qualityalternative.app.domain.model.ContentSourceType
 import com.qualityalternative.app.domain.model.usesRepositoryBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -23,12 +24,44 @@ class AssetContentRepositoryTest {
         assertTrue(items.isNotEmpty())
         items.forEach { item ->
             assertEquals("Quality Alternative Editorial", item.sourceLabel)
+            assertEquals(ContentSourceType.EDITORIAL, item.sourceType)
+            assertEquals(null, item.externalUrl)
+            assertFalse(item.bodyAssetPath.isNullOrBlank())
             assertEquals(ContentRightsClass.RENDERABLE, item.rights.rightsClass)
             assertEquals(ContentRenderMode.IN_APP_READER, item.rights.renderMode)
             assertEquals("Quality Alternative first-party placeholder", item.rights.licenseName)
+            assertEquals(null, item.rights.licenseUrl)
+            assertEquals(null, item.rights.sourceUrl)
             assertEquals("Quality Alternative", item.rights.attribution)
             assertFalse(item.rights.rightsReviewedAt.isNullOrBlank())
             assertTrue(item.usesRepositoryBody())
+        }
+    }
+
+    @Test
+    fun starterPackItemsDoNotClaimExternalPublicationAffiliation() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val repository = AssetContentRepository(context)
+        val disallowedPublicationLabels = setOf(
+            "Substack",
+            "The Atlantic",
+            "New Yorker",
+            "Wired",
+            "Guardian",
+            "NYT",
+            "Medium",
+        )
+
+        val items = repository.inventory()
+
+        assertTrue(items.isNotEmpty())
+        items.forEach { item ->
+            disallowedPublicationLabels.forEach { publication ->
+                assertFalse(
+                    "${item.id} should not imply affiliation with $publication",
+                    item.sourceLabel.orEmpty().contains(publication, ignoreCase = true),
+                )
+            }
         }
     }
 

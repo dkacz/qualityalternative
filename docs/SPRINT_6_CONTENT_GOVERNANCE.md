@@ -59,12 +59,15 @@ Test expectations:
 
 ### 6.2 Starter Inventory Audit
 
+Status: `implemented for Pro review`
+
 Acceptance criteria:
 
 - Existing starter-pack items no longer imply affiliation with real publications unless actually licensed.
 - Starter-pack JSON carries source and rights metadata.
 - In-app labels distinguish Quality Alternative editorial placeholders from user links and external sources.
 - Analytics can still distinguish editorial from user-added links.
+- This slice does not add new third-party content, source crawling, or runtime copyright blocking; it tightens labels and inventory tests only.
 
 Test expectations:
 

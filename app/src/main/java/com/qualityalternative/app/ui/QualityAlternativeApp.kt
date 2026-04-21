@@ -2748,10 +2748,12 @@ private fun ContentItem.topicLine(): String {
 }
 
 private fun ContentItem.sourceLabel(): String {
-    return sourceLabel?.ifBlank { null } ?: if (isUserLink()) {
-        externalUrl?.hostLabel()?.ifBlank { "Your link" } ?: "Your link"
+    return if (isUserLink()) {
+        val host = sourceLabel?.ifBlank { null } ?: externalUrl?.hostLabel()?.ifBlank { null }
+        host?.let { "Your link · $it" } ?: "Your link"
     } else {
-        packId.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.US) else it.toString() }
+        sourceLabel?.ifBlank { null }
+            ?: packId.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.US) else it.toString() }
     }
 }
 
