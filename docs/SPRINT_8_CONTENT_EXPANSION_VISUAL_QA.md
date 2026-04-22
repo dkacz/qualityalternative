@@ -238,6 +238,6 @@ Exit criteria:
 
 ## Open Decisions
 
-- Exact selected items for the 20-item link-only pack.
+- Resolved: the 20-item link-only pack is selected in `docs/CONTENT_LINK_ONLY_PACK_V1.md`.
 - Pro review should run after every Sprint 8 slice.
 - Whether to create a small internal content-review checklist for tester feedback before adding more than 60 shared items.

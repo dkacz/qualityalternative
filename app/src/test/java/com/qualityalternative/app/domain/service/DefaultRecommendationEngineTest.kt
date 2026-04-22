@@ -3,6 +3,9 @@ package com.qualityalternative.app.domain.service
 import com.qualityalternative.app.domain.model.ContentAvailability
 import com.qualityalternative.app.domain.model.ContentFormat
 import com.qualityalternative.app.domain.model.ContentItem
+import com.qualityalternative.app.domain.model.ContentRenderMode
+import com.qualityalternative.app.domain.model.ContentRightsClass
+import com.qualityalternative.app.domain.model.ContentRightsMetadata
 import com.qualityalternative.app.domain.model.ContentSourceType
 import com.qualityalternative.app.domain.model.DistractingApp
 import com.qualityalternative.app.domain.model.DurationBucket
@@ -333,6 +336,10 @@ class DefaultRecommendationEngineTest {
                 packId = "renderable",
                 minutes = 6 + (index % 4),
                 topics = setOf(TopicTag.SCIENCE),
+                rights = ContentRightsMetadata(
+                    rightsClass = ContentRightsClass.RENDERABLE,
+                    renderMode = ContentRenderMode.IN_APP_READER,
+                ),
             )
         }
         val linkOnlyItems = (1..20).map { index ->
@@ -343,6 +350,11 @@ class DefaultRecommendationEngineTest {
                 topics = setOf(if (index % 2 == 0) TopicTag.SCIENCE else TopicTag.PHILOSOPHY),
                 format = ContentFormat.HTML,
                 externalUrl = "https://example.com/deep-read-$index",
+                bodyAssetPath = null,
+                rights = ContentRightsMetadata(
+                    rightsClass = ContentRightsClass.LINK_ONLY,
+                    renderMode = ContentRenderMode.EXTERNAL_HANDOFF,
+                ),
             )
         }
         val userLinks = (1..4).map { index ->
@@ -355,6 +367,11 @@ class DefaultRecommendationEngineTest {
                 sourceType = ContentSourceType.USER_LINK,
                 availability = ContentAvailability.NEEDS_FALLBACK,
                 externalUrl = "https://example.com/user-$index",
+                bodyAssetPath = null,
+                rights = ContentRightsMetadata(
+                    rightsClass = ContentRightsClass.USER_PRIVATE,
+                    renderMode = ContentRenderMode.EXTERNAL_HANDOFF,
+                ),
             )
         }
 
@@ -386,6 +403,8 @@ class DefaultRecommendationEngineTest {
         sourceType: ContentSourceType = ContentSourceType.EDITORIAL,
         availability: ContentAvailability = ContentAvailability.AVAILABLE,
         externalUrl: String? = null,
+        bodyAssetPath: String? = "unused",
+        rights: ContentRightsMetadata = ContentRightsMetadata.renderableEditorial(),
     ): ContentItem = ContentItem(
         id = id,
         packId = packId,
@@ -394,9 +413,10 @@ class DefaultRecommendationEngineTest {
         durationMinutes = minutes,
         format = format,
         topicTags = topics,
-        bodyAssetPath = "unused",
+        bodyAssetPath = bodyAssetPath,
         externalUrl = externalUrl,
         sourceType = sourceType,
         availability = availability,
+        rights = rights,
     )
 }

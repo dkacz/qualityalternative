@@ -121,6 +121,67 @@ class MainViewModelTest {
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
+    fun completeOnboarding_selectsModernLinkOnlyPackWhenItIsAvailable() = runTest {
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val viewModel = createViewModel(
+            contentRepository = FakeContentRepository(includeLinkOnlyModern = true),
+            recommendationEngine = DefaultRecommendationEngine(),
+            analyticsTracker = analyticsTracker,
+        )
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+        viewModel.triggerDebugIntervention(nowMillis = 2_000L)
+        advanceUntilIdle()
+
+        assertEquals(
+            setOf("philosophy", "link-only-modern-v1"),
+            viewModel.uiState.preferences?.selectedPackIds,
+        )
+        val shownItems = listOfNotNull(viewModel.uiState.currentRecommendationSet?.primary) +
+            viewModel.uiState.currentRecommendationSet?.backups.orEmpty()
+        val linkOnlyItem = shownItems.first { item -> item.packId == "link-only-modern-v1" }
+
+        viewModel.acceptBackup(linkOnlyItem)
+        advanceUntilIdle()
+
+        assertEquals(MainScreen.ExternalHandoff, viewModel.uiState.screen)
+        assertEquals("https://longnow.org/ideas/the-big-here-and-long-now/", viewModel.currentExternalLinkUrl())
+
+        viewModel.recordExternalLinkOpened(nowMillis = 3_000L)
+
+        val event = analyticsTracker.allEvents().first {
+            it.type == AnalyticsEventType.EXTERNAL_HANDOFF_OPENED &&
+                it.contentId == "big-here-long-now"
+        }
+        assertEquals("EDITORIAL", event.metadata["sourceType"])
+        assertEquals("LINK_ONLY", event.metadata["rightsClass"])
+        assertEquals("EXTERNAL_HANDOFF", event.metadata["renderMode"])
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun completeOnboarding_selectsAllDefaultSharedPacksWhenAvailable() = runTest {
+        val viewModel = createViewModel(
+            contentRepository = FakeContentRepository(
+                includeAttentionClassics = true,
+                includeLinkOnlyModern = true,
+            ),
+        )
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+
+        assertEquals(
+            setOf("philosophy", "attention-classics-v1", "link-only-modern-v1"),
+            viewModel.uiState.preferences?.selectedPackIds,
+        )
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
     fun selectThemeMode_persistsAndUpdatesUiState() = runTest {
         val settingsRepository = FakeSettingsRepository()
         val viewModel = createViewModel(settingsRepository = settingsRepository)
@@ -1487,6 +1548,7 @@ class MainViewModelTest {
         extraItems: List<ContentItem> = emptyList(),
         isReady: Boolean = true,
         includeAttentionClassics: Boolean = false,
+        includeLinkOnlyModern: Boolean = false,
     ) : ContentRepository {
         private val ready = MutableStateFlow(isReady)
         private var extraItems = extraItems
@@ -1544,6 +1606,31 @@ class MainViewModelTest {
                     ),
                 )
             }
+            if (includeLinkOnlyModern) {
+                add(
+                    EditorialPack(
+                        id = "link-only-modern-v1",
+                        title = "Modern Deep Reads v1",
+                        description = "Pack",
+                        items = listOf(
+                            contentItem(
+                                id = "big-here-long-now",
+                                packId = "link-only-modern-v1",
+                                durationMinutes = 5,
+                                topics = setOf(TopicTag.ESSAYS, TopicTag.SCIENCE),
+                                format = ContentFormat.HTML,
+                                bodyAssetPath = null,
+                                externalUrl = "https://longnow.org/ideas/the-big-here-and-long-now/",
+                                rights = ContentRightsMetadata(
+                                    rightsClass = ContentRightsClass.LINK_ONLY,
+                                    renderMode = ContentRenderMode.EXTERNAL_HANDOFF,
+                                    sourceUrl = "https://longnow.org/ideas/the-big-here-and-long-now/",
+                                ),
+                            ),
+                        ),
+                    ),
+                )
+            }
         }
 
         override fun starterPacks(): List<EditorialPack> = packs
@@ -1569,15 +1656,21 @@ class MainViewModelTest {
             packId: String,
             durationMinutes: Int,
             topics: Set<TopicTag>,
+            format: ContentFormat = ContentFormat.MARKDOWN,
+            bodyAssetPath: String? = "unused",
+            externalUrl: String? = null,
+            rights: ContentRightsMetadata = ContentRightsMetadata.renderableEditorial(),
         ): ContentItem = ContentItem(
             id = id,
             packId = packId,
             title = id,
             description = id,
             durationMinutes = durationMinutes,
-            format = ContentFormat.MARKDOWN,
+            format = format,
             topicTags = topics,
-            bodyAssetPath = "unused",
+            bodyAssetPath = bodyAssetPath,
+            externalUrl = externalUrl,
+            rights = rights,
         )
     }
 
