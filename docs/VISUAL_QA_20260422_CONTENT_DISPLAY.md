@@ -8,7 +8,7 @@ Device: `qaApi36` Android emulator
 
 Resolution: `1080x2400`
 
-Branch: `codex/meditation-timer-replacement`
+Branch: `codex/sprint8-content-expansion`
 
 ## Scope
 
@@ -88,6 +88,12 @@ Refresh after placeholder and timer changes:
 
 - Re-ran the screenshot harness on `qaApi36`.
 - Replaced the feedback, reader, meditation timer, and contact-sheet artifacts so the baseline reflects the no-placeholder reader layout, one-line feedback chips, and timer replacement screens.
+
+Refresh after Sprint 8 system-bar fix:
+
+- Re-ran the screenshot harness on `qaApi36` after adding theme-aware Android system-bar icon handling.
+- Replaced the full `content-display` screenshot set and contact sheet so Dark-mode screenshots no longer show dark status-bar icons over dark app backgrounds.
+- The current `VisualQaScreenshotTest` now writes both this legacy content-display baseline and the Sprint 8 release-candidate baseline in one run.
 
 Non-blocker note:
 

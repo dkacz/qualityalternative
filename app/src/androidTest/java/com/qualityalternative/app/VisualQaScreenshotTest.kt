@@ -32,6 +32,7 @@ class VisualQaScreenshotTest {
 
     private var scenario: ActivityScenario<MainActivity>? = null
     private lateinit var screenshotDir: File
+    private lateinit var legacyScreenshotDir: File
 
     @Before
     fun resetAppState() {
@@ -40,6 +41,9 @@ class VisualQaScreenshotTest {
         screenshotDir = File(targetContext.filesDir, "visual-qa/sprint8-content-expansion")
         screenshotDir.deleteRecursively()
         screenshotDir.mkdirs()
+        legacyScreenshotDir = File(targetContext.filesDir, "visual-qa/content-display")
+        legacyScreenshotDir.deleteRecursively()
+        legacyScreenshotDir.mkdirs()
     }
 
     @After
@@ -146,15 +150,97 @@ class VisualQaScreenshotTest {
         composeRule.onNodeWithText("Start timer", substring = true).performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("meditation-timer-screen") }
         capture("18_meditation_timer_dark")
+
+        captureLegacyContentDisplayScreens()
     }
 
     private fun capture(name: String) {
+        captureTo(screenshotDir, name)
+    }
+
+    private fun captureLegacy(name: String) {
+        captureTo(legacyScreenshotDir, name)
+    }
+
+    private fun captureTo(directory: File, name: String) {
         composeRule.waitForIdle()
         InstrumentationRegistry.getInstrumentation().waitForIdleSync()
         Thread.sleep(350)
         val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
-        val file = File(screenshotDir, "$name.png")
+        val file = File(directory, "$name.png")
         assertTrue("Could not capture $name into ${file.absolutePath}", device.takeScreenshot(file))
+    }
+
+    private fun captureLegacyContentDisplayScreens() {
+        scenario?.close()
+        scenario = null
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+        resetPersistentState()
+
+        launchOnboardedApp()
+        seedAttentionClassicsSelection()
+        captureLegacy("01_home_light")
+
+        openTab("tab-library", "library-list")
+        composeRule.onNodeWithTag("library-list")
+            .performScrollToNode(hasText("Start With What Is Yours"))
+        captureLegacy("02_library_attention_light")
+
+        launchFixtureSystemIntervention()
+        captureLegacy("03_intervention_light")
+
+        composeRule.onNodeWithText("Read this", substring = true).performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
+        assertAttentionClassicsReaderCopyIsDisplayed()
+        captureLegacy("04_reader_attention_light")
+
+        composeRule.onNodeWithTag("reader-list")
+            .performScrollToNode(hasText("I'm done reading"))
+        composeRule.onNodeWithText("I'm done reading").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("feedback-screen") }
+        captureLegacy("05_feedback_light")
+
+        composeRule.onNodeWithText("Skip").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("progress-list") }
+        Thread.sleep(6_000)
+        captureLegacy("06_progress_light")
+
+        seedMeditationSelection()
+        launchFixtureSystemIntervention()
+        captureLegacy("07_intervention_meditation_light")
+        composeRule.onNodeWithText("Start timer", substring = true).performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("meditation-timer-screen") }
+        captureLegacy("08_meditation_timer_light")
+        composeRule.onNodeWithText("End early").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("home-list") }
+        Thread.sleep(6_000)
+
+        openTab("tab-settings", "settings-list")
+        composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasTestTag("theme-DARK"))
+        composeRule.onNodeWithTag("theme-DARK")
+            .performSemanticsAction(SemanticsActions.OnClick)
+        composeRule.waitForIdle()
+        captureLegacy("09_settings_dark")
+
+        openTab("tab-home", "home-list")
+        captureLegacy("10_home_dark")
+
+        seedAttentionClassicsSelection()
+        launchFixtureSystemIntervention()
+        captureLegacy("11_intervention_dark")
+
+        composeRule.onNodeWithText("Read this", substring = true).performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
+        assertAttentionClassicsReaderCopyIsDisplayed()
+        captureLegacy("12_reader_attention_dark")
+
+        seedMeditationSelection()
+        launchFixtureSystemIntervention()
+        captureLegacy("13_intervention_meditation_dark")
+        composeRule.onNodeWithText("Start timer", substring = true).performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("meditation-timer-screen") }
+        captureLegacy("14_meditation_timer_dark")
     }
 
     private fun openTab(tabTag: String, expectedScreenTag: String) {

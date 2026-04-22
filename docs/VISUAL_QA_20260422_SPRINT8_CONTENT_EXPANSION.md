@@ -48,6 +48,7 @@ Notes:
 - The intervention remains finite: one primary recommendation plus two backups, or no extra choices when the inventory is intentionally constrained to meditation.
 - Link-only items route to the external handoff surface rather than the in-app reader.
 - Renderable v2 items show author-facing source labels, not provenance-heavy Project Gutenberg or Wikisource labels.
+- Dark-mode screenshots use light Android system-bar icons after the theme-aware system-bar fix.
 - The progress surface can show the transient "Feedback skipped" snackbar when captured immediately after skipping feedback. This is acceptable for visual QA and mirrors the real app state.
 
 ## Validation Commands
