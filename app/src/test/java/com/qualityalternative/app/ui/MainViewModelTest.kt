@@ -97,6 +97,28 @@ class MainViewModelTest {
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
+    fun completeOnboarding_selectsAttentionClassicsPackWhenItIsAvailable() = runTest {
+        val viewModel = createViewModel(
+            contentRepository = FakeContentRepository(includeAttentionClassics = true),
+        )
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+        viewModel.triggerDebugIntervention(nowMillis = 2_000L)
+        advanceUntilIdle()
+
+        assertEquals(
+            setOf("philosophy", "attention-classics-v1"),
+            viewModel.uiState.preferences?.selectedPackIds,
+        )
+        val shownItems = listOfNotNull(viewModel.uiState.currentRecommendationSet?.primary) +
+            viewModel.uiState.currentRecommendationSet?.backups.orEmpty()
+        assertTrue(shownItems.any { item -> item.packId == "attention-classics-v1" })
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
     fun selectThemeMode_persistsAndUpdatesUiState() = runTest {
         val settingsRepository = FakeSettingsRepository()
         val viewModel = createViewModel(settingsRepository = settingsRepository)
@@ -1318,37 +1340,65 @@ class MainViewModelTest {
     private class FakeContentRepository(
         extraItems: List<ContentItem> = emptyList(),
         isReady: Boolean = true,
+        includeAttentionClassics: Boolean = false,
     ) : ContentRepository {
         private val ready = MutableStateFlow(isReady)
         private var extraItems = extraItems
-        private val packs = listOf(
-            EditorialPack(
-                id = "philosophy",
-                title = "Philosophy",
-                description = "Pack",
-                items = listOf(
-                    contentItem(
-                        id = "p1",
-                        packId = "philosophy",
-                        durationMinutes = 7,
-                        topics = setOf(TopicTag.PHILOSOPHY),
+        private val packs = buildList {
+            add(
+                EditorialPack(
+                    id = "philosophy",
+                    title = "Philosophy",
+                    description = "Pack",
+                    items = listOf(
+                        contentItem(
+                            id = "p1",
+                            packId = "philosophy",
+                            durationMinutes = 7,
+                            topics = setOf(TopicTag.PHILOSOPHY),
+                        ),
                     ),
                 ),
-            ),
-            EditorialPack(
-                id = "science",
-                title = "Science",
-                description = "Pack",
-                items = listOf(
-                    contentItem(
-                        id = "s1",
-                        packId = "science",
-                        durationMinutes = 6,
-                        topics = setOf(TopicTag.SCIENCE),
+            )
+            add(
+                EditorialPack(
+                    id = "science",
+                    title = "Science",
+                    description = "Pack",
+                    items = listOf(
+                        contentItem(
+                            id = "s1",
+                            packId = "science",
+                            durationMinutes = 6,
+                            topics = setOf(TopicTag.SCIENCE),
+                        ),
                     ),
                 ),
-            ),
-        )
+            )
+            if (includeAttentionClassics) {
+                add(
+                    EditorialPack(
+                        id = "attention-classics-v1",
+                        title = "Attention Classics v1",
+                        description = "Pack",
+                        items = listOf(
+                            contentItem(
+                                id = "attention-quick",
+                                packId = "attention-classics-v1",
+                                durationMinutes = 4,
+                                topics = setOf(TopicTag.ESSAYS, TopicTag.PHILOSOPHY),
+                            ),
+                            contentItem(
+                                id = "attention-backup",
+                                packId = "attention-classics-v1",
+                                durationMinutes = 3,
+                                topics = setOf(TopicTag.ESSAYS),
+                            ),
+                        ),
+                    ),
+                )
+            }
+        }
 
         override fun starterPacks(): List<EditorialPack> = packs
 

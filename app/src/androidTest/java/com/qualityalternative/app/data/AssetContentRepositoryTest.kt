@@ -77,12 +77,35 @@ class AssetContentRepositoryTest {
             items.map { item -> item.id }.toSet(),
         )
         items.forEach { item ->
-            assertEquals("Project Gutenberg public-domain text", item.sourceLabel)
-            assertTrue(item.rights.licenseName.orEmpty().contains("Public domain"))
+            assertEquals("Public-domain source text via Project Gutenberg", item.sourceLabel)
+            assertTrue(item.rights.licenseName.orEmpty().contains("Public domain text"))
+            assertTrue(item.rights.licenseName.orEmpty().contains("source policy"))
             assertEquals("https://www.gutenberg.org/policy/license.html", item.rights.licenseUrl)
             assertTrue(item.rights.sourceUrl.orEmpty().startsWith("https://www.gutenberg.org/"))
             assertFalse(item.rights.attribution.isNullOrBlank())
             assertEquals("2026-04-22", item.rights.rightsReviewedAt)
+        }
+    }
+
+    @Test
+    fun attentionClassicsDurationsMatchShippedMarkdownBodies() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val repository = AssetContentRepository(context)
+
+        val items = repository.starterPacks().first { it.id == "attention-classics-v1" }.items
+
+        items.forEach { item ->
+            val words = repository.contentBody(item).split(Regex("\\s+")).count(String::isNotBlank)
+            val wordsPerMinute = words / item.durationMinutes
+
+            assertTrue(
+                "${item.id} has too few words for ${item.durationMinutes} min: $words words",
+                wordsPerMinute >= 70,
+            )
+            assertTrue(
+                "${item.id} has too many words for ${item.durationMinutes} min: $words words",
+                wordsPerMinute <= 190,
+            )
         }
     }
 

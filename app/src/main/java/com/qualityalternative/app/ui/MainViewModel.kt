@@ -142,7 +142,7 @@ class MainViewModel(
 ) : ViewModel() {
     private val supportedApps = settingsRepository.supportedDistractingApps()
     private val starterPacks = contentRepository.starterPacks()
-    private val starterPackIds = starterPacks.mapTo(mutableSetOf(), EditorialPack::id)
+    private val defaultSelectedPackIds = defaultStarterPackIds(starterPacks)
     private var settingsLoaded = false
     private var contentReady = contentRepository.isReady()
     private var analyticsReady = analyticsTracker.isReady()
@@ -982,7 +982,7 @@ class MainViewModel(
     private fun applySettings(settings: AppSettings) {
         val preferences = settings.toUserPreferences(
             supportedApps = supportedApps,
-            fallbackPackIds = starterPackIds,
+            fallbackPackIds = defaultSelectedPackIds,
         )
         val availableTargetApps = if (settings.hasCompletedOnboarding) preferences.selectedApps else emptyList()
         val selectedTargetApp = if (settings.hasCompletedOnboarding) {
@@ -1517,8 +1517,16 @@ private fun defaultOnboardingSelection(
         selectedAppPackages = defaultSelectedPackages,
         preferredTopics = defaultPrototypeTopics(),
         preferredDurationBucket = DurationBucket.FOCUS,
-        selectedPackIds = starterPacks.take(1).mapTo(mutableSetOf(), EditorialPack::id),
+        selectedPackIds = defaultStarterPackIds(starterPacks),
     )
+}
+
+private fun defaultStarterPackIds(starterPacks: List<EditorialPack>): Set<String> {
+    val selected = starterPacks.take(1).mapTo(mutableSetOf(), EditorialPack::id)
+    if (starterPacks.any { pack -> pack.id == ATTENTION_CLASSICS_PACK_ID }) {
+        selected += ATTENTION_CLASSICS_PACK_ID
+    }
+    return selected
 }
 
 private fun AppSettings.toUserPreferences(
@@ -1577,6 +1585,8 @@ private fun defaultPrototypeTopics(): Set<TopicTag> = setOf(
     TopicTag.SCIENCE,
     TopicTag.DESIGN,
 )
+
+private const val ATTENTION_CLASSICS_PACK_ID = "attention-classics-v1"
 
 private fun AppSettings.toOnboardingSelection(
     supportedApps: List<DistractingApp>,

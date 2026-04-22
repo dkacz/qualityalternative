@@ -1166,7 +1166,10 @@ private fun ReaderScreen(
     onBack: () -> Unit,
 ) {
     val content = state.currentContent ?: return
-    val paragraphs = finiteReaderParagraphs(state.currentContentBody).ifEmpty { listOf(content.description) }
+    val paragraphs = readerParagraphsForDisplay(
+        body = state.currentContentBody,
+        fallback = content.description,
+    )
     var progress by remember(content.id, state.currentSessionStartedAtMillis) { mutableStateOf(0) }
 
     LaunchedEffect(content.id, state.currentSessionStartedAtMillis, content.durationMinutes) {
@@ -1202,7 +1205,7 @@ private fun ReaderScreen(
                 DisplayText(content.title, fontSize = 27.sp, lineHeight = 31.sp, modifier = Modifier.padding(bottom = 18.dp))
                 PlaceholderImage(modifier = Modifier.padding(bottom = 22.dp))
             }
-            items(paragraphs.take(5).withIndex().toList()) { indexedParagraph ->
+            items(paragraphs.withIndex().toList()) { indexedParagraph ->
                 Text(
                     text = indexedParagraph.value,
                     style = MaterialTheme.typography.bodyLarge.copy(
@@ -2689,6 +2692,10 @@ internal fun finiteReaderParagraphs(body: String): List<String> {
         .split(Regex("\\n\\s*\\n"))
         .map(String::trim)
         .filter(String::isNotEmpty)
+}
+
+internal fun readerParagraphsForDisplay(body: String, fallback: String): List<String> {
+    return finiteReaderParagraphs(body).ifEmpty { listOf(fallback) }
 }
 
 private fun formatTimestamp(timestampMillis: Long): String {

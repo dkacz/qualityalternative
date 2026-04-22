@@ -177,6 +177,24 @@ class ProgressSnapshotTest {
         )
     }
 
+    @Test
+    fun readerParagraphsForDisplayDoesNotCapLongAssets() {
+        val body = (1..7).joinToString(separator = "\n\n") { index -> "Paragraph $index." }
+
+        assertEquals(
+            (1..7).map { index -> "Paragraph $index." },
+            readerParagraphsForDisplay(body = body, fallback = "Fallback."),
+        )
+    }
+
+    @Test
+    fun readerParagraphsForDisplayUsesFallbackWhenBodyIsBlank() {
+        assertEquals(
+            listOf("Fallback."),
+            readerParagraphsForDisplay(body = " \n\n ", fallback = "Fallback."),
+        )
+    }
+
     private fun event(
         type: AnalyticsEventType,
         interventionId: String,
