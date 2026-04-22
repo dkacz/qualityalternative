@@ -89,20 +89,55 @@ class AssetContentRepositoryTest {
     }
 
     @Test
-    fun qualityAlternativePlaceholderItemsRemainClearlyLabeled() {
+    fun legacyStarterPacksNoLongerContainPlaceholderEditorialItems() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val repository = AssetContentRepository(context)
+
+        val legacyPacks = repository.starterPacks()
+            .filter { pack -> pack.id in setOf("philosophy", "science") }
+        val legacyItems = legacyPacks.flatMap { pack -> pack.items }
+
+        assertEquals(2, legacyPacks.size)
+        assertEquals(7, legacyItems.size)
+        assertEquals(
+            setOf(
+                "care-for-the-soul-first",
+                "leave-the-crowd",
+                "go-about-a-humans-work",
+                "neither-ask-nor-consent",
+                "a-candle-opens-natural-philosophy",
+                "water-dust-becomes-a-cloud",
+                "attention-comes-in-beats",
+            ),
+            legacyItems.map { item -> item.id }.toSet(),
+        )
+        legacyItems.forEach { item ->
+            assertFalse(item.sourceLabel.orEmpty().contains("Quality Alternative Editorial"))
+            assertFalse(item.rights.licenseName.orEmpty().contains("placeholder", ignoreCase = true))
+            assertEquals(ContentRightsClass.RENDERABLE, item.rights.rightsClass)
+            assertEquals(ContentRenderMode.IN_APP_READER, item.rights.renderMode)
+            assertFalse(item.bodyAssetPath.isNullOrBlank())
+            assertEquals(null, item.externalUrl)
+            assertFalse(item.whyThisNow.isNullOrBlank())
+            assertEquals("https://www.gutenberg.org/policy/license.html", item.rights.licenseUrl)
+            assertTrue(item.rights.sourceUrl.orEmpty().startsWith("https://www.gutenberg.org/ebooks/"))
+            assertFalse(item.rights.attribution.isNullOrBlank())
+            assertEquals("2026-04-22", item.rights.rightsReviewedAt)
+        }
+    }
+
+    @Test
+    fun starterInventoryContainsNoFirstPartyPlaceholderLicenses() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val repository = AssetContentRepository(context)
 
         val placeholders = repository.inventory()
-            .filter { item -> item.rights.licenseName == "Quality Alternative first-party placeholder" }
+            .filter { item ->
+                item.rights.licenseName.orEmpty().contains("placeholder", ignoreCase = true) ||
+                    item.sourceLabel.orEmpty() == "Quality Alternative Editorial"
+            }
 
-        assertTrue(placeholders.isNotEmpty())
-        placeholders.forEach { item ->
-            assertEquals("Quality Alternative Editorial", item.sourceLabel)
-            assertEquals(null, item.rights.licenseUrl)
-            assertEquals(null, item.rights.sourceUrl)
-            assertEquals("Quality Alternative", item.rights.attribution)
-        }
+        assertTrue(placeholders.isEmpty())
     }
 
     @Test

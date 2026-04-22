@@ -91,9 +91,9 @@ class ContentRightsMetadataTest {
     @Test
     fun renderableEditorialCanUseInAppReaderWhenExplicitlyMarked() {
         val rights = ContentRightsMetadata.renderableEditorial(
-            licenseName = "Quality Alternative first-party placeholder",
-            attribution = "Quality Alternative",
-            rightsReviewedAt = "2026-04-21",
+            licenseName = "Public domain text; Project Gutenberg source policy linked",
+            attribution = "Example Author, Example Work",
+            rightsReviewedAt = "2026-04-22",
         )
 
         assertEquals(ContentRightsClass.RENDERABLE, rights.rightsClass)

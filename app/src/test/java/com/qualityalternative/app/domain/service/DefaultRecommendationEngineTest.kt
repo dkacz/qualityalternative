@@ -249,8 +249,8 @@ class DefaultRecommendationEngineTest {
         )
 
         val inventory = listOf(
-            item(id = "quiet-hours", minutes = 7, topics = setOf(TopicTag.ESSAYS)),
-            item(id = "how-bees-decide", minutes = 6, topics = setOf(TopicTag.SCIENCE)),
+            item(id = "leave-the-crowd", minutes = 7, topics = setOf(TopicTag.ESSAYS)),
+            item(id = "a-candle-opens-natural-philosophy", minutes = 6, topics = setOf(TopicTag.SCIENCE)),
             item(
                 id = "sample-link:notes-on-taste",
                 packId = "user-links",
@@ -282,8 +282,8 @@ class DefaultRecommendationEngineTest {
             nowMillis = 0L,
         )
 
-        assertEquals("quiet-hours", result?.primary?.id)
-        assertEquals(listOf("how-bees-decide", "fixture-link:short-convenience-essay"), result?.backups?.map(ContentItem::id))
+        assertEquals("leave-the-crowd", result?.primary?.id)
+        assertEquals(listOf("a-candle-opens-natural-philosophy", "fixture-link:short-convenience-essay"), result?.backups?.map(ContentItem::id))
         assertTrue(result!!.backups.all { backup -> backup.durationMinutes <= result.primary.durationMinutes })
     }
 

@@ -82,6 +82,20 @@ class VisualQaScreenshotTest {
         assertPublicDomainExpansionReaderCopyIsDisplayed()
         capture("05_reader_renderable_v2_light")
 
+        seedPhilosophyReplacementSelection()
+        launchFixtureSystemIntervention()
+        composeRule.onNodeWithText("Read this", substring = true).performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
+        assertPhilosophyReplacementReaderCopyIsDisplayed()
+        capture("05b_reader_philosophy_replacement_light")
+
+        seedScienceReplacementSelection()
+        launchFixtureSystemIntervention()
+        composeRule.onNodeWithText("Read this", substring = true).performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
+        assertScienceReplacementReaderCopyIsDisplayed()
+        capture("05c_reader_science_replacement_light")
+
         composeRule.onNodeWithTag("reader-list")
             .performScrollToNode(hasText("I'm done reading"))
         composeRule.onNodeWithText("I'm done reading").performClick()
@@ -132,6 +146,20 @@ class VisualQaScreenshotTest {
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
         assertPublicDomainExpansionReaderCopyIsDisplayed()
         capture("14_reader_renderable_v2_dark")
+
+        seedPhilosophyReplacementSelection()
+        launchFixtureSystemIntervention()
+        composeRule.onNodeWithText("Read this", substring = true).performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
+        assertPhilosophyReplacementReaderCopyIsDisplayed()
+        capture("14b_reader_philosophy_replacement_dark")
+
+        seedScienceReplacementSelection()
+        launchFixtureSystemIntervention()
+        composeRule.onNodeWithText("Read this", substring = true).performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
+        assertScienceReplacementReaderCopyIsDisplayed()
+        capture("14c_reader_science_replacement_dark")
 
         composeRule.onNodeWithTag("reader-list")
             .performScrollToNode(hasText("I'm done reading"))
@@ -330,6 +358,34 @@ class VisualQaScreenshotTest {
         )
     }
 
+    private fun seedPhilosophyReplacementSelection() = runBlocking {
+        val repository = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication)
+            .appContainer
+            .settingsRepository
+        repository.saveOnboardingSelection(
+            OnboardingSelection(
+                selectedAppPackages = setOf(FixtureTargetRegistry.fixtureDistractors.first().packageName),
+                preferredTopics = setOf(TopicTag.PHILOSOPHY, TopicTag.ESSAYS),
+                preferredDurationBucket = DurationBucket.QUICK,
+                selectedPackIds = setOf("philosophy"),
+            ),
+        )
+    }
+
+    private fun seedScienceReplacementSelection() = runBlocking {
+        val repository = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication)
+            .appContainer
+            .settingsRepository
+        repository.saveOnboardingSelection(
+            OnboardingSelection(
+                selectedAppPackages = setOf(FixtureTargetRegistry.fixtureDistractors.first().packageName),
+                preferredTopics = setOf(TopicTag.SCIENCE, TopicTag.PSYCHOLOGY),
+                preferredDurationBucket = DurationBucket.QUICK,
+                selectedPackIds = setOf("science"),
+            ),
+        )
+    }
+
     private fun seedLinkOnlySelection() = runBlocking {
         val repository = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication)
             .appContainer
@@ -429,6 +485,35 @@ class VisualQaScreenshotTest {
 
         assertTrue("Expected a public-domain v2 title in the reader", titles.any(::hasNode))
         assertTrue("Expected an author-facing source label in the reader", authors.any(::hasNodeContaining))
+        assertTrue("Reader should not show provenance-heavy Project Gutenberg label", !hasNodeContaining("Project Gutenberg"))
+    }
+
+    private fun assertPhilosophyReplacementReaderCopyIsDisplayed() {
+        val titles = listOf(
+            "Care for the Soul First",
+            "Leave the Crowd",
+            "Go About a Human's Work",
+            "Neither Ask Nor Consent",
+        )
+        val authors = listOf("Plato", "Seneca", "Marcus Aurelius", "Cicero")
+
+        assertTrue("Expected a real philosophy starter title in the reader", titles.any(::hasNode))
+        assertTrue("Expected a public-domain philosophy source label in the reader", authors.any(::hasNodeContaining))
+        assertTrue("Reader should not show the old editorial placeholder label", !hasNodeContaining("Quality Alternative Editorial"))
+        assertTrue("Reader should not show provenance-heavy Project Gutenberg label", !hasNodeContaining("Project Gutenberg"))
+    }
+
+    private fun assertScienceReplacementReaderCopyIsDisplayed() {
+        val titles = listOf(
+            "A Candle Opens Natural Philosophy",
+            "Water-Dust Becomes a Cloud",
+            "Attention Comes in Beats",
+        )
+        val authors = listOf("Michael Faraday", "John Tyndall", "William James")
+
+        assertTrue("Expected a real science starter title in the reader", titles.any(::hasNode))
+        assertTrue("Expected a public-domain science source label in the reader", authors.any(::hasNodeContaining))
+        assertTrue("Reader should not show the old editorial placeholder label", !hasNodeContaining("Quality Alternative Editorial"))
         assertTrue("Reader should not show provenance-heavy Project Gutenberg label", !hasNodeContaining("Project Gutenberg"))
     }
 
