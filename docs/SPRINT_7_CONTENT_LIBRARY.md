@@ -1,6 +1,6 @@
 # Sprint 7 Source Discovery and Content Library v1
 
-Status: `in progress`
+Status: `complete`
 
 ## Goal
 
@@ -113,7 +113,7 @@ Validation:
 
 ### 7.4 Replacement Quality Pass
 
-Status: `implemented for Pro review`
+Status: `passed Pro review`
 
 Acceptance criteria:
 
@@ -129,6 +129,11 @@ Validation:
 Current quality pass:
 
 - See `docs/CONTENT_PACK_V1_QUALITY_PASS.md`.
+
+Completion note:
+
+- The final follow-up Pro review returned `VERDICT: PASS` after the source-label and tester-signal cleanup.
+- Sprint 7 ships `attention-classics-v1` as the first real renderable replacement pack.
 
 ## Definition of Done
 

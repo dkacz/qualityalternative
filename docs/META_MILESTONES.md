@@ -16,12 +16,14 @@ Completed:
 - Soft intervention with one primary replacement, two backups, `Open anyway`, and `Pause 15 min`.
 - Real-device alpha smoke on YouTube, X, and Facebook.
 - Public GitHub repo and internal alpha APK release.
+- Content governance model for renderable, link-only, and user-private inventory.
+- First real renderable content pack: `attention-classics-v1`.
 
 Current active track:
 
-- Sprint 7: Source discovery and content library v1.
-- Work mode: find real English-language replacement sources and select the first small pack that is worth choosing instead of social media.
-- Gate: no expanded content inventory ships unless it is `renderable`, `link_only`, or `user_private` with explicit metadata.
+- Sprint 7 is complete.
+- Work mode: decide whether the next move is PDF/pilot readiness, release packaging for the new content pack, or another content-quality iteration after tester signal.
+- Gate: do not expand inventory unless each item is classified as `renderable`, `link_only`, or `user_private` with explicit metadata.
 
 ## UI Timing
 
@@ -161,7 +163,7 @@ Sprint plan:
 
 ## Milestone 5: Sprint 7 Source Discovery and Content Library v1
 
-Status: `active`
+Status: `complete`
 
 Goal:
 
@@ -174,6 +176,14 @@ Likely scope:
 - source, rights, attribution, and duration metadata for each selected item
 - app integration for one small finite pack if source triage is safe enough
 - replacement-quality pass focused on whether the content is actually compelling at the moment of impulse
+
+Delivered:
+
+- Source candidate inventory and first pack selection.
+- `attention-classics-v1` integrated as a finite local renderable pack.
+- Author-facing source labels for the impulse card, with rights/source metadata preserved separately.
+- Tester instructions that collect item-level content-quality signal.
+- Pro review passed for all Sprint 7 slices.
 
 Out of scope:
 
@@ -193,6 +203,7 @@ Sprint plan:
 - See `docs/SPRINT_7_CONTENT_LIBRARY.md`.
 - See `docs/CONTENT_SOURCE_CANDIDATES.md`.
 - See `docs/CONTENT_PACK_V1_SELECTION.md`.
+- See `docs/CONTENT_PACK_V1_QUALITY_PASS.md`.
 
 ## Milestone 6: PDF and Pilot Readiness
 
@@ -222,7 +233,7 @@ Out of scope:
 
 Gate to start:
 
-- Sprint 7 should establish at least one real shared content pack or document why the next pilot must rely on link-only and user-private inventory first.
+- Sprint 7 established at least one real shared content pack; before PDF work starts, refresh or renumber the existing PDF plan.
 
 Sprint plan:
 

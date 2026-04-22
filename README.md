@@ -32,6 +32,8 @@ This repository now contains:
 - a completed Sprint 3 Android interception alpha slice with live system-intent intervention, fixture distractor apps, and cross-app automation coverage
 - a completed Sprint 4 user-added links slice with local link persistence, source-aware ranking, and external handoff
 - a completed Sprint 5 UI/UX pass with Light/Dark analog themes, restyled intervention, home, library, reader, feedback, and progress surfaces
+- a completed Sprint 6 content governance layer for renderable, link-only, and user-private inventory
+- a completed Sprint 7 content library v1 with the first real renderable pack, `Attention Classics v1`
 
 ## Source of Truth
 
@@ -54,11 +56,12 @@ This repository now contains:
 
 - `app/` contains the Android client prototype.
 - The current build is local-first and uses editorial starter packs from app assets.
+- `Attention Classics v1` is integrated as the first real renderable replacement pack.
 - User-added links are stored locally and can participate in the same finite recommendation set.
 - User settings and delay windows are persisted with `DataStore`.
 - Analytics and replacement history are persisted with `Room`.
 - The prototype already supports:
-  - onboarding with selected distracting apps, preferred topics, session length, and starter packs
+  - onboarding with selected distracting apps, preferred topics, session length, and default starter packs
   - manual debug intervention trigger
   - one primary recommendation plus two backups
   - reader flow
@@ -96,7 +99,7 @@ Use `JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home` a
 
 ## Alpha Status
 
-- Sprint 0-5 implementation is complete on Android.
+- Sprint 0-7 implementation is complete on Android.
 - Emulator validation is green for unit, lint, and instrumentation suites.
 - Internal alpha has been validated on a real Samsung `SM-S721B`.
 - Manual smoke passed for YouTube, X, and Facebook, including real interception, `Open anyway`, and `Pause 15 min`.

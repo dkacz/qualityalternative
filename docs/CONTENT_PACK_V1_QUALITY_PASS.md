@@ -1,6 +1,6 @@
 # Content Pack v1 Quality Pass
 
-Status: `Sprint 7.4 implemented for Pro review`
+Status: `Sprint 7.4 passed Pro review`
 
 Pack id: `attention-classics-v1`
 
