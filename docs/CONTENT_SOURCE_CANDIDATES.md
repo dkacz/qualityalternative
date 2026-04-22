@@ -47,9 +47,9 @@ Copyright and licensing checks happen during content selection, triage, and inve
 | 21 | Leo Tolstoy, `A Confession`, older English translation | Project Gutenberg / Standard Ebooks if available | `renderable_candidate` | Meaning-heavy alternative, but emotionally intense. | Verify translator and use only if tone fits calm intervention. |
 | 22 | Laozi, `Tao Te Ching`, older English translation | Project Gutenberg / Wikisource | `renderable_candidate` | Short contemplative passages fit the product beautifully. | Translation rights are the whole issue; verify before considering. |
 | 23 | `The Dhammapada`, older English translation | Project Gutenberg / Wikisource | `renderable_candidate` | Short passages about craving and attention are highly relevant. | Verify translation and add context carefully to avoid sloppy spiritual packaging. |
-| 24 | Our World in Data, `Energy` explainers | [Our World in Data](https://ourworldindata.org/) | `renderable_candidate` | Clear modern knowledge snack; strong for science-curious users. | Confirm article-level license and third-party chart/data constraints; use text-first. |
-| 25 | Our World in Data, `Climate Change` explainers | Our World in Data | `renderable_candidate` | High-value alternative to outrage feeds if kept concise. | Prefer short adapted reading modules with full CC BY attribution and modification notes. |
-| 26 | Our World in Data, `Life Expectancy` / health progress explainers | Our World in Data | `renderable_candidate` | Positive perspective reset; likely strong replacement content. | Confirm license and create chart-light text modules. |
+| 24 | Our World in Data, `Energy` explainers | [Our World in Data](https://ourworldindata.org/) | `renderable_candidate` | Clear modern knowledge snack; strong for science-curious users. | Select specific CC BY pages or excerpts; preserve attribution, source URL, license URL, and modification note. |
+| 25 | Our World in Data, `Climate Change` explainers | Our World in Data | `renderable_candidate` | High-value alternative to outrage feeds if kept concise. | Select specific CC BY pages or excerpts; do not create QA-authored summaries as replacement content. |
+| 26 | Our World in Data, `Life Expectancy` / health progress explainers | Our World in Data | `renderable_candidate` | Positive perspective reset; likely strong replacement content. | Select specific CC BY pages or excerpts; avoid chart-dependent material unless third-party data terms are clear. |
 | 27 | Our World in Data, `Mental Health` explainers | Our World in Data | `renderable_candidate` | Relevant to smartphone self-regulation, but sensitive. | Avoid medical advice framing; keep attribution and source link prominent. |
 | 28 | Our World in Data, `Demographic Change` explainers | Our World in Data | `renderable_candidate` | Big-picture learning in short sessions. | Pick only accessible pieces and avoid chart dependency. |
 | 29 | Our World in Data, `Artificial Intelligence` explainers | Our World in Data | `renderable_candidate` | Timely, educational, strong for tech testers. | Verify license on selected pages and avoid fast-aging claims if offline. |
@@ -96,7 +96,7 @@ Start with 10 items and cut aggressively if triage is uncertain:
 - Our World in Data, one chart-light progress explainer.
 - NASA Earth Observatory, one item-level-cleared Earth systems explainer.
 
-If the public-domain translation/edition checks take longer than expected, the fallback for 7.2 should be a `link_only` pack with SAPIENS, The Conversation, Aeon/Psyche, Quanta, and Stanford Encyclopedia links. That fallback should still preserve the one-primary-plus-two-backups intervention shape.
+If the public-domain translation/edition checks take longer than expected, the fallback for 7.2 should be a `link_only` pack with article-shaped sources such as SAPIENS, The Conversation, Aeon/Psyche, Quanta, Nautilus, and Long Now. Stanford Encyclopedia and Internet Encyclopedia of Philosophy should remain later deep-reference sources unless Slice 7.2 identifies a specific bounded section with a credible 5-12 minute reading time. The fallback should still preserve the one-primary-plus-two-backups intervention shape.
 
 ## Source Notes Checked
 
