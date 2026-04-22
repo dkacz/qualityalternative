@@ -21,10 +21,9 @@ Completed:
 
 Current active track:
 
-- Sprint 8: content expansion and visual QA.
-- Work mode: scale the replacement library with renderable and link-only inventory, while making emulator screenshot QA a release gate.
-- Gate: do not expand inventory unless each item is classified as `renderable`, `link_only`, or `user_private` with explicit metadata.
-- Completed Sprint 8 slices so far: visual QA baseline, shared link-only support, meditation timer replacement, source-candidate discovery, the first 20-item link-only pack, `public-domain-expansion-v2`, and the release-candidate visual QA pass.
+- Sprint 9: user-owned document import for Android.
+- Work mode: add PDF, Markdown, and EPUB as private replacement inventory without turning the app into a document manager.
+- Gate: Markdown may render in-app as user-private content; PDF and EPUB use controlled Android handoff until native readers are justified by tester signal.
 
 ## UI Timing
 
@@ -146,8 +145,7 @@ Likely scope:
 
 Out of scope:
 
-- PDF upload or PDF reader
-- EPUB support
+- user-document import or native PDF/EPUB reader work
 - RSS/newsletter ingestion
 - open-web crawling
 - AI summarization of third-party works
@@ -191,7 +189,7 @@ Out of scope:
 - first-party essay writing
 - open-web crawling
 - AI summarization of third-party articles
-- PDF upload or reader work
+- user-document import or native PDF/EPUB reader work
 - iOS
 - premium packaging implementation
 
@@ -223,7 +221,7 @@ Likely scope:
 - screenshot-based visual QA across Light and Dark modes
 - tester-facing content-quality feedback loop
 
-Delivered so far:
+Delivered:
 
 - Shared `EXTERNAL_HANDOFF` manifest support for link-only editorial items.
 - Repeatable 3-minute meditation timer as an app-utility replacement.
@@ -233,7 +231,7 @@ Delivered so far:
 
 Out of scope:
 
-- PDF upload or reader work
+- native PDF/EPUB reader work
 - RSS/newsletter ingestion
 - open-web crawling
 - AI summaries of third-party articles
@@ -244,21 +242,21 @@ Sprint plan:
 
 - See `docs/SPRINT_8_CONTENT_EXPANSION_VISUAL_QA.md`.
 
-## Milestone 7: PDF and Pilot Readiness
+## Milestone 7: User Documents and Pilot Readiness
 
-Status: `planned, after content library v1`
+Status: `in progress`
 
 Goal:
 
-- Move from internal alpha toward a small external pilot by supporting the second user-owned content format: PDFs.
+- Move from internal alpha toward a small external pilot by supporting user-owned documents as private replacement inventory.
 
 Likely scope:
 
-- Android document picker for PDF selection
+- Android document picker for PDF, Markdown, and EPUB selection
 - local URI/permission persistence
-- simple PDF reader or controlled fallback
-- PDF metadata as rankable content
-- source-aware analytics for editorial, link, and PDF
+- Markdown reader plus controlled PDF/EPUB fallback
+- document metadata as rankable content
+- source-aware analytics for editorial, link, and user-document replacements
 - external-pilot checklist and tester reporting polish
 
 Out of scope:
@@ -269,14 +267,15 @@ Out of scope:
 - full document management
 - cloud sync
 - AI PDF summarization
+- native PDF/EPUB rendering unless handoff proves too weak in pilot use
 
 Gate to start:
 
-- Sprint 8 should establish a larger shared library and visual QA baseline; before PDF work starts, refresh or renumber the existing PDF plan.
+- Sprint 8 established the larger shared library and visual QA baseline. User explicitly pulled this milestone forward to add PDF/Markdown/EPUB import before iOS.
 
 Sprint plan:
 
-- See `docs/SPRINT_6_PDF_PILOT_READINESS.md`; this document should be renumbered or refreshed before implementation starts.
+- See `docs/SPRINT_9_USER_DOCUMENT_IMPORT.md`.
 
 ## Milestone 8: Small External Pilot
 
@@ -288,7 +287,7 @@ Goal:
 
 Minimum pilot inputs:
 
-- Android build with editorial packs, user links, and PDFs
+- Android build with editorial packs, user links, Markdown import, and PDF/EPUB handoff
 - clear install/test instructions
 - simple feedback and bug-reporting workflow
 - stable local analytics/export path
@@ -371,7 +370,7 @@ Streak hypothesis:
 
 Decision gate:
 
-- Do not implement monetization, unlimited storage, EPUB support, or streak mechanics until pilot data shows that users repeatedly accept replacements and ask for more content depth or motivation.
+- Do not implement monetization, unlimited storage, native EPUB reading, or streak mechanics until pilot data shows that users repeatedly accept replacements and ask for more content depth or motivation.
 
 ## Operating Rule
 

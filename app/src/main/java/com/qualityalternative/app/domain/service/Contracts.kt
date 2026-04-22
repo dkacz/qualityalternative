@@ -19,6 +19,8 @@ import com.qualityalternative.app.domain.model.ReturnToTargetSignal
 import com.qualityalternative.app.domain.model.SessionFeedback
 import com.qualityalternative.app.domain.model.UserLinkDraft
 import com.qualityalternative.app.domain.model.UserLinkValidationError
+import com.qualityalternative.app.domain.model.UserDocumentDraft
+import com.qualityalternative.app.domain.model.UserDocumentValidationError
 import com.qualityalternative.app.domain.model.UserPreferences
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
@@ -37,6 +39,12 @@ sealed class AddUserLinkResult {
     data class Rejected(val errors: Set<UserLinkValidationError>) : AddUserLinkResult()
 }
 
+sealed class AddUserDocumentResult {
+    data class Added(val item: ContentItem) : AddUserDocumentResult()
+
+    data class Rejected(val errors: Set<UserDocumentValidationError>) : AddUserDocumentResult()
+}
+
 interface UserLinkRepository {
     fun userLinks(): List<ContentItem>
 
@@ -51,6 +59,28 @@ interface UserLinkRepository {
         contentId: String,
         nowMillis: Long = System.currentTimeMillis(),
     )
+
+    fun isReady(): Boolean = true
+
+    fun observeReady(): Flow<Boolean> = flowOf(isReady())
+}
+
+interface UserDocumentRepository {
+    fun userDocuments(): List<ContentItem>
+
+    fun observeUserDocuments(): Flow<List<ContentItem>> = flowOf(userDocuments())
+
+    suspend fun addDocument(
+        draft: UserDocumentDraft,
+        nowMillis: Long = System.currentTimeMillis(),
+    ): AddUserDocumentResult
+
+    suspend fun markUnavailable(
+        contentId: String,
+        nowMillis: Long = System.currentTimeMillis(),
+    )
+
+    fun contentBody(item: ContentItem): String = item.description
 
     fun isReady(): Boolean = true
 

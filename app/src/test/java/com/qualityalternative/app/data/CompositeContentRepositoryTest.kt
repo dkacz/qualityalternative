@@ -4,11 +4,15 @@ import com.qualityalternative.app.domain.model.ContentAvailability
 import com.qualityalternative.app.domain.model.ContentFormat
 import com.qualityalternative.app.domain.model.ContentItem
 import com.qualityalternative.app.domain.model.ContentSourceType
+import com.qualityalternative.app.domain.model.ContentRightsMetadata
 import com.qualityalternative.app.domain.model.EditorialPack
 import com.qualityalternative.app.domain.model.TopicTag
+import com.qualityalternative.app.domain.model.UserDocumentDraft
 import com.qualityalternative.app.domain.model.UserLinkDraft
+import com.qualityalternative.app.domain.service.AddUserDocumentResult
 import com.qualityalternative.app.domain.service.AddUserLinkResult
 import com.qualityalternative.app.domain.service.ContentRepository
+import com.qualityalternative.app.domain.service.UserDocumentRepository
 import com.qualityalternative.app.domain.service.UserLinkRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -35,25 +39,35 @@ class CompositeContentRepositoryTest {
                     userLink(id = "link-unavailable", availability = ContentAvailability.UNAVAILABLE),
                 ),
             ),
+            userDocumentRepository = FakeUserDocumentRepository(
+                documents = listOf(
+                    userDocument(id = "doc-available", availability = ContentAvailability.AVAILABLE),
+                    userDocument(id = "doc-unavailable", availability = ContentAvailability.UNAVAILABLE),
+                ),
+            ),
         )
 
         val inventory = repository.inventory()
 
-        assertEquals(listOf("editorial-1", "link-available"), inventory.map(ContentItem::id))
+        assertEquals(listOf("editorial-1", "link-available", "doc-available"), inventory.map(ContentItem::id))
         assertFalse(inventory.any { it.id == "link-unavailable" })
+        assertFalse(inventory.any { it.id == "doc-unavailable" })
     }
 
     @Test
-    fun contentBody_returnsEditorialBodyAndUserLinkFallbackDescription() {
+    fun contentBody_returnsEditorialBodyUserLinkFallbackAndUserDocumentBody() {
         val editorial = FakeEditorialRepository()
         val userLink = userLink(id = "link-available", description = "Fallback summary")
+        val userDocument = userDocument(id = "doc-available", description = "Document summary")
         val repository = CompositeContentRepository(
             editorialRepository = editorial,
             userLinkRepository = FakeUserLinkRepository(links = listOf(userLink)),
+            userDocumentRepository = FakeUserDocumentRepository(documents = listOf(userDocument), body = "Private markdown body"),
         )
 
         assertEquals("Editorial body", repository.contentBody(editorial.inventory().single()))
         assertEquals("Fallback summary", repository.contentBody(userLink))
+        assertEquals("Private markdown body", repository.contentBody(userDocument))
     }
 
     @Test
@@ -64,6 +78,7 @@ class CompositeContentRepositoryTest {
                 links = emptyList(),
                 isReady = MutableStateFlow(false),
             ),
+            userDocumentRepository = FakeUserDocumentRepository(documents = emptyList()),
         )
 
         assertFalse(repository.isReady())
@@ -80,6 +95,7 @@ class CompositeContentRepositoryTest {
                 links = emptyList(),
                 isReady = userLinksReady,
             ),
+            userDocumentRepository = FakeUserDocumentRepository(documents = emptyList()),
         )
         val emissions = mutableListOf<Boolean>()
 
@@ -157,6 +173,32 @@ class CompositeContentRepositoryTest {
         override fun observeReady(): Flow<Boolean> = isReady
     }
 
+    private class FakeUserDocumentRepository(
+        private val documents: List<ContentItem>,
+        private val body: String = "Document body",
+        private val isReady: MutableStateFlow<Boolean> = MutableStateFlow(true),
+    ) : UserDocumentRepository {
+        override fun userDocuments(): List<ContentItem> = documents
+
+        override fun observeUserDocuments(): Flow<List<ContentItem>> = flowOf(documents)
+
+        override suspend fun addDocument(
+            draft: UserDocumentDraft,
+            nowMillis: Long,
+        ): AddUserDocumentResult = error("Not needed")
+
+        override suspend fun markUnavailable(
+            contentId: String,
+            nowMillis: Long,
+        ) = Unit
+
+        override fun contentBody(item: ContentItem): String = body
+
+        override fun isReady(): Boolean = isReady.value
+
+        override fun observeReady(): Flow<Boolean> = isReady
+    }
+
     private fun userLink(
         id: String,
         description: String = "Saved link",
@@ -172,5 +214,22 @@ class CompositeContentRepositoryTest {
         externalUrl = "https://example.com/$id",
         sourceType = ContentSourceType.USER_LINK,
         availability = availability,
+    )
+
+    private fun userDocument(
+        id: String,
+        description: String = "Saved document",
+        availability: ContentAvailability = ContentAvailability.AVAILABLE,
+    ): ContentItem = ContentItem(
+        id = id,
+        packId = "user-documents",
+        title = id,
+        description = description,
+        durationMinutes = 10,
+        format = ContentFormat.MARKDOWN,
+        topicTags = setOf(TopicTag.PSYCHOLOGY),
+        sourceType = ContentSourceType.USER_DOCUMENT,
+        availability = availability,
+        rights = ContentRightsMetadata.userPrivateReader(sourceUrl = "content://docs/$id"),
     )
 }

@@ -6,7 +6,10 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
 import android.net.Uri
+import android.provider.OpenableColumns
 import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.text.BasicTextField
@@ -80,9 +83,11 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import com.qualityalternative.app.BuildConfig
+import com.qualityalternative.app.data.UserDocumentValidator
 import com.qualityalternative.app.domain.model.AnalyticsEvent
 import com.qualityalternative.app.domain.model.AnalyticsEventType
 import com.qualityalternative.app.domain.model.AppThemeMode
+import com.qualityalternative.app.domain.model.ContentFormat
 import com.qualityalternative.app.domain.model.ContentItem
 import com.qualityalternative.app.domain.model.ContentSourceType
 import com.qualityalternative.app.domain.model.DelayWindow
@@ -94,6 +99,7 @@ import com.qualityalternative.app.domain.model.PermissionReadiness
 import com.qualityalternative.app.domain.model.PermissionStatus
 import com.qualityalternative.app.domain.model.ReplacementHistoryEntry
 import com.qualityalternative.app.domain.model.TopicTag
+import com.qualityalternative.app.domain.model.UserDocumentValidationError
 import com.qualityalternative.app.domain.model.UserLinkValidationError
 import com.qualityalternative.app.domain.model.usesExternalHandoff
 import com.qualityalternative.app.domain.model.usesMeditationTimer
@@ -216,6 +222,20 @@ private fun MainRoute(
     viewModel: MainViewModel,
     onExitToTarget: () -> Unit,
 ) {
+    val context = LocalContext.current
+    val documentPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        val metadata = context.documentMetadata(uri)
+        viewModel.prepareUserDocumentImport(
+            uri = uri.toString(),
+            displayName = metadata.displayName,
+            mimeType = metadata.mimeType,
+        )
+    }
+    val onImportDocument = {
+        documentPicker.launch(USER_DOCUMENT_PICKER_MIME_TYPES)
+    }
+
     when (state.screen) {
         MainScreen.Onboarding -> OnboardingFlow(
             selection = state.onboardingSelection,
@@ -238,6 +258,7 @@ private fun MainRoute(
                 onSelectTargetApp = viewModel::selectTargetApp,
                 onTriggerIntervention = viewModel::triggerDebugIntervention,
                 onOpenAddLink = viewModel::openAddLink,
+                onImportDocument = onImportDocument,
                 onOpenSettings = viewModel::openSettings,
                 onStartDelayAlternative = viewModel::startActiveDelayAlternative,
             )
@@ -253,6 +274,7 @@ private fun MainRoute(
             LibraryTab(
                 state = state,
                 onAddLink = viewModel::openAddLink,
+                onImportDocument = onImportDocument,
                 onOpen = viewModel::openLibraryItem,
             )
         }
@@ -291,6 +313,23 @@ private fun MainRoute(
             onToggleTopic = viewModel::toggleAddLinkTopic,
             onSave = viewModel::saveUserLink,
             onCancel = viewModel::cancelAddLink,
+            onImportDocument = onImportDocument,
+        )
+
+        MainScreen.AddDocument -> AddDocumentScreen(
+            form = state.addDocumentForm,
+            onTitleChange = viewModel::updateAddDocumentTitle,
+            onDurationChange = viewModel::updateAddDocumentDuration,
+            onToggleTopic = viewModel::toggleAddDocumentTopic,
+            onSave = {
+                viewModel.saveUserDocument(
+                    persistReadPermission = { uriString ->
+                        persistDocumentPermission(context = context, uri = Uri.parse(uriString))
+                    },
+                )
+            },
+            onCancel = viewModel::cancelAddLink,
+            onPickAnother = onImportDocument,
         )
 
         MainScreen.AddLinkSuccess -> AddLinkSuccess(
@@ -762,13 +801,16 @@ private fun HomeTab(
     onSelectTargetApp: (DistractingApp) -> Unit,
     onTriggerIntervention: () -> Unit,
     onOpenAddLink: () -> Unit,
+    onImportDocument: () -> Unit,
     onOpenSettings: () -> Unit,
     onStartDelayAlternative: () -> Unit,
 ) {
     val selectedPacks = state.starterPacks.filter { it.id in state.preferences?.selectedPackIds.orEmpty() }
     val editorialItems = selectedPacks.flatMap { it.items }
-    val totalItems = editorialItems.size + state.userLinks.size
-    val totalMins = editorialItems.sumOf(ContentItem::durationMinutes) + state.userLinks.sumOf(ContentItem::durationMinutes)
+    val totalItems = editorialItems.size + state.userLinks.size + state.userDocuments.size
+    val totalMins = editorialItems.sumOf(ContentItem::durationMinutes) +
+        state.userLinks.sumOf(ContentItem::durationMinutes) +
+        state.userDocuments.sumOf(ContentItem::durationMinutes)
     val permOk = state.permissionReadiness.interceptionReady
     val hero = homeHeroCopy(state.permissionReadiness)
     val todayLabel = remember {
@@ -831,6 +873,8 @@ private fun HomeTab(
                 LibrarySummaryRow("Editorial picks", "${editorialItems.size} curated", ContentSourceType.EDITORIAL)
                 HorizontalDivider(color = QualityAlternativeThemeTokens.colors.line)
                 LibrarySummaryRow("Your added links", "${state.userLinks.size} saved", ContentSourceType.USER_LINK)
+                HorizontalDivider(color = QualityAlternativeThemeTokens.colors.line)
+                LibrarySummaryRow("Your files", "${state.userDocuments.size} saved", ContentSourceType.USER_DOCUMENT)
             }
         }
         item {
@@ -840,6 +884,13 @@ private fun HomeTab(
                 variant = QaButtonVariant.Outline,
                 leadingIcon = QaIconKind.Plus,
                 modifier = Modifier.testTag("home-add-link"),
+            )
+            QaButton(
+                text = "Import PDF / MD / EPUB",
+                onClick = onImportDocument,
+                variant = QaButtonVariant.Ghost,
+                leadingIcon = QaIconKind.Book,
+                modifier = Modifier.testTag("home-import-document"),
             )
         }
         item {
@@ -860,6 +911,7 @@ private fun HomeTab(
 private fun LibraryTab(
     state: MainUiState,
     onAddLink: () -> Unit,
+    onImportDocument: () -> Unit,
     onOpen: (ContentItem) -> Unit,
 ) {
     var filter by remember { mutableStateOf("all") }
@@ -869,7 +921,8 @@ private fun LibraryTab(
     val list = when (filter) {
         "editorial" -> editorial
         "yours" -> state.userLinks
-        else -> editorial + state.userLinks
+        "files" -> state.userDocuments
+        else -> editorial + state.userLinks + state.userDocuments
     }
 
     LazyColumn(
@@ -898,10 +951,20 @@ private fun LibraryTab(
             }
         }
         item {
+            QaButton(
+                text = "Import PDF / MD / EPUB",
+                onClick = onImportDocument,
+                variant = QaButtonVariant.Ghost,
+                leadingIcon = QaIconKind.Book,
+                modifier = Modifier.testTag("library-import-document"),
+            )
+        }
+        item {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(bottom = 8.dp)) {
                 QaChip("All", selected = filter == "all", onClick = { filter = "all" })
                 QaChip("Editorial", selected = filter == "editorial", onClick = { filter = "editorial" })
                 QaChip("Your links", selected = filter == "yours", onClick = { filter = "yours" })
+                QaChip("Files", selected = filter == "files", onClick = { filter = "files" })
             }
         }
         if (list.isEmpty()) {
@@ -930,6 +993,7 @@ private fun AddLinkScreen(
     onToggleTopic: (TopicTag) -> Unit,
     onSave: () -> Unit,
     onCancel: () -> Unit,
+    onImportDocument: () -> Unit,
 ) {
     val host = form.url.hostLabel()
 
@@ -950,6 +1014,15 @@ private fun AddLinkScreen(
                 text = "One piece you'd rather read than scroll. Not a bookmark graveyard — only things you'd actually open.",
                 color = QualityAlternativeThemeTokens.colors.mutedText,
                 modifier = Modifier.padding(top = 6.dp, bottom = 16.dp),
+            )
+            QaButton(
+                text = "Import PDF / MD / EPUB instead",
+                onClick = onImportDocument,
+                variant = QaButtonVariant.Outline,
+                leadingIcon = QaIconKind.Book,
+                modifier = Modifier
+                    .padding(bottom = 18.dp)
+                    .testTag("add-link-import-document"),
             )
             InputLabel("Link")
             QaTextField(
@@ -1021,6 +1094,127 @@ private fun AddLinkScreen(
                 enabled = form.canSave && !form.isSaving,
                 variant = QaButtonVariant.Primary,
                 modifier = Modifier.testTag("add-link-save"),
+            )
+        }
+    }
+}
+
+@Composable
+private fun AddDocumentScreen(
+    form: AddDocumentFormState,
+    onTitleChange: (String) -> Unit,
+    onDurationChange: (String) -> Unit,
+    onToggleTopic: (TopicTag) -> Unit,
+    onSave: () -> Unit,
+    onCancel: () -> Unit,
+    onPickAnother: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .testTag("add-document-screen"),
+    ) {
+        ScreenHead(onBack = onCancel)
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 28.dp),
+        ) {
+            DisplayText("Add a private\nreading file.", fontSize = 30.sp, lineHeight = 33.sp)
+            BodyText(
+                text = "PDF and EPUB open through Android's document viewer. Markdown opens in the calm in-app reader. The file stays on this device.",
+                color = QualityAlternativeThemeTokens.colors.mutedText,
+                modifier = Modifier.padding(top = 6.dp, bottom = 16.dp),
+            )
+            QaCard(modifier = Modifier.padding(bottom = 18.dp), padding = 16.dp) {
+                MonoText(documentFormatLabel(form), modifier = Modifier.padding(bottom = 6.dp))
+                Text(
+                    text = form.displayName.ifBlank { "No file selected" },
+                    style = MaterialTheme.typography.titleMedium,
+                    fontSize = 16.sp,
+                    lineHeight = 20.sp,
+                )
+                BodyText(
+                    text = form.uri,
+                    color = QualityAlternativeThemeTokens.colors.mutedText,
+                    fontSize = 12.sp,
+                    lineHeight = 17.sp,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+            }
+            QaButton(
+                text = "Choose a different file",
+                onClick = onPickAnother,
+                variant = QaButtonVariant.Outline,
+                size = QaButtonSize.Small,
+                leadingIcon = QaIconKind.Book,
+                modifier = Modifier
+                    .padding(bottom = 18.dp)
+                    .testTag("add-document-pick-another"),
+            )
+            AddDocumentValidationLine(form)
+            InputLabel("Title", Modifier.padding(top = 14.dp))
+            QaTextField(
+                value = form.title,
+                onValueChange = onTitleChange,
+                placeholder = "How you'd recognize it",
+                modifier = Modifier.testTag("add-document-title"),
+                isError = UserDocumentValidationError.BLANK_TITLE in form.validationErrors,
+            )
+            InputLabel("Estimated session", Modifier.padding(top = 14.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                listOf("5", "10", "15", "20", "30").forEach { mins ->
+                    QaChip(
+                        "$mins min",
+                        selected = form.durationMinutes == mins,
+                        onClick = { onDurationChange(mins) },
+                        modifier = Modifier.weight(1f),
+                        centered = true,
+                        minHeight = 32.dp,
+                        horizontalPadding = 0.dp,
+                        verticalPadding = 6.dp,
+                        fontSize = 11.sp,
+                    )
+                }
+            }
+            InputLabel("Topic", Modifier.padding(top = 14.dp))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                prototypeTopics().forEach { topic ->
+                    QaChip(
+                        text = topic.displayName(),
+                        selected = topic in form.selectedTopics,
+                        accentSelected = true,
+                        onClick = { onToggleTopic(topic) },
+                        modifier = Modifier.testTag("add-document-topic-${topic.name}"),
+                        minHeight = 32.dp,
+                        horizontalPadding = 12.dp,
+                        verticalPadding = 7.dp,
+                    )
+                }
+            }
+            if (UserDocumentValidationError.NO_TOPICS in form.validationErrors) {
+                BodyText(
+                    text = UserDocumentValidationError.NO_TOPICS.displayMessage(),
+                    color = QualityAlternativeThemeTokens.colors.accent,
+                    fontSize = 12.5.sp,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
+            Spacer(modifier = Modifier.height(30.dp))
+        }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(BorderStroke(1.dp, QualityAlternativeThemeTokens.colors.line))
+                .padding(horizontal = 28.dp, vertical = 10.dp),
+        ) {
+            QaButton(
+                text = if (form.isSaving) "Saving..." else "Add file to library",
+                onClick = onSave,
+                enabled = form.canSave && !form.isSaving,
+                variant = QaButtonVariant.Primary,
+                modifier = Modifier.testTag("add-document-save"),
             )
         }
     }
@@ -1275,6 +1469,7 @@ private fun ExternalLinkHandoffScreen(
     val content = state.currentContent ?: return
     val context = LocalContext.current
     var hasOpenedLink by remember(content.id) { mutableStateOf(false) }
+    val isFile = content.sourceType == ContentSourceType.USER_DOCUMENT
 
     Column(modifier = Modifier.fillMaxSize().testTag("external-handoff-screen")) {
         ScreenHead(onBack = onBack)
@@ -1285,23 +1480,31 @@ private fun ExternalLinkHandoffScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.Center,
         ) {
-            MonoText("External reading", modifier = Modifier.padding(bottom = 14.dp))
+            MonoText(if (isFile) "Private file" else "External reading", modifier = Modifier.padding(bottom = 14.dp))
             DisplayText(content.title, fontSize = 26.sp, lineHeight = 30.sp, modifier = Modifier.padding(bottom = 12.dp))
             QaCard(modifier = Modifier.padding(bottom = 20.dp), padding = 16.dp) {
-                BodyText("Opens in your browser", color = QualityAlternativeThemeTokens.colors.mutedText, modifier = Modifier.padding(bottom = 10.dp))
+                BodyText(
+                    if (isFile) "Opens with Android's document viewer" else "Opens in your browser",
+                    color = QualityAlternativeThemeTokens.colors.mutedText,
+                    modifier = Modifier.padding(bottom = 10.dp),
+                )
                 BodyText(
                 text = "We'll start a ${content.durationMinutes}-minute timer. When you come back, we'll ask one quick question.",
                 color = QualityAlternativeThemeTokens.colors.mutedText,
                 )
             }
-            MonoText("Link", modifier = Modifier.padding(bottom = 6.dp))
+            MonoText(if (isFile) "File" else "Link", modifier = Modifier.padding(bottom = 6.dp))
             BodyText(
                 text = content.externalUrl ?: content.description,
                 color = QualityAlternativeThemeTokens.colors.primaryText,
                 modifier = Modifier.padding(bottom = 28.dp),
             )
             QaButton(
-                text = "Open & start ${content.durationMinutes}-min session",
+                text = if (isFile) {
+                    "Open file & start ${content.durationMinutes}-min session"
+                } else {
+                    "Open & start ${content.durationMinutes}-min session"
+                },
                 onClick = {
                     hasOpenedLink = true
                     onOpenLink(context)
@@ -1311,7 +1514,7 @@ private fun ExternalLinkHandoffScreen(
                 modifier = Modifier.testTag("external-link-open"),
             )
             QaButton(
-                text = if (hasOpenedLink) "I'm back from reading" else "I've finished this link",
+                text = if (hasOpenedLink) "I'm back from reading" else if (isFile) "I've finished this file" else "I've finished this link",
                 onClick = onDone,
                 variant = QaButtonVariant.Outline,
                 modifier = Modifier.testTag("external-link-done"),
@@ -2567,6 +2770,7 @@ private fun SourceBadge(
     sourceType: ContentSourceType,
     icon: QaIconKind = when (sourceType) {
         ContentSourceType.USER_LINK -> QaIconKind.Link
+        ContentSourceType.USER_DOCUMENT -> QaIconKind.Book
         ContentSourceType.MEDITATION -> QaIconKind.Pause
         ContentSourceType.EDITORIAL -> QaIconKind.Sparkle
     },
@@ -2862,9 +3066,12 @@ private fun DurationBucket.prototypeMinutesLabel(): String = "${prototypeMinutes
 
 private fun ContentItem.isUserLink(): Boolean = sourceType == ContentSourceType.USER_LINK
 
+private fun ContentItem.isUserDocument(): Boolean = sourceType == ContentSourceType.USER_DOCUMENT
+
 private fun primaryActionLabel(item: ContentItem): String {
     return when {
         item.usesMeditationTimer() -> "Start timer · ${item.durationMinutes} min"
+        item.isUserDocument() && item.usesExternalHandoff() -> "Open file · ${item.durationMinutes} min"
         item.usesExternalHandoff() -> "Open link · ${item.durationMinutes} min"
         else -> "Read this · ${item.durationMinutes} min"
     }
@@ -2895,6 +3102,7 @@ private fun ContentItem.sourceLabel(): String {
             host?.let { "Your link · $it" } ?: "Your link"
         }
 
+        isUserDocument() -> sourceLabel?.let { "Your file · $it" } ?: "Your file"
         usesMeditationTimer() -> sourceLabel ?: "Quality Alternative"
         else -> sourceLabel?.ifBlank { null }
             ?: packId.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.US) else it.toString() }
@@ -2965,6 +3173,41 @@ private fun UserLinkValidationError.displayMessage(): String {
     }
 }
 
+@Composable
+private fun AddDocumentValidationLine(form: AddDocumentFormState) {
+    val blockingError = form.validationErrors.firstOrNull { error ->
+        error == UserDocumentValidationError.EMPTY_URI || error == UserDocumentValidationError.UNSUPPORTED_FORMAT
+    }
+    if (blockingError != null) {
+        BodyText(
+            text = blockingError.displayMessage(),
+            color = QualityAlternativeThemeTokens.colors.accent,
+            fontSize = 12.5.sp,
+            modifier = Modifier.padding(top = 6.dp),
+        )
+    }
+}
+
+private fun UserDocumentValidationError.displayMessage(): String {
+    return when (this) {
+        UserDocumentValidationError.EMPTY_URI -> "Choose a local PDF, Markdown, or EPUB file first."
+        UserDocumentValidationError.UNSUPPORTED_FORMAT -> "Use a PDF, .md/.markdown, or EPUB file."
+        UserDocumentValidationError.BLANK_TITLE -> "Add a title so the recommendation is easy to recognize."
+        UserDocumentValidationError.INVALID_DURATION -> "Choose an estimated session time from 1 to 120 minutes."
+        UserDocumentValidationError.NO_TOPICS -> "Choose at least one topic so the app can rank this file."
+    }
+}
+
+private fun documentFormatLabel(form: AddDocumentFormState): String {
+    return when (UserDocumentValidator.detectFormat(displayName = form.displayName, mimeType = form.mimeType)) {
+        ContentFormat.MARKDOWN -> "Markdown · private reader"
+        ContentFormat.PDF -> "PDF · external viewer"
+        ContentFormat.EPUB -> "EPUB · external viewer"
+        ContentFormat.HTML -> "Document"
+        null -> "Unsupported file"
+    }
+}
+
 private fun launchExternalLink(
     context: android.content.Context,
     viewModel: MainViewModel,
@@ -2974,7 +3217,18 @@ private fun launchExternalLink(
         viewModel.recordExternalLinkHandoffFailed(reason = "missing_url")
         return
     }
-    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+    val uri = Uri.parse(url)
+    val mimeType = viewModel.currentExternalContentMimeType()
+    val intent = Intent(Intent.ACTION_VIEW).apply {
+        if (mimeType != null) {
+            setDataAndType(uri, mimeType)
+        } else {
+            data = uri
+        }
+        if (uri.scheme == "content") {
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+    }
     runCatching {
         context.startActivity(intent)
     }.onSuccess {
@@ -2982,6 +3236,31 @@ private fun launchExternalLink(
     }.onFailure { error ->
         val reason = if (error is ActivityNotFoundException) "no_handler" else "start_activity_failed"
         viewModel.recordExternalLinkHandoffFailed(reason = reason)
+    }
+}
+
+private data class PickedDocumentMetadata(
+    val displayName: String,
+    val mimeType: String?,
+)
+
+private fun Context.documentMetadata(uri: Uri): PickedDocumentMetadata {
+    val queriedName = runCatching {
+        contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+            val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+            if (nameIndex >= 0 && cursor.moveToFirst()) cursor.getString(nameIndex) else null
+        }
+    }.getOrNull()
+    val fallbackName = uri.lastPathSegment?.substringAfterLast('/').orEmpty()
+    return PickedDocumentMetadata(
+        displayName = queriedName?.takeIf(String::isNotBlank) ?: fallbackName.ifBlank { "Untitled document" },
+        mimeType = contentResolver.getType(uri),
+    )
+}
+
+private fun persistDocumentPermission(context: Context, uri: Uri) {
+    runCatching {
+        context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
 }
 
@@ -2993,3 +3272,11 @@ private const val DEBUG_PARITY_VIEWPORT_WIDTH_DP = 340f
 private const val DEBUG_PARITY_VIEWPORT_HEIGHT_DP = 740f
 private const val MIN_DEBUG_PARITY_SCALE = 0.94f
 private const val MAX_DEBUG_PARITY_SCALE = 1.22f
+private val USER_DOCUMENT_PICKER_MIME_TYPES = arrayOf(
+    "application/pdf",
+    "application/epub+zip",
+    "text/markdown",
+    "text/x-markdown",
+    "text/plain",
+    "application/octet-stream",
+)

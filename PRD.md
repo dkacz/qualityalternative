@@ -102,10 +102,10 @@ When I reach for a distracting app out of habit, help me pause and give me one w
 - Replacement sources from:
   - editorial starter packs curated by the product
   - user-added links
-  - user-uploaded PDFs
+  - user-owned documents, starting with PDF, Markdown, and EPUB import
   - a lightweight saved queue maintained inside the app
 - Minimal preference capture for topic interests, preferred format, and preferred session length.
-- A simple reader or handoff experience for articles and PDFs.
+- A simple reader or handoff experience for articles and user-owned documents.
 - Lightweight post-session feedback with two questions.
 - Event logging and analytics needed to evaluate substitution behavior.
 
@@ -139,7 +139,7 @@ The user taps Instagram on Android during an unplanned idle moment. Instead of e
   - 10-20 minutes
 - User seeds the system by:
   - selecting at least one editorial starter pack
-  - adding at least three links or one PDF
+  - adding at least three links or one user-owned document
 
 ### 2. Intervention Trigger
 
@@ -214,7 +214,7 @@ The system must give the user enough replacement inventory to support useful rec
 
 - User can choose one or more editorial starter packs during onboarding.
 - User can add a web link manually.
-- User can upload at least one PDF manually.
+- User can upload at least one PDF, Markdown, or EPUB document manually.
 - User can save at least ten content items before any archival or overflow handling is needed.
 - Newsletter forwarding, inbox sync, and RSS import are not required for MVP.
 
@@ -285,7 +285,8 @@ The system must deliver a calm replacement session that feels meaningfully diffe
 
 - The replacement session opens without showing additional recommendation choices first.
 - The session presents the chosen content in a readable format when native rendering is supported.
-- If the item is a PDF, the user can read the PDF inside the app or via a clearly controlled fallback.
+- If the item is a user-owned Markdown document, the user can read it inside the app.
+- If the item is a user-owned PDF or EPUB, the user can open it through a clearly controlled Android document-viewer fallback.
 - The session avoids recommendation carousels or unrelated content suggestions during active reading.
 - The app can record session duration for analytics.
 
@@ -365,7 +366,7 @@ The MVP should not depend on a large-scale AI recommendation system. Instead, it
 
 - Renderable editorial starter packs created, licensed, public-domain verified, or Creative Commons-cleared for product use
 - Link-only external recommendations where the product stores metadata and opens the canonical source without reproducing the full work
-- User-private saved links and user-uploaded PDFs that are available only to the user who added them
+- User-private saved links and user-owned documents that are available only to the user who added them
 - Lightweight in-app saved queue with source and rights status attached to each item
 
 ### Content Rights and Rendering Policy
@@ -426,7 +427,7 @@ Android only for system-level interception MVP
 ## Dependencies
 
 - Android mobile client capable of interception and content rendering
-- Basic content store for links, PDFs, starter packs, and recommendation state
+- Basic content store for links, user-owned documents, starter packs, and recommendation state
 - Analytics pipeline for intervention and session events
 - Editorial workflow for starter-pack creation and maintenance
 
@@ -487,7 +488,7 @@ Internal alpha on Android with a narrow app-support list and editorial starter p
 
 ### Phase 2
 
-Small external pilot with user-added links and PDFs enabled
+Small external pilot with user-added links and user-owned documents enabled
 
 ### Phase 3
 
