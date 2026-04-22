@@ -50,6 +50,8 @@ Rejected for Sprint 7:
 
 ### 7.1 Source Candidate Discovery
 
+Status: `passed Pro review`
+
 Acceptance criteria:
 
 - Create a repo-local source candidate document with 30-50 realistic candidates.
@@ -65,6 +67,8 @@ Validation:
 
 ### 7.2 First Renderable Pack Selection
 
+Status: `selected for Pro review`
+
 Acceptance criteria:
 
 - Select one initial pack from the candidate list.
@@ -77,6 +81,10 @@ Validation:
 
 - Candidate pack review.
 - Pro review focused on whether the pack is compelling enough to test as replacement content.
+
+Current selection:
+
+- See `docs/CONTENT_PACK_V1_SELECTION.md`.
 
 ### 7.3 App Integration for Pack v1
 

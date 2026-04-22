@@ -192,6 +192,7 @@ Sprint plan:
 
 - See `docs/SPRINT_7_CONTENT_LIBRARY.md`.
 - See `docs/CONTENT_SOURCE_CANDIDATES.md`.
+- See `docs/CONTENT_PACK_V1_SELECTION.md`.
 
 ## Milestone 6: PDF and Pilot Readiness
 
