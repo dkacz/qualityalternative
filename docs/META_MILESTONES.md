@@ -19,8 +19,8 @@ Completed:
 
 Current active track:
 
-- Sprint 6: Content governance and starter-library readiness.
-- Work mode: classify content by rights/renderability before scaling the library, PDFs, or premium packaging.
+- Sprint 7: Source discovery and content library v1.
+- Work mode: find real English-language replacement sources and select the first small pack that is worth choosing instead of social media.
 - Gate: no expanded content inventory ships unless it is `renderable`, `link_only`, or `user_private` with explicit metadata.
 
 ## UI Timing
@@ -126,7 +126,7 @@ Sprint plan:
 
 ## Milestone 4: Sprint 6 Content Governance and Starter Library
 
-Status: `next`
+Status: `complete`
 
 Goal:
 
@@ -159,9 +159,43 @@ Sprint plan:
 
 - See `docs/SPRINT_6_CONTENT_GOVERNANCE.md`.
 
-## Milestone 5: PDF and Pilot Readiness
+## Milestone 5: Sprint 7 Source Discovery and Content Library v1
 
-Status: `planned, after content governance`
+Status: `active`
+
+Goal:
+
+- Build the first real English-language replacement library from existing sources, without first-party essays and without turning the product into a scraper, crawler, or generic read-later app.
+
+Likely scope:
+
+- source candidate inventory across public-domain, permissive-license, and link-only sources
+- first renderable or link-only pack selection
+- source, rights, attribution, and duration metadata for each selected item
+- app integration for one small finite pack if source triage is safe enough
+- replacement-quality pass focused on whether the content is actually compelling at the moment of impulse
+
+Out of scope:
+
+- first-party essay writing
+- open-web crawling
+- AI summarization of third-party articles
+- PDF upload or reader work
+- iOS
+- premium packaging implementation
+
+Gate to start:
+
+- Sprint 6 rights/rendering model is merged and the team agrees the next risk is replacement quality, not more governance.
+
+Sprint plan:
+
+- See `docs/SPRINT_7_CONTENT_LIBRARY.md`.
+- See `docs/CONTENT_SOURCE_CANDIDATES.md`.
+
+## Milestone 6: PDF and Pilot Readiness
+
+Status: `planned, after content library v1`
 
 Goal:
 
@@ -187,13 +221,13 @@ Out of scope:
 
 Gate to start:
 
-- Sprint 6 must establish the rights/rendering model so PDFs enter as `user_private`, not shared editorial inventory.
+- Sprint 7 should establish at least one real shared content pack or document why the next pilot must rely on link-only and user-private inventory first.
 
 Sprint plan:
 
 - See `docs/SPRINT_6_PDF_PILOT_READINESS.md`; this document should be renumbered or refreshed before implementation starts.
 
-## Milestone 6: Small External Pilot
+## Milestone 7: Small External Pilot
 
 Status: `planned, after UI/UX and PDF readiness`
 
@@ -216,7 +250,7 @@ Decision signals:
 - feedback saying the recommendation was a good fit
 - return to target app within 15 and 60 minutes
 
-## Milestone 7: iOS Discovery
+## Milestone 8: iOS Discovery
 
 Status: `later discovery, not implementation`
 
@@ -236,7 +270,7 @@ Gate to start:
 
 - Android pilot should show enough behavioral value to justify platform risk.
 
-## Milestone 8: Post-Pilot Product Bet
+## Milestone 9: Post-Pilot Product Bet
 
 Status: `future`
 
