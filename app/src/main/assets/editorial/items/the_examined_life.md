@@ -1,11 +1,11 @@
-Some one will say: Yes, Socrates, but cannot you hold your tongue, and then you may go into a foreign city, and no one will interfere with you?
+Friends, who would have acquitted me, I would like also to talk with you about the thing which has come to pass, while the magistrates are busy, and before I go to the place at which I must die. Stay then a little, for we may as well talk with one another while there is time.
 
-Now I have great difficulty in making you understand my answer to this. For if I tell you that to do as you say would be a disobedience to the God, and therefore that I cannot hold my tongue, you will not believe that I am serious; and if I say again that daily to discourse about virtue, and of those other things about which you hear me examining myself and others, is the greatest good of man, and that the unexamined life is not worth living, you are still less likely to believe me.
+You are my friends, and I should like to show you the meaning of this event which has happened to me. I should like to tell you of a wonderful circumstance.
 
-Yet I say what is true, although a thing of which it is hard for me to persuade you.
+Hitherto the divine faculty of which the internal oracle is the source has constantly been in the habit of opposing me even about trifles, if I was going to make a slip or error in any matter. And now there has come upon me that which may be thought, and is generally believed to be, the last and worst evil.
 
-Also, I have never been accustomed to think that I deserve to suffer any harm. Had I money I might have estimated the offence at what I was able to pay, and not have been much the worse. But I have none, and therefore I must ask you to proportion the fine to my means.
+But the oracle made no sign of opposition, either when I was leaving my house in the morning, or when I was on my way to the court, or while I was speaking, at anything which I was going to say. What do I take to be the explanation of this silence? I will tell you.
 
-Well, perhaps I could afford a mina, and therefore I propose that penalty: Plato, Crito, Critobulus, and Apollodorus, my friends here, bid me say thirty minae, and they will be the sureties.
+It is an intimation that what has happened to me is a good, and that those of us who think that death is an evil are in error. For the customary sign would surely have opposed me had I been going to evil and not to good.
 
-Let thirty minae be the penalty; for which sum they will be ample security to you.
+Wherefore, be of good cheer about death, and know of a certainty that no evil can happen to a good man, either in life or after death. He and his are not neglected by the gods; nor has my own approaching end happened by mere chance.

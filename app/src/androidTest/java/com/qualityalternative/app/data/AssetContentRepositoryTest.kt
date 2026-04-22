@@ -172,14 +172,24 @@ class AssetContentRepositoryTest {
 
         val renderableBodies = repository.inventory()
             .filter { item -> item.sourceType == ContentSourceType.EDITORIAL && item.usesRepositoryBody() }
-            .map { item -> item.id to normalizedShingles(repository.contentBody(item)) }
+            .map { item ->
+                val words = normalizedWords(repository.contentBody(item))
+                AssetBodyFingerprint(
+                    itemId = item.id,
+                    words = words,
+                    shingles = shingles(words),
+                )
+            }
 
-        renderableBodies.forEachIndexed { index, (leftId, leftShingles) ->
-            renderableBodies.drop(index + 1).forEach { (rightId, rightShingles) ->
-                val similarity = jaccard(leftShingles, rightShingles)
+        renderableBodies.forEachIndexed { index, left ->
+            renderableBodies.drop(index + 1).forEach { right ->
+                val similarity = jaccard(left.shingles, right.shingles)
+                val smallerCoverage = commonShingleCoverageOfSmaller(left.shingles, right.shingles)
+                val longestOverlap = longestContiguousOverlap(left.words, right.words)
                 assertTrue(
-                    "$leftId and $rightId appear to reuse the same excerpt body: $similarity",
-                    similarity < 0.45,
+                    "${left.itemId} and ${right.itemId} appear to reuse the same excerpt body: " +
+                        "jaccard=$similarity, smallerCoverage=$smallerCoverage, longestOverlap=$longestOverlap",
+                    similarity < 0.35 && smallerCoverage < 0.35 && longestOverlap < 40,
                 )
             }
         }
@@ -356,12 +366,20 @@ class AssetContentRepositoryTest {
         assertEquals(manifestFiles, packagedMarkdownFiles)
     }
 
-    private fun normalizedShingles(body: String): Set<String> {
-        val words = body
+    private data class AssetBodyFingerprint(
+        val itemId: String,
+        val words: List<String>,
+        val shingles: Set<String>,
+    )
+
+    private fun normalizedWords(body: String): List<String> =
+        body
             .lowercase()
             .replace(Regex("[^a-z0-9\\s]"), " ")
             .split(Regex("\\s+"))
             .filter { word -> word.length > 2 }
+
+    private fun shingles(words: List<String>): Set<String> {
         if (words.size < 8) {
             return setOf(words.joinToString(" "))
         }
@@ -375,5 +393,37 @@ class AssetContentRepositoryTest {
             return 1.0
         }
         return left.intersect(right).size.toDouble() / left.union(right).size.toDouble()
+    }
+
+    private fun commonShingleCoverageOfSmaller(left: Set<String>, right: Set<String>): Double {
+        val smaller = minOf(left.size, right.size)
+        if (smaller == 0) {
+            return 0.0
+        }
+        return left.intersect(right).size.toDouble() / smaller
+    }
+
+    private fun longestContiguousOverlap(left: List<String>, right: List<String>): Int {
+        if (left.isEmpty() || right.isEmpty()) {
+            return 0
+        }
+        val previous = IntArray(right.size + 1)
+        val current = IntArray(right.size + 1)
+        var best = 0
+
+        for (leftIndex in 1..left.size) {
+            for (rightIndex in 1..right.size) {
+                current[rightIndex] = if (left[leftIndex - 1] == right[rightIndex - 1]) {
+                    previous[rightIndex - 1] + 1
+                } else {
+                    0
+                }
+                best = maxOf(best, current[rightIndex])
+            }
+            java.util.Arrays.fill(previous, 0)
+            current.copyInto(previous)
+        }
+
+        return best
     }
 }
