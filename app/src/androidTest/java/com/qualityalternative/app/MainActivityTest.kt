@@ -293,8 +293,9 @@ class MainActivityTest {
             hasTag("reader-screen")
         }
         composeRule.onNodeWithTag("reader-screen").assertIsDisplayed()
-        composeRule.onNodeWithText("figure · editorial image", ignoreCase = true)
-            .assertIsDisplayed()
+        composeRule.onAllNodesWithText("figure · editorial image", ignoreCase = true)
+            .fetchSemanticsNodes()
+            .also { nodes -> assertEquals(0, nodes.size) }
         composeRule.onNodeWithTag("reader-list")
             .performScrollToNode(hasText("I'm done reading"))
         composeRule.onNodeWithText("I'm done reading")

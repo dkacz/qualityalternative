@@ -55,7 +55,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -1203,7 +1202,6 @@ private fun ReaderScreen(
             item {
                 MonoText("${content.sourceLabel()} · ${content.topicLine()}", modifier = Modifier.padding(bottom = 10.dp))
                 DisplayText(content.title, fontSize = 27.sp, lineHeight = 31.sp, modifier = Modifier.padding(bottom = 18.dp))
-                PlaceholderImage(modifier = Modifier.padding(bottom = 22.dp))
             }
             items(paragraphs.withIndex().toList()) { indexedParagraph ->
                 Text(
@@ -2480,35 +2478,6 @@ private fun ProgressLine(progress: Int, modifier: Modifier = Modifier) {
                 .fillMaxWidth((progress / 100f).coerceIn(0f, 1f))
                 .background(colors.accent),
         )
-    }
-}
-
-@Composable
-private fun PlaceholderImage(modifier: Modifier = Modifier) {
-    val colors = QualityAlternativeThemeTokens.colors
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(160.dp)
-            .clip(RoundedCornerShape(10.dp))
-            .background(colors.line)
-            .drawBehind {
-                val stripeGap = 20.dp.toPx()
-                val stripeWidth = 8.dp.toPx()
-                var x = -size.height
-                while (x < size.width) {
-                    drawLine(
-                        color = colors.elevatedSurface,
-                        start = Offset(x, size.height),
-                        end = Offset(x + size.height, 0f),
-                        strokeWidth = stripeWidth,
-                    )
-                    x += stripeGap
-                }
-            },
-        contentAlignment = Alignment.Center,
-    ) {
-        MonoText("figure · editorial image")
     }
 }
 
