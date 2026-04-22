@@ -430,15 +430,34 @@ class MainViewModel(
     }
 
     fun openLibraryItem(content: ContentItem) {
+        val startedAtMillis = nowProvider()
+        val contentBody = if (content.usesRepositoryBody()) {
+            try {
+                contentRepository.contentBody(content)
+            } catch (error: Throwable) {
+                if (error is CancellationException) throw error
+                viewModelScope.launch {
+                    handleRepositoryBodyLoadFailure(
+                        content = content,
+                        sessionId = null,
+                        failedAtMillis = startedAtMillis,
+                        error = error,
+                    )
+                }
+                return
+            }
+        } else {
+            ""
+        }
         uiState = uiState.copy(
             currentInterventionId = null,
             currentInterventionShownAtMillis = null,
             currentRecommendationSet = null,
             currentInterventionOrigin = null,
             currentContent = content,
-            currentContentBody = if (content.usesRepositoryBody()) contentRepository.contentBody(content) else "",
+            currentContentBody = contentBody,
             currentSessionId = null,
-            currentSessionStartedAtMillis = nowProvider(),
+            currentSessionStartedAtMillis = startedAtMillis,
             screen = screenForReplacement(content),
             latestMessage = null,
         )
@@ -1496,7 +1515,7 @@ class MainViewModel(
         nowMillis: Long = System.currentTimeMillis(),
     ) {
         val content = uiState.currentContent ?: return
-        val sessionId = uiState.currentSessionId ?: return
+        val sessionId = uiState.currentSessionId
         viewModelScope.launch {
             recordEvent(
                 AnalyticsEvent(
@@ -1520,7 +1539,9 @@ class MainViewModel(
                 ContentSourceType.USER_DOCUMENT -> userDocumentRepository.markUnavailable(contentId = content.id, nowMillis = nowMillis)
                 else -> Unit
             }
-            historyRepository.markSkipped(sessionId = sessionId, skippedAtMillis = nowMillis)
+            if (sessionId != null) {
+                historyRepository.markSkipped(sessionId = sessionId, skippedAtMillis = nowMillis)
+            }
             clearActiveSession(
                 latestMessage = content.handoffFailureMessage(),
             )
@@ -1555,7 +1576,7 @@ class MainViewModel(
 
     private suspend fun handleRepositoryBodyLoadFailure(
         content: ContentItem,
-        sessionId: String,
+        sessionId: String?,
         failedAtMillis: Long,
         error: Throwable,
     ) {
@@ -1577,7 +1598,9 @@ class MainViewModel(
         if (content.sourceType == ContentSourceType.USER_DOCUMENT) {
             userDocumentRepository.markUnavailable(contentId = content.id, nowMillis = failedAtMillis)
         }
-        historyRepository.markSkipped(sessionId = sessionId, skippedAtMillis = failedAtMillis)
+        if (sessionId != null) {
+            historyRepository.markSkipped(sessionId = sessionId, skippedAtMillis = failedAtMillis)
+        }
         clearActiveSession(
             latestMessage = content.handoffFailureMessage(),
         )

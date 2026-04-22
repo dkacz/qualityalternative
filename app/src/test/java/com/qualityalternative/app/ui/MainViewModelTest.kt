@@ -708,6 +708,44 @@ class MainViewModelTest {
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
+    fun libraryPdfHandoffFailureMarksDocumentUnavailableWithoutSession() = runTest {
+        val userDocument = savedUserDocument(format = ContentFormat.PDF)
+        val userDocumentRepository = FakeUserDocumentRepository(initialDocuments = listOf(userDocument))
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val viewModel = createViewModel(
+            contentRepository = FakeContentRepository(extraItems = listOf(userDocument)),
+            userDocumentRepository = userDocumentRepository,
+            analyticsTracker = analyticsTracker,
+        )
+
+        advanceUntilIdle()
+        viewModel.openLibraryItem(userDocument)
+        advanceUntilIdle()
+
+        assertEquals(MainScreen.ExternalHandoff, viewModel.uiState.screen)
+        assertEquals(null, viewModel.uiState.currentSessionId)
+
+        viewModel.recordExternalLinkHandoffFailed(reason = "no_handler", nowMillis = 2_000L)
+        advanceUntilIdle()
+
+        val failure = analyticsTracker.allEvents().first {
+            it.type == AnalyticsEventType.EXTERNAL_HANDOFF_FAILED
+        }
+        assertEquals(null, failure.sessionId)
+        assertEquals(userDocument.id, failure.contentId)
+        assertEquals("USER_DOCUMENT", failure.metadata["sourceType"])
+        assertEquals("no_handler", failure.metadata["failureReason"])
+        assertEquals(ContentAvailability.UNAVAILABLE, userDocumentRepository.documents.value.single().availability)
+        assertEquals(listOf(userDocument.id), userDocumentRepository.markedUnavailableIds)
+        assertEquals(MainScreen.Home, viewModel.uiState.screen)
+        assertEquals(
+            "This saved file could not be opened and was removed from future recommendations.",
+            viewModel.uiState.latestMessage,
+        )
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
     fun unreadableMarkdownDocumentIsMarkedUnavailableInsteadOfOpeningBlankReader() = runTest {
         val userDocument = savedUserDocument(format = ContentFormat.MARKDOWN)
         val userDocumentRepository = FakeUserDocumentRepository(initialDocuments = listOf(userDocument))
@@ -743,6 +781,43 @@ class MainViewModelTest {
         val failure = analyticsTracker.allEvents().first {
             it.type == AnalyticsEventType.USER_DOCUMENT_BODY_LOAD_FAILED
         }
+        assertEquals(userDocument.id, failure.contentId)
+        assertEquals("USER_DOCUMENT", failure.metadata["sourceType"])
+        assertEquals("USER_PRIVATE_READER", failure.metadata["renderMode"])
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun libraryUnreadableMarkdownDocumentIsMarkedUnavailableInsteadOfCrashing() = runTest {
+        val userDocument = savedUserDocument(format = ContentFormat.MARKDOWN)
+        val userDocumentRepository = FakeUserDocumentRepository(initialDocuments = listOf(userDocument))
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val viewModel = createViewModel(
+            contentRepository = FakeContentRepository(
+                extraItems = listOf(userDocument),
+                failUserDocumentBodyLoad = true,
+            ),
+            userDocumentRepository = userDocumentRepository,
+            analyticsTracker = analyticsTracker,
+            nowProvider = { 4_000L },
+        )
+
+        advanceUntilIdle()
+        viewModel.openLibraryItem(userDocument)
+        advanceUntilIdle()
+
+        assertEquals(MainScreen.Home, viewModel.uiState.screen)
+        assertEquals("", viewModel.uiState.currentContentBody)
+        assertEquals(ContentAvailability.UNAVAILABLE, userDocumentRepository.documents.value.single().availability)
+        assertEquals(listOf(userDocument.id), userDocumentRepository.markedUnavailableIds)
+        assertEquals(
+            "This saved file could not be opened and was removed from future recommendations.",
+            viewModel.uiState.latestMessage,
+        )
+        val failure = analyticsTracker.allEvents().first {
+            it.type == AnalyticsEventType.USER_DOCUMENT_BODY_LOAD_FAILED
+        }
+        assertEquals(null, failure.sessionId)
         assertEquals(userDocument.id, failure.contentId)
         assertEquals("USER_DOCUMENT", failure.metadata["sourceType"])
         assertEquals("USER_PRIVATE_READER", failure.metadata["renderMode"])
