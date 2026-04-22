@@ -76,8 +76,19 @@ class AssetContentRepositoryTest {
             ),
             items.map { item -> item.id }.toSet(),
         )
+        val expectedSourceLabels = mapOf(
+            "start-with-what-is-yours" to "Epictetus",
+            "the-morning-test" to "Marcus Aurelius",
+            "the-flywheel-of-habit" to "William James",
+            "live-deliberately" to "Henry David Thoreau",
+            "walk-before-you-scroll" to "Henry David Thoreau",
+            "trust-the-first-honest-thought" to "Ralph Waldo Emerson",
+            "the-desert-resets-the-eye" to "Mary Austin",
+            "of-studies" to "Francis Bacon",
+        )
         items.forEach { item ->
-            assertEquals("Public-domain source text via Project Gutenberg", item.sourceLabel)
+            assertEquals(expectedSourceLabels[item.id], item.sourceLabel)
+            assertFalse(item.sourceLabel.orEmpty().contains("Project Gutenberg"))
             assertTrue(item.rights.licenseName.orEmpty().contains("Public domain text"))
             assertTrue(item.rights.licenseName.orEmpty().contains("source policy"))
             assertEquals("https://www.gutenberg.org/policy/license.html", item.rights.licenseUrl)

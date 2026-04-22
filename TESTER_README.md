@@ -32,7 +32,8 @@ W aplikacji wybierz:
 1. Co najmniej trzy aplikacje, które chcesz traktować jako rozpraszające.
 2. Co najmniej trzy tematy, które cię interesują.
 3. Preferowaną długość sesji czytania.
-4. Starter packi z treściami.
+
+W tej alphie starter packi są wybrane automatycznie. Nowy pack `Attention Classics v1` jest włączony domyślnie, więc możesz go zobaczyć w interwencji bez szukania dodatkowego kroku konfiguracji.
 
 Wersja alpha obsługuje lokalne editorial starter packi, proste dodawanie własnych linków, tryb jasny i ciemny oraz odświeżony czytnik/progress. Nie ma jeszcze PDF-ów.
 
@@ -92,7 +93,8 @@ Wyślij proszę krótką informację:
 - czy `Pause 15 min` faktycznie wstrzymuje ponowną interwencję
 - czy aplikacja crashuje, zawiesza się albo pokazuje pusty ekran
 - czy rekomendacje treści wyglądają sensownie
-- czy przy nowym packu klasyków tytuł i opis sprawiają, że naprawdę chciałbyś/chciałabyś dać tej alternatywie 3-4 minuty zamiast wejść w feed
+- jeśli zobaczysz rekomendację z `Attention Classics v1`: podaj tytuł i napisz, czy tytuł oraz opis sprawiają, że naprawdę chciałbyś/chciałabyś dać tej alternatywie 3-4 minuty zamiast wejść w feed
+- jeśli odpowiedź brzmi `nie`, dopisz powód: zbyt szkolne, zbyt abstrakcyjne, zbyt archaiczne, nietrafione do momentu impulsu, za krótkie żeby było satysfakcjonujące albo za długie na tę chwilę
 - czy zapisany własny link pojawia się w bibliotece i może zostać otwarty jako alternatywa
 - czy tryb `Light` / `Dark` wygląda czytelnie na twoim telefonie
 - czy nowy ekran progressu motywuje bez poczucia karania albo wstydu

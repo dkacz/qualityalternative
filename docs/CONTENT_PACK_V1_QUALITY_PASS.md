@@ -29,6 +29,7 @@ The main 7.4 change is sharpening the user-facing title/description layer so the
 
 - Rewrote pack item descriptions to speak to the impulse moment rather than describing literary provenance.
 - Retitled `of-studies` from `Of Studies` to `Read to Weigh`; the attribution still records Francis Bacon and the source essay title.
+- Replaced provenance-heavy user-facing source labels with concise author labels while keeping rights metadata, source URLs, license URLs, attribution, and review dates unchanged.
 - Kept all durations at 3-4 minutes because the actual body assets are intentionally short.
 - Kept all eight items finite and local; no recommendation feed, content discovery surface, crawler, RSS, PDF, AI summary, or first-party essay expansion was added.
 
