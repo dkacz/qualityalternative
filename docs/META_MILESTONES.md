@@ -24,6 +24,7 @@ Current active track:
 - Sprint 8: content expansion and visual QA.
 - Work mode: scale the replacement library with renderable and link-only inventory, while making emulator screenshot QA a release gate.
 - Gate: do not expand inventory unless each item is classified as `renderable`, `link_only`, or `user_private` with explicit metadata.
+- Completed Sprint 8 slices so far: visual QA baseline, shared link-only support, meditation timer replacement, source-candidate discovery, and the first 20-item link-only pack.
 
 ## UI Timing
 
@@ -207,7 +208,7 @@ Sprint plan:
 
 ## Milestone 6: Sprint 8 Content Expansion and Visual QA
 
-Status: `planned`
+Status: `in progress`
 
 Goal:
 
@@ -221,6 +222,13 @@ Likely scope:
 - ranking diversity for larger inventory
 - screenshot-based visual QA across Light and Dark modes
 - tester-facing content-quality feedback loop
+
+Delivered so far:
+
+- Shared `EXTERNAL_HANDOFF` manifest support for link-only editorial items.
+- Repeatable 3-minute meditation timer as an app-utility replacement.
+- Sprint 8 source-candidate inventory with 50 link-only candidates and 30 renderable candidates.
+- `link-only-modern-v1`, a 20-item external-handoff pack for modern deep reads.
 
 Out of scope:
 

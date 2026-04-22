@@ -136,6 +136,7 @@ data class ContentItem(
     val topicTags: Set<TopicTag>,
     val bodyAssetPath: String? = null,
     val externalUrl: String? = null,
+    val whyThisNow: String? = null,
     val sourceLabel: String? = null,
     val sourceType: ContentSourceType = ContentSourceType.EDITORIAL,
     val availability: ContentAvailability = ContentAvailability.AVAILABLE,

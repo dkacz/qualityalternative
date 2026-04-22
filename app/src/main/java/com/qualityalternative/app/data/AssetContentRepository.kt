@@ -79,6 +79,7 @@ class AssetContentRepository(
                     topicTags = item.getJSONArray("topics").toTopicTags(),
                     bodyAssetPath = bodyAssetPath,
                     externalUrl = externalUrl,
+                    whyThisNow = item.optNonBlankString("whyThisNow"),
                     sourceLabel = item.optString("source").takeIf(String::isNotBlank),
                     rights = rights,
                 ),

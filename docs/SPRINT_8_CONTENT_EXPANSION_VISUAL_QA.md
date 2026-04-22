@@ -1,6 +1,6 @@
 # Sprint 8 Content Expansion and Visual QA
 
-Status: `started`
+Status: `in progress`
 
 ## Goal
 
@@ -148,7 +148,7 @@ Exit criteria:
 
 Result:
 
-- `link-only-smoke-v1` proves a shared editorial link-only item can be parsed from assets.
+- `link-only-modern-v1` proves shared editorial link-only items can be parsed from assets.
 - Shared link-only recommendations remain editorial inventory but route through external handoff.
 - Generic external-handoff analytics distinguish shared editorial links from user-added links.
 
@@ -190,6 +190,8 @@ Result:
 
 ### 8.4 Link-Only Pack v1
 
+Status: `implemented`
+
 - Add 20 curated link-only recommendations from modern high-quality sources.
 - Treat every item as canonical external handoff.
 - Prefer evergreen essays and explainers, not news.
@@ -198,6 +200,11 @@ Exit criteria:
 
 - Every item has title, source, description, canonical URL, duration estimate, topics, rights/render metadata, and "why this now?" note.
 - Pro review or equivalent review focuses on source quality, link-only correctness, and product fit.
+
+Result:
+
+- `link-only-modern-v1` adds 20 canonical external recommendations across Long Now, Psyche, Aeon, Quanta, SAPIENS, SEP, IEP, and Nautilus.
+- See `docs/CONTENT_LINK_ONLY_PACK_V1.md`.
 
 ### 8.5 Renderable Pack Expansion v2
 

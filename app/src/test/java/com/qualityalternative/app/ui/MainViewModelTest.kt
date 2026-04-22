@@ -1704,7 +1704,7 @@ class MainViewModelTest {
     private fun sharedLinkOnlyItem(): ContentItem {
         return ContentItem(
             id = "big-here-long-now",
-            packId = "link-only-smoke-v1",
+            packId = "link-only-modern-v1",
             title = "The Big Here and Long Now",
             description = "A perspective reset for the moment the feed narrows your sense of time and place.",
             durationMinutes = 10,

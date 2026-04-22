@@ -28,6 +28,7 @@ Checked on 2026-04-22:
 - NASA Earth Observatory image-use policy and selected NASA science pages resolve; item-level image/credit checks remain required.
 - The Conversation search was blocked by robots in this review lane, so The Conversation remains a source-family candidate until exact pages are manually verified before Slice 8.4.
 - A lightweight automated URL check returned `200` for the exact Long Now, SAPIENS, Quanta, SEP, IEP, Project Gutenberg, Wikisource, Our World in Data, NASA, and Earth Observatory URLs listed here. Aeon/Psyche returned throttling responses to automation and NOAA Climate.gov blocked automation, so those remain browser/manual checks before integration.
+- Rows with collection, homepage, source-family, or `Source TBD` URLs are not eligible for direct integration until exact canonical item URLs are selected and manually verified.
 
 ## Link-Only Candidate Pool
 
@@ -71,8 +72,8 @@ Checked on 2026-04-22:
 | L36 | Free Will | Stanford Encyclopedia of Philosophy | https://plato.stanford.edu/entries/freewill/ | 3 | evergreen | reserve | Choice and agency link, but long. | Deep-reference only. |
 | L37 | Consciousness | Stanford Encyclopedia of Philosophy | https://plato.stanford.edu/entries/consciousness/ | 3 | evergreen | hold | Too long and abstract for most interventions. | Use only after personalization. |
 | L38 | Philosophy of Technology | Stanford Encyclopedia of Philosophy | https://plato.stanford.edu/entries/technology/ | 3 | evergreen | reserve | Useful for tech-and-agency framing. | Confirm URL and length before integration. |
-| L39 | Free Will | Internet Encyclopedia of Philosophy | https://iep.utm.edu/freewill/ | 3 | evergreen | reserve | More accessible agency reference than SEP for some users. | Verify URL and source terms. |
-| L40 | Stoicism | Internet Encyclopedia of Philosophy | https://iep.utm.edu/stoicism/ | 3 | evergreen | reserve | Context link for Stoic readings. | Verify exact page and duration. |
+| L39 | Free Will | Internet Encyclopedia of Philosophy | https://iep.utm.edu/freewill/ | 3 | evergreen | possible | More accessible agency reference than SEP for some users. | Use as a deep external-handoff backup, not a default quick read. |
+| L40 | Stoicism | Internet Encyclopedia of Philosophy | https://iep.utm.edu/stoicism/ | 3 | evergreen | possible | Context link for Stoic readings. | Use as a bounded context link for users who choose philosophy. |
 | L41 | Personal Identity | Internet Encyclopedia of Philosophy | https://iep.utm.edu/person-i/ | 3 | evergreen | reserve | Good philosophy-curious backup. | Verify exact URL before selection. |
 | L42 | Consciousness | Internet Encyclopedia of Philosophy | https://iep.utm.edu/consciousness/ | 2 | evergreen | hold | Likely too broad for first batch. | Reassess after tester preferences. |
 | L43 | Digital distraction and attention article | The Conversation | https://theconversation.com/ | 4 | mostly_evergreen | possible | Accessible academic journalism on the core problem. | Manual exact URL verification required; search was robots-blocked. |
@@ -121,15 +122,16 @@ Checked on 2026-04-22:
 
 ## Recommended Slice 8.4 Link-Only Shortlist
 
-Start with 20, cutting weak items before integration:
+Start with 20, cutting weak items before integration. Rows with placeholder/source-family URLs are excluded from this shortlist until exact pages are selected.
 
 - 4 attention/agency items from Aeon/Psyche: L07, L08, L09, L10.
 - 4 curiosity/science items from Quanta: L25, L26, L27, L29.
 - 3 long-view items from Long Now: L01, L02, L03.
 - 3 anthropology/wonder items from SAPIENS: L17, L18, L20.
-- 2 deep-reference philosophy items: L33 and either L34 or L39.
-- 2 carefully manually verified The Conversation items, only if exact URLs and evergreen fit are confirmed.
-- 2 reserve slots from Nautilus or additional Quanta/SAPIENS if The Conversation candidates do not verify cleanly.
+- 3 deep-reference philosophy items: L33, L39, L40.
+- 3 Nautilus reserve replacements instead of The Conversation for this batch: L47-L49 represented by exact selected Nautilus URLs in `docs/CONTENT_LINK_ONLY_PACK_V1.md`.
+
+The Conversation remains a future source-family candidate; no The Conversation item should enter Slice 8.4 unless exact canonical item URLs are manually verified first.
 
 ## Recommended Slice 8.5 Renderable Shortlist
 

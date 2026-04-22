@@ -319,6 +319,64 @@ class DefaultRecommendationEngineTest {
         assertEquals("fresh-editorial", result?.primary?.id)
     }
 
+    @Test
+    fun generate_keepsFiniteThreeChoiceSetWhenInventoryIsLargeAndMixed() {
+        val preferences = UserPreferences(
+            selectedApps = listOf(DistractingApp(packageName = "pkg", displayName = "Instagram")),
+            preferredTopics = setOf(TopicTag.SCIENCE, TopicTag.PHILOSOPHY),
+            preferredDurationBucket = DurationBucket.FOCUS,
+            selectedPackIds = setOf("renderable", "modern-links", "user-links", "meditation"),
+        )
+        val renderableItems = (1..8).map { index ->
+            item(
+                id = "renderable-$index",
+                packId = "renderable",
+                minutes = 6 + (index % 4),
+                topics = setOf(TopicTag.SCIENCE),
+            )
+        }
+        val linkOnlyItems = (1..20).map { index ->
+            item(
+                id = "link-only-$index",
+                packId = "modern-links",
+                minutes = 6 + (index % 10),
+                topics = setOf(if (index % 2 == 0) TopicTag.SCIENCE else TopicTag.PHILOSOPHY),
+                format = ContentFormat.HTML,
+                externalUrl = "https://example.com/deep-read-$index",
+            )
+        }
+        val userLinks = (1..4).map { index ->
+            item(
+                id = "user-link-$index",
+                packId = "user-links",
+                minutes = 5 + index,
+                topics = setOf(TopicTag.PHILOSOPHY),
+                format = ContentFormat.HTML,
+                sourceType = ContentSourceType.USER_LINK,
+                availability = ContentAvailability.NEEDS_FALLBACK,
+                externalUrl = "https://example.com/user-$index",
+            )
+        }
+
+        val result = engine.generate(
+            targetApp = DistractingApp(packageName = "pkg", displayName = "Instagram"),
+            preferences = preferences,
+            inventory = renderableItems + linkOnlyItems + userLinks,
+            primaryExcludedIds = emptySet(),
+            signals = RecommendationSignals(timeOfDay = TimeOfDayBucket.MIDDAY),
+            nowMillis = 0L,
+        )
+
+        assertNotNull(result)
+        assertEquals(2, result?.backups?.size)
+        assertEquals(3, listOfNotNull(result?.primary).plus(result?.backups.orEmpty()).size)
+        assertEquals(
+            3,
+            listOfNotNull(result?.primary).plus(result?.backups.orEmpty()).map(ContentItem::id).toSet().size,
+        )
+        assertEquals(false, result?.inventoryShortage)
+    }
+
     private fun item(
         id: String,
         packId: String = "pack",

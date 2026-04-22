@@ -352,7 +352,7 @@ class MainActivityTest {
         launchLinkOnlyFixtureSystemIntervention()
 
         composeRule.waitUntil(timeoutMillis = 10_000) {
-            hasNode("The Big Here and Long Now")
+            hasNodeContaining("Open link")
         }
         if (hasNodeContaining("Open link")) {
             composeRule.onNodeWithText("Open link", substring = true)
@@ -368,8 +368,7 @@ class MainActivityTest {
             hasTag("external-handoff-screen")
         }
         composeRule.onNodeWithTag("external-handoff-screen").assertIsDisplayed()
-        composeRule.onNodeWithText("The Big Here and Long Now").assertIsDisplayed()
-        composeRule.onNodeWithText("https://longnow.org/ideas/the-big-here-and-long-now/")
+        composeRule.onNodeWithText("https://", substring = true)
             .assertIsDisplayed()
         composeRule.onNodeWithTag("external-link-open")
             .assertIsDisplayed()
@@ -556,7 +555,7 @@ class MainActivityTest {
                 selectedAppPackages = setOf(FixtureTargetRegistry.fixtureDistractors.first().packageName),
                 preferredTopics = setOf(TopicTag.PHILOSOPHY, TopicTag.ESSAYS, TopicTag.HISTORY),
                 preferredDurationBucket = DurationBucket.FOCUS,
-                selectedPackIds = setOf("link-only-smoke-v1"),
+                selectedPackIds = setOf("link-only-modern-v1"),
             ),
         )
     }

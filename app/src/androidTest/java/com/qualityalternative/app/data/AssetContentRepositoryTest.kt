@@ -49,8 +49,8 @@ class AssetContentRepositoryTest {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val repository = AssetContentRepository(context)
 
-        val pack = repository.starterPacks().first { it.id == "link-only-smoke-v1" }
-        val item = pack.items.single()
+        val pack = repository.starterPacks().first { it.id == "link-only-modern-v1" }
+        val item = pack.items.first { it.id == "big-here-long-now" }
 
         assertEquals("big-here-long-now", item.id)
         assertEquals("Long Now", item.sourceLabel)
@@ -61,6 +61,31 @@ class AssetContentRepositoryTest {
         assertTrue(item.usesExternalHandoff())
         assertFalse(item.usesRepositoryBody())
         assertEquals(item.description, repository.contentBody(item))
+    }
+
+    @Test
+    fun modernLinkOnlyPackContainsCuratedExternalHandoffInventory() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val repository = AssetContentRepository(context)
+
+        val pack = repository.starterPacks().first { it.id == "link-only-modern-v1" }
+        val items = pack.items
+
+        assertEquals(20, items.size)
+        assertTrue(items.map { item -> item.id }.toSet().size == items.size)
+        assertTrue(items.all { item -> item.sourceType == ContentSourceType.EDITORIAL })
+        assertTrue(items.all { item -> item.rights.rightsClass == ContentRightsClass.LINK_ONLY })
+        assertTrue(items.all { item -> item.rights.renderMode == ContentRenderMode.EXTERNAL_HANDOFF })
+        assertTrue(items.all { item -> item.bodyAssetPath == null })
+        assertTrue(items.all { item -> !item.externalUrl.isNullOrBlank() })
+        assertTrue(items.all { item -> item.externalUrl == item.rights.sourceUrl })
+        assertTrue(items.all { item -> !item.whyThisNow.isNullOrBlank() })
+        assertTrue(items.all { item -> item.durationMinutes in 6..18 })
+        assertTrue(items.all { item -> item.topicTags.isNotEmpty() })
+        assertTrue(items.none { item -> item.rights.licenseName.orEmpty().contains("first-party") })
+        assertTrue(
+            items.groupingBy { item -> item.sourceLabel.orEmpty() }.eachCount().values.all { count -> count <= 4 },
+        )
     }
 
     @Test
