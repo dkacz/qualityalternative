@@ -259,6 +259,47 @@ class MainViewModelTest {
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
+    fun skippingMeditationMarksSessionSkippedAndRecordsMeditationEvent() = runTest {
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val historyRepository = FakeHistoryRepository()
+        val viewModel = createViewModel(
+            recommendationEngine = FixedRecommendationEngine(
+                RecommendationSet(
+                    primary = MeditationTimerContentItem,
+                    backups = emptyList(),
+                    inventoryShortage = true,
+                    generatedAtMillis = 1_000L,
+                ),
+            ),
+            analyticsTracker = analyticsTracker,
+            historyRepository = historyRepository,
+        )
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+        viewModel.triggerDebugIntervention(nowMillis = 1_000L)
+        advanceUntilIdle()
+        viewModel.acceptPrimary()
+        advanceUntilIdle()
+
+        viewModel.skipMeditationReset(nowMillis = 4_000L)
+        advanceUntilIdle()
+
+        assertEquals(MainScreen.Home, viewModel.uiState.screen)
+        assertEquals("Meditation reset skipped.", viewModel.uiState.latestMessage)
+        assertTrue(historyRepository.historyEntries.value.first().isSkipped())
+        assertFalse(historyRepository.historyEntries.value.first().isCompleted())
+        val skippedEvent = analyticsTracker.allEvents().first {
+            it.type == AnalyticsEventType.MEDITATION_TIMER_SKIPPED
+        }
+        assertEquals(MEDITATION_TIMER_CONTENT_ID, skippedEvent.contentId)
+        assertEquals("MEDITATION", skippedEvent.metadata["sourceType"])
+        assertEquals("MEDITATION_TIMER", skippedEvent.metadata["renderMode"])
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
     fun failedUserLinkHandoffMarksLinkUnavailableAndDoesNotRecordSuccessfulOpen() = runTest {
         val userLink = savedUserLink()
         val userLinkRepository = FakeUserLinkRepository(initialLinks = listOf(userLink))
@@ -947,6 +988,28 @@ class MainViewModelTest {
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
+    fun triggerDebugIntervention_doesNotExcludeCompletedMeditationFromPrimaryCandidates() = runTest {
+        val recommendationEngine = RecordingRecommendationEngine()
+        val historyRepository = FakeHistoryRepository(
+            initialCompletedIds = setOf("p1", MEDITATION_TIMER_CONTENT_ID),
+        )
+        val viewModel = createViewModel(
+            recommendationEngine = recommendationEngine,
+            historyRepository = historyRepository,
+        )
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+        viewModel.triggerDebugIntervention(nowMillis = 2_000L)
+        advanceUntilIdle()
+
+        assertTrue(recommendationEngine.lastInventory.any { it.id == MEDITATION_TIMER_CONTENT_ID })
+        assertEquals(setOf("p1"), recommendationEngine.lastPrimaryExcludedIds)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
     fun triggerDebugIntervention_keepsMeditationAvailableWhenReadingInventoryIsCompleted() = runTest {
         val analyticsTracker = InMemoryAnalyticsTracker()
         val historyRepository = FakeHistoryRepository(initialCompletedIds = setOf("p1", "s1"))
@@ -1546,6 +1609,8 @@ class MainViewModelTest {
     private class RecordingRecommendationEngine : RecommendationEngine {
         var lastInventory: List<ContentItem> = emptyList()
             private set
+        var lastPrimaryExcludedIds: Set<String> = emptySet()
+            private set
 
         override fun generate(
             targetApp: DistractingApp,
@@ -1556,6 +1621,7 @@ class MainViewModelTest {
             nowMillis: Long,
         ): RecommendationSet? {
             lastInventory = inventory
+            lastPrimaryExcludedIds = primaryExcludedIds
             return null
         }
     }
