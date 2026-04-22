@@ -224,6 +224,8 @@ Result:
 
 ### 8.6 Replacement Quality and Release Candidate
 
+Status: `implemented`
+
 - Review item titles and descriptions for pickability at the impulse moment.
 - Remove weak items before release.
 - Run visual QA again after content scale-up.
@@ -233,6 +235,12 @@ Exit criteria:
 - Total shared inventory reaches roughly 45-55 items across renderable, link-only, and utility replacement classes.
 - The intervention still shows only one primary plus two backups.
 - Visual QA report has no blocker findings.
+
+Result:
+
+- Shared/local inventory now has 46 replacement items: 25 renderable editorial items, 20 link-only editorial items, and 1 app-utility meditation replacement.
+- The release-candidate visual QA harness captures Light and Dark screenshots for mixed library, link-only intervention, external handoff, renderable reader, feedback, progress, and meditation timer.
+- See `docs/VISUAL_QA_20260422_SPRINT8_CONTENT_EXPANSION.md`.
 
 ## Non-Goals
 

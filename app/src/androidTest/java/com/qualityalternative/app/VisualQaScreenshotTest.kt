@@ -37,7 +37,7 @@ class VisualQaScreenshotTest {
     fun resetAppState() {
         resetPersistentState()
         val targetContext = InstrumentationRegistry.getInstrumentation().targetContext
-        screenshotDir = File(targetContext.filesDir, "visual-qa/content-display")
+        screenshotDir = File(targetContext.filesDir, "visual-qa/sprint8-content-expansion")
         screenshotDir.deleteRecursively()
         screenshotDir.mkdirs()
     }
@@ -53,40 +53,48 @@ class VisualQaScreenshotTest {
     @Test
     fun captureCoreContentScreensInLightAndDark() {
         launchOnboardedApp()
-        seedAttentionClassicsSelection()
+        seedAllSharedContentSelection()
 
         capture("01_home_light")
 
         openTab("tab-library", "library-list")
         composeRule.onNodeWithTag("library-list")
-            .performScrollToNode(hasText("Start With What Is Yours"))
-        capture("02_library_attention_light")
+            .performScrollToNode(hasText("A Naturalist Notices Everything"))
+        capture("02_library_mixed_light")
 
+        seedLinkOnlySelection()
         launchFixtureSystemIntervention()
-        capture("03_intervention_light")
+        capture("03_intervention_link_only_light")
 
+        composeRule.onNodeWithText("Open link", substring = true).performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("external-handoff-screen") }
+        assertLinkOnlyHandoffCopyIsDisplayed()
+        capture("04_external_handoff_light")
+
+        seedPublicDomainExpansionSelection()
+        launchFixtureSystemIntervention()
         composeRule.onNodeWithText("Read this", substring = true).performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
-        assertAttentionClassicsReaderCopyIsDisplayed()
-        capture("04_reader_attention_light")
+        assertPublicDomainExpansionReaderCopyIsDisplayed()
+        capture("05_reader_renderable_v2_light")
 
         composeRule.onNodeWithTag("reader-list")
             .performScrollToNode(hasText("I'm done reading"))
         composeRule.onNodeWithText("I'm done reading").performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("feedback-screen") }
-        capture("05_feedback_light")
+        capture("06_feedback_light")
 
         composeRule.onNodeWithText("Skip").performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("progress-list") }
         Thread.sleep(6_000)
-        capture("06_progress_light")
+        capture("07_progress_light")
 
         seedMeditationSelection()
         launchFixtureSystemIntervention()
-        capture("07_intervention_meditation_light")
+        capture("08_intervention_meditation_light")
         composeRule.onNodeWithText("Start timer", substring = true).performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("meditation-timer-screen") }
-        capture("08_meditation_timer_light")
+        capture("09_meditation_timer_light")
         composeRule.onNodeWithText("End early").performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("home-list") }
         Thread.sleep(6_000)
@@ -97,26 +105,47 @@ class VisualQaScreenshotTest {
         composeRule.onNodeWithTag("theme-DARK")
             .performSemanticsAction(SemanticsActions.OnClick)
         composeRule.waitForIdle()
-        capture("09_settings_dark")
+        capture("10_settings_dark")
 
-        openTab("tab-home", "home-list")
-        capture("10_home_dark")
+        seedAllSharedContentSelection()
+        openTab("tab-library", "library-list")
+        composeRule.onNodeWithTag("library-list")
+            .performScrollToNode(hasText("A Naturalist Notices Everything"))
+        capture("11_library_mixed_dark")
 
-        seedAttentionClassicsSelection()
+        seedLinkOnlySelection()
         launchFixtureSystemIntervention()
-        capture("11_intervention_dark")
+        capture("12_intervention_link_only_dark")
 
+        composeRule.onNodeWithText("Open link", substring = true).performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("external-handoff-screen") }
+        assertLinkOnlyHandoffCopyIsDisplayed()
+        capture("13_external_handoff_dark")
+
+        seedPublicDomainExpansionSelection()
+        launchFixtureSystemIntervention()
         composeRule.onNodeWithText("Read this", substring = true).performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
-        assertAttentionClassicsReaderCopyIsDisplayed()
-        capture("12_reader_attention_dark")
+        assertPublicDomainExpansionReaderCopyIsDisplayed()
+        capture("14_reader_renderable_v2_dark")
+
+        composeRule.onNodeWithTag("reader-list")
+            .performScrollToNode(hasText("I'm done reading"))
+        composeRule.onNodeWithText("I'm done reading").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("feedback-screen") }
+        capture("15_feedback_dark")
+
+        composeRule.onNodeWithText("Skip").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("progress-list") }
+        Thread.sleep(6_000)
+        capture("16_progress_dark")
 
         seedMeditationSelection()
         launchFixtureSystemIntervention()
-        capture("13_intervention_meditation_dark")
+        capture("17_intervention_meditation_dark")
         composeRule.onNodeWithText("Start timer", substring = true).performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("meditation-timer-screen") }
-        capture("14_meditation_timer_dark")
+        capture("18_meditation_timer_dark")
     }
 
     private fun capture(name: String) {
@@ -201,6 +230,52 @@ class VisualQaScreenshotTest {
         )
     }
 
+    private fun seedPublicDomainExpansionSelection() = runBlocking {
+        val repository = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication)
+            .appContainer
+            .settingsRepository
+        repository.saveOnboardingSelection(
+            OnboardingSelection(
+                selectedAppPackages = setOf(FixtureTargetRegistry.fixtureDistractors.first().packageName),
+                preferredTopics = setOf(TopicTag.SCIENCE, TopicTag.ESSAYS, TopicTag.PHILOSOPHY),
+                preferredDurationBucket = DurationBucket.FOCUS,
+                selectedPackIds = setOf("public-domain-expansion-v2"),
+            ),
+        )
+    }
+
+    private fun seedLinkOnlySelection() = runBlocking {
+        val repository = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication)
+            .appContainer
+            .settingsRepository
+        repository.saveOnboardingSelection(
+            OnboardingSelection(
+                selectedAppPackages = setOf(FixtureTargetRegistry.fixtureDistractors.first().packageName),
+                preferredTopics = setOf(TopicTag.PHILOSOPHY, TopicTag.SCIENCE, TopicTag.PSYCHOLOGY),
+                preferredDurationBucket = DurationBucket.FOCUS,
+                selectedPackIds = setOf("link-only-modern-v1"),
+            ),
+        )
+    }
+
+    private fun seedAllSharedContentSelection() = runBlocking {
+        val repository = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication)
+            .appContainer
+            .settingsRepository
+        repository.saveOnboardingSelection(
+            OnboardingSelection(
+                selectedAppPackages = setOf(FixtureTargetRegistry.fixtureDistractors.first().packageName),
+                preferredTopics = setOf(TopicTag.PHILOSOPHY, TopicTag.HISTORY, TopicTag.ESSAYS, TopicTag.SCIENCE),
+                preferredDurationBucket = DurationBucket.FOCUS,
+                selectedPackIds = setOf(
+                    "attention-classics-v1",
+                    "public-domain-expansion-v2",
+                    "link-only-modern-v1",
+                ),
+            ),
+        )
+    }
+
     private fun seedMeditationSelection() = runBlocking {
         val repository = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication)
             .appContainer
@@ -239,6 +314,44 @@ class VisualQaScreenshotTest {
         assertTrue("Expected an Attention Classics title in the reader", titles.any(::hasNode))
         assertTrue("Expected an author-facing source label in the reader", authors.any(::hasNodeContaining))
         assertTrue("Reader should not show provenance-heavy Project Gutenberg label", !hasNodeContaining("Project Gutenberg"))
+    }
+
+    private fun assertPublicDomainExpansionReaderCopyIsDisplayed() {
+        val titles = listOf(
+            "A Naturalist Notices Everything",
+            "A Doorway Into Learning",
+            "Choose Your Own Plan",
+            "Look at the Stars",
+            "A Place of Business",
+            "The Mind's Own Snare",
+            "Rest Satisfied With What We Have",
+            "Anger Divides What Life Joins",
+            "Earnestness as an Island",
+            "The Examined Life",
+        )
+        val authors = listOf(
+            "Charles Darwin",
+            "Booker T. Washington",
+            "John Stuart Mill",
+            "Ralph Waldo Emerson",
+            "Henry David Thoreau",
+            "Michel de Montaigne",
+            "Seneca",
+            "The Dhammapada",
+            "Plato",
+        )
+
+        assertTrue("Expected a public-domain v2 title in the reader", titles.any(::hasNode))
+        assertTrue("Expected an author-facing source label in the reader", authors.any(::hasNodeContaining))
+        assertTrue("Reader should not show provenance-heavy Project Gutenberg label", !hasNodeContaining("Project Gutenberg"))
+    }
+
+    private fun assertLinkOnlyHandoffCopyIsDisplayed() {
+        val sourceHints = listOf("longnow.org", "psyche.co", "aeon.co", "quantamagazine.org", "sapiens.org", "plato.stanford.edu", "iep.utm.edu", "nautil.us")
+
+        assertTrue("Expected external reading label", hasNodeContaining("External reading"))
+        assertTrue("Expected external handoff copy", hasNode("Opens in your browser"))
+        assertTrue("Expected a canonical external URL", sourceHints.any(::hasNodeContaining))
     }
 
     private fun resetPersistentState() = runBlocking {
