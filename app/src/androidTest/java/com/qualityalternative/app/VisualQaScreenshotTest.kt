@@ -492,10 +492,10 @@ class VisualQaScreenshotTest {
         val titles = listOf(
             "Care for the Soul First",
             "Leave the Crowd",
-            "Go About a Human's Work",
+            "Let the Pleasure Wait",
             "Neither Ask Nor Consent",
         )
-        val authors = listOf("Plato", "Seneca", "Marcus Aurelius", "Cicero")
+        val authors = listOf("Plato", "Seneca", "Epictetus", "Cicero")
 
         assertTrue("Expected a real philosophy starter title in the reader", titles.any(::hasNode))
         assertTrue("Expected a public-domain philosophy source label in the reader", authors.any(::hasNodeContaining))

@@ -2,7 +2,7 @@
 
 Status: `passed on emulator`
 
-Scope: visual validation for Sprint 8 content scale-up after `link-only-modern-v1`, `public-domain-expansion-v2`, and the 3-minute meditation replacement.
+Scope: visual validation for Sprint 8 content scale-up after `link-only-modern-v1`, `public-domain-expansion-v2`, the replacement of the legacy `philosophy` and `science` placeholder pack items with real public-domain excerpts, and the 3-minute meditation replacement.
 
 Device: `qaApi36` emulator via `emulator-5554`.
 
@@ -15,6 +15,8 @@ Artifacts:
 - `docs/visual-qa/2026-04-22-sprint8-content-expansion/03_intervention_link_only_light.png`
 - `docs/visual-qa/2026-04-22-sprint8-content-expansion/04_external_handoff_light.png`
 - `docs/visual-qa/2026-04-22-sprint8-content-expansion/05_reader_renderable_v2_light.png`
+- `docs/visual-qa/2026-04-22-sprint8-content-expansion/05b_reader_philosophy_replacement_light.png`
+- `docs/visual-qa/2026-04-22-sprint8-content-expansion/05c_reader_science_replacement_light.png`
 - `docs/visual-qa/2026-04-22-sprint8-content-expansion/06_feedback_light.png`
 - `docs/visual-qa/2026-04-22-sprint8-content-expansion/07_progress_light.png`
 - `docs/visual-qa/2026-04-22-sprint8-content-expansion/08_intervention_meditation_light.png`
@@ -24,6 +26,8 @@ Artifacts:
 - `docs/visual-qa/2026-04-22-sprint8-content-expansion/12_intervention_link_only_dark.png`
 - `docs/visual-qa/2026-04-22-sprint8-content-expansion/13_external_handoff_dark.png`
 - `docs/visual-qa/2026-04-22-sprint8-content-expansion/14_reader_renderable_v2_dark.png`
+- `docs/visual-qa/2026-04-22-sprint8-content-expansion/14b_reader_philosophy_replacement_dark.png`
+- `docs/visual-qa/2026-04-22-sprint8-content-expansion/14c_reader_science_replacement_dark.png`
 - `docs/visual-qa/2026-04-22-sprint8-content-expansion/15_feedback_dark.png`
 - `docs/visual-qa/2026-04-22-sprint8-content-expansion/16_progress_dark.png`
 - `docs/visual-qa/2026-04-22-sprint8-content-expansion/17_intervention_meditation_dark.png`
@@ -36,6 +40,8 @@ Artifacts:
 - Light and Dark intervention surfaces where the primary recommendation is a shared `EXTERNAL_HANDOFF` link-only item.
 - Light and Dark external handoff surfaces with canonical URL display.
 - Light and Dark reader surfaces for `public-domain-expansion-v2`.
+- Light and Dark reader surfaces for the real public-domain replacement items in the legacy `philosophy` starter pack.
+- Light and Dark reader surfaces for the real public-domain replacement items in the legacy `science` starter pack.
 - Light and Dark feedback and progress surfaces after completing/skipping the replacement session.
 - Light and Dark meditation intervention and timer surfaces.
 
@@ -48,8 +54,15 @@ Notes:
 - The intervention remains finite: one primary recommendation plus two backups, or no extra choices when the inventory is intentionally constrained to meditation.
 - Link-only items route to the external handoff surface rather than the in-app reader.
 - Renderable v2 items show author-facing source labels, not provenance-heavy Project Gutenberg or Wikisource labels.
+- Replacement starter-pack reader screens show real public-domain author labels and no `Quality Alternative Editorial` placeholder label.
 - Dark-mode screenshots use light Android system-bar icons after the theme-aware system-bar fix.
 - The progress surface can show the transient "Feedback skipped" snackbar when captured immediately after skipping feedback. This is acceptable for visual QA and mirrors the real app state.
+
+Refresh after placeholder replacement Pro review:
+
+- Re-ran the screenshot harness on `qaApi36` after replacing the legacy `philosophy` and `science` placeholder pack items.
+- Added `05b`, `05c`, `14b`, and `14c` replacement-reader screenshots to prove the real starter-pack content renders in Light and Dark.
+- Synced the `docs/visual-qa/2026-04-22-sprint8-content-expansion/` PNG mirror with the current harness output so review bundles do not mix fresh root screenshots with stale documentation artifacts.
 
 ## Validation Commands
 

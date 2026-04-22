@@ -6,7 +6,7 @@ This slice replaces the original prototype editorial content in the `philosophy`
 
 ## Replaced Packs
 
-- `philosophy`: four public-domain philosophy excerpts from Plato, Seneca, Marcus Aurelius, and Cicero.
+- `philosophy`: four public-domain philosophy excerpts from Plato, Seneca, Epictetus, and Cicero.
 - `science`: three public-domain science or psychology excerpts from Michael Faraday, John Tyndall, and William James.
 
 ## Policy Shape

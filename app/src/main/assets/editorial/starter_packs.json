@@ -42,22 +42,22 @@
           "bodyAssetPath": "editorial/items/leave_the_crowd.md"
         },
         {
-          "id": "go-about-a-humans-work",
-          "title": "Go About a Human's Work",
-          "description": "Marcus Aurelius reframes reluctance and asks whether comfort is really what the morning is for.",
+          "id": "let-the-pleasure-wait",
+          "title": "Let the Pleasure Wait",
+          "description": "Epictetus turns delay itself into a tool: let the attraction cool before deciding whether it should rule the moment.",
           "durationMinutes": 3,
           "format": "MARKDOWN",
-          "source": "Marcus Aurelius",
+          "source": "Epictetus",
           "rightsClass": "RENDERABLE",
           "renderMode": "IN_APP_READER",
           "licenseName": "Public domain text; Project Gutenberg source policy linked for source-use and trademark terms; EU/Poland status reviewed by author/translator death year",
           "licenseUrl": "https://www.gutenberg.org/policy/license.html",
-          "sourceUrl": "https://www.gutenberg.org/ebooks/2680",
-          "attribution": "Marcus Aurelius, Meditations, translated by George Long",
+          "sourceUrl": "https://www.gutenberg.org/ebooks/10661",
+          "attribution": "Epictetus, A Selection from the Discourses of Epictetus with the Encheiridion, translated by George Long",
           "rightsReviewedAt": "2026-04-22",
-          "topics": ["PHILOSOPHY"],
-          "whyThisNow": "Use when the user needs a gentle nudge out of passive comfort.",
-          "bodyAssetPath": "editorial/items/go_about_a_humans_work.md"
+          "topics": ["PHILOSOPHY", "PSYCHOLOGY"],
+          "whyThisNow": "Use when the intervention should make delay feel like agency, not denial.",
+          "bodyAssetPath": "editorial/items/let_the_pleasure_wait.md"
         },
         {
           "id": "neither-ask-nor-consent",
@@ -160,6 +160,7 @@
           "attribution": "Epictetus, A Selection from the Discourses of Epictetus with the Encheiridion, translated by George Long",
           "rightsReviewedAt": "2026-04-22",
           "topics": ["PHILOSOPHY", "PSYCHOLOGY"],
+          "whyThisNow": "Helps separate chosen action from reflex.",
           "bodyAssetPath": "editorial/items/start_with_what_is_yours.md"
         },
         {
@@ -177,6 +178,7 @@
           "attribution": "Marcus Aurelius, Meditations, translated by George Long",
           "rightsReviewedAt": "2026-04-22",
           "topics": ["PHILOSOPHY"],
+          "whyThisNow": "Turns drifting toward default into a small test.",
           "bodyAssetPath": "editorial/items/the_morning_test.md"
         },
         {
@@ -194,6 +196,7 @@
           "attribution": "William James, The Principles of Psychology, Volume 1",
           "rightsReviewedAt": "2026-04-22",
           "topics": ["PSYCHOLOGY", "SCIENCE"],
+          "whyThisNow": "Makes the repeated tap visible as a groove.",
           "bodyAssetPath": "editorial/items/the_flywheel_of_habit.md"
         },
         {
@@ -211,6 +214,7 @@
           "attribution": "Henry David Thoreau, Walden",
           "rightsReviewedAt": "2026-04-22",
           "topics": ["ESSAYS", "PHILOSOPHY"],
+          "whyThisNow": "Reframes the minute as something to spend deliberately.",
           "bodyAssetPath": "editorial/items/live_deliberately.md"
         },
         {
@@ -228,6 +232,7 @@
           "attribution": "Henry David Thoreau, Walking, in Excursions",
           "rightsReviewedAt": "2026-04-22",
           "topics": ["ESSAYS", "PHILOSOPHY"],
+          "whyThisNow": "Gives a physical alternative without coercion.",
           "bodyAssetPath": "editorial/items/walk_before_you_scroll.md"
         },
         {
@@ -245,6 +250,7 @@
           "attribution": "Ralph Waldo Emerson, Self-Reliance, in Essays, First Series",
           "rightsReviewedAt": "2026-04-22",
           "topics": ["PHILOSOPHY", "CREATIVITY"],
+          "whyThisNow": "Counters social comparison with inward attention.",
           "bodyAssetPath": "editorial/items/trust_the_first_honest_thought.md"
         },
         {
@@ -262,6 +268,7 @@
           "attribution": "Mary Austin, The Land of Little Rain",
           "rightsReviewedAt": "2026-04-22",
           "topics": ["ESSAYS", "HISTORY"],
+          "whyThisNow": "Pulls attention outward into observation.",
           "bodyAssetPath": "editorial/items/the_desert_resets_the_eye.md"
         },
         {
@@ -279,6 +286,7 @@
           "attribution": "Francis Bacon, Of Studies, in The Essays or Counsels, Civil and Moral",
           "rightsReviewedAt": "2026-04-22",
           "topics": ["ESSAYS", "PHILOSOPHY"],
+          "whyThisNow": "Works as a quick backup when the user will not accept a longer read.",
           "bodyAssetPath": "editorial/items/of_studies.md"
         }
       ]

@@ -103,7 +103,7 @@ class AssetContentRepositoryTest {
             setOf(
                 "care-for-the-soul-first",
                 "leave-the-crowd",
-                "go-about-a-humans-work",
+                "let-the-pleasure-wait",
                 "neither-ask-nor-consent",
                 "a-candle-opens-natural-philosophy",
                 "water-dust-becomes-a-cloud",
@@ -138,6 +138,51 @@ class AssetContentRepositoryTest {
             }
 
         assertTrue(placeholders.isEmpty())
+    }
+
+    @Test
+    fun sharedRenderableInventoryCarriesCompleteDecisionAndRightsMetadata() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val repository = AssetContentRepository(context)
+
+        val renderableItems = repository.inventory()
+            .filter { item -> item.sourceType == ContentSourceType.EDITORIAL && item.usesRepositoryBody() }
+
+        assertTrue(renderableItems.isNotEmpty())
+        renderableItems.forEach { item ->
+            assertEquals("${item.id} rights class", ContentRightsClass.RENDERABLE, item.rights.rightsClass)
+            assertEquals("${item.id} render mode", ContentRenderMode.IN_APP_READER, item.rights.renderMode)
+            assertFalse("${item.id} bodyAssetPath", item.bodyAssetPath.isNullOrBlank())
+            assertEquals("${item.id} externalUrl", null, item.externalUrl)
+            assertFalse("${item.id} source label", item.sourceLabel.isNullOrBlank())
+            assertFalse("${item.id} sourceUrl", item.rights.sourceUrl.isNullOrBlank())
+            assertFalse("${item.id} licenseUrl", item.rights.licenseUrl.isNullOrBlank())
+            assertFalse("${item.id} licenseName", item.rights.licenseName.isNullOrBlank())
+            assertFalse("${item.id} attribution", item.rights.attribution.isNullOrBlank())
+            assertFalse("${item.id} rightsReviewedAt", item.rights.rightsReviewedAt.isNullOrBlank())
+            assertFalse("${item.id} whyThisNow", item.whyThisNow.isNullOrBlank())
+            assertFalse("${item.id} content body", repository.contentBody(item).isBlank())
+        }
+    }
+
+    @Test
+    fun sharedRenderableInventoryDoesNotShipNearDuplicateBodyAssets() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val repository = AssetContentRepository(context)
+
+        val renderableBodies = repository.inventory()
+            .filter { item -> item.sourceType == ContentSourceType.EDITORIAL && item.usesRepositoryBody() }
+            .map { item -> item.id to normalizedShingles(repository.contentBody(item)) }
+
+        renderableBodies.forEachIndexed { index, (leftId, leftShingles) ->
+            renderableBodies.drop(index + 1).forEach { (rightId, rightShingles) ->
+                val similarity = jaccard(leftShingles, rightShingles)
+                assertTrue(
+                    "$leftId and $rightId appear to reuse the same excerpt body: $similarity",
+                    similarity < 0.45,
+                )
+            }
+        }
     }
 
     @Test
@@ -309,5 +354,26 @@ class AssetContentRepositoryTest {
             .toSet()
 
         assertEquals(manifestFiles, packagedMarkdownFiles)
+    }
+
+    private fun normalizedShingles(body: String): Set<String> {
+        val words = body
+            .lowercase()
+            .replace(Regex("[^a-z0-9\\s]"), " ")
+            .split(Regex("\\s+"))
+            .filter { word -> word.length > 2 }
+        if (words.size < 8) {
+            return setOf(words.joinToString(" "))
+        }
+        return words.windowed(8)
+            .map { shingle -> shingle.joinToString(" ") }
+            .toSet()
+    }
+
+    private fun jaccard(left: Set<String>, right: Set<String>): Double {
+        if (left.isEmpty() && right.isEmpty()) {
+            return 1.0
+        }
+        return left.intersect(right).size.toDouble() / left.union(right).size.toDouble()
     }
 }
