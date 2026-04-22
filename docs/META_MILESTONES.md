@@ -21,8 +21,8 @@ Completed:
 
 Current active track:
 
-- Sprint 7 is complete.
-- Work mode: decide whether the next move is PDF/pilot readiness, release packaging for the new content pack, or another content-quality iteration after tester signal.
+- Sprint 8: content expansion and visual QA.
+- Work mode: scale the replacement library with renderable and link-only inventory, while making emulator screenshot QA a release gate.
 - Gate: do not expand inventory unless each item is classified as `renderable`, `link_only`, or `user_private` with explicit metadata.
 
 ## UI Timing
@@ -205,7 +205,36 @@ Sprint plan:
 - See `docs/CONTENT_PACK_V1_SELECTION.md`.
 - See `docs/CONTENT_PACK_V1_QUALITY_PASS.md`.
 
-## Milestone 6: PDF and Pilot Readiness
+## Milestone 6: Sprint 8 Content Expansion and Visual QA
+
+Status: `planned`
+
+Goal:
+
+- Move from one real renderable pack to a substantially larger replacement library and prove the content displays well in the app.
+
+Likely scope:
+
+- shared link-only editorial items with canonical external handoff
+- larger renderable inventory from public-domain or permissive sources
+- ranking diversity for larger inventory
+- screenshot-based visual QA across Light and Dark modes
+- tester-facing content-quality feedback loop
+
+Out of scope:
+
+- PDF upload or reader work
+- RSS/newsletter ingestion
+- open-web crawling
+- AI summaries of third-party articles
+- premium packaging implementation
+- iOS
+
+Sprint plan:
+
+- See `docs/SPRINT_8_CONTENT_EXPANSION_VISUAL_QA.md`.
+
+## Milestone 7: PDF and Pilot Readiness
 
 Status: `planned, after content library v1`
 
@@ -233,13 +262,13 @@ Out of scope:
 
 Gate to start:
 
-- Sprint 7 established at least one real shared content pack; before PDF work starts, refresh or renumber the existing PDF plan.
+- Sprint 8 should establish a larger shared library and visual QA baseline; before PDF work starts, refresh or renumber the existing PDF plan.
 
 Sprint plan:
 
 - See `docs/SPRINT_6_PDF_PILOT_READINESS.md`; this document should be renumbered or refreshed before implementation starts.
 
-## Milestone 7: Small External Pilot
+## Milestone 8: Small External Pilot
 
 Status: `planned, after UI/UX and PDF readiness`
 
@@ -262,7 +291,7 @@ Decision signals:
 - feedback saying the recommendation was a good fit
 - return to target app within 15 and 60 minutes
 
-## Milestone 8: iOS Discovery
+## Milestone 9: iOS Discovery
 
 Status: `later discovery, not implementation`
 

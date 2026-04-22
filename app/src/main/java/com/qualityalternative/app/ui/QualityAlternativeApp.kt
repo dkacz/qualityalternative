@@ -1775,11 +1775,11 @@ private fun ContentMetaRow(item: ContentItem, stacked: Boolean = false) {
         if (stacked) {
             MonoText(item.sourceLabel(), modifier = Modifier.width(76.dp), lineHeight = 12.sp)
             MonoText("·")
-            MonoText(item.topicLine(), modifier = Modifier.weight(1f))
+            MonoText(item.topicLine(), modifier = Modifier.weight(1f), maxLines = 2, overflow = TextOverflow.Ellipsis)
         } else {
-            MonoText(item.sourceLabel())
+            MonoText(item.sourceLabel(), modifier = Modifier.widthIn(max = 116.dp), maxLines = 1, overflow = TextOverflow.Ellipsis)
             MonoText("·")
-            MonoText(item.topicLine(), modifier = Modifier.weight(1f))
+            MonoText(item.topicLine(), modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             QaIcon(kind = QaIconKind.Clock, color = QualityAlternativeThemeTokens.colors.faintText, size = 14.dp)
@@ -1807,7 +1807,12 @@ private fun BackupRow(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(item.title, style = MaterialTheme.typography.titleMedium, fontSize = 16.sp, lineHeight = 19.sp, maxLines = 2)
-                MonoText("${item.sourceLabel()} · ${item.durationMinutes} min · ${item.topicLine()}", modifier = Modifier.padding(top = 3.dp))
+                MonoText(
+                    "${item.sourceLabel()} · ${item.durationMinutes} min · ${item.topicLine()}",
+                    modifier = Modifier.padding(top = 3.dp),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
             QaIcon(kind = QaIconKind.ChevronRight, color = QualityAlternativeThemeTokens.colors.faintText, size = 18.dp)
         }
@@ -2559,6 +2564,8 @@ private fun MonoText(
     color: Color = QualityAlternativeThemeTokens.colors.faintText,
     lineHeight: androidx.compose.ui.unit.TextUnit = 14.sp,
     textAlign: TextAlign? = null,
+    maxLines: Int = Int.MAX_VALUE,
+    overflow: TextOverflow = TextOverflow.Clip,
 ) {
     Text(
         text = text.uppercase(Locale.US),
@@ -2571,6 +2578,8 @@ private fun MonoText(
             color = color,
         ),
         textAlign = textAlign,
+        maxLines = maxLines,
+        overflow = overflow,
     )
 }
 
