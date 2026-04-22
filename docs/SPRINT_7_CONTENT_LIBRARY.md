@@ -67,7 +67,7 @@ Validation:
 
 ### 7.2 First Renderable Pack Selection
 
-Status: `selected for Pro review`
+Status: `passed Pro review`
 
 Acceptance criteria:
 
@@ -88,6 +88,8 @@ Current selection:
 
 ### 7.3 App Integration for Pack v1
 
+Status: `implemented for Pro review`
+
 Acceptance criteria:
 
 - Add the selected pack to local assets.
@@ -95,6 +97,12 @@ Acceptance criteria:
 - Keep recommendation set finite.
 - Do not add crawler, RSS, PDF, summarization, or network fetching.
 - Add tests for asset metadata and recommendation eligibility.
+
+Implementation notes:
+
+- The first integrated pack should use the first eight items from `attention-classics-v1`.
+- Darwin remains a reserve item until a short, vivid excerpt is selected.
+- At least three integrated items should be quick-session candidates of 5 minutes or less.
 
 Validation:
 

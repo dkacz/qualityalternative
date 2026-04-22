@@ -1,6 +1,6 @@
 # Content Pack v1 Selection
 
-Status: `Sprint 7.2 selected for Pro review`
+Status: `Sprint 7.2 passed Pro review; first eight items integrated in Slice 7.3`
 
 Pack id: `attention-classics-v1`
 
@@ -64,6 +64,8 @@ These are strong, but should not enter pack v1 unless one selected item fails ex
 Integrate the first eight items first. Keep Darwin as a ninth option only if the excerpt is vivid and short enough after cutting. This preserves the finite recommendation surface while giving the ranking engine enough variety across self-command, habit, nature, learning, and observation.
 
 Do not add OpenStax, OWID, NASA, magazine links, PDF support, RSS, crawler behavior, AI summarization, or link discovery in Slice 7.3.
+
+Slice 7.3 integration keeps Darwin in reserve and adds the first eight items as local Markdown assets under `app/src/main/assets/editorial/items/`. The integrated pack includes three quick-session items at 4 minutes each: `start-with-what-is-yours`, `the-morning-test`, and `of-studies`.
 
 ## Source Notes Checked
 

@@ -23,18 +23,66 @@ class AssetContentRepositoryTest {
 
         assertTrue(items.isNotEmpty())
         items.forEach { item ->
-            assertEquals("Quality Alternative Editorial", item.sourceLabel)
             assertEquals(ContentSourceType.EDITORIAL, item.sourceType)
             assertEquals(null, item.externalUrl)
             assertFalse(item.bodyAssetPath.isNullOrBlank())
             assertEquals(ContentRightsClass.RENDERABLE, item.rights.rightsClass)
             assertEquals(ContentRenderMode.IN_APP_READER, item.rights.renderMode)
-            assertEquals("Quality Alternative first-party placeholder", item.rights.licenseName)
+            assertFalse(item.sourceLabel.isNullOrBlank())
+            assertFalse(item.rights.licenseName.isNullOrBlank())
+            assertFalse(item.rights.attribution.isNullOrBlank())
+            assertFalse(item.rights.rightsReviewedAt.isNullOrBlank())
+            assertTrue(item.usesRepositoryBody())
+        }
+    }
+
+    @Test
+    fun qualityAlternativePlaceholderItemsRemainClearlyLabeled() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val repository = AssetContentRepository(context)
+
+        val placeholders = repository.inventory()
+            .filter { item -> item.rights.licenseName == "Quality Alternative first-party placeholder" }
+
+        assertTrue(placeholders.isNotEmpty())
+        placeholders.forEach { item ->
+            assertEquals("Quality Alternative Editorial", item.sourceLabel)
             assertEquals(null, item.rights.licenseUrl)
             assertEquals(null, item.rights.sourceUrl)
             assertEquals("Quality Alternative", item.rights.attribution)
-            assertFalse(item.rights.rightsReviewedAt.isNullOrBlank())
-            assertTrue(item.usesRepositoryBody())
+        }
+    }
+
+    @Test
+    fun attentionClassicsPackCarriesPublicDomainSourceMetadata() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val repository = AssetContentRepository(context)
+
+        val pack = repository.starterPacks().first { it.id == "attention-classics-v1" }
+        val items = pack.items
+
+        assertEquals(8, items.size)
+        assertTrue(items.count { item -> item.durationMinutes <= 5 } >= 3)
+        assertEquals(
+            setOf(
+                "start-with-what-is-yours",
+                "the-morning-test",
+                "the-flywheel-of-habit",
+                "live-deliberately",
+                "walk-before-you-scroll",
+                "trust-the-first-honest-thought",
+                "the-desert-resets-the-eye",
+                "of-studies",
+            ),
+            items.map { item -> item.id }.toSet(),
+        )
+        items.forEach { item ->
+            assertEquals("Project Gutenberg public-domain text", item.sourceLabel)
+            assertTrue(item.rights.licenseName.orEmpty().contains("Public domain"))
+            assertEquals("https://www.gutenberg.org/policy/license.html", item.rights.licenseUrl)
+            assertTrue(item.rights.sourceUrl.orEmpty().startsWith("https://www.gutenberg.org/"))
+            assertFalse(item.rights.attribution.isNullOrBlank())
+            assertEquals("2026-04-22", item.rights.rightsReviewedAt)
         }
     }
 

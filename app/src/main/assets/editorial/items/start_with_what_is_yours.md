@@ -1,0 +1,9 @@
+Of things some are in our power, and others are not. In our power are opinion, movement towards a thing, desire, aversion, turning from a thing; and in a word, whatever are our acts. Not in our power are the body, property, reputation, offices, and in a word, whatever are not our own acts.
+
+And the things in our power are by nature free, not subject to restraint or hindrance; but the things not in our power are weak, slavish, subject to restraint, in the power of others.
+
+Remember then, that if you think the things which are by nature slavish to be free, and the things which are in the power of others to be your own, you will be hindered, you will lament, you will be disturbed, you will blame both gods and men; but if you think that only which is your own to be your own, and if you think that what is another's, as it really is, belongs to another, no man will ever compel you, no man will hinder you, you will never blame any man, you will accuse no man, you will do nothing involuntarily, no man will harm you, you will have no enemy, for you will not suffer any harm.
+
+If then you desire such great things remember that you must not lay hold of them with a small effort; but you must leave alone some things entirely, and postpone others for the present.
+
+Straightway then practise saying to every harsh appearance: You are an appearance, and in no manner what you appear to be. Then examine it by the rules which you possess, and by this first and chiefly, whether it relates to the things which are in our power or to things which are not in our power; and if it relates to anything which is not in our power, be ready to say that it does not concern you.
