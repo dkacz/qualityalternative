@@ -169,28 +169,46 @@ Exit criteria:
 - The timer appears in Light and Dark screenshots.
 - The timer is repeatable after completion.
 
-### 8.3 Link-Only Pack v1
+### 8.3 Source Candidate Discovery and Scoring
 
-- Add 20-30 curated link-only recommendations from modern high-quality sources.
+Status: `implemented`
+
+- Build a larger candidate inventory before adding more app content.
+- Include roughly 50 link-only modern candidates and 30 renderable public-domain or permissive candidates.
+- Score candidates for impulse-fit, durability, first-batch suitability, and concrete next triage step.
+- Verify canonical source families and exact URLs where possible; mark source-family placeholders explicitly when exact item selection remains open.
+
+Exit criteria:
+
+- Candidate inventory exists and separates `link_only_candidate` from renderable candidates.
+- The first mixed-batch shortlist is clear enough for Slice 8.4 and Slice 8.5 implementation.
+- The document does not add runtime copyright blocking or app manifest content.
+
+Result:
+
+- See `docs/CONTENT_SOURCE_CANDIDATES_SPRINT8.md`.
+
+### 8.4 Link-Only Pack v1
+
+- Add 20 curated link-only recommendations from modern high-quality sources.
 - Treat every item as canonical external handoff.
 - Prefer evergreen essays and explainers, not news.
 
 Exit criteria:
 
-- Every item has title, source, description, canonical URL, duration estimate, topics, and "why this now?" note.
+- Every item has title, source, description, canonical URL, duration estimate, topics, rights/render metadata, and "why this now?" note.
 - Pro review or equivalent review focuses on source quality, link-only correctness, and product fit.
 
-### 8.4 Renderable Pack Expansion v2
+### 8.5 Renderable Pack Expansion v2
 
-- Add 16-24 more renderable items from already triaged public-domain or permissive sources.
+- Add 10 more renderable items from already triaged public-domain or permissive sources.
 - Prefer short, vivid excerpts over famous-but-dense material.
 
 Exit criteria:
 
-- Total renderable shared inventory reaches at least 30 items.
 - Tests confirm body assets exist, metadata is complete, durations are plausible, and reader rendering is not capped.
 
-### 8.5 Replacement Quality and Release Candidate
+### 8.6 Replacement Quality and Release Candidate
 
 - Review item titles and descriptions for pickability at the impulse moment.
 - Remove weak items before release.
@@ -198,7 +216,7 @@ Exit criteria:
 
 Exit criteria:
 
-- Total shared inventory reaches at least 60 items across renderable and link-only classes.
+- Total shared inventory reaches roughly 45-55 items across renderable, link-only, and utility replacement classes.
 - The intervention still shows only one primary plus two backups.
 - Visual QA report has no blocker findings.
 
@@ -213,6 +231,6 @@ Exit criteria:
 
 ## Open Decisions
 
-- Exact number of link-only items for the first external pack.
-- Whether to run Pro review after every content batch or only after pack-level completion.
+- Exact selected items for the 20-item link-only pack.
+- Pro review should run after every Sprint 8 slice.
 - Whether to create a small internal content-review checklist for tester feedback before adding more than 60 shared items.
