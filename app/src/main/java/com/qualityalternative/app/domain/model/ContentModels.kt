@@ -3,11 +3,14 @@ package com.qualityalternative.app.domain.model
 enum class ContentFormat {
     MARKDOWN,
     HTML,
+    PDF,
+    EPUB,
 }
 
 enum class ContentSourceType {
     EDITORIAL,
     USER_LINK,
+    USER_DOCUMENT,
     MEDITATION,
 }
 
@@ -84,6 +87,18 @@ data class ContentRightsMetadata(
         ): ContentRightsMetadata = ContentRightsMetadata(
             rightsClass = ContentRightsClass.USER_PRIVATE,
             renderMode = ContentRenderMode.EXTERNAL_HANDOFF,
+            sourceUrl = sourceUrl,
+            attribution = attribution,
+            rightsReviewedAt = rightsReviewedAt,
+        )
+
+        fun userPrivateReader(
+            sourceUrl: String? = null,
+            attribution: String? = null,
+            rightsReviewedAt: String? = null,
+        ): ContentRightsMetadata = ContentRightsMetadata(
+            rightsClass = ContentRightsClass.USER_PRIVATE,
+            renderMode = ContentRenderMode.USER_PRIVATE_READER,
             sourceUrl = sourceUrl,
             attribution = attribution,
             rightsReviewedAt = rightsReviewedAt,
@@ -183,6 +198,32 @@ enum class UserLinkValidationError {
 data class UserLinkValidationResult(
     val normalizedUrl: String? = null,
     val errors: Set<UserLinkValidationError> = emptySet(),
+) {
+    val isValid: Boolean
+        get() = errors.isEmpty()
+}
+
+data class UserDocumentDraft(
+    val uri: String,
+    val displayName: String,
+    val mimeType: String? = null,
+    val title: String,
+    val description: String = "",
+    val durationMinutes: Int,
+    val topicTags: Set<TopicTag>,
+)
+
+enum class UserDocumentValidationError {
+    EMPTY_URI,
+    UNSUPPORTED_FORMAT,
+    BLANK_TITLE,
+    INVALID_DURATION,
+    NO_TOPICS,
+}
+
+data class UserDocumentValidationResult(
+    val format: ContentFormat? = null,
+    val errors: Set<UserDocumentValidationError> = emptySet(),
 ) {
     val isValid: Boolean
         get() = errors.isEmpty()

@@ -12,8 +12,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         AnalyticsEventEntity::class,
         ReplacementSessionEntity::class,
         UserLinkEntity::class,
+        UserDocumentEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = true,
 )
 abstract class QualityAlternativeDatabase : RoomDatabase() {
@@ -22,6 +23,8 @@ abstract class QualityAlternativeDatabase : RoomDatabase() {
     abstract fun replacementSessionDao(): ReplacementSessionDao
 
     abstract fun userLinkDao(): UserLinkDao
+
+    abstract fun userDocumentDao(): UserDocumentDao
 
     companion object {
         fun build(
@@ -33,7 +36,7 @@ abstract class QualityAlternativeDatabase : RoomDatabase() {
                 QualityAlternativeDatabase::class.java,
                 databaseName,
             )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                 .build()
         }
 
@@ -183,6 +186,12 @@ abstract class QualityAlternativeDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                createUserDocumentsTable(db)
+            }
+        }
+
         private fun createUserLinksTable(db: SupportSQLiteDatabase) {
             db.execSQL(
                 """
@@ -202,6 +211,31 @@ abstract class QualityAlternativeDatabase : RoomDatabase() {
             )
             db.execSQL(
                 "CREATE UNIQUE INDEX IF NOT EXISTS index_user_links_normalizedUrl ON user_links(normalizedUrl)",
+            )
+        }
+
+        private fun createUserDocumentsTable(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS user_documents (
+                    id TEXT NOT NULL,
+                    uri TEXT NOT NULL,
+                    displayName TEXT NOT NULL,
+                    mimeType TEXT,
+                    documentFormat TEXT NOT NULL,
+                    title TEXT NOT NULL,
+                    description TEXT NOT NULL,
+                    durationMinutes INTEGER NOT NULL,
+                    topicTagsCsv TEXT NOT NULL,
+                    availability TEXT NOT NULL,
+                    createdAtMillis INTEGER NOT NULL,
+                    updatedAtMillis INTEGER NOT NULL,
+                    PRIMARY KEY(id)
+                )
+                """.trimIndent(),
+            )
+            db.execSQL(
+                "CREATE UNIQUE INDEX IF NOT EXISTS index_user_documents_uri ON user_documents(uri)",
             )
         }
     }

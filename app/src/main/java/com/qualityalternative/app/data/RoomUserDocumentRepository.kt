@@ -1,0 +1,259 @@
+package com.qualityalternative.app.data
+
+import android.content.ContentResolver
+import android.content.Context
+import android.net.Uri
+import com.qualityalternative.app.data.local.UserDocumentDao
+import com.qualityalternative.app.data.local.UserDocumentEntity
+import com.qualityalternative.app.domain.model.ContentAvailability
+import com.qualityalternative.app.domain.model.ContentFormat
+import com.qualityalternative.app.domain.model.ContentItem
+import com.qualityalternative.app.domain.model.ContentRightsMetadata
+import com.qualityalternative.app.domain.model.ContentSourceType
+import com.qualityalternative.app.domain.model.TopicTag
+import com.qualityalternative.app.domain.model.UserDocumentDraft
+import com.qualityalternative.app.domain.service.AddUserDocumentResult
+import com.qualityalternative.app.domain.service.UserDocumentRepository
+import java.security.MessageDigest
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
+
+class RoomUserDocumentRepository(
+    private val dao: UserDocumentDao,
+    private val scope: CoroutineScope,
+    private val bodyLoader: UserDocumentBodyLoader,
+    private val idProvider: (String) -> String = ::stableUserDocumentId,
+) : UserDocumentRepository {
+    private val documents = MutableStateFlow(emptyList<ContentItem>())
+    private val ready = MutableStateFlow(false)
+
+    init {
+        scope.launch {
+            dao.observeAll()
+                .map { rows -> rows.map(UserDocumentEntity::toContentItem) }
+                .collect { loadedDocuments ->
+                    documents.value = loadedDocuments
+                    ready.value = true
+                }
+        }
+    }
+
+    override fun userDocuments(): List<ContentItem> = documents.value
+
+    override fun observeUserDocuments(): Flow<List<ContentItem>> = documents.asStateFlow()
+
+    override suspend fun addDocument(
+        draft: UserDocumentDraft,
+        nowMillis: Long,
+    ): AddUserDocumentResult {
+        val validation = UserDocumentValidator.validate(draft)
+        val format = validation.format
+        if (!validation.isValid || format == null) {
+            return AddUserDocumentResult.Rejected(validation.errors)
+        }
+
+        val normalizedUri = draft.uri.trim()
+        val existing = dao.findByUri(normalizedUri)
+        val createdAtMillis = existing?.createdAtMillis ?: nowMillis
+        val displayName = draft.displayName.trim().ifBlank { draft.title.trim() }
+        val item = ContentItem(
+            id = existing?.id ?: idProvider(normalizedUri),
+            packId = USER_DOCUMENT_PACK_ID,
+            title = draft.title.trim(),
+            description = draft.description.trim().ifBlank {
+                defaultDescription(format = format, displayName = displayName)
+            },
+            durationMinutes = draft.durationMinutes,
+            format = format,
+            topicTags = draft.topicTags,
+            bodyAssetPath = null,
+            externalUrl = if (format.usesPrivateReader()) null else normalizedUri,
+            whyThisNow = "You chose this file as a better answer to an impulse.",
+            sourceLabel = displayName,
+            sourceType = ContentSourceType.USER_DOCUMENT,
+            availability = if (format.usesPrivateReader()) {
+                ContentAvailability.AVAILABLE
+            } else {
+                ContentAvailability.NEEDS_FALLBACK
+            },
+            rights = if (format.usesPrivateReader()) {
+                ContentRightsMetadata.userPrivateReader(
+                    sourceUrl = normalizedUri,
+                    attribution = displayName,
+                )
+            } else {
+                ContentRightsMetadata.userPrivateExternal(
+                    sourceUrl = normalizedUri,
+                    attribution = displayName,
+                )
+            },
+        )
+
+        dao.insertOrReplace(
+            item.toEntity(
+                uri = normalizedUri,
+                displayName = displayName,
+                mimeType = draft.mimeType,
+                createdAtMillis = createdAtMillis,
+                updatedAtMillis = nowMillis,
+            ),
+        )
+        documents.value = upsertUserDocumentForOptimisticState(documents.value, item)
+        return AddUserDocumentResult.Added(item)
+    }
+
+    override suspend fun markUnavailable(
+        contentId: String,
+        nowMillis: Long,
+    ) {
+        dao.updateAvailability(
+            id = contentId,
+            availability = ContentAvailability.UNAVAILABLE.name,
+            updatedAtMillis = nowMillis,
+        )
+        documents.value = documents.value.map { item ->
+            if (item.id == contentId) {
+                item.copy(availability = ContentAvailability.UNAVAILABLE)
+            } else {
+                item
+            }
+        }
+    }
+
+    override fun contentBody(item: ContentItem): String {
+        return if (item.sourceType == ContentSourceType.USER_DOCUMENT && item.format.usesPrivateReader()) {
+            bodyLoader.loadBody(uri = item.rights.sourceUrl.orEmpty(), format = item.format)
+        } else {
+            item.description
+        }
+    }
+
+    override fun isReady(): Boolean = ready.value
+
+    override fun observeReady(): Flow<Boolean> = ready.asStateFlow()
+
+    private companion object {
+        const val USER_DOCUMENT_PACK_ID = "user-documents"
+    }
+}
+
+fun interface UserDocumentBodyLoader {
+    fun loadBody(uri: String, format: ContentFormat): String
+}
+
+class AndroidUserDocumentBodyLoader(
+    context: Context,
+) : UserDocumentBodyLoader {
+    private val contentResolver: ContentResolver = context.contentResolver
+
+    override fun loadBody(uri: String, format: ContentFormat): String {
+        if (!format.usesPrivateReader()) {
+            return ""
+        }
+        return runCatching {
+            contentResolver.openInputStream(Uri.parse(uri))?.use { input ->
+                input.bufferedReader(Charsets.UTF_8).readText()
+            }.orEmpty()
+        }.getOrDefault("")
+    }
+}
+
+private fun UserDocumentEntity.toContentItem(): ContentItem {
+    val format = runCatching { ContentFormat.valueOf(documentFormat) }.getOrDefault(ContentFormat.PDF)
+    return ContentItem(
+        id = id,
+        packId = "user-documents",
+        title = title,
+        description = description,
+        durationMinutes = durationMinutes,
+        format = format,
+        topicTags = topicTagsCsv.toTopicTags(),
+        bodyAssetPath = null,
+        externalUrl = if (format.usesPrivateReader()) null else uri,
+        whyThisNow = "You chose this file as a better answer to an impulse.",
+        sourceLabel = displayName,
+        sourceType = ContentSourceType.USER_DOCUMENT,
+        availability = ContentAvailability.valueOf(availability),
+        rights = if (format.usesPrivateReader()) {
+            ContentRightsMetadata.userPrivateReader(
+                sourceUrl = uri,
+                attribution = displayName,
+            )
+        } else {
+            ContentRightsMetadata.userPrivateExternal(
+                sourceUrl = uri,
+                attribution = displayName,
+            )
+        },
+    )
+}
+
+private fun ContentItem.toEntity(
+    uri: String,
+    displayName: String,
+    mimeType: String?,
+    createdAtMillis: Long,
+    updatedAtMillis: Long,
+): UserDocumentEntity {
+    return UserDocumentEntity(
+        id = id,
+        uri = uri,
+        displayName = displayName,
+        mimeType = mimeType,
+        documentFormat = format.name,
+        title = title,
+        description = description,
+        durationMinutes = durationMinutes,
+        topicTagsCsv = topicTags.joinToString(",") { it.name },
+        availability = availability.name,
+        createdAtMillis = createdAtMillis,
+        updatedAtMillis = updatedAtMillis,
+    )
+}
+
+private fun ContentFormat.usesPrivateReader(): Boolean = this == ContentFormat.MARKDOWN
+
+private fun defaultDescription(format: ContentFormat, displayName: String): String {
+    return when (format) {
+        ContentFormat.MARKDOWN -> "A private Markdown file from your library: $displayName."
+        ContentFormat.PDF -> "A private PDF from your library. Opens through Android's document viewer."
+        ContentFormat.EPUB -> "A private EPUB from your library. Opens through Android's document viewer."
+        ContentFormat.HTML -> "A private document from your library."
+    }
+}
+
+private fun String.toTopicTags(): Set<TopicTag> {
+    if (isBlank()) {
+        return emptySet()
+    }
+    return split(",").mapNotNullTo(mutableSetOf()) { raw ->
+        runCatching { TopicTag.valueOf(raw) }.getOrNull()
+    }
+}
+
+internal fun upsertUserDocumentForOptimisticState(
+    currentDocuments: List<ContentItem>,
+    updatedDocument: ContentItem,
+): List<ContentItem> {
+    val existingIndex = currentDocuments.indexOfFirst { item ->
+        item.id == updatedDocument.id || item.rights.sourceUrl == updatedDocument.rights.sourceUrl
+    }
+    return if (existingIndex >= 0) {
+        currentDocuments.mapIndexed { index, item ->
+            if (index == existingIndex) updatedDocument else item
+        }
+    } else {
+        listOf(updatedDocument) + currentDocuments
+    }
+}
+
+private fun stableUserDocumentId(uri: String): String {
+    val digest = MessageDigest.getInstance("SHA-256")
+        .digest(uri.toByteArray(Charsets.UTF_8))
+        .joinToString("") { byte -> "%02x".format(byte) }
+    return "user-document:$digest"
+}

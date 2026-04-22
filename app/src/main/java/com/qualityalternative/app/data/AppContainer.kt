@@ -11,6 +11,7 @@ import com.qualityalternative.app.domain.service.HistoryRepository
 import com.qualityalternative.app.domain.service.InterceptionMonitor
 import com.qualityalternative.app.domain.service.RecommendationEngine
 import com.qualityalternative.app.domain.service.SettingsRepository
+import com.qualityalternative.app.domain.service.UserDocumentRepository
 import com.qualityalternative.app.domain.service.UserLinkRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -34,9 +35,15 @@ class AppContainer(context: Context) {
         dao = database.userLinkDao(),
         scope = appScope,
     )
+    val userDocumentRepository: UserDocumentRepository = RoomUserDocumentRepository(
+        dao = database.userDocumentDao(),
+        scope = appScope,
+        bodyLoader = AndroidUserDocumentBodyLoader(context = context),
+    )
     val contentRepository: ContentRepository = CompositeContentRepository(
         editorialRepository = AssetContentRepository(context = context),
         userLinkRepository = userLinkRepository,
+        userDocumentRepository = userDocumentRepository,
     )
     val historyRepository: HistoryRepository = RoomHistoryRepository(
         dao = database.replacementSessionDao(),

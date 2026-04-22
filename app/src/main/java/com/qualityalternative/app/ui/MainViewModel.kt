@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.qualityalternative.app.data.AppContainer
 import com.qualityalternative.app.data.SupportedCatalog
+import com.qualityalternative.app.data.UserDocumentValidator
 import com.qualityalternative.app.data.UserLinkValidator
 import com.qualityalternative.app.domain.model.AnalyticsEvent
 import com.qualityalternative.app.domain.model.AnalyticsSemanticKeys
@@ -15,6 +16,7 @@ import com.qualityalternative.app.domain.model.AnalyticsEventType
 import com.qualityalternative.app.domain.model.AppSettings
 import com.qualityalternative.app.domain.model.AppThemeMode
 import com.qualityalternative.app.domain.model.ContentAvailability
+import com.qualityalternative.app.domain.model.ContentFormat
 import com.qualityalternative.app.domain.model.ContentItem
 import com.qualityalternative.app.domain.model.ContentSourceType
 import com.qualityalternative.app.domain.model.DelayWindow
@@ -34,12 +36,15 @@ import com.qualityalternative.app.domain.model.ReturnToTargetSignal
 import com.qualityalternative.app.domain.model.SessionFeedback
 import com.qualityalternative.app.domain.model.TimeOfDayBucket
 import com.qualityalternative.app.domain.model.TopicTag
+import com.qualityalternative.app.domain.model.UserDocumentDraft
+import com.qualityalternative.app.domain.model.UserDocumentValidationError
 import com.qualityalternative.app.domain.model.UserLinkDraft
 import com.qualityalternative.app.domain.model.UserLinkValidationError
 import com.qualityalternative.app.domain.model.UserPreferences
 import com.qualityalternative.app.domain.model.usesExternalHandoff
 import com.qualityalternative.app.domain.model.usesMeditationTimer
 import com.qualityalternative.app.domain.model.usesRepositoryBody
+import com.qualityalternative.app.domain.service.AddUserDocumentResult
 import com.qualityalternative.app.domain.service.AddUserLinkResult
 import com.qualityalternative.app.domain.service.AnalyticsTracker
 import com.qualityalternative.app.domain.service.ContentRepository
@@ -48,6 +53,7 @@ import com.qualityalternative.app.domain.service.HistoryRepository
 import com.qualityalternative.app.domain.service.InterceptionMonitor
 import com.qualityalternative.app.domain.service.RecommendationEngine
 import com.qualityalternative.app.domain.service.SettingsRepository
+import com.qualityalternative.app.domain.service.UserDocumentRepository
 import com.qualityalternative.app.domain.service.UserLinkRepository
 import com.qualityalternative.app.interception.InterceptionRuntimeGate
 import java.util.UUID
@@ -86,7 +92,9 @@ data class MainUiState(
     val historyEntries: List<ReplacementHistoryEntry> = emptyList(),
     val completedContentIds: Set<String> = emptySet(),
     val userLinks: List<ContentItem> = emptyList(),
+    val userDocuments: List<ContentItem> = emptyList(),
     val addLinkForm: AddLinkFormState = AddLinkFormState(),
+    val addDocumentForm: AddDocumentFormState = AddDocumentFormState(),
     val savedLinkConfirmation: AddLinkConfirmation? = null,
     val themeMode: AppThemeMode = AppThemeMode.LIGHT,
     val latestMessage: String? = null,
@@ -112,6 +120,18 @@ data class AddLinkFormState(
     val isSaving: Boolean = false,
 )
 
+data class AddDocumentFormState(
+    val uri: String = "",
+    val displayName: String = "",
+    val mimeType: String? = null,
+    val title: String = "",
+    val durationMinutes: String = "10",
+    val selectedTopics: Set<TopicTag> = emptySet(),
+    val validationErrors: Set<UserDocumentValidationError> = emptySet(),
+    val canSave: Boolean = false,
+    val isSaving: Boolean = false,
+)
+
 enum class MainScreen {
     Onboarding,
     Home,
@@ -119,6 +139,7 @@ enum class MainScreen {
     Progress,
     Settings,
     AddLink,
+    AddDocument,
     AddLinkSuccess,
     Intervention,
     Reader,
@@ -135,6 +156,7 @@ enum class InterventionOrigin {
 class MainViewModel(
     private val contentRepository: ContentRepository,
     private val userLinkRepository: UserLinkRepository = EmptyUserLinkRepository,
+    private val userDocumentRepository: UserDocumentRepository = EmptyUserDocumentRepository,
     private val settingsRepository: SettingsRepository,
     private val recommendationEngine: RecommendationEngine,
     private val delayGate: DelayGate,
@@ -186,6 +208,11 @@ class MainViewModel(
         viewModelScope.launch {
             userLinkRepository.observeUserLinks().collect { links ->
                 uiState = uiState.copy(userLinks = links)
+            }
+        }
+        viewModelScope.launch {
+            userDocumentRepository.observeUserDocuments().collect { documents ->
+                uiState = uiState.copy(userDocuments = documents)
             }
         }
         viewModelScope.launch {
@@ -358,8 +385,31 @@ class MainViewModel(
         uiState = uiState.copy(
             screen = MainScreen.AddLink,
             addLinkForm = AddLinkFormState(),
+            addDocumentForm = AddDocumentFormState(),
             savedLinkConfirmation = null,
             latestMessage = null,
+        )
+    }
+
+    fun prepareUserDocumentImport(
+        uri: String,
+        displayName: String,
+        mimeType: String?,
+    ) {
+        val cleanedName = displayName.trim().ifBlank { "Untitled document" }
+        val title = cleanedName
+            .substringBeforeLast('.', cleanedName)
+            .trim()
+            .ifBlank { cleanedName }
+        updateAddDocumentForm(
+            form = AddDocumentFormState(
+                uri = uri,
+                displayName = cleanedName,
+                mimeType = mimeType,
+                title = title,
+                durationMinutes = defaultDocumentDuration(mimeType = mimeType, displayName = cleanedName),
+            ),
+            screen = MainScreen.AddDocument,
         )
     }
 
@@ -398,6 +448,7 @@ class MainViewModel(
         uiState = uiState.copy(
             screen = MainScreen.Home,
             addLinkForm = AddLinkFormState(),
+            addDocumentForm = AddDocumentFormState(),
             savedLinkConfirmation = null,
             latestMessage = null,
         )
@@ -487,8 +538,84 @@ class MainViewModel(
         uiState = uiState.copy(
             screen = MainScreen.Library,
             savedLinkConfirmation = null,
-            latestMessage = "Link saved for future replacement moments.",
+            latestMessage = "Saved for future replacement moments.",
         )
+    }
+
+    fun updateAddDocumentTitle(title: String) {
+        updateAddDocumentForm(uiState.addDocumentForm.copy(title = title))
+    }
+
+    fun updateAddDocumentDuration(durationMinutes: String) {
+        updateAddDocumentForm(uiState.addDocumentForm.copy(durationMinutes = durationMinutes))
+    }
+
+    fun toggleAddDocumentTopic(topic: TopicTag) {
+        val selectedTopics = uiState.addDocumentForm.selectedTopics.toMutableSet()
+        if (!selectedTopics.add(topic)) {
+            selectedTopics.remove(topic)
+        }
+        updateAddDocumentForm(uiState.addDocumentForm.copy(selectedTopics = selectedTopics))
+    }
+
+    fun saveUserDocument(nowMillis: Long = nowProvider()) {
+        val draft = uiState.addDocumentForm.toDraftOrNull()
+        if (draft == null) {
+            uiState = uiState.copy(
+                addDocumentForm = uiState.addDocumentForm.copy(
+                    validationErrors = uiState.addDocumentForm.localValidationErrors(),
+                    canSave = false,
+                    isSaving = false,
+                ),
+                latestMessage = "This file needs a little cleanup before saving.",
+            )
+            return
+        }
+
+        uiState = uiState.copy(addDocumentForm = uiState.addDocumentForm.copy(isSaving = true))
+        viewModelScope.launch {
+            try {
+                when (val result = userDocumentRepository.addDocument(draft = draft, nowMillis = nowMillis)) {
+                    is AddUserDocumentResult.Added -> {
+                        recordEventDurably(
+                            AnalyticsEvent(
+                                type = AnalyticsEventType.USER_DOCUMENT_ADDED,
+                                timestampMillis = nowMillis,
+                                contentId = result.item.id,
+                                metadata = result.item.analyticsMetadata() + mapOf(
+                                    "durationMinutes" to result.item.durationMinutes.toString(),
+                                    "topicCount" to result.item.topicTags.size.toString(),
+                                ),
+                            ),
+                        )
+                        uiState = uiState.copy(
+                            screen = MainScreen.AddLinkSuccess,
+                            addDocumentForm = AddDocumentFormState(),
+                            savedLinkConfirmation = result.item.toAddLinkConfirmation(),
+                            latestMessage = null,
+                        )
+                    }
+
+                    is AddUserDocumentResult.Rejected -> {
+                        uiState = uiState.copy(
+                            addDocumentForm = uiState.addDocumentForm.copy(
+                                validationErrors = result.errors,
+                                canSave = false,
+                                isSaving = false,
+                            ),
+                            latestMessage = "This file needs a little cleanup before saving.",
+                        )
+                    }
+                }
+            } catch (error: Throwable) {
+                if (error is CancellationException) throw error
+                uiState = uiState.copy(
+                    screen = MainScreen.AddDocument,
+                    addDocumentForm = uiState.addDocumentForm.copy(isSaving = false),
+                    latestMessage = "The file could not be saved locally. Try again.",
+                )
+            }
+        }
     }
 
     fun triggerDebugIntervention(nowMillis: Long = System.currentTimeMillis()) {
@@ -578,6 +705,7 @@ class MainViewModel(
                 when (item.sourceType) {
                     ContentSourceType.MEDITATION -> true
                     ContentSourceType.USER_LINK -> item.availability != ContentAvailability.UNAVAILABLE
+                    ContentSourceType.USER_DOCUMENT -> item.availability != ContentAvailability.UNAVAILABLE
                     ContentSourceType.EDITORIAL -> item.packId in preferences.selectedPackIds
                 }
             }
@@ -1060,6 +1188,7 @@ class MainViewModel(
                 !settings.hasCompletedOnboarding -> MainScreen.Onboarding
                 uiState.screen == MainScreen.Onboarding -> MainScreen.Home
                 uiState.screen == MainScreen.AddLink -> MainScreen.AddLink
+                uiState.screen == MainScreen.AddDocument -> MainScreen.AddDocument
                 uiState.screen == MainScreen.AddLinkSuccess -> MainScreen.AddLinkSuccess
                 uiState.screen == MainScreen.Library -> MainScreen.Library
                 uiState.screen == MainScreen.Progress -> MainScreen.Progress
@@ -1325,6 +1454,15 @@ class MainViewModel(
         return uiState.currentContent?.externalUrl
     }
 
+    fun currentExternalContentMimeType(): String? {
+        return when (uiState.currentContent?.format) {
+            ContentFormat.PDF -> "application/pdf"
+            ContentFormat.EPUB -> "application/epub+zip"
+            ContentFormat.MARKDOWN -> "text/markdown"
+            else -> null
+        }
+    }
+
     fun recordExternalLinkOpened(nowMillis: Long = System.currentTimeMillis()) {
         val content = uiState.currentContent ?: return
         val sessionId = uiState.currentSessionId ?: return
@@ -1372,16 +1510,14 @@ class MainViewModel(
                     metadata = content.analyticsMetadata() + mapOf("failureReason" to reason),
                 ),
             )
-            if (content.sourceType == ContentSourceType.USER_LINK) {
-                userLinkRepository.markUnavailable(contentId = content.id, nowMillis = nowMillis)
+            when (content.sourceType) {
+                ContentSourceType.USER_LINK -> userLinkRepository.markUnavailable(contentId = content.id, nowMillis = nowMillis)
+                ContentSourceType.USER_DOCUMENT -> userDocumentRepository.markUnavailable(contentId = content.id, nowMillis = nowMillis)
+                else -> Unit
             }
             historyRepository.markSkipped(sessionId = sessionId, skippedAtMillis = nowMillis)
             clearActiveSession(
-                latestMessage = if (content.sourceType == ContentSourceType.USER_LINK) {
-                    "This saved link could not be opened and was removed from future recommendations."
-                } else {
-                    "This external recommendation could not be opened."
-                },
+                latestMessage = content.handoffFailureMessage(),
             )
         }
     }
@@ -1543,6 +1679,21 @@ class MainViewModel(
             savedLinkConfirmation = null,
         )
     }
+
+    private fun updateAddDocumentForm(
+        form: AddDocumentFormState,
+        screen: MainScreen = uiState.screen,
+    ) {
+        uiState = uiState.copy(
+            screen = screen,
+            addDocumentForm = form.copy(
+                validationErrors = form.visibleValidationErrors(),
+                canSave = form.localValidationErrors().isEmpty(),
+                isSaving = false,
+            ),
+            savedLinkConfirmation = null,
+        )
+    }
 }
 
 class MainViewModelFactory(
@@ -1554,6 +1705,7 @@ class MainViewModelFactory(
         return MainViewModel(
             contentRepository = appContainer.contentRepository,
             userLinkRepository = appContainer.userLinkRepository,
+            userDocumentRepository = appContainer.userDocumentRepository,
             settingsRepository = appContainer.settingsRepository,
             recommendationEngine = appContainer.recommendationEngine,
             delayGate = appContainer.delayGate,
@@ -1622,10 +1774,30 @@ private fun AppSettings.toUserPreferences(
 private fun ContentItem.toAddLinkConfirmation(): AddLinkConfirmation {
     return AddLinkConfirmation(
         title = title,
-        host = externalUrl?.hostLabel().orEmpty().ifBlank { "your link" },
+        host = when (sourceType) {
+            ContentSourceType.USER_DOCUMENT -> sourceLabel.orEmpty().ifBlank { "your file" }
+            else -> externalUrl?.hostLabel().orEmpty().ifBlank { "your link" }
+        },
         durationMinutes = durationMinutes,
         topicLabel = topicTags.firstOrNull()?.displayName().orEmpty().ifBlank { "Reading" },
     )
+}
+
+private fun defaultDocumentDuration(mimeType: String?, displayName: String): String {
+    return when (UserDocumentValidator.detectFormat(displayName = displayName, mimeType = mimeType)) {
+        ContentFormat.MARKDOWN -> "8"
+        ContentFormat.PDF -> "15"
+        ContentFormat.EPUB -> "20"
+        else -> "10"
+    }
+}
+
+private fun ContentItem.handoffFailureMessage(): String {
+    return when (sourceType) {
+        ContentSourceType.USER_LINK -> "This saved link could not be opened and was removed from future recommendations."
+        ContentSourceType.USER_DOCUMENT -> "This saved file could not be opened and was removed from future recommendations."
+        else -> "This external recommendation could not be opened."
+    }
 }
 
 private fun String.hostLabel(): String {
@@ -1718,6 +1890,21 @@ private fun AddLinkFormState.toDraftOrNull(): UserLinkDraft? {
     )
 }
 
+private fun AddDocumentFormState.toDraftOrNull(): UserDocumentDraft? {
+    val duration = durationMinutes.toIntOrNull() ?: return null
+    if (localValidationErrors().isNotEmpty()) {
+        return null
+    }
+    return UserDocumentDraft(
+        uri = uri,
+        displayName = displayName,
+        mimeType = mimeType,
+        title = title,
+        durationMinutes = duration,
+        topicTags = selectedTopics,
+    )
+}
+
 private fun AddLinkFormState.localValidationErrors(): Set<UserLinkValidationError> {
     val errors = mutableSetOf<UserLinkValidationError>()
     val trimmedUrl = url.trim()
@@ -1733,6 +1920,20 @@ private fun AddLinkFormState.localValidationErrors(): Set<UserLinkValidationErro
         errors += UserLinkValidationError.NO_TOPICS
     }
     return errors
+}
+
+private fun AddDocumentFormState.localValidationErrors(): Set<UserDocumentValidationError> {
+    val duration = durationMinutes.toIntOrNull()
+    return UserDocumentValidator.validate(
+        UserDocumentDraft(
+            uri = uri,
+            displayName = displayName,
+            mimeType = mimeType,
+            title = title,
+            durationMinutes = duration ?: -1,
+            topicTags = selectedTopics,
+        ),
+    ).errors
 }
 
 private fun AddLinkFormState.visibleValidationErrors(): Set<UserLinkValidationError> {
@@ -1761,6 +1962,32 @@ private fun AddLinkFormState.visibleValidationErrors(): Set<UserLinkValidationEr
     return errors
 }
 
+private fun AddDocumentFormState.visibleValidationErrors(): Set<UserDocumentValidationError> {
+    val errors = mutableSetOf<UserDocumentValidationError>()
+    val duration = durationMinutes.trim()
+    val validDuration = duration.toIntOrNull()?.let { it in 1..120 } == true
+    val format = UserDocumentValidator.detectFormat(displayName = displayName, mimeType = mimeType)
+    if (uri.isBlank()) {
+        errors += UserDocumentValidationError.EMPTY_URI
+    }
+    if (format == null) {
+        errors += UserDocumentValidationError.UNSUPPORTED_FORMAT
+    }
+    if (duration.isNotBlank() && !validDuration) {
+        errors += UserDocumentValidationError.INVALID_DURATION
+    }
+    if (duration.isBlank() && (title.isNotBlank() || selectedTopics.isNotEmpty())) {
+        errors += UserDocumentValidationError.INVALID_DURATION
+    }
+    if (title.isBlank() && (uri.isNotBlank() || selectedTopics.isNotEmpty())) {
+        errors += UserDocumentValidationError.BLANK_TITLE
+    }
+    if (selectedTopics.isEmpty() && uri.isNotBlank() && title.isNotBlank() && validDuration) {
+        errors += UserDocumentValidationError.NO_TOPICS
+    }
+    return errors
+}
+
 private fun RecommendationSet.analyticsMetadata(): Map<String, String> {
     return primary.analyticsMetadata(prefix = "primary") +
         backups.flatMapIndexed { index, content ->
@@ -1783,6 +2010,14 @@ private fun inventoryDiagnostics(
         }
         .map(ContentItem::id)
         .toSet()
+    val unavailableUserDocumentIds = rawInventory
+        .asSequence()
+        .filter { item ->
+            item.sourceType == ContentSourceType.USER_DOCUMENT &&
+                item.availability == ContentAvailability.UNAVAILABLE
+        }
+        .map(ContentItem::id)
+        .toSet()
     return mapOf(
         "selectedPackCount" to preferences.selectedPackIds.size.toString(),
         "selectedPackIds" to preferences.selectedPackIds.sorted().joinToString(","),
@@ -1790,7 +2025,9 @@ private fun inventoryDiagnostics(
         "eligibleEditorialCount" to eligibleInventory.count { it.sourceType == ContentSourceType.EDITORIAL }.toString(),
         "eligibleMeditationCount" to eligibleInventory.count { it.sourceType == ContentSourceType.MEDITATION }.toString(),
         "eligibleUserLinkCount" to eligibleInventory.count { it.sourceType == ContentSourceType.USER_LINK }.toString(),
+        "eligibleUserDocumentCount" to eligibleInventory.count { it.sourceType == ContentSourceType.USER_DOCUMENT }.toString(),
         "unavailableUserLinkCount" to unavailableUserLinkIds.size.toString(),
+        "unavailableUserDocumentCount" to unavailableUserDocumentIds.size.toString(),
         "completedContentCount" to completedContentIds.size.toString(),
     )
 }
@@ -1817,6 +2054,22 @@ private object EmptyUserLinkRepository : UserLinkRepository {
         draft: UserLinkDraft,
         nowMillis: Long,
     ): AddUserLinkResult = AddUserLinkResult.Rejected(setOf(UserLinkValidationError.UNSUPPORTED_SCHEME))
+
+    override suspend fun markUnavailable(
+        contentId: String,
+        nowMillis: Long,
+    ) = Unit
+}
+
+private object EmptyUserDocumentRepository : UserDocumentRepository {
+    override fun userDocuments(): List<ContentItem> = emptyList()
+
+    override fun observeUserDocuments() = flowOf(emptyList<ContentItem>())
+
+    override suspend fun addDocument(
+        draft: UserDocumentDraft,
+        nowMillis: Long,
+    ): AddUserDocumentResult = AddUserDocumentResult.Rejected(setOf(UserDocumentValidationError.UNSUPPORTED_FORMAT))
 
     override suspend fun markUnavailable(
         contentId: String,

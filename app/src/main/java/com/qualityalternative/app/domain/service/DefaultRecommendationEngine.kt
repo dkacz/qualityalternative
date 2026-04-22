@@ -119,7 +119,8 @@ class DefaultRecommendationEngine : RecommendationEngine {
         return when (this) {
             ContentSourceType.EDITORIAL -> 0
             ContentSourceType.MEDITATION -> 1
-            ContentSourceType.USER_LINK -> 2
+            ContentSourceType.USER_DOCUMENT -> 2
+            ContentSourceType.USER_LINK -> 3
         }
     }
 }
