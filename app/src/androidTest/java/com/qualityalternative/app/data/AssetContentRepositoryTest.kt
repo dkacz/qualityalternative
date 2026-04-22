@@ -173,6 +173,68 @@ class AssetContentRepositoryTest {
     }
 
     @Test
+    fun publicDomainExpansionPackCarriesRenderableRightsAndBodies() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val repository = AssetContentRepository(context)
+
+        val pack = repository.starterPacks().first { it.id == "public-domain-expansion-v2" }
+        val items = pack.items
+
+        assertEquals(10, items.size)
+        assertEquals(
+            setOf(
+                "a-naturalist-notices-everything",
+                "a-doorway-into-learning",
+                "choose-your-own-plan",
+                "look-at-the-stars",
+                "a-place-of-business",
+                "the-minds-own-snare",
+                "rest-satisfied-with-what-we-have",
+                "anger-divides-what-life-joins",
+                "earnestness-as-an-island",
+                "the-examined-life",
+            ),
+            items.map { item -> item.id }.toSet(),
+        )
+        items.forEach { item ->
+            assertEquals(ContentSourceType.EDITORIAL, item.sourceType)
+            assertEquals(ContentRightsClass.RENDERABLE, item.rights.rightsClass)
+            assertEquals(ContentRenderMode.IN_APP_READER, item.rights.renderMode)
+            assertFalse(item.bodyAssetPath.isNullOrBlank())
+            assertEquals(null, item.externalUrl)
+            assertFalse(item.whyThisNow.isNullOrBlank())
+            assertFalse(item.rights.licenseName.isNullOrBlank())
+            assertFalse(item.rights.licenseUrl.isNullOrBlank())
+            assertFalse(item.rights.sourceUrl.isNullOrBlank())
+            assertFalse(item.rights.attribution.isNullOrBlank())
+            assertEquals("2026-04-22", item.rights.rightsReviewedAt)
+            assertFalse(repository.contentBody(item).isBlank())
+        }
+    }
+
+    @Test
+    fun publicDomainExpansionDurationsMatchShippedMarkdownBodies() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val repository = AssetContentRepository(context)
+
+        val items = repository.starterPacks().first { it.id == "public-domain-expansion-v2" }.items
+
+        items.forEach { item ->
+            val words = repository.contentBody(item).split(Regex("\\s+")).count(String::isNotBlank)
+            val wordsPerMinute = words / item.durationMinutes
+
+            assertTrue(
+                "${item.id} has too few words for ${item.durationMinutes} min: $words words",
+                wordsPerMinute >= 70,
+            )
+            assertTrue(
+                "${item.id} has too many words for ${item.durationMinutes} min: $words words",
+                wordsPerMinute <= 190,
+            )
+        }
+    }
+
+    @Test
     fun starterPackItemsDoNotClaimExternalPublicationAffiliation() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val repository = AssetContentRepository(context)

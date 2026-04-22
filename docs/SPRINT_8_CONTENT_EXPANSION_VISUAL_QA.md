@@ -208,12 +208,19 @@ Result:
 
 ### 8.5 Renderable Pack Expansion v2
 
+Status: `implemented`
+
 - Add 10 more renderable items from already triaged public-domain or permissive sources.
 - Prefer short, vivid excerpts over famous-but-dense material.
 
 Exit criteria:
 
 - Tests confirm body assets exist, metadata is complete, durations are plausible, and reader rendering is not capped.
+
+Result:
+
+- `public-domain-expansion-v2` adds 10 local markdown readings from Darwin, Booker T. Washington, Mill, Emerson, Thoreau, Montaigne, Seneca, `The Dhammapada`, and Plato.
+- See `docs/CONTENT_RENDERABLE_PACK_V2.md`.
 
 ### 8.6 Replacement Quality and Release Candidate
 

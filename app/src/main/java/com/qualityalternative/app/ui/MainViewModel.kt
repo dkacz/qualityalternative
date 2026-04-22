@@ -1594,6 +1594,9 @@ private fun defaultStarterPackIds(starterPacks: List<EditorialPack>): Set<String
     if (starterPacks.any { pack -> pack.id == ATTENTION_CLASSICS_PACK_ID }) {
         selected += ATTENTION_CLASSICS_PACK_ID
     }
+    if (starterPacks.any { pack -> pack.id == PUBLIC_DOMAIN_EXPANSION_PACK_ID }) {
+        selected += PUBLIC_DOMAIN_EXPANSION_PACK_ID
+    }
     if (starterPacks.any { pack -> pack.id == LINK_ONLY_MODERN_PACK_ID }) {
         selected += LINK_ONLY_MODERN_PACK_ID
     }
@@ -1658,6 +1661,7 @@ private fun defaultPrototypeTopics(): Set<TopicTag> = setOf(
 )
 
 private const val ATTENTION_CLASSICS_PACK_ID = "attention-classics-v1"
+private const val PUBLIC_DOMAIN_EXPANSION_PACK_ID = "public-domain-expansion-v2"
 private const val LINK_ONLY_MODERN_PACK_ID = "link-only-modern-v1"
 
 private fun AppSettings.toOnboardingSelection(

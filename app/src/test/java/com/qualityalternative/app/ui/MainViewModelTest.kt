@@ -166,6 +166,7 @@ class MainViewModelTest {
         val viewModel = createViewModel(
             contentRepository = FakeContentRepository(
                 includeAttentionClassics = true,
+                includePublicDomainExpansion = true,
                 includeLinkOnlyModern = true,
             ),
         )
@@ -175,7 +176,7 @@ class MainViewModelTest {
         advanceUntilIdle()
 
         assertEquals(
-            setOf("philosophy", "attention-classics-v1", "link-only-modern-v1"),
+            setOf("philosophy", "attention-classics-v1", "public-domain-expansion-v2", "link-only-modern-v1"),
             viewModel.uiState.preferences?.selectedPackIds,
         )
     }
@@ -1548,6 +1549,7 @@ class MainViewModelTest {
         extraItems: List<ContentItem> = emptyList(),
         isReady: Boolean = true,
         includeAttentionClassics: Boolean = false,
+        includePublicDomainExpansion: Boolean = false,
         includeLinkOnlyModern: Boolean = false,
     ) : ContentRepository {
         private val ready = MutableStateFlow(isReady)
@@ -1626,6 +1628,23 @@ class MainViewModelTest {
                                     renderMode = ContentRenderMode.EXTERNAL_HANDOFF,
                                     sourceUrl = "https://longnow.org/ideas/the-big-here-and-long-now/",
                                 ),
+                            ),
+                        ),
+                    ),
+                )
+            }
+            if (includePublicDomainExpansion) {
+                add(
+                    EditorialPack(
+                        id = "public-domain-expansion-v2",
+                        title = "Public-Domain Deep Reads v2",
+                        description = "Pack",
+                        items = listOf(
+                            contentItem(
+                                id = "darwin-noticing",
+                                packId = "public-domain-expansion-v2",
+                                durationMinutes = 3,
+                                topics = setOf(TopicTag.SCIENCE, TopicTag.ESSAYS),
                             ),
                         ),
                     ),

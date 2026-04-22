@@ -137,15 +137,17 @@ The Conversation remains a future source-family candidate; no The Conversation i
 
 Target 10 new renderable items:
 
-- R09 Darwin, `Voyage of the Beagle`.
-- R11 Booker T. Washington, `Up From Slavery`.
-- R12 Mill, `On Liberty`.
-- R14 Emerson, `Nature`.
-- R15 Thoreau, `Life Without Principle`, if source verification succeeds.
-- R17 Montaigne, `That Our Mind Hinders Itself`.
-- R18 Seneca, `Of a Happy Life`.
-- R19 Seneca, one moral letter, if Gummere/source status is clean.
-- R20 `The Dhammapada`, if framing passes quality review.
-- R26 OWID `Life Expectancy`, only if a text-first CC BY excerpt is durable without charts.
+- R09 Darwin, `Voyage of the Beagle` - integrated in `public-domain-expansion-v2`.
+- R11 Booker T. Washington, `Up From Slavery` - integrated in `public-domain-expansion-v2`.
+- R12 Mill, `On Liberty` - integrated in `public-domain-expansion-v2`.
+- R14 Emerson, `Nature` - integrated in `public-domain-expansion-v2`.
+- R15 Thoreau, `Life Without Principle` - source verified through Wikisource and integrated in `public-domain-expansion-v2`.
+- R17 Montaigne, `That Our Mind Hinders Itself` - integrated from Project Gutenberg ebook #3599 in `public-domain-expansion-v2`.
+- R18 Seneca, `Of a Happy Life` - integrated from Project Gutenberg ebook #56075 in `public-domain-expansion-v2`; the earlier #59025 pointer was not used.
+- R19 Seneca, one moral letter, if Gummere/source status is clean - not integrated because the Gummere translation path is less clean for EU/Poland reuse; replaced with Seneca `Of Anger` from the older L'Estrange source in Project Gutenberg ebook #56075.
+- R20 `The Dhammapada`, if framing passes quality review - integrated in `public-domain-expansion-v2`.
+- R26 OWID `Life Expectancy`, only if a text-first CC BY excerpt is durable without charts - not integrated in this pack; replaced with Plato `Apology` from Project Gutenberg ebook #1656 to keep Slice 8.5 text-only and public-domain.
+
+Resulting pack doc: `docs/CONTENT_RENDERABLE_PACK_V2.md`.
 
 Reserve R10, R13, R21, R22, R23, R24, R27, R28, R29, and R30 for later packs unless a selected item fails.

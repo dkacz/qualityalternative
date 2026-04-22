@@ -229,6 +229,7 @@ Delivered so far:
 - Repeatable 3-minute meditation timer as an app-utility replacement.
 - Sprint 8 source-candidate inventory with 50 link-only candidates and 30 renderable candidates.
 - `link-only-modern-v1`, a 20-item external-handoff pack for modern deep reads.
+- `public-domain-expansion-v2`, a 10-item local renderable pack from public-domain sources.
 
 Out of scope:
 
