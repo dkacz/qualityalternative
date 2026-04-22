@@ -261,6 +261,29 @@
           "bodyAssetPath": "editorial/items/of_studies.md"
         }
       ]
+    },
+    {
+      "id": "link-only-smoke-v1",
+      "title": "Link-only Smoke Pack",
+      "description": "One canonical external recommendation used to prove shared link-only content without reproducing article text.",
+      "items": [
+        {
+          "id": "big-here-long-now",
+          "title": "The Big Here and Long Now",
+          "description": "A perspective reset for the moment the feed narrows your sense of time and place.",
+          "durationMinutes": 10,
+          "format": "HTML",
+          "source": "Long Now",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no in-app reproduction",
+          "sourceUrl": "https://longnow.org/ideas/the-big-here-and-long-now/",
+          "externalUrl": "https://longnow.org/ideas/the-big-here-and-long-now/",
+          "attribution": "Brian Eno, The Long Now Foundation",
+          "rightsReviewedAt": "2026-04-22",
+          "topics": ["ESSAYS", "PHILOSOPHY"]
+        }
+      ]
     }
   ]
 }

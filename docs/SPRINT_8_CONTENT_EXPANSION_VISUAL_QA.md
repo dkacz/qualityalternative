@@ -134,6 +134,8 @@ Result:
 
 ### 8.2 Shared Link-Only Manifest Support
 
+Status: `implemented`
+
 - Extend local editorial assets to support `EXTERNAL_HANDOFF` items with `externalUrl` and no body asset.
 - Keep existing user-added links behavior unchanged.
 - Add tests for mixed renderable and link-only inventory.
@@ -143,6 +145,12 @@ Exit criteria:
 - A local shared link-only item can appear in the finite intervention.
 - Accepting it opens the saved-link/external handoff surface.
 - No body text is required or rendered for link-only items.
+
+Result:
+
+- `link-only-smoke-v1` proves a shared editorial link-only item can be parsed from assets.
+- Shared link-only recommendations remain editorial inventory but route through external handoff.
+- Generic external-handoff analytics distinguish shared editorial links from user-added links.
 
 ### 8.2b Meditation Timer Replacement
 

@@ -89,6 +89,7 @@ import com.qualityalternative.app.domain.model.PermissionStatus
 import com.qualityalternative.app.domain.model.ReplacementHistoryEntry
 import com.qualityalternative.app.domain.model.TopicTag
 import com.qualityalternative.app.domain.model.UserLinkValidationError
+import com.qualityalternative.app.domain.model.usesExternalHandoff
 import com.qualityalternative.app.domain.model.usesMeditationTimer
 import com.qualityalternative.app.ui.theme.QualityAlternativeAppTheme
 import com.qualityalternative.app.ui.theme.QualityAlternativeThemeTokens
@@ -1123,15 +1124,11 @@ private fun InterventionScreen(
             )
         }
         QaButton(
-            text = if (primary.usesMeditationTimer()) {
-                "Start timer · ${primary.durationMinutes} min"
-            } else {
-                "Read this · ${primary.durationMinutes} min"
-            },
+            text = primaryActionLabel(primary),
             onClick = onAcceptPrimary,
             variant = QaButtonVariant.Accent,
             modifier = Modifier.padding(bottom = 16.dp),
-            leadingIcon = if (primary.usesMeditationTimer()) QaIconKind.Pause else QaIconKind.Book,
+            leadingIcon = primaryActionIcon(primary),
         )
         MonoText("Or", modifier = Modifier.padding(bottom = 6.dp))
         Column(modifier = Modifier.padding(bottom = 18.dp)) {
@@ -2834,6 +2831,22 @@ private fun DurationBucket.prototypeMinutes(): Int {
 private fun DurationBucket.prototypeMinutesLabel(): String = "${prototypeMinutes()} min"
 
 private fun ContentItem.isUserLink(): Boolean = sourceType == ContentSourceType.USER_LINK
+
+private fun primaryActionLabel(item: ContentItem): String {
+    return when {
+        item.usesMeditationTimer() -> "Start timer · ${item.durationMinutes} min"
+        item.usesExternalHandoff() -> "Open link · ${item.durationMinutes} min"
+        else -> "Read this · ${item.durationMinutes} min"
+    }
+}
+
+private fun primaryActionIcon(item: ContentItem): QaIconKind {
+    return when {
+        item.usesMeditationTimer() -> QaIconKind.Pause
+        item.usesExternalHandoff() -> QaIconKind.External
+        else -> QaIconKind.Book
+    }
+}
 
 private fun meditationTimeLabel(totalSeconds: Int): String {
     val minutes = totalSeconds / 60

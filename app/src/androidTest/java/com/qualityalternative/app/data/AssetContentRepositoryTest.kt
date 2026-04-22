@@ -5,6 +5,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.qualityalternative.app.domain.model.ContentRenderMode
 import com.qualityalternative.app.domain.model.ContentRightsClass
 import com.qualityalternative.app.domain.model.ContentSourceType
+import com.qualityalternative.app.domain.model.usesExternalHandoff
 import com.qualityalternative.app.domain.model.usesRepositoryBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -15,7 +16,7 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class AssetContentRepositoryTest {
     @Test
-    fun starterPackItemsCarryExplicitRenderableRightsMetadata() {
+    fun starterPackItemsCarryExplicitRightsAndRenderMetadata() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val repository = AssetContentRepository(context)
 
@@ -24,16 +25,42 @@ class AssetContentRepositoryTest {
         assertTrue(items.isNotEmpty())
         items.forEach { item ->
             assertEquals(ContentSourceType.EDITORIAL, item.sourceType)
-            assertEquals(null, item.externalUrl)
-            assertFalse(item.bodyAssetPath.isNullOrBlank())
-            assertEquals(ContentRightsClass.RENDERABLE, item.rights.rightsClass)
-            assertEquals(ContentRenderMode.IN_APP_READER, item.rights.renderMode)
             assertFalse(item.sourceLabel.isNullOrBlank())
             assertFalse(item.rights.licenseName.isNullOrBlank())
             assertFalse(item.rights.attribution.isNullOrBlank())
             assertFalse(item.rights.rightsReviewedAt.isNullOrBlank())
-            assertTrue(item.usesRepositoryBody())
+            if (item.usesRepositoryBody()) {
+                assertFalse(item.bodyAssetPath.isNullOrBlank())
+                assertEquals(null, item.externalUrl)
+                assertEquals(ContentRightsClass.RENDERABLE, item.rights.rightsClass)
+                assertEquals(ContentRenderMode.IN_APP_READER, item.rights.renderMode)
+            }
+            if (item.usesExternalHandoff()) {
+                assertEquals(null, item.bodyAssetPath)
+                assertFalse(item.externalUrl.isNullOrBlank())
+                assertEquals(ContentRightsClass.LINK_ONLY, item.rights.rightsClass)
+                assertEquals(ContentRenderMode.EXTERNAL_HANDOFF, item.rights.renderMode)
+            }
         }
+    }
+
+    @Test
+    fun sharedLinkOnlyItemsUseExternalHandoffWithoutBodyAssets() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val repository = AssetContentRepository(context)
+
+        val pack = repository.starterPacks().first { it.id == "link-only-smoke-v1" }
+        val item = pack.items.single()
+
+        assertEquals("big-here-long-now", item.id)
+        assertEquals("Long Now", item.sourceLabel)
+        assertEquals(ContentRightsClass.LINK_ONLY, item.rights.rightsClass)
+        assertEquals(ContentRenderMode.EXTERNAL_HANDOFF, item.rights.renderMode)
+        assertEquals("https://longnow.org/ideas/the-big-here-and-long-now/", item.externalUrl)
+        assertEquals(null, item.bodyAssetPath)
+        assertTrue(item.usesExternalHandoff())
+        assertFalse(item.usesRepositoryBody())
+        assertEquals(item.description, repository.contentBody(item))
     }
 
     @Test

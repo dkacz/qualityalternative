@@ -1331,7 +1331,11 @@ class MainViewModel(
         content.externalUrl ?: return
         recordEvent(
             AnalyticsEvent(
-                type = AnalyticsEventType.USER_LINK_FALLBACK_OPENED,
+                type = if (content.sourceType == ContentSourceType.USER_LINK) {
+                    AnalyticsEventType.USER_LINK_FALLBACK_OPENED
+                } else {
+                    AnalyticsEventType.EXTERNAL_HANDOFF_OPENED
+                },
                 timestampMillis = nowMillis,
                 interventionId = uiState.currentInterventionId,
                 sessionId = sessionId,
@@ -1353,7 +1357,11 @@ class MainViewModel(
         viewModelScope.launch {
             recordEvent(
                 AnalyticsEvent(
-                    type = AnalyticsEventType.USER_LINK_HANDOFF_FAILED,
+                    type = if (content.sourceType == ContentSourceType.USER_LINK) {
+                        AnalyticsEventType.USER_LINK_HANDOFF_FAILED
+                    } else {
+                        AnalyticsEventType.EXTERNAL_HANDOFF_FAILED
+                    },
                     timestampMillis = nowMillis,
                     interventionId = uiState.currentInterventionId,
                     sessionId = sessionId,

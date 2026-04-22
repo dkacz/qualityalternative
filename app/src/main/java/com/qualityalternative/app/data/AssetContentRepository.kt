@@ -8,6 +8,7 @@ import com.qualityalternative.app.domain.model.ContentRightsClass
 import com.qualityalternative.app.domain.model.ContentRightsMetadata
 import com.qualityalternative.app.domain.model.EditorialPack
 import com.qualityalternative.app.domain.model.TopicTag
+import com.qualityalternative.app.domain.model.usesRepositoryBody
 import com.qualityalternative.app.domain.service.ContentRepository
 import org.json.JSONArray
 import org.json.JSONObject
@@ -25,8 +26,11 @@ class AssetContentRepository(
     override fun inventory(): List<ContentItem> = cachedPacks.flatMap(EditorialPack::items)
 
     override fun contentBody(item: ContentItem): String {
+        if (!item.usesRepositoryBody()) {
+            return item.description
+        }
         val bodyAssetPath = requireNotNull(item.bodyAssetPath) {
-            "Editorial content must provide a body asset path."
+            "Renderable editorial content must provide a body asset path."
         }
         return loadAsset(bodyAssetPath)
     }
@@ -51,6 +55,19 @@ class AssetContentRepository(
     private fun JSONArray.toContentItems(packId: String): List<ContentItem> = buildList {
         for (index in 0 until length()) {
             val item = getJSONObject(index)
+            val rights = item.toContentRightsMetadata()
+            val bodyAssetPath = item.optNonBlankString("bodyAssetPath")
+            val externalUrl = item.optNonBlankString("externalUrl")
+            if (rights.usesRepositoryBody) {
+                require(!bodyAssetPath.isNullOrBlank()) {
+                    "Renderable item ${item.getString("id")} must provide bodyAssetPath."
+                }
+            }
+            if (rights.usesExternalHandoff) {
+                require(!externalUrl.isNullOrBlank()) {
+                    "External handoff item ${item.getString("id")} must provide externalUrl."
+                }
+            }
             add(
                 ContentItem(
                     id = item.getString("id"),
@@ -60,9 +77,10 @@ class AssetContentRepository(
                     durationMinutes = item.getInt("durationMinutes"),
                     format = ContentFormat.valueOf(item.getString("format")),
                     topicTags = item.getJSONArray("topics").toTopicTags(),
-                    bodyAssetPath = item.getString("bodyAssetPath"),
+                    bodyAssetPath = bodyAssetPath,
+                    externalUrl = externalUrl,
                     sourceLabel = item.optString("source").takeIf(String::isNotBlank),
-                    rights = item.toContentRightsMetadata(),
+                    rights = rights,
                 ),
             )
         }

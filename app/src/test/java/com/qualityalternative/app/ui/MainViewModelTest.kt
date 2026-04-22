@@ -220,6 +220,48 @@ class MainViewModelTest {
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
+    fun acceptingSharedLinkOnlyRoutesToExternalHandoffAndRecordsGenericOpen() = runTest {
+        val linkOnly = sharedLinkOnlyItem()
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val viewModel = createViewModel(
+            contentRepository = FakeContentRepository(extraItems = listOf(linkOnly)),
+            recommendationEngine = FixedRecommendationEngine(
+                RecommendationSet(
+                    primary = linkOnly,
+                    backups = emptyList(),
+                    inventoryShortage = true,
+                    generatedAtMillis = 1_000L,
+                ),
+            ),
+            analyticsTracker = analyticsTracker,
+        )
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+        viewModel.triggerDebugIntervention(nowMillis = 1_000L)
+        advanceUntilIdle()
+        viewModel.acceptPrimary()
+        advanceUntilIdle()
+
+        assertEquals(MainScreen.ExternalHandoff, viewModel.uiState.screen)
+        assertEquals("https://longnow.org/ideas/the-big-here-and-long-now/", viewModel.currentExternalLinkUrl())
+        assertFalse(analyticsTracker.allEvents().any { it.type == AnalyticsEventType.USER_LINK_FALLBACK_OPENED })
+
+        viewModel.recordExternalLinkOpened(nowMillis = 2_000L)
+
+        val event = analyticsTracker.allEvents().first {
+            it.type == AnalyticsEventType.EXTERNAL_HANDOFF_OPENED
+        }
+        assertEquals(linkOnly.id, event.contentId)
+        assertEquals("EDITORIAL", event.metadata["sourceType"])
+        assertEquals("LINK_ONLY", event.metadata["rightsClass"])
+        assertEquals("EXTERNAL_HANDOFF", event.metadata["renderMode"])
+        assertEquals("https://longnow.org/ideas/the-big-here-and-long-now/", event.metadata["externalUrl"])
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
     fun acceptingMeditationRoutesToTimerAndCompletionRecordsMeditationEvent() = runTest {
         val analyticsTracker = InMemoryAnalyticsTracker()
         val viewModel = createViewModel(
@@ -1656,6 +1698,27 @@ class MainViewModelTest {
             sourceType = ContentSourceType.USER_LINK,
             availability = ContentAvailability.NEEDS_FALLBACK,
             rights = ContentRightsMetadata.userPrivateExternal(sourceUrl = "https://example.com/essay"),
+        )
+    }
+
+    private fun sharedLinkOnlyItem(): ContentItem {
+        return ContentItem(
+            id = "big-here-long-now",
+            packId = "link-only-smoke-v1",
+            title = "The Big Here and Long Now",
+            description = "A perspective reset for the moment the feed narrows your sense of time and place.",
+            durationMinutes = 10,
+            format = ContentFormat.HTML,
+            topicTags = setOf(TopicTag.ESSAYS, TopicTag.PHILOSOPHY),
+            externalUrl = "https://longnow.org/ideas/the-big-here-and-long-now/",
+            sourceLabel = "Long Now",
+            rights = ContentRightsMetadata(
+                rightsClass = ContentRightsClass.LINK_ONLY,
+                renderMode = ContentRenderMode.EXTERNAL_HANDOFF,
+                sourceUrl = "https://longnow.org/ideas/the-big-here-and-long-now/",
+                attribution = "Brian Eno, The Long Now Foundation",
+                rightsReviewedAt = "2026-04-22",
+            ),
         )
     }
 

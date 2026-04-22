@@ -347,6 +347,35 @@ class MainActivityTest {
         composeRule.onNodeWithText("End early").assertIsDisplayed()
     }
 
+    @Test
+    fun sharedLinkOnlyAlternativeOpensExternalHandoffScreen() {
+        launchLinkOnlyFixtureSystemIntervention()
+
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasNode("The Big Here and Long Now")
+        }
+        if (hasNodeContaining("Open link")) {
+            composeRule.onNodeWithText("Open link", substring = true)
+                .assertIsDisplayed()
+                .performClick()
+        } else {
+            composeRule.onNodeWithText("The Big Here and Long Now")
+                .assertIsDisplayed()
+                .performClick()
+        }
+
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasTag("external-handoff-screen")
+        }
+        composeRule.onNodeWithTag("external-handoff-screen").assertIsDisplayed()
+        composeRule.onNodeWithText("The Big Here and Long Now").assertIsDisplayed()
+        composeRule.onNodeWithText("https://longnow.org/ideas/the-big-here-and-long-now/")
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag("external-link-open")
+            .assertIsDisplayed()
+            .assertIsEnabled()
+    }
+
     private fun hasNode(text: String): Boolean {
         return runCatching {
             composeRule.onNodeWithText(text).fetchSemanticsNode()
@@ -462,6 +491,28 @@ class MainActivityTest {
         }
     }
 
+    private fun launchLinkOnlyFixtureSystemIntervention() {
+        launchOnboardedApp()
+        seedLinkOnlyFixtureSelection()
+
+        scenario?.close()
+        scenario = null
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+        Thread.sleep(250)
+
+        val targetContext = InstrumentationRegistry.getInstrumentation().targetContext
+        launchApp(
+            MainActivity.createSystemInterceptionIntent(
+                context = targetContext,
+                targetAppPackage = FixtureTargetRegistry.fixtureDistractors.first().packageName,
+            ),
+        )
+
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasNode("You reached for Fixture Feed One")
+        }
+    }
+
     private fun assertHomeHeroIsDisplayed() {
         composeRule.waitUntil(timeoutMillis = 10_000) {
             hasNode("You're set up for quieter reading today.") || hasNode("Interception needs one more step.")
@@ -492,6 +543,20 @@ class MainActivityTest {
                 preferredTopics = setOf(TopicTag.PSYCHOLOGY, TopicTag.PHILOSOPHY, TopicTag.ESSAYS),
                 preferredDurationBucket = DurationBucket.QUICK,
                 selectedPackIds = setOf("meditation-only-test-pack"),
+            ),
+        )
+    }
+
+    private fun seedLinkOnlyFixtureSelection() = runBlocking {
+        val repository = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication)
+            .appContainer
+            .settingsRepository
+        repository.saveOnboardingSelection(
+            OnboardingSelection(
+                selectedAppPackages = setOf(FixtureTargetRegistry.fixtureDistractors.first().packageName),
+                preferredTopics = setOf(TopicTag.PHILOSOPHY, TopicTag.ESSAYS, TopicTag.HISTORY),
+                preferredDurationBucket = DurationBucket.FOCUS,
+                selectedPackIds = setOf("link-only-smoke-v1"),
             ),
         )
     }
