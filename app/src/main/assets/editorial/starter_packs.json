@@ -127,7 +127,7 @@
         {
           "id": "start-with-what-is-yours",
           "title": "Start With What Is Yours",
-          "description": "Epictetus starts with the simplest anti-impulse question: is this actually yours to control?",
+          "description": "Before the feed opens, separate what is yours to choose from what is just noise.",
           "durationMinutes": 3,
           "format": "MARKDOWN",
           "source": "Public-domain source text via Project Gutenberg",
@@ -144,7 +144,7 @@
         {
           "id": "the-morning-test",
           "title": "The Morning Test",
-          "description": "Marcus Aurelius turns reluctance into a clean test of what the next action is for.",
+          "description": "A three-minute reset for the moment you catch yourself drifting toward default.",
           "durationMinutes": 3,
           "format": "MARKDOWN",
           "source": "Public-domain source text via Project Gutenberg",
@@ -161,7 +161,7 @@
         {
           "id": "the-flywheel-of-habit",
           "title": "The Flywheel of Habit",
-          "description": "William James explains why repeated tiny actions become the grooves our attention follows.",
+          "description": "William James explains why one repeated tap can become the groove attention follows.",
           "durationMinutes": 4,
           "format": "MARKDOWN",
           "source": "Public-domain source text via Project Gutenberg",
@@ -178,7 +178,7 @@
         {
           "id": "live-deliberately",
           "title": "Live Deliberately",
-          "description": "Thoreau asks what it would mean to choose the minute instead of letting detail spend it.",
+          "description": "A short Thoreau cut about spending this minute on purpose, not by default.",
           "durationMinutes": 3,
           "format": "MARKDOWN",
           "source": "Public-domain source text via Project Gutenberg",
@@ -195,7 +195,7 @@
         {
           "id": "walk-before-you-scroll",
           "title": "Walk Before You Scroll",
-          "description": "A short Thoreau passage that changes the replacement from punishment into movement.",
+          "description": "A phone-free alternative frame: move first, scroll later if you still mean to.",
           "durationMinutes": 3,
           "format": "MARKDOWN",
           "source": "Public-domain source text via Project Gutenberg",
@@ -212,7 +212,7 @@
         {
           "id": "trust-the-first-honest-thought",
           "title": "Trust the First Honest Thought",
-          "description": "Emerson offers a counterweight to comparison loops: notice the thought before it is drowned out.",
+          "description": "A counterweight to comparison loops: notice the thought before it is drowned out.",
           "durationMinutes": 4,
           "format": "MARKDOWN",
           "source": "Public-domain source text via Project Gutenberg",
@@ -229,7 +229,7 @@
         {
           "id": "the-desert-resets-the-eye",
           "title": "The Desert Resets the Eye",
-          "description": "Mary Austin's desert prose pulls attention outward into landscape instead of novelty.",
+          "description": "A landscape cut for when you need attention pulled outward instead of onward.",
           "durationMinutes": 3,
           "format": "MARKDOWN",
           "source": "Public-domain source text via Project Gutenberg",
@@ -245,8 +245,8 @@
         },
         {
           "id": "of-studies",
-          "title": "Of Studies",
-          "description": "Francis Bacon compresses reading into a practical discipline of weighing and considering.",
+          "title": "Read to Weigh",
+          "description": "A quick Bacon passage on reading as weighing and considering, not consuming.",
           "durationMinutes": 3,
           "format": "MARKDOWN",
           "source": "Public-domain source text via Project Gutenberg",

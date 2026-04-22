@@ -92,6 +92,7 @@ Wyślij proszę krótką informację:
 - czy `Pause 15 min` faktycznie wstrzymuje ponowną interwencję
 - czy aplikacja crashuje, zawiesza się albo pokazuje pusty ekran
 - czy rekomendacje treści wyglądają sensownie
+- czy przy nowym packu klasyków tytuł i opis sprawiają, że naprawdę chciałbyś/chciałabyś dać tej alternatywie 3-4 minuty zamiast wejść w feed
 - czy zapisany własny link pojawia się w bibliotece i może zostać otwarty jako alternatywa
 - czy tryb `Light` / `Dark` wygląda czytelnie na twoim telefonie
 - czy nowy ekran progressu motywuje bez poczucia karania albo wstydu

@@ -88,7 +88,7 @@ Current selection:
 
 ### 7.3 App Integration for Pack v1
 
-Status: `implemented for Pro review`
+Status: `passed Pro review`
 
 Acceptance criteria:
 
@@ -113,6 +113,8 @@ Validation:
 
 ### 7.4 Replacement Quality Pass
 
+Status: `implemented for Pro review`
+
 Acceptance criteria:
 
 - Review pack titles/descriptions for clickability at the moment of impulse.
@@ -123,6 +125,10 @@ Acceptance criteria:
 Validation:
 
 - Pro review focused on editorial/product quality.
+
+Current quality pass:
+
+- See `docs/CONTENT_PACK_V1_QUALITY_PASS.md`.
 
 ## Definition of Done
 
