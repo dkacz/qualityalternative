@@ -308,7 +308,7 @@ class MainActivityTest {
         composeRule.onNodeWithTag("feedback-screen").assertIsDisplayed()
         composeRule.onNodeWithText("Was this a good fit?").assertIsDisplayed()
         composeRule.onNodeWithText("Did it help you skip the scroll?").assertIsDisplayed()
-        composeRule.onNodeWithText("Yes, more like this").performClick()
+        composeRule.onNodeWithText("Great fit").performClick()
         composeRule.onNodeWithText("Yes").performClick()
         composeRule.onNodeWithTag("feedback-log")
             .assertIsDisplayed()

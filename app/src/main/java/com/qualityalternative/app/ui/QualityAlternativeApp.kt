@@ -1306,7 +1306,7 @@ private fun FeedbackScreen(
         FeedbackQuestion(
             title = "Was this a good fit?",
             selected = fit,
-            options = listOf("not" to "Not really", "ok" to "It was okay", "great" to "Yes, more like this"),
+            options = listOf("not" to "Not really", "ok" to "It was okay", "great" to "Great fit"),
             onSelect = { fit = it },
             modifier = Modifier.padding(bottom = 24.dp),
         )
@@ -1860,6 +1860,7 @@ private fun FeedbackQuestion(
                     horizontalPadding = 6.dp,
                     verticalPadding = 6.dp,
                     fontSize = 12.sp,
+                    maxLines = 1,
                 )
             }
         }
@@ -2340,6 +2341,7 @@ private fun QaChip(
     horizontalPadding: androidx.compose.ui.unit.Dp = 15.dp,
     verticalPadding: androidx.compose.ui.unit.Dp = 9.dp,
     fontSize: androidx.compose.ui.unit.TextUnit = 12.sp,
+    maxLines: Int = 2,
 ) {
     val colors = QualityAlternativeThemeTokens.colors
     val selectedColor = if (accentSelected) colors.accent else colors.primaryText
@@ -2364,7 +2366,7 @@ private fun QaChip(
                 fontWeight = FontWeight.Medium,
                 fontSize = fontSize,
                 textAlign = if (centered) TextAlign.Center else TextAlign.Start,
-                maxLines = 2,
+                maxLines = maxLines,
                 overflow = TextOverflow.Ellipsis,
             )
         }

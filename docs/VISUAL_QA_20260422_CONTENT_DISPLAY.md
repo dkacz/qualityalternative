@@ -72,11 +72,12 @@ Fix made during this QA pass:
 
 - Compact metadata rows now constrain long author/topic strings to one or two lines with ellipsis instead of awkward wrapping. This improves Library and backup-row readability without changing content metadata.
 - The in-app reader no longer shows the dashed placeholder illustration when an item has no `imageAssetPath`. This keeps image-less readings from looking like unfinished mockups.
+- Feedback fit chips now use a shorter `Great fit` label and one-line chip text so the three answer buttons keep a balanced height.
 
 Refresh after placeholder removal:
 
 - Re-ran the screenshot harness on `qaApi36`.
-- Replaced the reader and contact-sheet artifacts so the baseline now reflects the no-placeholder reader layout.
+- Replaced the feedback, reader, and contact-sheet artifacts so the baseline now reflects the no-placeholder reader layout and one-line feedback chips.
 
 Non-blocker note:
 
