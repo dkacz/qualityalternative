@@ -24,7 +24,7 @@ Current active track:
 - Sprint 8: content expansion and visual QA.
 - Work mode: scale the replacement library with renderable and link-only inventory, while making emulator screenshot QA a release gate.
 - Gate: do not expand inventory unless each item is classified as `renderable`, `link_only`, or `user_private` with explicit metadata.
-- Completed Sprint 8 slices so far: visual QA baseline, shared link-only support, meditation timer replacement, source-candidate discovery, and the first 20-item link-only pack.
+- Completed Sprint 8 slices so far: visual QA baseline, shared link-only support, meditation timer replacement, source-candidate discovery, the first 20-item link-only pack, `public-domain-expansion-v2`, and the release-candidate visual QA pass.
 
 ## UI Timing
 

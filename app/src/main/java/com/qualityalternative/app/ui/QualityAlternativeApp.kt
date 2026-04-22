@@ -1,6 +1,9 @@
 package com.qualityalternative.app.ui
 
+import android.app.Activity
 import android.content.ActivityNotFoundException
+import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
@@ -48,6 +51,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -64,6 +68,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontStyle
@@ -73,6 +78,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.sp
+import androidx.core.view.WindowCompat
 import com.qualityalternative.app.BuildConfig
 import com.qualityalternative.app.domain.model.AnalyticsEvent
 import com.qualityalternative.app.domain.model.AnalyticsEventType
@@ -109,6 +115,8 @@ fun QualityAlternativeApp(
     onExitToTarget: () -> Unit = {},
 ) {
     val uiState = viewModel.uiState
+
+    ApplySystemBarsForTheme(themeMode = uiState.themeMode)
 
     QualityAlternativeAppTheme(themeMode = uiState.themeMode) {
         DebugVisualParityDensityScale {
@@ -151,6 +159,28 @@ fun QualityAlternativeApp(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ApplySystemBarsForTheme(themeMode: AppThemeMode) {
+    val context = LocalContext.current
+    val view = LocalView.current
+    val useDarkIcons = themeMode == AppThemeMode.LIGHT
+
+    SideEffect {
+        val window = context.findActivity()?.window ?: return@SideEffect
+        val controller = WindowCompat.getInsetsController(window, view)
+        controller.isAppearanceLightStatusBars = useDarkIcons
+        controller.isAppearanceLightNavigationBars = useDarkIcons
+    }
+}
+
+private tailrec fun Context.findActivity(): Activity? {
+    return when (this) {
+        is Activity -> this
+        is ContextWrapper -> baseContext.findActivity()
+        else -> null
     }
 }
 
