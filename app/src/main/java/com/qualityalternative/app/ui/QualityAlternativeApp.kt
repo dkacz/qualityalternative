@@ -225,7 +225,6 @@ private fun MainRoute(
     val context = LocalContext.current
     val documentPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri ?: return@rememberLauncherForActivityResult
-        persistDocumentPermission(context = context, uri = uri)
         val metadata = context.documentMetadata(uri)
         viewModel.prepareUserDocumentImport(
             uri = uri.toString(),
@@ -322,7 +321,13 @@ private fun MainRoute(
             onTitleChange = viewModel::updateAddDocumentTitle,
             onDurationChange = viewModel::updateAddDocumentDuration,
             onToggleTopic = viewModel::toggleAddDocumentTopic,
-            onSave = viewModel::saveUserDocument,
+            onSave = {
+                viewModel.saveUserDocument(
+                    persistReadPermission = { uriString ->
+                        persistDocumentPermission(context = context, uri = Uri.parse(uriString))
+                    },
+                )
+            },
             onCancel = viewModel::cancelAddLink,
             onPickAnother = onImportDocument,
         )

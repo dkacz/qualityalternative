@@ -558,7 +558,10 @@ class MainViewModel(
         updateAddDocumentForm(uiState.addDocumentForm.copy(selectedTopics = selectedTopics))
     }
 
-    fun saveUserDocument(nowMillis: Long = nowProvider()) {
+    fun saveUserDocument(
+        nowMillis: Long = nowProvider(),
+        persistReadPermission: (String) -> Unit = {},
+    ) {
         val draft = uiState.addDocumentForm.toDraftOrNull()
         if (draft == null) {
             uiState = uiState.copy(
@@ -577,6 +580,7 @@ class MainViewModel(
             try {
                 when (val result = userDocumentRepository.addDocument(draft = draft, nowMillis = nowMillis)) {
                     is AddUserDocumentResult.Added -> {
+                        runCatching { persistReadPermission(draft.uri) }
                         recordEventDurably(
                             AnalyticsEvent(
                                 type = AnalyticsEventType.USER_DOCUMENT_ADDED,
@@ -715,6 +719,7 @@ class MainViewModel(
                 preferences = preferences,
                 completedContentIds = uiState.completedContentIds,
                 userLinks = uiState.userLinks,
+                userDocuments = uiState.userDocuments,
             )
             val signals = buildRecommendationSignals(nowMillis = processingNowMillis)
             val recommendationSet = recommendationEngine.generate(
@@ -1522,9 +1527,20 @@ class MainViewModel(
         }
     }
 
-    private fun openReplacementSession(content: ContentItem, sessionId: String, startedAtMillis: Long) {
+    private suspend fun openReplacementSession(content: ContentItem, sessionId: String, startedAtMillis: Long) {
         val contentBody = if (content.usesRepositoryBody()) {
-            contentRepository.contentBody(content)
+            try {
+                contentRepository.contentBody(content)
+            } catch (error: Throwable) {
+                if (error is CancellationException) throw error
+                handleRepositoryBodyLoadFailure(
+                    content = content,
+                    sessionId = sessionId,
+                    failedAtMillis = startedAtMillis,
+                    error = error,
+                )
+                return
+            }
         } else {
             ""
         }
@@ -1534,6 +1550,36 @@ class MainViewModel(
             currentSessionId = sessionId,
             currentSessionStartedAtMillis = startedAtMillis,
             screen = screenForReplacement(content),
+        )
+    }
+
+    private suspend fun handleRepositoryBodyLoadFailure(
+        content: ContentItem,
+        sessionId: String,
+        failedAtMillis: Long,
+        error: Throwable,
+    ) {
+        recordEvent(
+            AnalyticsEvent(
+                type = AnalyticsEventType.USER_DOCUMENT_BODY_LOAD_FAILED,
+                timestampMillis = failedAtMillis,
+                interventionId = uiState.currentInterventionId,
+                sessionId = sessionId,
+                targetAppPackage = uiState.selectedTargetApp?.packageName,
+                primaryContentId = uiState.currentRecommendationSet?.primary?.id,
+                backupContentIds = uiState.currentRecommendationSet?.backups.orEmpty().map(ContentItem::id),
+                contentId = content.id,
+                metadata = content.analyticsMetadata() + mapOf(
+                    "failureReason" to (error::class.simpleName ?: "body_load_failed"),
+                ),
+            ),
+        )
+        if (content.sourceType == ContentSourceType.USER_DOCUMENT) {
+            userDocumentRepository.markUnavailable(contentId = content.id, nowMillis = failedAtMillis)
+        }
+        historyRepository.markSkipped(sessionId = sessionId, skippedAtMillis = failedAtMillis)
+        clearActiveSession(
+            latestMessage = content.handoffFailureMessage(),
         )
     }
 
@@ -2001,6 +2047,7 @@ private fun inventoryDiagnostics(
     preferences: UserPreferences,
     completedContentIds: Set<String>,
     userLinks: List<ContentItem>,
+    userDocuments: List<ContentItem>,
 ): Map<String, String> {
     val unavailableUserLinkIds = (rawInventory + userLinks)
         .asSequence()
@@ -2010,7 +2057,7 @@ private fun inventoryDiagnostics(
         }
         .map(ContentItem::id)
         .toSet()
-    val unavailableUserDocumentIds = rawInventory
+    val unavailableUserDocumentIds = (rawInventory + userDocuments)
         .asSequence()
         .filter { item ->
             item.sourceType == ContentSourceType.USER_DOCUMENT &&

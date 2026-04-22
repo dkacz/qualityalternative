@@ -155,12 +155,20 @@ class AndroidUserDocumentBodyLoader(
             return ""
         }
         return runCatching {
-            contentResolver.openInputStream(Uri.parse(uri))?.use { input ->
+            val parsedUri = Uri.parse(uri)
+            contentResolver.openInputStream(parsedUri)?.use { input ->
                 input.bufferedReader(Charsets.UTF_8).readText()
-            }.orEmpty()
-        }.getOrDefault("")
+            } ?: throw UserDocumentBodyLoadException(uri)
+        }.getOrElse { error ->
+            throw UserDocumentBodyLoadException(uri = uri, cause = error)
+        }
     }
 }
+
+class UserDocumentBodyLoadException(
+    uri: String,
+    cause: Throwable? = null,
+) : IllegalStateException("Unable to load private document body for $uri", cause)
 
 private fun UserDocumentEntity.toContentItem(): ContentItem {
     val format = runCatching { ContentFormat.valueOf(documentFormat) }.getOrDefault(ContentFormat.PDF)

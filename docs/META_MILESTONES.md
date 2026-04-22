@@ -145,8 +145,7 @@ Likely scope:
 
 Out of scope:
 
-- PDF upload or PDF reader
-- EPUB support
+- user-document import or native PDF/EPUB reader work
 - RSS/newsletter ingestion
 - open-web crawling
 - AI summarization of third-party works
@@ -190,7 +189,7 @@ Out of scope:
 - first-party essay writing
 - open-web crawling
 - AI summarization of third-party articles
-- PDF upload or reader work
+- user-document import or native PDF/EPUB reader work
 - iOS
 - premium packaging implementation
 
@@ -222,7 +221,7 @@ Likely scope:
 - screenshot-based visual QA across Light and Dark modes
 - tester-facing content-quality feedback loop
 
-Delivered so far:
+Delivered:
 
 - Shared `EXTERNAL_HANDOFF` manifest support for link-only editorial items.
 - Repeatable 3-minute meditation timer as an app-utility replacement.
@@ -232,7 +231,7 @@ Delivered so far:
 
 Out of scope:
 
-- PDF upload or reader work
+- native PDF/EPUB reader work
 - RSS/newsletter ingestion
 - open-web crawling
 - AI summaries of third-party articles
@@ -288,7 +287,7 @@ Goal:
 
 Minimum pilot inputs:
 
-- Android build with editorial packs, user links, and PDFs
+- Android build with editorial packs, user links, Markdown import, and PDF/EPUB handoff
 - clear install/test instructions
 - simple feedback and bug-reporting workflow
 - stable local analytics/export path
@@ -371,7 +370,7 @@ Streak hypothesis:
 
 Decision gate:
 
-- Do not implement monetization, unlimited storage, EPUB support, or streak mechanics until pilot data shows that users repeatedly accept replacements and ask for more content depth or motivation.
+- Do not implement monetization, unlimited storage, native EPUB reading, or streak mechanics until pilot data shows that users repeatedly accept replacements and ask for more content depth or motivation.
 
 ## Operating Rule
 

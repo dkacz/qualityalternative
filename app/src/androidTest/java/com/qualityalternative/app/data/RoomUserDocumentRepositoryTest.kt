@@ -23,6 +23,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -138,6 +139,22 @@ class RoomUserDocumentRepositoryTest {
             appScope.cancel()
             delay(100)
             database.close()
+        }
+    }
+
+    @Test
+    fun androidBodyLoaderReportsUnreadableMarkdownUri() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val loader = AndroidUserDocumentBodyLoader(context)
+
+        try {
+            loader.loadBody(
+                uri = "content://com.qualityalternative.missing.provider/notes.md",
+                format = ContentFormat.MARKDOWN,
+            )
+            fail("Expected unreadable Markdown URI to throw")
+        } catch (error: UserDocumentBodyLoadException) {
+            assertTrue(error.message.orEmpty().contains("content://com.qualityalternative.missing.provider/notes.md"))
         }
     }
 

@@ -1,10 +1,10 @@
-# Quality Alternative v0.2.0-ui-alpha
+# Quality Alternative v0.4.0-documents-alpha
 
 ## Release Status
 
-Status: internal UI alpha ready for tester distribution.
+Status: internal documents alpha candidate.
 
-This release keeps the Android-first interception thesis from `v0.1.0-alpha` and adds the Sprint 4-5 product layer: user-added links plus a calmer analog UI pass across the core replacement loop.
+This release keeps the Android-first interception thesis and adds the Sprint 9 private document layer: user-owned PDF, Markdown, and EPUB imports as finite replacement candidates.
 
 ## What Works
 
@@ -13,6 +13,9 @@ This release keeps the Android-first interception thesis from `v0.1.0-alpha` and
 - Soft intervention with one primary recommendation, two backups, `Open anyway`, and `Pause 15 min`.
 - Local in-app reader, feedback flow, replacement history, delay state, and analytics ledger.
 - User-added links with local persistence, source-aware recommendation ranking, and a clear saved-link handoff before opening the browser.
+- User-owned document import for PDF, Markdown, and EPUB.
+- Markdown files open in the in-app private reader.
+- PDF and EPUB files open through a clearly labeled Android external document-viewer handoff.
 - Light and Dark analog themes with persisted theme choice.
 - Restyled intervention, home, library, add-link, reader, handoff, feedback, and progress surfaces.
 - Constructive progress framing around converted impulses and recent replacements, not shame-heavy streaks.
@@ -33,7 +36,7 @@ This release keeps the Android-first interception thesis from `v0.1.0-alpha` and
 - `testDebugUnitTest` passed.
 - `lintDebug` passed.
 - `connectedDebugAndroidTest` passed on `qaApi36`.
-- ChatGPT Pro review returned `VERDICT: PASS` for Sprint 3 completion, Sprint 4 user-added links, and Sprint 5 UI/UX slices.
+- ChatGPT Pro review is the release gate for the Sprint 9 documents alpha.
 - Real-device smoke passed on Samsung `SM-S721B` for YouTube, X, and Facebook.
 
 ## Known Limits
@@ -41,6 +44,6 @@ This release keeps the Android-first interception thesis from `v0.1.0-alpha` and
 - This is a debug/internal alpha build, not a public distribution build.
 - Real-device smoke has been performed on one Samsung Android device only.
 - iOS is out of scope for this release.
-- PDFs, hosted analytics, premium hard-block mode, and sub-surface blocking are not included.
-- User-added links are simple local web links only; there is no article extraction, crawling, summarization, cloud sync, or PDF support yet.
+- Native PDF/EPUB rendering, hosted analytics, premium hard-block mode, and sub-surface blocking are not included.
+- User-added links and user-owned documents are local/private; there is no article extraction, crawling, summarization, cloud sync, OCR, annotation, or document management.
 - Overlay permission remains optional and future-facing; Accessibility is the active interception path.

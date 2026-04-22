@@ -610,6 +610,146 @@ class MainViewModelTest {
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
+    fun saveUserDocument_retainsReadPermissionOnlyAfterSuccessfulSave() = runTest {
+        val userDocumentRepository = FakeUserDocumentRepository()
+        val retainedUris = mutableListOf<String>()
+        val viewModel = createViewModel(userDocumentRepository = userDocumentRepository)
+
+        advanceUntilIdle()
+        viewModel.prepareUserDocumentImport(
+            uri = "content://quality/notes",
+            displayName = "notes.md",
+            mimeType = "text/markdown",
+        )
+        advanceUntilIdle()
+
+        assertTrue(retainedUris.isEmpty())
+
+        viewModel.saveUserDocument(
+            nowMillis = 2_000L,
+            persistReadPermission = retainedUris::add,
+        )
+        advanceUntilIdle()
+
+        assertTrue(retainedUris.isEmpty())
+        assertEquals(MainScreen.AddDocument, viewModel.uiState.screen)
+
+        viewModel.updateAddDocumentDuration("8")
+        viewModel.toggleAddDocumentTopic(TopicTag.SCIENCE)
+        advanceUntilIdle()
+
+        viewModel.saveUserDocument(
+            nowMillis = 3_000L,
+            persistReadPermission = retainedUris::add,
+        )
+        advanceUntilIdle()
+
+        assertEquals(listOf("content://quality/notes"), retainedUris)
+        assertEquals(MainScreen.AddLinkSuccess, viewModel.uiState.screen)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun failedUserDocumentHandoffMarksDocumentUnavailableAndDiagnosticsCountIt() = runTest {
+        val userDocument = savedUserDocument(format = ContentFormat.PDF)
+        val userDocumentRepository = FakeUserDocumentRepository(initialDocuments = listOf(userDocument))
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val viewModel = createViewModel(
+            contentRepository = FakeContentRepository(extraItems = listOf(userDocument)),
+            userDocumentRepository = userDocumentRepository,
+            recommendationEngine = FixedRecommendationEngine(
+                RecommendationSet(
+                    primary = userDocument,
+                    backups = emptyList(),
+                    inventoryShortage = true,
+                    generatedAtMillis = 1_000L,
+                ),
+            ),
+            analyticsTracker = analyticsTracker,
+        )
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+        viewModel.triggerDebugIntervention(nowMillis = 1_000L)
+        advanceUntilIdle()
+        viewModel.acceptPrimary()
+        advanceUntilIdle()
+
+        viewModel.recordExternalLinkHandoffFailed(reason = "no_handler", nowMillis = 2_000L)
+        advanceUntilIdle()
+
+        val failure = analyticsTracker.allEvents().first {
+            it.type == AnalyticsEventType.EXTERNAL_HANDOFF_FAILED
+        }
+        assertEquals("USER_DOCUMENT", failure.metadata["sourceType"])
+        assertEquals("no_handler", failure.metadata["failureReason"])
+        assertEquals(ContentAvailability.UNAVAILABLE, userDocumentRepository.documents.value.single().availability)
+        assertEquals(listOf(userDocument.id), userDocumentRepository.markedUnavailableIds)
+        assertEquals(
+            "This saved file could not be opened and was removed from future recommendations.",
+            viewModel.uiState.latestMessage,
+        )
+
+        val diagnosticsTracker = InMemoryAnalyticsTracker()
+        val diagnosticsViewModel = createViewModel(
+            userDocumentRepository = userDocumentRepository,
+            analyticsTracker = diagnosticsTracker,
+        )
+        advanceUntilIdle()
+        diagnosticsViewModel.completeOnboarding()
+        advanceUntilIdle()
+        diagnosticsViewModel.triggerDebugIntervention(nowMillis = 3_000L)
+        advanceUntilIdle()
+
+        val nextEvent = diagnosticsTracker.allEvents().first { it.type == AnalyticsEventType.INTERVENTION_SHOWN }
+        assertEquals("1", nextEvent.metadata["unavailableUserDocumentCount"])
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun unreadableMarkdownDocumentIsMarkedUnavailableInsteadOfOpeningBlankReader() = runTest {
+        val userDocument = savedUserDocument(format = ContentFormat.MARKDOWN)
+        val userDocumentRepository = FakeUserDocumentRepository(initialDocuments = listOf(userDocument))
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val viewModel = createViewModel(
+            contentRepository = FakeContentRepository(
+                extraItems = listOf(userDocument),
+                failUserDocumentBodyLoad = true,
+            ),
+            userDocumentRepository = userDocumentRepository,
+            recommendationEngine = FixedRecommendationEngine(
+                RecommendationSet(
+                    primary = userDocument,
+                    backups = emptyList(),
+                    inventoryShortage = true,
+                    generatedAtMillis = 1_000L,
+                ),
+            ),
+            analyticsTracker = analyticsTracker,
+        )
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+        viewModel.triggerDebugIntervention(nowMillis = 1_000L)
+        advanceUntilIdle()
+        viewModel.acceptPrimary()
+        advanceUntilIdle()
+
+        assertEquals(MainScreen.Home, viewModel.uiState.screen)
+        assertEquals("", viewModel.uiState.currentContentBody)
+        assertEquals(ContentAvailability.UNAVAILABLE, userDocumentRepository.documents.value.single().availability)
+        val failure = analyticsTracker.allEvents().first {
+            it.type == AnalyticsEventType.USER_DOCUMENT_BODY_LOAD_FAILED
+        }
+        assertEquals(userDocument.id, failure.contentId)
+        assertEquals("USER_DOCUMENT", failure.metadata["sourceType"])
+        assertEquals("USER_PRIVATE_READER", failure.metadata["renderMode"])
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
     fun inAppRenderModeRoutesToReaderWithoutRuntimeRightsBlocking() = runTest {
         val inAppItem = ContentItem(
             id = "link-only-in-app-mode",
@@ -1671,6 +1811,7 @@ class MainViewModelTest {
         includeAttentionClassics: Boolean = false,
         includePublicDomainExpansion: Boolean = false,
         includeLinkOnlyModern: Boolean = false,
+        private val failUserDocumentBodyLoad: Boolean = false,
     ) : ContentRepository {
         private val ready = MutableStateFlow(isReady)
         private var extraItems = extraItems
@@ -1777,6 +1918,9 @@ class MainViewModelTest {
         override fun inventory(): List<ContentItem> = packs.flatMap(EditorialPack::items) + extraItems
 
         override fun contentBody(item: ContentItem): String {
+            if (item.sourceType == ContentSourceType.USER_DOCUMENT && failUserDocumentBodyLoad) {
+                error("Simulated private document body load failure")
+            }
             return if (item.sourceType == ContentSourceType.USER_DOCUMENT) item.description else item.title
         }
 
