@@ -89,6 +89,7 @@ import com.qualityalternative.app.domain.model.PermissionStatus
 import com.qualityalternative.app.domain.model.ReplacementHistoryEntry
 import com.qualityalternative.app.domain.model.TopicTag
 import com.qualityalternative.app.domain.model.UserLinkValidationError
+import com.qualityalternative.app.domain.model.usesMeditationTimer
 import com.qualityalternative.app.ui.theme.QualityAlternativeAppTheme
 import com.qualityalternative.app.ui.theme.QualityAlternativeThemeTokens
 import com.qualityalternative.app.ui.theme.QualityDisplayFontFamily
@@ -289,6 +290,12 @@ private fun MainRoute(
             onOpenLink = { launchExternalLink(context = it, viewModel = viewModel) },
             onDone = viewModel::finishReading,
             onBack = viewModel::skipReading,
+        )
+
+        MainScreen.MeditationTimer -> MeditationTimerScreen(
+            state = state,
+            onComplete = viewModel::finishMeditationReset,
+            onBack = viewModel::skipMeditationReset,
         )
 
         MainScreen.Feedback -> FeedbackScreen(
@@ -1116,11 +1123,15 @@ private fun InterventionScreen(
             )
         }
         QaButton(
-            text = "Read this · ${primary.durationMinutes} min",
+            text = if (primary.usesMeditationTimer()) {
+                "Start timer · ${primary.durationMinutes} min"
+            } else {
+                "Read this · ${primary.durationMinutes} min"
+            },
             onClick = onAcceptPrimary,
             variant = QaButtonVariant.Accent,
             modifier = Modifier.padding(bottom = 16.dp),
-            leadingIcon = QaIconKind.Book,
+            leadingIcon = if (primary.usesMeditationTimer()) QaIconKind.Pause else QaIconKind.Book,
         )
         MonoText("Or", modifier = Modifier.padding(bottom = 6.dp))
         Column(modifier = Modifier.padding(bottom = 18.dp)) {
@@ -1280,6 +1291,96 @@ private fun ExternalLinkHandoffScreen(
             )
             QaButton(text = "Not now", onClick = onBack, variant = QaButtonVariant.Ghost)
         }
+    }
+}
+
+@Composable
+private fun MeditationTimerScreen(
+    state: MainUiState,
+    onComplete: () -> Unit,
+    onBack: () -> Unit,
+) {
+    val content = state.currentContent ?: return
+    val startedAtMillis = state.currentSessionStartedAtMillis ?: System.currentTimeMillis()
+    val totalMillis = (content.durationMinutes * 60_000L).coerceAtLeast(1L)
+    var nowMillis by remember(content.id, startedAtMillis) { mutableStateOf(System.currentTimeMillis()) }
+
+    LaunchedEffect(content.id, startedAtMillis) {
+        while (true) {
+            nowMillis = System.currentTimeMillis()
+            delay(1_000L)
+        }
+    }
+
+    val remainingMillis = (totalMillis - (nowMillis - startedAtMillis)).coerceAtLeast(0L)
+    val remainingSeconds = ((remainingMillis + 999L) / 1_000L).toInt()
+    val isComplete = remainingMillis == 0L
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .testTag("meditation-timer-screen")
+            .padding(horizontal = 28.dp, vertical = 42.dp),
+    ) {
+        ScreenHead(onBack = onBack)
+        Spacer(modifier = Modifier.height(28.dp))
+        MonoText("Quiet reset", modifier = Modifier.padding(bottom = 14.dp))
+        DisplayText(
+            text = content.title,
+            fontSize = 34.sp,
+            lineHeight = 37.sp,
+            modifier = Modifier.padding(bottom = 14.dp),
+        )
+        BodyText(
+            text = "Put the phone down if you can. Breathe out slowly. Let the urge pass before deciding what to do next.",
+            color = QualityAlternativeThemeTokens.colors.mutedText,
+            fontSize = 16.sp,
+            lineHeight = 25.sp,
+            modifier = Modifier.padding(bottom = 34.dp),
+        )
+        QaCard(
+            padding = 30.dp,
+            background = QualityAlternativeThemeTokens.colors.accentSoft,
+            borderColor = QualityAlternativeThemeTokens.colors.lineStrong,
+            modifier = Modifier.testTag("meditation-timer-card"),
+        ) {
+            MonoText("Timer", modifier = Modifier.padding(bottom = 14.dp), color = QualityAlternativeThemeTokens.colors.accent)
+            Text(
+                text = meditationTimeLabel(remainingSeconds),
+                style = TextStyle(
+                    fontFamily = QualityDisplayFontFamily,
+                    fontSize = 76.sp,
+                    lineHeight = 78.sp,
+                    color = QualityAlternativeThemeTokens.colors.primaryText,
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("meditation-countdown"),
+                textAlign = TextAlign.Center,
+            )
+            BodyText(
+                text = if (isComplete) "Reset complete. Log it if it helped." else "No feed. Just three minutes back.",
+                color = QualityAlternativeThemeTokens.colors.mutedText,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 18.dp),
+            )
+        }
+        Spacer(modifier = Modifier.weight(1f))
+        QaButton(
+            text = if (isComplete) "Complete reset" else "Timer running",
+            onClick = onComplete,
+            enabled = isComplete,
+            variant = QaButtonVariant.Primary,
+            modifier = Modifier.testTag("meditation-complete"),
+        )
+        QaButton(
+            text = "End early",
+            onClick = onBack,
+            variant = QaButtonVariant.Ghost,
+            modifier = Modifier.testTag("meditation-skip"),
+        )
     }
 }
 
@@ -2437,7 +2538,11 @@ private fun AppDot(app: DistractingApp, size: androidx.compose.ui.unit.Dp = 28.d
 @Composable
 private fun SourceBadge(
     sourceType: ContentSourceType,
-    icon: QaIconKind = if (sourceType == ContentSourceType.USER_LINK) QaIconKind.Link else QaIconKind.Sparkle,
+    icon: QaIconKind = when (sourceType) {
+        ContentSourceType.USER_LINK -> QaIconKind.Link
+        ContentSourceType.MEDITATION -> QaIconKind.Pause
+        ContentSourceType.EDITORIAL -> QaIconKind.Sparkle
+    },
 ) {
     val colors = QualityAlternativeThemeTokens.colors
     Box(
@@ -2730,16 +2835,25 @@ private fun DurationBucket.prototypeMinutesLabel(): String = "${prototypeMinutes
 
 private fun ContentItem.isUserLink(): Boolean = sourceType == ContentSourceType.USER_LINK
 
+private fun meditationTimeLabel(totalSeconds: Int): String {
+    val minutes = totalSeconds / 60
+    val seconds = totalSeconds % 60
+    return "%d:%02d".format(Locale.US, minutes, seconds)
+}
+
 private fun ContentItem.topicLine(): String {
     return topicTags.joinToString { it.displayName() }.ifBlank { "Essays" }
 }
 
 private fun ContentItem.sourceLabel(): String {
-    return if (isUserLink()) {
-        val host = sourceLabel?.ifBlank { null } ?: externalUrl?.hostLabel()?.ifBlank { null }
-        host?.let { "Your link · $it" } ?: "Your link"
-    } else {
-        sourceLabel?.ifBlank { null }
+    return when {
+        isUserLink() -> {
+            val host = sourceLabel?.ifBlank { null } ?: externalUrl?.hostLabel()?.ifBlank { null }
+            host?.let { "Your link · $it" } ?: "Your link"
+        }
+
+        usesMeditationTimer() -> sourceLabel ?: "Quality Alternative"
+        else -> sourceLabel?.ifBlank { null }
             ?: packId.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.US) else it.toString() }
     }
 }

@@ -21,6 +21,8 @@ import com.qualityalternative.app.domain.model.DelayWindow
 import com.qualityalternative.app.domain.model.DistractingApp
 import com.qualityalternative.app.domain.model.DurationBucket
 import com.qualityalternative.app.domain.model.EditorialPack
+import com.qualityalternative.app.domain.model.MEDITATION_TIMER_CONTENT_ID
+import com.qualityalternative.app.domain.model.MeditationTimerContentItem
 import com.qualityalternative.app.domain.model.OnboardingSelection
 import com.qualityalternative.app.domain.model.PermissionReadiness
 import com.qualityalternative.app.domain.model.PermissionStatus
@@ -36,6 +38,7 @@ import com.qualityalternative.app.domain.model.UserLinkDraft
 import com.qualityalternative.app.domain.model.UserLinkValidationError
 import com.qualityalternative.app.domain.model.UserPreferences
 import com.qualityalternative.app.domain.model.usesExternalHandoff
+import com.qualityalternative.app.domain.model.usesMeditationTimer
 import com.qualityalternative.app.domain.model.usesRepositoryBody
 import com.qualityalternative.app.domain.service.AddUserLinkResult
 import com.qualityalternative.app.domain.service.AnalyticsTracker
@@ -120,6 +123,7 @@ enum class MainScreen {
     Intervention,
     Reader,
     ExternalHandoff,
+    MeditationTimer,
     Feedback,
 }
 
@@ -385,11 +389,7 @@ class MainViewModel(
             currentContentBody = if (content.usesRepositoryBody()) contentRepository.contentBody(content) else "",
             currentSessionId = null,
             currentSessionStartedAtMillis = nowProvider(),
-            screen = if (content.usesExternalHandoff()) {
-                MainScreen.ExternalHandoff
-            } else {
-                MainScreen.Reader
-            },
+            screen = screenForReplacement(content),
             latestMessage = null,
         )
     }
@@ -573,9 +573,10 @@ class MainViewModel(
             }
 
             val interventionId = UUID.randomUUID().toString()
-            val rawInventory = contentRepository.inventory()
+            val rawInventory = fullReplacementInventory()
             val filteredInventory = rawInventory.filter { item ->
                 when (item.sourceType) {
+                    ContentSourceType.MEDITATION -> true
                     ContentSourceType.USER_LINK -> item.availability != ContentAvailability.UNAVAILABLE
                     ContentSourceType.EDITORIAL -> item.packId in preferences.selectedPackIds
                 }
@@ -592,7 +593,7 @@ class MainViewModel(
                 targetApp = targetApp,
                 preferences = preferences,
                 inventory = filteredInventory,
-                primaryExcludedIds = uiState.completedContentIds,
+                primaryExcludedIds = primaryExcludedIdsForRecommendation(),
                 signals = signals,
                 nowMillis = processingNowMillis,
             )
@@ -893,6 +894,30 @@ class MainViewModel(
         }
     }
 
+    fun finishMeditationReset(nowMillis: Long = System.currentTimeMillis()) {
+        val content = uiState.currentContent ?: return
+        val sessionId = uiState.currentSessionId
+        viewModelScope.launch {
+            if (sessionId != null) {
+                historyRepository.markCompleted(sessionId = sessionId, completedAtMillis = nowMillis)
+                recordEvent(
+                    AnalyticsEvent(
+                        type = AnalyticsEventType.MEDITATION_TIMER_COMPLETED,
+                        timestampMillis = nowMillis,
+                        interventionId = uiState.currentInterventionId,
+                        sessionId = sessionId,
+                        targetAppPackage = uiState.selectedTargetApp?.packageName,
+                        primaryContentId = uiState.currentRecommendationSet?.primary?.id,
+                        backupContentIds = uiState.currentRecommendationSet?.backups.orEmpty().map(ContentItem::id),
+                        contentId = content.id,
+                        metadata = sessionDurationMetadata(nowMillis) + content.analyticsMetadata(),
+                    ),
+                )
+            }
+            uiState = uiState.copy(screen = MainScreen.Feedback)
+        }
+    }
+
     fun skipReading() {
         val content = uiState.currentContent ?: return
         val sessionId = uiState.currentSessionId
@@ -917,6 +942,30 @@ class MainViewModel(
             clearActiveSession(
                 latestMessage = "Replacement session skipped.",
             )
+        }
+    }
+
+    fun skipMeditationReset(nowMillis: Long = System.currentTimeMillis()) {
+        val content = uiState.currentContent ?: return
+        val sessionId = uiState.currentSessionId
+        viewModelScope.launch {
+            if (sessionId != null) {
+                historyRepository.markSkipped(sessionId = sessionId, skippedAtMillis = nowMillis)
+                recordEvent(
+                    AnalyticsEvent(
+                        type = AnalyticsEventType.MEDITATION_TIMER_SKIPPED,
+                        timestampMillis = nowMillis,
+                        interventionId = uiState.currentInterventionId,
+                        sessionId = sessionId,
+                        targetAppPackage = uiState.selectedTargetApp?.packageName,
+                        primaryContentId = uiState.currentRecommendationSet?.primary?.id,
+                        backupContentIds = uiState.currentRecommendationSet?.backups.orEmpty().map(ContentItem::id),
+                        contentId = content.id,
+                        metadata = sessionDurationMetadata(nowMillis) + content.analyticsMetadata(),
+                    ),
+                )
+            }
+            clearActiveSession(latestMessage = "Meditation reset skipped.")
         }
     }
 
@@ -1330,11 +1379,6 @@ class MainViewModel(
     }
 
     private fun openReplacementSession(content: ContentItem, sessionId: String, startedAtMillis: Long) {
-        val screen = if (content.usesExternalHandoff()) {
-            MainScreen.ExternalHandoff
-        } else {
-            MainScreen.Reader
-        }
         val contentBody = if (content.usesRepositoryBody()) {
             contentRepository.contentBody(content)
         } else {
@@ -1345,8 +1389,24 @@ class MainViewModel(
             currentContentBody = contentBody,
             currentSessionId = sessionId,
             currentSessionStartedAtMillis = startedAtMillis,
-            screen = screen,
+            screen = screenForReplacement(content),
         )
+    }
+
+    private fun screenForReplacement(content: ContentItem): MainScreen {
+        return when {
+            content.usesExternalHandoff() -> MainScreen.ExternalHandoff
+            content.usesMeditationTimer() -> MainScreen.MeditationTimer
+            else -> MainScreen.Reader
+        }
+    }
+
+    private fun fullReplacementInventory(): List<ContentItem> {
+        return contentRepository.inventory() + MeditationTimerContentItem
+    }
+
+    private fun primaryExcludedIdsForRecommendation(): Set<String> {
+        return uiState.completedContentIds - MEDITATION_TIMER_CONTENT_ID
     }
 
     private fun clearActiveSession(
@@ -1410,7 +1470,7 @@ class MainViewModel(
         if (candidateIds.isEmpty()) {
             return null
         }
-        return contentRepository.inventory()
+        return fullReplacementInventory()
             .asSequence()
             .filter { item ->
                 item.id in candidateIds &&
@@ -1427,7 +1487,7 @@ class MainViewModel(
         delayWindow: DelayWindow,
         fallbackContent: ContentItem,
     ): RecommendationSet {
-        val candidatesById = contentRepository.inventory().associateBy(ContentItem::id)
+        val candidatesById = fullReplacementInventory().associateBy(ContentItem::id)
         val primary = delayWindow.primaryContentId
             ?.let(candidatesById::get)
             ?: fallbackContent
@@ -1712,6 +1772,7 @@ private fun inventoryDiagnostics(
         "selectedPackIds" to preferences.selectedPackIds.sorted().joinToString(","),
         "eligibleInventoryCount" to eligibleInventory.size.toString(),
         "eligibleEditorialCount" to eligibleInventory.count { it.sourceType == ContentSourceType.EDITORIAL }.toString(),
+        "eligibleMeditationCount" to eligibleInventory.count { it.sourceType == ContentSourceType.MEDITATION }.toString(),
         "eligibleUserLinkCount" to eligibleInventory.count { it.sourceType == ContentSourceType.USER_LINK }.toString(),
         "unavailableUserLinkCount" to unavailableUserLinkIds.size.toString(),
         "completedContentCount" to completedContentIds.size.toString(),

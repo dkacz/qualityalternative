@@ -20,6 +20,8 @@ import com.qualityalternative.app.domain.model.ContentSourceType
 import com.qualityalternative.app.domain.model.DistractingApp
 import com.qualityalternative.app.domain.model.DurationBucket
 import com.qualityalternative.app.domain.model.EditorialPack
+import com.qualityalternative.app.domain.model.MEDITATION_TIMER_CONTENT_ID
+import com.qualityalternative.app.domain.model.MeditationTimerContentItem
 import com.qualityalternative.app.domain.model.OnboardingSelection
 import com.qualityalternative.app.domain.model.PermissionReadiness
 import com.qualityalternative.app.domain.model.PermissionStatus
@@ -170,7 +172,7 @@ class MainViewModelTest {
         advanceUntilIdle()
 
         assertEquals(
-            setOf("p1", "user-link"),
+            setOf("p1", "user-link", MEDITATION_TIMER_CONTENT_ID),
             recommendationEngine.lastInventory.mapTo(mutableSetOf(), ContentItem::id),
         )
     }
@@ -214,6 +216,45 @@ class MainViewModelTest {
         assertEquals("USER_LINK", event.metadata["sourceType"])
         assertEquals("NEEDS_FALLBACK", event.metadata["availability"])
         assertEquals("https://example.com/essay", event.metadata["externalUrl"])
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun acceptingMeditationRoutesToTimerAndCompletionRecordsMeditationEvent() = runTest {
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val viewModel = createViewModel(
+            recommendationEngine = FixedRecommendationEngine(
+                RecommendationSet(
+                    primary = MeditationTimerContentItem,
+                    backups = emptyList(),
+                    inventoryShortage = true,
+                    generatedAtMillis = 1_000L,
+                ),
+            ),
+            analyticsTracker = analyticsTracker,
+        )
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+        viewModel.triggerDebugIntervention(nowMillis = 1_000L)
+        advanceUntilIdle()
+        viewModel.acceptPrimary()
+        advanceUntilIdle()
+
+        assertEquals(MainScreen.MeditationTimer, viewModel.uiState.screen)
+        assertEquals(MEDITATION_TIMER_CONTENT_ID, viewModel.uiState.currentContent?.id)
+
+        viewModel.finishMeditationReset(nowMillis = System.currentTimeMillis() + 3 * 60_000L)
+        advanceUntilIdle()
+
+        assertEquals(MainScreen.Feedback, viewModel.uiState.screen)
+        val completedEvent = analyticsTracker.allEvents().first {
+            it.type == AnalyticsEventType.MEDITATION_TIMER_COMPLETED
+        }
+        assertEquals(MEDITATION_TIMER_CONTENT_ID, completedEvent.contentId)
+        assertEquals("MEDITATION", completedEvent.metadata["sourceType"])
+        assertEquals("MEDITATION_TIMER", completedEvent.metadata["renderMode"])
     }
 
     @Test
@@ -906,7 +947,7 @@ class MainViewModelTest {
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
-    fun triggerDebugIntervention_reportsNoRecommendationWhenAllInventoryIsCompleted() = runTest {
+    fun triggerDebugIntervention_keepsMeditationAvailableWhenReadingInventoryIsCompleted() = runTest {
         val analyticsTracker = InMemoryAnalyticsTracker()
         val historyRepository = FakeHistoryRepository(initialCompletedIds = setOf("p1", "s1"))
         val viewModel = createViewModel(
@@ -920,13 +961,12 @@ class MainViewModelTest {
         viewModel.triggerDebugIntervention(nowMillis = 2_000L)
         advanceUntilIdle()
 
-        assertEquals(null, viewModel.uiState.currentRecommendationSet)
-        assertEquals(null, viewModel.uiState.currentInterventionId)
-        assertEquals(MainScreen.Home, viewModel.uiState.screen)
-        assertEquals("No replacement inventory is available yet.", viewModel.uiState.latestMessage)
-        val event = analyticsTracker.allEvents().first { it.type == AnalyticsEventType.NO_RECOMMENDATION_AVAILABLE }
-        assertEquals("1", event.metadata["eligibleInventoryCount"])
+        assertEquals(MEDITATION_TIMER_CONTENT_ID, viewModel.uiState.currentRecommendationSet?.primary?.id)
+        assertEquals(MainScreen.Intervention, viewModel.uiState.screen)
+        val event = analyticsTracker.allEvents().first { it.type == AnalyticsEventType.INTERVENTION_SHOWN }
+        assertEquals("2", event.metadata["eligibleInventoryCount"])
         assertEquals("1", event.metadata["eligibleEditorialCount"])
+        assertEquals("1", event.metadata["eligibleMeditationCount"])
         assertEquals("0", event.metadata["eligibleUserLinkCount"])
         assertEquals("0", event.metadata["unavailableUserLinkCount"])
         assertEquals("2", event.metadata["completedContentCount"])
@@ -946,8 +986,9 @@ class MainViewModelTest {
         advanceUntilIdle()
 
         val event = analyticsTracker.allEvents().first { it.type == AnalyticsEventType.INVENTORY_SHORTAGE }
-        assertEquals("1", event.metadata["eligibleInventoryCount"])
+        assertEquals("2", event.metadata["eligibleInventoryCount"])
         assertEquals("1", event.metadata["eligibleEditorialCount"])
+        assertEquals("1", event.metadata["eligibleMeditationCount"])
         assertEquals("0", event.metadata["eligibleUserLinkCount"])
         assertEquals("0", event.metadata["unavailableUserLinkCount"])
         assertEquals("0", event.metadata["completedContentCount"])

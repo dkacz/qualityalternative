@@ -4,7 +4,7 @@ Status: `started`
 
 ## Goal
 
-Move from one real renderable pack to a substantially larger replacement inventory, while proving on emulator screenshots that the content renders well in the intervention, library, reader, feedback, progress, and dark-mode surfaces.
+Move from one real renderable pack to a substantially larger replacement inventory, while proving on emulator screenshots that replacement surfaces render well in the intervention, library, reader, feedback, progress, timer, and dark-mode surfaces.
 
 Sprint 8 should add breadth without changing the product into a feed. The user still sees one primary recommendation and two backups. The library can grow; the intervention remains finite.
 
@@ -14,6 +14,7 @@ Sprint 8 should add breadth without changing the product into a feed. The user s
 - Use content classes from Sprint 6: `renderable`, `link_only`, and `user_private`.
 - Copyright and reuse decisions happen during source selection and triage, not through hidden runtime blocking.
 - Link-only items are recommendations to canonical external pages; the app should not scrape, cache, reader-mode, summarize, or rehost them.
+- Utility replacements such as the meditation timer are allowed when they stay finite, local-first, and non-feed-like.
 - Every shared item needs a clear "why this now?" reason for the impulse moment.
 - Remove weak items rather than padding the count.
 
@@ -23,6 +24,7 @@ The near-term target before a broader pilot is 80-120 high-quality replacement o
 
 - 30-45 renderable public-domain or permissively licensed readings.
 - 35-60 link-only modern essays, explainers, and deep reads.
+- 1-3 utility replacements, starting with a 3-minute meditation timer.
 - User-private links and later PDFs as personal inventory, not shared catalog content.
 
 The app should still show only three options per intervention.
@@ -93,7 +95,21 @@ Acceptance criteria:
 - Cover at least: home, library, intervention, reader, feedback, progress, settings, and external handoff.
 - Include at least one renderable `Attention Classics v1` item in reader screenshots.
 - Include at least one link-only handoff screenshot once shared link-only items exist.
+- Include the meditation timer in both Light and Dark modes once implemented.
 - Record whether titles, source labels, metadata rows, line breaks, scroll behavior, and CTA placement look acceptable.
+
+### Track E: Utility Replacement
+
+Purpose: add a copyright-free, low-energy alternative for moments when reading is too much.
+
+Acceptance criteria:
+
+- Add a default 3-minute meditation timer as an app utility replacement.
+- The timer can appear as one of the existing finite intervention choices, not as a separate feed or browsing surface.
+- Completion records a replacement session and routes to the same feedback loop.
+- Early exit records a skipped timer session.
+- Meditation remains repeatable; completing it once must not permanently exclude it from future primary recommendations.
+- No guided-audio library, health claims, notifications, background timer, or meditation-course scope enters this slice.
 
 ## Proposed Slices
 
@@ -127,6 +143,23 @@ Exit criteria:
 - A local shared link-only item can appear in the finite intervention.
 - Accepting it opens the saved-link/external handoff surface.
 - No body text is required or rendered for link-only items.
+
+### 8.2b Meditation Timer Replacement
+
+Status: `implemented`
+
+- Add a 3-minute meditation timer replacement with its own app-utility render mode.
+- Keep the timer inside the same one-primary/two-backup intervention shape.
+- Record meditation completion and skip analytics separately from reader completion.
+- Add unit, instrumentation, and visual QA coverage.
+
+Exit criteria:
+
+- A meditation-only recommendation opens the timer screen.
+- The timer defaults to `3:00`.
+- Completion can be logged into the normal feedback flow.
+- The timer appears in Light and Dark screenshots.
+- The timer is repeatable after completion.
 
 ### 8.3 Link-Only Pack v1
 

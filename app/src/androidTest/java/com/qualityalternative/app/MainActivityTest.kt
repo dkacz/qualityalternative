@@ -321,6 +321,32 @@ class MainActivityTest {
         composeRule.onNodeWithText("days converted").assertIsDisplayed()
     }
 
+    @Test
+    fun meditationAlternativeOpensThreeMinuteTimer() {
+        launchMeditationFixtureSystemIntervention()
+
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasNode("3-minute reset")
+        }
+        if (hasNodeContaining("Start timer")) {
+            composeRule.onNodeWithText("Start timer", substring = true)
+                .assertIsDisplayed()
+                .performClick()
+        } else {
+            composeRule.onNodeWithText("3-minute reset")
+                .assertIsDisplayed()
+                .performClick()
+        }
+
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasTag("meditation-timer-screen")
+        }
+        composeRule.onNodeWithTag("meditation-timer-screen").assertIsDisplayed()
+        composeRule.onNodeWithText("3:00").assertIsDisplayed()
+        composeRule.onNodeWithTag("meditation-complete").assertIsNotEnabled()
+        composeRule.onNodeWithText("End early").assertIsDisplayed()
+    }
+
     private fun hasNode(text: String): Boolean {
         return runCatching {
             composeRule.onNodeWithText(text).fetchSemanticsNode()
@@ -414,6 +440,28 @@ class MainActivityTest {
         }
     }
 
+    private fun launchMeditationFixtureSystemIntervention() {
+        launchOnboardedApp()
+        seedMeditationFixtureSelection()
+
+        scenario?.close()
+        scenario = null
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+        Thread.sleep(250)
+
+        val targetContext = InstrumentationRegistry.getInstrumentation().targetContext
+        launchApp(
+            MainActivity.createSystemInterceptionIntent(
+                context = targetContext,
+                targetAppPackage = FixtureTargetRegistry.fixtureDistractors.first().packageName,
+            ),
+        )
+
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasNode("You reached for Fixture Feed One")
+        }
+    }
+
     private fun assertHomeHeroIsDisplayed() {
         composeRule.waitUntil(timeoutMillis = 10_000) {
             hasNode("You're set up for quieter reading today.") || hasNode("Interception needs one more step.")
@@ -430,6 +478,20 @@ class MainActivityTest {
                 preferredTopics = setOf(TopicTag.PHILOSOPHY, TopicTag.SCIENCE, TopicTag.HISTORY),
                 preferredDurationBucket = DurationBucket.FOCUS,
                 selectedPackIds = setOf("philosophy"),
+            ),
+        )
+    }
+
+    private fun seedMeditationFixtureSelection() = runBlocking {
+        val repository = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication)
+            .appContainer
+            .settingsRepository
+        repository.saveOnboardingSelection(
+            OnboardingSelection(
+                selectedAppPackages = setOf(FixtureTargetRegistry.fixtureDistractors.first().packageName),
+                preferredTopics = setOf(TopicTag.PSYCHOLOGY, TopicTag.PHILOSOPHY, TopicTag.ESSAYS),
+                preferredDurationBucket = DurationBucket.QUICK,
+                selectedPackIds = setOf("meditation-only-test-pack"),
             ),
         )
     }

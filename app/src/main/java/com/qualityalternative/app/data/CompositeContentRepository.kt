@@ -26,6 +26,7 @@ class CompositeContentRepository(
     override fun contentBody(item: ContentItem): String {
         return when (item.sourceType) {
             ContentSourceType.EDITORIAL -> editorialRepository.contentBody(item)
+            ContentSourceType.MEDITATION -> item.description
             ContentSourceType.USER_LINK -> item.description
         }
     }

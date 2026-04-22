@@ -81,24 +81,42 @@ class VisualQaScreenshotTest {
         Thread.sleep(6_000)
         capture("06_progress_light")
 
+        seedMeditationSelection()
+        launchFixtureSystemIntervention()
+        capture("07_intervention_meditation_light")
+        composeRule.onNodeWithText("Start timer", substring = true).performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("meditation-timer-screen") }
+        capture("08_meditation_timer_light")
+        composeRule.onNodeWithText("End early").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("home-list") }
+        Thread.sleep(6_000)
+
         openTab("tab-settings", "settings-list")
         composeRule.onNodeWithTag("settings-list")
             .performScrollToNode(hasTestTag("theme-DARK"))
         composeRule.onNodeWithTag("theme-DARK")
             .performSemanticsAction(SemanticsActions.OnClick)
         composeRule.waitForIdle()
-        capture("07_settings_dark")
+        capture("09_settings_dark")
 
         openTab("tab-home", "home-list")
-        capture("08_home_dark")
+        capture("10_home_dark")
 
+        seedAttentionClassicsSelection()
         launchFixtureSystemIntervention()
-        capture("09_intervention_dark")
+        capture("11_intervention_dark")
 
         composeRule.onNodeWithText("Read this", substring = true).performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
         assertAttentionClassicsReaderCopyIsDisplayed()
-        capture("10_reader_attention_dark")
+        capture("12_reader_attention_dark")
+
+        seedMeditationSelection()
+        launchFixtureSystemIntervention()
+        capture("13_intervention_meditation_dark")
+        composeRule.onNodeWithText("Start timer", substring = true).performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("meditation-timer-screen") }
+        capture("14_meditation_timer_dark")
     }
 
     private fun capture(name: String) {
@@ -176,9 +194,23 @@ class VisualQaScreenshotTest {
         repository.saveOnboardingSelection(
             OnboardingSelection(
                 selectedAppPackages = setOf(FixtureTargetRegistry.fixtureDistractors.first().packageName),
-                preferredTopics = setOf(TopicTag.PHILOSOPHY, TopicTag.PSYCHOLOGY, TopicTag.ESSAYS),
-                preferredDurationBucket = DurationBucket.QUICK,
+                preferredTopics = setOf(TopicTag.PHILOSOPHY, TopicTag.HISTORY, TopicTag.ESSAYS),
+                preferredDurationBucket = DurationBucket.FOCUS,
                 selectedPackIds = setOf("attention-classics-v1"),
+            ),
+        )
+    }
+
+    private fun seedMeditationSelection() = runBlocking {
+        val repository = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication)
+            .appContainer
+            .settingsRepository
+        repository.saveOnboardingSelection(
+            OnboardingSelection(
+                selectedAppPackages = setOf(FixtureTargetRegistry.fixtureDistractors.first().packageName),
+                preferredTopics = setOf(TopicTag.PSYCHOLOGY, TopicTag.PHILOSOPHY, TopicTag.ESSAYS),
+                preferredDurationBucket = DurationBucket.QUICK,
+                selectedPackIds = setOf("meditation-only-test-pack"),
             ),
         )
     }

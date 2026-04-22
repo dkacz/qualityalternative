@@ -211,12 +211,13 @@ Status: `planned`
 
 Goal:
 
-- Move from one real renderable pack to a substantially larger replacement library and prove the content displays well in the app.
+- Move from one real renderable pack to a substantially larger replacement library, add the first utility-style replacement, and prove the content/replacement surfaces display well in the app.
 
 Likely scope:
 
 - shared link-only editorial items with canonical external handoff
 - larger renderable inventory from public-domain or permissive sources
+- first utility replacement, starting with a repeatable 3-minute meditation timer
 - ranking diversity for larger inventory
 - screenshot-based visual QA across Light and Dark modes
 - tester-facing content-quality feedback loop

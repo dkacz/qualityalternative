@@ -8,6 +8,7 @@ enum class ContentFormat {
 enum class ContentSourceType {
     EDITORIAL,
     USER_LINK,
+    MEDITATION,
 }
 
 enum class ContentAvailability {
@@ -20,12 +21,14 @@ enum class ContentRightsClass {
     RENDERABLE,
     LINK_ONLY,
     USER_PRIVATE,
+    APP_UTILITY,
 }
 
 enum class ContentRenderMode {
     IN_APP_READER,
     EXTERNAL_HANDOFF,
     USER_PRIVATE_READER,
+    MEDITATION_TIMER,
 }
 
 data class ContentRightsMetadata(
@@ -48,6 +51,9 @@ data class ContentRightsMetadata(
 
     val usesExternalHandoff: Boolean
         get() = renderMode == ContentRenderMode.EXTERNAL_HANDOFF
+
+    val usesMeditationTimer: Boolean
+        get() = renderMode == ContentRenderMode.MEDITATION_TIMER
 
     companion object {
         fun safeDefault(): ContentRightsMetadata = ContentRightsMetadata(
@@ -81,6 +87,12 @@ data class ContentRightsMetadata(
             sourceUrl = sourceUrl,
             attribution = attribution,
             rightsReviewedAt = rightsReviewedAt,
+        )
+
+        fun appUtility(): ContentRightsMetadata = ContentRightsMetadata(
+            rightsClass = ContentRightsClass.APP_UTILITY,
+            renderMode = ContentRenderMode.MEDITATION_TIMER,
+            licenseName = "Quality Alternative app utility",
         )
     }
 }
@@ -131,6 +143,8 @@ data class ContentItem(
 )
 
 fun ContentItem.usesExternalHandoff(): Boolean = rights.usesExternalHandoff
+
+fun ContentItem.usesMeditationTimer(): Boolean = rights.usesMeditationTimer
 
 fun ContentItem.usesRepositoryBody(): Boolean = rights.usesRepositoryBody
 

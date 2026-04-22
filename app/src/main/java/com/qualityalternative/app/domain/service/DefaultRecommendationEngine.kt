@@ -89,6 +89,7 @@ class DefaultRecommendationEngine : RecommendationEngine {
         val completionBoost = item.topicTags.intersect(signals.completedTopics).size * 12
         val skipPenalty = item.topicTags.intersect(signals.skippedTopics).size * 18
         val packBoost = if (item.packId in signals.successfulPackIds) 20 else 0
+        val utilityBoost = if (item.sourceType == ContentSourceType.MEDITATION) 24 else 0
         val timeOfDayBoost = when (signals.timeOfDay) {
             TimeOfDayBucket.MORNING -> when {
                 item.durationMinutes <= DurationBucket.QUICK.maxMinutes -> 18
@@ -100,7 +101,7 @@ class DefaultRecommendationEngine : RecommendationEngine {
             TimeOfDayBucket.EVENING -> if (DurationBucket.DEEP.contains(item.durationMinutes)) 18 else 6
             TimeOfDayBucket.NIGHT -> if (item.durationMinutes <= DurationBucket.FOCUS.maxMinutes) 14 else 0
         }
-        return topicScore + durationScore + completionBoost + packBoost + timeOfDayBoost - skipPenalty
+        return topicScore + durationScore + completionBoost + packBoost + utilityBoost + timeOfDayBoost - skipPenalty
     }
 
     private data class ScoredCandidate(
@@ -117,7 +118,8 @@ class DefaultRecommendationEngine : RecommendationEngine {
     private fun ContentSourceType.backupPriority(): Int {
         return when (this) {
             ContentSourceType.EDITORIAL -> 0
-            ContentSourceType.USER_LINK -> 1
+            ContentSourceType.MEDITATION -> 1
+            ContentSourceType.USER_LINK -> 2
         }
     }
 }
