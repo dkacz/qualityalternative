@@ -1,6 +1,6 @@
 # iOS Discovery
 
-Status: `slice_11_1_platform_capability_research`
+Status: `slice_11_3_prototype_options_and_cost_pending_pro_review`
 Last updated: 2026-04-23
 
 This document records Sprint 11 discovery for whether Quality Alternative should start an iOS path. It is intentionally decision-oriented: the goal is to decide which iOS path is realistic, not to add iOS code to the Android repository.
@@ -448,7 +448,7 @@ Acceptance criteria:
 - The spike can prove or falsify backup submenu action handling.
 - The spike can prove or falsify pause/open-anyway state transitions without treating `.close` as continuation or `.defer` as timer control.
 - Any pass/fail conclusion for shielding, routing, submenu callbacks, pause, or open-anyway is backed by physical-device evidence; otherwise the result is explicitly marked inconclusive.
-- The final spike report recommends either `build_ios_mvp_slice`, `lightweight_ios_only`, or `defer_ios`.
+- The final spike report recommends either `build_full_ios_spike`, `build_lightweight_ios_spike`, or `defer_ios_until_android_pilot`.
 
 ### Track B: `lightweight_ios_spike`
 
