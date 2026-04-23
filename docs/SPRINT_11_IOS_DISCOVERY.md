@@ -1,6 +1,6 @@
 # Sprint 11: iOS Feasibility Discovery
 
-Status: `planned`
+Status: `in_progress`
 
 ## Goal
 
@@ -27,6 +27,8 @@ This sprint is discovery and decision work. It should not add iOS implementation
 ## Slice Sequence
 
 ### Slice 11.1: Platform Capability Research
+
+Status: `implemented_pending_pro_review`
 
 Deliverables:
 

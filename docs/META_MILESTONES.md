@@ -21,9 +21,9 @@ Completed:
 
 Current active track:
 
-- Sprint 10: EPUB private reader, reading-position progress, constructive streak, and meditation controls.
-- Work mode: improve long-document and utility replacement quality without turning the app into a document manager or gamified blocker.
-- Gate: EPUB renders as extracted text in the private reader; PDF stays controlled Android handoff until native PDF rendering is justified by tester signal.
+- Sprint 11: iOS feasibility discovery.
+- Work mode: decide whether an iOS path is worth building and which path is realistic, without adding iOS implementation code to the Android repository.
+- Gate: Pro-reviewed decision memo that accounts for Screen Time entitlement risk, shield UX/routing constraints, tester value, and Android-first opportunity cost.
 
 ## UI Timing
 
@@ -206,7 +206,7 @@ Sprint plan:
 
 ## Milestone 6: Sprint 8 Content Expansion and Visual QA
 
-Status: `in progress`
+Status: `complete`
 
 Goal:
 
@@ -244,7 +244,7 @@ Sprint plan:
 
 ## Milestone 7: User Documents and Pilot Readiness
 
-Status: `in progress`
+Status: `complete`
 
 Goal:
 
@@ -276,6 +276,7 @@ Gate to start:
 Sprint plan:
 
 - See `docs/SPRINT_9_USER_DOCUMENT_IMPORT.md`.
+- See `docs/SPRINT_10_READER_PROGRESS_MEDITATION.md`.
 
 ## Milestone 8: Small External Pilot
 
@@ -302,7 +303,7 @@ Decision signals:
 
 ## Milestone 9: iOS Discovery
 
-Status: `planned`
+Status: `in progress`
 
 Goal:
 
