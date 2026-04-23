@@ -1,6 +1,6 @@
 # iOS Discovery
 
-Status: `slice_11_3_prototype_options_and_cost_pending_pro_review`
+Status: `slice_11_4_decision_memo_pending_pro_review`
 Last updated: 2026-04-23
 
 This document records Sprint 11 discovery for whether Quality Alternative should start an iOS path. It is intentionally decision-oriented: the goal is to decide which iOS path is realistic, not to add iOS code to the Android repository.
@@ -10,7 +10,7 @@ This document records Sprint 11 discovery for whether Quality Alternative should
 - [x] Slice 11.1: Platform capability research.
 - [x] Slice 11.2: UX and flow feasibility.
 - [x] Slice 11.3: Prototype options and cost.
-- [ ] Slice 11.4: Final decision memo.
+- [x] Slice 11.4: Final decision memo.
 
 ## Slice 11.1 Sources Checked
 
@@ -567,3 +567,104 @@ However, `full_ios_spike` should start only if the team accepts three costs upfr
 - It will consume platform effort before Android pilot data is complete.
 
 If the next strategic question is "can iOS technically support the product thesis?", choose `full_ios_spike`. If the next question is "do users like replacement sessions on iOS?", choose `lightweight_ios_spike`. If the next question is "does the product work at all in the wild?", defer iOS until Android pilot signal.
+
+## Slice 11.4 Final Decision Memo
+
+Status: `implemented_pending_pro_review`
+
+Final recommendation: `build_full_ios_spike`.
+
+This is a recommendation to run a narrow feasibility spike, not to start an iOS product build. The reason is specific: Sprint 11 reduced the iOS question to one decisive unknown that cannot be answered by more documentation. If `openParentalControlsApp`, shield submenu callbacks, App Group state, and temporary unshield/reopen behavior can support a coherent replacement session on a physical iOS device, iOS may be viable as a constrained Screen Time product. If they cannot, the team should defer iOS before spending serious platform effort.
+
+### Decision Criteria
+
+| Criterion | Evidence from Sprint 11 | Decision effect |
+| --- | --- | --- |
+| Can iOS be an Android overlay clone? | No. Public iOS APIs do not support arbitrary third-party foreground-app overlays. | Do not pursue Android parity as the iOS goal. |
+| Is there a plausible public-API system path? | Yes, through FamilyControls, DeviceActivity, ManagedSettings, ManagedSettingsUI, and ShieldActionDelegate. | A narrow feasibility spike is justified. |
+| Is the hardest unknown still open? | Yes. Shield-to-app routing and action allocation need physical-device proof. | A docs-only decision is insufficient. |
+| Would a lightweight App Intents spike answer the hard question? | No. It can test session/content feel, not selected-app interruption. | Do not choose lightweight as the main next step if the goal is iOS system feasibility. |
+| Should iOS displace Android MVP work? | No. PRD keeps Android as MVP launch platform. | Keep the spike short, isolated, and non-production. |
+| Is deferral defensible? | Yes, if the team wants Android pilot evidence before any iOS platform work. | Deferral is the fallback if spike cost or entitlement readiness is unacceptable. |
+
+### Why Not `build_lightweight_ios_spike`
+
+`build_lightweight_ios_spike` would be faster and lower-risk, but it would not test the product's iOS-specific blocker: selected-app interruption and shield-to-replacement routing. It may be useful later for iOS reader/timer feel, but doing it first could create false confidence by validating only the easy part.
+
+Choose it only if the immediate question changes from "can iOS support the product thesis?" to "would iOS users like voluntary replacement sessions?"
+
+### Why Not `defer_ios_until_android_pilot`
+
+Deferral remains strategically clean and protects Android pilot focus. It is the correct choice if engineering capacity is constrained or if Apple entitlement readiness is not available.
+
+However, deferral leaves the iOS platform risk unresolved. Given Sprint 11 already found a plausible public-API path and reduced the question to a small number of testable shield behaviors, a short isolated full spike has enough expected value to run before any larger iOS decision.
+
+### Recommended Sprint 12: Full iOS Feasibility Spike
+
+Proposed Sprint 12 name: `Sprint 12: iOS Screen Time Feasibility Spike`.
+
+Goal:
+
+- Prove or falsify whether Quality Alternative can create a replacement-first selected-app interruption loop on iOS using public APIs and physical-device evidence.
+
+Scope:
+
+- Isolated iOS spike project, separate from the Android app.
+- Minimal SwiftUI host app.
+- FamilyControls authorization and FamilyActivityPicker selection.
+- App Group state shared with extensions.
+- ManagedSettingsStore shielding for selected targets.
+- ManagedSettingsUI shield configuration.
+- ShieldActionDelegate handling for:
+  - primary replacement routing through `openParentalControlsApp` where available
+  - backup submenu actions where available
+  - pause state through app-controlled shield expiry
+  - open-anyway through temporary unshield/reopen or `.none` behavior if reliable
+- Minimal replacement session screen using placeholder local content or meditation.
+
+Non-goals:
+
+- No production iOS app.
+- No Android/iOS feature parity.
+- No App Store/TestFlight release.
+- No native iOS document reader.
+- No backend, cloud sync, account system, or cross-platform rewrite.
+- No private APIs or unsupported routing workarounds.
+- No premium packaging or monetization.
+
+Required validation:
+
+- Physical iOS device evidence for any decisive pass/fail conclusion.
+- Simulator-only results are allowed only as supplemental and must be marked inconclusive for Screen Time/shield behavior.
+- Scenario evidence for selection, shield display, primary routing, backup routing, pause, open-anyway, repeated attempt, and cleanup.
+- Explicit capability/entitlement status: what works locally, what requires Apple approval, and what cannot be tested yet.
+- A final spike report choosing one of:
+  - continue to an iOS MVP slice
+  - run only a lightweight iOS session prototype
+  - defer iOS until Android pilot signal
+
+### What Would Change This Recommendation
+
+Choose `defer_ios_until_android_pilot` instead if:
+
+- no physical iOS device or Apple Developer capability path is available,
+- current engineering capacity should stay exclusively on Android pilot readiness,
+- the team wants user-behavior evidence before any new platform work,
+- or Apple documentation/API availability changes in a way that removes the routing/submenu feasibility path.
+
+Choose `build_lightweight_ios_spike` instead if:
+
+- the immediate goal is iOS session feel, not system interruption,
+- testers are available on iOS but not willing to grant Screen Time-style permissions,
+- or entitlement readiness blocks a full spike but the team still wants limited iOS UX feedback.
+
+Revisit iOS after Android pilot if:
+
+- Android replacement acceptance is below the pilot threshold,
+- users do not complete meaningful replacement sessions,
+- content quality remains the dominant bottleneck,
+- or iOS demand from testers is weak.
+
+### Final Sprint 11 Position
+
+Sprint 11 does not change the PRD launch platform. Android remains the MVP launch platform. The iOS recommendation is to run one bounded technical feasibility spike because the iOS platform question is now narrow, testable, and high-value. If the spike cannot prove shield-to-replacement routing on a physical device using public APIs, iOS should be deferred rather than approximated through a weaker product.

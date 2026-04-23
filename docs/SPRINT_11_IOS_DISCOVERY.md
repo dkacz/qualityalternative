@@ -78,6 +78,8 @@ Validation:
 
 ### Slice 11.4: Decision Memo
 
+Status: `implemented_pending_pro_review`
+
 Deliverables:
 
 - `docs/IOS_DISCOVERY.md` with final recommendation:
