@@ -274,7 +274,7 @@ object EpubTextExtractor {
     private fun String.listItemsToReaderMarkdown(ordered: Boolean): String {
         return topLevelListItemBodies()
             .mapIndexedNotNull { index, match ->
-                val lines = match.listItemLines()
+                val lines = match.listItemLines().inheritNestedContinuationIndent()
                 if (lines.isEmpty()) {
                     null
                 } else {
@@ -291,6 +291,27 @@ object EpubTextExtractor {
                 }
             }
             .joinToString("\n")
+    }
+
+    private fun List<String>.inheritNestedContinuationIndent(): List<String> {
+        if (size <= 1) {
+            return this
+        }
+        val listMarker = Regex("""^([-*+]|\d+[.)])\s+.+$""")
+        val nestedIndent = drop(1)
+            .map { line -> line.takeWhile(Char::isWhitespace).sumOf { char -> if (char == '\t') 2 else 1 } }
+            .filter { indent -> indent > 0 }
+            .minOrNull()
+            ?: return this
+        return listOf(first()) + drop(1).map { line ->
+            val currentIndent = line.takeWhile(Char::isWhitespace)
+                .sumOf { char -> if (char == '\t') 2 else 1 }
+            if (currentIndent == 0 && !listMarker.matches(line.trim())) {
+                " ".repeat(nestedIndent) + line.trim()
+            } else {
+                line
+            }
+        }
     }
 
     private fun String.topLevelListItemBodies(): List<String> {

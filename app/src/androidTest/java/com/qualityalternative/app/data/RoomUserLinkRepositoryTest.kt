@@ -231,7 +231,12 @@ class RoomUserLinkRepositoryTest {
             ) as AddUserLinkResult.Added
 
             val links = withTimeout(10_000L) {
-                repository.observeUserLinks().first { it.size == 1 }
+                repository.observeUserLinks().first { links ->
+                    links.size == 1 &&
+                        links.single().id == second.item.id &&
+                        links.single().title == "Updated title" &&
+                        links.single().durationMinutes == 10
+                }
             }
 
             assertEquals(first.item.id, second.item.id)

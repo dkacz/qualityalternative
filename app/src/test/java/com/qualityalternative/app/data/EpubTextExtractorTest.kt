@@ -402,6 +402,40 @@ class EpubTextExtractorTest {
         )
     }
 
+    @Test
+    fun extractPreservesContinuationParagraphsInsideNestedListDepth() {
+        val epub = singleChapterEpub(
+            """
+            <html><body>
+              <ol>
+                <li>Parent
+                  <ol>
+                    <li>Child
+                      <p>Child note before nested</p>
+                      <ol><li>Grandchild</li></ol>
+                      <p>Child note after nested</p>
+                    </li>
+                  </ol>
+                </li>
+              </ol>
+            </body></html>
+            """.trimIndent(),
+        )
+
+        val text = EpubTextExtractor.extract(ByteArrayInputStream(epub))
+
+        assertEquals(
+            """
+            1. Parent
+              1. Child
+                Child note before nested
+                1. Grandchild
+                Child note after nested
+            """.trimIndent(),
+            text,
+        )
+    }
+
     @Test(expected = IllegalArgumentException::class)
     fun extractThrowsWhenPackageDocumentIsMissing() {
         val epub = epubBytes("OPS/chapter.xhtml" to "<html><body><p>Lost.</p></body></html>")
