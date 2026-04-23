@@ -302,7 +302,7 @@ Decision signals:
 
 ## Milestone 9: iOS Discovery
 
-Status: `later discovery, not implementation`
+Status: `planned`
 
 Goal:
 
@@ -318,7 +318,12 @@ Likely work:
 
 Gate to start:
 
-- Android pilot should show enough behavioral value to justify platform risk.
+- Default gate remains Android pilot signal, but discovery can start earlier because it is decision work, not iOS implementation.
+- Sprint 11 should not add iOS code unless a later explicit decision changes scope.
+
+Sprint plan:
+
+- See `docs/SPRINT_11_IOS_DISCOVERY.md`.
 
 ## Milestone 9: Post-Pilot Product Bet
 
