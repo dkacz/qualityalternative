@@ -448,7 +448,7 @@ Acceptance criteria:
 - The spike can prove or falsify backup submenu action handling.
 - The spike can prove or falsify pause/open-anyway state transitions without treating `.close` as continuation or `.defer` as timer control.
 - Any pass/fail conclusion for shielding, routing, submenu callbacks, pause, or open-anyway is backed by physical-device evidence; otherwise the result is explicitly marked inconclusive.
-- The final spike report recommends either `build_full_ios_spike`, `build_lightweight_ios_spike`, or `defer_ios_until_android_pilot`.
+- The final spike report recommends either `continue_to_constrained_ios_product_scope_decision`, `run_lightweight_ios_session_prototype`, or `defer_ios_until_android_pilot`.
 
 ### Track B: `lightweight_ios_spike`
 
@@ -639,7 +639,7 @@ Required validation:
 - Scenario evidence for selection, shield display, primary routing, backup routing, pause, open-anyway, repeated attempt, and cleanup.
 - Explicit capability/entitlement status: what works locally, what requires Apple approval, and what cannot be tested yet.
 - A final spike report choosing one of:
-  - continue to an iOS MVP slice
+  - continue to a constrained iOS feasibility-to-product planning slice
   - run only a lightweight iOS session prototype
   - defer iOS until Android pilot signal
 
@@ -658,12 +658,19 @@ Choose `build_lightweight_ios_spike` instead if:
 - testers are available on iOS but not willing to grant Screen Time-style permissions,
 - or entitlement readiness blocks a full spike but the team still wants limited iOS UX feedback.
 
-Revisit iOS after Android pilot if:
+Keep iOS deferred after Android pilot if:
 
 - Android replacement acceptance is below the pilot threshold,
 - users do not complete meaningful replacement sessions,
 - content quality remains the dominant bottleneck,
 - or iOS demand from testers is weak.
+
+Reopen iOS after Android pilot if:
+
+- Android replacement acceptance meets or exceeds pilot thresholds,
+- users complete meaningful replacement sessions repeatedly,
+- content quality is no longer the dominant bottleneck,
+- or testers show strong iOS demand.
 
 ### Final Sprint 11 Position
 
