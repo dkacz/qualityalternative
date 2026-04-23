@@ -42,7 +42,7 @@ Checked on 2026-04-23.
 | Show our exact intervention UI over another app | ManagedSettingsUI configures shield appearance only. | `blocked` | We cannot assume the full Android intervention card can be rendered as-is over the target app. |
 | Put one primary replacement plus two backups directly in the interruption surface | Shield UI has configurable labels/buttons, and current beta documentation includes `secondaryButtonSubmenuItems`. | `limited_beta_option` | A submenu could potentially represent backup choices, but this is not equivalent to the Android full intervention card. Slice 11.2 must test whether beta availability, visual constraints, and action callbacks can support the product shape. |
 | Directly open Quality Alternative from the shield button | Stable production assumptions remain constrained; current beta API surface includes `ShieldActionResponse.openParentalControlsApp`. | `limited_beta_option` | The routing risk is reduced but not solved. Slice 11.2 must verify production availability, deployment target, whether it opens the right parent app/session, whether useful context can be passed, and whether App Review accepts the behavior. |
-| Allow conscious continuation | Shield action can close/defer/no-op; ManagedSettingsStore can update shield rules from app/extension state. | `limited` | Continuation is possible only if the app's state machine maps cleanly onto supported shield actions and unshield timing. Needs a spike. |
+| Allow conscious continuation | ManagedSettingsStore can update shield rules from app/extension state; `.none` may leave the user to continue after state changes. | `limited` | Continuation is possible only if the app's state machine maps cleanly onto temporary unshielding and user-initiated reopening. `.close` should not be treated as "open anyway," and `.defer` should not be treated as a 15-minute timer. Needs a spike. |
 | Track activity totals/progress | DeviceActivityReport and usage entitlement can report filtered activity in privacy-preserving form. | `works_with_entitlement` | Useful for feedback/progress, but entitlement and privacy constraints remain central. |
 | Lightweight tester prototype without Screen Time entitlement | App Intents/Shortcuts can expose actions but cannot reliably intercept selected distracting apps. | `limited` | Useful for testing replacement content and intent, not for validating system-level interruption. |
 
@@ -201,8 +201,8 @@ The current Android product shape is:
 | One primary replacement shown immediately | Shield title/subtitle/primary button can present one recommendation conceptually. | `limited` | A concise shield can present one clear primary action, but not the full Android card with rich metadata. | Test copy density and whether the primary action maps cleanly to a replacement session. |
 | Two backup recommendations | Current beta `secondaryButtonSubmenuItems` and related shield submenu actions. | `limited_beta_option` | Backups may be representable as submenu items, but this is deployment-target and beta-surface dependent. If unavailable, backups probably need to move into the app after parent-app routing. | Verify availability, callback behavior, visual affordance, and context handoff. |
 | Start replacement now | `openParentalControlsApp` beta/current API surface or a second-step app-opening workaround. | `limited_beta_option` | This is the decisive routing question. It may allow a shield action to open the parent app, but we still need to prove it can open the right replacement session, not just the app home screen. | Spike parent-app launch, session state, and App Review-safe behavior. |
-| Open anyway | `ShieldActionResponse.close`, temporary unshielding through shared state, or defer-style behavior. | `limited` | iOS can likely provide a conscious continuation path, but the exact mechanics may be more awkward than Android. A hard guarantee of immediate target-app open should not be promised yet. | Prototype whether the target app opens after close/unshield and whether state cleanup is reliable. |
-| Pause 15 min | `ShieldActionResponse.defer` or app-controlled temporary shield/unshield windows. | `works_with_constraints` | This maps better to iOS than direct replacement routing. Delay can be native-feeling if framed as "not now" rather than "open later." | Confirm defer duration control, analytics mapping, and repeated-attempt behavior. |
+| Open anyway | Temporary unshielding or shield-rule removal through shared state, followed by `.none` or a two-step reopen flow if needed. | `limited` | `.close` closes the current application or browser and should not be treated as "continue." iOS may support conscious continuation, but the exact mechanics are more awkward than Android. A hard guarantee of immediate target-app continuation should not be promised yet. | Prototype target-app reopening after temporary unshielding, `.none` behavior, repeated shields, and state cleanup. |
+| Pause 15 min | App-controlled shield state, App Group expiry state, and re-shield logic; `.defer` only as a possible asynchronous/redraw mechanism if a spike proves useful. | `works_with_constraints` | A 15-minute pause should be modeled by our own managed shield state, not by assuming `.defer` is a duration-control API. Delay can be native-feeling if framed as "not now" rather than "open later." | Validate timer expiry, repeated-attempt behavior, extension lifecycle, analytics mapping, and state cleanup. |
 | Delay suppresses repeated prompts | ManagedSettingsStore state plus App Group state. | `works_with_constraints` | Suppression can be modeled by changing shield rules, but extensions and host app need consistent shared state. | Validate extension lifecycle and race conditions. |
 | Replacement reader/meditation starts directly | Parent app session screen launched from shield or manually opened second step. | `limited_beta_option` | If parent-app routing works, a direct session is plausible. If not, iOS becomes a two-step flow and loses impulse-moment sharpness. | Prove deep-link/session-state equivalent without private APIs. |
 | Feedback after replacement | Host app UI. | `works` | Once the user is in the app, feedback is straightforward. | Ensure analytics can associate feedback to the shield-triggered session. |
@@ -223,6 +223,13 @@ Path:
 7. Feedback and progress are recorded in the host app.
 
 Status: `limited_beta_option`.
+
+Action allocation:
+
+- First-screen primary action: start the primary replacement through parent-app routing.
+- Backup actions: not represented on the shield unless Flow B submenu support is available; otherwise shown only after the app opens.
+- Pause 15 min: not on the first shield surface in this minimal variant; can be represented as a secondary action only if backups move into the app or if a separate shield configuration is chosen.
+- Open anyway: not a shield button in this minimal variant; handled as a second-step in-app control or a temporary-unshield/reopen flow if the spike proves it reliable.
 
 Why it is attractive:
 
@@ -249,6 +256,15 @@ Path:
 
 Status: `limited_beta_option`.
 
+Action allocation:
+
+- First-screen primary action: start the primary replacement through parent-app routing.
+- Secondary-button submenu: two backup recommendations, if submenu item labels and callbacks are available on the deployment target.
+- Pause 15 min: second-step in-app action after parent-app open, or a separate shield secondary action only if backups are moved out of the submenu.
+- Open anyway: second-step in-app action that temporarily removes the shield and tells the user to reopen the target, or a shield no-op/unshield path if a spike proves it works reliably.
+
+This allocation is not full Android parity. It preserves the finite replacement surface, but it likely pushes at least Pause and Open anyway out of the first shield screen.
+
 Why it is attractive:
 
 - Most closely maps to "one primary plus two backups."
@@ -272,6 +288,13 @@ Path:
 5. The app starts the replacement session.
 
 Status: `limited`.
+
+Action allocation:
+
+- First-screen shield action: pause/not-now behavior, implemented through managed shield state rather than assuming `.defer` provides a 15-minute timer.
+- Primary replacement: opened manually through the app, notification, widget, or shortcut after the shield interrupts the impulse.
+- Backup actions: shown in the app after the user enters Quality Alternative.
+- Open anyway: temporary-unshield/reopen flow or in-app conscious continuation step.
 
 Why it is useful:
 
