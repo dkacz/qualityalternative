@@ -3164,8 +3164,8 @@ internal fun readerMarkdownBlock(rawBlock: String): ReaderMarkdownBlock {
         )
     }
 
-    val unorderedListMarker = Regex("""^\s*[-*+]\s+(.+)$""")
-    val orderedListMarker = Regex("""^\s*(\d+[.)])\s+(.+)$""")
+    val unorderedListMarker = Regex("""^[-*+]\s+(.+)$""")
+    val orderedListMarker = Regex("""^(\d+[.)])\s+(.+)$""")
     val continuationLine = Regex("""^\s{2,}\S.*$""")
     if (lines.isNotEmpty() && lines.first().isReaderListItem(unorderedListMarker, orderedListMarker) &&
         lines.all { line ->

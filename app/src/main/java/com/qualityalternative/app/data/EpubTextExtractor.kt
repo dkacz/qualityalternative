@@ -163,12 +163,7 @@ object EpubTextExtractor {
     private fun String.isAuxiliaryDocumentPath(): Boolean {
         val fileName = substringAfterLast('/').substringBeforeLast('.').lowercase()
         val normalized = fileName.replace(Regex("""[_\-\s]+"""), "")
-        val tokens = fileName
-            .split(Regex("""[_\-\s]+"""))
-            .filter(String::isNotBlank)
-        return normalized in setOf("nav", "toc", "tableofcontents", "cover", "coverpage", "titlepage") ||
-            tokens.firstOrNull() == "cover" ||
-            tokens.lastOrNull() == "cover"
+        return normalized in setOf("nav", "toc", "tableofcontents", "cover", "coverpage", "titlepage")
     }
 
     private fun String.attribute(name: String): String? {
@@ -238,20 +233,43 @@ object EpubTextExtractor {
     }
 
     private fun String.replaceLists(): String {
-        val listPattern = Regex("""<(ol|ul)\b[^>]*>([\s\S]*?)</\1>""", RegexOption.IGNORE_CASE)
         var rendered = this
         while (true) {
-            val replaced = listPattern.replace(rendered) { match ->
-                val ordered = match.groupValues[1].equals("ol", ignoreCase = true)
-                val items = match.groupValues[2].listItemsToReaderMarkdown(ordered = ordered)
-                if (items.isBlank()) "" else "\n\n$items\n\n"
-            }
+            val replaced = rendered.replaceOneInnermostList()
             if (replaced == rendered) {
                 return rendered
             }
             rendered = replaced
         }
     }
+
+    private fun String.replaceOneInnermostList(): String {
+        val listTag = Regex("""</?(ol|ul)\b[^>]*>""", RegexOption.IGNORE_CASE)
+        val stack = mutableListOf<ListTag>()
+        listTag.findAll(this).forEach { match ->
+            val tagName = match.groupValues[1].lowercase()
+            val closing = match.value.startsWith("</", ignoreCase = true)
+            if (!closing) {
+                stack += ListTag(tagName = tagName, start = match.range.first, bodyStart = match.range.last + 1)
+            } else {
+                val openIndex = stack.indexOfLast { tag -> tag.tagName == tagName }
+                if (openIndex >= 0) {
+                    val open = stack.removeAt(openIndex)
+                    val body = substring(open.bodyStart, match.range.first)
+                    val items = body.listItemsToReaderMarkdown(ordered = tagName == "ol")
+                    val replacement = if (items.isBlank()) "" else "\n\n$items\n\n"
+                    return replaceRange(open.start, match.range.last + 1, replacement)
+                }
+            }
+        }
+        return this
+    }
+
+    private data class ListTag(
+        val tagName: String,
+        val start: Int,
+        val bodyStart: Int,
+    )
 
     private fun String.listItemsToReaderMarkdown(ordered: Boolean): String {
         return topLevelListItemBodies()

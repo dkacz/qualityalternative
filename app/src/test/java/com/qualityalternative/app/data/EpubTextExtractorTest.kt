@@ -174,7 +174,7 @@ class EpubTextExtractorTest {
     }
 
     @Test
-    fun extractKeepsLegitimateChapterNamesThatContainCoverLetters() {
+    fun extractKeepsLegitimateChapterNamesThatContainCover() {
         val epub = epubBytes(
             "META-INF/container.xml" to """
                 <container><rootfiles><rootfile full-path="OPS/package.opf"/></rootfiles></container>
@@ -184,21 +184,29 @@ class EpubTextExtractorTest {
                   <manifest>
                     <item id="discover" href="discover.xhtml" media-type="application/xhtml+xml"/>
                     <item id="recover" href="recover.xhtml" media-type="application/xhtml+xml"/>
+                    <item id="cover-story" href="cover-story.xhtml" media-type="application/xhtml+xml"/>
+                    <item id="story-cover" href="story-cover.xhtml" media-type="application/xhtml+xml"/>
                   </manifest>
                   <spine>
                     <itemref idref="discover"/>
                     <itemref idref="recover"/>
+                    <itemref idref="cover-story"/>
+                    <itemref idref="story-cover"/>
                   </spine>
                 </package>
             """.trimIndent(),
             "OPS/discover.xhtml" to "<html><body><h1>Discover Slowly</h1></body></html>",
             "OPS/recover.xhtml" to "<html><body><p>Recover attention without opening a feed.</p></body></html>",
+            "OPS/cover-story.xhtml" to "<html><body><p>A cover story can still be a chapter.</p></body></html>",
+            "OPS/story-cover.xhtml" to "<html><body><p>A story cover chapter can still be readable.</p></body></html>",
         )
 
         val text = EpubTextExtractor.extract(ByteArrayInputStream(epub))
 
         assertTrue(text.contains("# Discover Slowly"))
         assertTrue(text.contains("Recover attention without opening a feed."))
+        assertTrue(text.contains("A cover story can still be a chapter."))
+        assertTrue(text.contains("A story cover chapter can still be readable."))
     }
 
     @Test
@@ -299,6 +307,67 @@ class EpubTextExtractorTest {
         )
         assertFalse(text.contains("2. Sub B"))
         assertFalse(text.contains("3. Second"))
+    }
+
+    @Test
+    fun extractKeepsSameTypeNestedListsAttachedToTheirParentItem() {
+        val ordered = EpubTextExtractor.extract(
+            ByteArrayInputStream(
+                singleChapterEpub(
+                    """
+                    <html><body>
+                      <ol>
+                        <li>Parent
+                          <ol>
+                            <li>Sub 1</li>
+                            <li>Sub 2</li>
+                          </ol>
+                        </li>
+                        <li>Next</li>
+                      </ol>
+                    </body></html>
+                    """.trimIndent(),
+                ),
+            ),
+        )
+        val unordered = EpubTextExtractor.extract(
+            ByteArrayInputStream(
+                singleChapterEpub(
+                    """
+                    <html><body>
+                      <ul>
+                        <li>Parent
+                          <ul>
+                            <li>Sub A</li>
+                            <li>Sub B</li>
+                          </ul>
+                        </li>
+                        <li>Next</li>
+                      </ul>
+                    </body></html>
+                    """.trimIndent(),
+                ),
+            ),
+        )
+
+        assertEquals(
+            """
+            1. Parent
+              1. Sub 1
+              2. Sub 2
+            2. Next
+            """.trimIndent(),
+            ordered,
+        )
+        assertEquals(
+            """
+            - Parent
+              - Sub A
+              - Sub B
+            - Next
+            """.trimIndent(),
+            unordered,
+        )
     }
 
     @Test(expected = IllegalArgumentException::class)

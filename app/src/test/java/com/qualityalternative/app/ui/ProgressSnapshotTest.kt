@@ -261,6 +261,31 @@ class ProgressSnapshotTest {
     }
 
     @Test
+    fun readerBlocksForDisplayPreservesIndentedNestedMarkdownListLines() {
+        val blocks = readerBlocksForDisplay(
+            body = """
+                1. Parent
+                  1. Sub one
+                  2. Sub two
+                2. Next
+            """.trimIndent(),
+            fallback = "Fallback.",
+        )
+
+        assertEquals(1, blocks.size)
+        assertEquals(ReaderMarkdownBlockKind.LIST, blocks.single().kind)
+        assertEquals(
+            """
+            1. Parent
+              1. Sub one
+              2. Sub two
+            2. Next
+            """.trimIndent(),
+            blocks.single().text.text,
+        )
+    }
+
+    @Test
     fun readerBlocksForDisplayDoesNotTreatIntrawordUnderscoresAsItalic() {
         val blocks = readerBlocksForDisplay(
             body = "Keep imported_notes_v1.md readable while _intentional emphasis_ still works.",
