@@ -15,21 +15,18 @@ object EpubTextExtractor {
         val opf = entries[opfPath]?.toString(Charsets.UTF_8)
             ?: throw IllegalArgumentException("EPUB package document not readable")
         val baseDir = opfPath.substringBeforeLast('/', missingDelimiterValue = "")
-        val manifest = manifestItems(opf)
-        val spinePaths = spineIdRefs(opf)
-            .mapNotNull(manifest::get)
-            .map { href -> normalizePath(baseDir, href) }
+        val manifestItems = manifestItems(opf)
+        val spinePaths = spineItems(opf)
+            .mapNotNull { spineItem ->
+                manifestItems[spineItem.idref]
+                    ?.takeIf { manifestItem -> manifestItem.isReadableSpineDocument(spineItem = spineItem) }
+            }
+            .map { item -> normalizePath(baseDir, item.href) }
+            .filter(::isReadableDocumentPath)
             .filter { path -> entries.containsKey(path) }
         val readablePaths = spinePaths.ifEmpty {
             entries.keys
-                .filter { path ->
-                    path.endsWith(".xhtml", ignoreCase = true) ||
-                        path.endsWith(".html", ignoreCase = true) ||
-                        path.endsWith(".htm", ignoreCase = true)
-                }
-                .filterNot { path ->
-                    path.contains("nav", ignoreCase = true) || path.contains("cover", ignoreCase = true)
-                }
+                .filter(::isReadableDocumentPath)
                 .sorted()
         }
         val body = readablePaths
@@ -67,23 +64,95 @@ object EpubTextExtractor {
             ?.getOrNull(1)
     }
 
-    private fun manifestItems(opf: String): Map<String, String> {
+    private data class ManifestItem(
+        val id: String,
+        val href: String,
+        val mediaType: String?,
+        val properties: Set<String>,
+    )
+
+    private data class SpineItem(
+        val idref: String,
+        val linear: Boolean,
+    )
+
+    private fun manifestItems(opf: String): Map<String, ManifestItem> {
         return Regex("""<item\b[^>]*>""", RegexOption.IGNORE_CASE)
             .findAll(opf)
             .mapNotNull { match ->
                 val tag = match.value
                 val id = tag.attribute("id")
                 val href = tag.attribute("href")
-                if (id != null && href != null) id to href else null
+                if (id != null && href != null) {
+                    id to ManifestItem(
+                        id = id,
+                        href = href,
+                        mediaType = tag.attribute("media-type"),
+                        properties = tag.attribute("properties").toPropertySet(),
+                    )
+                } else {
+                    null
+                }
             }
             .toMap()
     }
 
-    private fun spineIdRefs(opf: String): List<String> {
+    private fun spineItems(opf: String): List<SpineItem> {
         return Regex("""<itemref\b[^>]*>""", RegexOption.IGNORE_CASE)
             .findAll(opf)
-            .mapNotNull { match -> match.value.attribute("idref") }
+            .mapNotNull { match ->
+                val tag = match.value
+                tag.attribute("idref")?.let { idref ->
+                    SpineItem(
+                        idref = idref,
+                        linear = tag.attribute("linear")?.equals("no", ignoreCase = true) != true,
+                    )
+                }
+            }
             .toList()
+    }
+
+    private fun ManifestItem.isReadableSpineDocument(spineItem: SpineItem): Boolean {
+        if (!spineItem.linear) {
+            return false
+        }
+        if ("nav" in properties) {
+            return false
+        }
+        val normalizedMediaType = mediaType?.lowercase()
+        return normalizedMediaType == null ||
+            normalizedMediaType == "application/xhtml+xml" ||
+            normalizedMediaType == "text/html"
+    }
+
+    private fun String?.toPropertySet(): Set<String> {
+        return this
+            ?.split(Regex("""\s+"""))
+            ?.mapNotNull { raw -> raw.trim().lowercase().takeIf(String::isNotBlank) }
+            ?.toSet()
+            .orEmpty()
+    }
+
+    private fun isReadableDocumentPath(path: String): Boolean {
+        if (!path.endsWith(".xhtml", ignoreCase = true) &&
+            !path.endsWith(".html", ignoreCase = true) &&
+            !path.endsWith(".htm", ignoreCase = true)
+        ) {
+            return false
+        }
+        return !path.isAuxiliaryDocumentPath()
+    }
+
+    private fun String.isAuxiliaryDocumentPath(): Boolean {
+        val fileName = substringAfterLast('/').substringBeforeLast('.').lowercase()
+        val normalized = fileName.replace(Regex("""[_\-\s]+"""), "")
+        return normalized == "nav" ||
+            normalized == "toc" ||
+            normalized == "tableofcontents" ||
+            normalized == "cover" ||
+            normalized == "titlepage" ||
+            normalized.startsWith("cover") ||
+            normalized.endsWith("cover")
     }
 
     private fun String.attribute(name: String): String? {
@@ -121,15 +190,11 @@ object EpubTextExtractor {
             .replace(Regex("""<svg\b[\s\S]*?</svg>""", RegexOption.IGNORE_CASE), " ")
             .replace(Regex("""<br\b[^>]*\/?>""", RegexOption.IGNORE_CASE), "\n")
             .replace(Regex("""<hr\b[^>]*\/?>""", RegexOption.IGNORE_CASE), "\n\n---\n\n")
-            .replaceInlineStyleTags("strong|b", "**")
-            .replaceInlineStyleTags("em|i|cite", "_")
-            .replaceInlineStyleTags("code|kbd|samp", "`")
             .replaceHeadings()
             .replaceBlockquotes()
-            .replaceListItems()
+            .replaceLists()
             .replace(Regex("""</(p|div|section|article|aside|header|footer|main|figure|figcaption|ul|ol|dl|table|tbody|thead|tr)>""", RegexOption.IGNORE_CASE), "\n\n")
-            .replace(Regex("""<[^>]+>"""), " ")
-            .decodeXmlEntities()
+            .toInlineReaderMarkdown(preserveLineBreaks = true)
             .normalizeReaderMarkdown()
     }
 
@@ -137,7 +202,7 @@ object EpubTextExtractor {
         return Regex("""<h([1-6])\b[^>]*>([\s\S]*?)</h\1>""", RegexOption.IGNORE_CASE)
             .replace(this) { match ->
                 val level = match.groupValues[1].toIntOrNull()?.coerceIn(1, 6) ?: 1
-                val text = match.groupValues[2].stripTagsToInlineText()
+                val text = match.groupValues[2].toInlineReaderMarkdown()
                 "\n\n${"#".repeat(level)} $text\n\n"
             }
     }
@@ -147,7 +212,7 @@ object EpubTextExtractor {
             .replace(this) { match ->
                 val quote = match.groupValues[1]
                     .replace(Regex("""</(p|div|li)>""", RegexOption.IGNORE_CASE), "\n")
-                    .stripTagsToInlineText(preserveLineBreaks = true)
+                    .toInlineReaderMarkdown(preserveLineBreaks = true)
                     .lines()
                     .map { line -> line.trim() }
                     .filter(String::isNotBlank)
@@ -156,12 +221,44 @@ object EpubTextExtractor {
             }
     }
 
-    private fun String.replaceListItems(): String {
-        return Regex("""<li\b[^>]*>([\s\S]*?)</li>""", RegexOption.IGNORE_CASE)
-            .replace(this) { match ->
-                val text = match.groupValues[1].stripTagsToInlineText()
-                "\n- $text"
+    private fun String.replaceLists(): String {
+        val listPattern = Regex("""<(ol|ul)\b[^>]*>([\s\S]*?)</\1>""", RegexOption.IGNORE_CASE)
+        var rendered = this
+        while (true) {
+            val replaced = listPattern.replace(rendered) { match ->
+                val ordered = match.groupValues[1].equals("ol", ignoreCase = true)
+                val items = match.groupValues[2].listItemsToReaderMarkdown(ordered = ordered)
+                if (items.isBlank()) "" else "\n\n$items\n\n"
             }
+            if (replaced == rendered) {
+                return rendered
+            }
+            rendered = replaced
+        }
+    }
+
+    private fun String.listItemsToReaderMarkdown(ordered: Boolean): String {
+        return Regex("""<li\b[^>]*>([\s\S]*?)</li>""", RegexOption.IGNORE_CASE)
+            .findAll(this)
+            .mapIndexedNotNull { index, match ->
+                val lines = match.groupValues[1].listItemLines()
+                if (lines.isEmpty()) {
+                    null
+                } else {
+                    val marker = if (ordered) "${index + 1}." else "-"
+                    buildString {
+                        append(marker)
+                        append(' ')
+                        append(lines.first())
+                        lines.drop(1).forEach { line ->
+                            append('\n')
+                            append("  ")
+                            append(line)
+                        }
+                    }
+                }
+            }
+            .joinToString("\n")
     }
 
     private fun String.replaceInlineStyleTags(tagNames: String, marker: String): String {
@@ -169,7 +266,7 @@ object EpubTextExtractor {
         var rendered = this
         while (true) {
             val replaced = pattern.replace(rendered) { match ->
-                val text = match.groupValues[2].stripTagsToInlineText()
+                val text = match.groupValues[2].toInlineReaderMarkdown()
                 if (text.isBlank()) "" else "$marker$text$marker"
             }
             if (replaced == rendered) {
@@ -179,19 +276,31 @@ object EpubTextExtractor {
         }
     }
 
-    private fun String.stripTagsToInlineText(preserveLineBreaks: Boolean = false): String {
+    private fun String.listItemLines(): List<String> {
+        return replace(Regex("""</(p|div|section|article|blockquote)>""", RegexOption.IGNORE_CASE), "\n")
+            .replace(Regex("""<br\b[^>]*\/?>""", RegexOption.IGNORE_CASE), "\n")
+            .toInlineReaderMarkdown(preserveLineBreaks = true)
+            .lines()
+            .map { line -> line.replace(Regex("""[ \t\r\f]+"""), " ").trim() }
+            .filter(String::isNotBlank)
+    }
+
+    private fun String.toInlineReaderMarkdown(preserveLineBreaks: Boolean = false): String {
         val withoutBlocks = if (preserveLineBreaks) {
             replace(Regex("""<(br|/p|/div|/li)\b[^>]*>""", RegexOption.IGNORE_CASE), "\n")
         } else {
             this
         }
         return withoutBlocks
+            .replaceInlineStyleTags("strong|b", "**")
+            .replaceInlineStyleTags("em|i|cite", "_")
+            .replaceInlineStyleTags("code|kbd|samp", "`")
             .replace(Regex("""<[^>]+>"""), " ")
             .decodeXmlEntities()
             .let { text ->
                 if (preserveLineBreaks) {
                     text.lines()
-                        .joinToString("\n") { line -> line.replace(Regex("""[ \t\r\f]+"""), " ").trim() }
+                        .joinToString("\n", transform = ::normalizeReaderMarkdownLine)
                 } else {
                     text.replace(Regex("""\s+"""), " ").trim()
                 }
@@ -201,19 +310,25 @@ object EpubTextExtractor {
 
     private fun String.normalizeReaderMarkdown(): String {
         return lines()
-            .map { line -> line.replace(Regex("""[ \t\r\f]+"""), " ").trim() }
+            .map(::normalizeReaderMarkdownLine)
             .joinToString("\n")
             .replace(Regex("""\n{3,}"""), "\n\n")
-            .split(Regex("""\n\s*\n"""))
+            .split(Regex("""\n[ \t\r\f]*\n"""))
             .map { block ->
                 block.lines()
-                    .map(String::trim)
+                    .map(::normalizeReaderMarkdownLine)
                     .filter(String::isNotBlank)
                     .joinToString("\n")
                     .trim()
             }
             .filter(String::isNotBlank)
             .joinToString(separator = "\n\n")
+    }
+
+    private fun normalizeReaderMarkdownLine(line: String): String {
+        val hasLeadingIndent = line.firstOrNull()?.isWhitespace() == true
+        val body = line.trim().replace(Regex("""[ \t\r\f]+"""), " ")
+        return if (hasLeadingIndent && body.isNotBlank()) "  $body" else body
     }
 
     private fun String.decodeXmlEntities(): String {
@@ -231,10 +346,14 @@ object EpubTextExtractor {
             .replace("&ndash;", "-")
             .replace("&hellip;", "...")
             .replace(Regex("""&#(\d+);""")) { match ->
-                match.groupValues[1].toIntOrNull()?.toChar()?.toString() ?: match.value
+                match.groupValues[1].toIntOrNull()?.toCodePointString() ?: match.value
             }
             .replace(Regex("""&#x([0-9a-fA-F]+);""")) { match ->
-                match.groupValues[1].toIntOrNull(radix = 16)?.toChar()?.toString() ?: match.value
+                match.groupValues[1].toIntOrNull(radix = 16)?.toCodePointString() ?: match.value
             }
+    }
+
+    private fun Int.toCodePointString(): String? {
+        return runCatching { String(Character.toChars(this)) }.getOrNull()
     }
 }

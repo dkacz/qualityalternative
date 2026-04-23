@@ -3164,12 +3164,24 @@ internal fun readerMarkdownBlock(rawBlock: String): ReaderMarkdownBlock {
         )
     }
 
-    val listMarker = Regex("""^\s*(?:[-*+]\s+|\d+[.)]\s+)(.+)$""")
-    if (lines.isNotEmpty() && lines.all { line -> listMarker.matches(line) }) {
+    val unorderedListMarker = Regex("""^\s*[-*+]\s+(.+)$""")
+    val orderedListMarker = Regex("""^\s*(\d+[.)])\s+(.+)$""")
+    val continuationLine = Regex("""^\s{2,}\S.*$""")
+    if (lines.isNotEmpty() && lines.first().isReaderListItem(unorderedListMarker, orderedListMarker) &&
+        lines.all { line ->
+            line.isReaderListItem(unorderedListMarker, orderedListMarker) || continuationLine.matches(line)
+        }
+    ) {
         return ReaderMarkdownBlock(
             text = parseInlineMarkdown(
                 lines.joinToString("\n") { line ->
-                    "• ${listMarker.matchEntire(line)?.groupValues?.getOrNull(1).orEmpty().trim()}"
+                    val ordered = orderedListMarker.matchEntire(line)
+                    val unordered = unorderedListMarker.matchEntire(line)
+                    when {
+                        ordered != null -> "${ordered.groupValues[1]} ${ordered.groupValues[2].trim()}"
+                        unordered != null -> "• ${unordered.groupValues[1].trim()}"
+                        else -> "  ${line.trim()}"
+                    }
                 },
             ),
             kind = ReaderMarkdownBlockKind.LIST,
@@ -3180,6 +3192,10 @@ internal fun readerMarkdownBlock(rawBlock: String): ReaderMarkdownBlock {
         text = parseInlineMarkdown(block),
         kind = ReaderMarkdownBlockKind.BODY,
     )
+}
+
+private fun String.isReaderListItem(unordered: Regex, ordered: Regex): Boolean {
+    return unordered.matches(this) || ordered.matches(this)
 }
 
 internal fun parseInlineMarkdown(rawText: String): AnnotatedString {
@@ -3281,7 +3297,7 @@ private fun canCloseInlineEmphasis(rawText: String, marker: Char, index: Int): B
 
 private fun AnnotatedString.Builder.appendStyledMarkdown(text: String, style: SpanStyle) {
     val start = length
-    append(text)
+    append(parseInlineMarkdown(text))
     addStyle(style, start, length)
 }
 
