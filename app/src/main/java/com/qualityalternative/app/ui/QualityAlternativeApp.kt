@@ -1751,7 +1751,11 @@ private fun ProgressTab(snapshot: ProgressSnapshot) {
                             color = colors.primaryText,
                         ),
                     )
-                    BodyText("days converted", color = colors.mutedText, modifier = Modifier.padding(bottom = 10.dp))
+                    BodyText(
+                        convertedDayNounLabel(snapshot.daysConverted),
+                        color = colors.mutedText,
+                        modifier = Modifier.padding(bottom = 10.dp),
+                    )
                 }
                 BodyText(
                     text = "Days you replaced an impulse with a real read. Missed days aren't tracked - come back when you can.",
@@ -1763,7 +1767,7 @@ private fun ProgressTab(snapshot: ProgressSnapshot) {
         }
         item {
             QaCard(padding = 0.dp) {
-                SmallStatRow("Current reading streak", "${snapshot.currentStreakDays} days")
+                SmallStatRow("Current reading streak", dayCountLabel(snapshot.currentStreakDays, "day"))
                 HorizontalDivider(color = colors.line)
                 SmallStatRow("Completed reads", snapshot.completedReads.toString())
                 HorizontalDivider(color = colors.line)
@@ -3180,7 +3184,7 @@ internal fun readerMarkdownBlock(rawBlock: String): ReaderMarkdownBlock {
                     when {
                         ordered != null -> "${ordered.groupValues[1]} ${ordered.groupValues[2].trim()}"
                         unordered != null -> "• ${unordered.groupValues[1].trim()}"
-                        else -> "  ${line.trim()}"
+                        else -> line.asReaderContinuationLine()
                     }
                 },
             ),
@@ -3313,6 +3317,25 @@ internal fun readerProgressPercentForReaderList(lastVisibleItemIndex: Int, parag
     val headerItemCount = 1
     val lastVisibleParagraphIndex = (lastVisibleItemIndex - headerItemCount).coerceAtLeast(0)
     return readerProgressPercent(lastVisibleItemIndex = lastVisibleParagraphIndex, paragraphCount = paragraphCount)
+}
+
+internal fun dayCountLabel(count: Int, singular: String): String {
+    return "$count ${dayNounLabel(count = count, singular = singular)}"
+}
+
+internal fun dayNounLabel(count: Int, singular: String): String {
+    return if (count == 1) singular else "${singular}s"
+}
+
+internal fun convertedDayNounLabel(count: Int): String {
+    return if (count == 1) "day converted" else "days converted"
+}
+
+private fun String.asReaderContinuationLine(): String {
+    val indent = takeWhile(Char::isWhitespace)
+        .sumOf { char -> if (char == '\t') 2 else 1 }
+        .coerceAtLeast(2)
+    return " ".repeat(indent) + trim()
 }
 
 internal fun currentReadingStreakDays(completedDays: Set<LocalDate>, today: LocalDate): Int {

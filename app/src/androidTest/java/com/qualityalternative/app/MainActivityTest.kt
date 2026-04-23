@@ -318,7 +318,7 @@ class MainActivityTest {
             hasTag("progress-card") || hasNode("Progress")
         }
         composeRule.onNodeWithTag("progress-card").assertIsDisplayed()
-        composeRule.onNodeWithText("days converted").assertIsDisplayed()
+        composeRule.onNodeWithText("day converted").assertIsDisplayed()
     }
 
     @Test

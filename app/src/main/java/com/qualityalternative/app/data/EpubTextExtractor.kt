@@ -285,8 +285,7 @@ object EpubTextExtractor {
                         append(lines.first())
                         lines.drop(1).forEach { line ->
                             append('\n')
-                            append("  ")
-                            append(line)
+                            append(line.indentContinuationLine())
                         }
                     }
                 }
@@ -340,8 +339,29 @@ object EpubTextExtractor {
             .replace(Regex("""<br\b[^>]*\/?>""", RegexOption.IGNORE_CASE), "\n")
             .toInlineReaderMarkdown(preserveLineBreaks = true)
             .lines()
-            .map { line -> line.replace(Regex("""[ \t\r\f]+"""), " ").trim() }
+            .map(::normalizeListItemLine)
             .filter(String::isNotBlank)
+    }
+
+    private fun normalizeListItemLine(line: String): String {
+        val body = line.trim().replace(Regex("""[ \t\r\f]+"""), " ")
+        if (body.isBlank()) {
+            return ""
+        }
+        val leadingIndent = line.takeWhile(Char::isWhitespace)
+            .sumOf { char -> if (char == '\t') 2 else 1 }
+        val nestedListMarker = Regex("""^([-*+]|\d+[.)])\s+.+$""")
+        return if (leadingIndent > 0 && nestedListMarker.matches(body)) {
+            " ".repeat(leadingIndent) + body
+        } else {
+            body
+        }
+    }
+
+    private fun String.indentContinuationLine(): String {
+        val existingIndent = takeWhile(Char::isWhitespace)
+            .sumOf { char -> if (char == '\t') 2 else 1 }
+        return " ".repeat(existingIndent + 2) + trim()
     }
 
     private fun String.toInlineReaderMarkdown(preserveLineBreaks: Boolean = false): String {
@@ -385,9 +405,10 @@ object EpubTextExtractor {
     }
 
     private fun normalizeReaderMarkdownLine(line: String): String {
-        val hasLeadingIndent = line.firstOrNull()?.isWhitespace() == true
+        val leadingIndent = line.takeWhile(Char::isWhitespace)
+            .sumOf { char -> if (char == '\t') 2 else 1 }
         val body = line.trim().replace(Regex("""[ \t\r\f]+"""), " ")
-        return if (hasLeadingIndent && body.isNotBlank()) "  $body" else body
+        return if (leadingIndent > 0 && body.isNotBlank()) " ".repeat(leadingIndent) + body else body
     }
 
     private fun String.decodeXmlEntities(): String {

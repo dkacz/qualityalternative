@@ -286,6 +286,39 @@ class ProgressSnapshotTest {
     }
 
     @Test
+    fun readerBlocksForDisplayPreservesThreeLevelMarkdownListDepth() {
+        val blocks = readerBlocksForDisplay(
+            body = """
+                1. Parent
+                  1. Child
+                    1. Grandchild
+                2. Next
+            """.trimIndent(),
+            fallback = "Fallback.",
+        )
+
+        assertEquals(1, blocks.size)
+        assertEquals(ReaderMarkdownBlockKind.LIST, blocks.single().kind)
+        assertEquals(
+            """
+            1. Parent
+              1. Child
+                1. Grandchild
+            2. Next
+            """.trimIndent(),
+            blocks.single().text.text,
+        )
+    }
+
+    @Test
+    fun dayLabelsUseSingularAndPluralCopy() {
+        assertEquals("1 day", dayCountLabel(count = 1, singular = "day"))
+        assertEquals("2 days", dayCountLabel(count = 2, singular = "day"))
+        assertEquals("day converted", convertedDayNounLabel(count = 1))
+        assertEquals("days converted", convertedDayNounLabel(count = 2))
+    }
+
+    @Test
     fun readerBlocksForDisplayDoesNotTreatIntrawordUnderscoresAsItalic() {
         val blocks = readerBlocksForDisplay(
             body = "Keep imported_notes_v1.md readable while _intentional emphasis_ still works.",
