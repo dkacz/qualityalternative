@@ -1414,7 +1414,7 @@ private fun ReaderScreen(
     val progress by remember(content.id, blocks.size) {
         derivedStateOf {
             val lastVisibleIndex = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-            readerProgressPercent(lastVisibleItemIndex = lastVisibleIndex, paragraphCount = blocks.size)
+            readerProgressPercentForReaderList(lastVisibleItemIndex = lastVisibleIndex, paragraphCount = blocks.size)
         }
     }
 
@@ -3307,6 +3307,12 @@ internal fun readerProgressPercent(lastVisibleItemIndex: Int, paragraphCount: In
     }
     val visibleParagraphs = lastVisibleItemIndex.coerceIn(0, paragraphCount)
     return ((visibleParagraphs * 100) / paragraphCount).coerceIn(0, 100)
+}
+
+internal fun readerProgressPercentForReaderList(lastVisibleItemIndex: Int, paragraphCount: Int): Int {
+    val headerItemCount = 1
+    val lastVisibleParagraphIndex = (lastVisibleItemIndex - headerItemCount).coerceAtLeast(0)
+    return readerProgressPercent(lastVisibleItemIndex = lastVisibleParagraphIndex, paragraphCount = paragraphCount)
 }
 
 internal fun currentReadingStreakDays(completedDays: Set<LocalDate>, today: LocalDate): Int {

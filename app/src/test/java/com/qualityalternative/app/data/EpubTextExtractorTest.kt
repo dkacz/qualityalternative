@@ -11,6 +11,7 @@ import java.util.zip.ZipOutputStream
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Test
 
 class EpubTextExtractorTest {
@@ -141,6 +142,66 @@ class EpubTextExtractorTest {
     }
 
     @Test
+    fun extractDoesNotFallbackToFilteredSpineOrUnlistedDocuments() {
+        val epub = epubBytes(
+            "META-INF/container.xml" to """
+                <container><rootfiles><rootfile full-path="OPS/package.opf"/></rootfiles></container>
+            """.trimIndent(),
+            "OPS/package.opf" to """
+                <package>
+                  <manifest>
+                    <item id="guide" href="guide.xhtml" media-type="application/xhtml+xml" properties="nav"/>
+                    <item id="appendix" href="appendix.xhtml" media-type="application/xhtml+xml"/>
+                    <item id="unlisted" href="chapter.xhtml" media-type="application/xhtml+xml"/>
+                  </manifest>
+                  <spine>
+                    <itemref idref="guide"/>
+                    <itemref idref="appendix" linear="no"/>
+                  </spine>
+                </package>
+            """.trimIndent(),
+            "OPS/guide.xhtml" to "<html><body><h1>Navigation should not render</h1></body></html>",
+            "OPS/appendix.xhtml" to "<html><body><p>Nonlinear appendix should not render.</p></body></html>",
+            "OPS/chapter.xhtml" to "<html><body><p>Unlisted fallback should not render when spine exists.</p></body></html>",
+        )
+
+        try {
+            EpubTextExtractor.extract(ByteArrayInputStream(epub))
+            fail("Filtered spine content should not be reintroduced by fallback scanning")
+        } catch (expected: IllegalArgumentException) {
+            assertTrue(expected.message?.contains("no readable text", ignoreCase = true) == true)
+        }
+    }
+
+    @Test
+    fun extractKeepsLegitimateChapterNamesThatContainCoverLetters() {
+        val epub = epubBytes(
+            "META-INF/container.xml" to """
+                <container><rootfiles><rootfile full-path="OPS/package.opf"/></rootfiles></container>
+            """.trimIndent(),
+            "OPS/package.opf" to """
+                <package>
+                  <manifest>
+                    <item id="discover" href="discover.xhtml" media-type="application/xhtml+xml"/>
+                    <item id="recover" href="recover.xhtml" media-type="application/xhtml+xml"/>
+                  </manifest>
+                  <spine>
+                    <itemref idref="discover"/>
+                    <itemref idref="recover"/>
+                  </spine>
+                </package>
+            """.trimIndent(),
+            "OPS/discover.xhtml" to "<html><body><h1>Discover Slowly</h1></body></html>",
+            "OPS/recover.xhtml" to "<html><body><p>Recover attention without opening a feed.</p></body></html>",
+        )
+
+        val text = EpubTextExtractor.extract(ByteArrayInputStream(epub))
+
+        assertTrue(text.contains("# Discover Slowly"))
+        assertTrue(text.contains("Recover attention without opening a feed."))
+    }
+
+    @Test
     fun extractPreservesOrderedListsAndContinuationText() {
         val epub = singleChapterEpub(
             """
@@ -205,6 +266,39 @@ class EpubTextExtractorTest {
         val text = EpubTextExtractor.extract(ByteArrayInputStream(epub))
 
         assertEquals("Smile: 😀 and hex: 🙂.", text)
+    }
+
+    @Test
+    fun extractKeepsNestedListsAttachedToTheirParentItem() {
+        val epub = singleChapterEpub(
+            """
+            <html><body>
+              <ol>
+                <li>First
+                  <ul>
+                    <li>Sub A</li>
+                    <li>Sub B</li>
+                  </ul>
+                </li>
+                <li>Second</li>
+              </ol>
+            </body></html>
+            """.trimIndent(),
+        )
+
+        val text = EpubTextExtractor.extract(ByteArrayInputStream(epub))
+
+        assertEquals(
+            """
+            1. First
+              - Sub A
+              - Sub B
+            2. Second
+            """.trimIndent(),
+            text,
+        )
+        assertFalse(text.contains("2. Sub B"))
+        assertFalse(text.contains("3. Second"))
     }
 
     @Test(expected = IllegalArgumentException::class)

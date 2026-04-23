@@ -282,6 +282,14 @@ class ProgressSnapshotTest {
         assertEquals(100, readerProgressPercent(lastVisibleItemIndex = 20, paragraphCount = 10))
     }
 
+    @Test
+    fun readerProgressPercentForReaderListIgnoresHeaderItem() {
+        assertEquals(0, readerProgressPercentForReaderList(lastVisibleItemIndex = 0, paragraphCount = 10))
+        assertEquals(0, readerProgressPercentForReaderList(lastVisibleItemIndex = 1, paragraphCount = 10))
+        assertEquals(30, readerProgressPercentForReaderList(lastVisibleItemIndex = 4, paragraphCount = 10))
+        assertEquals(100, readerProgressPercentForReaderList(lastVisibleItemIndex = 20, paragraphCount = 10))
+    }
+
     private fun event(
         type: AnalyticsEventType,
         interventionId: String,

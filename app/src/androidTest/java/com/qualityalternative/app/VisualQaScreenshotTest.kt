@@ -296,7 +296,29 @@ class VisualQaScreenshotTest {
         composeRule.onNodeWithText("Read this", substring = true).performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
         composeRule.onNodeWithText("The Night Quiet EPUB").assertIsDisplayed()
+        composeRule.onNodeWithText("Structured EPUB Notes").assertIsDisplayed()
+        composeRule.onNodeWithText("First EPUB bullet with bold text", substring = true).assertIsDisplayed()
+        assertTrue("Raw dark-mode EPUB bold markers should not be visible", !hasNodeContaining("**bold**"))
         captureSprint10("13_reader_epub_start_dark")
+        composeRule.onNodeWithTag("reader-list")
+            .performScrollToNode(hasText("I'm done reading"))
+        composeRule.onNodeWithText("I'm done reading").assertIsDisplayed()
+        captureSprint10("13b_reader_epub_done_dark")
+
+        seedUserMarkdownSelection(
+            title = "Night Markdown Notes",
+            fileName = "night-notes.md",
+            nowMillis = 2_500L,
+        )
+        launchFixtureSystemIntervention()
+        composeRule.onNodeWithText("Night Markdown Notes").assertIsDisplayed()
+        captureSprint10("13c_intervention_markdown_dark")
+        composeRule.onNodeWithText("Read this", substring = true).performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
+        composeRule.onNodeWithText("Imported Markdown Heading").assertIsDisplayed()
+        composeRule.onNodeWithText("First item with bold text", substring = true).assertIsDisplayed()
+        assertTrue("Raw dark-mode Markdown bold markers should not be visible", !hasNodeContaining("**bold**"))
+        captureSprint10("13d_reader_markdown_formatting_dark")
 
         resetForDarkMeditationFixture()
         launchFixtureSystemIntervention()
