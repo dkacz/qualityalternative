@@ -368,7 +368,7 @@ If those APIs are unavailable or cannot pass usable session context, the fallbac
 - a lightweight App Intents prototype for content/replacement acceptance only, or
 - deferring iOS until Android pilot signal justifies the platform effort.
 
-Slice 11.3 should therefore estimate two tracks: a full Screen Time spike that explicitly tests Flow A/B, and a lightweight App Intents spike that is clearly labeled as non-validation for system interruption.
+Slice 11.3 should therefore estimate two prototype tracks plus one defer option: `full_ios_spike` to test Flow A/B with the Screen Time stack, `lightweight_ios_spike` to test replacement-session acceptance without validating system interruption, and `defer_ios_until_android_pilot` to preserve Android pilot focus while explicitly leaving iOS entitlement and shield-routing risk unresolved.
 
 ## Slice 11.3 Prototype Options and Cost
 
