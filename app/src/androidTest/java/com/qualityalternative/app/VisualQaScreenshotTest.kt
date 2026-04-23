@@ -1,6 +1,7 @@
 package com.qualityalternative.app
 
 import android.content.Intent
+import android.net.Uri
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasTestTag
@@ -14,11 +15,18 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.UiDevice
+import com.qualityalternative.app.domain.model.AppThemeMode
 import com.qualityalternative.app.domain.model.DurationBucket
 import com.qualityalternative.app.domain.model.OnboardingSelection
 import com.qualityalternative.app.domain.model.TopicTag
+import com.qualityalternative.app.domain.model.UserDocumentDraft
+import com.qualityalternative.app.domain.service.AddUserDocumentResult
 import com.qualityalternative.app.interception.FixtureTargetRegistry
+import java.io.ByteArrayOutputStream
 import java.io.File
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertTrue
@@ -33,6 +41,7 @@ class VisualQaScreenshotTest {
     private var scenario: ActivityScenario<MainActivity>? = null
     private lateinit var screenshotDir: File
     private lateinit var legacyScreenshotDir: File
+    private lateinit var sprint10ScreenshotDir: File
 
     @Before
     fun resetAppState() {
@@ -44,6 +53,9 @@ class VisualQaScreenshotTest {
         legacyScreenshotDir = File(targetContext.filesDir, "visual-qa/content-display")
         legacyScreenshotDir.deleteRecursively()
         legacyScreenshotDir.mkdirs()
+        sprint10ScreenshotDir = File(targetContext.filesDir, "visual-qa/sprint10-reader-progress-meditation")
+        sprint10ScreenshotDir.deleteRecursively()
+        sprint10ScreenshotDir.mkdirs()
     }
 
     @After
@@ -182,12 +194,110 @@ class VisualQaScreenshotTest {
         captureLegacyContentDisplayScreens()
     }
 
+    @Test
+    fun captureSprint10ReaderProgressStreakAndMeditationScreens() {
+        launchOnboardedApp()
+        seedUserEpubSelection()
+
+        openTab("tab-library", "library-list")
+        composeRule.onNodeWithText("Files").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasNode("The Long Quiet EPUB") }
+        captureSprint10("01_library_epub_file_light")
+
+        launchFixtureSystemIntervention()
+        composeRule.onNodeWithText("The Long Quiet EPUB").assertIsDisplayed()
+        captureSprint10("02_intervention_epub_light")
+
+        composeRule.onNodeWithText("Read this", substring = true).performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
+        composeRule.onNodeWithText("The Long Quiet EPUB").assertIsDisplayed()
+        captureSprint10("03_reader_epub_start_light")
+
+        composeRule.onNodeWithTag("reader-list")
+            .performScrollToNode(hasText("Chapter Two"))
+        composeRule.onNodeWithText("Chapter Two").assertIsDisplayed()
+        captureSprint10("04_reader_epub_mid_progress_light")
+
+        composeRule.onNodeWithTag("reader-list")
+            .performScrollToNode(hasText("I'm done reading"))
+        composeRule.onNodeWithText("I'm done reading").assertIsDisplayed()
+        captureSprint10("05_reader_epub_done_light")
+
+        composeRule.onNodeWithText("I'm done reading").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("feedback-screen") }
+        captureSprint10("06_feedback_epub_light")
+
+        composeRule.onNodeWithText("Skip").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("progress-list") }
+        composeRule.onNodeWithText("Current reading streak").assertIsDisplayed()
+        composeRule.onNodeWithText("Completed reads").assertIsDisplayed()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            !hasNodeContaining("Feedback skipped for this session.")
+        }
+        captureSprint10("07_progress_streak_light")
+
+        openTab("tab-settings", "settings-list")
+        composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasTestTag("meditation-duration-5"))
+        composeRule.onNodeWithTag("meditation-duration-5")
+            .performSemanticsAction(SemanticsActions.OnClick)
+        composeRule.waitForIdle()
+        captureSprint10("08_settings_meditation_5m_light")
+
+        seedMeditationSelection()
+        launchFixtureSystemIntervention()
+        captureSprint10("09_intervention_meditation_5m_light")
+        composeRule.onNodeWithText("Start timer", substring = true).performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("meditation-timer-screen") }
+        composeRule.onNodeWithText("No feed. Just 5 minutes back.", substring = true).assertIsDisplayed()
+        captureSprint10("10_meditation_timer_5m_light")
+
+        composeRule.onNodeWithText("End early").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("home-list") }
+
+        openTab("tab-settings", "settings-list")
+        composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasTestTag("theme-DARK"))
+        composeRule.onNodeWithTag("theme-DARK")
+            .performSemanticsAction(SemanticsActions.OnClick)
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasTestTag("meditation-duration-5"))
+        captureSprint10("11_settings_meditation_5m_dark")
+
+        seedUserEpubSelection(
+            title = "The Night Quiet EPUB",
+            fileName = "night-quiet.epub",
+            nowMillis = 2_000L,
+        )
+        launchFixtureSystemIntervention()
+        composeRule.onNodeWithText("The Night Quiet EPUB").assertIsDisplayed()
+        captureSprint10("12_intervention_epub_dark")
+
+        composeRule.onNodeWithText("Read this", substring = true).performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
+        composeRule.onNodeWithText("The Night Quiet EPUB").assertIsDisplayed()
+        captureSprint10("13_reader_epub_start_dark")
+
+        resetForDarkMeditationFixture()
+        launchFixtureSystemIntervention()
+        captureSprint10("14_intervention_meditation_5m_dark")
+        composeRule.onNodeWithText("Start timer", substring = true).performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("meditation-timer-screen") }
+        composeRule.onNodeWithText("No feed. Just 5 minutes back.", substring = true).assertIsDisplayed()
+        captureSprint10("15_meditation_timer_5m_dark")
+    }
+
     private fun capture(name: String) {
         captureTo(screenshotDir, name)
     }
 
     private fun captureLegacy(name: String) {
         captureTo(legacyScreenshotDir, name)
+    }
+
+    private fun captureSprint10(name: String) {
+        captureTo(sprint10ScreenshotDir, name)
     }
 
     private fun captureTo(directory: File, name: String) {
@@ -430,6 +540,132 @@ class VisualQaScreenshotTest {
                 selectedPackIds = setOf("meditation-only-test-pack"),
             ),
         )
+    }
+
+    private fun seedUserEpubSelection(
+        title: String = "The Long Quiet EPUB",
+        fileName: String = "long-quiet.epub",
+        nowMillis: Long = 1_000L,
+    ) = runBlocking {
+        val targetContext = InstrumentationRegistry.getInstrumentation().targetContext
+        val app = targetContext.applicationContext as QualityAlternativeApplication
+        val fixture = File(targetContext.filesDir, "visual-qa-fixtures/$fileName")
+        fixture.parentFile?.mkdirs()
+        fixture.writeBytes(sprint10EpubBytes())
+
+        app.appContainer.userDocumentRepository.observeReady().first { it }
+        val result = app.appContainer.userDocumentRepository.addDocument(
+            draft = UserDocumentDraft(
+                uri = Uri.fromFile(fixture).toString(),
+                displayName = fileName,
+                mimeType = "application/epub+zip",
+                title = title,
+                durationMinutes = 20,
+                topicTags = setOf(TopicTag.HISTORY, TopicTag.ESSAYS),
+            ),
+            nowMillis = nowMillis,
+        )
+        assertTrue("Expected EPUB fixture to be saved", result is AddUserDocumentResult.Added)
+        app.appContainer.settingsRepository.saveOnboardingSelection(
+            OnboardingSelection(
+                selectedAppPackages = setOf(FixtureTargetRegistry.fixtureDistractors.first().packageName),
+                preferredTopics = setOf(TopicTag.HISTORY, TopicTag.ESSAYS),
+                preferredDurationBucket = DurationBucket.DEEP,
+                selectedPackIds = emptySet(),
+            ),
+        )
+    }
+
+    private fun resetForDarkMeditationFixture() {
+        scenario?.close()
+        scenario = null
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+        resetPersistentState()
+        launchOnboardedApp()
+        saveDarkThemeAndFiveMinuteMeditation()
+        seedMeditationSelection()
+    }
+
+    private fun saveDarkThemeAndFiveMinuteMeditation() = runBlocking {
+        val repository = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication)
+            .appContainer
+            .settingsRepository
+        repository.saveThemeMode(AppThemeMode.DARK)
+        repository.saveMeditationDurationMinutes(5)
+    }
+
+    private fun sprint10EpubBytes(): ByteArray {
+        return epubBytes(
+            "META-INF/container.xml" to """
+                <?xml version="1.0"?>
+                <container>
+                  <rootfiles>
+                    <rootfile full-path="OPS/package.opf" media-type="application/oebps-package+xml"/>
+                  </rootfiles>
+                </container>
+            """.trimIndent(),
+            "OPS/package.opf" to """
+                <package>
+                  <manifest>
+                    <item id="chapter-one" href="chapter1.xhtml" media-type="application/xhtml+xml"/>
+                    <item id="chapter-two" href="chapter2.xhtml" media-type="application/xhtml+xml"/>
+                    <item id="chapter-three" href="chapter3.xhtml" media-type="application/xhtml+xml"/>
+                  </manifest>
+                  <spine>
+                    <itemref idref="chapter-one"/>
+                    <itemref idref="chapter-two"/>
+                    <itemref idref="chapter-three"/>
+                  </spine>
+                </package>
+            """.trimIndent(),
+            "OPS/chapter1.xhtml" to """
+                <html><body>
+                  <h1>Chapter One</h1>
+                  <p>This private EPUB fixture is deliberately longer than a card. It gives the reader enough structure for visual progress to move as the text scrolls.</p>
+                  <p>The point of the test is not literary quality. The point is proving that a user's own long document can become the primary replacement without leaving the finite intervention loop.</p>
+                  <p>A calm reader should hold a line, keep the title legible, and avoid looking like a clipped browser view.</p>
+                  <p>At the top of the document, the progress indicator should feel honest: started, but not nearly finished.</p>
+                  <p>The fixture repeats a few ordinary sentences because emulator visual QA needs real scroll distance, not a perfect miniature essay.</p>
+                  <p>Each paragraph gives typography, spacing, and color a chance to fail loudly if a later UI pass breaks them.</p>
+                  <p>The reader should remain calm even when the imported file is much longer than the initial alternative cards.</p>
+                </body></html>
+            """.trimIndent(),
+            "OPS/chapter2.xhtml" to """
+                <html><body>
+                  <h1>Chapter Two</h1>
+                  <p>The second chapter keeps the emulator moving through enough paragraphs to expose spacing, typography, and progress-line behavior.</p>
+                  <p>Longer personal files are where progress matters most: the user needs to know that five minutes of reading still counted.</p>
+                  <p>If this screen regresses, the screenshot should make it visible before a release build goes to testers.</p>
+                  <p>This is the midpoint marker. It should appear after a deliberate scroll, with the top bar showing a meaningfully advanced percentage.</p>
+                  <p>The replacement loop should still feel finite here: one document, one reader, one completion path.</p>
+                  <p>No feed, no browsing shelf, and no accidental discovery surface should appear between the user and the next paragraph.</p>
+                  <p>The imported EPUB is private to the device, but the visual standard should match the shared renderable readings.</p>
+                </body></html>
+            """.trimIndent(),
+            "OPS/chapter3.xhtml" to """
+                <html><body>
+                  <h1>Chapter Three</h1>
+                  <p>The final section is a marker for the visual QA harness. It confirms that spine order, native rendering, and scroll-based progress survive the end-to-end flow.</p>
+                  <p>After completion, the same session should feed the progress screen and count toward the current reading streak.</p>
+                  <p>That closes the replacement loop: impulse, alternative, reading, completion, and visible momentum.</p>
+                  <p>The bottom of a long document is also where the call to finish should be easy to find and hard to confuse with opening a feed.</p>
+                  <p>When the user taps done, the app should move to feedback and then progress without losing the completed read.</p>
+                  <p>This final paragraph is intentionally plain. If it is readable, the layout is doing its job.</p>
+                </body></html>
+            """.trimIndent(),
+        )
+    }
+
+    private fun epubBytes(vararg entries: Pair<String, String>): ByteArray {
+        val output = ByteArrayOutputStream()
+        ZipOutputStream(output).use { zip ->
+            entries.forEach { (name, body) ->
+                zip.putNextEntry(ZipEntry(name))
+                zip.write(body.toByteArray(Charsets.UTF_8))
+                zip.closeEntry()
+            }
+        }
+        return output.toByteArray()
     }
 
     private fun assertAttentionClassicsReaderCopyIsDisplayed() {
