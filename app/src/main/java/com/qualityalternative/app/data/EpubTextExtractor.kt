@@ -5,6 +5,8 @@ import java.io.InputStream
 import java.util.zip.ZipInputStream
 
 object EpubTextExtractor {
+    private const val semanticIndentSentinel = "\uE000"
+
     fun extract(input: InputStream): String {
         val entries = readZipEntries(input)
         val opfPath = entries["META-INF/container.xml"]
@@ -274,7 +276,7 @@ object EpubTextExtractor {
     private fun String.listItemsToReaderMarkdown(ordered: Boolean): String {
         return topLevelListItemBodies()
             .mapIndexedNotNull { index, match ->
-                val lines = match.listItemLines().inheritNestedContinuationIndent()
+                val lines = match.listItemLines()
                 if (lines.isEmpty()) {
                     null
                 } else {
@@ -291,27 +293,6 @@ object EpubTextExtractor {
                 }
             }
             .joinToString("\n")
-    }
-
-    private fun List<String>.inheritNestedContinuationIndent(): List<String> {
-        if (size <= 1) {
-            return this
-        }
-        val listMarker = Regex("""^([-*+]|\d+[.)])\s+.+$""")
-        val nestedIndent = drop(1)
-            .map { line -> line.takeWhile(Char::isWhitespace).sumOf { char -> if (char == '\t') 2 else 1 } }
-            .filter { indent -> indent > 0 }
-            .minOrNull()
-            ?: return this
-        return listOf(first()) + drop(1).map { line ->
-            val currentIndent = line.takeWhile(Char::isWhitespace)
-                .sumOf { char -> if (char == '\t') 2 else 1 }
-            if (currentIndent == 0 && !listMarker.matches(line.trim())) {
-                " ".repeat(nestedIndent) + line.trim()
-            } else {
-                line
-            }
-        }
     }
 
     private fun String.topLevelListItemBodies(): List<String> {
@@ -358,13 +339,24 @@ object EpubTextExtractor {
         return replaceLists()
             .replace(Regex("""</(p|div|section|article|blockquote)>""", RegexOption.IGNORE_CASE), "\n")
             .replace(Regex("""<br\b[^>]*\/?>""", RegexOption.IGNORE_CASE), "\n")
-            .toInlineReaderMarkdown(preserveLineBreaks = true)
+            .toInlineReaderMarkdown(preserveLineBreaks = true, decodeSemanticIndent = false)
             .lines()
             .map(::normalizeListItemLine)
             .filter(String::isNotBlank)
     }
 
     private fun normalizeListItemLine(line: String): String {
+        line.semanticIndent()?.let { (indent, encodedBody) ->
+            val body = encodedBody.trim().replace(Regex("""[ \t\r\f]+"""), " ")
+            if (body.isBlank()) {
+                return ""
+            }
+            return if (indent > 0) {
+                " ".repeat(indent) + body
+            } else {
+                body
+            }
+        }
         val body = line.trim().replace(Regex("""[ \t\r\f]+"""), " ")
         if (body.isBlank()) {
             return ""
@@ -382,10 +374,13 @@ object EpubTextExtractor {
     private fun String.indentContinuationLine(): String {
         val existingIndent = takeWhile(Char::isWhitespace)
             .sumOf { char -> if (char == '\t') 2 else 1 }
-        return " ".repeat(existingIndent + 2) + trim()
+        return "$semanticIndentSentinel${existingIndent + 2}:${trim()}"
     }
 
-    private fun String.toInlineReaderMarkdown(preserveLineBreaks: Boolean = false): String {
+    private fun String.toInlineReaderMarkdown(
+        preserveLineBreaks: Boolean = false,
+        decodeSemanticIndent: Boolean = true,
+    ): String {
         val withoutBlocks = if (preserveLineBreaks) {
             replace(Regex("""<(br|/p|/div|/li)\b[^>]*>""", RegexOption.IGNORE_CASE), "\n")
         } else {
@@ -400,7 +395,12 @@ object EpubTextExtractor {
             .let { text ->
                 if (preserveLineBreaks) {
                     text.lines()
-                        .joinToString("\n", transform = ::normalizeReaderMarkdownLine)
+                        .joinToString("\n") { line ->
+                            normalizeReaderMarkdownLine(
+                                line = line,
+                                decodeSemanticIndent = decodeSemanticIndent,
+                            )
+                        }
                 } else {
                     text.replace(Regex("""\s+"""), " ").trim()
                 }
@@ -425,11 +425,37 @@ object EpubTextExtractor {
             .joinToString(separator = "\n\n")
     }
 
-    private fun normalizeReaderMarkdownLine(line: String): String {
+    private fun normalizeReaderMarkdownLine(line: String, decodeSemanticIndent: Boolean = true): String {
+        if (decodeSemanticIndent) {
+            line.semanticIndent()?.let { (indent, encodedBody) ->
+                val body = encodedBody.trim().replace(Regex("""[ \t\r\f]+"""), " ")
+                if (body.isBlank()) {
+                    return ""
+                }
+                return if (indent > 0) {
+                    " ".repeat(indent) + body
+                } else {
+                    body
+                }
+            }
+        }
         val leadingIndent = line.takeWhile(Char::isWhitespace)
             .sumOf { char -> if (char == '\t') 2 else 1 }
         val body = line.trim().replace(Regex("""[ \t\r\f]+"""), " ")
         return if (leadingIndent > 0 && body.isNotBlank()) " ".repeat(leadingIndent) + body else body
+    }
+
+    private fun String.semanticIndent(): Pair<Int, String>? {
+        if (!startsWith(semanticIndentSentinel)) {
+            return null
+        }
+        val encoded = removePrefix(semanticIndentSentinel)
+        val separatorIndex = encoded.indexOf(':')
+        if (separatorIndex <= 0) {
+            return null
+        }
+        val indent = encoded.substring(0, separatorIndex).toIntOrNull() ?: return null
+        return indent to encoded.substring(separatorIndex + 1)
     }
 
     private fun String.decodeXmlEntities(): String {

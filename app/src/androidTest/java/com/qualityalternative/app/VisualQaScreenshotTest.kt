@@ -301,9 +301,24 @@ class VisualQaScreenshotTest {
         assertTrue("Raw dark-mode EPUB bold markers should not be visible", !hasNodeContaining("**bold**"))
         captureSprint10("13_reader_epub_start_dark")
         composeRule.onNodeWithTag("reader-list")
+            .performScrollToNode(hasText("Chapter Two"))
+        composeRule.onNodeWithText("Chapter Two").assertIsDisplayed()
+        captureSprint10("13a_reader_epub_mid_progress_dark")
+        composeRule.onNodeWithTag("reader-list")
             .performScrollToNode(hasText("I'm done reading"))
         composeRule.onNodeWithText("I'm done reading").assertIsDisplayed()
         captureSprint10("13b_reader_epub_done_dark")
+        composeRule.onNodeWithText("I'm done reading").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("feedback-screen") }
+        captureSprint10("13e_feedback_epub_dark")
+        composeRule.onNodeWithText("Skip").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("progress-list") }
+        composeRule.onNodeWithText("Current reading streak").assertIsDisplayed()
+        composeRule.onNodeWithText("Completed reads").assertIsDisplayed()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            !hasNodeContaining("Feedback skipped for this session.")
+        }
+        captureSprint10("13f_progress_streak_dark")
 
         seedUserMarkdownSelection(
             title = "Night Markdown Notes",

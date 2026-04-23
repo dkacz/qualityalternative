@@ -13,13 +13,14 @@ Device: Android emulator `qaApi36 (emulator-5554)`
 
 ## Covered States
 
-- Light and dark EPUB intervention and reader states
+- Light and dark EPUB intervention, start, mid-progress, and completion states
 - Light and dark Markdown intervention and reader formatting states
-- Feedback and progress screens
+- Light and dark feedback and progress screens
 - Meditation settings, intervention, and timer states
 
 ## Observations
 
 - Progress copy now uses singular wording for `1 day converted` and `1 day`.
 - Reader typography and contrast remain stable in both themes.
+- The dark-mode screenshot set now mirrors the light-mode EPUB journey more closely, including mid-progress, feedback, and progress surfaces.
 - EPUB and Markdown readers continue to preserve finite-reader behavior with no feed or browsing chrome.
