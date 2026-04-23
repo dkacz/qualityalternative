@@ -211,6 +211,9 @@ class VisualQaScreenshotTest {
         composeRule.onNodeWithText("Read this", substring = true).performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
         composeRule.onNodeWithText("The Long Quiet EPUB").assertIsDisplayed()
+        composeRule.onNodeWithText("Structured EPUB Notes").assertIsDisplayed()
+        composeRule.onNodeWithText("First EPUB bullet with bold text", substring = true).assertIsDisplayed()
+        assertTrue("Raw EPUB bold markers should not be visible", !hasNodeContaining("**bold**"))
         captureSprint10("03_reader_epub_start_light")
 
         composeRule.onNodeWithTag("reader-list")
@@ -682,6 +685,13 @@ class VisualQaScreenshotTest {
             "OPS/chapter1.xhtml" to """
                 <html><body>
                   <h1>Chapter One</h1>
+                  <h2>Structured EPUB Notes</h2>
+                  <p>This EPUB keeps <strong>bold</strong>, <em>italic</em>, and <code>inline code</code> details in the calm reader.</p>
+                  <ul>
+                    <li>First EPUB bullet with <strong>bold</strong> text</li>
+                    <li>Second EPUB bullet with <em>italic</em> text</li>
+                  </ul>
+                  <blockquote><p>A quoted EPUB line should feel quieter than the body text.</p></blockquote>
                   <p>This private EPUB fixture is deliberately longer than a card. It gives the reader enough structure for visual progress to move as the text scrolls.</p>
                   <p>The point of the test is not literary quality. The point is proving that a user's own long document can become the primary replacement without leaving the finite intervention loop.</p>
                   <p>A calm reader should hold a line, keep the title legible, and avoid looking like a clipped browser view.</p>

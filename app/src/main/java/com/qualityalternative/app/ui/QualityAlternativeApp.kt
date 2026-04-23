@@ -1132,7 +1132,7 @@ private fun AddDocumentScreen(
         ) {
             DisplayText("Add a private\nreading file.", fontSize = 30.sp, lineHeight = 33.sp)
             BodyText(
-                text = "PDF and EPUB open through Android's document viewer. Markdown opens in the calm in-app reader. The file stays on this device.",
+                text = "PDF opens through Android's document viewer. Markdown and EPUB open in the calm in-app reader. The file stays on this device.",
                 color = QualityAlternativeThemeTokens.colors.mutedText,
                 modifier = Modifier.padding(top = 6.dp, bottom = 16.dp),
             )

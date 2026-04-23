@@ -4,6 +4,7 @@ import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -41,11 +42,60 @@ class EpubTextExtractorTest {
 
         val text = EpubTextExtractor.extract(ByteArrayInputStream(epub))
 
-        assertTrue(text.contains("First"))
+        assertTrue(text.contains("# First"))
         assertTrue(text.contains("Begin & notice."))
         assertTrue(text.contains("Second chapter."))
         assertTrue(text.indexOf("Begin & notice.") < text.indexOf("Second chapter."))
         assertTrue(text.contains("- One breath"))
+        assertTrue(text.contains("- One page"))
+    }
+
+    @Test
+    fun extractPreservesEpubStructureAsReaderMarkdown() {
+        val epub = epubBytes(
+            "META-INF/container.xml" to """
+                <?xml version="1.0"?>
+                <container>
+                  <rootfiles>
+                    <rootfile full-path="book/package.opf" media-type="application/oebps-package+xml"/>
+                  </rootfiles>
+                </container>
+            """.trimIndent(),
+            "book/package.opf" to """
+                <package>
+                  <manifest>
+                    <item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/>
+                  </manifest>
+                  <spine>
+                    <itemref idref="chapter"/>
+                  </spine>
+                </package>
+            """.trimIndent(),
+            "book/chapter.xhtml" to """
+                <html><body>
+                  <h1>A Better Chapter</h1>
+                  <p>This keeps <strong>bold</strong>, <em>italic</em>, and <code>inline code</code> markers.</p>
+                  <blockquote><p>Attention returns when the paragraph slows down.</p></blockquote>
+                  <ol><li>First page</li><li>Second page &mdash; not a feed</li></ol>
+                </body></html>
+            """.trimIndent(),
+        )
+
+        val text = EpubTextExtractor.extract(ByteArrayInputStream(epub))
+
+        assertEquals(
+            """
+            # A Better Chapter
+
+            This keeps **bold**, _italic_, and `inline code` markers.
+
+            > Attention returns when the paragraph slows down.
+
+            - First page
+            - Second page - not a feed
+            """.trimIndent(),
+            text,
+        )
     }
 
     @Test(expected = IllegalArgumentException::class)

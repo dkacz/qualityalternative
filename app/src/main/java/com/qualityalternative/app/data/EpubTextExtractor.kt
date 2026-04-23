@@ -119,13 +119,99 @@ object EpubTextExtractor {
             .replace(Regex("""<script\b[\s\S]*?</script>""", RegexOption.IGNORE_CASE), " ")
             .replace(Regex("""<style\b[\s\S]*?</style>""", RegexOption.IGNORE_CASE), " ")
             .replace(Regex("""<svg\b[\s\S]*?</svg>""", RegexOption.IGNORE_CASE), " ")
-            .replace(Regex("""<(br|hr)\b[^>]*>""", RegexOption.IGNORE_CASE), "\n")
-            .replace(Regex("""</(p|div|section|article|blockquote|h[1-6]|li|tr)>""", RegexOption.IGNORE_CASE), "\n\n")
-            .replace(Regex("""<li\b[^>]*>""", RegexOption.IGNORE_CASE), "\n- ")
+            .replace(Regex("""<br\b[^>]*\/?>""", RegexOption.IGNORE_CASE), "\n")
+            .replace(Regex("""<hr\b[^>]*\/?>""", RegexOption.IGNORE_CASE), "\n\n---\n\n")
+            .replaceInlineStyleTags("strong|b", "**")
+            .replaceInlineStyleTags("em|i|cite", "_")
+            .replaceInlineStyleTags("code|kbd|samp", "`")
+            .replaceHeadings()
+            .replaceBlockquotes()
+            .replaceListItems()
+            .replace(Regex("""</(p|div|section|article|aside|header|footer|main|figure|figcaption|ul|ol|dl|table|tbody|thead|tr)>""", RegexOption.IGNORE_CASE), "\n\n")
             .replace(Regex("""<[^>]+>"""), " ")
             .decodeXmlEntities()
-            .lines()
-            .map { line -> line.replace(Regex("""\s+"""), " ").trim() }
+            .normalizeReaderMarkdown()
+    }
+
+    private fun String.replaceHeadings(): String {
+        return Regex("""<h([1-6])\b[^>]*>([\s\S]*?)</h\1>""", RegexOption.IGNORE_CASE)
+            .replace(this) { match ->
+                val level = match.groupValues[1].toIntOrNull()?.coerceIn(1, 6) ?: 1
+                val text = match.groupValues[2].stripTagsToInlineText()
+                "\n\n${"#".repeat(level)} $text\n\n"
+            }
+    }
+
+    private fun String.replaceBlockquotes(): String {
+        return Regex("""<blockquote\b[^>]*>([\s\S]*?)</blockquote>""", RegexOption.IGNORE_CASE)
+            .replace(this) { match ->
+                val quote = match.groupValues[1]
+                    .replace(Regex("""</(p|div|li)>""", RegexOption.IGNORE_CASE), "\n")
+                    .stripTagsToInlineText(preserveLineBreaks = true)
+                    .lines()
+                    .map { line -> line.trim() }
+                    .filter(String::isNotBlank)
+                    .joinToString("\n") { line -> "> $line" }
+                "\n\n$quote\n\n"
+            }
+    }
+
+    private fun String.replaceListItems(): String {
+        return Regex("""<li\b[^>]*>([\s\S]*?)</li>""", RegexOption.IGNORE_CASE)
+            .replace(this) { match ->
+                val text = match.groupValues[1].stripTagsToInlineText()
+                "\n- $text"
+            }
+    }
+
+    private fun String.replaceInlineStyleTags(tagNames: String, marker: String): String {
+        val pattern = Regex("""<($tagNames)\b[^>]*>([\s\S]*?)</\1>""", RegexOption.IGNORE_CASE)
+        var rendered = this
+        while (true) {
+            val replaced = pattern.replace(rendered) { match ->
+                val text = match.groupValues[2].stripTagsToInlineText()
+                if (text.isBlank()) "" else "$marker$text$marker"
+            }
+            if (replaced == rendered) {
+                return rendered
+            }
+            rendered = replaced
+        }
+    }
+
+    private fun String.stripTagsToInlineText(preserveLineBreaks: Boolean = false): String {
+        val withoutBlocks = if (preserveLineBreaks) {
+            replace(Regex("""<(br|/p|/div|/li)\b[^>]*>""", RegexOption.IGNORE_CASE), "\n")
+        } else {
+            this
+        }
+        return withoutBlocks
+            .replace(Regex("""<[^>]+>"""), " ")
+            .decodeXmlEntities()
+            .let { text ->
+                if (preserveLineBreaks) {
+                    text.lines()
+                        .joinToString("\n") { line -> line.replace(Regex("""[ \t\r\f]+"""), " ").trim() }
+                } else {
+                    text.replace(Regex("""\s+"""), " ").trim()
+                }
+            }
+            .trim()
+    }
+
+    private fun String.normalizeReaderMarkdown(): String {
+        return lines()
+            .map { line -> line.replace(Regex("""[ \t\r\f]+"""), " ").trim() }
+            .joinToString("\n")
+            .replace(Regex("""\n{3,}"""), "\n\n")
+            .split(Regex("""\n\s*\n"""))
+            .map { block ->
+                block.lines()
+                    .map(String::trim)
+                    .filter(String::isNotBlank)
+                    .joinToString("\n")
+                    .trim()
+            }
             .filter(String::isNotBlank)
             .joinToString(separator = "\n\n")
     }
@@ -137,8 +223,18 @@ object EpubTextExtractor {
             .replace("&gt;", ">")
             .replace("&quot;", "\"")
             .replace("&apos;", "'")
+            .replace("&rsquo;", "'")
+            .replace("&lsquo;", "'")
+            .replace("&rdquo;", "\"")
+            .replace("&ldquo;", "\"")
+            .replace("&mdash;", "-")
+            .replace("&ndash;", "-")
+            .replace("&hellip;", "...")
             .replace(Regex("""&#(\d+);""")) { match ->
                 match.groupValues[1].toIntOrNull()?.toChar()?.toString() ?: match.value
+            }
+            .replace(Regex("""&#x([0-9a-fA-F]+);""")) { match ->
+                match.groupValues[1].toIntOrNull(radix = 16)?.toChar()?.toString() ?: match.value
             }
     }
 }
