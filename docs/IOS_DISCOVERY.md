@@ -413,7 +413,7 @@ Testing needs:
 
 - Xcode local build and install.
 - Apple Developer team with the relevant capability available for development testing.
-- Physical iOS device preferred; Screen Time and shield behavior may be misleading or unavailable in simulator.
+- Physical iOS device required for any decisive pass/fail conclusion about Screen Time shielding, shield actions, `openParentalControlsApp`, submenu callbacks, pause, or open-anyway behavior. Simulator evidence may be supplemental only; simulator-only results must be recorded as inconclusive for those platform questions.
 - Manual scenario notes plus screenshots/video for: selection, shield display, primary routing, backup routing, pause, open-anyway, repeated attempt, and state cleanup.
 - No production analytics needed; a simple local debug event log is enough for the spike.
 
@@ -447,6 +447,7 @@ Acceptance criteria:
 - The spike can prove or falsify parent-app routing into a specific replacement session.
 - The spike can prove or falsify backup submenu action handling.
 - The spike can prove or falsify pause/open-anyway state transitions without treating `.close` as continuation or `.defer` as timer control.
+- Any pass/fail conclusion for shielding, routing, submenu callbacks, pause, or open-anyway is backed by physical-device evidence; otherwise the result is explicitly marked inconclusive.
 - The final spike report recommends either `build_ios_mvp_slice`, `lightweight_ios_only`, or `defer_ios`.
 
 ### Track B: `lightweight_ios_spike`
@@ -547,6 +548,13 @@ Explicit non-goals:
 - No entitlement request.
 - No Screen Time API spike.
 - No Shortcuts prototype.
+
+Acceptance criteria:
+
+- Android pilot questions are named and tied to measurable decision signals such as replacement acceptance, sessions over 3 minutes, return-to-target behavior, and explicit iOS demand from testers.
+- iOS platform risk remains explicitly unresolved; deferral must not be recorded as evidence that entitlement, shield routing, App Review, or Screen Time feasibility is safe.
+- Slice 11.4 states when iOS will be revisited, for example after Android pilot thresholds, strong iOS tester demand, or a deliberate entitlement-readiness decision.
+- The roadmap records that no Screen Time, entitlement, shield-routing, submenu, pause/open-anyway, or App Review feasibility was validated by deferral.
 
 ### Slice 11.3 Recommendation
 
