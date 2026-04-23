@@ -285,8 +285,10 @@ The system must deliver a calm replacement session that feels meaningfully diffe
 
 - The replacement session opens without showing additional recommendation choices first.
 - The session presents the chosen content in a readable format when native rendering is supported.
-- If the item is a user-owned Markdown document, the user can read it inside the app.
-- If the item is a user-owned PDF or EPUB, the user can open it through a clearly controlled Android document-viewer fallback.
+- If the item is a user-owned Markdown or EPUB document, the user can read it inside the app.
+- If the item is a user-owned PDF, the user can open it through a clearly controlled Android document-viewer fallback.
+- Long-form reader surfaces show reading-position progress that is based on document position, not only elapsed time.
+- Meditation replacement duration can be adjusted by the user and plays a completion gong.
 - The session avoids recommendation carousels or unrelated content suggestions during active reading.
 - The app can record session duration for analytics.
 
@@ -498,14 +500,14 @@ Decision on whether to invest further in:
 - premium hard-block mode
 - additional content ingestion sources
 - free/premium packaging
-- streaks or other motivation mechanics
+- streaks or other motivation mechanics that reward successful substitutions and meaningful reading time
 - future iOS exploration
 
 ## Open Questions
 
 - What should the premium tier include first after MVP: hard-block mode, custom delay durations, or richer content ingestion?
 - Should the free tier combine core interception, basic content, and a limited personal library, with premium reserved for a broader curated library and materially higher or unlimited user-owned content capacity?
-- If streaks are added, should they reward successful substitutions and meaningful reading time rather than pure abstinence from social media?
+- How strong should streak mechanics become without turning progress into shame or loss aversion?
 - At what level of Android-device variability should the team narrow the officially supported-device list for public launch?
 
 ## Launch Recommendation

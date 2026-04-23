@@ -19,12 +19,12 @@ import com.qualityalternative.app.domain.model.ContentAvailability
 import com.qualityalternative.app.domain.model.ContentFormat
 import com.qualityalternative.app.domain.model.ContentItem
 import com.qualityalternative.app.domain.model.ContentSourceType
+import com.qualityalternative.app.domain.model.DEFAULT_MEDITATION_MINUTES
 import com.qualityalternative.app.domain.model.DelayWindow
 import com.qualityalternative.app.domain.model.DistractingApp
 import com.qualityalternative.app.domain.model.DurationBucket
 import com.qualityalternative.app.domain.model.EditorialPack
 import com.qualityalternative.app.domain.model.MEDITATION_TIMER_CONTENT_ID
-import com.qualityalternative.app.domain.model.MeditationTimerContentItem
 import com.qualityalternative.app.domain.model.OnboardingSelection
 import com.qualityalternative.app.domain.model.PermissionReadiness
 import com.qualityalternative.app.domain.model.PermissionStatus
@@ -41,6 +41,7 @@ import com.qualityalternative.app.domain.model.UserDocumentValidationError
 import com.qualityalternative.app.domain.model.UserLinkDraft
 import com.qualityalternative.app.domain.model.UserLinkValidationError
 import com.qualityalternative.app.domain.model.UserPreferences
+import com.qualityalternative.app.domain.model.meditationTimerContentItem
 import com.qualityalternative.app.domain.model.usesExternalHandoff
 import com.qualityalternative.app.domain.model.usesMeditationTimer
 import com.qualityalternative.app.domain.model.usesRepositoryBody
@@ -97,6 +98,7 @@ data class MainUiState(
     val addDocumentForm: AddDocumentFormState = AddDocumentFormState(),
     val savedLinkConfirmation: AddLinkConfirmation? = null,
     val themeMode: AppThemeMode = AppThemeMode.LIGHT,
+    val meditationDurationMinutes: Int = DEFAULT_MEDITATION_MINUTES,
     val latestMessage: String? = null,
     val events: List<AnalyticsEvent> = emptyList(),
     val screen: MainScreen = MainScreen.Onboarding,
@@ -353,6 +355,18 @@ class MainViewModel(
         )
         viewModelScope.launch {
             settingsRepository.savePreferredDurationBucket(durationBucket)
+        }
+    }
+
+    fun setMeditationDurationMinutes(minutes: Int) {
+        val preferences = uiState.preferences
+        uiState = uiState.copy(
+            meditationDurationMinutes = minutes,
+            preferences = preferences?.copy(meditationDurationMinutes = minutes),
+            latestMessage = null,
+        )
+        viewModelScope.launch {
+            settingsRepository.saveMeditationDurationMinutes(minutes)
         }
     }
 
@@ -1201,6 +1215,7 @@ class MainViewModel(
             selectedTargetApp = selectedTargetApp,
             preferences = preferences.takeIf { settings.hasCompletedOnboarding },
             themeMode = settings.themeMode,
+            meditationDurationMinutes = settings.meditationDurationMinutes,
             onboardingSelection = settings.toOnboardingSelection(
                 supportedApps = supportedApps,
                 starterPacks = starterPacks,
@@ -1615,7 +1630,7 @@ class MainViewModel(
     }
 
     private fun fullReplacementInventory(): List<ContentItem> {
-        return contentRepository.inventory() + MeditationTimerContentItem
+        return contentRepository.inventory() + meditationTimerContentItem(uiState.meditationDurationMinutes)
     }
 
     private fun primaryExcludedIdsForRecommendation(): Set<String> {
@@ -1837,6 +1852,7 @@ private fun AppSettings.toUserPreferences(
         preferredTopics = selectedTopics,
         preferredDurationBucket = preferredDurationBucket,
         selectedPackIds = packs,
+        meditationDurationMinutes = meditationDurationMinutes,
     )
 }
 

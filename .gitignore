@@ -10,6 +10,7 @@ app/build/
 local.properties
 captures/
 output/
+dist/
 
 # Kotlin / Java
 out/

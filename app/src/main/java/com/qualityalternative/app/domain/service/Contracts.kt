@@ -94,6 +94,7 @@ interface SettingsRepository {
     suspend fun saveSelectedAppPackages(packages: Set<String>)
     suspend fun savePreferredDurationBucket(bucket: DurationBucket)
     suspend fun saveThemeMode(themeMode: AppThemeMode)
+    suspend fun saveMeditationDurationMinutes(minutes: Int)
 }
 
 interface RecommendationEngine {

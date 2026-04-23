@@ -14,11 +14,13 @@ This release keeps the Android-first interception thesis and adds the Sprint 9 p
 - Local in-app reader, feedback flow, replacement history, delay state, and analytics ledger.
 - User-added links with local persistence, source-aware recommendation ranking, and a clear saved-link handoff before opening the browser.
 - User-owned document import for PDF, Markdown, and EPUB.
-- Markdown files open in the in-app private reader.
-- PDF and EPUB files open through a clearly labeled Android external document-viewer handoff.
+- Markdown and EPUB files open in the in-app private reader.
+- PDF files open through a clearly labeled Android external document-viewer handoff.
+- Reader progress tracks document position for long reads.
+- Meditation reset length can be changed, and the timer plays a completion gong.
 - Light and Dark analog themes with persisted theme choice.
 - Restyled intervention, home, library, add-link, reader, handoff, feedback, and progress surfaces.
-- Constructive progress framing around converted impulses and recent replacements, not shame-heavy streaks.
+- Constructive progress framing around converted impulses, recent replacements, and a current reading streak.
 - Durable local state using `DataStore` and `Room`.
 - Internal fixture apps and emulator instrumentation for repeatable cross-app validation.
 
@@ -44,6 +46,6 @@ This release keeps the Android-first interception thesis and adds the Sprint 9 p
 - This is a debug/internal alpha build, not a public distribution build.
 - Real-device smoke has been performed on one Samsung Android device only.
 - iOS is out of scope for this release.
-- Native PDF/EPUB rendering, hosted analytics, premium hard-block mode, and sub-surface blocking are not included.
+- Native PDF rendering, hosted analytics, premium hard-block mode, and sub-surface blocking are not included.
 - User-added links and user-owned documents are local/private; there is no article extraction, crawling, summarization, cloud sync, OCR, annotation, or document management.
 - Overlay permission remains optional and future-facing; Accessibility is the active interception path.

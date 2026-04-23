@@ -5,6 +5,8 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
+import android.media.AudioManager
+import android.media.ToneGenerator
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.provider.Settings
@@ -38,6 +40,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -53,8 +56,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -300,6 +305,7 @@ private fun MainRoute(
                 state = state,
                 onToggleApp = viewModel::toggleSettingsApp,
                 onSelectDuration = viewModel::setPreferredDuration,
+                onSelectMeditationDuration = viewModel::setMeditationDurationMinutes,
                 onSelectTheme = viewModel::selectThemeMode,
                 onRefreshReadiness = viewModel::refreshPermissionReadiness,
             )
@@ -1401,15 +1407,11 @@ private fun ReaderScreen(
         body = state.currentContentBody,
         fallback = content.description,
     )
-    var progress by remember(content.id, state.currentSessionStartedAtMillis) { mutableStateOf(0) }
-
-    LaunchedEffect(content.id, state.currentSessionStartedAtMillis, content.durationMinutes) {
-        val startedAtMillis = state.currentSessionStartedAtMillis ?: System.currentTimeMillis()
-        val totalMillis = (content.durationMinutes * 60_000L).coerceAtLeast(1L)
-        while (true) {
-            val elapsedMillis = (System.currentTimeMillis() - startedAtMillis).coerceAtLeast(0L)
-            progress = ((elapsedMillis * 100L) / totalMillis).toInt().coerceIn(0, 100)
-            delay(1_000L)
+    val listState = rememberLazyListState()
+    val progress by remember(content.id, paragraphs.size) {
+        derivedStateOf {
+            val lastVisibleIndex = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            readerProgressPercent(lastVisibleItemIndex = lastVisibleIndex, paragraphCount = paragraphs.size)
         }
     }
 
@@ -1423,9 +1425,10 @@ private fun ReaderScreen(
         ) {
             QaIconButton(icon = QaIconKind.Close, onClick = onBack)
             ProgressLine(progress = progress, modifier = Modifier.weight(1f))
-            MonoText("${remainingMinutes(content.durationMinutes, progress)} min left")
+            MonoText("$progress% read")
         }
         LazyColumn(
+            state = listState,
             modifier = Modifier
                 .weight(1f)
                 .testTag("reader-list"),
@@ -1534,6 +1537,12 @@ private fun MeditationTimerScreen(
     val startedAtMillis = state.currentSessionStartedAtMillis ?: System.currentTimeMillis()
     val totalMillis = (content.durationMinutes * 60_000L).coerceAtLeast(1L)
     var nowMillis by remember(content.id, startedAtMillis) { mutableStateOf(System.currentTimeMillis()) }
+    var hasPlayedGong by remember(content.id, startedAtMillis) { mutableStateOf(false) }
+    val toneGenerator = remember { runCatching { ToneGenerator(AudioManager.STREAM_MUSIC, 85) }.getOrNull() }
+
+    DisposableEffect(toneGenerator) {
+        onDispose { toneGenerator?.release() }
+    }
 
     LaunchedEffect(content.id, startedAtMillis) {
         while (true) {
@@ -1545,6 +1554,13 @@ private fun MeditationTimerScreen(
     val remainingMillis = (totalMillis - (nowMillis - startedAtMillis)).coerceAtLeast(0L)
     val remainingSeconds = ((remainingMillis + 999L) / 1_000L).toInt()
     val isComplete = remainingMillis == 0L
+
+    LaunchedEffect(isComplete) {
+        if (isComplete && !hasPlayedGong) {
+            toneGenerator?.startTone(ToneGenerator.TONE_PROP_ACK, 900)
+            hasPlayedGong = true
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -1589,7 +1605,11 @@ private fun MeditationTimerScreen(
                 textAlign = TextAlign.Center,
             )
             BodyText(
-                text = if (isComplete) "Reset complete. Log it if it helped." else "No feed. Just three minutes back.",
+                text = if (isComplete) {
+                    "Reset complete. The gong marks the end - log it if it helped."
+                } else {
+                    "No feed. Just ${content.durationMinutes} minutes back. A gong will sound when the timer ends."
+                },
                 color = QualityAlternativeThemeTokens.colors.mutedText,
                 textAlign = TextAlign.Center,
                 modifier = Modifier
@@ -1699,6 +1719,10 @@ private fun ProgressTab(snapshot: ProgressSnapshot) {
         }
         item {
             QaCard(padding = 0.dp) {
+                SmallStatRow("Current reading streak", "${snapshot.currentStreakDays} days")
+                HorizontalDivider(color = colors.line)
+                SmallStatRow("Completed reads", snapshot.completedReads.toString())
+                HorizontalDivider(color = colors.line)
                 SmallStatRow("Interventions shown", snapshot.interventionsShown.toString())
                 HorizontalDivider(color = colors.line)
                 SmallStatRow("Chose the alternative", "${snapshot.alternativesChosen}")
@@ -1733,6 +1757,7 @@ private fun SettingsTab(
     state: MainUiState,
     onToggleApp: (DistractingApp) -> Unit,
     onSelectDuration: (DurationBucket) -> Unit,
+    onSelectMeditationDuration: (Int) -> Unit,
     onSelectTheme: (AppThemeMode) -> Unit,
     onRefreshReadiness: () -> Unit,
 ) {
@@ -1805,6 +1830,27 @@ private fun SettingsTab(
                             selected = bucket == state.preferences?.preferredDurationBucket,
                             onClick = { onSelectDuration(bucket) },
                             modifier = Modifier.weight(1f),
+                            centered = true,
+                        )
+                    }
+                }
+            }
+        }
+        item {
+            SectionLabel("Meditation reset")
+            QaCard {
+                BodyText(
+                    text = "Choose how long the utility replacement runs before the completion gong.",
+                    color = colors.mutedText,
+                    modifier = Modifier.padding(bottom = 12.dp),
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf(1, 3, 5, 10).forEach { minutes ->
+                        QaChip(
+                            text = "${minutes}m",
+                            selected = state.meditationDurationMinutes == minutes,
+                            onClick = { onSelectMeditationDuration(minutes) },
+                            modifier = Modifier.weight(1f).testTag("meditation-duration-$minutes"),
                             centered = true,
                         )
                     }
@@ -2907,6 +2953,7 @@ private fun LabelText(text: String, modifier: Modifier = Modifier) {
 
 internal data class ProgressSnapshot(
     val daysConverted: Int,
+    val currentStreakDays: Int,
     val dayBars: List<ProgressDayBar>,
     val interventionsShown: Int,
     val alternativesChosen: Int,
@@ -2940,6 +2987,14 @@ internal fun progressSnapshot(
                 .toLocalDate()
         }
         .toSet()
+    val completedDays = entries
+        .filter(ReplacementHistoryEntry::isCompleted)
+        .map { entry ->
+            Instant.ofEpochMilli(entry.completedAtMillis ?: entry.acceptedAtMillis)
+                .atZone(zoneId)
+                .toLocalDate()
+        }
+        .toSet()
     val delayedDays = events
         .filter { it.type == AnalyticsEventType.DELAY_SELECTED }
         .map { event ->
@@ -2964,6 +3019,7 @@ internal fun progressSnapshot(
 
     return ProgressSnapshot(
         daysConverted = dayBars.count { it.state == ProgressDayState.CONVERTED },
+        currentStreakDays = currentReadingStreakDays(completedDays = completedDays, today = today),
         dayBars = dayBars,
         interventionsShown = events.distinctProgressEventCount(AnalyticsEventType.INTERVENTION_SHOWN),
         alternativesChosen = entries.size,
@@ -3012,6 +3068,29 @@ internal fun finiteReaderParagraphs(body: String): List<String> {
 
 internal fun readerParagraphsForDisplay(body: String, fallback: String): List<String> {
     return finiteReaderParagraphs(body).ifEmpty { listOf(fallback) }
+}
+
+internal fun readerProgressPercent(lastVisibleItemIndex: Int, paragraphCount: Int): Int {
+    if (paragraphCount <= 0) {
+        return 100
+    }
+    val visibleParagraphs = lastVisibleItemIndex.coerceIn(0, paragraphCount)
+    return ((visibleParagraphs * 100) / paragraphCount).coerceIn(0, 100)
+}
+
+internal fun currentReadingStreakDays(completedDays: Set<LocalDate>, today: LocalDate): Int {
+    val anchor = when {
+        today in completedDays -> today
+        today.minusDays(1) in completedDays -> today.minusDays(1)
+        else -> return 0
+    }
+    var streak = 0
+    var cursor = anchor
+    while (cursor in completedDays) {
+        streak += 1
+        cursor = cursor.minusDays(1)
+    }
+    return streak
 }
 
 private fun formatTimestamp(timestampMillis: Long): String {
@@ -3202,7 +3281,7 @@ private fun documentFormatLabel(form: AddDocumentFormState): String {
     return when (UserDocumentValidator.detectFormat(displayName = form.displayName, mimeType = form.mimeType)) {
         ContentFormat.MARKDOWN -> "Markdown · private reader"
         ContentFormat.PDF -> "PDF · external viewer"
-        ContentFormat.EPUB -> "EPUB · external viewer"
+        ContentFormat.EPUB -> "EPUB · private reader"
         ContentFormat.HTML -> "Document"
         null -> "Unsupported file"
     }

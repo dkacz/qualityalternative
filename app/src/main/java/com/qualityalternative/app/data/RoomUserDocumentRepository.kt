@@ -157,7 +157,11 @@ class AndroidUserDocumentBodyLoader(
         return runCatching {
             val parsedUri = Uri.parse(uri)
             contentResolver.openInputStream(parsedUri)?.use { input ->
-                input.bufferedReader(Charsets.UTF_8).readText()
+                when (format) {
+                    ContentFormat.MARKDOWN -> input.bufferedReader(Charsets.UTF_8).readText()
+                    ContentFormat.EPUB -> EpubTextExtractor.extract(input)
+                    else -> ""
+                }
             } ?: throw UserDocumentBodyLoadException(uri)
         }.getOrElse { error ->
             throw UserDocumentBodyLoadException(uri = uri, cause = error)
@@ -223,13 +227,13 @@ private fun ContentItem.toEntity(
     )
 }
 
-private fun ContentFormat.usesPrivateReader(): Boolean = this == ContentFormat.MARKDOWN
+private fun ContentFormat.usesPrivateReader(): Boolean = this == ContentFormat.MARKDOWN || this == ContentFormat.EPUB
 
 private fun defaultDescription(format: ContentFormat, displayName: String): String {
     return when (format) {
         ContentFormat.MARKDOWN -> "A private Markdown file from your library: $displayName."
         ContentFormat.PDF -> "A private PDF from your library. Opens through Android's document viewer."
-        ContentFormat.EPUB -> "A private EPUB from your library. Opens through Android's document viewer."
+        ContentFormat.EPUB -> "A private EPUB from your library: $displayName."
         ContentFormat.HTML -> "A private document from your library."
     }
 }

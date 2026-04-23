@@ -48,6 +48,7 @@ class ProgressSnapshotTest {
         )
 
         assertEquals(1, snapshot.daysConverted)
+        assertEquals(1, snapshot.currentStreakDays)
         assertEquals(21, snapshot.dayBars.size)
         assertEquals(2, snapshot.interventionsShown)
         assertEquals(2, snapshot.alternativesChosen)
@@ -170,6 +171,37 @@ class ProgressSnapshotTest {
     }
 
     @Test
+    fun progressSnapshotCountsCurrentReadingStreakFromCompletedSessions() {
+        val today = LocalDate.of(2026, 4, 21)
+        val entries = listOf(
+            replacementEntry(
+                sessionId = "today",
+                acceptedAtMillis = today.toMillis(),
+                completedAtMillis = today.toMillis() + 5_000L,
+            ),
+            replacementEntry(
+                sessionId = "yesterday",
+                acceptedAtMillis = today.minusDays(1).toMillis(),
+                completedAtMillis = today.minusDays(1).toMillis() + 5_000L,
+            ),
+            replacementEntry(
+                sessionId = "gap",
+                acceptedAtMillis = today.minusDays(3).toMillis(),
+                completedAtMillis = today.minusDays(3).toMillis() + 5_000L,
+            ),
+        )
+
+        val snapshot = progressSnapshot(
+            entries = entries,
+            events = emptyList(),
+            zoneId = ZoneOffset.UTC,
+            nowMillis = today.toMillis(),
+        )
+
+        assertEquals(2, snapshot.currentStreakDays)
+    }
+
+    @Test
     fun finiteReaderParagraphsReturnsOnlyRealParagraphs() {
         assertEquals(
             listOf("First paragraph.", "Second paragraph.", "Third paragraph."),
@@ -193,6 +225,13 @@ class ProgressSnapshotTest {
             listOf("Fallback."),
             readerParagraphsForDisplay(body = " \n\n ", fallback = "Fallback."),
         )
+    }
+
+    @Test
+    fun readerProgressPercentTracksVisibleParagraphsInsteadOfElapsedTime() {
+        assertEquals(0, readerProgressPercent(lastVisibleItemIndex = 0, paragraphCount = 10))
+        assertEquals(30, readerProgressPercent(lastVisibleItemIndex = 3, paragraphCount = 10))
+        assertEquals(100, readerProgressPercent(lastVisibleItemIndex = 20, paragraphCount = 10))
     }
 
     private fun event(

@@ -35,7 +35,8 @@ This repository now contains:
 - a completed Sprint 6 content governance layer for renderable, link-only, and user-private inventory
 - a completed Sprint 7 content library v1 with the first real renderable pack, `Attention Classics v1`
 - a completed Sprint 8 content expansion pass with shared link-only recommendations, a public-domain expansion pack, meditation replacement, and visual QA
-- an in-progress Sprint 9 user-document import slice for private PDF, Markdown, and EPUB replacements
+- a completed Sprint 9 user-document import slice for private PDF, Markdown, and EPUB replacements
+- a completed Sprint 10 reader/progress slice with native EPUB text reading, reading-position progress, constructive streaks, and configurable meditation
 
 ## Source of Truth
 
@@ -59,9 +60,10 @@ This repository now contains:
 - `app/` contains the Android client prototype.
 - The current build is local-first and uses editorial starter packs from app assets.
 - `Attention Classics v1` is integrated as the first real renderable replacement pack.
-- Sprint 8 adds modern link-only recommendations, more public-domain renderable readings, and a 3-minute meditation replacement.
+- Sprint 8 adds modern link-only recommendations, more public-domain renderable readings, and a meditation replacement.
 - User-added links are stored locally and can participate in the same finite recommendation set.
-- User-owned PDF, Markdown, and EPUB imports are implemented on the Sprint 9 branch as private replacement inventory.
+- User-owned PDF, Markdown, and EPUB imports are implemented as private replacement inventory.
+- Markdown and EPUB files render in the app's private reader; PDF remains an Android document-viewer handoff.
 - User settings and delay windows are persisted with `DataStore`.
 - Analytics and replacement history are persisted with `Room`.
 - The prototype already supports:
@@ -77,7 +79,9 @@ This repository now contains:
   - persisted delay windows across sessions
   - live system-interception routing from the accessibility service into the in-app intervention surface
   - user-added link capture and saved-link handoff
-  - user-document import for PDF, Markdown, and EPUB on the Sprint 9 branch
+  - user-document import for PDF, Markdown, and EPUB
+  - EPUB private reader v1 and reading-position progress for long documents
+  - configurable meditation reset length with completion gong
   - Light and Dark analog themes
   - constructive progress framing around converted impulses
   - internal fixture distractor apps for cross-app automation tests

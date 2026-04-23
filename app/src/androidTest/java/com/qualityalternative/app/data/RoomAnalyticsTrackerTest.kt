@@ -676,6 +676,7 @@ class RoomAnalyticsTrackerTest {
                 preferredDurationBucket = selection.preferredDurationBucket,
                 selectedPackIds = selection.selectedPackIds,
                 themeMode = state.value.themeMode,
+                meditationDurationMinutes = state.value.meditationDurationMinutes,
             )
         }
 
@@ -689,6 +690,10 @@ class RoomAnalyticsTrackerTest {
 
         override suspend fun saveThemeMode(themeMode: AppThemeMode) {
             state.value = state.value.copy(themeMode = themeMode)
+        }
+
+        override suspend fun saveMeditationDurationMinutes(minutes: Int) {
+            state.value = state.value.copy(meditationDurationMinutes = minutes)
         }
     }
 

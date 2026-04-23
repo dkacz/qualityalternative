@@ -10,6 +10,7 @@ data class UserPreferences(
     val preferredTopics: Set<TopicTag>,
     val preferredDurationBucket: DurationBucket,
     val selectedPackIds: Set<String>,
+    val meditationDurationMinutes: Int = DEFAULT_MEDITATION_MINUTES,
 )
 
 enum class AppThemeMode {
@@ -24,6 +25,7 @@ data class AppSettings(
     val preferredDurationBucket: DurationBucket,
     val selectedPackIds: Set<String>,
     val themeMode: AppThemeMode = AppThemeMode.LIGHT,
+    val meditationDurationMinutes: Int = DEFAULT_MEDITATION_MINUTES,
 )
 
 data class OnboardingSelection(

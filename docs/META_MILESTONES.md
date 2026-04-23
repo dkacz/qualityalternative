@@ -21,9 +21,9 @@ Completed:
 
 Current active track:
 
-- Sprint 9: user-owned document import for Android.
-- Work mode: add PDF, Markdown, and EPUB as private replacement inventory without turning the app into a document manager.
-- Gate: Markdown may render in-app as user-private content; PDF and EPUB use controlled Android handoff until native readers are justified by tester signal.
+- Sprint 10: EPUB private reader, reading-position progress, constructive streak, and meditation controls.
+- Work mode: improve long-document and utility replacement quality without turning the app into a document manager or gamified blocker.
+- Gate: EPUB renders as extracted text in the private reader; PDF stays controlled Android handoff until native PDF rendering is justified by tester signal.
 
 ## UI Timing
 
@@ -119,7 +119,7 @@ Not included:
 - iOS
 - premium packaging
 - hard-block mode
-- streak mechanics beyond constructive progress framing
+- shame-heavy streak mechanics or loss-aversion gamification
 - additional ingestion sources
 
 Sprint plan:
@@ -254,7 +254,7 @@ Likely scope:
 
 - Android document picker for PDF, Markdown, and EPUB selection
 - local URI/permission persistence
-- Markdown reader plus controlled PDF/EPUB fallback
+- Markdown and EPUB private reader plus controlled PDF fallback
 - document metadata as rankable content
 - source-aware analytics for editorial, link, and user-document replacements
 - external-pilot checklist and tester reporting polish
@@ -267,7 +267,7 @@ Out of scope:
 - full document management
 - cloud sync
 - AI PDF summarization
-- native PDF/EPUB rendering unless handoff proves too weak in pilot use
+- native PDF rendering unless handoff proves too weak in pilot use
 
 Gate to start:
 
@@ -287,7 +287,7 @@ Goal:
 
 Minimum pilot inputs:
 
-- Android build with editorial packs, user links, Markdown import, and PDF/EPUB handoff
+- Android build with editorial packs, user links, Markdown/EPUB import reader, PDF handoff, meditation controls, and constructive streak
 - clear install/test instructions
 - simple feedback and bug-reporting workflow
 - stable local analytics/export path
@@ -370,7 +370,7 @@ Streak hypothesis:
 
 Decision gate:
 
-- Do not implement monetization, unlimited storage, native EPUB reading, or streak mechanics until pilot data shows that users repeatedly accept replacements and ask for more content depth or motivation.
+- Do not implement monetization, unlimited storage, native PDF reading, or stronger gamification until pilot data shows that users repeatedly accept replacements and ask for more content depth or motivation.
 
 ## Operating Rule
 

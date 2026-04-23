@@ -35,7 +35,7 @@ W aplikacji wybierz:
 
 W tej alphie starter packi są wybrane automatycznie. Nowy pack `Attention Classics v1` jest włączony domyślnie, więc możesz go zobaczyć w interwencji bez szukania dodatkowego kroku konfiguracji.
 
-Wersja alpha obsługuje lokalne editorial starter packi, proste dodawanie własnych linków, prywatny import własnych plików PDF / Markdown / EPUB, tryb jasny i ciemny oraz odświeżony czytnik/progress. Markdown otwiera się w aplikacji, a PDF i EPUB przez systemowy viewer Androida.
+Wersja alpha obsługuje lokalne editorial starter packi, proste dodawanie własnych linków, prywatny import własnych plików PDF / Markdown / EPUB, tryb jasny i ciemny oraz odświeżony czytnik/progress. Markdown i EPUB otwierają się w aplikacji, a PDF przez systemowy viewer Androida.
 
 ## 4. Włącz Accessibility
 
@@ -78,7 +78,7 @@ Najlepiej zacząć od YouTube, X albo Facebooka, bo te przepływy były już pot
 7. Sprawdź `Pause 15 min`.
 8. Po wybraniu opóźnienia otwórz tę samą aplikację ponownie i upewnij się, że pełna interwencja nie pojawia się natychmiast drugi raz.
 9. Opcjonalnie dodaj własny link w bibliotece i sprawdź, czy jako alternatywa otwiera się przez ekran `Saved link handoff`.
-10. Opcjonalnie zaimportuj własny plik Markdown, PDF albo EPUB. Markdown powinien otworzyć się w czytniku aplikacji, a PDF/EPUB przez ekran handoff do systemowego viewera Androida.
+10. Opcjonalnie zaimportuj własny plik Markdown, PDF albo EPUB. Markdown i EPUB powinny otworzyć się w czytniku aplikacji, a PDF przez ekran handoff do systemowego viewera Androida.
 
 Właśnie ten moment jest najważniejszy w alphie: aplikacja ma zatrzymać impuls, zaproponować skończoną alternatywę i nie zamienić się w kolejny feed.
 
@@ -98,8 +98,10 @@ Wyślij proszę krótką informację:
 - jeśli odpowiedź brzmi `nie`, dopisz powód: zbyt szkolne, zbyt abstrakcyjne, zbyt archaiczne, nietrafione do momentu impulsu, za krótkie żeby było satysfakcjonujące albo za długie na tę chwilę
 - czy zapisany własny link pojawia się w bibliotece i może zostać otwarty jako alternatywa
 - czy własny Markdown/PDF/EPUB pojawia się w bibliotece i może zostać otwarty jako alternatywa
+- czy przy dłuższym Markdown/EPUB pasek postępu czytania przesuwa się wraz ze scrollowaniem
+- czy ustawienie długości medytacji działa i czy po zakończeniu słychać gong
 - czy tryb `Light` / `Dark` wygląda czytelnie na twoim telefonie
-- czy nowy ekran progressu motywuje bez poczucia karania albo wstydu
+- czy ekran progressu i streak motywują bez poczucia karania albo wstydu
 
 Przykładowy raport:
 
@@ -119,7 +121,7 @@ Problemy: brak / opis problemu
 - Działa tylko na Androidzie.
 - Wymaga włączenia Accessibility.
 - Nie ma jeszcze iOS.
-- Własne linki i pliki są lokalne i proste; Markdown ma prywatny czytnik w aplikacji, PDF/EPUB używają systemowego viewera Androida, a synchronizacji w chmurze nie ma.
+- Własne linki i pliki są lokalne i proste; Markdown/EPUB mają prywatny czytnik w aplikacji, PDF używa systemowego viewera Androida, a synchronizacji w chmurze nie ma.
 - Nie blokuje pojedynczych powierzchni typu Shorts/Reels; przechwytuje całą wybraną aplikację.
 - Testy real-device były dotąd potwierdzone na jednym Samsungu dla YouTube, X i Facebooka.
 

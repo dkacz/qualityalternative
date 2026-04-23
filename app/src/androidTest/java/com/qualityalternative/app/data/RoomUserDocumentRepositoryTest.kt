@@ -143,6 +143,55 @@ class RoomUserDocumentRepositoryTest {
     }
 
     @Test
+    fun addEpubDocument_roundTripsAsPrivateReaderContent() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val database = Room.inMemoryDatabaseBuilder(
+            context,
+            QualityAlternativeDatabase::class.java,
+        ).allowMainThreadQueries().build()
+        val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+        try {
+            val repository = RoomUserDocumentRepository(
+                dao = database.userDocumentDao(),
+                scope = appScope,
+                bodyLoader = UserDocumentBodyLoader { _, format ->
+                    assertEquals(ContentFormat.EPUB, format)
+                    "Extracted EPUB text."
+                },
+                idProvider = { _ -> "user-document:epub" },
+            )
+            repository.observeReady().first { it }
+
+            repository.addDocument(
+                draft = UserDocumentDraft(
+                    uri = "content://quality/book",
+                    displayName = "book.epub",
+                    mimeType = "application/epub+zip",
+                    title = "Saved EPUB",
+                    durationMinutes = 20,
+                    topicTags = setOf(TopicTag.HISTORY),
+                ),
+                nowMillis = 1_000L,
+            )
+
+            val saved = withTimeout(10_000L) {
+                repository.observeUserDocuments().first { it.size == 1 }.single()
+            }
+
+            assertEquals(ContentFormat.EPUB, saved.format)
+            assertEquals(null, saved.externalUrl)
+            assertEquals(ContentAvailability.AVAILABLE, saved.availability)
+            assertEquals(ContentRenderMode.USER_PRIVATE_READER, saved.rights.renderMode)
+            assertEquals("Extracted EPUB text.", repository.contentBody(saved))
+        } finally {
+            appScope.cancel()
+            delay(100)
+            database.close()
+        }
+    }
+
+    @Test
     fun androidBodyLoaderReportsUnreadableMarkdownUri() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val loader = AndroidUserDocumentBodyLoader(context)

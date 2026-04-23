@@ -441,6 +441,31 @@ class MainViewModelTest {
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
+    fun meditationDurationSettingUpdatesUtilityReplacementInventory() = runTest {
+        val recommendationEngine = RecordingRecommendationEngine()
+        val settingsRepository = FakeSettingsRepository()
+        val viewModel = createViewModel(
+            settingsRepository = settingsRepository,
+            recommendationEngine = recommendationEngine,
+        )
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+
+        viewModel.setMeditationDurationMinutes(5)
+        advanceUntilIdle()
+        viewModel.triggerDebugIntervention(nowMillis = 2_000L)
+        advanceUntilIdle()
+
+        val meditation = recommendationEngine.lastInventory.first { it.id == MEDITATION_TIMER_CONTENT_ID }
+        assertEquals(5, meditation.durationMinutes)
+        assertEquals("5-minute reset", meditation.title)
+        assertEquals(5, settingsRepository.state.value.meditationDurationMinutes)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
     fun skippingMeditationMarksSessionSkippedAndRecordsMeditationEvent() = runTest {
         val analyticsTracker = InMemoryAnalyticsTracker()
         val historyRepository = FakeHistoryRepository()
@@ -1716,6 +1741,7 @@ class MainViewModelTest {
                 preferredDurationBucket = selection.preferredDurationBucket,
                 selectedPackIds = selection.selectedPackIds,
                 themeMode = state.value.themeMode,
+                meditationDurationMinutes = state.value.meditationDurationMinutes,
             )
         }
 
@@ -1729,6 +1755,10 @@ class MainViewModelTest {
 
         override suspend fun saveThemeMode(themeMode: AppThemeMode) {
             state.value = state.value.copy(themeMode = themeMode)
+        }
+
+        override suspend fun saveMeditationDurationMinutes(minutes: Int) {
+            state.value = state.value.copy(meditationDurationMinutes = minutes)
         }
     }
 
@@ -2229,7 +2259,6 @@ class MainViewModelTest {
     private fun savedUserDocument(format: ContentFormat): ContentItem {
         val externalUrl = when (format) {
             ContentFormat.PDF -> "content://quality/document.pdf"
-            ContentFormat.EPUB -> "content://quality/book.epub"
             else -> null
         }
         return ContentItem(

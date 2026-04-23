@@ -5,12 +5,16 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import com.qualityalternative.app.domain.model.AppSettings
 import com.qualityalternative.app.domain.model.AppThemeMode
+import com.qualityalternative.app.domain.model.DEFAULT_MEDITATION_MINUTES
 import com.qualityalternative.app.domain.model.DistractingApp
 import com.qualityalternative.app.domain.model.DurationBucket
+import com.qualityalternative.app.domain.model.MAX_MEDITATION_MINUTES
+import com.qualityalternative.app.domain.model.MIN_MEDITATION_MINUTES
 import com.qualityalternative.app.domain.model.OnboardingSelection
 import com.qualityalternative.app.domain.model.TopicTag
 import com.qualityalternative.app.domain.service.SettingsRepository
@@ -45,6 +49,8 @@ class PreferencesSettingsRepository(
                     }.getOrDefault(DurationBucket.FOCUS),
                     selectedPackIds = preferences[SelectedPackIds].orEmpty(),
                     themeMode = parseThemeMode(preferences[ThemeMode]),
+                    meditationDurationMinutes = (preferences[MeditationDurationMinutes] ?: DEFAULT_MEDITATION_MINUTES)
+                        .coerceIn(MIN_MEDITATION_MINUTES, MAX_MEDITATION_MINUTES),
                 )
             }
     }
@@ -79,6 +85,12 @@ class PreferencesSettingsRepository(
         }
     }
 
+    override suspend fun saveMeditationDurationMinutes(minutes: Int) {
+        dataStore.edit { preferences ->
+            preferences[MeditationDurationMinutes] = minutes.coerceIn(MIN_MEDITATION_MINUTES, MAX_MEDITATION_MINUTES)
+        }
+    }
+
     suspend fun clearForTests() {
         dataStore.edit { preferences ->
             preferences.clear()
@@ -99,5 +111,6 @@ class PreferencesSettingsRepository(
         val PreferredDurationBucket = stringPreferencesKey("preferred_duration_bucket")
         val SelectedPackIds = stringSetPreferencesKey("selected_pack_ids")
         val ThemeMode = stringPreferencesKey("theme_mode")
+        val MeditationDurationMinutes = intPreferencesKey("meditation_duration_minutes")
     }
 }
