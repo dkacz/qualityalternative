@@ -326,7 +326,7 @@ Sprint plan:
 
 - See `docs/SPRINT_11_IOS_DISCOVERY.md`.
 
-## Milestone 9: Post-Pilot Product Bet
+## Milestone 10: Post-Pilot Product Bet
 
 Status: `future`
 
