@@ -78,7 +78,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -1403,15 +1406,15 @@ private fun ReaderScreen(
     onBack: () -> Unit,
 ) {
     val content = state.currentContent ?: return
-    val paragraphs = readerParagraphsForDisplay(
+    val blocks = readerBlocksForDisplay(
         body = state.currentContentBody,
         fallback = content.description,
     )
     val listState = rememberLazyListState()
-    val progress by remember(content.id, paragraphs.size) {
+    val progress by remember(content.id, blocks.size) {
         derivedStateOf {
             val lastVisibleIndex = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-            readerProgressPercent(lastVisibleItemIndex = lastVisibleIndex, paragraphCount = paragraphs.size)
+            readerProgressPercent(lastVisibleItemIndex = lastVisibleIndex, paragraphCount = blocks.size)
         }
     }
 
@@ -1438,17 +1441,8 @@ private fun ReaderScreen(
                 MonoText("${content.sourceLabel()} · ${content.topicLine()}", modifier = Modifier.padding(bottom = 10.dp))
                 DisplayText(content.title, fontSize = 27.sp, lineHeight = 31.sp, modifier = Modifier.padding(bottom = 18.dp))
             }
-            items(paragraphs.withIndex().toList()) { indexedParagraph ->
-                Text(
-                    text = indexedParagraph.value,
-                    style = MaterialTheme.typography.bodyLarge.copy(
-                        fontFamily = QualityDisplayFontFamily,
-                        fontSize = 17.sp,
-                        lineHeight = 27.sp,
-                    ),
-                    color = QualityAlternativeThemeTokens.colors.primaryText,
-                    modifier = Modifier.padding(bottom = 16.dp),
-                )
+            items(blocks.withIndex().toList()) { indexedBlock ->
+                ReaderMarkdownBlockText(block = indexedBlock.value)
             }
             item {
                 QaButton(
@@ -1460,6 +1454,56 @@ private fun ReaderScreen(
             }
         }
     }
+}
+
+@Composable
+private fun ReaderMarkdownBlockText(block: ReaderMarkdownBlock) {
+    val colors = QualityAlternativeThemeTokens.colors
+    val baseStyle = MaterialTheme.typography.bodyLarge.copy(
+        fontFamily = QualityDisplayFontFamily,
+        fontSize = 17.sp,
+        lineHeight = 27.sp,
+    )
+    val style = when (block.kind) {
+        ReaderMarkdownBlockKind.HEADING -> baseStyle.copy(
+            fontSize = 22.sp,
+            lineHeight = 29.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+
+        ReaderMarkdownBlockKind.CODE -> baseStyle.copy(
+            fontFamily = QualityMonoFontFamily,
+            fontSize = 14.sp,
+            lineHeight = 22.sp,
+        )
+
+        ReaderMarkdownBlockKind.QUOTE -> baseStyle.copy(fontStyle = FontStyle.Italic)
+        ReaderMarkdownBlockKind.BODY,
+        ReaderMarkdownBlockKind.LIST,
+        -> baseStyle
+    }
+    val textColor = when (block.kind) {
+        ReaderMarkdownBlockKind.QUOTE -> colors.mutedText
+        else -> colors.primaryText
+    }
+    val modifier = when (block.kind) {
+        ReaderMarkdownBlockKind.CODE -> Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(colors.elevatedSurface)
+            .border(BorderStroke(1.dp, colors.line), RoundedCornerShape(14.dp))
+            .padding(14.dp)
+            .padding(bottom = 4.dp)
+
+        else -> Modifier.padding(bottom = if (block.kind == ReaderMarkdownBlockKind.HEADING) 10.dp else 16.dp)
+    }
+
+    Text(
+        text = block.text,
+        style = style,
+        color = textColor,
+        modifier = modifier,
+    )
 }
 
 @Composable
@@ -3068,6 +3112,177 @@ internal fun finiteReaderParagraphs(body: String): List<String> {
 
 internal fun readerParagraphsForDisplay(body: String, fallback: String): List<String> {
     return finiteReaderParagraphs(body).ifEmpty { listOf(fallback) }
+}
+
+internal enum class ReaderMarkdownBlockKind {
+    BODY,
+    HEADING,
+    QUOTE,
+    LIST,
+    CODE,
+}
+
+internal data class ReaderMarkdownBlock(
+    val text: AnnotatedString,
+    val kind: ReaderMarkdownBlockKind,
+)
+
+internal fun readerBlocksForDisplay(body: String, fallback: String): List<ReaderMarkdownBlock> {
+    return readerParagraphsForDisplay(body = body, fallback = fallback)
+        .map(::readerMarkdownBlock)
+}
+
+internal fun readerMarkdownBlock(rawBlock: String): ReaderMarkdownBlock {
+    val block = rawBlock.trim()
+    val fencedCode = Regex("""^```[A-Za-z0-9_-]*\n([\s\S]*?)\n?```$""")
+        .matchEntire(block)
+    if (fencedCode != null) {
+        return ReaderMarkdownBlock(
+            text = AnnotatedString(fencedCode.groupValues[1].trim('\n')),
+            kind = ReaderMarkdownBlockKind.CODE,
+        )
+    }
+
+    Regex("""^(#{1,6})\s+(.+)$""")
+        .matchEntire(block)
+        ?.let { match ->
+            return ReaderMarkdownBlock(
+                text = parseInlineMarkdown(match.groupValues[2].trim()),
+                kind = ReaderMarkdownBlockKind.HEADING,
+            )
+        }
+
+    val lines = block.lines().map(String::trimEnd).filter(String::isNotBlank)
+    if (lines.isNotEmpty() && lines.all { line -> line.trimStart().startsWith(">") }) {
+        return ReaderMarkdownBlock(
+            text = parseInlineMarkdown(
+                lines.joinToString("\n") { line ->
+                    line.trimStart().removePrefix(">").trimStart()
+                },
+            ),
+            kind = ReaderMarkdownBlockKind.QUOTE,
+        )
+    }
+
+    val listMarker = Regex("""^\s*(?:[-*+]\s+|\d+[.)]\s+)(.+)$""")
+    if (lines.isNotEmpty() && lines.all { line -> listMarker.matches(line) }) {
+        return ReaderMarkdownBlock(
+            text = parseInlineMarkdown(
+                lines.joinToString("\n") { line ->
+                    "• ${listMarker.matchEntire(line)?.groupValues?.getOrNull(1).orEmpty().trim()}"
+                },
+            ),
+            kind = ReaderMarkdownBlockKind.LIST,
+        )
+    }
+
+    return ReaderMarkdownBlock(
+        text = parseInlineMarkdown(block),
+        kind = ReaderMarkdownBlockKind.BODY,
+    )
+}
+
+internal fun parseInlineMarkdown(rawText: String): AnnotatedString {
+    return buildAnnotatedString {
+        var index = 0
+        while (index < rawText.length) {
+            when {
+                rawText[index] == '\\' && index + 1 < rawText.length -> {
+                    append(rawText[index + 1])
+                    index += 2
+                }
+
+                rawText.startsWith("**", index) || rawText.startsWith("__", index) -> {
+                    val marker = rawText.substring(index, index + 2)
+                    val close = rawText.indexOf(marker, startIndex = index + 2)
+                    if (close > index + 2) {
+                        appendStyledMarkdown(
+                            text = rawText.substring(index + 2, close),
+                            style = SpanStyle(fontWeight = FontWeight.SemiBold),
+                        )
+                        index = close + 2
+                    } else {
+                        append(rawText[index])
+                        index += 1
+                    }
+                }
+
+                rawText[index] == '`' -> {
+                    val close = rawText.indexOf('`', startIndex = index + 1)
+                    if (close > index + 1) {
+                        appendStyledMarkdown(
+                            text = rawText.substring(index + 1, close),
+                            style = SpanStyle(fontFamily = QualityMonoFontFamily),
+                        )
+                        index = close + 1
+                    } else {
+                        append(rawText[index])
+                        index += 1
+                    }
+                }
+
+                rawText[index] == '*' || rawText[index] == '_' -> {
+                    val marker = rawText[index]
+                    val close = if (canOpenInlineEmphasis(rawText, index)) {
+                        findClosingInlineEmphasis(rawText = rawText, marker = marker, startIndex = index + 1)
+                    } else {
+                        -1
+                    }
+                    if (close > index + 1 && rawText.substring(index + 1, close).isNotBlank()) {
+                        appendStyledMarkdown(
+                            text = rawText.substring(index + 1, close),
+                            style = SpanStyle(fontStyle = FontStyle.Italic),
+                        )
+                        index = close + 1
+                    } else {
+                        append(rawText[index])
+                        index += 1
+                    }
+                }
+
+                else -> {
+                    append(rawText[index])
+                    index += 1
+                }
+            }
+        }
+    }
+}
+
+private fun canOpenInlineEmphasis(rawText: String, index: Int): Boolean {
+    val marker = rawText[index]
+    val previous = rawText.getOrNull(index - 1)
+    val next = rawText.getOrNull(index + 1)
+    if (next == null || next.isWhitespace()) {
+        return false
+    }
+    return marker != '_' || previous?.isLetterOrDigit() != true
+}
+
+private fun findClosingInlineEmphasis(rawText: String, marker: Char, startIndex: Int): Int {
+    var close = rawText.indexOf(marker, startIndex = startIndex)
+    while (close != -1) {
+        if (canCloseInlineEmphasis(rawText = rawText, marker = marker, index = close)) {
+            return close
+        }
+        close = rawText.indexOf(marker, startIndex = close + 1)
+    }
+    return -1
+}
+
+private fun canCloseInlineEmphasis(rawText: String, marker: Char, index: Int): Boolean {
+    val previous = rawText.getOrNull(index - 1)
+    val next = rawText.getOrNull(index + 1)
+    if (previous == null || previous.isWhitespace()) {
+        return false
+    }
+    return marker != '_' || next?.isLetterOrDigit() != true
+}
+
+private fun AnnotatedString.Builder.appendStyledMarkdown(text: String, style: SpanStyle) {
+    val start = length
+    append(text)
+    addStyle(style, start, length)
 }
 
 internal fun readerProgressPercent(lastVisibleItemIndex: Int, paragraphCount: Int): Int {

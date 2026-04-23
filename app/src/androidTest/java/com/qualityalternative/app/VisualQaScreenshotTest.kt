@@ -236,6 +236,22 @@ class VisualQaScreenshotTest {
         }
         captureSprint10("07_progress_streak_light")
 
+        seedUserMarkdownSelection()
+        launchFixtureSystemIntervention()
+        composeRule.onNodeWithText("Imported Markdown Notes").assertIsDisplayed()
+        captureSprint10("07b_intervention_markdown_light")
+        composeRule.onNodeWithText("Read this", substring = true).performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
+        composeRule.onNodeWithText("Imported Markdown Heading").assertIsDisplayed()
+        composeRule.onNodeWithText("First item with bold text", substring = true).assertIsDisplayed()
+        assertTrue("Raw bold markers should not be visible", !hasNodeContaining("**bold**"))
+        assertTrue("Raw heading marker should not be visible", !hasNodeContaining("# Imported Markdown Heading"))
+        captureSprint10("07c_reader_markdown_formatting_light")
+        scenario?.close()
+        scenario = null
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+        launchOnboardedApp()
+
         openTab("tab-settings", "settings-list")
         composeRule.onNodeWithTag("settings-list")
             .performScrollToNode(hasTestTag("meditation-duration-5"))
@@ -571,6 +587,51 @@ class VisualQaScreenshotTest {
                 selectedAppPackages = setOf(FixtureTargetRegistry.fixtureDistractors.first().packageName),
                 preferredTopics = setOf(TopicTag.HISTORY, TopicTag.ESSAYS),
                 preferredDurationBucket = DurationBucket.DEEP,
+                selectedPackIds = emptySet(),
+            ),
+        )
+    }
+
+    private fun seedUserMarkdownSelection(
+        title: String = "Imported Markdown Notes",
+        fileName: String = "imported-notes.md",
+        nowMillis: Long = 1_500L,
+    ) = runBlocking {
+        val targetContext = InstrumentationRegistry.getInstrumentation().targetContext
+        val app = targetContext.applicationContext as QualityAlternativeApplication
+        val fixture = File(targetContext.filesDir, "visual-qa-fixtures/$fileName")
+        fixture.parentFile?.mkdirs()
+        fixture.writeText(
+            """
+            # Imported Markdown Heading
+
+            This paragraph has **bold** text, _italic_ emphasis, and `inline code` in one calm reader block.
+
+            - First item with **bold** text
+            - Second item with _italic_ text
+
+            > A quoted line should look quieter than the body text.
+            """.trimIndent(),
+        )
+
+        app.appContainer.userDocumentRepository.observeReady().first { it }
+        val result = app.appContainer.userDocumentRepository.addDocument(
+            draft = UserDocumentDraft(
+                uri = Uri.fromFile(fixture).toString(),
+                displayName = fileName,
+                mimeType = "text/markdown",
+                title = title,
+                durationMinutes = 8,
+                topicTags = setOf(TopicTag.ESSAYS, TopicTag.PSYCHOLOGY),
+            ),
+            nowMillis = nowMillis,
+        )
+        assertTrue("Expected Markdown fixture to be saved", result is AddUserDocumentResult.Added)
+        app.appContainer.settingsRepository.saveOnboardingSelection(
+            OnboardingSelection(
+                selectedAppPackages = setOf(FixtureTargetRegistry.fixtureDistractors.first().packageName),
+                preferredTopics = setOf(TopicTag.ESSAYS, TopicTag.PSYCHOLOGY),
+                preferredDurationBucket = DurationBucket.FOCUS,
                 selectedPackIds = emptySet(),
             ),
         )

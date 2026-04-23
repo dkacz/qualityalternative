@@ -1,5 +1,7 @@
 package com.qualityalternative.app.ui
 
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
 import com.qualityalternative.app.domain.model.AnalyticsEvent
 import com.qualityalternative.app.domain.model.AnalyticsEventType
 import com.qualityalternative.app.domain.model.RecommendationSource
@@ -8,6 +10,7 @@ import com.qualityalternative.app.domain.model.TopicTag
 import java.time.LocalDate
 import java.time.ZoneOffset
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ProgressSnapshotTest {
@@ -228,6 +231,51 @@ class ProgressSnapshotTest {
     }
 
     @Test
+    fun readerBlocksForDisplayPreservesBasicMarkdownFormatting() {
+        val blocks = readerBlocksForDisplay(
+            body = """
+                # Saved **Heading**
+
+                - First **bold** item
+                - Second _italic_ item
+
+                > A quoted line
+
+                Use `inline code` before scrolling.
+            """.trimIndent(),
+            fallback = "Fallback.",
+        )
+
+        assertEquals(4, blocks.size)
+        assertEquals(ReaderMarkdownBlockKind.HEADING, blocks[0].kind)
+        assertEquals("Saved Heading", blocks[0].text.text)
+        assertTrue(blocks[0].text.hasSpan { span -> span.fontWeight == FontWeight.SemiBold })
+        assertEquals(ReaderMarkdownBlockKind.LIST, blocks[1].kind)
+        assertEquals("• First bold item\n• Second italic item", blocks[1].text.text)
+        assertTrue(blocks[1].text.hasSpan { span -> span.fontWeight == FontWeight.SemiBold })
+        assertTrue(blocks[1].text.hasSpan { span -> span.fontStyle == FontStyle.Italic })
+        assertEquals(ReaderMarkdownBlockKind.QUOTE, blocks[2].kind)
+        assertEquals("A quoted line", blocks[2].text.text)
+        assertEquals(ReaderMarkdownBlockKind.BODY, blocks[3].kind)
+        assertEquals("Use inline code before scrolling.", blocks[3].text.text)
+    }
+
+    @Test
+    fun readerBlocksForDisplayDoesNotTreatIntrawordUnderscoresAsItalic() {
+        val blocks = readerBlocksForDisplay(
+            body = "Keep imported_notes_v1.md readable while _intentional emphasis_ still works.",
+            fallback = "Fallback.",
+        )
+
+        assertEquals(1, blocks.size)
+        assertEquals(
+            "Keep imported_notes_v1.md readable while intentional emphasis still works.",
+            blocks[0].text.text,
+        )
+        assertEquals(1, blocks[0].text.spanStyles.count { range -> range.item.fontStyle == FontStyle.Italic })
+    }
+
+    @Test
     fun readerProgressPercentTracksVisibleParagraphsInsteadOfElapsedTime() {
         assertEquals(0, readerProgressPercent(lastVisibleItemIndex = 0, paragraphCount = 10))
         assertEquals(30, readerProgressPercent(lastVisibleItemIndex = 3, paragraphCount = 10))
@@ -276,4 +324,10 @@ class ProgressSnapshotTest {
     private fun LocalDate.toMillis(): Long {
         return atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
     }
+}
+
+private fun androidx.compose.ui.text.AnnotatedString.hasSpan(
+    predicate: (androidx.compose.ui.text.SpanStyle) -> Boolean,
+): Boolean {
+    return spanStyles.any { range -> predicate(range.item) }
 }
