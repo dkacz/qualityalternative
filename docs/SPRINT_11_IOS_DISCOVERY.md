@@ -43,6 +43,8 @@ Validation:
 
 ### Slice 11.2: UX and Flow Feasibility
 
+Status: `implemented_pending_pro_review`
+
 Deliverables:
 
 - Compare possible iOS flows against Android alpha behavior:
