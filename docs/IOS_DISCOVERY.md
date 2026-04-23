@@ -658,14 +658,13 @@ Choose `build_lightweight_ios_spike` instead if:
 - testers are available on iOS but not willing to grant Screen Time-style permissions,
 - or entitlement readiness blocks a full spike but the team still wants limited iOS UX feedback.
 
-Keep iOS deferred after Android pilot if:
+Keep iOS deferred if any Android core-thesis condition is negative:
 
 - Android replacement acceptance is below the pilot threshold,
 - users do not complete meaningful replacement sessions,
-- content quality remains the dominant bottleneck,
-- or iOS demand from testers is weak.
+- or content quality remains the dominant bottleneck.
 
-Reopen iOS after Android pilot only if all core-thesis conditions are positive:
+If all Android core-thesis conditions are positive, keep iOS deferred unless either strong iOS tester demand exists or the team records a deliberate entitlement-readiness decision:
 
 - Android replacement acceptance meets or exceeds pilot thresholds,
 - users complete meaningful replacement sessions repeatedly,

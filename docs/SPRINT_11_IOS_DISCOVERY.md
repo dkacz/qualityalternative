@@ -69,7 +69,7 @@ Deliverables:
 - Define two prototype tracks plus one defer option:
   - `full_ios_spike`: native SwiftUI app using Screen Time stack, assuming entitlement path is plausible.
   - `lightweight_ios_spike`: Shortcuts/App Intents assisted test for replacement-session acceptance, content/session feel, and voluntary entry points only; this does not validate system-level interruption.
-  - `defer_ios_until_android_pilot`: no iOS prototype now; revisit after Android pilot signal, strong iOS tester demand, or a deliberate entitlement-readiness decision.
+  - `defer_ios_until_android_pilot`: no iOS prototype now; revisit only after positive Android pilot core-thesis signal plus either strong iOS tester demand or a deliberate entitlement-readiness decision.
 - Estimate implementation complexity, testing needs, policy risk, and expected learning value.
 
 Validation:
