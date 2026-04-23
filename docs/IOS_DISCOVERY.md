@@ -9,7 +9,7 @@ This document records Sprint 11 discovery for whether Quality Alternative should
 
 - [x] Slice 11.1: Platform capability research.
 - [x] Slice 11.2: UX and flow feasibility.
-- [ ] Slice 11.3: Prototype options and cost.
+- [x] Slice 11.3: Prototype options and cost.
 - [ ] Slice 11.4: Final decision memo.
 
 ## Slice 11.1 Sources Checked
@@ -369,3 +369,193 @@ If those APIs are unavailable or cannot pass usable session context, the fallbac
 - deferring iOS until Android pilot signal justifies the platform effort.
 
 Slice 11.3 should therefore estimate two tracks: a full Screen Time spike that explicitly tests Flow A/B, and a lightweight App Intents spike that is clearly labeled as non-validation for system interruption.
+
+## Slice 11.3 Prototype Options and Cost
+
+Status: `implemented_pending_pro_review`
+
+Goal: define concrete iOS prototype tracks, estimate cost/risk/learning value, and preserve the distinction between validating system interruption and validating replacement-session demand.
+
+### Track Comparison
+
+| Track | What it validates | What it does not validate | Complexity | Policy risk | Learning value |
+| --- | --- | --- | --- | --- | --- |
+| `full_ios_spike` | Whether Screen Time APIs can produce an acceptable shield-to-replacement loop for selected apps/sites. | It does not prove entitlement approval for production distribution until Apple grants the required capability. | `high` | `high` | `high` if the goal is cross-platform system product feasibility. |
+| `lightweight_ios_spike` | Whether iOS users accept the replacement session, reader/timer experience, and content proposition. | It does not validate selected-app interruption, shield routing, or Screen Time entitlement feasibility. | `low_to_medium` | `low` | `medium` for content/UX learning, low for system-interruption learning. |
+| `defer_ios_until_android_pilot` | Nothing new on iOS; protects Android pilot focus. | It does not answer entitlement or shield UX risk soon. | `low` | `low` | `medium` if Android pilot signal is the highest-leverage next evidence. |
+
+### Track A: `full_ios_spike`
+
+Purpose: answer the only question that can justify serious iOS implementation work now: can a Screen Time based iOS app create a Quality Alternative-style replacement loop without private APIs?
+
+Scope:
+
+- Minimal SwiftUI host app.
+- FamilyControls authorization request.
+- FamilyActivityPicker target selection.
+- App Group state shared between host app and Screen Time extensions.
+- ManagedSettingsStore shield rules for selected targets.
+- ManagedSettingsUI shield configuration with Quality Alternative copy.
+- ShieldActionDelegate handling for primary replacement, backup submenu if available, pause, and open-anyway state transitions.
+- Minimal replacement session screen in the host app; content can be placeholder local text or meditation, because this spike tests platform routing rather than content quality.
+
+3-5 day spike plan:
+
+| Day | Work | Exit evidence |
+| --- | --- | --- |
+| Day 1 | Create isolated iOS spike project outside the Android app, configure app group, FamilyControls capability, and Screen Time extension targets. | Project builds locally; entitlement/capability blockers are documented. |
+| Day 2 | Implement FamilyActivityPicker selection and persist selected tokens through App Group state. | Selected app/site/category tokens survive app restart and are visible to extensions. |
+| Day 3 | Apply ManagedSettings shields to selected targets and show a custom shield configuration. | Opening a selected target shows the Quality Alternative shield on a physical iOS device or simulator if supported. |
+| Day 4 | Test Flow A/B routing: `openParentalControlsApp`, primary replacement state handoff, submenu backup callbacks where available. | Evidence table for parent-app launch, session-context handoff, submenu support, and deployment target constraints. |
+| Day 5 | Test pause/open-anyway state transitions and record spike decision. | Evidence table for temporary unshielding, repeated attempts, timer expiry, cleanup, and whether Flow A/B is viable. |
+
+Testing needs:
+
+- Xcode local build and install.
+- Apple Developer team with the relevant capability available for development testing.
+- Physical iOS device preferred; Screen Time and shield behavior may be misleading or unavailable in simulator.
+- Manual scenario notes plus screenshots/video for: selection, shield display, primary routing, backup routing, pause, open-anyway, repeated attempt, and state cleanup.
+- No production analytics needed; a simple local debug event log is enough for the spike.
+
+Policy and entitlement risk:
+
+- High. Family Controls distribution approval is external and may depend on Apple's interpretation of the product category.
+- The product should be framed as user-authorized self-control and digital wellbeing, not parental surveillance and not punitive blocking.
+- `openParentalControlsApp` and submenu surfaces may be beta/current APIs with deployment-target constraints. Even if technically present, App Review acceptance remains unproven.
+- The spike must not use private APIs or unsupported URL-scheme workarounds to simulate success.
+
+Expected learning value:
+
+- High if successful: it proves that the iOS product can preserve the moment-of-impulse replacement thesis.
+- High even if unsuccessful: it can justify deferring iOS before large platform investment.
+- The decisive output is a go/no-go matrix for Flow A/B, not a polished iOS app.
+
+Explicit non-goals:
+
+- No production iOS app.
+- No App Store/TestFlight release.
+- No full Android feature parity.
+- No native PDF/EPUB reader on iOS.
+- No cross-platform rewrite.
+- No cloud sync or account system.
+- No premium packaging.
+- No attempt to bypass entitlement, App Review, or Screen Time constraints.
+
+Acceptance criteria:
+
+- The spike can show selected target shielding through public APIs, or document exactly why it cannot.
+- The spike can prove or falsify parent-app routing into a specific replacement session.
+- The spike can prove or falsify backup submenu action handling.
+- The spike can prove or falsify pause/open-anyway state transitions without treating `.close` as continuation or `.defer` as timer control.
+- The final spike report recommends either `build_ios_mvp_slice`, `lightweight_ios_only`, or `defer_ios`.
+
+### Track B: `lightweight_ios_spike`
+
+Purpose: test whether the replacement experience itself works for iOS users when system-level interruption is intentionally out of scope.
+
+Scope:
+
+- Minimal SwiftUI host app.
+- One replacement session screen that can show a short renderable text item and a meditation timer.
+- App Intent such as "Start a replacement session" or "Start a 3 minute alternative."
+- Optional Shortcuts setup notes for testers.
+- Local event log for session started, session duration, timer complete, and feedback.
+
+3-5 day spike plan:
+
+| Day | Work | Exit evidence |
+| --- | --- | --- |
+| Day 1 | Create isolated SwiftUI app with one replacement home/session screen. | App runs locally and starts a replacement session. |
+| Day 2 | Add one renderable reading and one meditation timer, using the Android content/utility concepts but not shared code. | User can complete a short reading or timer session. |
+| Day 3 | Add App Intent / Shortcut entry point for "Start replacement." | User can start the session from Shortcuts/Siri/Spotlight where supported. |
+| Day 4 | Add lightweight feedback and local debug event log. | Session duration and feedback are recorded locally. |
+| Day 5 | Run 2-3 manual tester-style scenarios and summarize whether iOS presentation/content feels worth pursuing. | Report distinguishes content/session signal from missing interruption signal. |
+
+Testing needs:
+
+- Xcode local build and install.
+- iPhone or simulator is acceptable because this track does not test Screen Time shields.
+- Manual scenarios for home launch, App Intent launch, reading session, meditation session, feedback, and session duration.
+- No Family Controls entitlement required.
+
+Policy and entitlement risk:
+
+- Low. This track avoids Screen Time entitlements and shield behavior.
+- The main risk is product misinterpretation: a successful lightweight prototype must not be presented as proof that iOS system interruption works.
+
+Expected learning value:
+
+- Medium for iOS replacement-session design, reading/timer feel, and content acceptance.
+- Low for system product feasibility.
+- Useful if the team wants iOS tester feedback while deferring the entitlement-heavy path.
+
+Explicit non-goals:
+
+- No selected-app detection.
+- No Screen Time API, FamilyControls, DeviceActivity, ManagedSettings, or shield UI.
+- No claim of interruption or blocking.
+- No App Store/TestFlight release unless explicitly decided later.
+- No cross-platform architecture work.
+- No shared backend or sync.
+
+Acceptance criteria:
+
+- User can start a replacement session from the app and from an App Intent/Shortcut.
+- User can complete a reading or meditation session.
+- The report clearly labels this as a content/session prototype, not an iOS system-interruption prototype.
+- The report recommends whether this track provides enough value to run before, after, or instead of the full Screen Time spike.
+
+### Track C: `defer_ios_until_android_pilot`
+
+Purpose: protect execution focus if the iOS spike cost is not justified before Android pilot signal.
+
+Scope:
+
+- No iOS project.
+- Preserve docs and entitlement notes.
+- Continue Android pilot readiness, replacement-quality work, and tester analytics.
+- Revisit iOS after pilot evidence shows repeated replacement acceptance or explicit iOS demand.
+
+3-5 day alternative plan:
+
+| Day | Work | Exit evidence |
+| --- | --- | --- |
+| Day 1 | Define Android pilot questions that decide whether iOS is worth pulling forward. | Pilot decision checklist. |
+| Day 2 | Package tester instructions and feedback prompts around replacement acceptance and content quality. | Updated pilot materials. |
+| Day 3 | Verify Android APK install/test path and local analytics export. | Pilot readiness checklist. |
+| Day 4 | Recruit or identify first pilot testers and record platform demand. | Tester list with Android/iOS availability. |
+| Day 5 | Decide whether iOS remains deferred or needs a spike due to strong signal. | Updated roadmap note. |
+
+Testing needs:
+
+- Android-only validation, already covered by the existing pilot/release process.
+- No iOS technical testing.
+
+Policy and entitlement risk:
+
+- Low now, but the risk remains unresolved.
+- Deferral is appropriate only if Android pilot evidence is more valuable than early iOS platform learning.
+
+Expected learning value:
+
+- High for the core product thesis.
+- Low for iOS technical feasibility.
+
+Explicit non-goals:
+
+- No iOS implementation.
+- No entitlement request.
+- No Screen Time API spike.
+- No Shortcuts prototype.
+
+### Slice 11.3 Recommendation
+
+The next actual build should not be a lightweight iOS app unless the team explicitly wants content/session feedback without testing interruption. For deciding whether iOS can become a real Quality Alternative product, `full_ios_spike` is the only prototype with decisive learning value.
+
+However, `full_ios_spike` should start only if the team accepts three costs upfront:
+
+- It may require Apple capability access before the spike can fully run.
+- It may prove that iOS routing is too constrained for a replacement-first product.
+- It will consume platform effort before Android pilot data is complete.
+
+If the next strategic question is "can iOS technically support the product thesis?", choose `full_ios_spike`. If the next question is "do users like replacement sessions on iOS?", choose `lightweight_ios_spike`. If the next question is "does the product work at all in the wild?", defer iOS until Android pilot signal.

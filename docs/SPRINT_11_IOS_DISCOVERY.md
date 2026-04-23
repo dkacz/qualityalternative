@@ -62,6 +62,8 @@ Validation:
 
 ### Slice 11.3: Prototype Options and Cost
 
+Status: `implemented_pending_pro_review`
+
 Deliverables:
 
 - Define two possible prototype tracks:
