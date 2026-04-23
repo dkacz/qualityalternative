@@ -515,7 +515,7 @@ Scope:
 - No iOS project.
 - Preserve docs and entitlement notes.
 - Continue Android pilot readiness, replacement-quality work, and tester analytics.
-- Revisit iOS after pilot evidence shows repeated replacement acceptance or explicit iOS demand.
+- Revisit iOS only after positive Android pilot signal plus either strong iOS tester demand or a deliberate entitlement-readiness decision.
 
 3-5 day alternative plan:
 
@@ -553,7 +553,7 @@ Acceptance criteria:
 
 - Android pilot questions are named and tied to measurable decision signals such as replacement acceptance, sessions over 3 minutes, return-to-target behavior, and explicit iOS demand from testers.
 - iOS platform risk remains explicitly unresolved; deferral must not be recorded as evidence that entitlement, shield routing, App Review, or Screen Time feasibility is safe.
-- Slice 11.4 states when iOS will be revisited, for example after Android pilot thresholds, strong iOS tester demand, or a deliberate entitlement-readiness decision.
+- Slice 11.4 states that iOS will be revisited only after positive Android pilot signal plus either strong iOS tester demand or a deliberate entitlement-readiness decision.
 - The roadmap records that no Screen Time, entitlement, shield-routing, submenu, pause/open-anyway, or App Review feasibility was validated by deferral.
 
 ### Slice 11.3 Recommendation
@@ -665,12 +665,12 @@ Keep iOS deferred after Android pilot if:
 - content quality remains the dominant bottleneck,
 - or iOS demand from testers is weak.
 
-Reopen iOS after Android pilot if:
+Reopen iOS after Android pilot only if all core-thesis conditions are positive:
 
 - Android replacement acceptance meets or exceeds pilot thresholds,
 - users complete meaningful replacement sessions repeatedly,
 - content quality is no longer the dominant bottleneck,
-- or testers show strong iOS demand.
+- and either testers show strong iOS demand or the team makes a deliberate entitlement-readiness decision.
 
 ### Final Sprint 11 Position
 
