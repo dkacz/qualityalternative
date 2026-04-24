@@ -5,11 +5,13 @@ Branch: `codex/sprint13-ios-simulator-release`
 
 ## Goal
 
-Turn the Pro-reviewed Sprint 12 simulator implementation into a signed iOS release candidate, then validate the actual Screen Time, DeviceActivity, ManagedSettings shield, and extension behavior on a physical iPhone.
+Turn the Pro-reviewed Sprint 12 simulator implementation into a simulator-only release candidate that can be installed and launched in Xcode Simulator.
 
 This sprint must not claim release readiness until signed physical-device validation passes. Simulator success remains useful compile/state/visual evidence only.
 
 Current operator decision: physical-device validation is paused for now. The active deliverable is a simulator-only release candidate that can be installed and launched in Xcode Simulator. It is not installable on an iPhone and does not prove real Screen Time enforcement.
+
+Future physical-device goal: after Apple Developer signing, provisioning, Family Controls entitlement approval, and a physical iPhone are available, build a signed iOS release candidate and validate actual Screen Time, DeviceActivity, ManagedSettings shield, and extension behavior on-device.
 
 ## Slice 13.1: Signing and Device Release Preflight
 
@@ -130,9 +132,9 @@ Required evidence for PASS:
 - Logs proving whether DeviceActivity callbacks fired on-device.
 - Explicit PASS/FAIL table for every checklist item above.
 
-## Next Slice Gate
+## Future Physical-Device Gate
 
-Slice 13.2 can start only after the signing inputs are available. The expected first action is to set `DEVELOPMENT_TEAM` for all four iOS targets, build a signed Release archive, install it on a physical iPhone, and execute the physical-device checklist.
+The original physical-device gate is deferred by operator decision. A future signed-device slice can start only after signing inputs are available. The expected first action for that future slice is to set `DEVELOPMENT_TEAM` for all four iOS targets, build a signed Release archive, install it on a physical iPhone, and execute the physical-device checklist.
 
 ## Slice 13.2: Simulator Release Candidate
 
@@ -155,6 +157,7 @@ Validation completed on 2026-04-24:
 - Simulator install on booted `QA iPhone 16 Sprint12`: PASS
 - Simulator launch for bundle `com.qualityalternative.ios`: PASS
 - Packaged simulator artifact: `QUALITY_ALTERNATIVE_IOS_SIMULATOR_RC_20260424_173000.zip`
+- Packaging transcript: `output/ios_sprint13_simulator_rc_20260424_173000/package_simulator_artifact.log`
 - SHA-256: `output/ios_sprint13_simulator_rc_20260424_173000/QUALITY_ALTERNATIVE_IOS_SIMULATOR_RC_20260424_173000.sha256`
 - Environment log: `output/ios_sprint13_simulator_rc_20260424_173000/simulator_release_environment.log`
 - Build log: `output/ios_sprint13_simulator_rc_20260424_173000/xcodebuild_release_simulator.log`
@@ -174,7 +177,7 @@ Simulator install command:
 cd /Users/omare/Documents/qualityalternative-ios-sprint12 && unzip -q QUALITY_ALTERNATIVE_IOS_SIMULATOR_RC_20260424_173000.zip -d /tmp/qualityalternative-ios-simulator-rc && DEVELOPER_DIR=/Applications/Xcode-26.1.1.app/Contents/Developer xcrun simctl install booted /tmp/qualityalternative-ios-simulator-rc/QualityAlternative.app && DEVELOPER_DIR=/Applications/Xcode-26.1.1.app/Contents/Developer xcrun simctl launch booted com.qualityalternative.ios
 ```
 
-## GPT Pro Review
+## Superseded Physical-Device Preflight Review
 
 - Lane: `https://chatgpt.com/c/69eb8aa8-43fc-8388-bd58-7dbe92b6f267`
 - Status: superseded for now by simulator-only scope change
@@ -185,7 +188,8 @@ cd /Users/omare/Documents/qualityalternative-ios-sprint12 && unzip -q QUALITY_AL
 ## GPT Pro Simulator RC Review
 
 - Lane: `https://chatgpt.com/c/69eb8c39-78e4-8384-ba30-3d8a776064aa`
-- Status: pending
+- Harvested verdict: `REVISE`
+- Status: addressed by documentation and package-provenance fixes
 - Prompt: `PRO_REVIEW_PROMPT_20260424_172800.md`
 - Bundle: `QUALITY_ALTERNATIVE_IOS_REVIEW_BUNDLE_20260424_172800.zip`
-- Expected harvest path: `PRO_REVIEW_OUTPUT_20260424_172800/`
+- Harvest path: `PRO_REVIEW_OUTPUT_20260424_172800/`
