@@ -571,4 +571,39 @@ final class QualityAlternativeDesignTests: XCTestCase {
         XCTAssertTrue(modes.contains(.externalHandoff))
         XCTAssertTrue(modes.contains(.meditationTimer))
     }
+
+    func testAndroidEditorialCatalogParityLoadsBundledStarterPacks() {
+        let editorialItems = QASampleData.editorialLibrary
+
+        XCTAssertEqual(QASampleData.packs.count, 5)
+        XCTAssertEqual(editorialItems.count, 45)
+        XCTAssertEqual(editorialItems.filter { $0.renderMode == .inAppReader }.count, 25)
+        XCTAssertEqual(editorialItems.filter { $0.renderMode == .externalHandoff }.count, 20)
+        XCTAssertEqual(editorialItems.filter { $0.rightsClass == .renderable }.count, 25)
+        XCTAssertEqual(editorialItems.filter { $0.rightsClass == .linkOnly }.count, 20)
+        XCTAssertEqual(Set(editorialItems.map(\.sourceType)), [.editorial])
+    }
+
+    func testEditorialReaderBodyLoadsMarkdownAsset() {
+        let item = QASampleData.editorialLibrary.first { $0.bodyAssetPath != nil }
+        let body = item.map(QASampleData.body(for:)) ?? ""
+
+        XCTAssertNotNil(item)
+        XCTAssertGreaterThan(body.count, item?.description.count ?? 0)
+        XCTAssertTrue(body.contains("\n\n"))
+        XCTAssertFalse(body.contains(item?.description ?? ""))
+    }
+
+    func testContentPriorityChangesReplacementPrimaryWithoutGrowingTheChoiceSet() {
+        let myFiles = QASampleData.replacementSession(meditationMinutes: 10, priority: .myFiles)
+        let savedLinks = QASampleData.replacementSession(meditationMinutes: 10, priority: .savedLinks)
+        let meditation = QASampleData.replacementSession(meditationMinutes: 10, priority: .meditation)
+
+        XCTAssertEqual(myFiles.primary.id, QASampleData.epubDocumentItem.id)
+        XCTAssertEqual(savedLinks.primary.id, QASampleData.userLinkItem.id)
+        XCTAssertEqual(meditation.primary.id, "meditation-10m")
+        XCTAssertEqual(myFiles.backups.count, 2)
+        XCTAssertEqual(savedLinks.backups.count, 2)
+        XCTAssertEqual(meditation.backups.count, 2)
+    }
 }

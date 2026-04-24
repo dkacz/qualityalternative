@@ -5,7 +5,26 @@ struct HomeScreen: View {
     @Environment(\.qaTokens) private var tokens
     let progress: QAProgressSnapshot
     let session: QAReplacementSession
+    let editorialPacks: [QAEditorialPack]
+    let userLinks: [QAContentItem]
+    let userDocuments: [QAContentItem]
+    let meditation: QAContentItem
     let onStartIntervention: () -> Void
+    let onAddLink: () -> Void
+    let onImportDocument: () -> Void
+    let onStartDelayAlternative: () -> Void
+
+    private var editorialItems: [QAContentItem] {
+        editorialPacks.flatMap(\.items)
+    }
+
+    private var totalItems: Int {
+        editorialItems.count + userLinks.count + userDocuments.count + 1
+    }
+
+    private var totalMinutes: Int {
+        (editorialItems + userLinks + userDocuments + [meditation]).reduce(0) { $0 + $1.durationMinutes }
+    }
 
     var body: some View {
         QAScreen(accessibilityIdentifier: "home-screen") {
@@ -37,6 +56,47 @@ struct HomeScreen: View {
                         MetricCard(label: "Done", value: "\(progress.replacementsCompleted)")
                         MetricCard(label: "Recovered", value: "\(progress.minutesRecovered)m")
                     }
+
+                    QACard {
+                        VStack(alignment: .leading, spacing: 14) {
+                            SettingsSectionTitle("Your library")
+                            LibrarySummaryLine(title: "Editorial picks", value: "\(editorialItems.count) curated")
+                            LibrarySummaryLine(title: "Your added links", value: "\(userLinks.count) saved")
+                            LibrarySummaryLine(title: "Your files", value: "\(userDocuments.count) saved")
+                            LibrarySummaryLine(title: "Utility reset", value: meditation.duration)
+                            Text("\(totalItems) items · \(totalMinutes) min available in simulator parity mode")
+                                .font(.qaBody(12))
+                                .foregroundStyle(tokens.colors.mutedText)
+                        }
+                    }
+
+                    QAButton(
+                        title: "Add a link",
+                        style: .secondary,
+                        accessibilityIdentifier: "home-add-link",
+                        action: onAddLink
+                    )
+                    QAButton(
+                        title: "Import PDF / MD / EPUB",
+                        style: .quiet,
+                        accessibilityIdentifier: "home-import-document",
+                        action: onImportDocument
+                    )
+
+                    QACard {
+                        VStack(alignment: .leading, spacing: 12) {
+                            SettingsSectionTitle("Active delay")
+                            Text("A simulator-only delay card mirrors Android's active pause state without claiming real iOS target-app reopening.")
+                                .font(.qaBody(14))
+                                .foregroundStyle(tokens.colors.mutedText)
+                            QAButton(
+                                title: "Read current alternative",
+                                style: .secondary,
+                                accessibilityIdentifier: "active-delay-alternative",
+                                action: onStartDelayAlternative
+                            )
+                        }
+                    }
                 }
                 .padding(20)
             }
@@ -46,20 +106,157 @@ struct HomeScreen: View {
 
 struct LibraryScreen: View {
     @Environment(\.qaTokens) private var tokens
-    let items: [QAContentItem]
+    let packs: [QAEditorialPack]
+    let userLinks: [QAContentItem]
+    let userDocuments: [QAContentItem]
+    let meditation: QAContentItem
+    let onAddLink: () -> Void
+    let onImportDocument: () -> Void
+    let onOpen: (QAContentItem) -> Void
+    @State private var filter: Filter = .all
+
+    enum Filter: String, CaseIterable {
+        case all
+        case editorial
+        case yours
+        case files
+
+        var label: String {
+            switch self {
+            case .all:
+                "All"
+            case .editorial:
+                "Editorial"
+            case .yours:
+                "Your links"
+            case .files:
+                "Files"
+            }
+        }
+    }
+
+    private var editorialItems: [QAContentItem] {
+        packs.flatMap(\.items)
+    }
+
+    private var filteredItems: [QAContentItem] {
+        switch filter {
+        case .all:
+            editorialItems + userLinks + userDocuments + [meditation]
+        case .editorial:
+            editorialItems
+        case .yours:
+            userLinks
+        case .files:
+            userDocuments
+        }
+    }
 
     var body: some View {
         QAScreen(accessibilityIdentifier: "library-screen") {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    HeaderBlock(
-                        eyebrow: "LIBRARY",
-                        title: "Finite replacements, not a feed.",
-                        subtitle: "Renderable readings, link-only handoffs, and utility replacements share one editorial surface."
-                    )
-                    ForEach(items) { item in
-                        ContentRow(item: item)
+                    HStack(alignment: .firstTextBaseline) {
+                        HeaderBlock(
+                            eyebrow: "LIBRARY",
+                            title: "Finite replacements.",
+                            subtitle: "\(editorialItems.count) Android editorial items plus simulator saved links, files, and utility reset."
+                        )
+                        Spacer(minLength: 10)
+                        QAButton(title: "Add", style: .secondary, accessibilityIdentifier: "library-add-link", action: onAddLink)
+                            .frame(width: 88)
                     }
+                    QAButton(
+                        title: "Import PDF / MD / EPUB",
+                        style: .quiet,
+                        accessibilityIdentifier: "library-import-document",
+                        action: onImportDocument
+                    )
+                    HStack(spacing: 8) {
+                        ForEach(Filter.allCases, id: \.self) { option in
+                            FilterChip(title: option.label, isSelected: filter == option) {
+                                filter = option
+                            }
+                        }
+                    }
+                    .accessibilityIdentifier("library-filter-row")
+
+                    if filter == .editorial {
+                        ForEach(packs) { pack in
+                            PackHeader(pack: pack)
+                            ForEach(pack.items) { item in
+                                ContentRow(item: item, onOpen: { onOpen(item) })
+                            }
+                        }
+                    } else {
+                        ForEach(filteredItems) { item in
+                            ContentRow(item: item, onOpen: { onOpen(item) })
+                        }
+                    }
+                }
+                .padding(20)
+            }
+        }
+    }
+}
+
+struct AddLinkScreen: View {
+    let onCancel: () -> Void
+    let onImportDocument: () -> Void
+
+    var body: some View {
+        QAScreen(accessibilityIdentifier: "add-link-screen") {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    HeaderBlock(
+                        eyebrow: "SAVED LINK",
+                        title: "Add to your quality alternative.",
+                        subtitle: "Simulator parity shows Android's saved-link flow without scraping, caching, summarizing, or rehosting the link."
+                    )
+                    QAFormField(label: "Link", value: "https://example.com/quality-alternative-saved-link")
+                    QAFormField(label: "Title", value: "A Saved Link for Later")
+                    DurationChipRow(label: "Estimated read", values: [3, 5, 8, 12, 20], selected: 8, onSelect: { _ in })
+                    TopicChipRow(label: "Topic", selected: ["PSYCHOLOGY", "TECH"])
+                    QAButton(title: "Add to library", style: .primary, accessibilityIdentifier: "add-link-save", action: onCancel)
+                    QAButton(title: "Import PDF / MD / EPUB instead", style: .quiet, accessibilityIdentifier: "add-link-import-document", action: onImportDocument)
+                    QAButton(title: "Cancel", style: .quiet, action: onCancel)
+                }
+                .padding(20)
+            }
+        }
+    }
+}
+
+struct AddDocumentScreen: View {
+    @Environment(\.qaTokens) private var tokens
+    let onCancel: () -> Void
+
+    var body: some View {
+        QAScreen(accessibilityIdentifier: "add-document-screen") {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    HeaderBlock(
+                        eyebrow: "PRIVATE FILE",
+                        title: "Add a private reading file.",
+                        subtitle: "Markdown and EPUB use the calm in-app reader. PDF remains an external handoff, matching Android scope."
+                    )
+                    QACard {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("EPUB fixture")
+                                .font(.qaMono(12))
+                                .foregroundStyle(tokens.colors.faintText)
+                            Text("private-book.epub")
+                                .font(.qaDisplay(24, weight: .medium))
+                            Text("File stays on this device. Simulator parity uses local fixtures, not a production file picker.")
+                                .font(.qaBody(13))
+                                .foregroundStyle(tokens.colors.mutedText)
+                        }
+                    }
+                    QAFormField(label: "Title", value: "Private EPUB Extract")
+                    DurationChipRow(label: "Estimated session", values: [5, 10, 15, 20, 30], selected: 20, onSelect: { _ in })
+                    TopicChipRow(label: "Topic", selected: ["PHILOSOPHY", "ESSAYS"])
+                    QAButton(title: "Add file to library", style: .primary, accessibilityIdentifier: "add-document-save", action: onCancel)
+                    QAButton(title: "Cancel", style: .quiet, action: onCancel)
                 }
                 .padding(20)
             }
@@ -70,9 +267,10 @@ struct LibraryScreen: View {
 struct InterventionScreen: View {
     @Environment(\.qaTokens) private var tokens
     let session: QAReplacementSession
-    let onReadPrimary: () -> Void
-    let onOpenLink: () -> Void
-    let onMeditate: () -> Void
+    let meditationDurationMinutes: Int
+    let onAcceptPrimary: () -> Void
+    let onAcceptBackup: (QAContentItem) -> Void
+    let onSelectMeditationDuration: (Int) -> Void
     let onPause: () -> Void
     let onContinue: () -> Void
 
@@ -81,15 +279,15 @@ struct InterventionScreen: View {
             VStack(alignment: .leading, spacing: 18) {
                 HeaderBlock(
                     eyebrow: "PROTECTED SELECTION",
-                    title: "Try this first.",
-                    subtitle: "Same product shape as Android: one primary suggestion and two backups, adapted to iOS constraints."
+                    title: "A brief detour, if you'd like one.",
+                    subtitle: "One primary replacement, two backups, pause, and intentional continuation. iOS keeps the surface native and token-safe."
                 )
 
                 QACard {
                     VStack(alignment: .leading, spacing: 14) {
                         HStack {
                             QATag(text: session.primary.duration)
-                            QATag(text: "Reader")
+                            QATag(text: renderModeLabel(session.primary))
                         }
                         Text(session.primary.title)
                             .font(.qaDisplay(30, weight: .medium))
@@ -97,17 +295,34 @@ struct InterventionScreen: View {
                         Text(session.primary.whyThisNow)
                             .font(.qaBody(16))
                             .foregroundStyle(tokens.colors.mutedText)
-                        QAButton(title: "Read this", style: .primary, action: onReadPrimary)
+                        QAButton(
+                            title: primaryActionLabel(session.primary),
+                            style: .primary,
+                            accessibilityIdentifier: "primary-replacement-action",
+                            action: onAcceptPrimary
+                        )
                     }
                 }
 
                 VStack(spacing: 10) {
-                    ForEach(session.backups) { backup in
+                    if session.primary.renderMode == .meditationTimer {
+                        DurationChipRow(
+                            label: "Meditation length",
+                            values: [3, 5, 10, 15],
+                            selected: meditationDurationMinutes,
+                            onSelect: onSelectMeditationDuration
+                        )
+                    }
+                    Text("Other options")
+                        .font(.qaMono(12, weight: .medium))
+                        .foregroundStyle(tokens.colors.faintText)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    ForEach(Array(session.backups.enumerated()), id: \.element.id) { index, backup in
                         QAButton(
                             title: backupActionTitle(for: backup),
                             style: .secondary,
-                            accessibilityIdentifier: "backup-action-\(backup.id)",
-                            action: backupAction(for: backup)
+                            accessibilityIdentifier: "backup-action-\(index)",
+                            action: { onAcceptBackup(backup) }
                         )
                     }
                     QAButton(
@@ -131,23 +346,36 @@ struct InterventionScreen: View {
 
     private func backupActionTitle(for item: QAContentItem) -> String {
         switch item.renderMode {
-        case .inAppReader:
-            "Read backup - \(item.duration)"
+        case .inAppReader, .userPrivateReader:
+            "Read backup · \(item.duration)"
         case .externalHandoff:
-            "Open link-only backup - \(item.duration)"
+            item.sourceType == .userDocument ? "Open file · \(item.duration)" : "Open link · \(item.duration)"
         case .meditationTimer:
-            "Start meditation - \(item.duration)"
+            "Start meditation · \(item.duration)"
         }
     }
 
-    private func backupAction(for item: QAContentItem) -> () -> Void {
+    private func primaryActionLabel(_ item: QAContentItem) -> String {
+        switch item.renderMode {
+        case .inAppReader, .userPrivateReader:
+            "Read this · \(item.duration)"
+        case .externalHandoff:
+            item.sourceType == .userDocument ? "Open file · \(item.duration)" : "Open link · \(item.duration)"
+        case .meditationTimer:
+            "Start timer · \(item.duration)"
+        }
+    }
+
+    private func renderModeLabel(_ item: QAContentItem) -> String {
         switch item.renderMode {
         case .inAppReader:
-            onReadPrimary
+            "Reader"
+        case .userPrivateReader:
+            item.format == .epub ? "EPUB" : "Markdown"
         case .externalHandoff:
-            onOpenLink
+            item.format == .pdf ? "PDF handoff" : "Link-only"
         case .meditationTimer:
-            onMeditate
+            "Timer"
         }
     }
 }
@@ -155,14 +383,19 @@ struct InterventionScreen: View {
 struct ReaderScreen: View {
     @Environment(\.qaTokens) private var tokens
     let item: QAContentItem
+    let readerBody: String
     let onDone: () -> Void
+
+    private var blocks: [QAReaderBlock] {
+        QAReaderMarkdownParser.blocks(for: readerBody, fallback: item.description)
+    }
 
     var body: some View {
         QAScreen(accessibilityIdentifier: "reader-screen") {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     HeaderBlock(
-                        eyebrow: item.source.uppercased(),
+                        eyebrow: "\(item.source.uppercased()) · \(item.topicLine)",
                         title: item.title,
                         subtitle: item.description
                     )
@@ -170,13 +403,10 @@ struct ReaderScreen: View {
                         .tint(tokens.colors.accent)
                         .accessibilityIdentifier("reader-progress")
                     VStack(alignment: .leading, spacing: 14) {
-                        Text("I went to the woods because I wished to live deliberately, to front only the essential facts of life.")
-                        Text("The iOS reader will keep the same quiet surface as Android: generous margins, readable type, and visible progress for long documents.")
-                        Text("This slice proves the visual foundation before connecting real imported EPUB/Markdown state.")
+                        ForEach(blocks) { block in
+                            ReaderBlockView(block: block)
+                        }
                     }
-                    .font(.qaDisplay(21))
-                    .lineSpacing(5)
-                    .foregroundStyle(tokens.colors.primaryText)
                     QAButton(title: "I'm done reading", style: .primary, action: onDone)
                 }
                 .padding(20)
@@ -190,13 +420,19 @@ struct ExternalHandoffScreen: View {
     let item: QAContentItem
     let onDone: () -> Void
 
+    private var isFile: Bool {
+        item.sourceType == .userDocument
+    }
+
     var body: some View {
         QAScreen(accessibilityIdentifier: "handoff-screen") {
             VStack(alignment: .leading, spacing: 18) {
                 HeaderBlock(
-                    eyebrow: "EXTERNAL HANDOFF",
+                    eyebrow: isFile ? "PRIVATE FILE" : "EXTERNAL HANDOFF",
                     title: item.title,
-                    subtitle: "Modern third-party content stays external. We link out intentionally instead of scraping, caching, summarizing, or rehosting."
+                    subtitle: isFile
+                        ? "PDF stays an external document handoff. Markdown and EPUB use the reader."
+                        : "Modern third-party content stays external. We link out intentionally instead of scraping, caching, summarizing, or rehosting."
                 )
                 QACard {
                     VStack(alignment: .leading, spacing: 14) {
@@ -206,7 +442,15 @@ struct ExternalHandoffScreen: View {
                         Text(item.whyThisNow)
                             .font(.qaBody(16))
                             .foregroundStyle(tokens.colors.primaryText)
-                        QAButton(title: "Mark handoff complete", style: .primary, action: onDone)
+                        Text(item.externalURL ?? item.description)
+                            .font(.qaMono(12))
+                            .foregroundStyle(tokens.colors.faintText)
+                        QAButton(
+                            title: isFile ? "I've finished this file" : "I've finished this link",
+                            style: .primary,
+                            accessibilityIdentifier: "external-link-done",
+                            action: onDone
+                        )
                     }
                 }
                 Spacer()
@@ -219,6 +463,8 @@ struct ExternalHandoffScreen: View {
 struct MeditationTimerScreen: View {
     @Environment(\.qaTokens) private var tokens
     let item: QAContentItem
+    let meditationDurationMinutes: Int
+    let onSelectMeditationDuration: (Int) -> Void
     let onDone: () -> Void
 
     var body: some View {
@@ -227,7 +473,13 @@ struct MeditationTimerScreen: View {
                 HeaderBlock(
                     eyebrow: "MEDITATION",
                     title: item.title,
-                    subtitle: "The default iOS replacement timer mirrors Android's utility replacement and will gain duration/gong controls in later slices."
+                    subtitle: "Put the phone down if you can. A simulator timer surface mirrors Android's adjustable utility replacement."
+                )
+                DurationChipRow(
+                    label: "Length for this reset",
+                    values: [3, 5, 10, 15],
+                    selected: meditationDurationMinutes,
+                    onSelect: onSelectMeditationDuration
                 )
                 Spacer()
                 ZStack {
@@ -238,7 +490,7 @@ struct MeditationTimerScreen: View {
                         .stroke(tokens.colors.accent, style: StrokeStyle(lineWidth: 14, lineCap: .round))
                         .rotationEffect(.degrees(-90))
                     VStack(spacing: 4) {
-                        Text("03:00")
+                        Text(String(format: "%02d:00", item.durationMinutes))
                             .font(.qaMono(42, weight: .medium))
                             .foregroundStyle(tokens.colors.primaryText)
                         Text("breathe")
@@ -249,6 +501,7 @@ struct MeditationTimerScreen: View {
                 .frame(width: 220, height: 220)
                 Spacer()
                 QAButton(title: "Complete reset", style: .primary, action: onDone)
+                QAButton(title: "End early", style: .quiet, accessibilityIdentifier: "meditation-skip", action: onDone)
             }
             .padding(20)
         }
@@ -277,6 +530,42 @@ struct ProgressScreen: View {
     }
 }
 
+struct FeedbackScreen: View {
+    @Environment(\.qaTokens) private var tokens
+    let item: QAContentItem
+    let onDone: () -> Void
+
+    var body: some View {
+        QAScreen(accessibilityIdentifier: "feedback-screen") {
+            VStack(alignment: .leading, spacing: 18) {
+                HeaderBlock(
+                    eyebrow: "FEEDBACK",
+                    title: "Did this help?",
+                    subtitle: "Simulator parity keeps Android's quick reflection after a finite replacement session."
+                )
+                QACard {
+                    VStack(alignment: .leading, spacing: 14) {
+                        Text(item.title)
+                            .font(.qaDisplay(24, weight: .medium))
+                            .foregroundStyle(tokens.colors.primaryText)
+                        Text("One tap is enough; analytics wiring is separate from this simulator-only parity pass.")
+                            .font(.qaBody(14))
+                            .foregroundStyle(tokens.colors.mutedText)
+                        HStack(spacing: 8) {
+                            QATag(text: "Helpful")
+                            QATag(text: "Too long")
+                            QATag(text: "Not now")
+                        }
+                    }
+                }
+                QAButton(title: "Save feedback", style: .primary, accessibilityIdentifier: "feedback-save", action: onDone)
+                Spacer()
+            }
+            .padding(20)
+        }
+    }
+}
+
 struct SettingsScreen: View {
     @Environment(\.qaTokens) private var tokens
     @Binding var themeMode: QAThemeMode
@@ -285,6 +574,8 @@ struct SettingsScreen: View {
     @Binding var protectedSelection: FamilyActivitySelection
     let shieldSession: QAShieldSessionState?
     let deviceActivitySchedule: QADeviceActivityScheduleState?
+    @Binding var meditationDurationMinutes: Int
+    @Binding var contentPriority: QAContentPriority
     let onRequestScreenTimeAuthorization: () -> Void
     let onApplyShieldRules: () -> Void
     let onPauseShieldRules: () -> Void
@@ -486,6 +777,43 @@ struct SettingsScreen: View {
 
                     QACard {
                         VStack(alignment: .leading, spacing: 12) {
+                            SettingsSectionTitle("Content priority")
+                            Text("Keep recommendations balanced, or gently prioritize one type.")
+                                .font(.qaBody(13))
+                                .foregroundStyle(tokens.colors.mutedText)
+                            FlowLayout(spacing: 8) {
+                                ForEach(QAContentPriority.allCases, id: \.self) { priority in
+                                    FilterChip(
+                                        title: priority.label,
+                                        isSelected: contentPriority == priority,
+                                        accessibilityIdentifier: "content-priority-\(priority.rawValue)"
+                                    ) {
+                                        contentPriority = priority
+                                    }
+                                }
+                            }
+                            Text(contentPriority.description)
+                                .font(.qaBody(12))
+                                .lineSpacing(2)
+                                .foregroundStyle(tokens.colors.mutedText)
+                        }
+                    }
+
+                    QACard {
+                        VStack(alignment: .leading, spacing: 12) {
+                            SettingsSectionTitle("Default session length")
+                            DurationChipRow(label: "Meditation reset", values: [3, 5, 10, 15], selected: meditationDurationMinutes) { minutes in
+                                meditationDurationMinutes = minutes
+                            }
+                            Text("This default is also adjustable immediately before starting a meditation replacement.")
+                                .font(.qaBody(12))
+                                .lineSpacing(2)
+                                .foregroundStyle(tokens.colors.mutedText)
+                        }
+                    }
+
+                    QACard {
+                        VStack(alignment: .leading, spacing: 12) {
                             SettingsSectionTitle("Theme")
                             HStack(spacing: 10) {
                                 QAButton(title: "Light", style: themeMode == .light ? .primary : .secondary) {
@@ -666,12 +994,195 @@ private struct StatusPill: View {
     }
 }
 
+private struct LibrarySummaryLine: View {
+    @Environment(\.qaTokens) private var tokens
+    let title: String
+    let value: String
+
+    var body: some View {
+        HStack {
+            Text(title)
+                .font(.qaBody(14, weight: .medium))
+                .foregroundStyle(tokens.colors.primaryText)
+            Spacer()
+            Text(value)
+                .font(.qaMono(12))
+                .foregroundStyle(tokens.colors.mutedText)
+        }
+    }
+}
+
+private struct PackHeader: View {
+    @Environment(\.qaTokens) private var tokens
+    let pack: QAEditorialPack
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(pack.title)
+                .font(.qaBody(14, weight: .semibold))
+                .foregroundStyle(tokens.colors.primaryText)
+            Text(pack.description)
+                .font(.qaBody(12))
+                .foregroundStyle(tokens.colors.mutedText)
+        }
+        .padding(.top, 10)
+    }
+}
+
+private struct FilterChip: View {
+    @Environment(\.qaTokens) private var tokens
+    let title: String
+    let isSelected: Bool
+    let accessibilityIdentifier: String?
+    let action: () -> Void
+
+    init(title: String, isSelected: Bool, accessibilityIdentifier: String? = nil, action: @escaping () -> Void) {
+        self.title = title
+        self.isSelected = isSelected
+        self.accessibilityIdentifier = accessibilityIdentifier
+        self.action = action
+    }
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.qaBody(12, weight: .semibold))
+                .foregroundStyle(isSelected ? selectedText : tokens.colors.mutedText)
+                .padding(.horizontal, 11)
+                .padding(.vertical, 8)
+                .background(isSelected ? tokens.colors.accent : tokens.colors.background)
+                .clipShape(Capsule())
+                .overlay(Capsule().stroke(isSelected ? tokens.colors.accent : tokens.colors.line, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(accessibilityIdentifier ?? title)
+    }
+
+    private var selectedText: Color {
+        tokens.mode == .dark ? Color(hex: 0x21140E) : .white
+    }
+}
+
+private struct DurationChipRow: View {
+    @Environment(\.qaTokens) private var tokens
+    let label: String
+    let values: [Int]
+    let selected: Int
+    let onSelect: (Int) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(label)
+                .font(.qaBody(13, weight: .semibold))
+                .foregroundStyle(tokens.colors.mutedText)
+            HStack(spacing: 7) {
+                ForEach(values, id: \.self) { minutes in
+                    FilterChip(title: "\(minutes) min", isSelected: selected == minutes, accessibilityIdentifier: "duration-\(minutes)") {
+                        onSelect(minutes)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+            }
+        }
+    }
+}
+
+private struct TopicChipRow: View {
+    @Environment(\.qaTokens) private var tokens
+    let label: String
+    let selected: [String]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(label)
+                .font(.qaBody(13, weight: .semibold))
+                .foregroundStyle(tokens.colors.mutedText)
+            FlowLayout(spacing: 8) {
+                ForEach(selected, id: \.self) { topic in
+                    QATag(text: topic)
+                }
+            }
+        }
+    }
+}
+
+private struct QAFormField: View {
+    @Environment(\.qaTokens) private var tokens
+    let label: String
+    let value: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(label)
+                .font(.qaBody(13, weight: .semibold))
+                .foregroundStyle(tokens.colors.mutedText)
+            Text(value)
+                .font(.qaBody(15))
+                .foregroundStyle(tokens.colors.primaryText)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(14)
+                .background(tokens.colors.elevatedSurface)
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(tokens.colors.line, lineWidth: 1)
+                )
+        }
+    }
+}
+
+private struct FlowLayout: Layout {
+    let spacing: CGFloat
+
+    init(spacing: CGFloat = 8) {
+        self.spacing = spacing
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let maxWidth = proposal.width ?? 320
+        var rows: [CGSize] = [.zero]
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            let row = rows.count - 1
+            let nextWidth = rows[row].width == 0 ? size.width : rows[row].width + spacing + size.width
+            if nextWidth > maxWidth, rows[row].width > 0 {
+                rows.append(size)
+            } else {
+                rows[row].width = nextWidth
+                rows[row].height = max(rows[row].height, size.height)
+            }
+        }
+        return CGSize(
+            width: maxWidth,
+            height: rows.reduce(0) { $0 + $1.height } + CGFloat(max(0, rows.count - 1)) * spacing
+        )
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var x = bounds.minX
+        var y = bounds.minY
+        var rowHeight: CGFloat = 0
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x > bounds.minX, x + size.width > bounds.maxX {
+                x = bounds.minX
+                y += rowHeight + spacing
+                rowHeight = 0
+            }
+            subview.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))
+            x += size.width + spacing
+            rowHeight = max(rowHeight, size.height)
+        }
+    }
+}
+
 private struct ContentRow: View {
     @Environment(\.qaTokens) private var tokens
     let item: QAContentItem
+    let onOpen: () -> Void
 
     var body: some View {
-        QACard {
+        Button(action: onOpen) {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
                     Text(item.source)
@@ -693,7 +1204,117 @@ private struct ContentRow: View {
                 }
             }
         }
+        .buttonStyle(.plain)
+        .padding(18)
+        .background(tokens.colors.elevatedSurface)
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(tokens.colors.line, lineWidth: 1)
+        )
         .accessibilityIdentifier("library-item-\(item.id)")
+    }
+}
+
+private enum QAReaderBlockKind {
+    case heading
+    case quote
+    case list
+    case code
+    case body
+}
+
+private struct QAReaderBlock: Identifiable {
+    let id = UUID()
+    let text: String
+    let kind: QAReaderBlockKind
+}
+
+private enum QAReaderMarkdownParser {
+    static func blocks(for body: String, fallback: String) -> [QAReaderBlock] {
+        let source = body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? fallback : body
+        let rawBlocks = source
+            .components(separatedBy: "\n\n")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        let parsed = rawBlocks.map(block)
+        return parsed.isEmpty ? [QAReaderBlock(text: fallback, kind: .body)] : parsed
+    }
+
+    private static func block(_ raw: String) -> QAReaderBlock {
+        if raw.hasPrefix("```") {
+            return QAReaderBlock(text: raw.replacingOccurrences(of: "```", with: "").trimmed, kind: .code)
+        }
+        if raw.hasPrefix("#") {
+            return QAReaderBlock(text: raw.replacingOccurrences(of: #"^#{1,6}\s*"#, with: "", options: .regularExpression).trimmed, kind: .heading)
+        }
+        if raw.hasPrefix(">") {
+            return QAReaderBlock(text: raw.replacingOccurrences(of: #"^>\s*"#, with: "", options: .regularExpression).trimmed, kind: .quote)
+        }
+        if raw.hasPrefix("- ") || raw.range(of: #"^\d+\.\s"#, options: .regularExpression) != nil {
+            return QAReaderBlock(
+                text: raw
+                    .components(separatedBy: .newlines)
+                    .map { line in line.replacingOccurrences(of: #"^[-*]\s+|^\d+\.\s+"#, with: "• ", options: .regularExpression) }
+                    .joined(separator: "\n")
+                    .trimmed,
+                kind: .list
+            )
+        }
+        return QAReaderBlock(text: raw.replacingInlineMarkdown.trimmed, kind: .body)
+    }
+}
+
+private struct ReaderBlockView: View {
+    @Environment(\.qaTokens) private var tokens
+    let block: QAReaderBlock
+
+    var body: some View {
+        Text(block.text)
+            .font(font)
+            .lineSpacing(lineSpacing)
+            .foregroundStyle(color)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(padding)
+            .background(background)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(border, lineWidth: block.kind == .code ? 1 : 0)
+            )
+    }
+
+    private var font: Font {
+        switch block.kind {
+        case .heading:
+            .qaDisplay(24, weight: .semibold)
+        case .code:
+            .qaMono(14)
+        case .quote:
+            .qaDisplay(20).italic()
+        case .list, .body:
+            .qaDisplay(21)
+        }
+    }
+
+    private var lineSpacing: CGFloat {
+        block.kind == .code ? 3 : 5
+    }
+
+    private var color: Color {
+        block.kind == .quote ? tokens.colors.mutedText : tokens.colors.primaryText
+    }
+
+    private var padding: EdgeInsets {
+        block.kind == .code ? EdgeInsets(top: 14, leading: 14, bottom: 14, trailing: 14) : EdgeInsets()
+    }
+
+    private var background: Color {
+        block.kind == .code ? tokens.colors.elevatedSurface : .clear
+    }
+
+    private var border: Color {
+        block.kind == .code ? tokens.colors.line : .clear
     }
 }
 
@@ -719,5 +1340,18 @@ private struct MetricCard: View {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .stroke(tokens.colors.line, lineWidth: 1)
         )
+    }
+}
+
+private extension String {
+    var trimmed: String {
+        trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var replacingInlineMarkdown: String {
+        replacingOccurrences(of: #"(\*\*|__)(.*?)\1"#, with: "$2", options: .regularExpression)
+            .replacingOccurrences(of: #"(\*|_)(.*?)\1"#, with: "$2", options: .regularExpression)
+            .replacingOccurrences(of: #"`([^`]+)`"#, with: "$1", options: .regularExpression)
+            .replacingOccurrences(of: #"\[([^\]]+)\]\([^\)]+\)"#, with: "$1", options: .regularExpression)
     }
 }

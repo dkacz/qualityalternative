@@ -6,7 +6,7 @@ final class QualityAlternativeVisualQaTests: XCTestCase {
         continueAfterFailure = false
     }
 
-    func testSlice12VisualParityScreens() throws {
+    func testSprint14SimulatorParityScreens() throws {
         capture(route: "home", name: "01_home_light")
         capture(route: "library", name: "02_library_light")
         capture(route: "intervention", name: "03_intervention_light", verifyInterventionActions: true)
@@ -15,10 +15,13 @@ final class QualityAlternativeVisualQaTests: XCTestCase {
         capture(route: "meditation", name: "06_meditation_light")
         capture(route: "progress", name: "07_progress_light")
         capture(route: "settings", name: "08_settings_light", verifyScreenTimeSetup: true)
-        capture(route: "intervention", name: "09_intervention_dark", dark: true, verifyInterventionActions: true)
-        capture(route: "reader", name: "10_reader_dark", dark: true)
-        capture(route: "meditation", name: "11_meditation_dark", dark: true)
-        capture(route: "settings", name: "12_device_activity_light", verifyDeviceActivityMonitor: true)
+        capture(route: "addLink", name: "09_add_link_light", verifyAddLink: true)
+        capture(route: "addDocument", name: "10_add_document_light", verifyAddDocument: true)
+        capture(route: "feedback", name: "11_feedback_light")
+        capture(route: "intervention", name: "12_intervention_dark", dark: true, verifyInterventionActions: true)
+        capture(route: "reader", name: "13_reader_dark", dark: true)
+        capture(route: "meditation", name: "14_meditation_dark", dark: true)
+        capture(route: "settings", name: "15_device_activity_light", verifyDeviceActivityMonitor: true)
     }
 
     private func capture(
@@ -27,7 +30,9 @@ final class QualityAlternativeVisualQaTests: XCTestCase {
         dark: Bool = false,
         verifyInterventionActions: Bool = false,
         verifyScreenTimeSetup: Bool = false,
-        verifyDeviceActivityMonitor: Bool = false
+        verifyDeviceActivityMonitor: Bool = false,
+        verifyAddLink: Bool = false,
+        verifyAddDocument: Bool = false
     ) {
         let app = XCUIApplication()
         app.launchArguments = ["--qa-route", route]
@@ -36,7 +41,7 @@ final class QualityAlternativeVisualQaTests: XCTestCase {
         }
         app.launch()
 
-        let expectedScreen = route == "handoff" ? "handoff-screen" : "\(route)-screen"
+        let expectedScreen = expectedScreenIdentifier(for: route)
         XCTAssertTrue(app.descendants(matching: .any)[expectedScreen].waitForExistence(timeout: 6))
         if verifyInterventionActions {
             assertInterventionActionSet(in: app)
@@ -47,6 +52,12 @@ final class QualityAlternativeVisualQaTests: XCTestCase {
         if verifyDeviceActivityMonitor {
             assertDeviceActivityMonitor(in: app)
         }
+        if verifyAddLink {
+            assertAddLink(in: app)
+        }
+        if verifyAddDocument {
+            assertAddDocument(in: app)
+        }
 
         let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         attachment.name = name
@@ -56,19 +67,30 @@ final class QualityAlternativeVisualQaTests: XCTestCase {
         app.terminate()
     }
 
+    private func expectedScreenIdentifier(for route: String) -> String {
+        switch route {
+        case "addLink":
+            "add-link-screen"
+        case "addDocument":
+            "add-document-screen"
+        case "handoff":
+            "handoff-screen"
+        default:
+            "\(route)-screen"
+        }
+    }
+
     private func assertInterventionActionSet(in app: XCUIApplication) {
         XCTAssertTrue(app.staticTexts["PROTECTED SELECTION"].exists)
         XCTAssertFalse(app.staticTexts["OPENING INSTAGRAM"].exists)
-        XCTAssertTrue(app.buttons["Read this"].exists)
-        XCTAssertTrue(app.buttons["Open link-only backup - 8 min"].exists)
-        XCTAssertTrue(app.buttons["Start meditation - 3 min"].exists)
         XCTAssertTrue(app.buttons["Pause for 15 min"].exists)
         XCTAssertTrue(app.buttons["Continue intentionally"].exists)
 
         let actions = app.descendants(matching: .any)
-        XCTAssertTrue(actions["backup-action-psyche-boredom"].exists)
-        XCTAssertTrue(actions["backup-action-meditation-3m"].exists)
-        XCTAssertFalse(actions["backup-action-naturalist-notices"].exists)
+        XCTAssertTrue(actions["primary-replacement-action"].exists)
+        XCTAssertTrue(actions["backup-action-0"].exists)
+        XCTAssertTrue(actions["backup-action-1"].exists)
+        XCTAssertFalse(actions["backup-action-2"].exists)
         XCTAssertTrue(actions["pause-action"].exists)
         XCTAssertTrue(actions["continue-intentionally-action"].exists)
     }
@@ -87,6 +109,15 @@ final class QualityAlternativeVisualQaTests: XCTestCase {
             app.scrollViews.firstMatch.swipeUp()
         }
         XCTAssertTrue(app.buttons["Apply shield rules"].exists)
+        XCTAssertTrue(app.staticTexts["Content priority"].exists)
+        XCTAssertTrue(app.buttons["content-priority-balanced"].exists)
+        XCTAssertTrue(app.buttons["content-priority-readings"].exists)
+        XCTAssertTrue(app.buttons["content-priority-myFiles"].exists)
+        XCTAssertTrue(app.buttons["content-priority-savedLinks"].exists)
+        XCTAssertTrue(app.buttons["content-priority-meditation"].exists)
+        XCTAssertTrue(app.staticTexts["Default session length"].exists)
+        XCTAssertTrue(app.buttons["duration-3"].exists)
+        XCTAssertTrue(app.buttons["duration-5"].exists)
     }
 
     private func assertDeviceActivityMonitor(in app: XCUIApplication) {
@@ -100,5 +131,24 @@ final class QualityAlternativeVisualQaTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["No monitor schedule"].exists)
         XCTAssertTrue(app.staticTexts["Needs setup"].exists)
         XCTAssertTrue(app.buttons["Start monitor schedule"].exists)
+    }
+
+    private func assertAddLink(in app: XCUIApplication) {
+        let actions = app.descendants(matching: .any)
+        XCTAssertTrue(app.staticTexts["SAVED LINK"].exists)
+        XCTAssertTrue(app.staticTexts["Link"].exists)
+        XCTAssertTrue(actions["add-link-save"].exists)
+        XCTAssertTrue(actions["add-link-import-document"].exists)
+    }
+
+    private func assertAddDocument(in app: XCUIApplication) {
+        let actions = app.descendants(matching: .any)
+        XCTAssertTrue(app.staticTexts["PRIVATE FILE"].exists)
+        XCTAssertTrue(app.staticTexts["EPUB fixture"].exists)
+        XCTAssertTrue(actions["add-document-save"].exists)
+        let pdfScopeCopy = app.staticTexts
+            .matching(NSPredicate(format: "label CONTAINS %@", "PDF remains an external handoff"))
+            .firstMatch
+        XCTAssertTrue(pdfScopeCopy.exists)
     }
 }

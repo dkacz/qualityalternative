@@ -10,6 +10,9 @@ struct AppRootView: View {
     @State private var protectedSelection: FamilyActivitySelection
     @State private var shieldSession: QAShieldSessionState?
     @State private var deviceActivitySchedule: QADeviceActivityScheduleState?
+    @State private var selectedContent: QAContentItem
+    @State private var meditationDurationMinutes: Int
+    @State private var contentPriority: QAContentPriority
     private let shouldConsumeShieldIntent: Bool
     private let shieldApplier = QAManagedSettingsShieldApplier()
 
@@ -18,6 +21,7 @@ struct AppRootView: View {
         let hasExplicitRoute = arguments.contains("--qa-route")
         let requestedRoute = arguments.argumentValue(after: "--qa-route").flatMap(QARoute.init(rawValue:)) ?? .home
         let requestedTheme = arguments.contains("--qa-dark") ? QAThemeMode.dark : QAThemeMode.light
+        let initialMeditationDuration = 5
         _route = State(initialValue: requestedRoute)
         _themeMode = State(initialValue: requestedTheme)
         _screenTimeAuthorization = State(initialValue: QAScreenTimeAuthorizationState(AuthorizationCenter.shared.authorizationStatus))
@@ -25,7 +29,23 @@ struct AppRootView: View {
         _protectedSelection = State(initialValue: QAFamilyActivitySelectionStore.load())
         _shieldSession = State(initialValue: QAShieldSessionStore.load())
         _deviceActivitySchedule = State(initialValue: QADeviceActivityScheduleStore.load())
+        _selectedContent = State(initialValue: Self.initialContent(for: requestedRoute, meditationMinutes: initialMeditationDuration))
+        _meditationDurationMinutes = State(initialValue: initialMeditationDuration)
+        _contentPriority = State(initialValue: .balanced)
         shouldConsumeShieldIntent = !hasExplicitRoute
+    }
+
+    private static func initialContent(for route: QARoute, meditationMinutes: Int) -> QAContentItem {
+        switch route {
+        case .handoff:
+            QASampleData.linkOnlyItem
+        case .meditation:
+            QASampleData.meditationContentItem(minutes: meditationMinutes)
+        case .reader, .feedback:
+            QASampleData.readerItem
+        case .home, .library, .addLink, .addDocument, .intervention, .progress, .settings:
+            QASampleData.readerItem
+        }
     }
 
     var body: some View {
@@ -37,6 +57,9 @@ struct AppRootView: View {
             protectedSelection: $protectedSelection,
             shieldSession: $shieldSession,
             deviceActivitySchedule: $deviceActivitySchedule,
+            selectedContent: $selectedContent,
+            meditationDurationMinutes: $meditationDurationMinutes,
+            contentPriority: $contentPriority,
             shieldApplier: shieldApplier
         )
             .environment(\.qaTokens, QATokens.tokens(for: themeMode))
@@ -85,7 +108,14 @@ private struct RootContent: View {
     @Binding var protectedSelection: FamilyActivitySelection
     @Binding var shieldSession: QAShieldSessionState?
     @Binding var deviceActivitySchedule: QADeviceActivityScheduleState?
+    @Binding var selectedContent: QAContentItem
+    @Binding var meditationDurationMinutes: Int
+    @Binding var contentPriority: QAContentPriority
     let shieldApplier: QAManagedSettingsShieldApplier
+
+    private var activeSession: QAReplacementSession {
+        QASampleData.replacementSession(meditationMinutes: meditationDurationMinutes, priority: contentPriority)
+    }
 
     var body: some View {
         switch route {
@@ -93,29 +123,76 @@ private struct RootContent: View {
             TabShell(activeRoute: .home, route: $route) {
                 HomeScreen(
                     progress: QASampleData.progress,
-                    session: QASampleData.session,
-                    onStartIntervention: { route = .intervention }
+                    session: activeSession,
+                    editorialPacks: QASampleData.packs,
+                    userLinks: QASampleData.userLinks,
+                    userDocuments: QASampleData.userDocuments,
+                    meditation: QASampleData.meditationContentItem(minutes: meditationDurationMinutes),
+                    onStartIntervention: { route = .intervention },
+                    onAddLink: { route = .addLink },
+                    onImportDocument: { route = .addDocument },
+                    onStartDelayAlternative: {
+                        selectedContent = activeSession.primary
+                        route = route(for: activeSession.primary)
+                    }
                 )
             }
         case .library:
             TabShell(activeRoute: .library, route: $route) {
-                LibraryScreen(items: QASampleData.library)
+                LibraryScreen(
+                    packs: QASampleData.packs,
+                    userLinks: QASampleData.userLinks,
+                    userDocuments: QASampleData.userDocuments,
+                    meditation: QASampleData.meditationContentItem(minutes: meditationDurationMinutes),
+                    onAddLink: { route = .addLink },
+                    onImportDocument: { route = .addDocument },
+                    onOpen: { item in
+                        selectedContent = item
+                        route = route(for: item)
+                    }
+                )
             }
+        case .addLink:
+            AddLinkScreen(onCancel: { route = .library }, onImportDocument: { route = .addDocument })
+        case .addDocument:
+            AddDocumentScreen(onCancel: { route = .library })
         case .intervention:
             InterventionScreen(
-                session: QASampleData.session,
-                onReadPrimary: { route = .reader },
-                onOpenLink: { route = .handoff },
-                onMeditate: { route = .meditation },
+                session: activeSession,
+                meditationDurationMinutes: meditationDurationMinutes,
+                onAcceptPrimary: {
+                    selectedContent = activeSession.primary
+                    route = route(for: activeSession.primary)
+                },
+                onAcceptBackup: { item in
+                    selectedContent = item
+                    route = route(for: item)
+                },
+                onSelectMeditationDuration: { minutes in
+                    meditationDurationMinutes = minutes
+                    if selectedContent.renderMode == .meditationTimer {
+                        selectedContent = QASampleData.meditationContentItem(minutes: minutes)
+                    }
+                },
                 onPause: { route = .home },
                 onContinue: { route = .home }
             )
         case .reader:
-            ReaderScreen(item: QASampleData.readerItem, onDone: { route = .progress })
+            ReaderScreen(item: selectedContent, readerBody: QASampleData.body(for: selectedContent), onDone: { route = .feedback })
         case .handoff:
-            ExternalHandoffScreen(item: QASampleData.linkOnlyItem, onDone: { route = .progress })
+            ExternalHandoffScreen(item: selectedContent, onDone: { route = .feedback })
         case .meditation:
-            MeditationTimerScreen(item: QASampleData.meditationItem, onDone: { route = .progress })
+            MeditationTimerScreen(
+                item: selectedContent.renderMode == .meditationTimer ? selectedContent : QASampleData.meditationContentItem(minutes: meditationDurationMinutes),
+                meditationDurationMinutes: meditationDurationMinutes,
+                onSelectMeditationDuration: { minutes in
+                    meditationDurationMinutes = minutes
+                    selectedContent = QASampleData.meditationContentItem(minutes: minutes)
+                },
+                onDone: { route = .feedback }
+            )
+        case .feedback:
+            FeedbackScreen(item: selectedContent, onDone: { route = .progress })
         case .progress:
             TabShell(activeRoute: .progress, route: $route) {
                 ProgressScreen(progress: QASampleData.progress)
@@ -129,6 +206,8 @@ private struct RootContent: View {
                     protectedSelection: $protectedSelection,
                     shieldSession: shieldSession,
                     deviceActivitySchedule: deviceActivitySchedule,
+                    meditationDurationMinutes: $meditationDurationMinutes,
+                    contentPriority: $contentPriority,
                     onRequestScreenTimeAuthorization: requestScreenTimeAuthorization,
                     onApplyShieldRules: applyShieldRules,
                     onPauseShieldRules: pauseShieldRules,
@@ -138,6 +217,17 @@ private struct RootContent: View {
                     onStopDeviceActivityMonitoring: stopDeviceActivityMonitoring
                 )
             }
+        }
+    }
+
+    private func route(for item: QAContentItem) -> QARoute {
+        switch item.renderMode {
+        case .inAppReader, .userPrivateReader:
+            .reader
+        case .externalHandoff:
+            .handoff
+        case .meditationTimer:
+            .meditation
         }
     }
 
@@ -167,7 +257,7 @@ private struct RootContent: View {
         }
         let now = Date()
         let state = QAShieldSessionState.armed(
-            session: QASampleData.session,
+            session: activeSession,
             selection: screenTimeSetupSnapshot.selection,
             now: now
         )
