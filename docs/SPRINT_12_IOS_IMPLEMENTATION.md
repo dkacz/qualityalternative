@@ -434,8 +434,8 @@ GPT Pro review-fix follow-up:
 
 GPT Pro empty-selection follow-up:
 
-- Lane: pending
-- Status: pending follow-up launch
+- Lane: `https://chatgpt.com/c/69eb823d-6994-838a-908b-13b5aa1e6058`
+- Status: pending
 - Prompt: `PRO_REVIEW_PROMPT_20260424_164357.md`
 - Bundle: `QUALITY_ALTERNATIVE_IOS_REVIEW_BUNDLE_20260424_164357.zip`
 - Expected harvest path: `PRO_REVIEW_OUTPUT_20260424_164357/`
