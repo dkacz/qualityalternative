@@ -177,7 +177,15 @@ cd /Users/omare/Documents/qualityalternative-ios-sprint12 && unzip -q QUALITY_AL
 ## GPT Pro Review
 
 - Lane: `https://chatgpt.com/c/69eb8aa8-43fc-8388-bd58-7dbe92b6f267`
-- Status: pending
+- Status: superseded for now by simulator-only scope change
 - Prompt: `PRO_REVIEW_PROMPT_20260424_172119.md`
 - Bundle: `QUALITY_ALTERNATIVE_IOS_REVIEW_BUNDLE_20260424_172119.zip`
 - Expected harvest path: `PRO_REVIEW_OUTPUT_20260424_172119/`
+
+## GPT Pro Simulator RC Review
+
+- Lane: `https://chatgpt.com/c/69eb8c39-78e4-8384-ba30-3d8a776064aa`
+- Status: pending
+- Prompt: `PRO_REVIEW_PROMPT_20260424_172800.md`
+- Bundle: `QUALITY_ALTERNATIVE_IOS_REVIEW_BUNDLE_20260424_172800.zip`
+- Expected harvest path: `PRO_REVIEW_OUTPUT_20260424_172800/`
