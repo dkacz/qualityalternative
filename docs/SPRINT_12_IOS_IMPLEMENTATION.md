@@ -1,6 +1,6 @@
 # Sprint 12 iOS Implementation
 
-Status: `slice_12_3_followup_pro_review_pending`
+Status: `slice_12_4_in_progress`
 Branch: `codex/sprint12-ios-implementation`
 
 ## Goal
@@ -246,8 +246,31 @@ Review fixes applied:
 
 GPT Pro follow-up review:
 
-- Status: pending
+- Harvested verdict: `10/10 PASS`
 - Lane: `https://chatgpt.com/c/69eb5a08-8a68-8391-8546-a65326e01c10`
 - Prompt: `PRO_REVIEW_PROMPT_20260424_135332.md`
 - Bundle: `QUALITY_ALTERNATIVE_IOS_REVIEW_BUNDLE_20260424_135332.zip`
-- Expected harvest path: `PRO_REVIEW_OUTPUT_20260424_135332/`
+- Harvest path: `PRO_REVIEW_OUTPUT_20260424_135332/`
+
+## Slice 12.4: Shield Configuration and Action Extensions
+
+Scope:
+
+- Add a ManagedSettingsUI shield-configuration extension that can render a finite iOS-native shield surface from App Group state.
+- Add a ManagedSettings shield-action extension that handles public primary and secondary shield actions.
+- Keep shield state token-safe: actions may persist replacement ids, action kinds, timestamps, and generic target context, not readable protected-app names.
+- Route primary shield action toward the host app's prepared replacement flow through documented public responses.
+- Route secondary shield action as an explicit short pause request without treating Apple's `defer` response as a timer.
+- Add right-sized tests for shield copy, action planning, action-intent persistence, and host-app intent consumption.
+
+Out of scope:
+
+- No private APIs or custom overlay parity claim.
+- No DeviceActivity monitor schedule yet.
+- No physical-device PASS claim for actual shield presentation, Screen Time enforcement, extension invocation, or host-app routing.
+- No readable app identity inference from opaque FamilyControls tokens.
+
+Validation notes:
+
+- Simulator validation can compile extension targets and test pure action/state behavior only.
+- Real shield display and ShieldActionDelegate routing still require a signed physical-device validation pass.
