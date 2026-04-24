@@ -284,11 +284,14 @@ struct SettingsScreen: View {
     let screenTimeAuthorizationError: String?
     @Binding var protectedSelection: FamilyActivitySelection
     let shieldSession: QAShieldSessionState?
+    let deviceActivitySchedule: QADeviceActivityScheduleState?
     let onRequestScreenTimeAuthorization: () -> Void
     let onApplyShieldRules: () -> Void
     let onPauseShieldRules: () -> Void
     let onResumeShieldRules: () -> Void
     let onClearShieldRules: () -> Void
+    let onStartDeviceActivityMonitoring: () -> Void
+    let onStopDeviceActivityMonitoring: () -> Void
     @State private var isFamilyActivityPickerPresented = false
 
     private var setupSnapshot: QAScreenTimeSetupSnapshot {
@@ -307,6 +310,13 @@ struct SettingsScreen: View {
             setup: setupSnapshot,
             session: shieldSession,
             now: Date()
+        )
+    }
+
+    private var deviceActivitySnapshot: QADeviceActivityScheduleSnapshot {
+        QADeviceActivityScheduleSnapshot(
+            setup: setupSnapshot,
+            state: deviceActivitySchedule
         )
     }
 
@@ -432,6 +442,49 @@ struct SettingsScreen: View {
                     .accessibilityIdentifier("shield-controls-card")
 
                     QACard {
+                        VStack(alignment: .leading, spacing: 14) {
+                            SettingsSectionTitle("Device Activity monitor")
+                            HStack(spacing: 8) {
+                                StatusPill(
+                                    text: deviceActivitySnapshot.statusTitle,
+                                    tone: deviceActivityStatusTone,
+                                    accessibilityIdentifier: "device-activity-state-pill"
+                                )
+                                StatusPill(
+                                    text: deviceActivitySnapshot.canStartMonitoring ? "Ready to schedule" : "Needs setup",
+                                    tone: deviceActivitySnapshot.canStartMonitoring ? .success : .neutral
+                                )
+                            }
+                            Text(deviceActivitySnapshot.detailText)
+                                .font(.qaBody(15))
+                                .foregroundStyle(tokens.colors.primaryText)
+                                .accessibilityIdentifier("device-activity-detail")
+
+                            QAButton(
+                                title: "Start monitor schedule",
+                                style: .primary,
+                                accessibilityIdentifier: "start-device-activity-monitoring",
+                                isEnabled: deviceActivitySnapshot.canStartMonitoring,
+                                action: onStartDeviceActivityMonitoring
+                            )
+                            if deviceActivitySnapshot.canStopMonitoring {
+                                QAButton(
+                                    title: "Stop monitor schedule",
+                                    style: .quiet,
+                                    accessibilityIdentifier: "stop-device-activity-monitoring",
+                                    action: onStopDeviceActivityMonitoring
+                                )
+                            }
+
+                            Text("DeviceActivity can reapply shield rules during protected windows; simulator checks compile and host state only.")
+                                .font(.qaBody(12))
+                                .lineSpacing(2)
+                                .foregroundStyle(tokens.colors.mutedText)
+                        }
+                    }
+                    .accessibilityIdentifier("device-activity-card")
+
+                    QACard {
                         VStack(alignment: .leading, spacing: 12) {
                             SettingsSectionTitle("Theme")
                             HStack(spacing: 10) {
@@ -495,6 +548,17 @@ struct SettingsScreen: View {
             return .success
         }
         return .warning
+    }
+
+    private var deviceActivityStatusTone: StatusPill.Tone {
+        switch deviceActivitySchedule?.mode {
+        case .scheduled:
+            return .success
+        case .failed:
+            return .warning
+        case .inactive, .stopped, nil:
+            return .neutral
+        }
     }
 }
 

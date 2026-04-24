@@ -18,6 +18,7 @@ final class QualityAlternativeVisualQaTests: XCTestCase {
         capture(route: "intervention", name: "09_intervention_dark", dark: true, verifyInterventionActions: true)
         capture(route: "reader", name: "10_reader_dark", dark: true)
         capture(route: "meditation", name: "11_meditation_dark", dark: true)
+        capture(route: "settings", name: "12_device_activity_light", verifyDeviceActivityMonitor: true)
     }
 
     private func capture(
@@ -25,7 +26,8 @@ final class QualityAlternativeVisualQaTests: XCTestCase {
         name: String,
         dark: Bool = false,
         verifyInterventionActions: Bool = false,
-        verifyScreenTimeSetup: Bool = false
+        verifyScreenTimeSetup: Bool = false,
+        verifyDeviceActivityMonitor: Bool = false
     ) {
         let app = XCUIApplication()
         app.launchArguments = ["--qa-route", route]
@@ -41,6 +43,9 @@ final class QualityAlternativeVisualQaTests: XCTestCase {
         }
         if verifyScreenTimeSetup {
             assertScreenTimeSetup(in: app)
+        }
+        if verifyDeviceActivityMonitor {
+            assertDeviceActivityMonitor(in: app)
         }
 
         let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
@@ -82,5 +87,18 @@ final class QualityAlternativeVisualQaTests: XCTestCase {
             app.scrollViews.firstMatch.swipeUp()
         }
         XCTAssertTrue(app.buttons["Apply shield rules"].exists)
+    }
+
+    private func assertDeviceActivityMonitor(in app: XCUIApplication) {
+        let scrollView = app.scrollViews.firstMatch
+        let title = app.staticTexts["Device Activity monitor"]
+        for _ in 0..<4 where !title.isHittable {
+            scrollView.swipeUp()
+        }
+        XCTAssertTrue(title.exists)
+        XCTAssertTrue(title.isHittable)
+        XCTAssertTrue(app.staticTexts["No monitor schedule"].exists)
+        XCTAssertTrue(app.staticTexts["Needs setup"].exists)
+        XCTAssertTrue(app.buttons["Start monitor schedule"].exists)
     }
 }

@@ -1,6 +1,6 @@
 # Sprint 12 iOS Implementation
 
-Status: `slice_12_4_followup_pro_review_pending`
+Status: `slice_12_5_in_progress`
 Branch: `codex/sprint12-ios-implementation`
 
 ## Goal
@@ -324,7 +324,61 @@ Review fixes applied:
 
 GPT Pro follow-up review:
 
+- Harvested verdict: `10/10 PASS`
 - Lane: `https://chatgpt.com/c/69eb676e-ab1c-8397-ac42-fda87b1dc886`
 - Prompt: `PRO_REVIEW_PROMPT_20260424_145056.md`
 - Bundle: `QUALITY_ALTERNATIVE_IOS_REVIEW_BUNDLE_20260424_145056.zip`
-- Expected harvest path: `PRO_REVIEW_OUTPUT_20260424_145056/`
+- Harvest path: `PRO_REVIEW_OUTPUT_20260424_145056/`
+
+## Slice 12.5: DeviceActivity Monitor Schedule
+
+Scope:
+
+- Add a DeviceActivity monitor extension target using Apple's public `com.apple.deviceactivity.monitor-extension` point.
+- Add host-app controls for starting and stopping a daily protected-window monitor schedule.
+- Keep schedule state token-safe: store only opaque token counts, generic activity names, interval metadata, monitor mode, timestamps, and generic event kinds.
+- Have the monitor extension reapply or clear shield rules from App Group state without reading protected-app names.
+- Add tests for schedule readiness, empty-selection safety, token-safe schedule metadata, and pause/reapply monitor policy.
+- Regenerate Settings visual QA to show the DeviceActivity monitor surface.
+
+Out of scope:
+
+- No physical-device PASS claim for real DeviceActivity callbacks, Screen Time enforcement, extension invocation, or entitlement/signing behavior.
+- No private API foreground-app detection.
+- No readable app identity inference from opaque FamilyControls tokens.
+- No production background reliability claim; simulator validation remains compile/state/visual only.
+
+Validation notes:
+
+- Simulator validation can compile the extension target, verify host schedule state, and exercise pure monitor policy.
+- Real DeviceActivity scheduling, callback delivery, and shield reapplication still require a signed physical-device validation pass.
+
+Validation completed on 2026-04-24:
+
+- `git diff --check`: PASS
+- `plutil -lint` for app and extension entitlements/Info.plists: PASS
+- `xcodebuild test`: PASS on `QA iPhone 16 Sprint12`
+- Unit tests: 21 passed, 0 failed
+- UI visual QA tests: 1 passed, 0 failed
+- Total tests: 22 passed, 0 failed
+- Result bundle: `output/ios_sprint12_slice12_5_validation_20260424_155000/QualityAlternative.xcresult`
+- Test summary: `output/ios_sprint12_slice12_5_validation_20260424_155000/test_summary.json`
+
+Visual QA artifacts:
+
+- Contact sheet: `docs/visual-qa/sprint12-ios-slice12-5/contact_sheet.png`
+- Light screenshots: home, library, intervention, reader, handoff, meditation, progress, settings with Screen Time setup and shield controls, settings scrolled to DeviceActivity monitor controls
+- Dark screenshots: intervention, reader, meditation
+
+Implemented state:
+
+- The app embeds a DeviceActivity monitor extension target using Apple's public extension point.
+- Settings exposes start/stop controls for a daily protected-window monitor schedule without claiming simulator enforcement.
+- `QADeviceActivityScheduleState` stores token-safe schedule metadata only: opaque counts, generic activity/event names, interval metadata, mode, timestamps, and generic event kinds.
+- DeviceActivity schedule writes fail closed with observable logging when App Group storage is unavailable.
+- The monitor extension uses App Group state to apply, clear, or keep shields based on pause/open-anyway/session state.
+- Empty protected selections do not create monitor events, and monitor policy is covered by unit tests.
+
+GPT Pro review:
+
+- Status: pending

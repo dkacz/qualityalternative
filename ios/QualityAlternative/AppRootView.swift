@@ -9,6 +9,7 @@ struct AppRootView: View {
     @State private var screenTimeAuthorizationError: String?
     @State private var protectedSelection: FamilyActivitySelection
     @State private var shieldSession: QAShieldSessionState?
+    @State private var deviceActivitySchedule: QADeviceActivityScheduleState?
     private let shouldConsumeShieldIntent: Bool
     private let shieldApplier = QAManagedSettingsShieldApplier()
 
@@ -23,6 +24,7 @@ struct AppRootView: View {
         _screenTimeAuthorizationError = State(initialValue: nil)
         _protectedSelection = State(initialValue: QAFamilyActivitySelectionStore.load())
         _shieldSession = State(initialValue: QAShieldSessionStore.load())
+        _deviceActivitySchedule = State(initialValue: QADeviceActivityScheduleStore.load())
         shouldConsumeShieldIntent = !hasExplicitRoute
     }
 
@@ -34,6 +36,7 @@ struct AppRootView: View {
             screenTimeAuthorizationError: $screenTimeAuthorizationError,
             protectedSelection: $protectedSelection,
             shieldSession: $shieldSession,
+            deviceActivitySchedule: $deviceActivitySchedule,
             shieldApplier: shieldApplier
         )
             .environment(\.qaTokens, QATokens.tokens(for: themeMode))
@@ -81,6 +84,7 @@ private struct RootContent: View {
     @Binding var screenTimeAuthorizationError: String?
     @Binding var protectedSelection: FamilyActivitySelection
     @Binding var shieldSession: QAShieldSessionState?
+    @Binding var deviceActivitySchedule: QADeviceActivityScheduleState?
     let shieldApplier: QAManagedSettingsShieldApplier
 
     var body: some View {
@@ -124,11 +128,14 @@ private struct RootContent: View {
                     screenTimeAuthorizationError: screenTimeAuthorizationError,
                     protectedSelection: $protectedSelection,
                     shieldSession: shieldSession,
+                    deviceActivitySchedule: deviceActivitySchedule,
                     onRequestScreenTimeAuthorization: requestScreenTimeAuthorization,
                     onApplyShieldRules: applyShieldRules,
                     onPauseShieldRules: pauseShieldRules,
                     onResumeShieldRules: resumeShieldRules,
-                    onClearShieldRules: clearShieldRules
+                    onClearShieldRules: clearShieldRules,
+                    onStartDeviceActivityMonitoring: startDeviceActivityMonitoring,
+                    onStopDeviceActivityMonitoring: stopDeviceActivityMonitoring
                 )
             }
         }
@@ -191,6 +198,28 @@ private struct RootContent: View {
         shieldApplier.clear()
         shieldSession = nil
         QAShieldSessionStore.clear()
+        deviceActivitySchedule = QADeviceActivityScheduler().stopProtectedWindow()
+    }
+
+    private func startDeviceActivityMonitoring() {
+        do {
+            deviceActivitySchedule = try QADeviceActivityScheduler().startProtectedWindow(
+                selection: protectedSelection,
+                setup: screenTimeSetupSnapshot
+            )
+        } catch {
+            let state = QADeviceActivityScheduleState.failed(
+                selection: screenTimeSetupSnapshot.selection,
+                error: error,
+                now: Date()
+            )
+            QADeviceActivityScheduleStore.save(state)
+            deviceActivitySchedule = state
+        }
+    }
+
+    private func stopDeviceActivityMonitoring() {
+        deviceActivitySchedule = QADeviceActivityScheduler().stopProtectedWindow()
     }
 }
 

@@ -1,4 +1,5 @@
 import XCTest
+import FamilyControls
 @testable import QualityAlternative
 
 final class QualityAlternativeDesignTests: XCTestCase {
@@ -212,6 +213,69 @@ final class QualityAlternativeDesignTests: XCTestCase {
         XCTAssertTrue(plan.shouldClearIntent)
     }
 
+    func testDeviceActivityScheduleRequiresAuthorizedProtectedSelection() {
+        let selectedApps = QAScreenTimeSelectionSummary(applicationCount: 1, categoryCount: 0, webDomainCount: 0)
+        let emptySelection = QAScreenTimeSelectionSummary(applicationCount: 0, categoryCount: 0, webDomainCount: 0)
+
+        XCTAssertTrue(
+            QADeviceActivityScheduleSnapshot(
+                setup: QAScreenTimeSetupSnapshot(authorization: .approved, selection: selectedApps),
+                state: nil
+            ).canStartMonitoring
+        )
+        XCTAssertFalse(
+            QADeviceActivityScheduleSnapshot(
+                setup: QAScreenTimeSetupSnapshot(authorization: .approved, selection: emptySelection),
+                state: nil
+            ).canStartMonitoring
+        )
+        XCTAssertFalse(
+            QADeviceActivityScheduleSnapshot(
+                setup: QAScreenTimeSetupSnapshot(authorization: .denied, selection: selectedApps),
+                state: nil
+            ).canStartMonitoring
+        )
+    }
+
+    func testDeviceActivitySchedulePlanDoesNotMonitorEmptySelection() {
+        XCTAssertNil(QADeviceActivitySchedulePlan.protectedWindow(selection: FamilyActivitySelection()))
+    }
+
+    func testDeviceActivityScheduleStateIsTokenSafe() {
+        let now = Date(timeIntervalSince1970: 1_777_000_000)
+        let state = QADeviceActivityScheduleState.scheduled(
+            selection: QAScreenTimeSelectionSummary(applicationCount: 2, categoryCount: 0, webDomainCount: 1),
+            now: now
+        ).recording(
+            QADeviceActivityMonitorEventRecord(
+                kind: .intervalStarted,
+                activityName: QADeviceActivityNames.protectedWindow.rawValue,
+                eventName: nil,
+                createdAt: now
+            )
+        )
+
+        XCTAssertEqual(state.selection.totalCount, 3)
+        XCTAssertTrue(state.containsOnlyTokenSafeMetadata)
+    }
+
+    func testDeviceActivityMonitorPolicyRespectsPauseAndReapply() {
+        let now = Date(timeIntervalSince1970: 1_777_000_000)
+        let selection = QAScreenTimeSelectionSummary(applicationCount: 1, categoryCount: 0, webDomainCount: 0)
+        let armed = QAShieldSessionState.armed(
+            session: QASampleData.session,
+            selection: selection,
+            now: now
+        )
+        let paused = armed.paused(until: now.addingTimeInterval(60), now: now)
+        let expiredPause = armed.paused(until: now.addingTimeInterval(-1), now: now)
+
+        XCTAssertEqual(QADeviceActivityMonitorPolicy.action(session: nil, selection: selection, now: now), .keepShield)
+        XCTAssertEqual(QADeviceActivityMonitorPolicy.action(session: armed, selection: selection, now: now), .applyShield)
+        XCTAssertEqual(QADeviceActivityMonitorPolicy.action(session: paused, selection: selection, now: now), .clearShield)
+        XCTAssertEqual(QADeviceActivityMonitorPolicy.action(session: expiredPause, selection: selection, now: now), .applyShield)
+    }
+
     func testShieldActionIntentStorePersistsAndClearsThroughInjectedDefaults() {
         let suiteName = "qa.shieldActionIntent.tests.\(UUID().uuidString)"
         let userDefaults = UserDefaults(suiteName: suiteName)
@@ -247,6 +311,18 @@ final class QualityAlternativeDesignTests: XCTestCase {
             userDefaults: nil
         )
         QAShieldActionIntentStore.clear(userDefaults: nil)
+        let schedule = QADeviceActivityScheduleState.scheduled(selection: state.selection, now: now)
+        XCTAssertNil(QADeviceActivityScheduleStore.load(userDefaults: nil))
+        QADeviceActivityScheduleStore.save(schedule, userDefaults: nil)
+        QADeviceActivityScheduleStore.record(
+            QADeviceActivityMonitorEventRecord(
+                kind: .intervalStarted,
+                activityName: QADeviceActivityNames.protectedWindow.rawValue,
+                eventName: nil,
+                createdAt: now
+            ),
+            userDefaults: nil
+        )
 
         let selection = QAFamilyActivitySelectionStore.load(userDefaults: nil)
         XCTAssertEqual(selection.applicationTokens.count, 0)

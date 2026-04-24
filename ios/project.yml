@@ -23,6 +23,8 @@ targets:
         embed: true
       - target: QualityAlternativeShieldAction
         embed: true
+      - target: QualityAlternativeDeviceActivityMonitor
+        embed: true
     info:
       path: QualityAlternative/Info.plist
       properties:
@@ -93,6 +95,30 @@ targets:
         SUPPORTS_MACCATALYST: NO
         APPLICATION_EXTENSION_API_ONLY: YES
         CODE_SIGN_ENTITLEMENTS: QualityAlternativeShieldAction/QualityAlternativeShieldAction.entitlements
+  QualityAlternativeDeviceActivityMonitor:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: QualityAlternativeDeviceActivityMonitor
+      - path: QualityAlternative/Models.swift
+      - path: QualityAlternative/ShieldState.swift
+      - path: QualityAlternative/DeviceActivityScheduleState.swift
+    info:
+      path: QualityAlternativeDeviceActivityMonitor/Info.plist
+      properties:
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.deviceactivity.monitor-extension
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).DeviceActivityMonitorExtension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.qualityalternative.ios.deviceactivitymonitor
+        PRODUCT_NAME: QualityAlternativeDeviceActivityMonitor
+        TARGETED_DEVICE_FAMILY: 1
+        SUPPORTS_MACCATALYST: NO
+        APPLICATION_EXTENSION_API_ONLY: YES
+        CODE_SIGN_ENTITLEMENTS: QualityAlternativeDeviceActivityMonitor/QualityAlternativeDeviceActivityMonitor.entitlements
   QualityAlternativeTests:
     type: bundle.unit-test
     platform: iOS

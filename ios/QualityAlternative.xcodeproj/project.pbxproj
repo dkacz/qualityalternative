@@ -10,6 +10,7 @@
 		0D77A4735CB24367FA5B7103 /* AppRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4835C83FF44378FFBBD5CAE4 /* AppRootView.swift */; };
 		1E59DD061EFBBA8E04463D1C /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = C16DF47FB202AFB7DBFBE0BF /* Models.swift */; };
 		29261369568DD5F8E5F77301 /* ShieldActionExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C2BC2A3A66A29F3EA9AF1BE /* ShieldActionExtension.swift */; };
+		2B6C345A6D52A4B59DF2B1E1 /* ShieldState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9753DA9C9984C2C634FB8683 /* ShieldState.swift */; };
 		33F7BE6479AAB4607015873A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E901090BE8E5DBEEC40B7B94 /* Assets.xcassets */; };
 		358E366AA8344BA5BD8882D7 /* QualityAlternativeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EB6DD71717FC105FFAFC6AD /* QualityAlternativeApp.swift */; };
 		3B9D92FDFC48B0B58F712FCE /* ShieldState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9753DA9C9984C2C634FB8683 /* ShieldState.swift */; };
@@ -17,21 +18,33 @@
 		4058D198128F749DAC9EE8A4 /* work_sans.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 6F2187ABD8BFBCE906EFFDBE /* work_sans.ttf */; };
 		5249AA83C8DF1CFB2E8B561C /* Screens.swift in Sources */ = {isa = PBXBuildFile; fileRef = D546361CF40E9855AB5CE92B /* Screens.swift */; };
 		56DD75C7125DD655743390CA /* newsreader_italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 11C42CDCFEEA877130E7830A /* newsreader_italic.ttf */; };
+		5894051BE497E1F412077E57 /* DeviceActivityScheduleState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A73E4ECBE74939E082973562 /* DeviceActivityScheduleState.swift */; };
 		6B0BB322AE83EEB674C1A0F5 /* QualityAlternativeShieldConfiguration.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 8F1EED1531D0361DBAC3798D /* QualityAlternativeShieldConfiguration.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		74387CFB0A2D7271415674F5 /* newsreader.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 4765AA3FAF2B4568C416C528 /* newsreader.ttf */; };
 		7A26C17527E26EEEDABE243D /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = C16DF47FB202AFB7DBFBE0BF /* Models.swift */; };
+		7F14A45FCDD91F6C1EFDC402 /* DeviceActivityMonitorExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00CB863660CE14E45A89EC6B /* DeviceActivityMonitorExtension.swift */; };
 		84298F73FCC7008AF1FE164E /* QualityAlternativeShieldAction.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B86C7DD91859AF5589B0C931 /* QualityAlternativeShieldAction.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		983BAE36E7D1198A323B6B40 /* ShieldState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9753DA9C9984C2C634FB8683 /* ShieldState.swift */; };
 		9F439A71026DF544C34B3ACD /* SampleData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 751B6560439EF749202948DB /* SampleData.swift */; };
 		A0E1E822D7D222DBD452B5CB /* jetbrains_mono.ttf in Resources */ = {isa = PBXBuildFile; fileRef = C505B630242F142EB4A5E311 /* jetbrains_mono.ttf */; };
 		B16E4E3D702EAB430FAC9F15 /* ShieldConfigurationExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 434495C0E1B4A90AC6DECA72 /* ShieldConfigurationExtension.swift */; };
+		BA220FBBABF08D5229D5DF63 /* DeviceActivityScheduleState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A73E4ECBE74939E082973562 /* DeviceActivityScheduleState.swift */; };
 		BC3F90AB41BFB8E32F1D9A3E /* ShieldState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9753DA9C9984C2C634FB8683 /* ShieldState.swift */; };
 		C2BC46E1C8F1300EAAC174B7 /* QualityAlternativeVisualQaTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4C7B55B1E44755A6415522C /* QualityAlternativeVisualQaTests.swift */; };
+		D1F7EAB13AA3B4B09753BB77 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = C16DF47FB202AFB7DBFBE0BF /* Models.swift */; };
 		E529D3331687CADD77B3EACB /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 604C448C981C1F19E337108B /* DesignSystem.swift */; };
+		F4F6B2FEFE1C600759153745 /* QualityAlternativeDeviceActivityMonitor.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = FE979E1C32B1E70E77DBA8D8 /* QualityAlternativeDeviceActivityMonitor.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		FFBCBC28133ABA96BB9AE98D /* QualityAlternativeDesignTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F8D5B75F0B425D116C4A647 /* QualityAlternativeDesignTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		1FE092A53359C9D6894D7927 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 6054D8EF62FA4E005A56E581 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 4DB58DC8FD81D9ED2CC8B8D3;
+			remoteInfo = QualityAlternativeDeviceActivityMonitor;
+		};
 		2A994D876C53374FC25A54FE /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 6054D8EF62FA4E005A56E581 /* Project object */;
@@ -71,6 +84,7 @@
 			files = (
 				6B0BB322AE83EEB674C1A0F5 /* QualityAlternativeShieldConfiguration.appex in Embed Foundation Extensions */,
 				84298F73FCC7008AF1FE164E /* QualityAlternativeShieldAction.appex in Embed Foundation Extensions */,
+				F4F6B2FEFE1C600759153745 /* QualityAlternativeDeviceActivityMonitor.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -78,9 +92,12 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		00CB863660CE14E45A89EC6B /* DeviceActivityMonitorExtension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceActivityMonitorExtension.swift; sourceTree = "<group>"; };
 		03BC423636A28350BC8EAA42 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		05A306AE91658323D2AE6EF0 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		11C42CDCFEEA877130E7830A /* newsreader_italic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = newsreader_italic.ttf; sourceTree = "<group>"; };
 		1F8D5B75F0B425D116C4A647 /* QualityAlternativeDesignTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QualityAlternativeDesignTests.swift; sourceTree = "<group>"; };
+		221362D46FC1E54691776A9B /* QualityAlternativeDeviceActivityMonitor.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = QualityAlternativeDeviceActivityMonitor.entitlements; sourceTree = "<group>"; };
 		434495C0E1B4A90AC6DECA72 /* ShieldConfigurationExtension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShieldConfigurationExtension.swift; sourceTree = "<group>"; };
 		4765AA3FAF2B4568C416C528 /* newsreader.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = newsreader.ttf; sourceTree = "<group>"; };
 		4835C83FF44378FFBBD5CAE4 /* AppRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRootView.swift; sourceTree = "<group>"; };
@@ -96,6 +113,7 @@
 		8C2BC2A3A66A29F3EA9AF1BE /* ShieldActionExtension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShieldActionExtension.swift; sourceTree = "<group>"; };
 		8F1EED1531D0361DBAC3798D /* QualityAlternativeShieldConfiguration.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = QualityAlternativeShieldConfiguration.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		9753DA9C9984C2C634FB8683 /* ShieldState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShieldState.swift; sourceTree = "<group>"; };
+		A73E4ECBE74939E082973562 /* DeviceActivityScheduleState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceActivityScheduleState.swift; sourceTree = "<group>"; };
 		B86C7DD91859AF5589B0C931 /* QualityAlternativeShieldAction.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = QualityAlternativeShieldAction.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		C16DF47FB202AFB7DBFBE0BF /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		C4C7B55B1E44755A6415522C /* QualityAlternativeVisualQaTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QualityAlternativeVisualQaTests.swift; sourceTree = "<group>"; };
@@ -105,6 +123,7 @@
 		D91872FA31A629BDC4EE6865 /* QualityAlternativeUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = QualityAlternativeUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		E901090BE8E5DBEEC40B7B94 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		F6DDA3113B27E1366C384414 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		FE979E1C32B1E70E77DBA8D8 /* QualityAlternativeDeviceActivityMonitor.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = QualityAlternativeDeviceActivityMonitor.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -139,6 +158,7 @@
 			isa = PBXGroup;
 			children = (
 				E0B0289506D3DD6CB09627E5 /* QualityAlternative */,
+				B62D0DE760612C71299FCFED /* QualityAlternativeDeviceActivityMonitor */,
 				1B7D4F3F2DEE55A7A9045C33 /* QualityAlternativeShieldAction */,
 				AF717F6ED64FD95E5553DC89 /* QualityAlternativeShieldConfiguration */,
 				986029DD092B5DFA28F22F5B /* QualityAlternativeTests */,
@@ -176,11 +196,22 @@
 			path = QualityAlternativeShieldConfiguration;
 			sourceTree = "<group>";
 		};
+		B62D0DE760612C71299FCFED /* QualityAlternativeDeviceActivityMonitor */ = {
+			isa = PBXGroup;
+			children = (
+				00CB863660CE14E45A89EC6B /* DeviceActivityMonitorExtension.swift */,
+				05A306AE91658323D2AE6EF0 /* Info.plist */,
+				221362D46FC1E54691776A9B /* QualityAlternativeDeviceActivityMonitor.entitlements */,
+			);
+			path = QualityAlternativeDeviceActivityMonitor;
+			sourceTree = "<group>";
+		};
 		E0B0289506D3DD6CB09627E5 /* QualityAlternative */ = {
 			isa = PBXGroup;
 			children = (
 				4835C83FF44378FFBBD5CAE4 /* AppRootView.swift */,
 				604C448C981C1F19E337108B /* DesignSystem.swift */,
+				A73E4ECBE74939E082973562 /* DeviceActivityScheduleState.swift */,
 				F6DDA3113B27E1366C384414 /* Info.plist */,
 				C16DF47FB202AFB7DBFBE0BF /* Models.swift */,
 				7E43C16E28CB65944EE19C07 /* QualityAlternative.entitlements */,
@@ -197,6 +228,7 @@
 			isa = PBXGroup;
 			children = (
 				CE80BB50ACBB4C9CE7F8DBF0 /* QualityAlternative.app */,
+				FE979E1C32B1E70E77DBA8D8 /* QualityAlternativeDeviceActivityMonitor.appex */,
 				B86C7DD91859AF5589B0C931 /* QualityAlternativeShieldAction.appex */,
 				8F1EED1531D0361DBAC3798D /* QualityAlternativeShieldConfiguration.appex */,
 				80041F60FAAD0FD09F039361 /* QualityAlternativeTests.xctest */,
@@ -225,6 +257,23 @@
 			productName = QualityAlternativeUITests;
 			productReference = D91872FA31A629BDC4EE6865 /* QualityAlternativeUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		4DB58DC8FD81D9ED2CC8B8D3 /* QualityAlternativeDeviceActivityMonitor */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 3CA5CEB0E4D14184D8F6482A /* Build configuration list for PBXNativeTarget "QualityAlternativeDeviceActivityMonitor" */;
+			buildPhases = (
+				027EB7ECD169A88EE6A1A4E4 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = QualityAlternativeDeviceActivityMonitor;
+			packageProductDependencies = (
+			);
+			productName = QualityAlternativeDeviceActivityMonitor;
+			productReference = FE979E1C32B1E70E77DBA8D8 /* QualityAlternativeDeviceActivityMonitor.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 		605049A5120FF2DFF0A101FB /* QualityAlternativeTests */ = {
 			isa = PBXNativeTarget;
@@ -291,6 +340,7 @@
 			dependencies = (
 				22968D1A47774314203BC398 /* PBXTargetDependency */,
 				0CAADAC86E8418F6375AD2FA /* PBXTargetDependency */,
+				FDFF5FB2EA0FDB8EA3640EE6 /* PBXTargetDependency */,
 			);
 			name = QualityAlternative;
 			packageProductDependencies = (
@@ -328,6 +378,7 @@
 			projectRoot = "";
 			targets = (
 				EFDE195CC2BDA159C60A7664 /* QualityAlternative */,
+				4DB58DC8FD81D9ED2CC8B8D3 /* QualityAlternativeDeviceActivityMonitor */,
 				E5712334E0152ADBBDA3510B /* QualityAlternativeShieldAction */,
 				95FB98B3F3D4E31B045999DB /* QualityAlternativeShieldConfiguration */,
 				605049A5120FF2DFF0A101FB /* QualityAlternativeTests */,
@@ -352,6 +403,17 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		027EB7ECD169A88EE6A1A4E4 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7F14A45FCDD91F6C1EFDC402 /* DeviceActivityMonitorExtension.swift in Sources */,
+				5894051BE497E1F412077E57 /* DeviceActivityScheduleState.swift in Sources */,
+				D1F7EAB13AA3B4B09753BB77 /* Models.swift in Sources */,
+				2B6C345A6D52A4B59DF2B1E1 /* ShieldState.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		1AB9FC4CD5FDD2D1BCCC2DF5 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -368,6 +430,7 @@
 			files = (
 				0D77A4735CB24367FA5B7103 /* AppRootView.swift in Sources */,
 				E529D3331687CADD77B3EACB /* DesignSystem.swift in Sources */,
+				BA220FBBABF08D5229D5DF63 /* DeviceActivityScheduleState.swift in Sources */,
 				7A26C17527E26EEEDABE243D /* Models.swift in Sources */,
 				358E366AA8344BA5BD8882D7 /* QualityAlternativeApp.swift in Sources */,
 				9F439A71026DF544C34B3ACD /* SampleData.swift in Sources */,
@@ -424,6 +487,11 @@
 			isa = PBXTargetDependency;
 			target = EFDE195CC2BDA159C60A7664 /* QualityAlternative */;
 			targetProxy = 5075ED870D458BA19EA0FFBF /* PBXContainerItemProxy */;
+		};
+		FDFF5FB2EA0FDB8EA3640EE6 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 4DB58DC8FD81D9ED2CC8B8D3 /* QualityAlternativeDeviceActivityMonitor */;
+			targetProxy = 1FE092A53359C9D6894D7927 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -640,6 +708,25 @@
 			};
 			name = Debug;
 		};
+		5C9876B56F6BAC770A6520EA /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = QualityAlternativeDeviceActivityMonitor/QualityAlternativeDeviceActivityMonitor.entitlements;
+				INFOPLIST_FILE = QualityAlternativeDeviceActivityMonitor/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.qualityalternative.ios.deviceactivitymonitor;
+				PRODUCT_NAME = QualityAlternativeDeviceActivityMonitor;
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
 		7E6823DBD4A8E166D0903783 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -714,6 +801,25 @@
 			};
 			name = Release;
 		};
+		E225F99E2860E0A3ADD30A2E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = QualityAlternativeDeviceActivityMonitor/QualityAlternativeDeviceActivityMonitor.entitlements;
+				INFOPLIST_FILE = QualityAlternativeDeviceActivityMonitor/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.qualityalternative.ios.deviceactivitymonitor;
+				PRODUCT_NAME = QualityAlternativeDeviceActivityMonitor;
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
 		E627F6B44219A84F27771D51 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -736,6 +842,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		3CA5CEB0E4D14184D8F6482A /* Build configuration list for PBXNativeTarget "QualityAlternativeDeviceActivityMonitor" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5C9876B56F6BAC770A6520EA /* Debug */,
+				E225F99E2860E0A3ADD30A2E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		54FDD57E641BEDA4010B7C95 /* Build configuration list for PBXNativeTarget "QualityAlternativeUITests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
