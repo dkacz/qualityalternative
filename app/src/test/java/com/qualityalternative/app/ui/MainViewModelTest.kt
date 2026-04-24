@@ -13,6 +13,7 @@ import com.qualityalternative.app.domain.model.ContentAvailability
 import com.qualityalternative.app.domain.model.AppThemeMode
 import com.qualityalternative.app.domain.model.ContentFormat
 import com.qualityalternative.app.domain.model.ContentItem
+import com.qualityalternative.app.domain.model.ContentPriority
 import com.qualityalternative.app.domain.model.ContentRenderMode
 import com.qualityalternative.app.domain.model.ContentRightsClass
 import com.qualityalternative.app.domain.model.ContentRightsMetadata
@@ -462,6 +463,63 @@ class MainViewModelTest {
         assertEquals(5, meditation.durationMinutes)
         assertEquals("5-minute reset", meditation.title)
         assertEquals(5, settingsRepository.state.value.meditationDurationMinutes)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun meditationDurationCanBeChangedBeforeStartingCurrentMeditation() = runTest {
+        val recommendationEngine = FixedRecommendationEngine(
+            RecommendationSet(
+                primary = MeditationTimerContentItem,
+                backups = emptyList(),
+                inventoryShortage = true,
+                generatedAtMillis = 1_000L,
+            ),
+        )
+        val settingsRepository = FakeSettingsRepository()
+        val viewModel = createViewModel(
+            settingsRepository = settingsRepository,
+            recommendationEngine = recommendationEngine,
+        )
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+        viewModel.triggerDebugIntervention(nowMillis = 1_000L)
+        advanceUntilIdle()
+
+        viewModel.setMeditationDurationMinutes(10)
+        advanceUntilIdle()
+        viewModel.acceptPrimary()
+        advanceUntilIdle()
+
+        assertEquals(MainScreen.MeditationTimer, viewModel.uiState.screen)
+        assertEquals(10, viewModel.uiState.currentContent?.durationMinutes)
+        assertEquals("10-minute reset", viewModel.uiState.currentContent?.title)
+        assertEquals(10, settingsRepository.state.value.meditationDurationMinutes)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun setContentPriorityUpdatesSettingsAndRecommendationPreferences() = runTest {
+        val recommendationEngine = RecordingRecommendationEngine()
+        val settingsRepository = FakeSettingsRepository()
+        val viewModel = createViewModel(
+            settingsRepository = settingsRepository,
+            recommendationEngine = recommendationEngine,
+        )
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+        viewModel.setContentPriority(ContentPriority.MY_FILES)
+        advanceUntilIdle()
+        viewModel.triggerDebugIntervention(nowMillis = 2_000L)
+        advanceUntilIdle()
+
+        assertEquals(ContentPriority.MY_FILES, viewModel.uiState.contentPriority)
+        assertEquals(ContentPriority.MY_FILES, settingsRepository.state.value.contentPriority)
+        assertEquals(ContentPriority.MY_FILES, recommendationEngine.lastPreferences?.contentPriority)
     }
 
     @Test
@@ -1742,6 +1800,7 @@ class MainViewModelTest {
                 selectedPackIds = selection.selectedPackIds,
                 themeMode = state.value.themeMode,
                 meditationDurationMinutes = state.value.meditationDurationMinutes,
+                contentPriority = state.value.contentPriority,
             )
         }
 
@@ -1759,6 +1818,10 @@ class MainViewModelTest {
 
         override suspend fun saveMeditationDurationMinutes(minutes: Int) {
             state.value = state.value.copy(meditationDurationMinutes = minutes)
+        }
+
+        override suspend fun saveContentPriority(priority: ContentPriority) {
+            state.value = state.value.copy(contentPriority = priority)
         }
     }
 
@@ -2185,6 +2248,8 @@ class MainViewModelTest {
     private class RecordingRecommendationEngine : RecommendationEngine {
         var lastInventory: List<ContentItem> = emptyList()
             private set
+        var lastPreferences: UserPreferences? = null
+            private set
         var lastPrimaryExcludedIds: Set<String> = emptySet()
             private set
 
@@ -2196,6 +2261,7 @@ class MainViewModelTest {
             signals: RecommendationSignals,
             nowMillis: Long,
         ): RecommendationSet? {
+            lastPreferences = preferences
             lastInventory = inventory
             lastPrimaryExcludedIds = primaryExcludedIds
             return null

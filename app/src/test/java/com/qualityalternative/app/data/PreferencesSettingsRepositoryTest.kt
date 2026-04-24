@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.qualityalternative.app.domain.model.AppThemeMode
+import com.qualityalternative.app.domain.model.ContentPriority
 import com.qualityalternative.app.domain.model.DurationBucket
 import com.qualityalternative.app.domain.model.OnboardingSelection
 import com.qualityalternative.app.domain.model.TopicTag
@@ -88,6 +89,28 @@ class PreferencesSettingsRepositoryTest {
         assertTrue(restored.hasCompletedOnboarding)
         assertEquals(selection.selectedAppPackages, restored.selectedAppPackages)
         assertEquals(5, restored.meditationDurationMinutes)
+    }
+
+    @Test
+    fun saveContentPriority_persistsWithoutResettingOnboarding() = runBlocking {
+        val repository = PreferencesSettingsRepository(
+            dataStore = testDataStore(),
+            supportedApps = SupportedCatalog.distractingApps,
+        )
+        val selection = OnboardingSelection(
+            selectedAppPackages = SupportedCatalog.distractingApps.take(3).mapTo(mutableSetOf()) { it.packageName },
+            preferredTopics = setOf(TopicTag.PHILOSOPHY, TopicTag.SCIENCE, TopicTag.HISTORY),
+            preferredDurationBucket = DurationBucket.FOCUS,
+            selectedPackIds = setOf("science"),
+        )
+
+        repository.saveOnboardingSelection(selection)
+        repository.saveContentPriority(ContentPriority.MY_FILES)
+
+        val restored = repository.observeAppSettings().first()
+        assertTrue(restored.hasCompletedOnboarding)
+        assertEquals(selection.selectedAppPackages, restored.selectedAppPackages)
+        assertEquals(ContentPriority.MY_FILES, restored.contentPriority)
     }
 
     @Test

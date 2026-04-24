@@ -97,6 +97,7 @@ import com.qualityalternative.app.domain.model.AnalyticsEventType
 import com.qualityalternative.app.domain.model.AppThemeMode
 import com.qualityalternative.app.domain.model.ContentFormat
 import com.qualityalternative.app.domain.model.ContentItem
+import com.qualityalternative.app.domain.model.ContentPriority
 import com.qualityalternative.app.domain.model.ContentSourceType
 import com.qualityalternative.app.domain.model.DelayWindow
 import com.qualityalternative.app.domain.model.DistractingApp
@@ -309,6 +310,7 @@ private fun MainRoute(
                 onToggleApp = viewModel::toggleSettingsApp,
                 onSelectDuration = viewModel::setPreferredDuration,
                 onSelectMeditationDuration = viewModel::setMeditationDurationMinutes,
+                onSelectContentPriority = viewModel::setContentPriority,
                 onSelectTheme = viewModel::selectThemeMode,
                 onRefreshReadiness = viewModel::refreshPermissionReadiness,
             )
@@ -350,6 +352,7 @@ private fun MainRoute(
             state = state,
             onAcceptPrimary = viewModel::acceptPrimary,
             onAcceptBackup = viewModel::acceptBackup,
+            onSelectMeditationDuration = viewModel::setMeditationDurationMinutes,
             onDelay = viewModel::delayFor15Minutes,
             onOpenAnyway = {
                 if (viewModel.openAnyway()) {
@@ -373,6 +376,7 @@ private fun MainRoute(
 
         MainScreen.MeditationTimer -> MeditationTimerScreen(
             state = state,
+            onSelectMeditationDuration = viewModel::setMeditationDurationMinutes,
             onComplete = viewModel::finishMeditationReset,
             onBack = viewModel::skipMeditationReset,
         )
@@ -1293,6 +1297,7 @@ private fun InterventionScreen(
     state: MainUiState,
     onAcceptPrimary: () -> Unit,
     onAcceptBackup: (ContentItem) -> Unit,
+    onSelectMeditationDuration: (Int) -> Unit,
     onDelay: () -> Unit,
     onOpenAnyway: () -> Unit,
 ) {
@@ -1301,6 +1306,7 @@ private fun InterventionScreen(
     val colors = QualityAlternativeThemeTokens.colors
     val primary = recommendationSet.primary
     val backups = recommendationSet.backups.take(MAX_BACKUP_RECOMMENDATIONS)
+    val canAdjustMeditationBeforeStart = primary.usesMeditationTimer()
     val backgroundBrush = Brush.verticalGradient(
         colors = listOf(
             colors.accentSoft,
@@ -1319,7 +1325,7 @@ private fun InterventionScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 28.dp),
+                .padding(bottom = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
@@ -1335,15 +1341,15 @@ private fun InterventionScreen(
         MonoText("A brief detour, if you'd like one", modifier = Modifier.padding(bottom = 14.dp))
         QaCard(
             borderColor = colors.lineStrong,
-            padding = 25.dp,
-            modifier = Modifier.padding(bottom = 18.dp),
+            padding = 20.dp,
+            modifier = Modifier.padding(bottom = 12.dp),
         ) {
             ContentMetaRow(primary, stacked = true)
             DisplayText(
                 text = primary.title,
-                fontSize = 32.sp,
-                lineHeight = 35.sp,
-                modifier = Modifier.padding(top = 14.dp, bottom = 12.dp),
+                fontSize = 29.sp,
+                lineHeight = 32.sp,
+                modifier = Modifier.padding(top = 10.dp, bottom = 10.dp),
             )
             Text(
                 text = "\"${primary.description}\"",
@@ -1360,11 +1366,33 @@ private fun InterventionScreen(
             text = primaryActionLabel(primary),
             onClick = onAcceptPrimary,
             variant = QaButtonVariant.Accent,
-            modifier = Modifier.padding(bottom = 16.dp),
+            modifier = Modifier.padding(bottom = 12.dp),
             leadingIcon = primaryActionIcon(primary),
         )
-        MonoText("Or", modifier = Modifier.padding(bottom = 6.dp))
-        Column(modifier = Modifier.padding(bottom = 18.dp)) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = 8.dp),
+        ) {
+            if (canAdjustMeditationBeforeStart) {
+                MeditationDurationChooser(
+                    selectedMinutes = state.meditationDurationMinutes,
+                    onSelect = onSelectMeditationDuration,
+                    label = "Meditation length",
+                    helper = "Default is ${state.meditationDurationMinutes} min. Change it here before starting.",
+                    modifier = Modifier.padding(bottom = 14.dp),
+                    testTagPrefix = "intervention-meditation-duration",
+                )
+            }
+            MonoText("Other options", modifier = Modifier.padding(bottom = 6.dp))
+            BodyText(
+                text = "Pick one of these instead of the main suggestion.",
+                color = colors.mutedText,
+                fontSize = 13.sp,
+                lineHeight = 18.sp,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
             backups.forEachIndexed { index, backup ->
                 BackupRow(
                     item = backup,
@@ -1376,8 +1404,7 @@ private fun InterventionScreen(
                 BodyText("No extra choices are available right now.", color = colors.mutedText)
             }
         }
-        Spacer(modifier = Modifier.weight(1f))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
             QaButton(
                 text = "Pause 15 min",
                 onClick = onDelay,
@@ -1574,6 +1601,7 @@ private fun ExternalLinkHandoffScreen(
 @Composable
 private fun MeditationTimerScreen(
     state: MainUiState,
+    onSelectMeditationDuration: (Int) -> Unit,
     onComplete: () -> Unit,
     onBack: () -> Unit,
 ) {
@@ -1613,55 +1641,76 @@ private fun MeditationTimerScreen(
             .padding(horizontal = 28.dp, vertical = 42.dp),
     ) {
         ScreenHead(onBack = onBack)
-        Spacer(modifier = Modifier.height(28.dp))
-        MonoText("Quiet reset", modifier = Modifier.padding(bottom = 14.dp))
-        DisplayText(
-            text = content.title,
-            fontSize = 34.sp,
-            lineHeight = 37.sp,
-            modifier = Modifier.padding(bottom = 14.dp),
-        )
-        BodyText(
-            text = "Put the phone down if you can. Breathe out slowly. Let the urge pass before deciding what to do next.",
-            color = QualityAlternativeThemeTokens.colors.mutedText,
-            fontSize = 16.sp,
-            lineHeight = 25.sp,
-            modifier = Modifier.padding(bottom = 34.dp),
-        )
-        QaCard(
-            padding = 30.dp,
-            background = QualityAlternativeThemeTokens.colors.accentSoft,
-            borderColor = QualityAlternativeThemeTokens.colors.lineStrong,
-            modifier = Modifier.testTag("meditation-timer-card"),
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(top = 22.dp, bottom = 18.dp),
         ) {
-            MonoText("Timer", modifier = Modifier.padding(bottom = 14.dp), color = QualityAlternativeThemeTokens.colors.accent)
-            Text(
-                text = meditationTimeLabel(remainingSeconds),
-                style = TextStyle(
-                    fontFamily = QualityDisplayFontFamily,
-                    fontSize = 76.sp,
-                    lineHeight = 78.sp,
-                    color = QualityAlternativeThemeTokens.colors.primaryText,
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("meditation-countdown"),
-                textAlign = TextAlign.Center,
+            MonoText("Quiet reset", modifier = Modifier.padding(bottom = 14.dp))
+            DisplayText(
+                text = content.title,
+                fontSize = 34.sp,
+                lineHeight = 37.sp,
+                modifier = Modifier.padding(bottom = 14.dp),
             )
             BodyText(
-                text = if (isComplete) {
-                    "Reset complete. The gong marks the end - log it if it helped."
-                } else {
-                    "No feed. Just ${content.durationMinutes} minutes back. A gong will sound when the timer ends."
-                },
+                text = "Put the phone down if you can. Breathe out slowly. Let the urge pass before deciding what to do next.",
+                color = QualityAlternativeThemeTokens.colors.mutedText,
+                fontSize = 16.sp,
+                lineHeight = 25.sp,
+                modifier = Modifier.padding(bottom = 20.dp),
+            )
+            MeditationDurationChooser(
+                selectedMinutes = content.durationMinutes,
+                onSelect = onSelectMeditationDuration,
+                label = "Length for this reset",
+                helper = "Changing this restarts the countdown and becomes the new default.",
+                modifier = Modifier.padding(bottom = 18.dp),
+                testTagPrefix = "timer-meditation-duration",
+            )
+            BodyText(
+                text = "No feed. Just ${content.durationMinutes} minutes back.",
                 color = QualityAlternativeThemeTokens.colors.mutedText,
                 textAlign = TextAlign.Center,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 18.dp),
+                    .padding(bottom = 12.dp),
             )
+            QaCard(
+                padding = 24.dp,
+                background = QualityAlternativeThemeTokens.colors.accentSoft,
+                borderColor = QualityAlternativeThemeTokens.colors.lineStrong,
+                modifier = Modifier.testTag("meditation-timer-card"),
+            ) {
+                MonoText("Timer", modifier = Modifier.padding(bottom = 14.dp), color = QualityAlternativeThemeTokens.colors.accent)
+                Text(
+                    text = meditationTimeLabel(remainingSeconds),
+                    style = TextStyle(
+                        fontFamily = QualityDisplayFontFamily,
+                        fontSize = 70.sp,
+                        lineHeight = 72.sp,
+                        color = QualityAlternativeThemeTokens.colors.primaryText,
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("meditation-countdown"),
+                    textAlign = TextAlign.Center,
+                )
+                BodyText(
+                    text = if (isComplete) {
+                        "Reset complete. The gong marks the end - log it if it helped."
+                    } else {
+                        "A gong will sound when the timer ends."
+                    },
+                    color = QualityAlternativeThemeTokens.colors.mutedText,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 18.dp),
+                )
+            }
         }
-        Spacer(modifier = Modifier.weight(1f))
         QaButton(
             text = if (isComplete) "Complete reset" else "Timer running",
             onClick = onComplete,
@@ -1806,6 +1855,7 @@ private fun SettingsTab(
     onToggleApp: (DistractingApp) -> Unit,
     onSelectDuration: (DurationBucket) -> Unit,
     onSelectMeditationDuration: (Int) -> Unit,
+    onSelectContentPriority: (ContentPriority) -> Unit,
     onSelectTheme: (AppThemeMode) -> Unit,
     onRefreshReadiness: () -> Unit,
 ) {
@@ -1869,6 +1919,37 @@ private fun SettingsTab(
             }
         }
         item {
+            SectionLabel("Content priority")
+            QaCard {
+                BodyText(
+                    text = "Keep recommendations balanced, or gently prioritize one type.",
+                    color = colors.mutedText,
+                    modifier = Modifier.padding(bottom = 12.dp),
+                )
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    ContentPriority.entries.forEach { priority ->
+                        QaChip(
+                            text = priority.displayLabel(),
+                            selected = state.contentPriority == priority,
+                            onClick = { onSelectContentPriority(priority) },
+                            modifier = Modifier.testTag("content-priority-${priority.name}"),
+                            minHeight = 32.dp,
+                            horizontalPadding = 12.dp,
+                            verticalPadding = 7.dp,
+                            fontSize = 11.5.sp,
+                        )
+                    }
+                }
+                BodyText(
+                    text = state.contentPriority.displayDescription(),
+                    color = colors.mutedText,
+                    fontSize = 12.5.sp,
+                    lineHeight = 17.sp,
+                    modifier = Modifier.padding(top = 10.dp),
+                )
+            }
+        }
+        item {
             SectionLabel("Default session length")
             QaCard {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -1888,21 +1969,15 @@ private fun SettingsTab(
             SectionLabel("Meditation reset")
             QaCard {
                 BodyText(
-                    text = "Choose how long the utility replacement runs before the completion gong.",
+                    text = "Set the default length for the breathing timer. You can still change it right before starting.",
                     color = colors.mutedText,
                     modifier = Modifier.padding(bottom = 12.dp),
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    listOf(1, 3, 5, 10).forEach { minutes ->
-                        QaChip(
-                            text = "${minutes}m",
-                            selected = state.meditationDurationMinutes == minutes,
-                            onClick = { onSelectMeditationDuration(minutes) },
-                            modifier = Modifier.weight(1f).testTag("meditation-duration-$minutes"),
-                            centered = true,
-                        )
-                    }
-                }
+                MeditationDurationChooser(
+                    selectedMinutes = state.meditationDurationMinutes,
+                    onSelect = onSelectMeditationDuration,
+                    testTagPrefix = "meditation-duration",
+                )
             }
         }
         item {
@@ -1942,6 +2017,42 @@ private fun SettingsTab(
                     .padding(vertical = 20.dp),
                 textAlign = TextAlign.Center,
             )
+        }
+    }
+}
+
+@Composable
+private fun MeditationDurationChooser(
+    selectedMinutes: Int,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+    label: String? = null,
+    helper: String? = null,
+    testTagPrefix: String = "meditation-duration",
+) {
+    Column(modifier = modifier) {
+        label?.let {
+            MonoText(text = it, modifier = Modifier.padding(bottom = 6.dp))
+        }
+        helper?.let {
+            BodyText(
+                text = it,
+                color = QualityAlternativeThemeTokens.colors.mutedText,
+                fontSize = 12.5.sp,
+                lineHeight = 18.sp,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf(1, 3, 5, 10).forEach { minutes ->
+                QaChip(
+                    text = "${minutes}m",
+                    selected = selectedMinutes == minutes,
+                    onClick = { onSelect(minutes) },
+                    modifier = Modifier.weight(1f).testTag("$testTagPrefix-$minutes"),
+                    centered = true,
+                )
+            }
         }
     }
 }
@@ -2217,28 +2328,39 @@ private fun BackupRow(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
+    val colors = QualityAlternativeThemeTokens.colors
+    Row(
         modifier = modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
+            .padding(bottom = 8.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .border(BorderStroke(1.dp, colors.line), RoundedCornerShape(16.dp))
+            .background(colors.elevatedSurface)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 13.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        HorizontalDivider(color = QualityAlternativeThemeTokens.colors.line)
-        Row(
-            modifier = Modifier.padding(vertical = 14.dp, horizontal = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        Box(
+            modifier = Modifier
+                .size(34.dp)
+                .clip(CircleShape)
+                .background(colors.accentSoft),
+            contentAlignment = Alignment.Center,
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(item.title, style = MaterialTheme.typography.titleMedium, fontSize = 16.sp, lineHeight = 19.sp, maxLines = 2)
-                MonoText(
-                    "${item.sourceLabel()} · ${item.durationMinutes} min · ${item.topicLine()}",
-                    modifier = Modifier.padding(top = 3.dp),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            QaIcon(kind = QaIconKind.ChevronRight, color = QualityAlternativeThemeTokens.colors.faintText, size = 18.dp)
+            QaIcon(kind = primaryActionIcon(item), color = colors.accent, size = 17.dp)
         }
+        Column(modifier = Modifier.weight(1f)) {
+            MonoText("Try instead · ${item.durationMinutes} min", color = colors.accent, modifier = Modifier.padding(bottom = 3.dp))
+            Text(item.title, style = MaterialTheme.typography.titleMedium, fontSize = 16.sp, lineHeight = 19.sp, maxLines = 2)
+            MonoText(
+                "${item.sourceLabel()} · ${item.topicLine()}",
+                modifier = Modifier.padding(top = 3.dp),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        QaIcon(kind = QaIconKind.ChevronRight, color = colors.faintText, size = 18.dp)
     }
 }
 
@@ -3379,6 +3501,26 @@ private fun TopicTag.displayName(): String {
         TopicTag.ARCHITECTURE -> "Architecture"
         TopicTag.CREATIVITY -> "Design"
         TopicTag.PSYCHOLOGY -> "Psychology"
+    }
+}
+
+private fun ContentPriority.displayLabel(): String {
+    return when (this) {
+        ContentPriority.BALANCED -> "Balanced"
+        ContentPriority.READINGS -> "Built-in readings"
+        ContentPriority.MY_FILES -> "My files"
+        ContentPriority.SAVED_LINKS -> "Saved links"
+        ContentPriority.MEDITATION -> "Meditation"
+    }
+}
+
+private fun ContentPriority.displayDescription(): String {
+    return when (this) {
+        ContentPriority.BALANCED -> "Let the app choose from all eligible replacements."
+        ContentPriority.READINGS -> "Prefer curated reader pieces when they fit."
+        ContentPriority.MY_FILES -> "Prefer your imported Markdown, EPUB, or PDF handoffs."
+        ContentPriority.SAVED_LINKS -> "Prefer your saved external links."
+        ContentPriority.MEDITATION -> "Prefer the breathing timer when it is a good fit."
     }
 }
 

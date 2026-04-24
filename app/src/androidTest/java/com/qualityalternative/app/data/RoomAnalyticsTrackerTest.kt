@@ -16,6 +16,7 @@ import com.qualityalternative.app.domain.model.AnalyticsSemanticKeys
 import com.qualityalternative.app.domain.model.AppSettings
 import com.qualityalternative.app.domain.model.AnalyticsEventType
 import com.qualityalternative.app.domain.model.AppThemeMode
+import com.qualityalternative.app.domain.model.ContentPriority
 import com.qualityalternative.app.domain.model.ContentFormat
 import com.qualityalternative.app.domain.model.ContentItem
 import com.qualityalternative.app.domain.model.DelayWindow
@@ -677,6 +678,7 @@ class RoomAnalyticsTrackerTest {
                 selectedPackIds = selection.selectedPackIds,
                 themeMode = state.value.themeMode,
                 meditationDurationMinutes = state.value.meditationDurationMinutes,
+                contentPriority = state.value.contentPriority,
             )
         }
 
@@ -694,6 +696,10 @@ class RoomAnalyticsTrackerTest {
 
         override suspend fun saveMeditationDurationMinutes(minutes: Int) {
             state.value = state.value.copy(meditationDurationMinutes = minutes)
+        }
+
+        override suspend fun saveContentPriority(priority: ContentPriority) {
+            state.value = state.value.copy(contentPriority = priority)
         }
     }
 

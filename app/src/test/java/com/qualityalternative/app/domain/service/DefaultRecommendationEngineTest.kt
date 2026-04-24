@@ -3,6 +3,7 @@ package com.qualityalternative.app.domain.service
 import com.qualityalternative.app.domain.model.ContentAvailability
 import com.qualityalternative.app.domain.model.ContentFormat
 import com.qualityalternative.app.domain.model.ContentItem
+import com.qualityalternative.app.domain.model.ContentPriority
 import com.qualityalternative.app.domain.model.ContentRenderMode
 import com.qualityalternative.app.domain.model.ContentRightsClass
 import com.qualityalternative.app.domain.model.ContentRightsMetadata
@@ -392,6 +393,44 @@ class DefaultRecommendationEngineTest {
             listOfNotNull(result?.primary).plus(result?.backups.orEmpty()).map(ContentItem::id).toSet().size,
         )
         assertEquals(false, result?.inventoryShortage)
+    }
+
+    @Test
+    fun generate_boostsSelectedContentPriorityWithoutExpandingFiniteSet() {
+        val preferences = UserPreferences(
+            selectedApps = listOf(DistractingApp(packageName = "pkg", displayName = "Instagram")),
+            preferredTopics = setOf(TopicTag.SCIENCE),
+            preferredDurationBucket = DurationBucket.FOCUS,
+            selectedPackIds = setOf("pack", "documents"),
+            contentPriority = ContentPriority.MY_FILES,
+        )
+        val inventory = listOf(
+            item(id = "editorial", minutes = 6, topics = setOf(TopicTag.SCIENCE)),
+            item(
+                id = "document",
+                packId = "documents",
+                minutes = 6,
+                topics = setOf(TopicTag.SCIENCE),
+                sourceType = ContentSourceType.USER_DOCUMENT,
+                rights = ContentRightsMetadata(
+                    rightsClass = ContentRightsClass.USER_PRIVATE,
+                    renderMode = ContentRenderMode.USER_PRIVATE_READER,
+                ),
+            ),
+            item(id = "backup", minutes = 5, topics = setOf(TopicTag.HISTORY)),
+        )
+
+        val result = engine.generate(
+            targetApp = DistractingApp(packageName = "pkg", displayName = "Instagram"),
+            preferences = preferences,
+            inventory = inventory,
+            primaryExcludedIds = emptySet(),
+            signals = RecommendationSignals(timeOfDay = TimeOfDayBucket.MIDDAY),
+            nowMillis = 0L,
+        )
+
+        assertEquals("document", result?.primary?.id)
+        assertEquals(2, result?.backups?.size)
     }
 
     private fun item(

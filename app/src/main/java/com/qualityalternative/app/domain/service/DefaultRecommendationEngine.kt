@@ -1,6 +1,7 @@
 package com.qualityalternative.app.domain.service
 
 import com.qualityalternative.app.domain.model.ContentItem
+import com.qualityalternative.app.domain.model.ContentPriority
 import com.qualityalternative.app.domain.model.ContentSourceType
 import com.qualityalternative.app.domain.model.DistractingApp
 import com.qualityalternative.app.domain.model.DurationBucket
@@ -90,6 +91,7 @@ class DefaultRecommendationEngine : RecommendationEngine {
         val skipPenalty = item.topicTags.intersect(signals.skippedTopics).size * 18
         val packBoost = if (item.packId in signals.successfulPackIds) 20 else 0
         val utilityBoost = if (item.sourceType == ContentSourceType.MEDITATION) 24 else 0
+        val priorityBoost = preferences.contentPriority.boostFor(item.sourceType)
         val timeOfDayBoost = when (signals.timeOfDay) {
             TimeOfDayBucket.MORNING -> when {
                 item.durationMinutes <= DurationBucket.QUICK.maxMinutes -> 18
@@ -101,7 +103,7 @@ class DefaultRecommendationEngine : RecommendationEngine {
             TimeOfDayBucket.EVENING -> if (DurationBucket.DEEP.contains(item.durationMinutes)) 18 else 6
             TimeOfDayBucket.NIGHT -> if (item.durationMinutes <= DurationBucket.FOCUS.maxMinutes) 14 else 0
         }
-        return topicScore + durationScore + completionBoost + packBoost + utilityBoost + timeOfDayBoost - skipPenalty
+        return topicScore + durationScore + completionBoost + packBoost + utilityBoost + priorityBoost + timeOfDayBoost - skipPenalty
     }
 
     private data class ScoredCandidate(
@@ -121,6 +123,16 @@ class DefaultRecommendationEngine : RecommendationEngine {
             ContentSourceType.MEDITATION -> 1
             ContentSourceType.USER_DOCUMENT -> 2
             ContentSourceType.USER_LINK -> 3
+        }
+    }
+
+    private fun ContentPriority.boostFor(sourceType: ContentSourceType): Int {
+        return when (this) {
+            ContentPriority.BALANCED -> 0
+            ContentPriority.READINGS -> if (sourceType == ContentSourceType.EDITORIAL) 48 else 0
+            ContentPriority.MY_FILES -> if (sourceType == ContentSourceType.USER_DOCUMENT) 48 else 0
+            ContentPriority.SAVED_LINKS -> if (sourceType == ContentSourceType.USER_LINK) 48 else 0
+            ContentPriority.MEDITATION -> if (sourceType == ContentSourceType.MEDITATION) 48 else 0
         }
     }
 }

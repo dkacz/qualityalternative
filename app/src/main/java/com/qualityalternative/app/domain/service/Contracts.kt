@@ -4,6 +4,7 @@ import com.qualityalternative.app.domain.model.AnalyticsEvent
 import com.qualityalternative.app.domain.model.AppSettings
 import com.qualityalternative.app.domain.model.AppThemeMode
 import com.qualityalternative.app.domain.model.ContentItem
+import com.qualityalternative.app.domain.model.ContentPriority
 import com.qualityalternative.app.domain.model.DelayInspection
 import com.qualityalternative.app.domain.model.DelayWindow
 import com.qualityalternative.app.domain.model.DistractingApp
@@ -95,6 +96,7 @@ interface SettingsRepository {
     suspend fun savePreferredDurationBucket(bucket: DurationBucket)
     suspend fun saveThemeMode(themeMode: AppThemeMode)
     suspend fun saveMeditationDurationMinutes(minutes: Int)
+    suspend fun saveContentPriority(priority: ContentPriority)
 }
 
 interface RecommendationEngine {

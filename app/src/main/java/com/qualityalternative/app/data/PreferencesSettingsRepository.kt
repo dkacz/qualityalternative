@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import com.qualityalternative.app.domain.model.AppSettings
 import com.qualityalternative.app.domain.model.AppThemeMode
+import com.qualityalternative.app.domain.model.ContentPriority
 import com.qualityalternative.app.domain.model.DEFAULT_MEDITATION_MINUTES
 import com.qualityalternative.app.domain.model.DistractingApp
 import com.qualityalternative.app.domain.model.DurationBucket
@@ -51,6 +52,7 @@ class PreferencesSettingsRepository(
                     themeMode = parseThemeMode(preferences[ThemeMode]),
                     meditationDurationMinutes = (preferences[MeditationDurationMinutes] ?: DEFAULT_MEDITATION_MINUTES)
                         .coerceIn(MIN_MEDITATION_MINUTES, MAX_MEDITATION_MINUTES),
+                    contentPriority = parseContentPriority(preferences[ContentPriorityPreference]),
                 )
             }
     }
@@ -91,6 +93,12 @@ class PreferencesSettingsRepository(
         }
     }
 
+    override suspend fun saveContentPriority(priority: ContentPriority) {
+        dataStore.edit { preferences ->
+            preferences[ContentPriorityPreference] = priority.name
+        }
+    }
+
     suspend fun clearForTests() {
         dataStore.edit { preferences ->
             preferences.clear()
@@ -105,6 +113,12 @@ class PreferencesSettingsRepository(
             }.getOrDefault(AppThemeMode.LIGHT)
         }
 
+        fun parseContentPriority(raw: String?): ContentPriority {
+            return runCatching {
+                ContentPriority.valueOf(raw ?: ContentPriority.BALANCED.name)
+            }.getOrDefault(ContentPriority.BALANCED)
+        }
+
         val HasCompletedOnboarding = booleanPreferencesKey("has_completed_onboarding")
         val SelectedAppPackages = stringSetPreferencesKey("selected_app_packages")
         val PreferredTopics = stringSetPreferencesKey("preferred_topics")
@@ -112,5 +126,6 @@ class PreferencesSettingsRepository(
         val SelectedPackIds = stringSetPreferencesKey("selected_pack_ids")
         val ThemeMode = stringPreferencesKey("theme_mode")
         val MeditationDurationMinutes = intPreferencesKey("meditation_duration_minutes")
+        val ContentPriorityPreference = stringPreferencesKey("content_priority")
     }
 }

@@ -18,6 +18,7 @@ import com.qualityalternative.app.domain.model.AppThemeMode
 import com.qualityalternative.app.domain.model.ContentAvailability
 import com.qualityalternative.app.domain.model.ContentFormat
 import com.qualityalternative.app.domain.model.ContentItem
+import com.qualityalternative.app.domain.model.ContentPriority
 import com.qualityalternative.app.domain.model.ContentSourceType
 import com.qualityalternative.app.domain.model.DEFAULT_MEDITATION_MINUTES
 import com.qualityalternative.app.domain.model.DelayWindow
@@ -99,6 +100,7 @@ data class MainUiState(
     val savedLinkConfirmation: AddLinkConfirmation? = null,
     val themeMode: AppThemeMode = AppThemeMode.LIGHT,
     val meditationDurationMinutes: Int = DEFAULT_MEDITATION_MINUTES,
+    val contentPriority: ContentPriority = ContentPriority.BALANCED,
     val latestMessage: String? = null,
     val events: List<AnalyticsEvent> = emptyList(),
     val screen: MainScreen = MainScreen.Onboarding,
@@ -360,13 +362,33 @@ class MainViewModel(
 
     fun setMeditationDurationMinutes(minutes: Int) {
         val preferences = uiState.preferences
+        val meditation = meditationTimerContentItem(minutes)
         uiState = uiState.copy(
-            meditationDurationMinutes = minutes,
-            preferences = preferences?.copy(meditationDurationMinutes = minutes),
+            meditationDurationMinutes = meditation.durationMinutes,
+            preferences = preferences?.copy(meditationDurationMinutes = meditation.durationMinutes),
+            currentRecommendationSet = uiState.currentRecommendationSet?.withMeditationDuration(meditation),
+            currentContent = uiState.currentContent?.replaceIfMeditation(meditation),
+            currentSessionStartedAtMillis = if (uiState.currentContent?.usesMeditationTimer() == true) {
+                nowProvider()
+            } else {
+                uiState.currentSessionStartedAtMillis
+            },
             latestMessage = null,
         )
         viewModelScope.launch {
-            settingsRepository.saveMeditationDurationMinutes(minutes)
+            settingsRepository.saveMeditationDurationMinutes(meditation.durationMinutes)
+        }
+    }
+
+    fun setContentPriority(priority: ContentPriority) {
+        val preferences = uiState.preferences
+        uiState = uiState.copy(
+            contentPriority = priority,
+            preferences = preferences?.copy(contentPriority = priority),
+            latestMessage = null,
+        )
+        viewModelScope.launch {
+            settingsRepository.saveContentPriority(priority)
         }
     }
 
@@ -1216,6 +1238,7 @@ class MainViewModel(
             preferences = preferences.takeIf { settings.hasCompletedOnboarding },
             themeMode = settings.themeMode,
             meditationDurationMinutes = settings.meditationDurationMinutes,
+            contentPriority = settings.contentPriority,
             onboardingSelection = settings.toOnboardingSelection(
                 supportedApps = supportedApps,
                 starterPacks = starterPacks,
@@ -1853,7 +1876,19 @@ private fun AppSettings.toUserPreferences(
         preferredDurationBucket = preferredDurationBucket,
         selectedPackIds = packs,
         meditationDurationMinutes = meditationDurationMinutes,
+        contentPriority = contentPriority,
     )
+}
+
+private fun RecommendationSet.withMeditationDuration(meditation: ContentItem): RecommendationSet {
+    return copy(
+        primary = primary.replaceIfMeditation(meditation),
+        backups = backups.map { item -> item.replaceIfMeditation(meditation) },
+    )
+}
+
+private fun ContentItem.replaceIfMeditation(meditation: ContentItem): ContentItem {
+    return if (usesMeditationTimer()) meditation else this
 }
 
 private fun ContentItem.toAddLinkConfirmation(): AddLinkConfirmation {
