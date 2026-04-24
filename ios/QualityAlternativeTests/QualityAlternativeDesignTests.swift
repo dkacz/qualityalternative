@@ -392,6 +392,48 @@ final class QualityAlternativeDesignTests: XCTestCase {
         XCTAssertEqual(decision.action, .keepShield)
     }
 
+    func testDeviceActivityCallbackPlannerKeepsShieldForEmptySelection() {
+        let now = Date(timeIntervalSince1970: 1_777_000_000)
+        let emptySelection = QAScreenTimeSelectionSummary(applicationCount: 0, categoryCount: 0, webDomainCount: 0)
+        let armed = QAShieldSessionState.armed(
+            session: QASampleData.session,
+            selection: emptySelection,
+            now: now
+        )
+
+        let started = QADeviceActivityMonitorCallbackPlanner.decision(
+            kind: .intervalStarted,
+            activityName: QADeviceActivityNames.protectedWindow.rawValue,
+            eventName: nil,
+            session: armed,
+            selection: emptySelection,
+            now: now
+        )
+        let threshold = QADeviceActivityMonitorCallbackPlanner.decision(
+            kind: .thresholdReached,
+            activityName: QADeviceActivityNames.protectedWindow.rawValue,
+            eventName: QADeviceActivityNames.firstMinute.rawValue,
+            session: armed,
+            selection: emptySelection,
+            now: now
+        )
+        let ended = QADeviceActivityMonitorCallbackPlanner.decision(
+            kind: .intervalEnded,
+            activityName: QADeviceActivityNames.protectedWindow.rawValue,
+            eventName: nil,
+            session: armed,
+            selection: emptySelection,
+            now: now
+        )
+
+        XCTAssertNil(started.event)
+        XCTAssertEqual(started.action, .keepShield)
+        XCTAssertNil(threshold.event)
+        XCTAssertEqual(threshold.action, .keepShield)
+        XCTAssertNil(ended.event)
+        XCTAssertEqual(ended.action, .keepShield)
+    }
+
     func testDeviceActivityCallbackPlannerRecordsOnlyGenericThresholdEvent() {
         let now = Date(timeIntervalSince1970: 1_777_000_000)
         let selection = QAScreenTimeSelectionSummary(applicationCount: 1, categoryCount: 0, webDomainCount: 0)
@@ -418,6 +460,55 @@ final class QualityAlternativeDesignTests: XCTestCase {
         XCTAssertEqual(safeDecision.action, .applyShield)
         XCTAssertNil(hostileDecision.event)
         XCTAssertEqual(hostileDecision.action, .keepShield)
+    }
+
+    func testDeviceActivityScheduleStoreDoesNotRecordWithoutActiveNonEmptySchedule() {
+        let suiteName = "qa.deviceActivitySchedule.tests.\(UUID().uuidString)"
+        let userDefaults = UserDefaults(suiteName: suiteName)
+        defer {
+            userDefaults?.removePersistentDomain(forName: suiteName)
+        }
+        let now = Date(timeIntervalSince1970: 1_777_000_000)
+        guard let event = QADeviceActivityMonitorEventRecord.tokenSafe(
+            kind: .intervalStarted,
+            activityName: QADeviceActivityNames.protectedWindow.rawValue,
+            eventName: nil,
+            createdAt: now
+        ) else {
+            XCTFail("Expected generic protected-window event metadata to be token safe.")
+            return
+        }
+
+        QADeviceActivityScheduleStore.record(event, userDefaults: userDefaults)
+
+        XCTAssertNil(QADeviceActivityScheduleStore.load(userDefaults: userDefaults))
+    }
+
+    func testDeviceActivityScheduleStoreRecordsOnlyForActiveNonEmptySchedule() {
+        let suiteName = "qa.deviceActivitySchedule.tests.\(UUID().uuidString)"
+        let userDefaults = UserDefaults(suiteName: suiteName)
+        defer {
+            userDefaults?.removePersistentDomain(forName: suiteName)
+        }
+        let now = Date(timeIntervalSince1970: 1_777_000_000)
+        let scheduled = QADeviceActivityScheduleState.scheduled(
+            selection: QAScreenTimeSelectionSummary(applicationCount: 1, categoryCount: 0, webDomainCount: 0),
+            now: now
+        )
+        guard let event = QADeviceActivityMonitorEventRecord.tokenSafe(
+            kind: .thresholdReached,
+            activityName: QADeviceActivityNames.protectedWindow.rawValue,
+            eventName: QADeviceActivityNames.firstMinute.rawValue,
+            createdAt: now.addingTimeInterval(1)
+        ) else {
+            XCTFail("Expected generic protected-window event metadata to be token safe.")
+            return
+        }
+
+        QADeviceActivityScheduleStore.save(scheduled, userDefaults: userDefaults)
+        QADeviceActivityScheduleStore.record(event, userDefaults: userDefaults)
+
+        XCTAssertEqual(QADeviceActivityScheduleStore.load(userDefaults: userDefaults)?.lastEvent, event)
     }
 
     func testShieldActionIntentStorePersistsAndClearsThroughInjectedDefaults() {

@@ -35,6 +35,10 @@ enum QADeviceActivityScheduleFailureReason: String, Codable, Equatable {
     }
 }
 
+private extension QAScreenTimeSelectionSummary {
+    static let empty = QAScreenTimeSelectionSummary(applicationCount: 0, categoryCount: 0, webDomainCount: 0)
+}
+
 enum QADeviceActivityMonitorAction: Equatable {
     case applyShield
     case clearShield
@@ -392,6 +396,13 @@ enum QADeviceActivityMonitorCallbackPlanner {
                 updatedSession: nil
             )
         }
+        guard selection.hasProtectedTargets else {
+            return QADeviceActivityMonitorCallbackDecision(
+                event: nil,
+                action: .keepShield,
+                updatedSession: nil
+            )
+        }
 
         if kind == .intervalEnded {
             return QADeviceActivityMonitorCallbackDecision(
@@ -453,12 +464,12 @@ enum QADeviceActivityScheduleStore {
     }
 
     static func record(_ event: QADeviceActivityMonitorEventRecord, userDefaults: UserDefaults? = QAAppGroup.userDefaults) {
-        let state = load(userDefaults: userDefaults)
-            ?? QADeviceActivityScheduleState.scheduled(selection: .empty, now: event.createdAt)
+        guard let state = load(userDefaults: userDefaults),
+              state.mode == .scheduled,
+              state.selection.hasProtectedTargets else {
+            deviceActivityScheduleLogger.error("Refusing to record DeviceActivity callback without an active non-empty schedule.")
+            return
+        }
         save(state.recording(event), userDefaults: userDefaults)
     }
-}
-
-private extension QAScreenTimeSelectionSummary {
-    static let empty = QAScreenTimeSelectionSummary(applicationCount: 0, categoryCount: 0, webDomainCount: 0)
 }

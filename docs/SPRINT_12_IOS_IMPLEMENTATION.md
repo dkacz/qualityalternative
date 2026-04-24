@@ -375,6 +375,18 @@ Review-fix validation completed on 2026-04-24:
 - Result bundle: `output/ios_sprint12_slice12_5_review_fix_validation_20260424_164800/QualityAlternative.xcresult`
 - Test summary: `output/ios_sprint12_slice12_5_review_fix_validation_20260424_164800/test_summary.json`
 
+Empty-selection review-fix validation completed on 2026-04-24:
+
+- `git diff --check`: PASS
+- `plutil -lint` for app and extension entitlements/Info.plists, including `ios/QualityAlternative/Info.plist`: PASS
+- `xcodebuild test`: PASS on `QA iPhone 16 Sprint12`
+- Unit tests: 29 passed, 0 failed
+- UI visual QA tests: 1 passed, 0 failed
+- Total tests: 30 passed, 0 failed
+- Result bundle: `output/ios_sprint12_slice12_5_empty_selection_fix_validation_20260424_165500/QualityAlternative.xcresult`
+- Test summary: `output/ios_sprint12_slice12_5_empty_selection_fix_validation_20260424_165500/test_summary.json`
+- Screenshot attachments: `output/ios_sprint12_slice12_5_empty_selection_fix_validation_20260424_165500/attachments/manifest.json`
+
 Visual QA artifacts:
 
 - Contact sheet: `docs/visual-qa/sprint12-ios-slice12-5/contact_sheet.png`
@@ -388,6 +400,8 @@ Implemented state:
 - `QADeviceActivityScheduleState` stores token-safe schedule metadata only: opaque counts, typed generic activity/event names, interval metadata, mode, bounded failure reasons, timestamps, and generic event kinds.
 - DeviceActivity schedule writes fail closed with observable logging when App Group storage is unavailable.
 - The monitor extension scopes callbacks to the generic protected-window activity before recording events or mutating shields.
+- The monitor callback planner refuses even generic protected-window callbacks when the current protected selection is empty.
+- The schedule store refuses callback recording unless an existing scheduled state has a non-empty protected selection.
 - Open-anyway is finite: the monitor clears shields once during a bounded open-anyway window, then persists an armed replacement state for later callbacks.
 - Empty protected selections do not create monitor events, and monitor policy is covered by positive and hostile-input unit tests.
 - Settings visual QA now keeps scrolled DeviceActivity evidence below the iOS status bar.
@@ -412,7 +426,16 @@ GPT Pro retry review:
 GPT Pro review-fix follow-up:
 
 - Lane: `https://chatgpt.com/c/69eb7d2d-8f0c-838b-8297-c8ca0d37d91e`
-- Status: pending
+- Harvested verdict: `REVISE`
+- Status: addressed by empty-selection review-fix implementation and validation
 - Prompt: `PRO_REVIEW_PROMPT_20260424_162127.md`
 - Bundle: `QUALITY_ALTERNATIVE_IOS_REVIEW_BUNDLE_20260424_162127.zip`
-- Expected harvest path: `PRO_REVIEW_OUTPUT_20260424_162127/`
+- Harvest path: `PRO_REVIEW_OUTPUT_20260424_162127/`
+
+GPT Pro empty-selection follow-up:
+
+- Lane: pending
+- Status: pending follow-up launch
+- Prompt: `PRO_REVIEW_PROMPT_20260424_164357.md`
+- Bundle: `QUALITY_ALTERNATIVE_IOS_REVIEW_BUNDLE_20260424_164357.zip`
+- Expected harvest path: `PRO_REVIEW_OUTPUT_20260424_164357/`
