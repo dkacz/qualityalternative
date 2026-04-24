@@ -23,5 +23,10 @@ out/
 # Logs
 *.log
 
+# Review artifacts
+PRO_REVIEW_PROMPT_*.md
+PRO_REVIEW_OUTPUT_*/
+QUALITY_ALTERNATIVE_IOS_REVIEW_BUNDLE_*.zip
+
 # OS files
 Thumbs.db

@@ -67,11 +67,11 @@ final class QualityAlternativeVisualQaTests: XCTestCase {
     }
 
     private func assertScreenTimeSetup(in app: XCUIApplication) {
-        let elements = app.descendants(matching: .any)
-        XCTAssertTrue(elements["screen-time-setup-card"].exists)
-        XCTAssertTrue(elements["screen-time-status-pill"].exists)
-        XCTAssertTrue(elements["screen-time-selection-summary"].exists)
-        XCTAssertTrue(elements["request-screen-time-access"].exists)
-        XCTAssertTrue(elements["choose-protected-apps"].exists)
+        XCTAssertTrue(app.staticTexts["Screen Time setup"].exists)
+        XCTAssertTrue(app.staticTexts["Permission not requested"].exists)
+        XCTAssertTrue(app.staticTexts["No shield yet"].exists)
+        XCTAssertTrue(app.staticTexts["No protected apps, categories, or websites selected yet."].exists)
+        XCTAssertTrue(app.buttons["Request Screen Time access"].exists)
+        XCTAssertTrue(app.buttons["Choose protected apps"].exists)
     }
 }

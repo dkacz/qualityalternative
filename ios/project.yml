@@ -37,6 +37,7 @@ targets:
         TARGETED_DEVICE_FAMILY: 1
         SUPPORTS_MACCATALYST: NO
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        CODE_SIGN_ENTITLEMENTS: QualityAlternative/QualityAlternative.entitlements
     scheme:
       testTargets:
         - QualityAlternativeTests

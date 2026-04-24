@@ -318,20 +318,10 @@ struct SettingsScreen: View {
                                 )
                                 StatusPill(text: setupSnapshot.canPrepareShielding ? "Ready for shield spike" : "No shield yet", tone: setupSnapshot.canPrepareShielding ? .success : .neutral)
                             }
-                            Color.clear
-                                .frame(width: 1, height: 1)
-                                .accessibilityElement()
-                                .accessibilityLabel("screen-time-status-pill")
-                                .accessibilityIdentifier("screen-time-status-pill")
 
                             Text(selectionSummaryText)
                                 .font(.qaBody(15))
                                 .foregroundStyle(tokens.colors.primaryText)
-                                .accessibilityIdentifier("screen-time-selection-summary")
-                            Color.clear
-                                .frame(width: 1, height: 1)
-                                .accessibilityElement()
-                                .accessibilityLabel("screen-time-selection-summary")
                                 .accessibilityIdentifier("screen-time-selection-summary")
 
                             if let screenTimeAuthorizationError {
@@ -347,11 +337,6 @@ struct SettingsScreen: View {
                                 accessibilityIdentifier: "request-screen-time-access",
                                 action: onRequestScreenTimeAuthorization
                             )
-                            Color.clear
-                                .frame(width: 1, height: 1)
-                                .accessibilityElement()
-                                .accessibilityLabel("request-screen-time-access")
-                                .accessibilityIdentifier("request-screen-time-access")
                             QAButton(
                                 title: "Choose protected apps",
                                 style: .secondary,
@@ -359,11 +344,6 @@ struct SettingsScreen: View {
                             ) {
                                 isFamilyActivityPickerPresented = true
                             }
-                            Color.clear
-                                .frame(width: 1, height: 1)
-                                .accessibilityElement()
-                                .accessibilityLabel("choose-protected-apps")
-                                .accessibilityIdentifier("choose-protected-apps")
 
                             Text("iOS stores opaque app/site/category tokens. Real shielding still needs later device validation.")
                                 .font(.qaBody(12))

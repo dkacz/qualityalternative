@@ -1,6 +1,6 @@
 # Sprint 12 iOS Implementation
 
-Status: `slice_12_2_pro_review_pending`
+Status: `slice_12_2_followup_pro_review_pending`
 Branch: `codex/sprint12-ios-implementation`
 
 ## Goal
@@ -136,8 +136,9 @@ Validation completed on 2026-04-24:
 - Unit tests: 5 passed, 0 failed
 - UI visual QA tests: 1 passed, 0 failed
 - Total tests: 6 passed, 0 failed
-- Result bundle: `output/ios_sprint12_slice12_2_validation_20260424_124050/QualityAlternative.xcresult`
-- Test summary: `output/ios_sprint12_slice12_2_validation_20260424_124050/test_summary.json`
+- Initial result bundle: `output/ios_sprint12_slice12_2_validation_20260424_124050/QualityAlternative.xcresult`
+- Review-fix result bundle: `output/ios_sprint12_slice12_2_review_fix_validation_20260424_130205/QualityAlternative.xcresult`
+- Review-fix test summary: `output/ios_sprint12_slice12_2_review_fix_validation_20260424_130205/test_summary.json`
 
 Visual QA artifacts:
 
@@ -155,6 +156,18 @@ Implemented state:
 GPT Pro review:
 
 - Lane: `https://chatgpt.com/c/69eb4a61-a454-838b-bd7a-e8099482ad97`
+- Harvested verdict: `REVISE`
 - Prompt: `PRO_REVIEW_PROMPT_20260424_124547.md`
 - Bundle: `QUALITY_ALTERNATIVE_IOS_REVIEW_BUNDLE_20260424_124547.zip`
-- Expected harvest path: `PRO_REVIEW_OUTPUT_20260424_124547/`
+- Harvest path: `PRO_REVIEW_OUTPUT_20260424_124547/`
+
+Review fixes applied:
+
+- Removed hidden `Color.clear` accessibility marker views from the Screen Time setup card so visual layout and accessibility traversal are not affected by test-only nodes.
+- Updated the visual QA test to assert visible user-facing Settings controls directly instead of hidden duplicate markers.
+- Added `CODE_SIGN_ENTITLEMENTS: QualityAlternative/QualityAlternative.entitlements` to `ios/project.yml` so project regeneration preserves Family Controls entitlements.
+- Added repo-root review prompts, Pro review outputs, and iOS review ZIP bundles to `.gitignore`; generated review packets remain local artifacts and are not committed.
+
+GPT Pro follow-up review:
+
+- Status: pending
