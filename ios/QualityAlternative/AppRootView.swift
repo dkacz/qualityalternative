@@ -1,8 +1,12 @@
+import FamilyControls
 import SwiftUI
 
 struct AppRootView: View {
     @State private var route: QARoute
     @State private var themeMode: QAThemeMode
+    @State private var screenTimeAuthorization: QAScreenTimeAuthorizationState
+    @State private var screenTimeAuthorizationError: String?
+    @State private var protectedSelection: FamilyActivitySelection
 
     init() {
         let arguments = ProcessInfo.processInfo.arguments
@@ -10,18 +14,36 @@ struct AppRootView: View {
         let requestedTheme = arguments.contains("--qa-dark") ? QAThemeMode.dark : QAThemeMode.light
         _route = State(initialValue: requestedRoute)
         _themeMode = State(initialValue: requestedTheme)
+        _screenTimeAuthorization = State(initialValue: QAScreenTimeAuthorizationState(AuthorizationCenter.shared.authorizationStatus))
+        _screenTimeAuthorizationError = State(initialValue: nil)
+        _protectedSelection = State(initialValue: QAFamilyActivitySelectionStore.load())
     }
 
     var body: some View {
-        RootContent(route: $route, themeMode: $themeMode)
+        RootContent(
+            route: $route,
+            themeMode: $themeMode,
+            screenTimeAuthorization: $screenTimeAuthorization,
+            screenTimeAuthorizationError: $screenTimeAuthorizationError,
+            protectedSelection: $protectedSelection
+        )
             .environment(\.qaTokens, QATokens.tokens(for: themeMode))
             .preferredColorScheme(themeMode == .dark ? .dark : .light)
+            .onReceive(AuthorizationCenter.shared.$authorizationStatus) { status in
+                screenTimeAuthorization = QAScreenTimeAuthorizationState(status)
+            }
+            .onChange(of: protectedSelection) { _, selection in
+                QAFamilyActivitySelectionStore.save(selection)
+            }
     }
 }
 
 private struct RootContent: View {
     @Binding var route: QARoute
     @Binding var themeMode: QAThemeMode
+    @Binding var screenTimeAuthorization: QAScreenTimeAuthorizationState
+    @Binding var screenTimeAuthorizationError: String?
+    @Binding var protectedSelection: FamilyActivitySelection
 
     var body: some View {
         switch route {
@@ -58,7 +80,26 @@ private struct RootContent: View {
             }
         case .settings:
             TabShell(activeRoute: .settings, route: $route) {
-                SettingsScreen(themeMode: $themeMode)
+                SettingsScreen(
+                    themeMode: $themeMode,
+                    screenTimeAuthorization: screenTimeAuthorization,
+                    screenTimeAuthorizationError: screenTimeAuthorizationError,
+                    protectedSelection: $protectedSelection,
+                    onRequestScreenTimeAuthorization: requestScreenTimeAuthorization
+                )
+            }
+        }
+    }
+
+    private func requestScreenTimeAuthorization() {
+        screenTimeAuthorizationError = nil
+        Task {
+            do {
+                try await AuthorizationCenter.shared.requestAuthorization(for: .individual)
+                screenTimeAuthorization = QAScreenTimeAuthorizationState(AuthorizationCenter.shared.authorizationStatus)
+            } catch {
+                screenTimeAuthorization = QAScreenTimeAuthorizationState(AuthorizationCenter.shared.authorizationStatus)
+                screenTimeAuthorizationError = error.localizedDescription
             }
         }
     }
@@ -125,5 +166,38 @@ private extension [String] {
             return nil
         }
         return self[nextIndex]
+    }
+}
+
+private enum QAFamilyActivitySelectionStore {
+    private static let key = "qa.familyActivitySelection.v1"
+
+    static func load() -> FamilyActivitySelection {
+        guard let data = UserDefaults.standard.data(forKey: key) else {
+            return FamilyActivitySelection()
+        }
+        return (try? JSONDecoder().decode(FamilyActivitySelection.self, from: data)) ?? FamilyActivitySelection()
+    }
+
+    static func save(_ selection: FamilyActivitySelection) {
+        guard let data = try? JSONEncoder().encode(selection) else {
+            return
+        }
+        UserDefaults.standard.set(data, forKey: key)
+    }
+}
+
+private extension QAScreenTimeAuthorizationState {
+    init(_ status: AuthorizationStatus) {
+        switch status {
+        case .notDetermined:
+            self = .notDetermined
+        case .denied:
+            self = .denied
+        case .approved:
+            self = .approved
+        @unknown default:
+            self = .denied
+        }
     }
 }

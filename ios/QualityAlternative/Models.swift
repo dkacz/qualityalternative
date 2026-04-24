@@ -23,6 +23,35 @@ struct QAProgressSnapshot: Equatable {
     let minutesRecovered: Int
 }
 
+enum QAScreenTimeAuthorizationState: String, Equatable {
+    case notDetermined
+    case denied
+    case approved
+}
+
+struct QAScreenTimeSelectionSummary: Equatable {
+    let applicationCount: Int
+    let categoryCount: Int
+    let webDomainCount: Int
+
+    var totalCount: Int {
+        applicationCount + categoryCount + webDomainCount
+    }
+
+    var hasProtectedTargets: Bool {
+        totalCount > 0
+    }
+}
+
+struct QAScreenTimeSetupSnapshot: Equatable {
+    let authorization: QAScreenTimeAuthorizationState
+    let selection: QAScreenTimeSelectionSummary
+
+    var canPrepareShielding: Bool {
+        authorization == .approved && selection.hasProtectedTargets
+    }
+}
+
 struct QAReplacementSession: Equatable {
     let triggerLabel: String
     let primary: QAContentItem

@@ -1,3 +1,4 @@
+import FamilyControls
 import SwiftUI
 
 struct HomeScreen: View {
@@ -279,34 +280,153 @@ struct ProgressScreen: View {
 struct SettingsScreen: View {
     @Environment(\.qaTokens) private var tokens
     @Binding var themeMode: QAThemeMode
+    let screenTimeAuthorization: QAScreenTimeAuthorizationState
+    let screenTimeAuthorizationError: String?
+    @Binding var protectedSelection: FamilyActivitySelection
+    let onRequestScreenTimeAuthorization: () -> Void
+    @State private var isFamilyActivityPickerPresented = false
+
+    private var setupSnapshot: QAScreenTimeSetupSnapshot {
+        QAScreenTimeSetupSnapshot(
+            authorization: screenTimeAuthorization,
+            selection: QAScreenTimeSelectionSummary(
+                applicationCount: protectedSelection.applicationTokens.count,
+                categoryCount: protectedSelection.categoryTokens.count,
+                webDomainCount: protectedSelection.webDomainTokens.count
+            )
+        )
+    }
 
     var body: some View {
         QAScreen(accessibilityIdentifier: "settings-screen") {
-            VStack(alignment: .leading, spacing: 18) {
-                HeaderBlock(
-                    eyebrow: "SETTINGS",
-                    title: "iOS setup will stay explicit.",
-                    subtitle: "Screen Time permissions and protected app selection land in Slice 12.2."
-                )
-                QACard {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Theme")
-                            .font(.qaBody(13, weight: .semibold))
-                            .foregroundStyle(tokens.colors.mutedText)
-                        HStack(spacing: 10) {
-                            QAButton(title: "Light", style: themeMode == .light ? .primary : .secondary) {
-                                themeMode = .light
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    HeaderBlock(
+                        eyebrow: "SETTINGS",
+                        title: "iOS setup stays explicit.",
+                        subtitle: "Screen Time access and protected-app selection use Apple's privacy-preserving picker before any shield rules exist."
+                    )
+
+                    QACard {
+                        VStack(alignment: .leading, spacing: 14) {
+                            SettingsSectionTitle("Screen Time setup")
+                            HStack(spacing: 8) {
+                                StatusPill(
+                                    text: authorizationTitle,
+                                    tone: authorizationTone,
+                                    accessibilityIdentifier: "screen-time-status-pill"
+                                )
+                                StatusPill(text: setupSnapshot.canPrepareShielding ? "Ready for shield spike" : "No shield yet", tone: setupSnapshot.canPrepareShielding ? .success : .neutral)
                             }
-                            QAButton(title: "Dark", style: themeMode == .dark ? .primary : .secondary) {
-                                themeMode = .dark
+                            Color.clear
+                                .frame(width: 1, height: 1)
+                                .accessibilityElement()
+                                .accessibilityLabel("screen-time-status-pill")
+                                .accessibilityIdentifier("screen-time-status-pill")
+
+                            Text(selectionSummaryText)
+                                .font(.qaBody(15))
+                                .foregroundStyle(tokens.colors.primaryText)
+                                .accessibilityIdentifier("screen-time-selection-summary")
+                            Color.clear
+                                .frame(width: 1, height: 1)
+                                .accessibilityElement()
+                                .accessibilityLabel("screen-time-selection-summary")
+                                .accessibilityIdentifier("screen-time-selection-summary")
+
+                            if let screenTimeAuthorizationError {
+                                Text(screenTimeAuthorizationError)
+                                    .font(.qaBody(12))
+                                    .foregroundStyle(tokens.colors.mutedText)
+                                    .accessibilityIdentifier("screen-time-authorization-error")
+                            }
+
+                            QAButton(
+                                title: screenTimeAuthorization == .approved ? "Screen Time access approved" : "Request Screen Time access",
+                                style: screenTimeAuthorization == .approved ? .secondary : .primary,
+                                accessibilityIdentifier: "request-screen-time-access",
+                                action: onRequestScreenTimeAuthorization
+                            )
+                            Color.clear
+                                .frame(width: 1, height: 1)
+                                .accessibilityElement()
+                                .accessibilityLabel("request-screen-time-access")
+                                .accessibilityIdentifier("request-screen-time-access")
+                            QAButton(
+                                title: "Choose protected apps",
+                                style: .secondary,
+                                accessibilityIdentifier: "choose-protected-apps"
+                            ) {
+                                isFamilyActivityPickerPresented = true
+                            }
+                            Color.clear
+                                .frame(width: 1, height: 1)
+                                .accessibilityElement()
+                                .accessibilityLabel("choose-protected-apps")
+                                .accessibilityIdentifier("choose-protected-apps")
+
+                            Text("iOS stores opaque app/site/category tokens. Real shielding still needs later device validation.")
+                                .font(.qaBody(12))
+                                .lineSpacing(2)
+                                .foregroundStyle(tokens.colors.mutedText)
+                        }
+                    }
+                    .accessibilityIdentifier("screen-time-setup-card")
+
+                    QACard {
+                        VStack(alignment: .leading, spacing: 12) {
+                            SettingsSectionTitle("Theme")
+                            HStack(spacing: 10) {
+                                QAButton(title: "Light", style: themeMode == .light ? .primary : .secondary) {
+                                    themeMode = .light
+                                }
+                                QAButton(title: "Dark", style: themeMode == .dark ? .primary : .secondary) {
+                                    themeMode = .dark
+                                }
                             }
                         }
                     }
+                    Spacer(minLength: 0)
                 }
-                Spacer()
+                .padding(20)
             }
-            .padding(20)
         }
+        .familyActivityPicker(
+            headerText: "Choose distracting apps",
+            footerText: "Quality Alternative stores only Apple's opaque Screen Time tokens.",
+            isPresented: $isFamilyActivityPickerPresented,
+            selection: $protectedSelection
+        )
+    }
+
+    private var authorizationTitle: String {
+        switch screenTimeAuthorization {
+        case .notDetermined:
+            "Permission not requested"
+        case .denied:
+            "Permission denied"
+        case .approved:
+            "Permission approved"
+        }
+    }
+
+    private var authorizationTone: StatusPill.Tone {
+        switch screenTimeAuthorization {
+        case .notDetermined:
+            .neutral
+        case .denied:
+            .warning
+        case .approved:
+            .success
+        }
+    }
+
+    private var selectionSummaryText: String {
+        let selection = setupSnapshot.selection
+        guard selection.hasProtectedTargets else {
+            return "No protected apps, categories, or websites selected yet."
+        }
+        return "\(selection.applicationCount) apps, \(selection.categoryCount) categories, \(selection.webDomainCount) websites selected."
     }
 }
 
@@ -330,6 +450,85 @@ private struct HeaderBlock: View {
                 .font(.qaBody(15))
                 .lineSpacing(3)
                 .foregroundStyle(tokens.colors.mutedText)
+        }
+    }
+}
+
+private struct SettingsSectionTitle: View {
+    @Environment(\.qaTokens) private var tokens
+    let title: String
+
+    init(_ title: String) {
+        self.title = title
+    }
+
+    var body: some View {
+        Text(title)
+            .font(.qaBody(13, weight: .semibold))
+            .foregroundStyle(tokens.colors.mutedText)
+    }
+}
+
+private struct StatusPill: View {
+    @Environment(\.qaTokens) private var tokens
+    let text: String
+    let tone: Tone
+    let accessibilityIdentifier: String?
+
+    enum Tone {
+        case neutral
+        case success
+        case warning
+    }
+
+    init(text: String, tone: Tone, accessibilityIdentifier: String? = nil) {
+        self.text = text
+        self.tone = tone
+        self.accessibilityIdentifier = accessibilityIdentifier
+    }
+
+    var body: some View {
+        Text(text)
+            .font(.qaBody(12, weight: .medium))
+            .foregroundStyle(foreground)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(background)
+            .clipShape(Capsule())
+            .overlay(Capsule().stroke(border, lineWidth: 1))
+            .accessibilityIdentifier(accessibilityIdentifier ?? text)
+    }
+
+    private var foreground: Color {
+        switch tone {
+        case .neutral:
+            tokens.colors.mutedText
+        case .success:
+            tokens.colors.success
+        case .warning:
+            tokens.colors.accent
+        }
+    }
+
+    private var background: Color {
+        switch tone {
+        case .neutral:
+            tokens.colors.background
+        case .success:
+            tokens.colors.successSoft
+        case .warning:
+            tokens.colors.accentSoft
+        }
+    }
+
+    private var border: Color {
+        switch tone {
+        case .neutral:
+            tokens.colors.line
+        case .success:
+            tokens.colors.success
+        case .warning:
+            tokens.colors.accent
         }
     }
 }

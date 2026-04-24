@@ -14,7 +14,7 @@ final class QualityAlternativeVisualQaTests: XCTestCase {
         capture(route: "handoff", name: "05_handoff_light")
         capture(route: "meditation", name: "06_meditation_light")
         capture(route: "progress", name: "07_progress_light")
-        capture(route: "settings", name: "08_settings_light")
+        capture(route: "settings", name: "08_settings_light", verifyScreenTimeSetup: true)
         capture(route: "intervention", name: "09_intervention_dark", dark: true, verifyInterventionActions: true)
         capture(route: "reader", name: "10_reader_dark", dark: true)
         capture(route: "meditation", name: "11_meditation_dark", dark: true)
@@ -24,7 +24,8 @@ final class QualityAlternativeVisualQaTests: XCTestCase {
         route: String,
         name: String,
         dark: Bool = false,
-        verifyInterventionActions: Bool = false
+        verifyInterventionActions: Bool = false,
+        verifyScreenTimeSetup: Bool = false
     ) {
         let app = XCUIApplication()
         app.launchArguments = ["--qa-route", route]
@@ -37,6 +38,9 @@ final class QualityAlternativeVisualQaTests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)[expectedScreen].waitForExistence(timeout: 6))
         if verifyInterventionActions {
             assertInterventionActionSet(in: app)
+        }
+        if verifyScreenTimeSetup {
+            assertScreenTimeSetup(in: app)
         }
 
         let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
@@ -60,5 +64,14 @@ final class QualityAlternativeVisualQaTests: XCTestCase {
         XCTAssertFalse(actions["backup-action-naturalist-notices"].exists)
         XCTAssertTrue(actions["pause-action"].exists)
         XCTAssertTrue(actions["continue-intentionally-action"].exists)
+    }
+
+    private func assertScreenTimeSetup(in app: XCUIApplication) {
+        let elements = app.descendants(matching: .any)
+        XCTAssertTrue(elements["screen-time-setup-card"].exists)
+        XCTAssertTrue(elements["screen-time-status-pill"].exists)
+        XCTAssertTrue(elements["screen-time-selection-summary"].exists)
+        XCTAssertTrue(elements["request-screen-time-access"].exists)
+        XCTAssertTrue(elements["choose-protected-apps"].exists)
     }
 }

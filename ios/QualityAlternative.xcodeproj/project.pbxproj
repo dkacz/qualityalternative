@@ -47,6 +47,7 @@
 		4EB6DD71717FC105FFAFC6AD /* QualityAlternativeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QualityAlternativeApp.swift; sourceTree = "<group>"; };
 		604C448C981C1F19E337108B /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
 		6F2187ABD8BFBCE906EFFDBE /* work_sans.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = work_sans.ttf; sourceTree = "<group>"; };
+		70C2B61147F744E2893F4211 /* QualityAlternative.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = QualityAlternative.entitlements; sourceTree = "<group>"; };
 		751B6560439EF749202948DB /* SampleData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleData.swift; sourceTree = "<group>"; };
 		80041F60FAAD0FD09F039361 /* QualityAlternativeTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = QualityAlternativeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		C16DF47FB202AFB7DBFBE0BF /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
@@ -114,6 +115,7 @@
 				F6DDA3113B27E1366C384414 /* Info.plist */,
 				C16DF47FB202AFB7DBFBE0BF /* Models.swift */,
 				4EB6DD71717FC105FFAFC6AD /* QualityAlternativeApp.swift */,
+				70C2B61147F744E2893F4211 /* QualityAlternative.entitlements */,
 				751B6560439EF749202948DB /* SampleData.swift */,
 				D546361CF40E9855AB5CE92B /* Screens.swift */,
 				28525AECA30488202BDBABEA /* Resources */,
@@ -463,6 +465,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = QualityAlternative/QualityAlternative.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				INFOPLIST_FILE = QualityAlternative/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -498,6 +501,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = QualityAlternative/QualityAlternative.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				INFOPLIST_FILE = QualityAlternative/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (

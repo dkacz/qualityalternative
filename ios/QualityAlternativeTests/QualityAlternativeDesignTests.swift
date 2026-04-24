@@ -32,6 +32,23 @@ final class QualityAlternativeDesignTests: XCTestCase {
         ])
     }
 
+    func testScreenTimeSetupRequiresAuthorizationAndSelection() {
+        let emptySelection = QAScreenTimeSelectionSummary(
+            applicationCount: 0,
+            categoryCount: 0,
+            webDomainCount: 0
+        )
+        let selectedApps = QAScreenTimeSelectionSummary(
+            applicationCount: 2,
+            categoryCount: 0,
+            webDomainCount: 1
+        )
+
+        XCTAssertFalse(QAScreenTimeSetupSnapshot(authorization: .approved, selection: emptySelection).canPrepareShielding)
+        XCTAssertFalse(QAScreenTimeSetupSnapshot(authorization: .denied, selection: selectedApps).canPrepareShielding)
+        XCTAssertTrue(QAScreenTimeSetupSnapshot(authorization: .approved, selection: selectedApps).canPrepareShielding)
+    }
+
     func testLibraryIncludesRenderableLinkOnlyAndMeditationItems() {
         let modes = Set(QASampleData.library.map(\.renderMode))
 
