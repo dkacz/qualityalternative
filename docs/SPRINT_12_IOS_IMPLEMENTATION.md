@@ -1,6 +1,6 @@
 # Sprint 12 iOS Implementation
 
-Status: `slice_12_3_pro_review_pending`
+Status: `slice_12_3_followup_pro_review_pending`
 Branch: `codex/sprint12-ios-implementation`
 
 ## Goal
@@ -211,6 +211,9 @@ Validation completed on 2026-04-24:
 - Total tests: 10 passed, 0 failed
 - Result bundle: `output/ios_sprint12_slice12_3_validation_20260424_132000/QualityAlternative.xcresult`
 - Test summary: `output/ios_sprint12_slice12_3_validation_20260424_132000/test_summary.json`
+- Follow-up result bundle: `output/ios_sprint12_slice12_3_followup_validation_20260424_135000/QualityAlternative.xcresult`
+- Follow-up test summary: `output/ios_sprint12_slice12_3_followup_validation_20260424_135000/test_summary.json`
+- Follow-up tests: 11 passed, 0 failed
 
 Visual QA artifacts:
 
@@ -228,8 +231,19 @@ Implemented state:
 
 GPT Pro review:
 
-- Status: pending
+- Harvested verdict: `REVISE`
 - Lane: `https://chatgpt.com/c/69eb55b3-0bb8-838e-a4c3-0bc034486057`
 - Prompt: `PRO_REVIEW_PROMPT_20260424_133526.md`
 - Bundle: `QUALITY_ALTERNATIVE_IOS_REVIEW_BUNDLE_20260424_133526.zip`
-- Expected harvest path: `PRO_REVIEW_OUTPUT_20260424_133526/`
+- Harvest path: `PRO_REVIEW_OUTPUT_20260424_133526/`
+
+Review fixes applied:
+
+- Removed the silent App Group fallback to `.standard`; App Group-backed stores now fail closed with observable logging when shared defaults are unavailable.
+- Added unit coverage for nil shared-defaults behavior so stores do not mask App Group availability failures.
+- Removed stale generated `ios/output/` artifacts that could pollute review packets with failed validation logs.
+- Regenerated follow-up validation evidence and Slice 12.3 screenshots from the latest successful simulator test run.
+
+GPT Pro follow-up review:
+
+- Status: pending

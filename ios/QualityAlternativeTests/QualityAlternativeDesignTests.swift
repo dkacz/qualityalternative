@@ -110,6 +110,24 @@ final class QualityAlternativeDesignTests: XCTestCase {
         XCTAssertNil(state.pauseExpiresAt)
     }
 
+    func testAppGroupStoresFailClosedWhenSharedDefaultsAreUnavailable() {
+        let now = Date(timeIntervalSince1970: 1_777_000_000)
+        let state = QAShieldSessionState.armed(
+            session: QASampleData.session,
+            selection: QAScreenTimeSelectionSummary(applicationCount: 1, categoryCount: 0, webDomainCount: 0),
+            now: now
+        )
+
+        XCTAssertNil(QAShieldSessionStore.load(userDefaults: nil))
+        QAShieldSessionStore.save(state, userDefaults: nil)
+        QAShieldSessionStore.clear(userDefaults: nil)
+
+        let selection = QAFamilyActivitySelectionStore.load(userDefaults: nil)
+        XCTAssertEqual(selection.applicationTokens.count, 0)
+        XCTAssertEqual(selection.categoryTokens.count, 0)
+        XCTAssertEqual(selection.webDomainTokens.count, 0)
+    }
+
     func testLibraryIncludesRenderableLinkOnlyAndMeditationItems() {
         let modes = Set(QASampleData.library.map(\.renderMode))
 

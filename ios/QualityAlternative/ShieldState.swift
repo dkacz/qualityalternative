@@ -1,14 +1,22 @@
 import FamilyControls
 import Foundation
 import ManagedSettings
+import OSLog
 
 enum QAAppGroup {
     static let identifier = "group.com.qualityalternative.ios"
+    private static let logger = Logger(subsystem: "com.qualityalternative.ios", category: "AppGroup")
 
-    static var userDefaults: UserDefaults {
-        UserDefaults(suiteName: identifier) ?? .standard
+    static var userDefaults: UserDefaults? {
+        guard let userDefaults = UserDefaults(suiteName: identifier) else {
+            logger.error("App Group storage unavailable for \(identifier, privacy: .public)")
+            return nil
+        }
+        return userDefaults
     }
 }
+
+private let shieldStateLogger = Logger(subsystem: "com.qualityalternative.ios", category: "ShieldState")
 
 enum QAShieldActionMode: String, Codable, Equatable {
     case inactive
@@ -174,21 +182,31 @@ struct QAManagedSettingsShieldApplier: QAShieldRuleApplying {
 enum QAShieldSessionStore {
     private static let key = "qa.shieldSession.v1"
 
-    static func load(userDefaults: UserDefaults = QAAppGroup.userDefaults) -> QAShieldSessionState? {
+    static func load(userDefaults: UserDefaults? = QAAppGroup.userDefaults) -> QAShieldSessionState? {
+        guard let userDefaults else {
+            return nil
+        }
         guard let data = userDefaults.data(forKey: key) else {
             return nil
         }
         return try? JSONDecoder().decode(QAShieldSessionState.self, from: data)
     }
 
-    static func save(_ state: QAShieldSessionState, userDefaults: UserDefaults = QAAppGroup.userDefaults) {
+    static func save(_ state: QAShieldSessionState, userDefaults: UserDefaults? = QAAppGroup.userDefaults) {
+        guard let userDefaults else {
+            shieldStateLogger.error("Refusing to write shield state because App Group storage is unavailable.")
+            return
+        }
         guard let data = try? JSONEncoder().encode(state) else {
             return
         }
         userDefaults.set(data, forKey: key)
     }
 
-    static func clear(userDefaults: UserDefaults = QAAppGroup.userDefaults) {
+    static func clear(userDefaults: UserDefaults? = QAAppGroup.userDefaults) {
+        guard let userDefaults else {
+            return
+        }
         userDefaults.removeObject(forKey: key)
     }
 }
@@ -196,14 +214,21 @@ enum QAShieldSessionStore {
 enum QAFamilyActivitySelectionStore {
     private static let key = "qa.familyActivitySelection.v1"
 
-    static func load(userDefaults: UserDefaults = QAAppGroup.userDefaults) -> FamilyActivitySelection {
+    static func load(userDefaults: UserDefaults? = QAAppGroup.userDefaults) -> FamilyActivitySelection {
+        guard let userDefaults else {
+            return FamilyActivitySelection()
+        }
         guard let data = userDefaults.data(forKey: key) else {
             return FamilyActivitySelection()
         }
         return (try? JSONDecoder().decode(FamilyActivitySelection.self, from: data)) ?? FamilyActivitySelection()
     }
 
-    static func save(_ selection: FamilyActivitySelection, userDefaults: UserDefaults = QAAppGroup.userDefaults) {
+    static func save(_ selection: FamilyActivitySelection, userDefaults: UserDefaults? = QAAppGroup.userDefaults) {
+        guard let userDefaults else {
+            shieldStateLogger.error("Refusing to write protected selection because App Group storage is unavailable.")
+            return
+        }
         guard let data = try? JSONEncoder().encode(selection) else {
             return
         }
