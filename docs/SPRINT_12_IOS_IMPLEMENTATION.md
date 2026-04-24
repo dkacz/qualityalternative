@@ -324,7 +324,7 @@ Review fixes applied:
 
 GPT Pro follow-up review:
 
-- Lane: pending
-- Prompt: pending
-- Bundle: pending
-- Expected harvest path: pending
+- Lane: `https://chatgpt.com/c/69eb676e-ab1c-8397-ac42-fda87b1dc886`
+- Prompt: `PRO_REVIEW_PROMPT_20260424_145056.md`
+- Bundle: `QUALITY_ALTERNATIVE_IOS_REVIEW_BUNDLE_20260424_145056.zip`
+- Expected harvest path: `PRO_REVIEW_OUTPUT_20260424_145056/`
