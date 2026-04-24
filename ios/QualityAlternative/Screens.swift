@@ -385,6 +385,12 @@ struct SettingsScreen: View {
                                 .foregroundStyle(tokens.colors.primaryText)
                                 .accessibilityIdentifier("shield-control-detail")
 
+                            Text("Shield actions can queue a replacement or pause; real invocation needs device validation.")
+                                .font(.qaBody(12))
+                                .lineSpacing(2)
+                                .foregroundStyle(tokens.colors.mutedText)
+                                .accessibilityIdentifier("shield-extension-mapping-note")
+
                             QAButton(
                                 title: "Apply shield rules",
                                 style: .primary,

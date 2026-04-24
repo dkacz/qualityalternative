@@ -25,6 +25,37 @@ enum QAShieldActionMode: String, Codable, Equatable {
     case openAnyway
 }
 
+enum QAShieldActionIntentKind: String, Codable, Equatable {
+    case showReplacementChoices
+    case pauseForFifteenMinutes
+}
+
+struct QAShieldActionIntent: Codable, Equatable, Identifiable {
+    let id: String
+    let kind: QAShieldActionIntentKind
+    let selectedContentID: String?
+    let triggerContextID: String
+    let createdAt: Date
+
+    static func make(
+        kind: QAShieldActionIntentKind,
+        session: QAShieldSessionState?,
+        now: Date
+    ) -> QAShieldActionIntent {
+        QAShieldActionIntent(
+            id: "shield-action-\(Int(now.timeIntervalSince1970))",
+            kind: kind,
+            selectedContentID: session?.primaryContentID,
+            triggerContextID: session?.triggerContextID ?? "screen-time-selection",
+            createdAt: now
+        )
+    }
+
+    var containsOnlyTokenSafeMetadata: Bool {
+        triggerContextID == "screen-time-selection"
+    }
+}
+
 struct QAShieldSessionState: Codable, Equatable, Identifiable {
     let id: String
     let triggerContextID: String
@@ -94,6 +125,96 @@ struct QAShieldSessionState: Codable, Equatable, Identifiable {
             return false
         }
         return pauseExpiresAt <= now
+    }
+}
+
+struct QAShieldCopy: Equatable {
+    let title: String
+    let subtitle: String
+    let primaryButtonLabel: String
+    let secondaryButtonLabel: String
+}
+
+enum QAShieldCopyFactory {
+    static func copy(
+        for session: QAShieldSessionState?,
+        pendingIntent: QAShieldActionIntent? = nil
+    ) -> QAShieldCopy {
+        if pendingIntent?.kind == .showReplacementChoices {
+            return QAShieldCopy(
+                title: "Replacement is queued.",
+                subtitle: "Open Quality Alternative to choose one primary replacement and two backups. iOS shield actions cannot directly open the host app.",
+                primaryButtonLabel: "Keep replacement queued",
+                secondaryButtonLabel: "Pause 15 min"
+            )
+        }
+        let protectedTargets = session?.selection.totalCount ?? 0
+        let subtitle: String
+        if protectedTargets > 0 {
+            subtitle = "\(protectedTargets) opaque protected tokens are shielded. Queue a finite replacement or pause briefly."
+        } else {
+            subtitle = "Open Quality Alternative to choose one finite replacement before continuing."
+        }
+        return QAShieldCopy(
+            title: "Try one better thing first.",
+            subtitle: subtitle,
+            primaryButtonLabel: "Queue replacement",
+            secondaryButtonLabel: "Pause 15 min"
+        )
+    }
+}
+
+enum QAShieldActionButton: Equatable {
+    case primary
+    case secondary
+}
+
+enum QAShieldActionResponsePlan: Equatable {
+    case redrawShield
+    case closeShield
+}
+
+struct QAShieldActionPlan: Equatable {
+    let response: QAShieldActionResponsePlan
+    let intent: QAShieldActionIntent?
+    let updatedSession: QAShieldSessionState?
+}
+
+enum QAShieldActionPlanner {
+    static let pauseDuration: TimeInterval = 15 * 60
+
+    static func plan(
+        for button: QAShieldActionButton,
+        session: QAShieldSessionState?,
+        now: Date
+    ) -> QAShieldActionPlan {
+        switch button {
+        case .primary:
+            return QAShieldActionPlan(
+                response: .redrawShield,
+                intent: QAShieldActionIntent.make(kind: .showReplacementChoices, session: session, now: now),
+                updatedSession: nil
+            )
+        case .secondary:
+            return QAShieldActionPlan(
+                response: .closeShield,
+                intent: session.map { QAShieldActionIntent.make(kind: .pauseForFifteenMinutes, session: $0, now: now) },
+                updatedSession: session?.paused(until: now.addingTimeInterval(pauseDuration), now: now)
+            )
+        }
+    }
+}
+
+enum QAShieldHostIntentRouter {
+    static func route(for intent: QAShieldActionIntent?) -> QARoute? {
+        switch intent?.kind {
+        case .showReplacementChoices:
+            return .intervention
+        case .pauseForFifteenMinutes:
+            return .home
+        case nil:
+            return nil
+        }
     }
 }
 
@@ -198,6 +319,38 @@ enum QAShieldSessionStore {
             return
         }
         guard let data = try? JSONEncoder().encode(state) else {
+            return
+        }
+        userDefaults.set(data, forKey: key)
+    }
+
+    static func clear(userDefaults: UserDefaults? = QAAppGroup.userDefaults) {
+        guard let userDefaults else {
+            return
+        }
+        userDefaults.removeObject(forKey: key)
+    }
+}
+
+enum QAShieldActionIntentStore {
+    private static let key = "qa.shieldActionIntent.v1"
+
+    static func load(userDefaults: UserDefaults? = QAAppGroup.userDefaults) -> QAShieldActionIntent? {
+        guard let userDefaults else {
+            return nil
+        }
+        guard let data = userDefaults.data(forKey: key) else {
+            return nil
+        }
+        return try? JSONDecoder().decode(QAShieldActionIntent.self, from: data)
+    }
+
+    static func save(_ intent: QAShieldActionIntent, userDefaults: UserDefaults? = QAAppGroup.userDefaults) {
+        guard let userDefaults else {
+            shieldStateLogger.error("Refusing to write shield action intent because App Group storage is unavailable.")
+            return
+        }
+        guard let data = try? JSONEncoder().encode(intent) else {
             return
         }
         userDefaults.set(data, forKey: key)

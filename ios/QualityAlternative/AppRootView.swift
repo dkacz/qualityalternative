@@ -2,16 +2,19 @@ import FamilyControls
 import SwiftUI
 
 struct AppRootView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @State private var route: QARoute
     @State private var themeMode: QAThemeMode
     @State private var screenTimeAuthorization: QAScreenTimeAuthorizationState
     @State private var screenTimeAuthorizationError: String?
     @State private var protectedSelection: FamilyActivitySelection
     @State private var shieldSession: QAShieldSessionState?
+    private let shouldConsumeShieldIntent: Bool
     private let shieldApplier = QAManagedSettingsShieldApplier()
 
     init() {
         let arguments = ProcessInfo.processInfo.arguments
+        let hasExplicitRoute = arguments.contains("--qa-route")
         let requestedRoute = arguments.argumentValue(after: "--qa-route").flatMap(QARoute.init(rawValue:)) ?? .home
         let requestedTheme = arguments.contains("--qa-dark") ? QAThemeMode.dark : QAThemeMode.light
         _route = State(initialValue: requestedRoute)
@@ -20,6 +23,7 @@ struct AppRootView: View {
         _screenTimeAuthorizationError = State(initialValue: nil)
         _protectedSelection = State(initialValue: QAFamilyActivitySelectionStore.load())
         _shieldSession = State(initialValue: QAShieldSessionStore.load())
+        shouldConsumeShieldIntent = !hasExplicitRoute
     }
 
     var body: some View {
@@ -40,6 +44,27 @@ struct AppRootView: View {
             .onChange(of: protectedSelection) { _, selection in
                 QAFamilyActivitySelectionStore.save(selection)
             }
+            .onAppear {
+                consumePendingShieldIntentIfNeeded()
+            }
+            .onChange(of: scenePhase) { _, phase in
+                guard phase == .active else {
+                    return
+                }
+                consumePendingShieldIntentIfNeeded()
+            }
+    }
+
+    private func consumePendingShieldIntentIfNeeded() {
+        guard shouldConsumeShieldIntent else {
+            return
+        }
+        let intent = QAShieldActionIntentStore.load()
+        guard let routedIntent = QAShieldHostIntentRouter.route(for: intent) else {
+            return
+        }
+        route = routedIntent
+        QAShieldActionIntentStore.clear()
     }
 }
 

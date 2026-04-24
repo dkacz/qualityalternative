@@ -8,22 +8,37 @@
 
 /* Begin PBXBuildFile section */
 		0D77A4735CB24367FA5B7103 /* AppRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4835C83FF44378FFBBD5CAE4 /* AppRootView.swift */; };
+		1E59DD061EFBBA8E04463D1C /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = C16DF47FB202AFB7DBFBE0BF /* Models.swift */; };
+		29261369568DD5F8E5F77301 /* ShieldActionExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C2BC2A3A66A29F3EA9AF1BE /* ShieldActionExtension.swift */; };
 		33F7BE6479AAB4607015873A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E901090BE8E5DBEEC40B7B94 /* Assets.xcassets */; };
 		358E366AA8344BA5BD8882D7 /* QualityAlternativeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EB6DD71717FC105FFAFC6AD /* QualityAlternativeApp.swift */; };
+		3B9D92FDFC48B0B58F712FCE /* ShieldState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9753DA9C9984C2C634FB8683 /* ShieldState.swift */; };
+		3C3F961F64E4FFBCAED2ABEC /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = C16DF47FB202AFB7DBFBE0BF /* Models.swift */; };
 		4058D198128F749DAC9EE8A4 /* work_sans.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 6F2187ABD8BFBCE906EFFDBE /* work_sans.ttf */; };
 		5249AA83C8DF1CFB2E8B561C /* Screens.swift in Sources */ = {isa = PBXBuildFile; fileRef = D546361CF40E9855AB5CE92B /* Screens.swift */; };
 		56DD75C7125DD655743390CA /* newsreader_italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 11C42CDCFEEA877130E7830A /* newsreader_italic.ttf */; };
+		6B0BB322AE83EEB674C1A0F5 /* QualityAlternativeShieldConfiguration.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 8F1EED1531D0361DBAC3798D /* QualityAlternativeShieldConfiguration.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		74387CFB0A2D7271415674F5 /* newsreader.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 4765AA3FAF2B4568C416C528 /* newsreader.ttf */; };
 		7A26C17527E26EEEDABE243D /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = C16DF47FB202AFB7DBFBE0BF /* Models.swift */; };
+		84298F73FCC7008AF1FE164E /* QualityAlternativeShieldAction.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B86C7DD91859AF5589B0C931 /* QualityAlternativeShieldAction.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		983BAE36E7D1198A323B6B40 /* ShieldState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9753DA9C9984C2C634FB8683 /* ShieldState.swift */; };
 		9F439A71026DF544C34B3ACD /* SampleData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 751B6560439EF749202948DB /* SampleData.swift */; };
 		A0E1E822D7D222DBD452B5CB /* jetbrains_mono.ttf in Resources */ = {isa = PBXBuildFile; fileRef = C505B630242F142EB4A5E311 /* jetbrains_mono.ttf */; };
+		B16E4E3D702EAB430FAC9F15 /* ShieldConfigurationExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 434495C0E1B4A90AC6DECA72 /* ShieldConfigurationExtension.swift */; };
+		BC3F90AB41BFB8E32F1D9A3E /* ShieldState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9753DA9C9984C2C634FB8683 /* ShieldState.swift */; };
 		C2BC46E1C8F1300EAAC174B7 /* QualityAlternativeVisualQaTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4C7B55B1E44755A6415522C /* QualityAlternativeVisualQaTests.swift */; };
 		E529D3331687CADD77B3EACB /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 604C448C981C1F19E337108B /* DesignSystem.swift */; };
 		FFBCBC28133ABA96BB9AE98D /* QualityAlternativeDesignTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F8D5B75F0B425D116C4A647 /* QualityAlternativeDesignTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		2A994D876C53374FC25A54FE /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 6054D8EF62FA4E005A56E581 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E5712334E0152ADBBDA3510B;
+			remoteInfo = QualityAlternativeShieldAction;
+		};
 		5075ED870D458BA19EA0FFBF /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 6054D8EF62FA4E005A56E581 /* Project object */;
@@ -38,20 +53,50 @@
 			remoteGlobalIDString = EFDE195CC2BDA159C60A7664;
 			remoteInfo = QualityAlternative;
 		};
+		DD9CD9EA3C7A3D37FEDCD731 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 6054D8EF62FA4E005A56E581 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 95FB98B3F3D4E31B045999DB;
+			remoteInfo = QualityAlternativeShieldConfiguration;
+		};
 /* End PBXContainerItemProxy section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		60FB61752FAAD54B21E3F514 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				6B0BB322AE83EEB674C1A0F5 /* QualityAlternativeShieldConfiguration.appex in Embed Foundation Extensions */,
+				84298F73FCC7008AF1FE164E /* QualityAlternativeShieldAction.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		03BC423636A28350BC8EAA42 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		11C42CDCFEEA877130E7830A /* newsreader_italic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = newsreader_italic.ttf; sourceTree = "<group>"; };
 		1F8D5B75F0B425D116C4A647 /* QualityAlternativeDesignTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QualityAlternativeDesignTests.swift; sourceTree = "<group>"; };
+		434495C0E1B4A90AC6DECA72 /* ShieldConfigurationExtension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShieldConfigurationExtension.swift; sourceTree = "<group>"; };
 		4765AA3FAF2B4568C416C528 /* newsreader.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = newsreader.ttf; sourceTree = "<group>"; };
 		4835C83FF44378FFBBD5CAE4 /* AppRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRootView.swift; sourceTree = "<group>"; };
 		4EB6DD71717FC105FFAFC6AD /* QualityAlternativeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QualityAlternativeApp.swift; sourceTree = "<group>"; };
 		604C448C981C1F19E337108B /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
 		6F2187ABD8BFBCE906EFFDBE /* work_sans.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = work_sans.ttf; sourceTree = "<group>"; };
 		751B6560439EF749202948DB /* SampleData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleData.swift; sourceTree = "<group>"; };
+		7A129BF44B76C192A1283050 /* QualityAlternativeShieldConfiguration.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = QualityAlternativeShieldConfiguration.entitlements; sourceTree = "<group>"; };
+		7CFE101ED42331F343F2CC80 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		7E43C16E28CB65944EE19C07 /* QualityAlternative.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = QualityAlternative.entitlements; sourceTree = "<group>"; };
 		80041F60FAAD0FD09F039361 /* QualityAlternativeTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = QualityAlternativeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		8AE192B88AFFFA7712D3E00A /* QualityAlternativeShieldAction.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = QualityAlternativeShieldAction.entitlements; sourceTree = "<group>"; };
+		8C2BC2A3A66A29F3EA9AF1BE /* ShieldActionExtension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShieldActionExtension.swift; sourceTree = "<group>"; };
+		8F1EED1531D0361DBAC3798D /* QualityAlternativeShieldConfiguration.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = QualityAlternativeShieldConfiguration.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		9753DA9C9984C2C634FB8683 /* ShieldState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShieldState.swift; sourceTree = "<group>"; };
+		B86C7DD91859AF5589B0C931 /* QualityAlternativeShieldAction.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = QualityAlternativeShieldAction.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		C16DF47FB202AFB7DBFBE0BF /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		C4C7B55B1E44755A6415522C /* QualityAlternativeVisualQaTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QualityAlternativeVisualQaTests.swift; sourceTree = "<group>"; };
 		C505B630242F142EB4A5E311 /* jetbrains_mono.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = jetbrains_mono.ttf; sourceTree = "<group>"; };
@@ -63,6 +108,16 @@
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
+		1B7D4F3F2DEE55A7A9045C33 /* QualityAlternativeShieldAction */ = {
+			isa = PBXGroup;
+			children = (
+				03BC423636A28350BC8EAA42 /* Info.plist */,
+				8AE192B88AFFFA7712D3E00A /* QualityAlternativeShieldAction.entitlements */,
+				8C2BC2A3A66A29F3EA9AF1BE /* ShieldActionExtension.swift */,
+			);
+			path = QualityAlternativeShieldAction;
+			sourceTree = "<group>";
+		};
 		26F17F50A8BA4D57A9E741E5 /* QualityAlternativeUITests */ = {
 			isa = PBXGroup;
 			children = (
@@ -84,6 +139,8 @@
 			isa = PBXGroup;
 			children = (
 				E0B0289506D3DD6CB09627E5 /* QualityAlternative */,
+				1B7D4F3F2DEE55A7A9045C33 /* QualityAlternativeShieldAction */,
+				AF717F6ED64FD95E5553DC89 /* QualityAlternativeShieldConfiguration */,
 				986029DD092B5DFA28F22F5B /* QualityAlternativeTests */,
 				26F17F50A8BA4D57A9E741E5 /* QualityAlternativeUITests */,
 				FC0F4A5F241DEF064D6D1401 /* Products */,
@@ -109,6 +166,16 @@
 			path = QualityAlternativeTests;
 			sourceTree = "<group>";
 		};
+		AF717F6ED64FD95E5553DC89 /* QualityAlternativeShieldConfiguration */ = {
+			isa = PBXGroup;
+			children = (
+				7CFE101ED42331F343F2CC80 /* Info.plist */,
+				7A129BF44B76C192A1283050 /* QualityAlternativeShieldConfiguration.entitlements */,
+				434495C0E1B4A90AC6DECA72 /* ShieldConfigurationExtension.swift */,
+			);
+			path = QualityAlternativeShieldConfiguration;
+			sourceTree = "<group>";
+		};
 		E0B0289506D3DD6CB09627E5 /* QualityAlternative */ = {
 			isa = PBXGroup;
 			children = (
@@ -130,6 +197,8 @@
 			isa = PBXGroup;
 			children = (
 				CE80BB50ACBB4C9CE7F8DBF0 /* QualityAlternative.app */,
+				B86C7DD91859AF5589B0C931 /* QualityAlternativeShieldAction.appex */,
+				8F1EED1531D0361DBAC3798D /* QualityAlternativeShieldConfiguration.appex */,
 				80041F60FAAD0FD09F039361 /* QualityAlternativeTests.xctest */,
 				D91872FA31A629BDC4EE6865 /* QualityAlternativeUITests.xctest */,
 			);
@@ -175,16 +244,53 @@
 			productReference = 80041F60FAAD0FD09F039361 /* QualityAlternativeTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		95FB98B3F3D4E31B045999DB /* QualityAlternativeShieldConfiguration */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E7F2B12ADC36C4D404C2B7A9 /* Build configuration list for PBXNativeTarget "QualityAlternativeShieldConfiguration" */;
+			buildPhases = (
+				1AB9FC4CD5FDD2D1BCCC2DF5 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = QualityAlternativeShieldConfiguration;
+			packageProductDependencies = (
+			);
+			productName = QualityAlternativeShieldConfiguration;
+			productReference = 8F1EED1531D0361DBAC3798D /* QualityAlternativeShieldConfiguration.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		E5712334E0152ADBBDA3510B /* QualityAlternativeShieldAction */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 720139B5FC1AA577D4821A37 /* Build configuration list for PBXNativeTarget "QualityAlternativeShieldAction" */;
+			buildPhases = (
+				5F27826F4DE7AA29916566D4 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = QualityAlternativeShieldAction;
+			packageProductDependencies = (
+			);
+			productName = QualityAlternativeShieldAction;
+			productReference = B86C7DD91859AF5589B0C931 /* QualityAlternativeShieldAction.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		EFDE195CC2BDA159C60A7664 /* QualityAlternative */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = C622E0C4CDE152015475AAEF /* Build configuration list for PBXNativeTarget "QualityAlternative" */;
 			buildPhases = (
 				210ACA03917B43EB9B02070C /* Sources */,
 				3CBDA179A172C30FA6596079 /* Resources */,
+				60FB61752FAAD54B21E3F514 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				22968D1A47774314203BC398 /* PBXTargetDependency */,
+				0CAADAC86E8418F6375AD2FA /* PBXTargetDependency */,
 			);
 			name = QualityAlternative;
 			packageProductDependencies = (
@@ -222,6 +328,8 @@
 			projectRoot = "";
 			targets = (
 				EFDE195CC2BDA159C60A7664 /* QualityAlternative */,
+				E5712334E0152ADBBDA3510B /* QualityAlternativeShieldAction */,
+				95FB98B3F3D4E31B045999DB /* QualityAlternativeShieldConfiguration */,
 				605049A5120FF2DFF0A101FB /* QualityAlternativeTests */,
 				1ECDD95521858E2818204D8F /* QualityAlternativeUITests */,
 			);
@@ -244,6 +352,16 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		1AB9FC4CD5FDD2D1BCCC2DF5 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3C3F961F64E4FFBCAED2ABEC /* Models.swift in Sources */,
+				B16E4E3D702EAB430FAC9F15 /* ShieldConfigurationExtension.swift in Sources */,
+				3B9D92FDFC48B0B58F712FCE /* ShieldState.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		210ACA03917B43EB9B02070C /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -255,6 +373,16 @@
 				9F439A71026DF544C34B3ACD /* SampleData.swift in Sources */,
 				5249AA83C8DF1CFB2E8B561C /* Screens.swift in Sources */,
 				983BAE36E7D1198A323B6B40 /* ShieldState.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5F27826F4DE7AA29916566D4 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1E59DD061EFBBA8E04463D1C /* Models.swift in Sources */,
+				29261369568DD5F8E5F77301 /* ShieldActionExtension.swift in Sources */,
+				BC3F90AB41BFB8E32F1D9A3E /* ShieldState.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -277,10 +405,20 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		0CAADAC86E8418F6375AD2FA /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = E5712334E0152ADBBDA3510B /* QualityAlternativeShieldAction */;
+			targetProxy = 2A994D876C53374FC25A54FE /* PBXContainerItemProxy */;
+		};
 		1064DE5E0E8384EB0FC11423 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = EFDE195CC2BDA159C60A7664 /* QualityAlternative */;
 			targetProxy = 5A159414B33FFE06832D2B67 /* PBXContainerItemProxy */;
+		};
+		22968D1A47774314203BC398 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 95FB98B3F3D4E31B045999DB /* QualityAlternativeShieldConfiguration */;
+			targetProxy = DD9CD9EA3C7A3D37FEDCD731 /* PBXContainerItemProxy */;
 		};
 		F161B17F41376AB66997AB27 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
@@ -290,6 +428,25 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		0CF15BB5C3A5F16A7587DE0C /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = QualityAlternativeShieldConfiguration/QualityAlternativeShieldConfiguration.entitlements;
+				INFOPLIST_FILE = QualityAlternativeShieldConfiguration/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.qualityalternative.ios.shieldconfiguration;
+				PRODUCT_NAME = QualityAlternativeShieldConfiguration;
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
 		1CD7595DBC91C15540FF647C /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -362,6 +519,25 @@
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/QualityAlternative.app/QualityAlternative";
+			};
+			name = Debug;
+		};
+		3B970EDB2BECE62060075BCB /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = QualityAlternativeShieldAction/QualityAlternativeShieldAction.entitlements;
+				INFOPLIST_FILE = QualityAlternativeShieldAction/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.qualityalternative.ios.shieldaction;
+				PRODUCT_NAME = QualityAlternativeShieldAction;
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
@@ -500,6 +676,44 @@
 			};
 			name = Debug;
 		};
+		C663345C310FFF382847591C /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = QualityAlternativeShieldConfiguration/QualityAlternativeShieldConfiguration.entitlements;
+				INFOPLIST_FILE = QualityAlternativeShieldConfiguration/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.qualityalternative.ios.shieldconfiguration;
+				PRODUCT_NAME = QualityAlternativeShieldConfiguration;
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		D10A4743829FAB006A384700 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = QualityAlternativeShieldAction/QualityAlternativeShieldAction.entitlements;
+				INFOPLIST_FILE = QualityAlternativeShieldAction/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.qualityalternative.ios.shieldaction;
+				PRODUCT_NAME = QualityAlternativeShieldAction;
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
 		E627F6B44219A84F27771D51 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -531,6 +745,15 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
+		720139B5FC1AA577D4821A37 /* Build configuration list for PBXNativeTarget "QualityAlternativeShieldAction" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3B970EDB2BECE62060075BCB /* Debug */,
+				D10A4743829FAB006A384700 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		7673A822AC354DC31302B999 /* Build configuration list for PBXProject "QualityAlternative" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -554,6 +777,15 @@
 			buildConfigurations = (
 				E627F6B44219A84F27771D51 /* Debug */,
 				7E6823DBD4A8E166D0903783 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		E7F2B12ADC36C4D404C2B7A9 /* Build configuration list for PBXNativeTarget "QualityAlternativeShieldConfiguration" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C663345C310FFF382847591C /* Debug */,
+				0CF15BB5C3A5F16A7587DE0C /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

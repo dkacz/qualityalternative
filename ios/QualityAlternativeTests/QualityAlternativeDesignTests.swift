@@ -110,6 +110,92 @@ final class QualityAlternativeDesignTests: XCTestCase {
         XCTAssertNil(state.pauseExpiresAt)
     }
 
+    func testShieldConfigurationCopyStaysFiniteAndTokenSafe() {
+        let now = Date(timeIntervalSince1970: 1_777_000_000)
+        let state = QAShieldSessionState.armed(
+            session: QASampleData.session,
+            selection: QAScreenTimeSelectionSummary(applicationCount: 2, categoryCount: 0, webDomainCount: 1),
+            now: now
+        )
+
+        let copy = QAShieldCopyFactory.copy(for: state)
+
+        XCTAssertEqual(copy.title, "Try one better thing first.")
+        XCTAssertEqual(copy.primaryButtonLabel, "Queue replacement")
+        XCTAssertEqual(copy.secondaryButtonLabel, "Pause 15 min")
+        XCTAssertTrue(copy.subtitle.contains("3 opaque protected tokens"))
+        XCTAssertFalse(copy.subtitle.contains("Instagram"))
+        XCTAssertFalse(copy.subtitle.contains("TikTok"))
+    }
+
+    func testQueuedShieldConfigurationCopyDoesNotClaimDirectHostOpen() {
+        let intent = QAShieldActionIntent.make(
+            kind: .showReplacementChoices,
+            session: nil,
+            now: Date(timeIntervalSince1970: 1_777_000_000)
+        )
+
+        let copy = QAShieldCopyFactory.copy(for: nil, pendingIntent: intent)
+
+        XCTAssertEqual(copy.title, "Replacement is queued.")
+        XCTAssertEqual(copy.primaryButtonLabel, "Keep replacement queued")
+        XCTAssertTrue(copy.subtitle.contains("cannot directly open the host app"))
+    }
+
+    func testPrimaryShieldActionQueuesHostInterventionIntent() {
+        let now = Date(timeIntervalSince1970: 1_777_000_000)
+        let state = QAShieldSessionState.armed(
+            session: QASampleData.session,
+            selection: QAScreenTimeSelectionSummary(applicationCount: 1, categoryCount: 0, webDomainCount: 0),
+            now: now
+        )
+
+        let plan = QAShieldActionPlanner.plan(for: .primary, session: state, now: now)
+
+        XCTAssertEqual(plan.response, .redrawShield)
+        XCTAssertNil(plan.updatedSession)
+        XCTAssertEqual(plan.intent?.kind, .showReplacementChoices)
+        XCTAssertEqual(plan.intent?.selectedContentID, QASampleData.readerItem.id)
+        XCTAssertEqual(QAShieldHostIntentRouter.route(for: plan.intent), .intervention)
+        XCTAssertEqual(plan.intent?.containsOnlyTokenSafeMetadata, true)
+    }
+
+    func testSecondaryShieldActionPausesWithoutUsingSystemDeferAsTimer() {
+        let now = Date(timeIntervalSince1970: 1_777_000_000)
+        let state = QAShieldSessionState.armed(
+            session: QASampleData.session,
+            selection: QAScreenTimeSelectionSummary(applicationCount: 1, categoryCount: 0, webDomainCount: 0),
+            now: now
+        )
+
+        let plan = QAShieldActionPlanner.plan(for: .secondary, session: state, now: now)
+
+        XCTAssertEqual(plan.response, .closeShield)
+        XCTAssertEqual(plan.intent?.kind, .pauseForFifteenMinutes)
+        XCTAssertEqual(plan.updatedSession?.actionMode, .paused)
+        XCTAssertEqual(plan.updatedSession?.pauseExpiresAt, now.addingTimeInterval(QAShieldActionPlanner.pauseDuration))
+        XCTAssertEqual(QAShieldHostIntentRouter.route(for: plan.intent), .home)
+    }
+
+    func testShieldActionIntentStorePersistsAndClearsThroughInjectedDefaults() {
+        let suiteName = "qa.shieldActionIntent.tests.\(UUID().uuidString)"
+        let userDefaults = UserDefaults(suiteName: suiteName)
+        defer {
+            userDefaults?.removePersistentDomain(forName: suiteName)
+        }
+        let intent = QAShieldActionIntent.make(
+            kind: .showReplacementChoices,
+            session: nil,
+            now: Date(timeIntervalSince1970: 1_777_000_000)
+        )
+
+        QAShieldActionIntentStore.save(intent, userDefaults: userDefaults)
+        XCTAssertEqual(QAShieldActionIntentStore.load(userDefaults: userDefaults), intent)
+
+        QAShieldActionIntentStore.clear(userDefaults: userDefaults)
+        XCTAssertNil(QAShieldActionIntentStore.load(userDefaults: userDefaults))
+    }
+
     func testAppGroupStoresFailClosedWhenSharedDefaultsAreUnavailable() {
         let now = Date(timeIntervalSince1970: 1_777_000_000)
         let state = QAShieldSessionState.armed(
@@ -121,6 +207,11 @@ final class QualityAlternativeDesignTests: XCTestCase {
         XCTAssertNil(QAShieldSessionStore.load(userDefaults: nil))
         QAShieldSessionStore.save(state, userDefaults: nil)
         QAShieldSessionStore.clear(userDefaults: nil)
+        QAShieldActionIntentStore.save(
+            QAShieldActionIntent.make(kind: .showReplacementChoices, session: state, now: now),
+            userDefaults: nil
+        )
+        QAShieldActionIntentStore.clear(userDefaults: nil)
 
         let selection = QAFamilyActivitySelectionStore.load(userDefaults: nil)
         XCTAssertEqual(selection.applicationTokens.count, 0)

@@ -18,6 +18,11 @@ targets:
       - path: QualityAlternative
     resources:
       - path: QualityAlternative/Resources
+    dependencies:
+      - target: QualityAlternativeShieldConfiguration
+        embed: true
+      - target: QualityAlternativeShieldAction
+        embed: true
     info:
       path: QualityAlternative/Info.plist
       properties:
@@ -42,6 +47,52 @@ targets:
       testTargets:
         - QualityAlternativeTests
         - QualityAlternativeUITests
+  QualityAlternativeShieldConfiguration:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: QualityAlternativeShieldConfiguration
+      - path: QualityAlternative/Models.swift
+      - path: QualityAlternative/ShieldState.swift
+    info:
+      path: QualityAlternativeShieldConfiguration/Info.plist
+      properties:
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.ManagedSettingsUI.shield-configuration-service
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShieldConfigurationExtension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.qualityalternative.ios.shieldconfiguration
+        PRODUCT_NAME: QualityAlternativeShieldConfiguration
+        TARGETED_DEVICE_FAMILY: 1
+        SUPPORTS_MACCATALYST: NO
+        APPLICATION_EXTENSION_API_ONLY: YES
+        CODE_SIGN_ENTITLEMENTS: QualityAlternativeShieldConfiguration/QualityAlternativeShieldConfiguration.entitlements
+  QualityAlternativeShieldAction:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: QualityAlternativeShieldAction
+      - path: QualityAlternative/Models.swift
+      - path: QualityAlternative/ShieldState.swift
+    info:
+      path: QualityAlternativeShieldAction/Info.plist
+      properties:
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.ManagedSettings.shield-action-service
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShieldActionExtension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.qualityalternative.ios.shieldaction
+        PRODUCT_NAME: QualityAlternativeShieldAction
+        TARGETED_DEVICE_FAMILY: 1
+        SUPPORTS_MACCATALYST: NO
+        APPLICATION_EXTENSION_API_ONLY: YES
+        CODE_SIGN_ENTITLEMENTS: QualityAlternativeShieldAction/QualityAlternativeShieldAction.entitlements
   QualityAlternativeTests:
     type: bundle.unit-test
     platform: iOS

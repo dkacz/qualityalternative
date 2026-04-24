@@ -1,6 +1,6 @@
 # Sprint 12 iOS Implementation
 
-Status: `slice_12_4_in_progress`
+Status: `slice_12_4_pro_review_pending`
 Branch: `codex/sprint12-ios-implementation`
 
 ## Goal
@@ -259,7 +259,7 @@ Scope:
 - Add a ManagedSettingsUI shield-configuration extension that can render a finite iOS-native shield surface from App Group state.
 - Add a ManagedSettings shield-action extension that handles public primary and secondary shield actions.
 - Keep shield state token-safe: actions may persist replacement ids, action kinds, timestamps, and generic target context, not readable protected-app names.
-- Route primary shield action toward the host app's prepared replacement flow through documented public responses.
+- Route primary shield action by saving a replacement intent for the next host-app foreground and returning Apple's documented `defer` response to redraw the shield.
 - Route secondary shield action as an explicit short pause request without treating Apple's `defer` response as a timer.
 - Add right-sized tests for shield copy, action planning, action-intent persistence, and host-app intent consumption.
 
@@ -268,9 +268,43 @@ Out of scope:
 - No private APIs or custom overlay parity claim.
 - No DeviceActivity monitor schedule yet.
 - No physical-device PASS claim for actual shield presentation, Screen Time enforcement, extension invocation, or host-app routing.
+- No claim that ShieldActionDelegate can directly open the host app; the local SDK exposes only `none`, `close`, and `defer`.
 - No readable app identity inference from opaque FamilyControls tokens.
 
 Validation notes:
 
 - Simulator validation can compile extension targets and test pure action/state behavior only.
 - Real shield display and ShieldActionDelegate routing still require a signed physical-device validation pass.
+
+Validation completed on 2026-04-24:
+
+- `git diff --check`: PASS
+- `plutil -lint` for app and extension entitlements/Info.plists: PASS
+- `xcodebuild test`: PASS on `QA iPhone 16 Sprint12`
+- Unit tests: 15 passed, 0 failed
+- UI visual QA tests: 1 passed, 0 failed
+- Total tests: 16 passed, 0 failed
+- Result bundle: `output/ios_sprint12_slice12_4_validation_20260424_150000/QualityAlternative.xcresult`
+- Test summary: `output/ios_sprint12_slice12_4_validation_20260424_150000/test_summary.json`
+
+Visual QA artifacts:
+
+- Contact sheet: `docs/visual-qa/sprint12-ios-slice12-4/contact_sheet.png`
+- Light screenshots: home, library, intervention, reader, handoff, meditation, progress, settings with Screen Time setup and shield controls
+- Dark screenshots: intervention, reader, meditation
+
+Implemented state:
+
+- The app embeds ManagedSettingsUI shield-configuration and ManagedSettings shield-action extension targets.
+- Both extension targets declare the required public `NSExtension` point identifiers and use App Group plus Family Controls entitlements.
+- `QAShieldCopyFactory` renders finite, token-safe shield copy from App Group state without exposing readable protected-app identities.
+- The primary shield action stores a host-app replacement intent and returns `.defer` to redraw the Apple shield; it does not claim direct host-app launch.
+- The secondary shield action records an explicit pause, clears ManagedSettings shields, and returns `.close`; it does not treat `.defer` as a timer.
+- The host app consumes queued shield intents on foreground and routes replacement requests into the finite intervention screen.
+
+GPT Pro review:
+
+- Lane: pending
+- Prompt: pending
+- Bundle: pending
+- Expected harvest path: pending
