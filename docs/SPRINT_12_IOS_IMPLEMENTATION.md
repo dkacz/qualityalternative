@@ -1,6 +1,6 @@
 # Sprint 12 iOS Implementation
 
-Status: `slice_12_2_followup_pro_review_pending`
+Status: `slice_12_3_in_progress`
 Branch: `codex/sprint12-ios-implementation`
 
 ## Goal
@@ -170,8 +170,27 @@ Review fixes applied:
 
 GPT Pro follow-up review:
 
-- Status: pending
+- Harvested verdict: `10/10 PASS`
 - Lane: `https://chatgpt.com/c/69eb4ec3-449c-838b-b29b-8677b0a1deeb`
 - Prompt: `PRO_REVIEW_PROMPT_20260424_130548.md`
 - Bundle: `QUALITY_ALTERNATIVE_IOS_REVIEW_BUNDLE_20260424_130548.zip`
-- Expected harvest path: `PRO_REVIEW_OUTPUT_20260424_130548/`
+- Harvest path: `PRO_REVIEW_OUTPUT_20260424_130548/`
+
+## Slice 12.3: Shared Shield State and Host Controls
+
+Scope:
+
+- Add an App Group-backed state model for the current iOS replacement/shield session.
+- Add host-app controls that can prepare, pause, resume, and clear shield state from the Settings setup surface.
+- Apply selected protected tokens to a `ManagedSettingsStore` only when authorization and at least one protected target are present.
+- Keep state token-safe: store counts, selected replacement ids, pause expiry, and action mode, not readable protected-app names.
+- Add unit tests for shield readiness, pause expiry, action state, and no-selection safety.
+- Add simulator visual QA for the Settings shield-control surface.
+
+Out of scope:
+
+- No DeviceActivity monitor extension yet.
+- No ManagedSettingsUI shield configuration extension yet.
+- No ShieldActionDelegate routing yet.
+- No physical-device PASS claim for actual shield display or Screen Time enforcement.
+- No private API workaround for opening another app or bypassing Screen Time constraints.
