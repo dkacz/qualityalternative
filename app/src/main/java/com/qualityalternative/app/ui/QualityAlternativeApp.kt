@@ -2484,7 +2484,7 @@ private fun RecentReplacementRow(entry: ReplacementHistoryEntry) {
     Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
             MonoText(formatRelativeDay(entry.acceptedAtMillis), modifier = Modifier.weight(1f))
-            MonoText("${entry.contentMinutesGuess()} min")
+            MonoText(recentReplacementDurationLabel(entry))
         }
         Text(
             entry.contentTitle,
@@ -3637,14 +3637,8 @@ private fun DistractingApp.dotColor(): Color {
     }
 }
 
-private fun ReplacementHistoryEntry.contentMinutesGuess(): Int {
-    return when {
-        contentDescription.contains("seven", ignoreCase = true) -> 7
-        contentDescription.contains("five", ignoreCase = true) -> 5
-        contentDescription.contains("six", ignoreCase = true) -> 6
-        contentDescription.contains("eight", ignoreCase = true) -> 8
-        else -> 10
-    }
+internal fun recentReplacementDurationLabel(entry: ReplacementHistoryEntry): String {
+    return "${entry.contentDurationMinutes} min"
 }
 
 private fun List<AnalyticsEvent>.distinctProgressEventCount(type: AnalyticsEventType): Int {

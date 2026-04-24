@@ -174,6 +174,17 @@ class ProgressSnapshotTest {
     }
 
     @Test
+    fun recentReplacementDurationLabelUsesPersistedDuration() {
+        val entry = replacementEntry(
+            sessionId = "five-minute-reset",
+            acceptedAtMillis = 1_000L,
+            contentDurationMinutes = 5,
+        )
+
+        assertEquals("5 min", recentReplacementDurationLabel(entry))
+    }
+
+    @Test
     fun progressSnapshotCountsCurrentReadingStreakFromCompletedSessions() {
         val today = LocalDate.of(2026, 4, 21)
         val entries = listOf(
@@ -367,6 +378,7 @@ class ProgressSnapshotTest {
         sessionId: String,
         acceptedAtMillis: Long,
         completedAtMillis: Long? = null,
+        contentDurationMinutes: Int = 10,
     ): ReplacementHistoryEntry {
         return ReplacementHistoryEntry(
             sessionId = sessionId,
@@ -379,6 +391,7 @@ class ProgressSnapshotTest {
             contentId = "content-$sessionId",
             contentTitle = "Replacement $sessionId",
             contentDescription = "A finite replacement.",
+            contentDurationMinutes = contentDurationMinutes,
             contentTopics = setOf(TopicTag.SCIENCE),
             packId = "science",
             recommendationSource = RecommendationSource.PRIMARY,

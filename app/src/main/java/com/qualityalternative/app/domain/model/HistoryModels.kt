@@ -46,6 +46,7 @@ data class ReplacementHistoryEntry(
     val contentId: String,
     val contentTitle: String,
     val contentDescription: String,
+    val contentDurationMinutes: Int = 10,
     val contentTopics: Set<TopicTag>,
     val packId: String,
     val recommendationSource: RecommendationSource,

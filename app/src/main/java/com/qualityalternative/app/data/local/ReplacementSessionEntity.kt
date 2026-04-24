@@ -15,6 +15,7 @@ data class ReplacementSessionEntity(
     val contentId: String,
     val contentTitle: String,
     val contentDescription: String,
+    val contentDurationMinutes: Int,
     val contentTopicsCsv: String,
     val packId: String,
     val recommendationSource: String,

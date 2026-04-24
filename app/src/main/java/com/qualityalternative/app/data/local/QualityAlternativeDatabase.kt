@@ -14,7 +14,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         UserLinkEntity::class,
         UserDocumentEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = true,
 )
 abstract class QualityAlternativeDatabase : RoomDatabase() {
@@ -36,7 +36,14 @@ abstract class QualityAlternativeDatabase : RoomDatabase() {
                 QualityAlternativeDatabase::class.java,
                 databaseName,
             )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                .addMigrations(
+                    MIGRATION_1_2,
+                    MIGRATION_2_3,
+                    MIGRATION_3_4,
+                    MIGRATION_4_5,
+                    MIGRATION_5_6,
+                    MIGRATION_6_7,
+                )
                 .build()
         }
 
@@ -189,6 +196,14 @@ abstract class QualityAlternativeDatabase : RoomDatabase() {
         val MIGRATION_5_6 = object : Migration(5, 6) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 createUserDocumentsTable(db)
+            }
+        }
+
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE replacement_sessions ADD COLUMN contentDurationMinutes INTEGER NOT NULL DEFAULT 10",
+                )
             }
         }
 

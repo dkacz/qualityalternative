@@ -81,6 +81,7 @@ class RoomHistoryRepositoryTest {
             }
 
             assertTrue(historyEntry.isCompleted())
+            assertEquals(7, historyEntry.contentDurationMinutes)
             assertEquals(3_000L, historyEntry.returnedToTargetAtMillis)
             assertEquals(true, historyEntry.feedbackHelpedAvoidScrolling)
             assertEquals("great", historyEntry.feedbackFitRating)
@@ -179,9 +180,9 @@ class RoomHistoryRepositoryTest {
                 topicTags = setOf(TopicTag.PSYCHOLOGY),
             )
             val updatedContent = content.copy(
-                title = "10-minute reset",
+                title = "5-minute reset",
                 description = "A longer reset",
-                durationMinutes = 10,
+                durationMinutes = 5,
             )
 
             val sessionId = repository.recordAcceptedSession(
@@ -199,8 +200,9 @@ class RoomHistoryRepositoryTest {
             val historyEntry = repository.recentHistory(nowMillis = 2_000L).single()
 
             assertEquals("meditation-reset", historyEntry.contentId)
-            assertEquals("10-minute reset", historyEntry.contentTitle)
+            assertEquals("5-minute reset", historyEntry.contentTitle)
             assertEquals("A longer reset", historyEntry.contentDescription)
+            assertEquals(5, historyEntry.contentDurationMinutes)
             assertEquals(setOf(TopicTag.PSYCHOLOGY), historyEntry.contentTopics)
         } finally {
             appScope.cancel()

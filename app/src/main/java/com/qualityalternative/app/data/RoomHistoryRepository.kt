@@ -89,6 +89,7 @@ class RoomHistoryRepository(
                 contentId = content.id,
                 contentTitle = content.title,
                 contentDescription = content.description,
+                contentDurationMinutes = content.durationMinutes,
                 contentTopics = content.topicTags,
                 packId = content.packId,
                 recommendationSource = source,
@@ -114,6 +115,7 @@ class RoomHistoryRepository(
                     contentId = content.id,
                     contentTitle = content.title,
                     contentDescription = content.description,
+                    contentDurationMinutes = content.durationMinutes,
                     contentTopics = content.topicTags,
                     packId = content.packId,
                 )
@@ -226,6 +228,7 @@ private fun ReplacementHistoryEntry.toEntity(): ReplacementSessionEntity {
         contentId = contentId,
         contentTitle = contentTitle,
         contentDescription = contentDescription,
+        contentDurationMinutes = contentDurationMinutes,
         contentTopicsCsv = contentTopics.joinToString(",") { it.name },
         packId = packId,
         recommendationSource = recommendationSource.name,
@@ -252,6 +255,7 @@ private fun ReplacementSessionEntity.toModel(): ReplacementHistoryEntry {
         contentId = contentId,
         contentTitle = contentTitle,
         contentDescription = contentDescription,
+        contentDurationMinutes = contentDurationMinutes,
         contentTopics = if (contentTopicsCsv.isBlank()) {
             emptySet()
         } else {

@@ -444,7 +444,8 @@ class RoomUserLinkRepositoryTest {
                         feedbackGoodFit,
                         feedbackHelpedAvoidScrolling,
                         feedbackFitRating,
-                        feedbackScrollRating
+                        feedbackScrollRating,
+                        contentDurationMinutes
                     FROM replacement_sessions
                     """.trimIndent(),
                 ).use { cursor ->
@@ -470,6 +471,7 @@ class RoomUserLinkRepositoryTest {
                     assertTrue(cursor.isNull(18))
                     assertTrue(cursor.isNull(19))
                     assertTrue(cursor.isNull(20))
+                    assertEquals(10, cursor.getInt(21))
                 }
                 migrated.openHelper.writableDatabase.query("PRAGMA index_list('user_links')").use { cursor ->
                     var foundUniqueNormalizedUrlIndex = false

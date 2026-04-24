@@ -287,6 +287,17 @@ class RoomUserDocumentRepositoryTest {
                     assertTrue(cursor.moveToFirst())
                     assertEquals(0, cursor.getInt(0))
                 }
+                migrated.openHelper.writableDatabase.query("PRAGMA table_info('replacement_sessions')").use { cursor ->
+                    var foundDurationColumn = false
+                    while (cursor.moveToNext()) {
+                        val columnName = cursor.getString(cursor.getColumnIndexOrThrow("name"))
+                        val defaultValue = cursor.getString(cursor.getColumnIndexOrThrow("dflt_value"))
+                        if (columnName == "contentDurationMinutes" && defaultValue == "10") {
+                            foundDurationColumn = true
+                        }
+                    }
+                    assertTrue(foundDurationColumn)
+                }
                 migrated.openHelper.writableDatabase.query("PRAGMA index_list('user_documents')").use { cursor ->
                     var foundUniqueUriIndex = false
                     while (cursor.moveToNext()) {

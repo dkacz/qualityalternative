@@ -532,14 +532,15 @@ class MainViewModelTest {
         assertEquals("3-minute reset", historyRepository.historyEntries.value.single().contentTitle)
 
         nowMillis = 9_000L
-        viewModel.setMeditationDurationMinutes(10)
+        viewModel.setMeditationDurationMinutes(5)
         advanceUntilIdle()
 
-        assertEquals(10, viewModel.uiState.currentContent?.durationMinutes)
-        assertEquals("10-minute reset", viewModel.uiState.currentContent?.title)
+        assertEquals(5, viewModel.uiState.currentContent?.durationMinutes)
+        assertEquals("5-minute reset", viewModel.uiState.currentContent?.title)
         assertEquals(9_000L, viewModel.uiState.currentSessionStartedAtMillis)
-        assertEquals(10, settingsRepository.state.value.meditationDurationMinutes)
-        assertEquals("10-minute reset", historyRepository.historyEntries.value.single().contentTitle)
+        assertEquals(5, settingsRepository.state.value.meditationDurationMinutes)
+        assertEquals("5-minute reset", historyRepository.historyEntries.value.single().contentTitle)
+        assertEquals(5, historyRepository.historyEntries.value.single().contentDurationMinutes)
         assertEquals("A quiet timer for breathing through the impulse before choosing what comes next.", historyRepository.historyEntries.value.single().contentDescription)
     }
 
@@ -1913,6 +1914,7 @@ class MainViewModelTest {
                 contentId = content.id,
                 contentTitle = content.title,
                 contentDescription = content.description,
+                contentDurationMinutes = content.durationMinutes,
                 contentTopics = content.topicTags,
                 packId = content.packId,
                 recommendationSource = source,
@@ -1937,6 +1939,7 @@ class MainViewModelTest {
                         contentId = content.id,
                         contentTitle = content.title,
                         contentDescription = content.description,
+                        contentDurationMinutes = content.durationMinutes,
                         contentTopics = content.topicTags,
                         packId = content.packId,
                     )
