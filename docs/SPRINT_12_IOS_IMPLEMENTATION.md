@@ -1,6 +1,6 @@
 # Sprint 12 iOS Implementation
 
-Status: `slice_12_5_in_progress`
+Status: `slice_12_5_pro_review_pending`
 Branch: `codex/sprint12-ios-implementation`
 
 ## Goal
@@ -381,4 +381,8 @@ Implemented state:
 
 GPT Pro review:
 
+- Lane: `https://chatgpt.com/c/69eb6f21-5584-8386-bb42-e60a6fe43133`
 - Status: pending
+- Prompt: `PRO_REVIEW_PROMPT_20260424_152312.md`
+- Bundle: `QUALITY_ALTERNATIVE_IOS_REVIEW_BUNDLE_20260424_152312.zip`
+- Expected harvest path: `PRO_REVIEW_OUTPUT_20260424_152312/`
