@@ -1,13 +1,15 @@
 # Sprint 13 iOS Release Validation
 
-Status: `slice_13_1_blocked_by_signing_identity_and_physical_device`
-Branch: `codex/sprint13-ios-physical-release`
+Status: `simulator_release_candidate_created_physical_device_out_of_scope_for_now`
+Branch: `codex/sprint13-ios-simulator-release`
 
 ## Goal
 
 Turn the Pro-reviewed Sprint 12 simulator implementation into a signed iOS release candidate, then validate the actual Screen Time, DeviceActivity, ManagedSettings shield, and extension behavior on a physical iPhone.
 
 This sprint must not claim release readiness until signed physical-device validation passes. Simulator success remains useful compile/state/visual evidence only.
+
+Current operator decision: physical-device validation is paused for now. The active deliverable is a simulator-only release candidate that can be installed and launched in Xcode Simulator. It is not installable on an iPhone and does not prove real Screen Time enforcement.
 
 ## Slice 13.1: Signing and Device Release Preflight
 
@@ -131,6 +133,46 @@ Required evidence for PASS:
 ## Next Slice Gate
 
 Slice 13.2 can start only after the signing inputs are available. The expected first action is to set `DEVELOPMENT_TEAM` for all four iOS targets, build a signed Release archive, install it on a physical iPhone, and execute the physical-device checklist.
+
+## Slice 13.2: Simulator Release Candidate
+
+Scope:
+
+- Build the app in Release configuration for `iphonesimulator`.
+- Package the generated `.app` bundle as a repo-root ZIP artifact for local simulator installation.
+- Install and launch the Release app in the booted `QA iPhone 16 Sprint12` simulator.
+- Preserve all physical-device caveats from Slice 13.1.
+
+Out of scope:
+
+- No iPhone-installable `.ipa`.
+- No TestFlight, ad-hoc, or App Store artifact.
+- No claim that Screen Time authorization, shield display, DeviceActivity callbacks, or ManagedSettings enforcement work on simulator like they do on a signed physical device.
+
+Validation completed on 2026-04-24:
+
+- Release `iphonesimulator` build: PASS
+- Simulator install on booted `QA iPhone 16 Sprint12`: PASS
+- Simulator launch for bundle `com.qualityalternative.ios`: PASS
+- Packaged simulator artifact: `QUALITY_ALTERNATIVE_IOS_SIMULATOR_RC_20260424_173000.zip`
+- SHA-256: `output/ios_sprint13_simulator_rc_20260424_173000/QUALITY_ALTERNATIVE_IOS_SIMULATOR_RC_20260424_173000.sha256`
+- Environment log: `output/ios_sprint13_simulator_rc_20260424_173000/simulator_release_environment.log`
+- Build log: `output/ios_sprint13_simulator_rc_20260424_173000/xcodebuild_release_simulator.log`
+- Install log: `output/ios_sprint13_simulator_rc_20260424_173000/simctl_install.log`
+- Launch log: `output/ios_sprint13_simulator_rc_20260424_173000/simctl_launch.log`
+
+Simulator artifact contents:
+
+- `QualityAlternative.app`
+- `QualityAlternative.app/PlugIns/QualityAlternativeDeviceActivityMonitor.appex`
+- `QualityAlternative.app/PlugIns/QualityAlternativeShieldAction.appex`
+- `QualityAlternative.app/PlugIns/QualityAlternativeShieldConfiguration.appex`
+
+Simulator install command:
+
+```bash
+cd /Users/omare/Documents/qualityalternative-ios-sprint12 && unzip -q QUALITY_ALTERNATIVE_IOS_SIMULATOR_RC_20260424_173000.zip -d /tmp/qualityalternative-ios-simulator-rc && DEVELOPER_DIR=/Applications/Xcode-26.1.1.app/Contents/Developer xcrun simctl install booted /tmp/qualityalternative-ios-simulator-rc/QualityAlternative.app && DEVELOPER_DIR=/Applications/Xcode-26.1.1.app/Contents/Developer xcrun simctl launch booted com.qualityalternative.ios
+```
 
 ## GPT Pro Review
 
