@@ -1,6 +1,6 @@
 # Sprint 12 iOS Implementation
 
-Status: `slice_12_2_ready_for_pro_review`
+Status: `slice_12_2_pro_review_pending`
 Branch: `codex/sprint12-ios-implementation`
 
 ## Goal
@@ -151,3 +151,10 @@ Implemented state:
 - `FamilyActivitySelection` is loaded/saved locally through JSON in `UserDefaults` for host-app continuity.
 - The UI deliberately shows token counts and readiness only; it does not expose, infer, or fake readable app identities.
 - No Screen Time shielding, DeviceActivity monitoring, ManagedSettings store, ManagedSettingsUI shield, or ShieldActionDelegate routing has been added in this slice.
+
+GPT Pro review:
+
+- Lane: `https://chatgpt.com/c/69eb4a61-a454-838b-bd7a-e8099482ad97`
+- Prompt: `PRO_REVIEW_PROMPT_20260424_124547.md`
+- Bundle: `QUALITY_ALTERNATIVE_IOS_REVIEW_BUNDLE_20260424_124547.zip`
+- Expected harvest path: `PRO_REVIEW_OUTPUT_20260424_124547/`
