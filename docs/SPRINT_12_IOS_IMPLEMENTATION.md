@@ -411,4 +411,8 @@ GPT Pro retry review:
 
 GPT Pro review-fix follow-up:
 
-- Status: pending launch after review-fix commit
+- Lane: `https://chatgpt.com/c/69eb7d2d-8f0c-838b-8297-c8ca0d37d91e`
+- Status: pending
+- Prompt: `PRO_REVIEW_PROMPT_20260424_162127.md`
+- Bundle: `QUALITY_ALTERNATIVE_IOS_REVIEW_BUNDLE_20260424_162127.zip`
+- Expected harvest path: `PRO_REVIEW_OUTPUT_20260424_162127/`
