@@ -1,6 +1,6 @@
 # Sprint 14 iOS Simulator Parity
 
-Status: `pdf_safearea_review_fixes_implemented_followup_pro_review_pending`
+Status: `pdf_binary_diffcheck_review_fix_followup_pro_review_pending`
 Branch: `codex/sprint14-ios-simulator-parity`
 
 ## Goal
@@ -86,6 +86,13 @@ Concrete fixes implemented before the next follow-up review:
 - Added a top safe-area background scrim so scrolled content no longer visibly collides with the iOS status bar.
 - Regenerated all Sprint 14 visual QA screenshots and the contact sheet from the passing simulator run.
 
+The PDF/safe-area follow-up lane returned `REVISE`; the harvested audit is saved at `PRO_REVIEW_OUTPUT_20260424_205637/iOS_Simulator_Parity_Review.md`.
+
+Concrete fix implemented before the next follow-up review:
+
+- Added `.gitattributes` with `*.pdf binary` so the intentionally bundled PDF fixture is treated as binary audit evidence instead of text diff content.
+- Reran `git diff --check` for both the current worktree and the prior PDF-fixture commit range, saving empty pass artifacts in the latest validation directory.
+
 ## Out of Scope
 
 - No physical-device proof of Screen Time authorization, FamilyActivityPicker persistence on real device, ManagedSettings shield display, Shield Action extension invocation, or DeviceActivity callback delivery.
@@ -95,17 +102,23 @@ Concrete fixes implemented before the next follow-up review:
 
 ## Validation
 
-PDF/safe-area review-fix validation completed on 2026-04-24 with `DEVELOPER_DIR=/Applications/Xcode-26.1.1.app/Contents/Developer`:
+PDF binary/diff-check review-fix validation completed on 2026-04-24 with `DEVELOPER_DIR=/Applications/Xcode-26.1.1.app/Contents/Developer`:
 
+- `git diff --check`: PASS
+- `git diff --check HEAD~1..HEAD`: PASS
+- Android and iOS editorial JSON validation: PASS
+- `plutil -lint`: PASS
 - `xcodebuild test`: PASS
 - Unit tests: 37 passed, 0 failed
 - UI visual QA tests: 1 passed, 0 failed
 - Total tests: 38 passed, 0 failed
 - Visual screenshots captured: 21
-- Result bundle: `output/ios_sprint14_parity_pdf_safearea_validation_20260424_205113/QualityAlternative.xcresult`
-- Test log: `output/ios_sprint14_parity_pdf_safearea_validation_20260424_205113/xcodebuild_test.log`
-- Test summary: `output/ios_sprint14_parity_pdf_safearea_validation_20260424_205113/test_summary.json`
-- Screenshot attachments: `output/ios_sprint14_parity_pdf_safearea_validation_20260424_205113/attachments/manifest.json`
+- Result bundle: `output/ios_sprint14_parity_pdf_binary_validation_20260424_211004/QualityAlternative.xcresult`
+- Git diff check: `output/ios_sprint14_parity_pdf_binary_validation_20260424_211004/git_diff_check.txt`
+- Prior commit-range diff check: `output/ios_sprint14_parity_pdf_binary_validation_20260424_211004/git_diff_check_previous_commit_range.txt`
+- Test log: `output/ios_sprint14_parity_pdf_binary_validation_20260424_211004/xcodebuild_test.log`
+- Test summary: `output/ios_sprint14_parity_pdf_binary_validation_20260424_211004/test_summary.json`
+- Screenshot attachments: `output/ios_sprint14_parity_pdf_binary_validation_20260424_211004/attachments/manifest.json`
 
 Visual QA artifacts:
 
