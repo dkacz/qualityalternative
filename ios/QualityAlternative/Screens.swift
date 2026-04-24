@@ -283,7 +283,12 @@ struct SettingsScreen: View {
     let screenTimeAuthorization: QAScreenTimeAuthorizationState
     let screenTimeAuthorizationError: String?
     @Binding var protectedSelection: FamilyActivitySelection
+    let shieldSession: QAShieldSessionState?
     let onRequestScreenTimeAuthorization: () -> Void
+    let onApplyShieldRules: () -> Void
+    let onPauseShieldRules: () -> Void
+    let onResumeShieldRules: () -> Void
+    let onClearShieldRules: () -> Void
     @State private var isFamilyActivityPickerPresented = false
 
     private var setupSnapshot: QAScreenTimeSetupSnapshot {
@@ -294,6 +299,14 @@ struct SettingsScreen: View {
                 categoryCount: protectedSelection.categoryTokens.count,
                 webDomainCount: protectedSelection.webDomainTokens.count
             )
+        )
+    }
+
+    private var shieldSnapshot: QAShieldControlSnapshot {
+        QAShieldControlSnapshot(
+            setup: setupSnapshot,
+            session: shieldSession,
+            now: Date()
         )
     }
 
@@ -354,6 +367,65 @@ struct SettingsScreen: View {
                     .accessibilityIdentifier("screen-time-setup-card")
 
                     QACard {
+                        VStack(alignment: .leading, spacing: 14) {
+                            SettingsSectionTitle("Shield controls")
+                            HStack(spacing: 8) {
+                                StatusPill(
+                                    text: shieldSnapshot.statusTitle,
+                                    tone: shieldStatusTone,
+                                    accessibilityIdentifier: "shield-state-pill"
+                                )
+                                StatusPill(
+                                    text: shieldSnapshot.canApplyShieldRules ? "Ready to apply" : "Needs setup",
+                                    tone: shieldSnapshot.canApplyShieldRules ? .success : .neutral
+                                )
+                            }
+                            Text(shieldSnapshot.detailText)
+                                .font(.qaBody(15))
+                                .foregroundStyle(tokens.colors.primaryText)
+                                .accessibilityIdentifier("shield-control-detail")
+
+                            QAButton(
+                                title: "Apply shield rules",
+                                style: .primary,
+                                accessibilityIdentifier: "apply-shield-rules",
+                                isEnabled: shieldSnapshot.canApplyShieldRules,
+                                action: onApplyShieldRules
+                            )
+                            if shieldSnapshot.canPauseShieldRules {
+                                QAButton(
+                                    title: "Pause shields for 15 min",
+                                    style: .secondary,
+                                    accessibilityIdentifier: "pause-shield-rules",
+                                    action: onPauseShieldRules
+                                )
+                            }
+                            if shieldSnapshot.canResumeShieldRules {
+                                QAButton(
+                                    title: "Resume shield rules",
+                                    style: .secondary,
+                                    accessibilityIdentifier: "resume-shield-rules",
+                                    action: onResumeShieldRules
+                                )
+                            }
+                            if shieldSnapshot.canClearShieldRules {
+                                QAButton(
+                                    title: "Clear shield state",
+                                    style: .quiet,
+                                    accessibilityIdentifier: "clear-shield-rules",
+                                    action: onClearShieldRules
+                                )
+                            }
+
+                            Text("Simulator checks only host-app state and ManagedSettings wiring. Real shield display still requires a signed physical-device pass.")
+                                .font(.qaBody(12))
+                                .lineSpacing(2)
+                                .foregroundStyle(tokens.colors.mutedText)
+                        }
+                    }
+                    .accessibilityIdentifier("shield-controls-card")
+
+                    QACard {
                         VStack(alignment: .leading, spacing: 12) {
                             SettingsSectionTitle("Theme")
                             HStack(spacing: 10) {
@@ -407,6 +479,16 @@ struct SettingsScreen: View {
             return "No protected apps, categories, or websites selected yet."
         }
         return "\(selection.applicationCount) apps, \(selection.categoryCount) categories, \(selection.webDomainCount) websites selected."
+    }
+
+    private var shieldStatusTone: StatusPill.Tone {
+        guard let shieldSession else {
+            return .neutral
+        }
+        if shieldSession.actionMode == .armed {
+            return .success
+        }
+        return .warning
     }
 }
 

@@ -29,7 +29,7 @@ enum QAScreenTimeAuthorizationState: String, Equatable {
     case approved
 }
 
-struct QAScreenTimeSelectionSummary: Equatable {
+struct QAScreenTimeSelectionSummary: Codable, Equatable {
     let applicationCount: Int
     let categoryCount: Int
     let webDomainCount: Int

@@ -52,6 +52,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.qualityalternative.ios.tests
+        GENERATE_INFOPLIST_FILE: YES
   QualityAlternativeUITests:
     type: bundle.ui-testing
     platform: iOS
@@ -62,3 +63,4 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.qualityalternative.ios.uitests
+        GENERATE_INFOPLIST_FILE: YES

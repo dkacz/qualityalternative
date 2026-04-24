@@ -138,6 +138,7 @@ struct QAButton: View {
     let title: String
     let style: Style
     let accessibilityIdentifier: String?
+    let isEnabled: Bool
     let action: () -> Void
 
     enum Style {
@@ -150,16 +151,23 @@ struct QAButton: View {
         title: String,
         style: Style,
         accessibilityIdentifier: String? = nil,
+        isEnabled: Bool = true,
         action: @escaping () -> Void
     ) {
         self.title = title
         self.style = style
         self.accessibilityIdentifier = accessibilityIdentifier
+        self.isEnabled = isEnabled
         self.action = action
     }
 
     var body: some View {
-        Button(action: action) {
+        Button {
+            guard isEnabled else {
+                return
+            }
+            action()
+        } label: {
             Text(title)
                 .font(.qaBody(15, weight: .semibold))
                 .frame(maxWidth: .infinity)
@@ -171,11 +179,13 @@ struct QAButton: View {
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
                         .stroke(border, lineWidth: style == .quiet ? 0 : 1)
                 )
+                .opacity(isEnabled ? 1 : 0.48)
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(title)
         .accessibilityIdentifier(accessibilityIdentifier ?? title)
+        .accessibilityValue(isEnabled ? "" : "Unavailable until setup is complete")
     }
 
     private var background: Color {

@@ -73,5 +73,12 @@ final class QualityAlternativeVisualQaTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["No protected apps, categories, or websites selected yet."].exists)
         XCTAssertTrue(app.buttons["Request Screen Time access"].exists)
         XCTAssertTrue(app.buttons["Choose protected apps"].exists)
+        XCTAssertTrue(app.staticTexts["Shield controls"].exists)
+        XCTAssertTrue(app.staticTexts["No shield session"].exists)
+        XCTAssertTrue(app.staticTexts["Needs setup"].exists)
+        if !app.buttons["Apply shield rules"].exists {
+            app.scrollViews.firstMatch.swipeUp()
+        }
+        XCTAssertTrue(app.buttons["Apply shield rules"].exists)
     }
 }

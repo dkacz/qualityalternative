@@ -1,6 +1,6 @@
 # Sprint 12 iOS Implementation
 
-Status: `slice_12_3_in_progress`
+Status: `slice_12_3_pro_review_pending`
 Branch: `codex/sprint12-ios-implementation`
 
 ## Goal
@@ -194,3 +194,38 @@ Out of scope:
 - No ShieldActionDelegate routing yet.
 - No physical-device PASS claim for actual shield display or Screen Time enforcement.
 - No private API workaround for opening another app or bypassing Screen Time constraints.
+
+Validation notes:
+
+- Simulator validation covers host-app state, App Group persistence plumbing, ManagedSettings API wiring, and visual QA only.
+- The shared state deliberately stores only generic trigger context, replacement ids, backup ids, token counts, action mode, pause expiry, and timestamps.
+- Real shield display, Screen Time enforcement, app-opening behavior, pause expiry enforcement, and open-anyway behavior still require a signed physical-device pass.
+
+Validation completed on 2026-04-24:
+
+- `git diff --check`: PASS
+- `plutil -lint ios/QualityAlternative/QualityAlternative.entitlements`: PASS
+- `xcodebuild test`: PASS on `QA iPhone 16 Sprint12`
+- Unit tests: 9 passed, 0 failed
+- UI visual QA tests: 1 passed, 0 failed
+- Total tests: 10 passed, 0 failed
+- Result bundle: `output/ios_sprint12_slice12_3_validation_20260424_132000/QualityAlternative.xcresult`
+- Test summary: `output/ios_sprint12_slice12_3_validation_20260424_132000/test_summary.json`
+
+Visual QA artifacts:
+
+- Contact sheet: `docs/visual-qa/sprint12-ios-slice12-3/contact_sheet.png`
+- Light screenshots: home, library, intervention, reader, handoff, meditation, progress, settings with Screen Time setup and shield controls
+- Dark screenshots: intervention, reader, meditation
+
+Implemented state:
+
+- App and future extensions share the App Group id `group.com.qualityalternative.ios`.
+- `QAFamilyActivitySelectionStore` now persists protected selection through the App Group-backed `UserDefaults` fallback.
+- `QAShieldSessionState` stores a token-safe current shield session for App Group sharing.
+- `QAManagedSettingsShieldApplier` applies selected app/category/domain tokens to `ManagedSettingsStore` only when setup is ready.
+- Settings exposes shield preparation and state controls without claiming simulator enforcement.
+
+GPT Pro review:
+
+- Status: pending

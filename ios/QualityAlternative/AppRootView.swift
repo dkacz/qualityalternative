@@ -7,6 +7,8 @@ struct AppRootView: View {
     @State private var screenTimeAuthorization: QAScreenTimeAuthorizationState
     @State private var screenTimeAuthorizationError: String?
     @State private var protectedSelection: FamilyActivitySelection
+    @State private var shieldSession: QAShieldSessionState?
+    private let shieldApplier = QAManagedSettingsShieldApplier()
 
     init() {
         let arguments = ProcessInfo.processInfo.arguments
@@ -17,6 +19,7 @@ struct AppRootView: View {
         _screenTimeAuthorization = State(initialValue: QAScreenTimeAuthorizationState(AuthorizationCenter.shared.authorizationStatus))
         _screenTimeAuthorizationError = State(initialValue: nil)
         _protectedSelection = State(initialValue: QAFamilyActivitySelectionStore.load())
+        _shieldSession = State(initialValue: QAShieldSessionStore.load())
     }
 
     var body: some View {
@@ -25,7 +28,9 @@ struct AppRootView: View {
             themeMode: $themeMode,
             screenTimeAuthorization: $screenTimeAuthorization,
             screenTimeAuthorizationError: $screenTimeAuthorizationError,
-            protectedSelection: $protectedSelection
+            protectedSelection: $protectedSelection,
+            shieldSession: $shieldSession,
+            shieldApplier: shieldApplier
         )
             .environment(\.qaTokens, QATokens.tokens(for: themeMode))
             .preferredColorScheme(themeMode == .dark ? .dark : .light)
@@ -44,6 +49,8 @@ private struct RootContent: View {
     @Binding var screenTimeAuthorization: QAScreenTimeAuthorizationState
     @Binding var screenTimeAuthorizationError: String?
     @Binding var protectedSelection: FamilyActivitySelection
+    @Binding var shieldSession: QAShieldSessionState?
+    let shieldApplier: QAManagedSettingsShieldApplier
 
     var body: some View {
         switch route {
@@ -85,7 +92,12 @@ private struct RootContent: View {
                     screenTimeAuthorization: screenTimeAuthorization,
                     screenTimeAuthorizationError: screenTimeAuthorizationError,
                     protectedSelection: $protectedSelection,
-                    onRequestScreenTimeAuthorization: requestScreenTimeAuthorization
+                    shieldSession: shieldSession,
+                    onRequestScreenTimeAuthorization: requestScreenTimeAuthorization,
+                    onApplyShieldRules: applyShieldRules,
+                    onPauseShieldRules: pauseShieldRules,
+                    onResumeShieldRules: resumeShieldRules,
+                    onClearShieldRules: clearShieldRules
                 )
             }
         }
@@ -102,6 +114,52 @@ private struct RootContent: View {
                 screenTimeAuthorizationError = error.localizedDescription
             }
         }
+    }
+
+    private var screenTimeSetupSnapshot: QAScreenTimeSetupSnapshot {
+        QAScreenTimeSetupSnapshot(
+            authorization: screenTimeAuthorization,
+            selection: QAScreenTimeSelectionSummary(selection: protectedSelection)
+        )
+    }
+
+    private func applyShieldRules() {
+        guard screenTimeSetupSnapshot.canPrepareShielding else {
+            return
+        }
+        let now = Date()
+        let state = QAShieldSessionState.armed(
+            session: QASampleData.session,
+            selection: screenTimeSetupSnapshot.selection,
+            now: now
+        )
+        shieldApplier.apply(selection: protectedSelection)
+        shieldSession = state
+        QAShieldSessionStore.save(state)
+    }
+
+    private func pauseShieldRules() {
+        guard let shieldSession else {
+            return
+        }
+        let now = Date()
+        let state = shieldSession.paused(until: now.addingTimeInterval(15 * 60), now: now)
+        shieldApplier.clear()
+        self.shieldSession = state
+        QAShieldSessionStore.save(state)
+    }
+
+    private func resumeShieldRules() {
+        guard screenTimeSetupSnapshot.canPrepareShielding else {
+            return
+        }
+        applyShieldRules()
+    }
+
+    private func clearShieldRules() {
+        shieldApplier.clear()
+        shieldSession = nil
+        QAShieldSessionStore.clear()
     }
 }
 
@@ -166,24 +224,6 @@ private extension [String] {
             return nil
         }
         return self[nextIndex]
-    }
-}
-
-private enum QAFamilyActivitySelectionStore {
-    private static let key = "qa.familyActivitySelection.v1"
-
-    static func load() -> FamilyActivitySelection {
-        guard let data = UserDefaults.standard.data(forKey: key) else {
-            return FamilyActivitySelection()
-        }
-        return (try? JSONDecoder().decode(FamilyActivitySelection.self, from: data)) ?? FamilyActivitySelection()
-    }
-
-    static func save(_ selection: FamilyActivitySelection) {
-        guard let data = try? JSONEncoder().encode(selection) else {
-            return
-        }
-        UserDefaults.standard.set(data, forKey: key)
     }
 }
 
