@@ -22,20 +22,32 @@ final class QualityAlternativeVisualQaTests: XCTestCase {
         capture(route: "reader", name: "13_reader_dark", dark: true)
         capture(route: "meditation", name: "14_meditation_dark", dark: true)
         capture(route: "settings", name: "15_device_activity_light", verifyDeviceActivityMonitor: true)
+        capture(route: "reader", name: "16_private_markdown_reader_light", contentID: "ios-private-markdown")
+        capture(route: "reader", name: "17_private_epub_reader_light", contentID: "ios-private-epub")
+        capture(route: "handoff", name: "18_private_pdf_handoff_light", contentID: "ios-private-pdf", verifyExternalHandoff: true)
+        captureLibraryFilesFilter()
+        captureSettingsDefaultSessionLength()
+        captureActiveDelayAfterPause()
+        assertAddLinkPersistsAfterRelaunch()
     }
 
     private func capture(
         route: String,
         name: String,
         dark: Bool = false,
+        contentID: String? = nil,
         verifyInterventionActions: Bool = false,
         verifyScreenTimeSetup: Bool = false,
         verifyDeviceActivityMonitor: Bool = false,
         verifyAddLink: Bool = false,
-        verifyAddDocument: Bool = false
+        verifyAddDocument: Bool = false,
+        verifyExternalHandoff: Bool = false
     ) {
         let app = XCUIApplication()
-        app.launchArguments = ["--qa-route", route]
+        app.launchArguments = ["--qa-route", route, "--qa-reset-local-state"]
+        if let contentID {
+            app.launchArguments += ["--qa-content-id", contentID]
+        }
         if dark {
             app.launchArguments.append("--qa-dark")
         }
@@ -58,6 +70,9 @@ final class QualityAlternativeVisualQaTests: XCTestCase {
         if verifyAddDocument {
             assertAddDocument(in: app)
         }
+        if verifyExternalHandoff {
+            assertExternalHandoff(in: app)
+        }
 
         let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         attachment.name = name
@@ -65,6 +80,92 @@ final class QualityAlternativeVisualQaTests: XCTestCase {
         add(attachment)
 
         app.terminate()
+    }
+
+    private func captureLibraryFilesFilter() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--qa-route", "library", "--qa-reset-local-state"]
+        app.launch()
+
+        XCTAssertTrue(app.descendants(matching: .any)["library-screen"].waitForExistence(timeout: 6))
+        app.buttons["Files"].tap()
+        XCTAssertTrue(app.staticTexts["Private Markdown Note"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["Private EPUB Extract"].exists)
+        XCTAssertTrue(app.staticTexts["Private PDF Handoff"].exists)
+
+        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        attachment.name = "19_library_files_filter_light"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+
+        app.terminate()
+    }
+
+    private func captureSettingsDefaultSessionLength() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--qa-route", "settings", "--qa-reset-local-state"]
+        app.launch()
+
+        XCTAssertTrue(app.descendants(matching: .any)["settings-screen"].waitForExistence(timeout: 6))
+        let scrollView = app.scrollViews.firstMatch
+        let title = app.staticTexts["Default session length"]
+        for _ in 0..<5 where !title.isHittable {
+            scrollView.swipeUp()
+        }
+        XCTAssertTrue(title.exists)
+        XCTAssertTrue(app.buttons["duration-15"].exists)
+
+        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        attachment.name = "20_settings_default_session_light"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+
+        app.terminate()
+    }
+
+    private func captureActiveDelayAfterPause() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--qa-route", "intervention", "--qa-reset-local-state"]
+        app.launch()
+
+        XCTAssertTrue(app.descendants(matching: .any)["intervention-screen"].waitForExistence(timeout: 6))
+        app.buttons["Pause for 15 min"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["home-screen"].waitForExistence(timeout: 3))
+        let activeDelay = app.descendants(matching: .any)["active-delay-state"]
+        XCTAssertTrue(activeDelay.waitForExistence(timeout: 3))
+        let scrollView = app.scrollViews.firstMatch
+        for _ in 0..<4 where !activeDelay.isHittable {
+            scrollView.swipeUp()
+        }
+        XCTAssertTrue(activeDelay.isHittable)
+
+        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        attachment.name = "21_home_active_delay_light"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+
+        app.terminate()
+    }
+
+    private func assertAddLinkPersistsAfterRelaunch() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--qa-route", "addLink", "--qa-reset-local-state"]
+        app.launch()
+
+        XCTAssertTrue(app.descendants(matching: .any)["add-link-screen"].waitForExistence(timeout: 6))
+        replaceText(in: app.textFields["add-link-title-field"], with: "Simulator Saved Link")
+        replaceText(in: app.textFields["add-link-url-field"], with: "https://example.com/simulator-saved-link")
+        app.buttons["Add to library"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["library-screen"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["Simulator Saved Link"].waitForExistence(timeout: 3))
+
+        app.terminate()
+        let relaunched = XCUIApplication()
+        relaunched.launchArguments = ["--qa-route", "library"]
+        relaunched.launch()
+        XCTAssertTrue(relaunched.descendants(matching: .any)["library-screen"].waitForExistence(timeout: 6))
+        XCTAssertTrue(relaunched.staticTexts["Simulator Saved Link"].waitForExistence(timeout: 3))
+        relaunched.terminate()
     }
 
     private func expectedScreenIdentifier(for route: String) -> String {
@@ -145,10 +246,27 @@ final class QualityAlternativeVisualQaTests: XCTestCase {
         let actions = app.descendants(matching: .any)
         XCTAssertTrue(app.staticTexts["PRIVATE FILE"].exists)
         XCTAssertTrue(app.staticTexts["EPUB fixture"].exists)
+        XCTAssertTrue(actions["document-format-markdown"].exists)
+        XCTAssertTrue(actions["document-format-epub"].exists)
+        XCTAssertTrue(actions["document-format-pdf"].exists)
         XCTAssertTrue(actions["add-document-save"].exists)
         let pdfScopeCopy = app.staticTexts
             .matching(NSPredicate(format: "label CONTAINS %@", "PDF remains an external handoff"))
             .firstMatch
         XCTAssertTrue(pdfScopeCopy.exists)
+    }
+
+    private func assertExternalHandoff(in app: XCUIApplication) {
+        XCTAssertTrue(app.descendants(matching: .any)["external-open-action"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["external-link-done"].exists)
+    }
+
+    private func replaceText(in element: XCUIElement, with text: String) {
+        XCTAssertTrue(element.waitForExistence(timeout: 3))
+        element.tap()
+        if let current = element.value as? String, !current.isEmpty {
+            element.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: current.count))
+        }
+        element.typeText(text)
     }
 }

@@ -44,6 +44,10 @@ struct QAContentItem: Identifiable, Equatable, Codable {
     let renderMode: QARenderMode
     let whyThisNow: String
     let attribution: String?
+    let sourceURL: String?
+    let licenseName: String?
+    let licenseURL: String?
+    let rightsReviewedAt: String?
 
     var duration: String {
         "\(durationMinutes) min"
@@ -72,7 +76,11 @@ struct QAContentItem: Identifiable, Equatable, Codable {
         rightsClass: QAContentRightsClass,
         renderMode: QARenderMode,
         whyThisNow: String,
-        attribution: String? = nil
+        attribution: String? = nil,
+        sourceURL: String? = nil,
+        licenseName: String? = nil,
+        licenseURL: String? = nil,
+        rightsReviewedAt: String? = nil
     ) {
         self.id = id
         self.packId = packId
@@ -89,6 +97,10 @@ struct QAContentItem: Identifiable, Equatable, Codable {
         self.renderMode = renderMode
         self.whyThisNow = whyThisNow
         self.attribution = attribution
+        self.sourceURL = sourceURL
+        self.licenseName = licenseName
+        self.licenseURL = licenseURL
+        self.rightsReviewedAt = rightsReviewedAt
     }
 
     enum CodingKeys: String, CodingKey {
@@ -107,6 +119,10 @@ struct QAContentItem: Identifiable, Equatable, Codable {
         case renderMode
         case whyThisNow
         case attribution
+        case sourceURL = "sourceUrl"
+        case licenseName
+        case licenseURL = "licenseUrl"
+        case rightsReviewedAt
     }
 }
 
@@ -117,7 +133,7 @@ struct QAEditorialPack: Identifiable, Equatable, Codable {
     let items: [QAContentItem]
 }
 
-enum QAContentPriority: String, CaseIterable, Equatable {
+enum QAContentPriority: String, CaseIterable, Equatable, Codable {
     case balanced
     case readings
     case myFiles
@@ -199,6 +215,21 @@ struct QAReplacementSession: Equatable {
         self.triggerLabel = triggerLabel
         self.primary = primary
         self.backups = Array(backups.prefix(2))
+    }
+}
+
+struct QASimulatorDelayState: Codable, Equatable {
+    let startedAt: Date
+    let expiresAt: Date
+    let selectedContentID: String
+
+    var remainingMinutesText: String {
+        let remaining = max(0, Int(ceil(expiresAt.timeIntervalSince(Date()) / 60)))
+        return "\(remaining) min left"
+    }
+
+    func isActive(now: Date = Date()) -> Bool {
+        expiresAt > now
     }
 }
 

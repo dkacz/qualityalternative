@@ -1,6 +1,6 @@
 # Sprint 14 iOS Simulator Parity
 
-Status: `implemented_simulator_validated_pro_review_pending`
+Status: `review_fixes_implemented_followup_pro_review_pending`
 Branch: `codex/sprint14-ios-simulator-parity`
 
 ## Goal
@@ -22,6 +22,7 @@ Bring the iOS simulator build as close as possible to the Android MVP without cl
 - Imported Android editorial assets from `app/src/main/assets/editorial`.
 - Bundled `starter_packs.json` and 25 Markdown body files into the iOS app target.
 - iOS decodes the Android-compatible starter pack schema into `QAEditorialPack` and `QAContentItem`.
+- iOS keeps Android source/rights metadata in the runtime model: source URL, license name, license URL, and review timestamp.
 - Unit coverage proves the bundled catalog loads 5 packs and 45 editorial items.
 - Unit coverage proves 25 items are in-app reader items and 20 are link-only external handoffs.
 - The resource lookup handles Xcode's flat resource-copy behavior so `editorial/...` JSON paths still resolve in the app bundle.
@@ -31,21 +32,23 @@ Bring the iOS simulator build as close as possible to the Android MVP without cl
 - Home now shows a library summary with editorial picks, saved links, private files, and total finite minutes.
 - Library now has filters for All, Editorial, Your links, and Files.
 - Saved-link simulator flow mirrors Android scope without scraping, caching, summarizing, or rehosting third-party content.
+- Saved links are locally editable, saved into simulator-local state, and proven to survive app relaunch.
 - Private-file simulator flow distinguishes Markdown/EPUB reader support from PDF external handoff.
+- Private Markdown, EPUB-shaped, and PDF fixtures are visible in the Library Files filter and direct route screenshots.
 - Added dedicated Add Link and Import PDF / MD / EPUB screens for visual and E2E coverage.
 
 ### Intervention and Replacement Flow
 
 - Intervention uses the active replacement session instead of fixed sample button copy.
 - Primary action is routed from render mode: reader, external handoff, private reader, or meditation timer.
-- Backups remain capped at two and now have stable UI test identifiers.
-- Pause and Continue intentionally remain explicit actions.
+- Backups remain capped at two, use lower-or-equal commitment than the primary, and have stable UI test identifiers.
+- Pause and Continue intentionally remain explicit actions; the simulator delay card becomes visible only after a pause.
 - Meditation can be prioritized as the primary replacement and still remains finite.
 
 ### Reader, Handoff, Meditation, Feedback
 
 - Reader renders Markdown blocks from bundled editorial bodies or private Markdown/EPUB-shaped fixtures.
-- External handoff screen differentiates link-only web content from PDF/file handoff copy.
+- External handoff screen differentiates link-only web content from PDF/file handoff copy and exposes an explicit open action.
 - Meditation timer uses the configured default duration and exposes duration chips before starting.
 - Feedback screen is included as the post-replacement reflection surface.
 
@@ -53,8 +56,24 @@ Bring the iOS simulator build as close as possible to the Android MVP without cl
 
 - Added Content priority controls: Balanced, Readings, My files, Saved links, Meditation.
 - Added Default session length controls for meditation reset duration.
+- Content priority and default meditation duration persist in local simulator state and affect the generated replacement session.
 - Kept existing Screen Time, shield, and Device Activity simulator caveats.
 - Maintained the iOS-native scope: public APIs only, token-safe state, no private foreground-app detection, and no Android overlay parity promise.
+
+## Pro Review Fixes
+
+The first Sprint 14 Pro lane returned `BLOCK`; the harvested audit is saved at `PRO_REVIEW_OUTPUT_20260424_192655/iOS_Simulator_Parity_Audit.md`.
+
+Concrete fixes implemented before the follow-up review:
+
+- Expanded the review evidence from 15 to 21 screenshots, covering private Markdown, private EPUB, private PDF handoff, Library Files filter, Settings default duration, and the active delay card.
+- Made Add Link and Add Document local-state flows instead of static screens.
+- Added a real simulator-local settings store for content priority and default meditation length.
+- Added explicit external open buttons for link/PDF handoff.
+- Preserved Android editorial source/rights metadata in the iOS runtime model.
+- Enforced lower-or-equal commitment backups and capped backups at two.
+- Added unit tests for rights metadata, backup commitment bounds, saved local content persistence, and settings persistence.
+- Regenerated the review bundle with complete iOS source and Android source editorial assets.
 
 ## Out of Scope
 
@@ -65,21 +84,23 @@ Bring the iOS simulator build as close as possible to the Android MVP without cl
 
 ## Validation
 
-Completed on 2026-04-24 with `DEVELOPER_DIR=/Applications/Xcode-26.1.1.app/Contents/Developer`:
+Review-fix validation completed on 2026-04-24 with `DEVELOPER_DIR=/Applications/Xcode-26.1.1.app/Contents/Developer`:
 
 - `xcodebuild test`: PASS
-- Unit tests: 32 passed, 0 failed
+- Unit tests: 36 passed, 0 failed
 - UI visual QA tests: 1 passed, 0 failed
-- Visual screenshots captured: 15
-- Result bundle: `output/ios_sprint14_parity_validation_20260424_195500/DerivedData/Logs/Test/Test-QualityAlternative-2026.04.24_19-22-52-+0200.xcresult`
-- Test summary: `output/ios_sprint14_parity_validation_20260424_195500/test_summary.json`
-- Test result details: `output/ios_sprint14_parity_validation_20260424_195500/test_results.json`
-- Screenshot attachments: `output/ios_sprint14_parity_validation_20260424_195500/attachments/manifest.json`
+- Total tests: 37 passed, 0 failed
+- Visual screenshots captured: 21
+- Result bundle: `output/ios_sprint14_parity_fix_validation_20260424_205500/QualityAlternative.xcresult`
+- Test log: `output/ios_sprint14_parity_fix_validation_20260424_205500/xcodebuild_test.log`
+- Test summary: `output/ios_sprint14_parity_fix_validation_20260424_205500/test_summary.json`
+- Test result details: `output/ios_sprint14_parity_fix_validation_20260424_205500/test_results.json`
+- Screenshot attachments: `output/ios_sprint14_parity_fix_validation_20260424_205500/attachments/manifest.json`
 
 Visual QA artifacts:
 
 - Contact sheet: `docs/visual-qa/sprint14-ios-simulator-parity/contact_sheet.png`
-- Light screenshots: home, library, intervention, reader, handoff, meditation, progress, settings, add link, add document, feedback, Device Activity settings.
+- Light screenshots: home, library, intervention, reader, handoff, meditation, progress, settings, add link, add document, feedback, Device Activity settings, private Markdown reader, private EPUB reader, private PDF handoff, Library Files filter, Settings default session length, active delay.
 - Dark screenshots: intervention, reader, meditation.
 
 ## Review Target

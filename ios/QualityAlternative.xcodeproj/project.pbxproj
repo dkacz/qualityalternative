@@ -61,6 +61,7 @@
 		F1A27FA08CC815DF1F7CA6D1 /* care_for_the_soul_first.md in Resources */ = {isa = PBXBuildFile; fileRef = 2AFD7FC69C00DF47C02F4BB9 /* care_for_the_soul_first.md */; };
 		F31796AE96CC04D43E177D35 /* the_desert_resets_the_eye.md in Resources */ = {isa = PBXBuildFile; fileRef = DC87B9321106443C63D4D4CE /* the_desert_resets_the_eye.md */; };
 		F4F6B2FEFE1C600759153745 /* QualityAlternativeDeviceActivityMonitor.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = FE979E1C32B1E70E77DBA8D8 /* QualityAlternativeDeviceActivityMonitor.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		F5AAB578010C287D254E93C1 /* LocalStores.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEE51C7EF57A87DF06E131CB /* LocalStores.swift */; };
 		FFBCBC28133ABA96BB9AE98D /* QualityAlternativeDesignTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F8D5B75F0B425D116C4A647 /* QualityAlternativeDesignTests.swift */; };
 /* End PBXBuildFile section */
 
@@ -176,6 +177,7 @@
 		DC87B9321106443C63D4D4CE /* the_desert_resets_the_eye.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = the_desert_resets_the_eye.md; sourceTree = "<group>"; };
 		E4C68D484B4B602154AC3843 /* a_place_of_business.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = a_place_of_business.md; sourceTree = "<group>"; };
 		E901090BE8E5DBEEC40B7B94 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		EEE51C7EF57A87DF06E131CB /* LocalStores.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalStores.swift; sourceTree = "<group>"; };
 		F6DDA3113B27E1366C384414 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		FE979E1C32B1E70E77DBA8D8 /* QualityAlternativeDeviceActivityMonitor.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = QualityAlternativeDeviceActivityMonitor.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -310,6 +312,7 @@
 				A73E4ECBE74939E082973562 /* DeviceActivityScheduleState.swift */,
 				2CA164EFA168A479EFB886A9 /* EditorialCatalog.swift */,
 				F6DDA3113B27E1366C384414 /* Info.plist */,
+				EEE51C7EF57A87DF06E131CB /* LocalStores.swift */,
 				C16DF47FB202AFB7DBFBE0BF /* Models.swift */,
 				7E43C16E28CB65944EE19C07 /* QualityAlternative.entitlements */,
 				4EB6DD71717FC105FFAFC6AD /* QualityAlternativeApp.swift */,
@@ -555,6 +558,7 @@
 				E529D3331687CADD77B3EACB /* DesignSystem.swift in Sources */,
 				BA220FBBABF08D5229D5DF63 /* DeviceActivityScheduleState.swift in Sources */,
 				3080006B3FD323381DEE1795 /* EditorialCatalog.swift in Sources */,
+				F5AAB578010C287D254E93C1 /* LocalStores.swift in Sources */,
 				7A26C17527E26EEEDABE243D /* Models.swift in Sources */,
 				358E366AA8344BA5BD8882D7 /* QualityAlternativeApp.swift in Sources */,
 				9F439A71026DF544C34B3ACD /* SampleData.swift in Sources */,

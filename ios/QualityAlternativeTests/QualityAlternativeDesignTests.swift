@@ -12,8 +12,9 @@ final class QualityAlternativeDesignTests: XCTestCase {
         let session = QASampleData.session
 
         XCTAssertEqual(session.backups.count, 2)
-        XCTAssertEqual(session.primary.renderMode, .inAppReader)
-        XCTAssertEqual(Set(session.backups.map(\.renderMode)), [.externalHandoff, .meditationTimer])
+        XCTAssertEqual(session.primary.renderMode, .externalHandoff)
+        XCTAssertTrue(session.backups.allSatisfy { $0.durationMinutes <= session.primary.durationMinutes })
+        XCTAssertEqual(Set(session.backups.map(\.renderMode)), [.inAppReader, .meditationTimer])
     }
 
     func testReplacementSessionCapsBackupsAtTwo() {
@@ -73,8 +74,8 @@ final class QualityAlternativeDesignTests: XCTestCase {
         )
 
         XCTAssertEqual(state.triggerContextID, "screen-time-selection")
-        XCTAssertEqual(state.primaryContentID, QASampleData.readerItem.id)
-        XCTAssertEqual(state.backupContentIDs, [QASampleData.linkOnlyItem.id, QASampleData.meditationItem.id])
+        XCTAssertEqual(state.primaryContentID, QASampleData.session.primary.id)
+        XCTAssertEqual(state.backupContentIDs, QASampleData.session.backups.map(\.id))
         XCTAssertEqual(state.selection.totalCount, 3)
         XCTAssertEqual(state.actionMode, .armed)
         XCTAssertTrue(state.containsOnlyTokenSafeMetadata)
@@ -165,7 +166,7 @@ final class QualityAlternativeDesignTests: XCTestCase {
         XCTAssertEqual(plan.response, .redrawShield)
         XCTAssertNil(plan.updatedSession)
         XCTAssertEqual(plan.intent?.kind, .showReplacementChoices)
-        XCTAssertEqual(plan.intent?.selectedContentID, QASampleData.readerItem.id)
+        XCTAssertEqual(plan.intent?.selectedContentID, QASampleData.session.primary.id)
         XCTAssertEqual(QAShieldHostIntentRouter.route(for: plan.intent), .intervention)
         XCTAssertEqual(plan.intent?.containsOnlyTokenSafeMetadata, true)
     }
@@ -584,6 +585,16 @@ final class QualityAlternativeDesignTests: XCTestCase {
         XCTAssertEqual(Set(editorialItems.map(\.sourceType)), [.editorial])
     }
 
+    func testEditorialCatalogPreservesRightsAndSourceMetadata() {
+        let item = QASampleData.editorialLibrary.first { $0.id == "care-for-the-soul-first" }
+
+        XCTAssertEqual(item?.sourceURL, "https://www.gutenberg.org/ebooks/1656")
+        XCTAssertEqual(item?.licenseURL, "https://www.gutenberg.org/policy/license.html")
+        XCTAssertEqual(item?.rightsReviewedAt, "2026-04-22")
+        XCTAssertTrue(item?.licenseName?.contains("Public domain") == true)
+        XCTAssertTrue(item?.attribution?.contains("Plato") == true)
+    }
+
     func testEditorialReaderBodyLoadsMarkdownAsset() {
         let item = QASampleData.editorialLibrary.first { $0.bodyAssetPath != nil }
         let body = item.map(QASampleData.body(for:)) ?? ""
@@ -605,5 +616,61 @@ final class QualityAlternativeDesignTests: XCTestCase {
         XCTAssertEqual(myFiles.backups.count, 2)
         XCTAssertEqual(savedLinks.backups.count, 2)
         XCTAssertEqual(meditation.backups.count, 2)
+    }
+
+    func testReplacementBackupsStayLowerCommitmentAcrossPrioritiesAndDurations() {
+        for priority in QAContentPriority.allCases {
+            for duration in [3, 5, 10, 15] {
+                let session = QASampleData.replacementSession(meditationMinutes: duration, priority: priority)
+
+                XCTAssertEqual(session.backups.count, 2, "Expected two backups for \(priority) at \(duration)m")
+                XCTAssertFalse(
+                    session.backups.contains { $0.id == session.primary.id },
+                    "Backups must not repeat primary for \(priority) at \(duration)m"
+                )
+                XCTAssertTrue(
+                    session.backups.allSatisfy { $0.durationMinutes <= session.primary.durationMinutes },
+                    "Backups must not exceed primary duration for \(priority) at \(duration)m"
+                )
+            }
+        }
+    }
+
+    func testLocalContentStorePersistsSavedLinksAndDocuments() {
+        let suiteName = "qa.localContent.tests.\(UUID().uuidString)"
+        let userDefaults = UserDefaults(suiteName: suiteName)!
+        defer {
+            userDefaults.removePersistentDomain(forName: suiteName)
+        }
+        var state = QALocalLibraryState.defaults
+        let link = QALocalContentStore.makeSavedLink(
+            title: "Simulator Saved Link",
+            url: "https://example.com/simulator-saved-link",
+            durationMinutes: 12
+        )
+        let pdf = QALocalContentStore.makeDocument(title: "Simulator PDF", format: .pdf, durationMinutes: 15)
+        state.userLinks.append(link)
+        state.userDocuments.append(pdf)
+
+        QALocalContentStore.save(state, defaults: userDefaults)
+        let reloaded = QALocalContentStore.load(defaults: userDefaults)
+
+        XCTAssertTrue(reloaded.userLinks.contains(link))
+        XCTAssertTrue(reloaded.userDocuments.contains(pdf))
+        XCTAssertEqual(pdf.renderMode, .externalHandoff)
+        XCTAssertEqual(link.sourceType, .userLink)
+    }
+
+    func testLocalSettingsStorePersistsMeditationDurationAndPriority() {
+        let suiteName = "qa.localSettings.tests.\(UUID().uuidString)"
+        let userDefaults = UserDefaults(suiteName: suiteName)!
+        defer {
+            userDefaults.removePersistentDomain(forName: suiteName)
+        }
+        let settings = QALocalSettings(meditationDurationMinutes: 15, contentPriority: .myFiles)
+
+        QALocalSettingsStore.save(settings, defaults: userDefaults)
+
+        XCTAssertEqual(QALocalSettingsStore.load(defaults: userDefaults), settings)
     }
 }

@@ -96,36 +96,86 @@ enum QASampleData {
     static let linkOnlyItem: QAContentItem = editorialLibrary.first(where: { $0.renderMode == .externalHandoff })
         ?? userLinkItem
     static let meditationItem: QAContentItem = meditationContentItem()
-    static let userLinks: [QAContentItem] = [userLinkItem]
-    static let userDocuments: [QAContentItem] = [markdownDocumentItem, epubDocumentItem, pdfDocumentItem]
-    static let library: [QAContentItem] = editorialLibrary + userLinks + userDocuments + [meditationItem]
+    static let defaultUserLinks: [QAContentItem] = [userLinkItem]
+    static let defaultUserDocuments: [QAContentItem] = [markdownDocumentItem, epubDocumentItem, pdfDocumentItem]
+    static let userLinks: [QAContentItem] = defaultUserLinks
+    static let userDocuments: [QAContentItem] = defaultUserDocuments
+    static let library: [QAContentItem] = editorialLibrary + defaultUserLinks + defaultUserDocuments + [meditationItem]
 
-    static func replacementSession(meditationMinutes: Int = 5, priority: QAContentPriority = .balanced) -> QAReplacementSession {
+    static var readerItems: [QAContentItem] {
+        editorialLibrary.filter { $0.renderMode == .inAppReader }.sorted { lhs, rhs in
+            if lhs.durationMinutes == rhs.durationMinutes {
+                return lhs.title < rhs.title
+            }
+            return lhs.durationMinutes < rhs.durationMinutes
+        }
+    }
+
+    static var longReaderItem: QAContentItem {
+        readerItems.last ?? readerItem
+    }
+
+    static func replacementSession(
+        meditationMinutes: Int = 5,
+        priority: QAContentPriority = .balanced,
+        userLinks: [QAContentItem] = defaultUserLinks,
+        userDocuments: [QAContentItem] = defaultUserDocuments
+    ) -> QAReplacementSession {
         let meditation = meditationContentItem(minutes: meditationMinutes)
         let primary: QAContentItem
-        let backups: [QAContentItem]
+        let candidates: [QAContentItem]
         switch priority {
         case .readings:
-            primary = readerItem
-            backups = [linkOnlyItem, meditation]
+            primary = longReaderItem
+            candidates = readerItems.filter { $0.id != primary.id } + [meditation]
         case .myFiles:
-            primary = epubDocumentItem
-            backups = [markdownDocumentItem, meditation]
+            primary = userDocuments.first(where: { $0.format == .epub }) ?? epubDocumentItem
+            candidates = userDocuments.filter { $0.id != primary.id } + [meditation] + readerItems
         case .savedLinks:
-            primary = userLinkItem
-            backups = [readerItem, meditation]
+            primary = userLinks.first ?? userLinkItem
+            candidates = [meditation] + readerItems + userLinks.filter { $0.id != primary.id }
         case .meditation:
             primary = meditation
-            backups = [readerItem, linkOnlyItem]
+            candidates = readerItems + userLinks + userDocuments
         case .balanced:
-            primary = readerItem
-            backups = [linkOnlyItem, meditation]
+            primary = linkOnlyItem
+            candidates = [meditation] + readerItems + userLinks + userDocuments
         }
         return QAReplacementSession(
             triggerLabel: "Protected selection",
             primary: primary,
-            backups: backups
+            backups: lowerCommitmentBackups(for: primary, candidates: candidates, meditationMinutes: meditationMinutes)
         )
+    }
+
+    static func lowerCommitmentBackups(
+        for primary: QAContentItem,
+        candidates: [QAContentItem],
+        meditationMinutes: Int = 5
+    ) -> [QAContentItem] {
+        let direct = candidates
+            .filter { $0.id != primary.id && $0.durationMinutes <= primary.durationMinutes }
+        let fill = readerItems
+            .filter { $0.id != primary.id && $0.durationMinutes <= primary.durationMinutes }
+        let cappedMeditation = meditationContentItem(minutes: min(meditationMinutes, primary.durationMinutes))
+        let combined = direct + fill + [cappedMeditation]
+        var seen: Set<String> = []
+        return combined.filter { item in
+            guard item.id != primary.id else {
+                return false
+            }
+            guard !seen.contains(item.id) else {
+                return false
+            }
+            seen.insert(item.id)
+            return item.durationMinutes <= primary.durationMinutes
+        }
+        .prefix(2)
+        .map { $0 }
+    }
+
+    static func item(withID id: String, localLibrary: QALocalLibraryState = .defaults) -> QAContentItem? {
+        (editorialLibrary + localLibrary.libraryAdditions + [meditationItem]).first { $0.id == id }
     }
 
     static let session: QAReplacementSession = replacementSession()
@@ -159,6 +209,17 @@ enum QASampleData {
             ## Reading Contract
 
             The native reader keeps headings, paragraphs, quotes, and lists readable. PDF remains an external handoff; Markdown and EPUB-shaped content stay renderable.
+            """
+        }
+        if item.sourceType == .userDocument, item.renderMode == .userPrivateReader {
+            return """
+            # \(item.title)
+
+            This is a simulator-local \(item.format.rawValue) item rendered through the same native reader as editorial Markdown.
+
+            - It stays private to local state.
+            - It preserves finite replacement behavior.
+            - It avoids scraping, rehosting, or web retrieval.
             """
         }
         return QAEditorialCatalog.body(for: item)

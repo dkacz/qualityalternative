@@ -98,6 +98,10 @@ private struct StarterPackItem: Codable {
     let bodyAssetPath: String?
     let externalURL: String?
     let attribution: String?
+    let sourceURL: String?
+    let licenseName: String?
+    let licenseURL: String?
+    let rightsReviewedAt: String?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -113,6 +117,10 @@ private struct StarterPackItem: Codable {
         case bodyAssetPath
         case externalURL = "externalUrl"
         case attribution
+        case sourceURL = "sourceUrl"
+        case licenseName
+        case licenseURL = "licenseUrl"
+        case rightsReviewedAt
     }
 
     func contentItem(packId: String) -> QAContentItem {
@@ -131,7 +139,11 @@ private struct StarterPackItem: Codable {
             rightsClass: rightsClass,
             renderMode: renderMode,
             whyThisNow: whyThisNow,
-            attribution: attribution
+            attribution: attribution,
+            sourceURL: sourceURL,
+            licenseName: licenseName,
+            licenseURL: licenseURL,
+            rightsReviewedAt: rightsReviewedAt
         )
     }
 }
@@ -152,7 +164,8 @@ private enum QASampleFallback {
         rightsClass: .renderable,
         renderMode: .inAppReader,
         whyThisNow: "Good when the impulse is automatic and you need one clean thought before continuing.",
-        attribution: "Henry David Thoreau, Walden"
+        attribution: "Henry David Thoreau, Walden",
+        licenseName: "Public domain fallback fixture"
     )
 
     static let linkOnlyItem = QAContentItem(
@@ -169,7 +182,8 @@ private enum QASampleFallback {
         sourceType: .userLink,
         rightsClass: .linkOnly,
         renderMode: .externalHandoff,
-        whyThisNow: "Useful when scrolling is trying to erase a quiet moment."
+        whyThisNow: "Useful when scrolling is trying to erase a quiet moment.",
+        sourceURL: "https://psyche.co/"
     )
 }
 

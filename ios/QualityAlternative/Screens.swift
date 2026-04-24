@@ -9,6 +9,7 @@ struct HomeScreen: View {
     let userLinks: [QAContentItem]
     let userDocuments: [QAContentItem]
     let meditation: QAContentItem
+    let activeDelayState: QASimulatorDelayState?
     let onStartIntervention: () -> Void
     let onAddLink: () -> Void
     let onImportDocument: () -> Void
@@ -83,18 +84,24 @@ struct HomeScreen: View {
                         action: onImportDocument
                     )
 
-                    QACard {
-                        VStack(alignment: .leading, spacing: 12) {
-                            SettingsSectionTitle("Active delay")
-                            Text("A simulator-only delay card mirrors Android's active pause state without claiming real iOS target-app reopening.")
-                                .font(.qaBody(14))
-                                .foregroundStyle(tokens.colors.mutedText)
-                            QAButton(
-                                title: "Read current alternative",
-                                style: .secondary,
-                                accessibilityIdentifier: "active-delay-alternative",
-                                action: onStartDelayAlternative
-                            )
+                    if let activeDelayState {
+                        QACard {
+                            VStack(alignment: .leading, spacing: 12) {
+                                SettingsSectionTitle("Active delay")
+                                Text("Paused replacement · \(activeDelayState.remainingMinutesText)")
+                                    .font(.qaBody(15, weight: .semibold))
+                                    .foregroundStyle(tokens.colors.primaryText)
+                                    .accessibilityIdentifier("active-delay-state")
+                                Text("A simulator-only delay card mirrors Android's active pause state without claiming real iOS target-app reopening.")
+                                    .font(.qaBody(14))
+                                    .foregroundStyle(tokens.colors.mutedText)
+                                QAButton(
+                                    title: "Read current alternative",
+                                    style: .secondary,
+                                    accessibilityIdentifier: "active-delay-alternative",
+                                    action: onStartDelayAlternative
+                                )
+                            }
                         }
                     }
                 }
@@ -202,7 +209,11 @@ struct LibraryScreen: View {
 
 struct AddLinkScreen: View {
     let onCancel: () -> Void
+    let onSave: (QAContentItem) -> Void
     let onImportDocument: () -> Void
+    @State private var link = "https://example.com/quality-alternative-saved-link"
+    @State private var title = "A Saved Link for Later"
+    @State private var durationMinutes = 8
 
     var body: some View {
         QAScreen(accessibilityIdentifier: "add-link-screen") {
@@ -213,11 +224,19 @@ struct AddLinkScreen: View {
                         title: "Add to your quality alternative.",
                         subtitle: "Simulator parity shows Android's saved-link flow without scraping, caching, summarizing, or rehosting the link."
                     )
-                    QAFormField(label: "Link", value: "https://example.com/quality-alternative-saved-link")
-                    QAFormField(label: "Title", value: "A Saved Link for Later")
-                    DurationChipRow(label: "Estimated read", values: [3, 5, 8, 12, 20], selected: 8, onSelect: { _ in })
+                    QAEditableField(label: "Link", text: $link, accessibilityIdentifier: "add-link-url-field")
+                    QAEditableField(label: "Title", text: $title, accessibilityIdentifier: "add-link-title-field")
+                    DurationChipRow(label: "Estimated read", values: [3, 5, 8, 12, 20], selected: durationMinutes) { minutes in
+                        durationMinutes = minutes
+                    }
                     TopicChipRow(label: "Topic", selected: ["PSYCHOLOGY", "TECH"])
-                    QAButton(title: "Add to library", style: .primary, accessibilityIdentifier: "add-link-save", action: onCancel)
+                    QAButton(
+                        title: "Add to library",
+                        style: .primary,
+                        accessibilityIdentifier: "add-link-save"
+                    ) {
+                        onSave(QALocalContentStore.makeSavedLink(title: title, url: link, durationMinutes: durationMinutes))
+                    }
                     QAButton(title: "Import PDF / MD / EPUB instead", style: .quiet, accessibilityIdentifier: "add-link-import-document", action: onImportDocument)
                     QAButton(title: "Cancel", style: .quiet, action: onCancel)
                 }
@@ -230,6 +249,10 @@ struct AddLinkScreen: View {
 struct AddDocumentScreen: View {
     @Environment(\.qaTokens) private var tokens
     let onCancel: () -> Void
+    let onSave: (QAContentItem) -> Void
+    @State private var title = "Private EPUB Extract"
+    @State private var format: QAContentFormat = .epub
+    @State private var durationMinutes = 20
 
     var body: some View {
         QAScreen(accessibilityIdentifier: "add-document-screen") {
@@ -242,24 +265,78 @@ struct AddDocumentScreen: View {
                     )
                     QACard {
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("EPUB fixture")
+                            Text("\(format.rawValue) fixture")
                                 .font(.qaMono(12))
                                 .foregroundStyle(tokens.colors.faintText)
-                            Text("private-book.epub")
+                            Text(fileName)
                                 .font(.qaDisplay(24, weight: .medium))
                             Text("File stays on this device. Simulator parity uses local fixtures, not a production file picker.")
                                 .font(.qaBody(13))
                                 .foregroundStyle(tokens.colors.mutedText)
                         }
                     }
-                    QAFormField(label: "Title", value: "Private EPUB Extract")
-                    DurationChipRow(label: "Estimated session", values: [5, 10, 15, 20, 30], selected: 20, onSelect: { _ in })
-                    TopicChipRow(label: "Topic", selected: ["PHILOSOPHY", "ESSAYS"])
-                    QAButton(title: "Add file to library", style: .primary, accessibilityIdentifier: "add-document-save", action: onCancel)
+                    FlowLayout(spacing: 8) {
+                        documentFormatChip(title: "Markdown", format: .markdown)
+                        documentFormatChip(title: "EPUB", format: .epub)
+                        documentFormatChip(title: "PDF", format: .pdf)
+                    }
+                    QAEditableField(label: "Title", text: $title, accessibilityIdentifier: "add-document-title-field")
+                    DurationChipRow(label: "Estimated session", values: [5, 10, 15, 20, 30], selected: durationMinutes) { minutes in
+                        durationMinutes = minutes
+                    }
+                    TopicChipRow(label: "Topic", selected: format == .pdf ? ["SCIENCE", "PDF"] : ["PHILOSOPHY", "ESSAYS"])
+                    QAButton(
+                        title: "Add file to library",
+                        style: .primary,
+                        accessibilityIdentifier: "add-document-save"
+                    ) {
+                        onSave(QALocalContentStore.makeDocument(title: title, format: format, durationMinutes: durationMinutes))
+                    }
                     QAButton(title: "Cancel", style: .quiet, action: onCancel)
                 }
                 .padding(20)
             }
+        }
+    }
+
+    private var fileName: String {
+        switch format {
+        case .markdown:
+            "private-note.md"
+        case .epub:
+            "private-book.epub"
+        case .pdf:
+            "private-paper.pdf"
+        case .html:
+            "private-page.html"
+        }
+    }
+
+    private func documentFormatChip(title: String, format chipFormat: QAContentFormat) -> some View {
+        FilterChip(
+            title: title,
+            isSelected: format == chipFormat,
+            accessibilityIdentifier: "document-format-\(chipFormat.rawValue.lowercased())"
+        ) {
+            format = chipFormat
+            titleDidFollowFormat(chipFormat)
+        }
+    }
+
+    private func titleDidFollowFormat(_ format: QAContentFormat) {
+        switch format {
+        case .markdown:
+            title = "Private Markdown Note"
+            durationMinutes = 10
+        case .epub:
+            title = "Private EPUB Extract"
+            durationMinutes = 20
+        case .pdf:
+            title = "Private PDF Handoff"
+            durationMinutes = 15
+        case .html:
+            title = "Private Web Archive"
+            durationMinutes = 10
         }
     }
 }
@@ -417,6 +494,7 @@ struct ReaderScreen: View {
 
 struct ExternalHandoffScreen: View {
     @Environment(\.qaTokens) private var tokens
+    @Environment(\.openURL) private var openURL
     let item: QAContentItem
     let onDone: () -> Void
 
@@ -446,8 +524,18 @@ struct ExternalHandoffScreen: View {
                             .font(.qaMono(12))
                             .foregroundStyle(tokens.colors.faintText)
                         QAButton(
-                            title: isFile ? "I've finished this file" : "I've finished this link",
+                            title: isFile ? "Open file" : "Open link",
                             style: .primary,
+                            accessibilityIdentifier: "external-open-action",
+                            isEnabled: targetURL != nil
+                        ) {
+                            if let targetURL {
+                                openURL(targetURL)
+                            }
+                        }
+                        QAButton(
+                            title: isFile ? "I've finished this file" : "I've finished this link",
+                            style: .secondary,
                             accessibilityIdentifier: "external-link-done",
                             action: onDone
                         )
@@ -457,6 +545,13 @@ struct ExternalHandoffScreen: View {
             }
             .padding(20)
         }
+    }
+
+    private var targetURL: URL? {
+        guard let externalURL = item.externalURL else {
+            return nil
+        }
+        return URL(string: externalURL)
     }
 }
 
@@ -1127,6 +1222,34 @@ private struct QAFormField: View {
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
                         .stroke(tokens.colors.line, lineWidth: 1)
                 )
+        }
+    }
+}
+
+private struct QAEditableField: View {
+    @Environment(\.qaTokens) private var tokens
+    let label: String
+    @Binding var text: String
+    let accessibilityIdentifier: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(label)
+                .font(.qaBody(13, weight: .semibold))
+                .foregroundStyle(tokens.colors.mutedText)
+            TextField(label, text: $text)
+                .font(.qaBody(15))
+                .foregroundStyle(tokens.colors.primaryText)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .padding(14)
+                .background(tokens.colors.elevatedSurface)
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(tokens.colors.line, lineWidth: 1)
+                )
+                .accessibilityIdentifier(accessibilityIdentifier)
         }
     }
 }
