@@ -12,6 +12,11 @@ captures/
 output/
 dist/
 
+# iOS / Xcode
+ios/DerivedData/
+*.xcresult/
+**/xcuserdata/
+
 # Kotlin / Java
 out/
 

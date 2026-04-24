@@ -1,0 +1,63 @@
+name: QualityAlternative
+options:
+  bundleIdPrefix: com.qualityalternative
+  deploymentTarget:
+    iOS: "17.0"
+settings:
+  base:
+    CURRENT_PROJECT_VERSION: 1
+    MARKETING_VERSION: 0.5.0-ios-alpha
+    SWIFT_VERSION: 6.0
+    IPHONEOS_DEPLOYMENT_TARGET: 17.0
+packages: {}
+targets:
+  QualityAlternative:
+    type: application
+    platform: iOS
+    sources:
+      - path: QualityAlternative
+    resources:
+      - path: QualityAlternative/Resources
+    info:
+      path: QualityAlternative/Info.plist
+      properties:
+        CFBundleDisplayName: Quality Alternative
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UILaunchScreen:
+          UIColorName: LaunchBackground
+        UIAppFonts:
+          - newsreader.ttf
+          - newsreader_italic.ttf
+          - work_sans.ttf
+          - jetbrains_mono.ttf
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.qualityalternative.ios
+        TARGETED_DEVICE_FAMILY: 1
+        SUPPORTS_MACCATALYST: NO
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+    scheme:
+      testTargets:
+        - QualityAlternativeTests
+        - QualityAlternativeUITests
+  QualityAlternativeTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: QualityAlternativeTests
+    dependencies:
+      - target: QualityAlternative
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.qualityalternative.ios.tests
+  QualityAlternativeUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: QualityAlternativeUITests
+    dependencies:
+      - target: QualityAlternative
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.qualityalternative.ios.uitests
