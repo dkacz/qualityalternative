@@ -37,6 +37,7 @@
 		83BB64E304B31BA03B191AAD /* the_examined_life.md in Resources */ = {isa = PBXBuildFile; fileRef = 5D30F95963E9C58FF12908D0 /* the_examined_life.md */; };
 		84298F73FCC7008AF1FE164E /* QualityAlternativeShieldAction.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B86C7DD91859AF5589B0C931 /* QualityAlternativeShieldAction.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		8551CD64CE1C08B660F94359 /* anger_divides_what_life_joins.md in Resources */ = {isa = PBXBuildFile; fileRef = 8C158D60A9732C11B67499C9 /* anger_divides_what_life_joins.md */; };
+		856ABED6D90C31D767AF13C6 /* private-paper.pdf in Resources */ = {isa = PBXBuildFile; fileRef = 9CC2F40512FE275BB79E1034 /* private-paper.pdf */; };
 		9387805E31A5124643A950DF /* look_at_the_stars.md in Resources */ = {isa = PBXBuildFile; fileRef = 32A00E9117D9D6C0E7ED2E5C /* look_at_the_stars.md */; };
 		983BAE36E7D1198A323B6B40 /* ShieldState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9753DA9C9984C2C634FB8683 /* ShieldState.swift */; };
 		9841F5E9F4ECEC486361FD06 /* trust_the_first_honest_thought.md in Resources */ = {isa = PBXBuildFile; fileRef = AF6F96E755D0D793B4728333 /* trust_the_first_honest_thought.md */; };
@@ -159,6 +160,7 @@
 		8C2BC2A3A66A29F3EA9AF1BE /* ShieldActionExtension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShieldActionExtension.swift; sourceTree = "<group>"; };
 		8F1EED1531D0361DBAC3798D /* QualityAlternativeShieldConfiguration.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = QualityAlternativeShieldConfiguration.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		9753DA9C9984C2C634FB8683 /* ShieldState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShieldState.swift; sourceTree = "<group>"; };
+		9CC2F40512FE275BB79E1034 /* private-paper.pdf */ = {isa = PBXFileReference; lastKnownFileType = image.pdf; path = "private-paper.pdf"; sourceTree = "<group>"; };
 		A41C494FA12A0C06F66677AB /* rest_satisfied_with_what_we_have.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = rest_satisfied_with_what_we_have.md; sourceTree = "<group>"; };
 		A73E4ECBE74939E082973562 /* DeviceActivityScheduleState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceActivityScheduleState.swift; sourceTree = "<group>"; };
 		AF6F96E755D0D793B4728333 /* trust_the_first_honest_thought.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = trust_the_first_honest_thought.md; sourceTree = "<group>"; };
@@ -237,6 +239,7 @@
 			isa = PBXGroup;
 			children = (
 				E901090BE8E5DBEEC40B7B94 /* Assets.xcassets */,
+				9CC2F40512FE275BB79E1034 /* private-paper.pdf */,
 				3FFF0437C1772700782113BE /* editorial */,
 				7A1A7590FE1B25250058C16A /* Fonts */,
 			);
@@ -511,6 +514,7 @@
 				74387CFB0A2D7271415674F5 /* newsreader.ttf in Resources */,
 				56DD75C7125DD655743390CA /* newsreader_italic.ttf in Resources */,
 				E61E567B02A785ACCABD6B77 /* of_studies.md in Resources */,
+				856ABED6D90C31D767AF13C6 /* private-paper.pdf in Resources */,
 				483932AA8D456A370646EF63 /* rest_satisfied_with_what_we_have.md in Resources */,
 				AB267E06F979BDEF2F5A5397 /* start_with_what_is_yours.md in Resources */,
 				1B9BB4C9F8FB4DB999C075DC /* starter_packs.json in Resources */,

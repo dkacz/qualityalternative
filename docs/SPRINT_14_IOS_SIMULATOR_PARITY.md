@@ -1,6 +1,6 @@
 # Sprint 14 iOS Simulator Parity
 
-Status: `review_fixes_implemented_followup_pro_review_pending`
+Status: `pdf_safearea_review_fixes_implemented_followup_pro_review_pending`
 Branch: `codex/sprint14-ios-simulator-parity`
 
 ## Goal
@@ -75,6 +75,17 @@ Concrete fixes implemented before the follow-up review:
 - Added unit tests for rights metadata, backup commitment bounds, saved local content persistence, and settings persistence.
 - Regenerated the review bundle with complete iOS source and Android source editorial assets.
 
+The follow-up Sprint 14 Pro lane returned `REVISE`; the harvested audit is saved at `PRO_REVIEW_OUTPUT_20260424_202238/iOS_Simulator_Parity_Audit.md`.
+
+Concrete fixes implemented before the next follow-up review:
+
+- Replaced the placeholder PDF handoff URL with a bundled simulator-local `private-paper.pdf` fixture.
+- Added project wiring so the PDF fixture is copied into the iOS app bundle.
+- Added unit coverage proving sample and locally-created PDF handoff items resolve to an existing local file URL.
+- Updated the Library Files visual test to scroll until the PDF row is hittable before capturing the Files-filter screenshot.
+- Added a top safe-area background scrim so scrolled content no longer visibly collides with the iOS status bar.
+- Regenerated all Sprint 14 visual QA screenshots and the contact sheet from the passing simulator run.
+
 ## Out of Scope
 
 - No physical-device proof of Screen Time authorization, FamilyActivityPicker persistence on real device, ManagedSettings shield display, Shield Action extension invocation, or DeviceActivity callback delivery.
@@ -84,18 +95,17 @@ Concrete fixes implemented before the follow-up review:
 
 ## Validation
 
-Review-fix validation completed on 2026-04-24 with `DEVELOPER_DIR=/Applications/Xcode-26.1.1.app/Contents/Developer`:
+PDF/safe-area review-fix validation completed on 2026-04-24 with `DEVELOPER_DIR=/Applications/Xcode-26.1.1.app/Contents/Developer`:
 
 - `xcodebuild test`: PASS
-- Unit tests: 36 passed, 0 failed
+- Unit tests: 37 passed, 0 failed
 - UI visual QA tests: 1 passed, 0 failed
-- Total tests: 37 passed, 0 failed
+- Total tests: 38 passed, 0 failed
 - Visual screenshots captured: 21
-- Result bundle: `output/ios_sprint14_parity_fix_validation_20260424_205500/QualityAlternative.xcresult`
-- Test log: `output/ios_sprint14_parity_fix_validation_20260424_205500/xcodebuild_test.log`
-- Test summary: `output/ios_sprint14_parity_fix_validation_20260424_205500/test_summary.json`
-- Test result details: `output/ios_sprint14_parity_fix_validation_20260424_205500/test_results.json`
-- Screenshot attachments: `output/ios_sprint14_parity_fix_validation_20260424_205500/attachments/manifest.json`
+- Result bundle: `output/ios_sprint14_parity_pdf_safearea_validation_20260424_205113/QualityAlternative.xcresult`
+- Test log: `output/ios_sprint14_parity_pdf_safearea_validation_20260424_205113/xcodebuild_test.log`
+- Test summary: `output/ios_sprint14_parity_pdf_safearea_validation_20260424_205113/test_summary.json`
+- Screenshot attachments: `output/ios_sprint14_parity_pdf_safearea_validation_20260424_205113/attachments/manifest.json`
 
 Visual QA artifacts:
 

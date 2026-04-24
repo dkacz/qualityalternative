@@ -104,6 +104,15 @@ struct QAScreen<Content: View>: View {
         ZStack {
             tokens.colors.background.ignoresSafeArea()
             content
+            VStack(spacing: 0) {
+                tokens.colors.background
+                    .frame(height: 64)
+                    .frame(maxWidth: .infinity)
+                    .ignoresSafeArea(edges: .top)
+                Spacer(minLength: 0)
+            }
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
             Color.clear
                 .frame(width: 1, height: 1)
                 .accessibilityElement()

@@ -64,13 +64,18 @@ enum QASampleData {
         format: .pdf,
         topics: ["SCIENCE"],
         bodyAssetPath: nil,
-        externalURL: "file:///simulator/private-paper.pdf",
+        externalURL: bundledPDFURLString(),
         source: "Private PDF",
         sourceType: .userDocument,
         rightsClass: .userPrivate,
         renderMode: .externalHandoff,
         whyThisNow: "Use when the better action is opening a chosen file instead of a feed."
     )
+
+    private static func bundledPDFURLString() -> String {
+        Bundle.main.url(forResource: "private-paper", withExtension: "pdf")?.absoluteString
+            ?? "file:///simulator/private-paper.pdf"
+    }
 
     static func meditationContentItem(minutes: Int = 5) -> QAContentItem {
         QAContentItem(

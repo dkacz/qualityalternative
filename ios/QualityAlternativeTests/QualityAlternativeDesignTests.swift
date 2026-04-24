@@ -327,6 +327,29 @@ final class QualityAlternativeDesignTests: XCTestCase {
         XCTAssertFalse(snapshot.detailText.contains("Instagram"))
     }
 
+    func testPrivatePDFHandoffUsesBundledOpenableFixture() {
+        let samplePDF = QASampleData.pdfDocumentItem
+        let localPDF = QALocalContentStore.makeDocument(
+            title: "Private PDF Handoff",
+            format: .pdf,
+            durationMinutes: 15
+        )
+
+        for item in [samplePDF, localPDF] {
+            XCTAssertEqual(item.format, .pdf)
+            XCTAssertEqual(item.renderMode, .externalHandoff)
+            guard let externalURL = item.externalURL, let url = URL(string: externalURL) else {
+                XCTFail("Expected PDF handoff item to store a file URL.")
+                continue
+            }
+            XCTAssertTrue(url.isFileURL)
+            XCTAssertTrue(
+                FileManager.default.fileExists(atPath: url.path),
+                "Expected bundled simulator PDF fixture to exist at \(url.path)."
+            )
+        }
+    }
+
     func testDeviceActivityMonitorPolicyRespectsPauseAndReapply() {
         let now = Date(timeIntervalSince1970: 1_777_000_000)
         let selection = QAScreenTimeSelectionSummary(applicationCount: 1, categoryCount: 0, webDomainCount: 0)

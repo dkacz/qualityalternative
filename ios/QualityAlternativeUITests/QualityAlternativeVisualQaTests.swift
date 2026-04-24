@@ -91,7 +91,13 @@ final class QualityAlternativeVisualQaTests: XCTestCase {
         app.buttons["Files"].tap()
         XCTAssertTrue(app.staticTexts["Private Markdown Note"].waitForExistence(timeout: 3))
         XCTAssertTrue(app.staticTexts["Private EPUB Extract"].exists)
-        XCTAssertTrue(app.staticTexts["Private PDF Handoff"].exists)
+        let pdfRow = app.staticTexts["Private PDF Handoff"]
+        XCTAssertTrue(pdfRow.exists)
+        let scrollView = app.scrollViews.firstMatch
+        for _ in 0..<3 where !pdfRow.isHittable {
+            scrollView.swipeUp()
+        }
+        XCTAssertTrue(pdfRow.isHittable)
 
         let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         attachment.name = "19_library_files_filter_light"

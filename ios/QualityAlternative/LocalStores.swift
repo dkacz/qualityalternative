@@ -75,7 +75,7 @@ enum QALocalContentStore {
             format: format,
             topics: ["PRIVATE", format.rawValue],
             bodyAssetPath: nil,
-            externalURL: isPDF ? "file:///simulator/private-paper.pdf" : nil,
+            externalURL: isPDF ? bundledPDFURLString() : nil,
             source: isPDF ? "Private PDF" : "Private file",
             sourceType: .userDocument,
             rightsClass: .userPrivate,
@@ -110,6 +110,11 @@ enum QALocalContentStore {
         case .html:
             "A private HTML-style document saved locally for simulator parity."
         }
+    }
+
+    private static func bundledPDFURLString() -> String {
+        Bundle.main.url(forResource: "private-paper", withExtension: "pdf")?.absoluteString
+            ?? "file:///simulator/private-paper.pdf"
     }
 
     private static func stableIDFragment(_ source: String) -> String {
