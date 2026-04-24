@@ -109,6 +109,15 @@ final class QualityAlternativeDesignTests: XCTestCase {
 
         XCTAssertEqual(state.actionMode, .openAnyway)
         XCTAssertNil(state.pauseExpiresAt)
+        XCTAssertEqual(state.openAnywayExpiresAt, now.addingTimeInterval(1 + QAShieldSessionState.openAnywayDuration))
+        XCTAssertTrue(state.isOpenAnywayActive(now: now.addingTimeInterval(2)))
+        XCTAssertFalse(
+            state.isOpenAnywayActive(
+                now: now.addingTimeInterval(2 + QAShieldSessionState.openAnywayDuration)
+            )
+        )
+        XCTAssertEqual(state.rearmedAfterOpenAnyway(now: now.addingTimeInterval(3)).actionMode, .armed)
+        XCTAssertNil(state.rearmedAfterOpenAnyway(now: now.addingTimeInterval(3)).openAnywayExpiresAt)
     }
 
     func testShieldConfigurationCopyStaysFiniteAndTokenSafe() {
@@ -243,20 +252,78 @@ final class QualityAlternativeDesignTests: XCTestCase {
 
     func testDeviceActivityScheduleStateIsTokenSafe() {
         let now = Date(timeIntervalSince1970: 1_777_000_000)
+        guard let event = QADeviceActivityMonitorEventRecord.tokenSafe(
+            kind: .intervalStarted,
+            activityName: QADeviceActivityNames.protectedWindow.rawValue,
+            eventName: nil,
+            createdAt: now
+        ) else {
+            XCTFail("Expected generic protected-window event metadata to be token safe.")
+            return
+        }
         let state = QADeviceActivityScheduleState.scheduled(
             selection: QAScreenTimeSelectionSummary(applicationCount: 2, categoryCount: 0, webDomainCount: 1),
             now: now
-        ).recording(
-            QADeviceActivityMonitorEventRecord(
-                kind: .intervalStarted,
-                activityName: QADeviceActivityNames.protectedWindow.rawValue,
-                eventName: nil,
-                createdAt: now
-            )
-        )
+        ).recording(event)
 
         XCTAssertEqual(state.selection.totalCount, 3)
         XCTAssertTrue(state.containsOnlyTokenSafeMetadata)
+    }
+
+    func testDeviceActivityScheduleRejectsReadableCallbackMetadata() {
+        let now = Date(timeIntervalSince1970: 1_777_000_000)
+
+        XCTAssertNil(
+            QADeviceActivityMonitorEventRecord.tokenSafe(
+                kind: .thresholdReached,
+                activityName: "Instagram",
+                eventName: QADeviceActivityNames.firstMinute.rawValue,
+                createdAt: now
+            )
+        )
+        XCTAssertNil(
+            QADeviceActivityMonitorEventRecord.tokenSafe(
+                kind: .thresholdReached,
+                activityName: QADeviceActivityNames.protectedWindow.rawValue,
+                eventName: "TikTok",
+                createdAt: now
+            )
+        )
+        XCTAssertEqual(
+            QADeviceActivityMonitorEventRecord.tokenSafe(
+                kind: .thresholdReached,
+                activityName: QADeviceActivityNames.protectedWindow.rawValue,
+                eventName: QADeviceActivityNames.firstMinute.rawValue,
+                createdAt: now
+            )?.eventName,
+            .firstMinute
+        )
+    }
+
+    func testDeviceActivityFailureStateDoesNotPersistRawErrorText() {
+        struct ReadableError: LocalizedError {
+            var errorDescription: String? {
+                "Instagram authorization failed"
+            }
+        }
+
+        let now = Date(timeIntervalSince1970: 1_777_000_000)
+        let state = QADeviceActivityScheduleState.failed(
+            selection: QAScreenTimeSelectionSummary(applicationCount: 1, categoryCount: 0, webDomainCount: 0),
+            error: ReadableError(),
+            now: now
+        )
+        let snapshot = QADeviceActivityScheduleSnapshot(
+            setup: QAScreenTimeSetupSnapshot(
+                authorization: .approved,
+                selection: state.selection
+            ),
+            state: state
+        )
+
+        XCTAssertEqual(state.lastFailureReason, .startMonitoringFailed)
+        XCTAssertTrue(state.containsOnlyTokenSafeMetadata)
+        XCTAssertFalse(snapshot.detailText.contains("Instagram"))
     }
 
     func testDeviceActivityMonitorPolicyRespectsPauseAndReapply() {
@@ -274,6 +341,83 @@ final class QualityAlternativeDesignTests: XCTestCase {
         XCTAssertEqual(QADeviceActivityMonitorPolicy.action(session: armed, selection: selection, now: now), .applyShield)
         XCTAssertEqual(QADeviceActivityMonitorPolicy.action(session: paused, selection: selection, now: now), .clearShield)
         XCTAssertEqual(QADeviceActivityMonitorPolicy.action(session: expiredPause, selection: selection, now: now), .applyShield)
+    }
+
+    func testDeviceActivityMonitorPolicyConsumesOpenAnywayOnce() {
+        let now = Date(timeIntervalSince1970: 1_777_000_000)
+        let selection = QAScreenTimeSelectionSummary(applicationCount: 1, categoryCount: 0, webDomainCount: 0)
+        let openAnyway = QAShieldSessionState
+            .armed(session: QASampleData.session, selection: selection, now: now)
+            .openAnyway(now: now)
+
+        let firstDecision = QADeviceActivityMonitorPolicy.decision(
+            session: openAnyway,
+            selection: selection,
+            now: now.addingTimeInterval(1)
+        )
+        let secondDecision = QADeviceActivityMonitorPolicy.decision(
+            session: firstDecision.updatedSession,
+            selection: selection,
+            now: now.addingTimeInterval(2)
+        )
+        let expiredDecision = QADeviceActivityMonitorPolicy.decision(
+            session: openAnyway,
+            selection: selection,
+            now: now.addingTimeInterval(QAShieldSessionState.openAnywayDuration + 1)
+        )
+
+        XCTAssertEqual(firstDecision.action, .clearShield)
+        XCTAssertEqual(firstDecision.updatedSession?.actionMode, .armed)
+        XCTAssertEqual(secondDecision.action, .applyShield)
+        XCTAssertEqual(expiredDecision.action, .applyShield)
+        XCTAssertEqual(expiredDecision.updatedSession?.actionMode, .armed)
+    }
+
+    func testDeviceActivityCallbackPlannerIgnoresUnrecognizedActivity() {
+        let now = Date(timeIntervalSince1970: 1_777_000_000)
+        let selection = QAScreenTimeSelectionSummary(applicationCount: 1, categoryCount: 0, webDomainCount: 0)
+        let armed = QAShieldSessionState.armed(session: QASampleData.session, selection: selection, now: now)
+
+        let decision = QADeviceActivityMonitorCallbackPlanner.decision(
+            kind: .intervalEnded,
+            activityName: "qa.future-or-readable-activity",
+            eventName: nil,
+            session: armed,
+            selection: selection,
+            now: now
+        )
+
+        XCTAssertNil(decision.event)
+        XCTAssertNil(decision.updatedSession)
+        XCTAssertEqual(decision.action, .keepShield)
+    }
+
+    func testDeviceActivityCallbackPlannerRecordsOnlyGenericThresholdEvent() {
+        let now = Date(timeIntervalSince1970: 1_777_000_000)
+        let selection = QAScreenTimeSelectionSummary(applicationCount: 1, categoryCount: 0, webDomainCount: 0)
+        let armed = QAShieldSessionState.armed(session: QASampleData.session, selection: selection, now: now)
+
+        let safeDecision = QADeviceActivityMonitorCallbackPlanner.decision(
+            kind: .thresholdReached,
+            activityName: QADeviceActivityNames.protectedWindow.rawValue,
+            eventName: QADeviceActivityNames.firstMinute.rawValue,
+            session: armed,
+            selection: selection,
+            now: now
+        )
+        let hostileDecision = QADeviceActivityMonitorCallbackPlanner.decision(
+            kind: .thresholdReached,
+            activityName: QADeviceActivityNames.protectedWindow.rawValue,
+            eventName: "Readable app name",
+            session: armed,
+            selection: selection,
+            now: now
+        )
+
+        XCTAssertEqual(safeDecision.event?.eventName, .firstMinute)
+        XCTAssertEqual(safeDecision.action, .applyShield)
+        XCTAssertNil(hostileDecision.event)
+        XCTAssertEqual(hostileDecision.action, .keepShield)
     }
 
     func testShieldActionIntentStorePersistsAndClearsThroughInjectedDefaults() {
@@ -314,15 +458,14 @@ final class QualityAlternativeDesignTests: XCTestCase {
         let schedule = QADeviceActivityScheduleState.scheduled(selection: state.selection, now: now)
         XCTAssertNil(QADeviceActivityScheduleStore.load(userDefaults: nil))
         QADeviceActivityScheduleStore.save(schedule, userDefaults: nil)
-        QADeviceActivityScheduleStore.record(
-            QADeviceActivityMonitorEventRecord(
-                kind: .intervalStarted,
-                activityName: QADeviceActivityNames.protectedWindow.rawValue,
-                eventName: nil,
-                createdAt: now
-            ),
-            userDefaults: nil
-        )
+        if let event = QADeviceActivityMonitorEventRecord.tokenSafe(
+            kind: .intervalStarted,
+            activityName: QADeviceActivityNames.protectedWindow.rawValue,
+            eventName: nil,
+            createdAt: now
+        ) {
+            QADeviceActivityScheduleStore.record(event, userDefaults: nil)
+        }
 
         let selection = QAFamilyActivitySelectionStore.load(userDefaults: nil)
         XCTAssertEqual(selection.applicationTokens.count, 0)

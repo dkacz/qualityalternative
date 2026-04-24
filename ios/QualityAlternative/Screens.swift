@@ -501,6 +501,7 @@ struct SettingsScreen: View {
                 }
                 .padding(20)
             }
+            .padding(.top, 28)
         }
         .familyActivityPicker(
             headerText: "Choose distracting apps",

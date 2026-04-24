@@ -17,7 +17,6 @@ final class DeviceActivityMonitorExtension: DeviceActivityMonitor {
     override func intervalDidEnd(for activity: DeviceActivityName) {
         super.intervalDidEnd(for: activity)
         handle(kind: .intervalEnded, activity: activity, event: nil)
-        shieldApplier.clear()
     }
 
     private func handle(
@@ -26,25 +25,24 @@ final class DeviceActivityMonitorExtension: DeviceActivityMonitor {
         event: DeviceActivityEvent.Name?
     ) {
         let now = Date()
-        QADeviceActivityScheduleStore.record(
-            QADeviceActivityMonitorEventRecord(
-                kind: kind,
-                activityName: activity.rawValue,
-                eventName: event?.rawValue,
-                createdAt: now
-            )
-        )
-
-        guard activity == QADeviceActivityNames.protectedWindow else {
-            return
-        }
-
         let selection = QAFamilyActivitySelectionStore.load()
-        switch QADeviceActivityMonitorPolicy.action(
+        let decision = QADeviceActivityMonitorCallbackPlanner.decision(
+            kind: kind,
+            activityName: activity.rawValue,
+            eventName: event?.rawValue,
             session: QAShieldSessionStore.load(),
             selection: QAScreenTimeSelectionSummary(selection: selection),
             now: now
-        ) {
+        )
+
+        if let event = decision.event {
+            QADeviceActivityScheduleStore.record(event)
+        }
+        if let updatedSession = decision.updatedSession {
+            QAShieldSessionStore.save(updatedSession)
+        }
+
+        switch decision.action {
         case .applyShield:
             shieldApplier.apply(selection: selection)
         case .clearShield:

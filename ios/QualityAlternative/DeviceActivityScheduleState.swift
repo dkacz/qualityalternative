@@ -18,20 +18,83 @@ enum QADeviceActivityMonitorEventKind: String, Codable, Equatable {
     case thresholdReached
 }
 
+enum QADeviceActivityScheduleFailureReason: String, Codable, Equatable {
+    case notReady
+    case emptySelection
+    case startMonitoringFailed
+
+    var detailText: String {
+        switch self {
+        case .notReady:
+            return "Screen Time access and protected selection are required before monitoring can start."
+        case .emptySelection:
+            return "DeviceActivity monitoring needs at least one opaque protected token."
+        case .startMonitoringFailed:
+            return "DeviceActivity could not start monitoring on this environment."
+        }
+    }
+}
+
 enum QADeviceActivityMonitorAction: Equatable {
     case applyShield
     case clearShield
     case keepShield
 }
 
+enum QADeviceActivityMonitorActivityName: String, Codable, Equatable {
+    case protectedWindow = "qa.protected-window"
+}
+
+enum QADeviceActivityMonitorEventName: String, Codable, Equatable {
+    case firstMinute = "qa.first-minute"
+}
+
 struct QADeviceActivityMonitorEventRecord: Codable, Equatable {
     let kind: QADeviceActivityMonitorEventKind
-    let activityName: String
-    let eventName: String?
+    let activityName: QADeviceActivityMonitorActivityName
+    let eventName: QADeviceActivityMonitorEventName?
     let createdAt: Date
 
+    private init(
+        kind: QADeviceActivityMonitorEventKind,
+        activityName: QADeviceActivityMonitorActivityName,
+        eventName: QADeviceActivityMonitorEventName?,
+        createdAt: Date
+    ) {
+        self.kind = kind
+        self.activityName = activityName
+        self.eventName = eventName
+        self.createdAt = createdAt
+    }
+
+    static func tokenSafe(
+        kind: QADeviceActivityMonitorEventKind,
+        activityName: String,
+        eventName: String?,
+        createdAt: Date
+    ) -> QADeviceActivityMonitorEventRecord? {
+        guard activityName == QADeviceActivityNames.protectedWindow.rawValue else {
+            return nil
+        }
+        let safeEventName: QADeviceActivityMonitorEventName?
+        if let eventName {
+            guard eventName == QADeviceActivityNames.firstMinute.rawValue else {
+                return nil
+            }
+            safeEventName = .firstMinute
+        } else {
+            safeEventName = nil
+        }
+        return QADeviceActivityMonitorEventRecord(
+            kind: kind,
+            activityName: .protectedWindow,
+            eventName: safeEventName,
+            createdAt: createdAt
+        )
+    }
+
     var containsOnlyTokenSafeMetadata: Bool {
-        activityName == QADeviceActivityNames.protectedWindow.rawValue
+        activityName == .protectedWindow && (eventName == nil || eventName == .firstMinute)
     }
 }
 
@@ -45,7 +108,7 @@ struct QADeviceActivityScheduleState: Codable, Equatable, Identifiable {
     let intervalEndMinute: Int
     let repeats: Bool
     let updatedAt: Date
-    let lastErrorDescription: String?
+    let lastFailureReason: QADeviceActivityScheduleFailureReason?
     let lastEvent: QADeviceActivityMonitorEventRecord?
 
     static func scheduled(selection: QAScreenTimeSelectionSummary, now: Date) -> QADeviceActivityScheduleState {
@@ -59,7 +122,7 @@ struct QADeviceActivityScheduleState: Codable, Equatable, Identifiable {
             intervalEndMinute: 59,
             repeats: true,
             updatedAt: now,
-            lastErrorDescription: nil,
+            lastFailureReason: nil,
             lastEvent: nil
         )
     }
@@ -75,13 +138,14 @@ struct QADeviceActivityScheduleState: Codable, Equatable, Identifiable {
             intervalEndMinute: previous?.intervalEndMinute ?? 59,
             repeats: previous?.repeats ?? true,
             updatedAt: now,
-            lastErrorDescription: nil,
+            lastFailureReason: nil,
             lastEvent: previous?.lastEvent
         )
     }
 
     static func failed(selection: QAScreenTimeSelectionSummary, error: Error, now: Date) -> QADeviceActivityScheduleState {
-        QADeviceActivityScheduleState(
+        deviceActivityScheduleLogger.error("DeviceActivity monitoring failed: \(String(describing: error), privacy: .private)")
+        return QADeviceActivityScheduleState(
             id: QADeviceActivityNames.protectedWindow.rawValue,
             mode: .failed,
             selection: selection,
@@ -91,7 +155,7 @@ struct QADeviceActivityScheduleState: Codable, Equatable, Identifiable {
             intervalEndMinute: 59,
             repeats: true,
             updatedAt: now,
-            lastErrorDescription: error.localizedDescription,
+            lastFailureReason: QADeviceActivityScheduleFailureReason.from(error),
             lastEvent: nil
         )
     }
@@ -107,7 +171,7 @@ struct QADeviceActivityScheduleState: Codable, Equatable, Identifiable {
             intervalEndMinute: intervalEndMinute,
             repeats: repeats,
             updatedAt: event.createdAt,
-            lastErrorDescription: lastErrorDescription,
+            lastFailureReason: lastFailureReason,
             lastEvent: event
         )
     }
@@ -154,7 +218,7 @@ struct QADeviceActivityScheduleSnapshot: Equatable {
         case .stopped:
             return "The DeviceActivity schedule is stopped; existing shield rules can still be managed by host controls."
         case .failed:
-            return state.lastErrorDescription ?? "DeviceActivity could not start monitoring on this environment."
+            return state.lastFailureReason?.detailText ?? QADeviceActivityScheduleFailureReason.startMonitoringFailed.detailText
         case .inactive:
             return "No active DeviceActivity monitoring is expected."
         }
@@ -213,6 +277,20 @@ enum QADeviceActivitySchedulingError: LocalizedError, Equatable {
     }
 }
 
+extension QADeviceActivityScheduleFailureReason {
+    static func from(_ error: Error) -> QADeviceActivityScheduleFailureReason {
+        guard let schedulingError = error as? QADeviceActivitySchedulingError else {
+            return .startMonitoringFailed
+        }
+        switch schedulingError {
+        case .notReady:
+            return .notReady
+        case .emptySelection:
+            return .emptySelection
+        }
+    }
+}
+
 struct QADeviceActivityScheduler {
     private let center: DeviceActivityCenter
 
@@ -249,21 +327,90 @@ struct QADeviceActivityScheduler {
 }
 
 enum QADeviceActivityMonitorPolicy {
+    struct Decision: Equatable {
+        let action: QADeviceActivityMonitorAction
+        let updatedSession: QAShieldSessionState?
+    }
+
+    static func decision(
+        session: QAShieldSessionState?,
+        selection: QAScreenTimeSelectionSummary,
+        now: Date
+    ) -> Decision {
+        guard let session, selection.hasProtectedTargets else {
+            return Decision(action: .keepShield, updatedSession: nil)
+        }
+        if session.isPauseActive(now: now) {
+            return Decision(action: .clearShield, updatedSession: nil)
+        }
+        if session.actionMode == .openAnyway {
+            let rearmedSession = session.rearmedAfterOpenAnyway(now: now)
+            if session.isOpenAnywayActive(now: now) {
+                return Decision(action: .clearShield, updatedSession: rearmedSession)
+            }
+            return Decision(action: .applyShield, updatedSession: rearmedSession)
+        }
+        if session.actionMode == .armed || session.needsManualReapply(now: now) {
+            return Decision(action: .applyShield, updatedSession: nil)
+        }
+        return Decision(action: .keepShield, updatedSession: nil)
+    }
+
     static func action(
         session: QAShieldSessionState?,
         selection: QAScreenTimeSelectionSummary,
         now: Date
     ) -> QADeviceActivityMonitorAction {
-        guard let session, selection.hasProtectedTargets else {
-            return .keepShield
+        decision(session: session, selection: selection, now: now).action
+    }
+}
+
+struct QADeviceActivityMonitorCallbackDecision: Equatable {
+    let event: QADeviceActivityMonitorEventRecord?
+    let action: QADeviceActivityMonitorAction
+    let updatedSession: QAShieldSessionState?
+}
+
+enum QADeviceActivityMonitorCallbackPlanner {
+    static func decision(
+        kind: QADeviceActivityMonitorEventKind,
+        activityName: String,
+        eventName: String?,
+        session: QAShieldSessionState?,
+        selection: QAScreenTimeSelectionSummary,
+        now: Date
+    ) -> QADeviceActivityMonitorCallbackDecision {
+        guard let event = QADeviceActivityMonitorEventRecord.tokenSafe(
+            kind: kind,
+            activityName: activityName,
+            eventName: eventName,
+            createdAt: now
+        ) else {
+            return QADeviceActivityMonitorCallbackDecision(
+                event: nil,
+                action: .keepShield,
+                updatedSession: nil
+            )
         }
-        if session.isPauseActive(now: now) || session.actionMode == .openAnyway {
-            return .clearShield
+
+        if kind == .intervalEnded {
+            return QADeviceActivityMonitorCallbackDecision(
+                event: event,
+                action: .clearShield,
+                updatedSession: nil
+            )
         }
-        if session.actionMode == .armed || session.needsManualReapply(now: now) {
-            return .applyShield
-        }
-        return .keepShield
+
+        let policyDecision = QADeviceActivityMonitorPolicy.decision(
+            session: session,
+            selection: selection,
+            now: now
+        )
+        return QADeviceActivityMonitorCallbackDecision(
+            event: event,
+            action: policyDecision.action,
+            updatedSession: policyDecision.updatedSession
+        )
     }
 }
 
@@ -277,12 +424,26 @@ enum QADeviceActivityScheduleStore {
         guard let data = userDefaults.data(forKey: key) else {
             return nil
         }
-        return try? JSONDecoder().decode(QADeviceActivityScheduleState.self, from: data)
+        do {
+            let state = try JSONDecoder().decode(QADeviceActivityScheduleState.self, from: data)
+            guard state.containsOnlyTokenSafeMetadata else {
+                deviceActivityScheduleLogger.error("Discarding DeviceActivity schedule state with non-token-safe metadata.")
+                return nil
+            }
+            return state
+        } catch {
+            deviceActivityScheduleLogger.error("Discarding unreadable DeviceActivity schedule state: \(String(describing: error), privacy: .private)")
+            return nil
+        }
     }
 
     static func save(_ state: QADeviceActivityScheduleState, userDefaults: UserDefaults? = QAAppGroup.userDefaults) {
         guard let userDefaults else {
             deviceActivityScheduleLogger.error("Refusing to write DeviceActivity schedule because App Group storage is unavailable.")
+            return
+        }
+        guard state.containsOnlyTokenSafeMetadata else {
+            deviceActivityScheduleLogger.error("Refusing to write DeviceActivity schedule with non-token-safe metadata.")
             return
         }
         guard let data = try? JSONEncoder().encode(state) else {

@@ -64,7 +64,10 @@ struct QAShieldSessionState: Codable, Equatable, Identifiable {
     let selection: QAScreenTimeSelectionSummary
     let actionMode: QAShieldActionMode
     let pauseExpiresAt: Date?
+    let openAnywayExpiresAt: Date?
     let updatedAt: Date
+
+    static let openAnywayDuration: TimeInterval = 60
 
     static func armed(
         session: QAReplacementSession,
@@ -79,6 +82,7 @@ struct QAShieldSessionState: Codable, Equatable, Identifiable {
             selection: selection,
             actionMode: .armed,
             pauseExpiresAt: nil,
+            openAnywayExpiresAt: nil,
             updatedAt: now
         )
     }
@@ -92,6 +96,7 @@ struct QAShieldSessionState: Codable, Equatable, Identifiable {
             selection: selection,
             actionMode: .paused,
             pauseExpiresAt: pauseExpiresAt,
+            openAnywayExpiresAt: nil,
             updatedAt: now
         )
     }
@@ -105,6 +110,21 @@ struct QAShieldSessionState: Codable, Equatable, Identifiable {
             selection: selection,
             actionMode: .openAnyway,
             pauseExpiresAt: nil,
+            openAnywayExpiresAt: now.addingTimeInterval(Self.openAnywayDuration),
+            updatedAt: now
+        )
+    }
+
+    func rearmedAfterOpenAnyway(now: Date) -> QAShieldSessionState {
+        QAShieldSessionState(
+            id: id,
+            triggerContextID: triggerContextID,
+            primaryContentID: primaryContentID,
+            backupContentIDs: backupContentIDs,
+            selection: selection,
+            actionMode: .armed,
+            pauseExpiresAt: nil,
+            openAnywayExpiresAt: nil,
             updatedAt: now
         )
     }
@@ -125,6 +145,17 @@ struct QAShieldSessionState: Codable, Equatable, Identifiable {
             return false
         }
         return pauseExpiresAt <= now
+    }
+
+    func isOpenAnywayActive(now: Date) -> Bool {
+        guard actionMode == .openAnyway, let openAnywayExpiresAt else {
+            return false
+        }
+        return openAnywayExpiresAt > now
+    }
+
+    func needsOpenAnywayReapply(now: Date) -> Bool {
+        actionMode == .openAnyway && !isOpenAnywayActive(now: now)
     }
 }
 
@@ -275,6 +306,9 @@ struct QAShieldControlSnapshot: Equatable {
         guard let session else {
             return "No shield session"
         }
+        if session.needsOpenAnywayReapply(now: now) {
+            return "Open once expired"
+        }
         if session.needsManualReapply(now: now) {
             return "Pause expired"
         }
@@ -294,6 +328,9 @@ struct QAShieldControlSnapshot: Equatable {
         guard let session else {
             return "Apply shield rules after Screen Time access and protected selection are ready."
         }
+        if session.needsOpenAnywayReapply(now: now) {
+            return "The bounded open-anyway window has expired; the monitor should reapply shield rules on the next scoped callback."
+        }
         if session.needsManualReapply(now: now) {
             return "The host app must reapply shield rules after an expired pause; simulator state is not device enforcement proof."
         }
@@ -305,7 +342,7 @@ struct QAShieldControlSnapshot: Equatable {
         case .paused:
             return "ManagedSettings rules are cleared until the pause expires; later slices need extension/device validation."
         case .openAnyway:
-            return "The next open-anyway attempt should clear rules once, then return to a protected state later."
+            return "ManagedSettings rules are cleared for one bounded open-anyway callback, then the monitor re-arms protection."
         }
     }
 }
