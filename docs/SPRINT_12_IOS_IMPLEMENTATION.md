@@ -1,6 +1,6 @@
 # Sprint 12 iOS Implementation
 
-Status: `slice_12_5_pro_review_pending`
+Status: `sprint_12_slices_12_1_to_12_5_10_10_pass_simulator_validated_physical_device_pending`
 Branch: `codex/sprint12-ios-implementation`
 
 ## Goal
@@ -435,7 +435,15 @@ GPT Pro review-fix follow-up:
 GPT Pro empty-selection follow-up:
 
 - Lane: `https://chatgpt.com/c/69eb823d-6994-838a-908b-13b5aa1e6058`
-- Status: pending
+- Harvested verdict: `10/10 PASS`
+- Status: passed with no fresh findings
 - Prompt: `PRO_REVIEW_PROMPT_20260424_164357.md`
 - Bundle: `QUALITY_ALTERNATIVE_IOS_REVIEW_BUNDLE_20260424_164357.zip`
-- Expected harvest path: `PRO_REVIEW_OUTPUT_20260424_164357/`
+- Harvest path: `PRO_REVIEW_OUTPUT_20260424_164357/`
+- Non-blocking bundle note: future bundles should include standalone `git diff --check` and `plutil -lint` transcript files alongside the xcodebuild log.
+
+## Current iOS Release State
+
+- Sprint 12 slices 12.1 through 12.5 have passed GPT Pro review at `10/10 PASS`.
+- The iOS app builds and passes simulator unit/UI visual validation on `QA iPhone 16 Sprint12`.
+- Release is not yet a signed physical-device/TestFlight artifact; real Screen Time authorization, DeviceActivity callback delivery, shield display, extension invocation, entitlement approval, signing, and App Group behavior still require signed device validation.
