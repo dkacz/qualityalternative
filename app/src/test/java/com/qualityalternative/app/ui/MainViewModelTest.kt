@@ -501,6 +501,50 @@ class MainViewModelTest {
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
+    fun meditationDurationChangeOnTimerKeepsAcceptedSessionConsistent() = runTest {
+        var nowMillis = 4_000L
+        val historyRepository = FakeHistoryRepository()
+        val recommendationEngine = FixedRecommendationEngine(
+            RecommendationSet(
+                primary = MeditationTimerContentItem,
+                backups = emptyList(),
+                inventoryShortage = true,
+                generatedAtMillis = 1_000L,
+            ),
+        )
+        val settingsRepository = FakeSettingsRepository()
+        val viewModel = createViewModel(
+            settingsRepository = settingsRepository,
+            historyRepository = historyRepository,
+            recommendationEngine = recommendationEngine,
+            nowProvider = { nowMillis },
+        )
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+        viewModel.triggerDebugIntervention(nowMillis = 1_000L)
+        advanceUntilIdle()
+        viewModel.acceptPrimary()
+        advanceUntilIdle()
+
+        assertEquals(MainScreen.MeditationTimer, viewModel.uiState.screen)
+        assertEquals("3-minute reset", historyRepository.historyEntries.value.single().contentTitle)
+
+        nowMillis = 9_000L
+        viewModel.setMeditationDurationMinutes(10)
+        advanceUntilIdle()
+
+        assertEquals(10, viewModel.uiState.currentContent?.durationMinutes)
+        assertEquals("10-minute reset", viewModel.uiState.currentContent?.title)
+        assertEquals(9_000L, viewModel.uiState.currentSessionStartedAtMillis)
+        assertEquals(10, settingsRepository.state.value.meditationDurationMinutes)
+        assertEquals("10-minute reset", historyRepository.historyEntries.value.single().contentTitle)
+        assertEquals("A quiet timer for breathing through the impulse before choosing what comes next.", historyRepository.historyEntries.value.single().contentDescription)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
     fun setContentPriorityUpdatesSettingsAndRecommendationPreferences() = runTest {
         val recommendationEngine = RecordingRecommendationEngine()
         val settingsRepository = FakeSettingsRepository()
@@ -1884,6 +1928,22 @@ class MainViewModelTest {
             }
             completedIds.value = historyEntries.value.filter(ReplacementHistoryEntry::isCompleted)
                 .mapTo(mutableSetOf(), ReplacementHistoryEntry::contentId)
+        }
+
+        override suspend fun updateAcceptedSessionContent(sessionId: String, content: ContentItem) {
+            historyEntries.value = historyEntries.value.map { entry ->
+                if (entry.sessionId == sessionId) {
+                    entry.copy(
+                        contentId = content.id,
+                        contentTitle = content.title,
+                        contentDescription = content.description,
+                        contentTopics = content.topicTags,
+                        packId = content.packId,
+                    )
+                } else {
+                    entry
+                }
+            }
         }
 
         override suspend fun markSkipped(sessionId: String, skippedAtMillis: Long) {

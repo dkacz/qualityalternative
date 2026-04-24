@@ -9,6 +9,7 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performSemanticsAction
@@ -206,6 +207,9 @@ class VisualQaScreenshotTest {
 
         launchFixtureSystemIntervention()
         composeRule.onNodeWithText("The Long Quiet EPUB").assertIsDisplayed()
+        assertNodeFullyWithinRoot("intervention-backup-action-0")
+        assertNodeFullyWithinRoot("intervention-backup-action-1")
+        assertNodeFullyWithinRoot("intervention-bottom-actions")
         captureSprint10("02_intervention_epub_light")
 
         composeRule.onNodeWithText("Read this", substring = true).performClick()
@@ -257,6 +261,9 @@ class VisualQaScreenshotTest {
 
         openTab("tab-settings", "settings-list")
         composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasTestTag("content-priority-MEDITATION"))
+        captureSprint10("08a_settings_content_priority_light")
+        composeRule.onNodeWithTag("settings-list")
             .performScrollToNode(hasTestTag("meditation-duration-5"))
         composeRule.onNodeWithTag("meditation-duration-5")
             .performSemanticsAction(SemanticsActions.OnClick)
@@ -269,6 +276,9 @@ class VisualQaScreenshotTest {
         composeRule.onNodeWithText("Start timer", substring = true).performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("meditation-timer-screen") }
         composeRule.onNodeWithText("No feed. Just 5 minutes back.", substring = true).assertIsDisplayed()
+        assertNodeFullyWithinRoot("meditation-countdown")
+        assertNodeFullyWithinRoot("meditation-timer-card")
+        assertNodeFullyWithinRoot("meditation-complete")
         captureSprint10("10_meditation_timer_5m_light")
 
         composeRule.onNodeWithText("End early").performClick()
@@ -281,6 +291,9 @@ class VisualQaScreenshotTest {
             .performSemanticsAction(SemanticsActions.OnClick)
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasTestTag("content-priority-BALANCED"))
+        captureSprint10("11a_settings_content_priority_dark")
+        composeRule.onNodeWithTag("settings-list")
             .performScrollToNode(hasTestTag("meditation-duration-5"))
         captureSprint10("11_settings_meditation_5m_dark")
 
@@ -291,6 +304,9 @@ class VisualQaScreenshotTest {
         )
         launchFixtureSystemIntervention()
         composeRule.onNodeWithText("The Night Quiet EPUB").assertIsDisplayed()
+        assertNodeFullyWithinRoot("intervention-backup-action-0")
+        assertNodeFullyWithinRoot("intervention-backup-action-1")
+        assertNodeFullyWithinRoot("intervention-bottom-actions")
         captureSprint10("12_intervention_epub_dark")
 
         composeRule.onNodeWithText("Read this", substring = true).performClick()
@@ -341,6 +357,9 @@ class VisualQaScreenshotTest {
         composeRule.onNodeWithText("Start timer", substring = true).performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("meditation-timer-screen") }
         composeRule.onNodeWithText("No feed. Just 5 minutes back.", substring = true).assertIsDisplayed()
+        assertNodeFullyWithinRoot("meditation-countdown")
+        assertNodeFullyWithinRoot("meditation-timer-card")
+        assertNodeFullyWithinRoot("meditation-complete")
         captureSprint10("15_meditation_timer_5m_dark")
     }
 
@@ -890,4 +909,15 @@ class VisualQaScreenshotTest {
         composeRule.onNodeWithTag(tag).fetchSemanticsNode()
         true
     }.getOrDefault(false)
+
+    private fun assertNodeFullyWithinRoot(tag: String) {
+        composeRule.waitForIdle()
+        val rootBounds = composeRule.onRoot().fetchSemanticsNode().boundsInRoot
+        val nodeBounds = composeRule.onNodeWithTag(tag).fetchSemanticsNode().boundsInRoot
+        val tolerance = 1f
+        assertTrue("$tag left is clipped: node=$nodeBounds root=$rootBounds", nodeBounds.left >= rootBounds.left - tolerance)
+        assertTrue("$tag top is clipped: node=$nodeBounds root=$rootBounds", nodeBounds.top >= rootBounds.top - tolerance)
+        assertTrue("$tag right is clipped: node=$nodeBounds root=$rootBounds", nodeBounds.right <= rootBounds.right + tolerance)
+        assertTrue("$tag bottom is clipped: node=$nodeBounds root=$rootBounds", nodeBounds.bottom <= rootBounds.bottom + tolerance)
+    }
 }

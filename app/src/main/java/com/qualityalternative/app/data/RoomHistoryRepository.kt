@@ -107,6 +107,20 @@ class RoomHistoryRepository(
         }
     }
 
+    override suspend fun updateAcceptedSessionContent(sessionId: String, content: ContentItem) {
+        writeMutex.withLock {
+            updateEntry(sessionId) { entry ->
+                entry.copy(
+                    contentId = content.id,
+                    contentTitle = content.title,
+                    contentDescription = content.description,
+                    contentTopics = content.topicTags,
+                    packId = content.packId,
+                )
+            }
+        }
+    }
+
     override suspend fun markSkipped(sessionId: String, skippedAtMillis: Long) {
         writeMutex.withLock {
             updateEntry(sessionId) { entry ->

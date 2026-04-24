@@ -363,12 +363,14 @@ class MainViewModel(
     fun setMeditationDurationMinutes(minutes: Int) {
         val preferences = uiState.preferences
         val meditation = meditationTimerContentItem(minutes)
+        val isCurrentMeditation = uiState.currentContent?.usesMeditationTimer() == true
+        val activeSessionId = uiState.currentSessionId
         uiState = uiState.copy(
             meditationDurationMinutes = meditation.durationMinutes,
             preferences = preferences?.copy(meditationDurationMinutes = meditation.durationMinutes),
             currentRecommendationSet = uiState.currentRecommendationSet?.withMeditationDuration(meditation),
             currentContent = uiState.currentContent?.replaceIfMeditation(meditation),
-            currentSessionStartedAtMillis = if (uiState.currentContent?.usesMeditationTimer() == true) {
+            currentSessionStartedAtMillis = if (isCurrentMeditation) {
                 nowProvider()
             } else {
                 uiState.currentSessionStartedAtMillis
@@ -377,6 +379,9 @@ class MainViewModel(
         )
         viewModelScope.launch {
             settingsRepository.saveMeditationDurationMinutes(meditation.durationMinutes)
+            if (isCurrentMeditation && activeSessionId != null) {
+                historyRepository.updateAcceptedSessionContent(sessionId = activeSessionId, content = meditation)
+            }
         }
     }
 

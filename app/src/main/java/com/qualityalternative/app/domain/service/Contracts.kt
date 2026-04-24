@@ -214,6 +214,8 @@ interface HistoryRepository {
         acceptedAtMillis: Long = System.currentTimeMillis(),
     ): String
 
+    suspend fun updateAcceptedSessionContent(sessionId: String, content: ContentItem)
+
     suspend fun markCompleted(sessionId: String, completedAtMillis: Long = System.currentTimeMillis())
 
     suspend fun markSkipped(sessionId: String, skippedAtMillis: Long = System.currentTimeMillis())

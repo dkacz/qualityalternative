@@ -717,6 +717,11 @@ class RoomAnalyticsTrackerTest {
             acceptedAtMillis: Long,
         ): String = "unused-session"
 
+        override suspend fun updateAcceptedSessionContent(
+            sessionId: String,
+            content: com.qualityalternative.app.domain.model.ContentItem,
+        ) = Unit
+
         override suspend fun markCompleted(sessionId: String, completedAtMillis: Long) = Unit
 
         override suspend fun markSkipped(sessionId: String, skippedAtMillis: Long) = Unit

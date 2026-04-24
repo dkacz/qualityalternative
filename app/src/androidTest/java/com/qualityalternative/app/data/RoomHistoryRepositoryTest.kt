@@ -151,4 +151,61 @@ class RoomHistoryRepositoryTest {
             database.close()
         }
     }
+
+    @Test
+    fun updateAcceptedSessionContent_rewritesStoredContentMetadata() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val database = Room.inMemoryDatabaseBuilder(
+            context,
+            QualityAlternativeDatabase::class.java,
+        ).allowMainThreadQueries().build()
+        val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+        try {
+            val repository = RoomHistoryRepository(
+                dao = database.replacementSessionDao(),
+                scope = appScope,
+            )
+            repository.observeReady().first { it }
+
+            val targetApp = SupportedCatalog.distractingApps.first()
+            val content = ContentItem(
+                id = "meditation-reset",
+                packId = "utility",
+                title = "3-minute reset",
+                description = "A short reset",
+                durationMinutes = 3,
+                format = ContentFormat.MARKDOWN,
+                topicTags = setOf(TopicTag.PSYCHOLOGY),
+            )
+            val updatedContent = content.copy(
+                title = "10-minute reset",
+                description = "A longer reset",
+                durationMinutes = 10,
+            )
+
+            val sessionId = repository.recordAcceptedSession(
+                targetApp = targetApp,
+                interventionId = "intervention-1",
+                interventionShownAtMillis = 1_000L,
+                primaryContentId = content.id,
+                backupContentIds = emptyList(),
+                content = content,
+                source = RecommendationSource.PRIMARY,
+                acceptedAtMillis = 1_100L,
+            )
+            repository.updateAcceptedSessionContent(sessionId = sessionId, content = updatedContent)
+
+            val historyEntry = repository.recentHistory(nowMillis = 2_000L).single()
+
+            assertEquals("meditation-reset", historyEntry.contentId)
+            assertEquals("10-minute reset", historyEntry.contentTitle)
+            assertEquals("A longer reset", historyEntry.contentDescription)
+            assertEquals(setOf(TopicTag.PSYCHOLOGY), historyEntry.contentTopics)
+        } finally {
+            appScope.cancel()
+            delay(100)
+            database.close()
+        }
+    }
 }

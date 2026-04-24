@@ -1320,12 +1320,12 @@ private fun InterventionScreen(
             .fillMaxSize()
             .testTag("intervention-screen")
             .background(backgroundBrush)
-            .padding(horizontal = 24.dp, vertical = 26.dp),
+            .padding(horizontal = 22.dp, vertical = 20.dp),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 16.dp),
+                .padding(bottom = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
@@ -1338,35 +1338,40 @@ private fun InterventionScreen(
             )
             QaIconButton(icon = QaIconKind.Close, onClick = onOpenAnyway)
         }
-        MonoText("A brief detour, if you'd like one", modifier = Modifier.padding(bottom = 14.dp))
+        MonoText("A brief detour, if you'd like one", modifier = Modifier.padding(bottom = 10.dp))
         QaCard(
             borderColor = colors.lineStrong,
-            padding = 20.dp,
-            modifier = Modifier.padding(bottom = 12.dp),
+            padding = 16.dp,
+            modifier = Modifier.padding(bottom = 10.dp),
         ) {
             ContentMetaRow(primary, stacked = true)
             DisplayText(
                 text = primary.title,
-                fontSize = 29.sp,
-                lineHeight = 32.sp,
-                modifier = Modifier.padding(top = 10.dp, bottom = 10.dp),
+                fontSize = 26.sp,
+                lineHeight = 28.sp,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
             )
             Text(
                 text = "\"${primary.description}\"",
                 style = MaterialTheme.typography.bodyMedium.copy(
                     fontFamily = QualityDisplayFontFamily,
                     fontStyle = FontStyle.Italic,
-                    fontSize = 15.sp,
-                    lineHeight = 24.sp,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
                 ),
                 color = colors.mutedText,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
         }
         QaButton(
             text = primaryActionLabel(primary),
             onClick = onAcceptPrimary,
             variant = QaButtonVariant.Accent,
-            modifier = Modifier.padding(bottom = 12.dp),
+            modifier = Modifier.padding(bottom = 10.dp),
+            size = QaButtonSize.Small,
             leadingIcon = primaryActionIcon(primary),
         )
         Column(
@@ -1404,7 +1409,12 @@ private fun InterventionScreen(
                 BodyText("No extra choices are available right now.", color = colors.mutedText)
             }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier
+                .padding(top = 8.dp)
+                .testTag("intervention-bottom-actions"),
+        ) {
             QaButton(
                 text = "Pause 15 min",
                 onClick = onDelay,
@@ -1638,35 +1648,35 @@ private fun MeditationTimerScreen(
         modifier = Modifier
             .fillMaxSize()
             .testTag("meditation-timer-screen")
-            .padding(horizontal = 28.dp, vertical = 42.dp),
+            .padding(horizontal = 28.dp, vertical = 28.dp),
     ) {
         ScreenHead(onBack = onBack)
         Column(
             modifier = Modifier
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .padding(top = 22.dp, bottom = 18.dp),
+                .padding(top = 14.dp, bottom = 10.dp),
         ) {
-            MonoText("Quiet reset", modifier = Modifier.padding(bottom = 14.dp))
+            MonoText("Quiet reset", modifier = Modifier.padding(bottom = 10.dp))
             DisplayText(
                 text = content.title,
-                fontSize = 34.sp,
-                lineHeight = 37.sp,
-                modifier = Modifier.padding(bottom = 14.dp),
+                fontSize = 30.sp,
+                lineHeight = 32.sp,
+                modifier = Modifier.padding(bottom = 10.dp),
             )
             BodyText(
                 text = "Put the phone down if you can. Breathe out slowly. Let the urge pass before deciding what to do next.",
                 color = QualityAlternativeThemeTokens.colors.mutedText,
-                fontSize = 16.sp,
-                lineHeight = 25.sp,
-                modifier = Modifier.padding(bottom = 20.dp),
+                fontSize = 14.5.sp,
+                lineHeight = 22.sp,
+                modifier = Modifier.padding(bottom = 14.dp),
             )
             MeditationDurationChooser(
                 selectedMinutes = content.durationMinutes,
                 onSelect = onSelectMeditationDuration,
                 label = "Length for this reset",
-                helper = "Changing this restarts the countdown and becomes the new default.",
-                modifier = Modifier.padding(bottom = 18.dp),
+                helper = "Restarts the countdown and saves the default.",
+                modifier = Modifier.padding(bottom = 12.dp),
                 testTagPrefix = "timer-meditation-duration",
             )
             BodyText(
@@ -1675,21 +1685,21 @@ private fun MeditationTimerScreen(
                 textAlign = TextAlign.Center,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 12.dp),
+                    .padding(bottom = 8.dp),
             )
             QaCard(
-                padding = 24.dp,
+                padding = 18.dp,
                 background = QualityAlternativeThemeTokens.colors.accentSoft,
                 borderColor = QualityAlternativeThemeTokens.colors.lineStrong,
                 modifier = Modifier.testTag("meditation-timer-card"),
             ) {
-                MonoText("Timer", modifier = Modifier.padding(bottom = 14.dp), color = QualityAlternativeThemeTokens.colors.accent)
+                MonoText("Timer", modifier = Modifier.padding(bottom = 8.dp), color = QualityAlternativeThemeTokens.colors.accent)
                 Text(
                     text = meditationTimeLabel(remainingSeconds),
                     style = TextStyle(
                         fontFamily = QualityDisplayFontFamily,
-                        fontSize = 70.sp,
-                        lineHeight = 72.sp,
+                        fontSize = 62.sp,
+                        lineHeight = 64.sp,
                         color = QualityAlternativeThemeTokens.colors.primaryText,
                     ),
                     modifier = Modifier
@@ -1707,7 +1717,7 @@ private fun MeditationTimerScreen(
                     textAlign = TextAlign.Center,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 18.dp),
+                        .padding(top = 10.dp),
                 )
             }
         }
@@ -1717,6 +1727,7 @@ private fun MeditationTimerScreen(
             enabled = isComplete,
             variant = QaButtonVariant.Primary,
             modifier = Modifier.testTag("meditation-complete"),
+            size = QaButtonSize.Small,
         )
         QaButton(
             text = "End early",
@@ -2332,35 +2343,42 @@ private fun BackupRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(bottom = 8.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .border(BorderStroke(1.dp, colors.line), RoundedCornerShape(16.dp))
+            .padding(bottom = 6.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .border(BorderStroke(1.dp, colors.line), RoundedCornerShape(14.dp))
             .background(colors.elevatedSurface)
             .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 13.dp),
+            .padding(horizontal = 12.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Box(
             modifier = Modifier
-                .size(34.dp)
+                .size(30.dp)
                 .clip(CircleShape)
                 .background(colors.accentSoft),
             contentAlignment = Alignment.Center,
         ) {
-            QaIcon(kind = primaryActionIcon(item), color = colors.accent, size = 17.dp)
+            QaIcon(kind = primaryActionIcon(item), color = colors.accent, size = 15.dp)
         }
         Column(modifier = Modifier.weight(1f)) {
-            MonoText("Try instead · ${item.durationMinutes} min", color = colors.accent, modifier = Modifier.padding(bottom = 3.dp))
-            Text(item.title, style = MaterialTheme.typography.titleMedium, fontSize = 16.sp, lineHeight = 19.sp, maxLines = 2)
+            MonoText("Try instead · ${item.durationMinutes} min", color = colors.accent, modifier = Modifier.padding(bottom = 2.dp))
+            Text(
+                item.title,
+                style = MaterialTheme.typography.titleMedium,
+                fontSize = 15.sp,
+                lineHeight = 18.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
             MonoText(
                 "${item.sourceLabel()} · ${item.topicLine()}",
-                modifier = Modifier.padding(top = 3.dp),
+                modifier = Modifier.padding(top = 2.dp),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        QaIcon(kind = QaIconKind.ChevronRight, color = colors.faintText, size = 18.dp)
+        QaIcon(kind = QaIconKind.ChevronRight, color = colors.faintText, size = 16.dp)
     }
 }
 
@@ -3047,6 +3065,8 @@ private fun DisplayText(
     fontSize: androidx.compose.ui.unit.TextUnit = 28.sp,
     lineHeight: androidx.compose.ui.unit.TextUnit = 31.sp,
     textAlign: TextAlign? = null,
+    maxLines: Int = Int.MAX_VALUE,
+    overflow: TextOverflow = TextOverflow.Clip,
 ) {
     Text(
         text = text,
@@ -3060,6 +3080,8 @@ private fun DisplayText(
             color = QualityAlternativeThemeTokens.colors.primaryText,
         ),
         textAlign = textAlign,
+        maxLines = maxLines,
+        overflow = overflow,
     )
 }
 
