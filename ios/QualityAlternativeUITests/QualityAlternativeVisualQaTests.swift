@@ -52,6 +52,8 @@ final class QualityAlternativeVisualQaTests: XCTestCase {
     }
 
     private func assertInterventionActionSet(in app: XCUIApplication) {
+        XCTAssertTrue(app.staticTexts["PROTECTED SELECTION"].exists)
+        XCTAssertFalse(app.staticTexts["OPENING INSTAGRAM"].exists)
         XCTAssertTrue(app.buttons["Read this"].exists)
         XCTAssertTrue(app.buttons["Open link-only backup - 8 min"].exists)
         XCTAssertTrue(app.buttons["Start meditation - 3 min"].exists)

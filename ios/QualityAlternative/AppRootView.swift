@@ -56,15 +56,21 @@ struct AppRootView: View {
     }
 
     private func consumePendingShieldIntentIfNeeded() {
+        let plan = QAShieldHostForegroundResolver.resolve(
+            refreshedSession: QAShieldSessionStore.load(),
+            pendingIntent: shouldConsumeShieldIntent ? QAShieldActionIntentStore.load() : nil
+        )
+        shieldSession = plan.refreshedSession
         guard shouldConsumeShieldIntent else {
             return
         }
-        let intent = QAShieldActionIntentStore.load()
-        guard let routedIntent = QAShieldHostIntentRouter.route(for: intent) else {
+        guard let routedIntent = plan.route else {
             return
         }
         route = routedIntent
-        QAShieldActionIntentStore.clear()
+        if plan.shouldClearIntent {
+            QAShieldActionIntentStore.clear()
+        }
     }
 }
 

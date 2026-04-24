@@ -170,6 +170,7 @@ enum QAShieldActionButton: Equatable {
 }
 
 enum QAShieldActionResponsePlan: Equatable {
+    case keepShield
     case redrawShield
     case closeShield
 }
@@ -196,10 +197,17 @@ enum QAShieldActionPlanner {
                 updatedSession: nil
             )
         case .secondary:
+            guard let session else {
+                return QAShieldActionPlan(
+                    response: .keepShield,
+                    intent: nil,
+                    updatedSession: nil
+                )
+            }
             return QAShieldActionPlan(
                 response: .closeShield,
-                intent: session.map { QAShieldActionIntent.make(kind: .pauseForFifteenMinutes, session: $0, now: now) },
-                updatedSession: session?.paused(until: now.addingTimeInterval(pauseDuration), now: now)
+                intent: QAShieldActionIntent.make(kind: .pauseForFifteenMinutes, session: session, now: now),
+                updatedSession: session.paused(until: now.addingTimeInterval(pauseDuration), now: now)
             )
         }
     }
@@ -215,6 +223,27 @@ enum QAShieldHostIntentRouter {
         case nil:
             return nil
         }
+    }
+}
+
+struct QAShieldHostForegroundConsumptionPlan: Equatable {
+    let refreshedSession: QAShieldSessionState?
+    let route: QARoute?
+
+    var shouldClearIntent: Bool {
+        route != nil
+    }
+}
+
+enum QAShieldHostForegroundResolver {
+    static func resolve(
+        refreshedSession: QAShieldSessionState?,
+        pendingIntent: QAShieldActionIntent?
+    ) -> QAShieldHostForegroundConsumptionPlan {
+        QAShieldHostForegroundConsumptionPlan(
+            refreshedSession: refreshedSession,
+            route: QAShieldHostIntentRouter.route(for: pendingIntent)
+        )
     }
 }
 

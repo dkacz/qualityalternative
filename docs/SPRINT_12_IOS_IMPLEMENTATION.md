@@ -1,6 +1,6 @@
 # Sprint 12 iOS Implementation
 
-Status: `slice_12_4_pro_review_pending`
+Status: `slice_12_4_followup_pro_review_pending`
 Branch: `codex/sprint12-ios-implementation`
 
 ## Goal
@@ -281,11 +281,13 @@ Validation completed on 2026-04-24:
 - `git diff --check`: PASS
 - `plutil -lint` for app and extension entitlements/Info.plists: PASS
 - `xcodebuild test`: PASS on `QA iPhone 16 Sprint12`
-- Unit tests: 15 passed, 0 failed
+- Unit tests: 17 passed, 0 failed
 - UI visual QA tests: 1 passed, 0 failed
-- Total tests: 16 passed, 0 failed
-- Result bundle: `output/ios_sprint12_slice12_4_validation_20260424_150000/QualityAlternative.xcresult`
-- Test summary: `output/ios_sprint12_slice12_4_validation_20260424_150000/test_summary.json`
+- Total tests: 18 passed, 0 failed
+- Initial result bundle: `output/ios_sprint12_slice12_4_validation_20260424_150000/QualityAlternative.xcresult`
+- Initial test summary: `output/ios_sprint12_slice12_4_validation_20260424_150000/test_summary.json`
+- Review-fix result bundle: `output/ios_sprint12_slice12_4_review_fix_validation_20260424_145000/QualityAlternative.xcresult`
+- Review-fix test summary: `output/ios_sprint12_slice12_4_review_fix_validation_20260424_145000/test_summary.json`
 
 Visual QA artifacts:
 
@@ -299,12 +301,30 @@ Implemented state:
 - Both extension targets declare the required public `NSExtension` point identifiers and use App Group plus Family Controls entitlements.
 - `QAShieldCopyFactory` renders finite, token-safe shield copy from App Group state without exposing readable protected-app identities.
 - The primary shield action stores a host-app replacement intent and returns `.defer` to redraw the Apple shield; it does not claim direct host-app launch.
-- The secondary shield action records an explicit pause, clears ManagedSettings shields, and returns `.close`; it does not treat `.defer` as a timer.
-- The host app consumes queued shield intents on foreground and routes replacement requests into the finite intervention screen.
+- The secondary shield action records an explicit pause, clears ManagedSettings shields, and returns `.close` only after a session is loaded; nil session and unknown actions fail closed with `.none`.
+- The host app refreshes App Group shield state on foreground before consuming queued shield intents and routing replacement requests into the finite intervention screen.
 
 GPT Pro review:
 
+- Harvested verdict: `REVISE`
 - Lane: `https://chatgpt.com/c/69eb631b-9b64-838d-8787-8012dd484ae4`
 - Prompt: `PRO_REVIEW_PROMPT_20260424_143201.md`
 - Bundle: `QUALITY_ALTERNATIVE_IOS_REVIEW_BUNDLE_20260424_143201.zip`
-- Expected harvest path: `PRO_REVIEW_OUTPUT_20260424_143201/`
+- Harvest path: `PRO_REVIEW_OUTPUT_20260424_143201/`
+
+Review fixes applied:
+
+- Replaced the intervention eyebrow `OPENING INSTAGRAM` with the generic token-safe `PROTECTED SELECTION` label.
+- Added UI assertions that the intervention surface shows the generic protected-selection header and does not render `OPENING INSTAGRAM`.
+- Added `.keepShield` as the fail-closed shield action response plan and mapped it to Apple's `.none` response.
+- Changed nil-session secondary shield action planning to keep the shield in place rather than closing without a recorded pause.
+- Changed unknown shield actions to return `.none`.
+- Added unit coverage for nil-session secondary action fail-closed behavior.
+- Added host foreground resolver coverage proving the host refreshes shared shield state before routing and clearing a pending intent.
+
+GPT Pro follow-up review:
+
+- Lane: pending
+- Prompt: pending
+- Bundle: pending
+- Expected harvest path: pending

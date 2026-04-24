@@ -35,7 +35,7 @@ final class ShieldActionExtension: ShieldActionDelegate {
         case .secondaryButtonPressed:
             complete(planFor: .secondary, completionHandler: completionHandler)
         @unknown default:
-            completionHandler(.close)
+            completionHandler(.none)
         }
     }
 
@@ -62,6 +62,8 @@ final class ShieldActionExtension: ShieldActionDelegate {
 private extension QAShieldActionResponsePlan {
     var shieldActionResponse: ShieldActionResponse {
         switch self {
+        case .keepShield:
+            return .none
         case .redrawShield:
             return .defer
         case .closeShield:

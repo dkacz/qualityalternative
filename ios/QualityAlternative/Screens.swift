@@ -80,7 +80,7 @@ struct InterventionScreen: View {
         QAScreen(accessibilityIdentifier: "intervention-screen") {
             VStack(alignment: .leading, spacing: 18) {
                 HeaderBlock(
-                    eyebrow: "OPENING \(session.triggerLabel.uppercased())",
+                    eyebrow: "PROTECTED SELECTION",
                     title: "Try this first.",
                     subtitle: "Same product shape as Android: one primary suggestion and two backups, adapted to iOS constraints."
                 )

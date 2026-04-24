@@ -177,6 +177,41 @@ final class QualityAlternativeDesignTests: XCTestCase {
         XCTAssertEqual(QAShieldHostIntentRouter.route(for: plan.intent), .home)
     }
 
+    func testSecondaryShieldActionFailsClosedWithoutSession() {
+        let plan = QAShieldActionPlanner.plan(
+            for: .secondary,
+            session: nil,
+            now: Date(timeIntervalSince1970: 1_777_000_000)
+        )
+
+        XCTAssertEqual(plan.response, .keepShield)
+        XCTAssertNil(plan.intent)
+        XCTAssertNil(plan.updatedSession)
+    }
+
+    func testHostForegroundConsumptionRefreshesShieldSessionBeforeRouting() {
+        let now = Date(timeIntervalSince1970: 1_777_000_000)
+        let refreshedSession = QAShieldSessionState.armed(
+            session: QASampleData.session,
+            selection: QAScreenTimeSelectionSummary(applicationCount: 1, categoryCount: 0, webDomainCount: 0),
+            now: now
+        ).paused(until: now.addingTimeInterval(60), now: now)
+        let pendingIntent = QAShieldActionIntent.make(
+            kind: .pauseForFifteenMinutes,
+            session: refreshedSession,
+            now: now
+        )
+
+        let plan = QAShieldHostForegroundResolver.resolve(
+            refreshedSession: refreshedSession,
+            pendingIntent: pendingIntent
+        )
+
+        XCTAssertEqual(plan.refreshedSession, refreshedSession)
+        XCTAssertEqual(plan.route, .home)
+        XCTAssertTrue(plan.shouldClearIntent)
+    }
+
     func testShieldActionIntentStorePersistsAndClearsThroughInjectedDefaults() {
         let suiteName = "qa.shieldActionIntent.tests.\(UUID().uuidString)"
         let userDefaults = UserDefaults(suiteName: suiteName)
