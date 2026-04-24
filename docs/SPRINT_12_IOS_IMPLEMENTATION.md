@@ -229,3 +229,7 @@ Implemented state:
 GPT Pro review:
 
 - Status: pending
+- Lane: `https://chatgpt.com/c/69eb55b3-0bb8-838e-a4c3-0bc034486057`
+- Prompt: `PRO_REVIEW_PROMPT_20260424_133526.md`
+- Bundle: `QUALITY_ALTERNATIVE_IOS_REVIEW_BUNDLE_20260424_133526.zip`
+- Expected harvest path: `PRO_REVIEW_OUTPUT_20260424_133526/`
