@@ -27,6 +27,12 @@ struct QAReplacementSession: Equatable {
     let triggerLabel: String
     let primary: QAContentItem
     let backups: [QAContentItem]
+
+    init(triggerLabel: String, primary: QAContentItem, backups: [QAContentItem]) {
+        self.triggerLabel = triggerLabel
+        self.primary = primary
+        self.backups = Array(backups.prefix(2))
+    }
 }
 
 enum QARoute: String {

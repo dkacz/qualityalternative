@@ -1,6 +1,6 @@
 # Sprint 12 iOS Implementation
 
-Status: `slice_12_1_gpt_pro_review_pending`
+Status: `slice_12_1_gpt_pro_followup_pending`
 Branch: `codex/sprint12-ios-implementation`
 
 ## Goal
@@ -59,9 +59,11 @@ Completed on 2026-04-24:
 - `git diff --check`: PASS
 - `xcodebuild build`: PASS
 - `xcodebuild test`: PASS
-- Unit tests: 3 passed, 0 failed
+- Unit tests: 4 passed, 0 failed
 - UI visual QA tests: 1 passed, 0 failed
 - Manual simulator screenshot pass: PASS on `QA iPhone 16 Sprint12`
+- Follow-up validation bundle: `output/ios_sprint12_slice12_1_fix_validation_20260424_120330/QualityAlternative.xcresult`
+- Follow-up validation log: `output/ios_sprint12_slice12_1_fix_validation_20260424_120330/xcodebuild_test.log`
 
 Visual QA artifacts:
 
@@ -72,9 +74,20 @@ Visual QA artifacts:
 GPT Pro review:
 
 - Lane: `https://chatgpt.com/c/69eb3a1e-5f60-8386-bf9a-7588993d741e`
+- Harvested verdict: `REVISE`
 - Prompt: `PRO_REVIEW_PROMPT_20260424_113738.md`
 - Bundle: `QUALITY_ALTERNATIVE_IOS_REVIEW_BUNDLE_20260424_113738.zip`
 - Expected harvest path: `PRO_REVIEW_OUTPUT_20260424_113738/`
+
+Follow-up fixes applied:
+
+- Added an explicit "Continue intentionally" intervention action for the iOS-safe conscious-continuation path.
+- Render backup actions from `QAReplacementSession.backups` instead of hard-coded buttons.
+- Capped `QAReplacementSession.backups` to two items in the model.
+- Added unit coverage for the two-backup cap.
+- Added UI assertions for primary, two backups, pause, continue, and absence of a third backup.
+- Moved screen accessibility markers off the root container so action identifiers remain queryable.
+- Regenerated the Slice 12.1 screenshot set under `docs/visual-qa/sprint12-ios-slice12-1/` so bundle paths match the documented paths.
 
 Observed scope state:
 

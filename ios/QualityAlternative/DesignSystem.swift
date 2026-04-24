@@ -104,8 +104,12 @@ struct QAScreen<Content: View>: View {
         ZStack {
             tokens.colors.background.ignoresSafeArea()
             content
+            Color.clear
+                .frame(width: 1, height: 1)
+                .accessibilityElement()
+                .accessibilityLabel(accessibilityIdentifier)
+                .accessibilityIdentifier(accessibilityIdentifier)
         }
-        .accessibilityIdentifier(accessibilityIdentifier)
     }
 }
 
@@ -133,12 +137,25 @@ struct QAButton: View {
     @Environment(\.qaTokens) private var tokens
     let title: String
     let style: Style
+    let accessibilityIdentifier: String?
     let action: () -> Void
 
     enum Style {
         case primary
         case secondary
         case quiet
+    }
+
+    init(
+        title: String,
+        style: Style,
+        accessibilityIdentifier: String? = nil,
+        action: @escaping () -> Void
+    ) {
+        self.title = title
+        self.style = style
+        self.accessibilityIdentifier = accessibilityIdentifier
+        self.action = action
     }
 
     var body: some View {
@@ -156,6 +173,9 @@ struct QAButton: View {
                 )
         }
         .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(title)
+        .accessibilityIdentifier(accessibilityIdentifier ?? title)
     }
 
     private var background: Color {

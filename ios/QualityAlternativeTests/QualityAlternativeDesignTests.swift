@@ -15,6 +15,23 @@ final class QualityAlternativeDesignTests: XCTestCase {
         XCTAssertEqual(Set(session.backups.map(\.renderMode)), [.externalHandoff, .meditationTimer])
     }
 
+    func testReplacementSessionCapsBackupsAtTwo() {
+        let session = QAReplacementSession(
+            triggerLabel: "Fixture",
+            primary: QASampleData.readerItem,
+            backups: [
+                QASampleData.linkOnlyItem,
+                QASampleData.meditationItem,
+                QASampleData.library[3]
+            ]
+        )
+
+        XCTAssertEqual(session.backups.map(\.id), [
+            QASampleData.linkOnlyItem.id,
+            QASampleData.meditationItem.id
+        ])
+    }
+
     func testLibraryIncludesRenderableLinkOnlyAndMeditationItems() {
         let modes = Set(QASampleData.library.map(\.renderMode))
 

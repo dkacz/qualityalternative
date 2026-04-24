@@ -43,7 +43,8 @@ private struct RootContent: View {
                 onReadPrimary: { route = .reader },
                 onOpenLink: { route = .handoff },
                 onMeditate: { route = .meditation },
-                onPause: { route = .home }
+                onPause: { route = .home },
+                onContinue: { route = .home }
             )
         case .reader:
             ReaderScreen(item: QASampleData.readerItem, onDone: { route = .progress })

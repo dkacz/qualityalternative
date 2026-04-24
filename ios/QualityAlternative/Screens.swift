@@ -73,6 +73,7 @@ struct InterventionScreen: View {
     let onOpenLink: () -> Void
     let onMeditate: () -> Void
     let onPause: () -> Void
+    let onContinue: () -> Void
 
     var body: some View {
         QAScreen(accessibilityIdentifier: "intervention-screen") {
@@ -100,13 +101,52 @@ struct InterventionScreen: View {
                 }
 
                 VStack(spacing: 10) {
-                    QAButton(title: "Open link-only backup", style: .secondary, action: onOpenLink)
-                    QAButton(title: "Start 3 min meditation", style: .secondary, action: onMeditate)
-                    QAButton(title: "Pause for 15 min", style: .quiet, action: onPause)
+                    ForEach(session.backups) { backup in
+                        QAButton(
+                            title: backupActionTitle(for: backup),
+                            style: .secondary,
+                            accessibilityIdentifier: "backup-action-\(backup.id)",
+                            action: backupAction(for: backup)
+                        )
+                    }
+                    QAButton(
+                        title: "Pause for 15 min",
+                        style: .quiet,
+                        accessibilityIdentifier: "pause-action",
+                        action: onPause
+                    )
+                    QAButton(
+                        title: "Continue intentionally",
+                        style: .quiet,
+                        accessibilityIdentifier: "continue-intentionally-action",
+                        action: onContinue
+                    )
                 }
                 Spacer(minLength: 0)
             }
             .padding(20)
+        }
+    }
+
+    private func backupActionTitle(for item: QAContentItem) -> String {
+        switch item.renderMode {
+        case .inAppReader:
+            "Read backup - \(item.duration)"
+        case .externalHandoff:
+            "Open link-only backup - \(item.duration)"
+        case .meditationTimer:
+            "Start meditation - \(item.duration)"
+        }
+    }
+
+    private func backupAction(for item: QAContentItem) -> () -> Void {
+        switch item.renderMode {
+        case .inAppReader:
+            onReadPrimary
+        case .externalHandoff:
+            onOpenLink
+        case .meditationTimer:
+            onMeditate
         }
     }
 }
