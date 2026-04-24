@@ -13,24 +13,25 @@ This file is the repo-level index for active and recently completed execution la
 
 ## Android Meditation / Content Priority Fix
 
-Status: `implementation_pushed_pending_gpt_pro_review`
+Status: `review_fixes_pushed_followup_gpt_pro_review_pending`
 
 - Branch: `codex/android-meditation-priority-controls`
 - Remote: `origin/codex/android-meditation-priority-controls`
-- Commit: `4bc8fc0` (`Improve meditation and content priority controls`)
+- Latest commit: `ca00a1e` (`Fix Android meditation review findings`)
 - PR draft URL: `https://github.com/dkacz/qualityalternative/pull/new/codex/android-meditation-priority-controls`
-- GPT Pro review lane: `https://chatgpt.com/c/69eb1e4f-b620-8397-adb6-9c06613d72cd`
+- Current GPT Pro follow-up lane: `https://chatgpt.com/c/69eb2afe-7058-8390-946a-e96dd2842d90`
 - Heartbeat automation: `android-meditation-priority-pro-review`
-- Review prompt: `PRO_REVIEW_PROMPT_20260424_093850.md`
-- Review bundle: `QUALITY_ALTERNATIVE_REVIEW_BUNDLE_20260424_093850.zip`
-- Expected review harvest path: `PRO_REVIEW_OUTPUT_20260424_093850/`
+- Current review prompt: `PRO_REVIEW_PROMPT_20260424_103230.md`
+- Current review bundle: `QUALITY_ALTERNATIVE_REVIEW_BUNDLE_20260424_103230.zip`
+- Expected current review harvest path: `PRO_REVIEW_OUTPUT_20260424_103230/`
+- Prior review output: `PRO_REVIEW_OUTPUT_20260424_093850/`
 - Visual QA contact sheet: `output/android-meditation-priority-visual-20260424/contact_sheet_meditation_priority.png`
 
 Completed validation:
 
 - `testDebugUnitTest`
 - `lintDebug`
-- `connectedDebugAndroidTest` on Android emulator, 49/49 passing
+- `connectedDebugAndroidTest` on Android emulator, 50/50 passing
 - `git diff --check`
 - JSON validation for `app/src/main/assets/editorial/starter_packs.json`
 - `VisualQaScreenshotTest#captureSprint10ReaderProgressStreakAndMeditationScreens`
@@ -38,7 +39,7 @@ Completed validation:
 
 Next gate:
 
-- Harvest GPT Pro review.
+- Harvest GPT Pro follow-up review.
 - If `REVISE` or `BLOCK`, implement concrete fixes on `codex/android-meditation-priority-controls`, rerun validation, push, and relaunch review.
 - If `10/10 PASS`, this lane is eligible for merge/release decision.
 
