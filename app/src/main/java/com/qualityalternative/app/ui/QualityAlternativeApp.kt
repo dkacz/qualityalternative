@@ -1937,28 +1937,30 @@ private fun SettingsTab(
             }
         }
         item {
-            SectionLabel("Apps to interrupt", right = "${state.availableTargetApps.size} active")
-            QaCard {
-                BodyText(
-                    text = "Checked apps trigger the replacement prompt. The Home screen only chooses which checked app to preview.",
-                    color = colors.mutedText,
-                    modifier = Modifier.padding(bottom = 12.dp),
-                )
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    state.allSupportedApps.forEach { app ->
-                        AppSelectionRow(
-                            app = app,
-                            selected = state.availableTargetApps.any { it.packageName == app.packageName },
-                            onClick = { onToggleApp(app) },
-                        )
+            Column(modifier = Modifier.testTag("settings-app-selection-section")) {
+                SectionLabel("Apps to interrupt", right = "${state.availableTargetApps.size} active")
+                QaCard {
+                    BodyText(
+                        text = "Checked apps trigger the replacement prompt. The Home screen only chooses which checked app to preview.",
+                        color = colors.mutedText,
+                        modifier = Modifier.padding(bottom = 12.dp),
+                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        state.allSupportedApps.forEach { app ->
+                            AppSelectionRow(
+                                app = app,
+                                selected = state.availableTargetApps.any { it.packageName == app.packageName },
+                                onClick = { onToggleApp(app) },
+                            )
+                        }
                     }
+                    BodyText(
+                        text = "Keep at least 3 selected for the alpha.",
+                        color = colors.mutedText,
+                        fontSize = 12.5.sp,
+                        modifier = Modifier.padding(top = 10.dp),
+                    )
                 }
-                BodyText(
-                    text = "Keep at least 3 selected for the alpha.",
-                    color = colors.mutedText,
-                    fontSize = 12.5.sp,
-                    modifier = Modifier.padding(top = 10.dp),
-                )
             }
         }
         item {
@@ -2066,6 +2068,7 @@ private fun SettingsTab(
                     .fillMaxWidth()
                     .padding(vertical = 20.dp),
                 textAlign = TextAlign.Center,
+                preserveCase = true,
             )
         }
     }
@@ -3184,9 +3187,10 @@ private fun MonoText(
     textAlign: TextAlign? = null,
     maxLines: Int = Int.MAX_VALUE,
     overflow: TextOverflow = TextOverflow.Clip,
+    preserveCase: Boolean = false,
 ) {
     Text(
-        text = text.uppercase(Locale.US),
+        text = if (preserveCase) text else text.uppercase(Locale.US),
         modifier = modifier,
         style = TextStyle(
             fontFamily = QualityMonoFontFamily,

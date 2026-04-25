@@ -258,8 +258,19 @@ class VisualQaScreenshotTest {
         scenario = null
         InstrumentationRegistry.getInstrumentation().waitForIdleSync()
         launchOnboardedApp()
+        seedSupportedAppSelection()
+        scenario?.close()
+        scenario = null
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+        launchOnboardedApp()
 
         openTab("tab-settings", "settings-list")
+        composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasText("APPS TO INTERRUPT"))
+        composeRule.onNodeWithText("APPS TO INTERRUPT").assertIsDisplayed()
+        composeRule.onNodeWithText("Instagram").assertIsDisplayed()
+        composeRule.onNodeWithText("X").assertIsDisplayed()
+        captureSprint10("08b_settings_app_selection_light")
         composeRule.onNodeWithTag("settings-list")
             .performScrollToNode(hasTestTag("content-priority-MEDITATION"))
         captureSprint10("08a_settings_content_priority_light")
@@ -290,6 +301,12 @@ class VisualQaScreenshotTest {
         composeRule.onNodeWithTag("theme-DARK")
             .performSemanticsAction(SemanticsActions.OnClick)
         composeRule.waitForIdle()
+        composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasText("APPS TO INTERRUPT"))
+        composeRule.onNodeWithText("APPS TO INTERRUPT").assertIsDisplayed()
+        composeRule.onNodeWithText("Instagram").assertIsDisplayed()
+        composeRule.onNodeWithText("X").assertIsDisplayed()
+        captureSprint10("11b_settings_app_selection_dark")
         composeRule.onNodeWithTag("settings-list")
             .performScrollToNode(hasTestTag("content-priority-BALANCED"))
         captureSprint10("11a_settings_content_priority_dark")
@@ -610,6 +627,28 @@ class VisualQaScreenshotTest {
         repository.saveOnboardingSelection(
             OnboardingSelection(
                 selectedAppPackages = setOf(FixtureTargetRegistry.fixtureDistractors.first().packageName),
+                preferredTopics = setOf(TopicTag.PHILOSOPHY, TopicTag.HISTORY, TopicTag.ESSAYS, TopicTag.SCIENCE),
+                preferredDurationBucket = DurationBucket.FOCUS,
+                selectedPackIds = setOf(
+                    "attention-classics-v1",
+                    "public-domain-expansion-v2",
+                    "link-only-modern-v1",
+                ),
+            ),
+        )
+    }
+
+    private fun seedSupportedAppSelection() = runBlocking {
+        val repository = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication)
+            .appContainer
+            .settingsRepository
+        repository.saveOnboardingSelection(
+            OnboardingSelection(
+                selectedAppPackages = setOf(
+                    "com.instagram.android",
+                    "com.twitter.android",
+                    "com.reddit.frontpage",
+                ),
                 preferredTopics = setOf(TopicTag.PHILOSOPHY, TopicTag.HISTORY, TopicTag.ESSAYS, TopicTag.SCIENCE),
                 preferredDurationBucket = DurationBucket.FOCUS,
                 selectedPackIds = setOf(

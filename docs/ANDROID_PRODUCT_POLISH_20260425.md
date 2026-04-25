@@ -11,6 +11,8 @@ Status: implemented and locally validated on `codex/android-product-polish-favor
 - Reworked Settings app selection from ambiguous pills into checked rows for apps that trigger replacement prompts.
 - Expanded user-facing topic choices to expose the full existing topic taxonomy and added an `Other` fallback.
 - Added visual QA coverage for the onboarding topic picker so `Other` and `Creativity` are auditable in screenshots.
+- Preserved the exact lowercase prerelease version string in the Settings footer.
+- Added dedicated visual QA captures for the Settings app-selection section in light and dark themes.
 
 ## Guardrails
 
