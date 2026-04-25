@@ -48,7 +48,7 @@ No modern source family exceeds the 10-row full-pool cap. `Aeon/Psyche` remains 
 
 - Chart-heavy data pages (`s9-3-l11-owid-energy`, `s9-3-l12-owid-greenhouse-gases`) are link-only and flagged `chart_dependent_external_only`.
 - NASA visual/data candidates are link-only and flagged for image/data context.
-- Astronomy and natural-history renderable candidates with diagrams or plates require text-only excerpt selection.
+- Astronomy and natural-history renderable candidates with diagrams, species images, or plates require text-only excerpt selection.
 - Recent Quanta research candidates are marked `mostly_evergreen` and flagged for durability review.
 - Climate and energy rows carry medium political/current-events risk and stay external handoff only.
 - `The Story of a Piece of Coal` is flagged for dated industrial energy framing and medium current-events sensitivity.

@@ -288,6 +288,10 @@ class ContentSourceExpansionArtifactsTest {
         assertEquals("image_dependent_sections_avoid", storyHeavens["image_chart_dependency"])
         assertEquals("diagram_image_review_needed", storyHeavens["third_party_asset_risk"])
 
+        val spider = rows.getValue("s9-3-r02-fabre-life-spider")
+        assertEquals("image_dependent_sections_avoid", spider["image_chart_dependency"])
+        assertEquals("diagram_image_review_needed", spider["third_party_asset_risk"])
+
         val coal = rows.getValue("s9-3-r07-martin-piece-coal")
         assertEquals("medium", coal["political_current_events_risk"])
         assertEquals("dated_energy_industrial_language_review", coal["sensitivity_flags"])
@@ -299,6 +303,18 @@ class ContentSourceExpansionArtifactsTest {
         val vertebrateIntelligence = rows.getValue("s9-3-l05-quanta-vertebrate-intelligence")
         assertEquals("mostly_evergreen", vertebrateIntelligence["durability"])
         assertEquals("recent_research_durability_review", vertebrateIntelligence["sensitivity_flags"])
+
+        listOf(
+            "s9-3-l01-quanta-life-complexity",
+            "s9-3-l02-quanta-quantumness",
+            "s9-3-l03-quanta-uncertainty-measurements",
+            "s9-3-l04-quanta-universe-shape",
+        ).forEach { candidateId ->
+            assertEquals(
+                "open_page_spot_check_needs_manual_verification",
+                rows.getValue(candidateId)["url_verification_method"],
+            )
+        }
     }
 
     @Test

@@ -1,6 +1,6 @@
 # Sprint 9 Content Source Expansion
 
-Status: Slice 9.3 implemented for Pro review.
+Status: Slice 9.3 review fix implemented for Pro follow-up.
 
 ## Goal
 
@@ -88,6 +88,8 @@ Slice 9.3 adds 26 sourcing-only candidate rows for Wonder, Curiosity, and Scienc
 - Chart-heavy, image-dependent, and recent-research candidates stay link-only or require text-only excerpt selection.
 - 0 new app content integrations.
 - 0 runtime scraping, caching, rehosting, reader-mode extraction, or AI summary behavior.
+
+Slice 9.3 initial Pro result: `REVISE` for metadata consistency only. The follow-up fix aligns one spider image-dependency row with its structured risk fields and aligns four Quanta open-page spot-check rows with their verification method.
 
 ## Current Inventory Baseline
 
