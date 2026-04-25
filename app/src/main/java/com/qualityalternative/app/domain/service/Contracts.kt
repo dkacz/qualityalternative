@@ -97,6 +97,7 @@ interface SettingsRepository {
     suspend fun saveThemeMode(themeMode: AppThemeMode)
     suspend fun saveMeditationDurationMinutes(minutes: Int)
     suspend fun saveContentPriority(priority: ContentPriority)
+    suspend fun savePriorityContentIds(contentIds: Set<String>)
 }
 
 interface RecommendationEngine {

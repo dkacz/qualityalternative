@@ -49,6 +49,7 @@ enum class AnalyticsEventType {
     USER_LINK_HANDOFF_FAILED,
     EXTERNAL_HANDOFF_OPENED,
     EXTERNAL_HANDOFF_FAILED,
+    PRIORITY_CONTENT_TOGGLED,
 }
 
 data class AnalyticsEvent(

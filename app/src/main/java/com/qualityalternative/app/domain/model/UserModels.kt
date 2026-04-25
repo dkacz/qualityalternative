@@ -12,6 +12,7 @@ data class UserPreferences(
     val selectedPackIds: Set<String>,
     val meditationDurationMinutes: Int = DEFAULT_MEDITATION_MINUTES,
     val contentPriority: ContentPriority = ContentPriority.BALANCED,
+    val priorityContentIds: Set<String> = emptySet(),
 )
 
 enum class AppThemeMode {
@@ -36,6 +37,7 @@ data class AppSettings(
     val themeMode: AppThemeMode = AppThemeMode.LIGHT,
     val meditationDurationMinutes: Int = DEFAULT_MEDITATION_MINUTES,
     val contentPriority: ContentPriority = ContentPriority.BALANCED,
+    val priorityContentIds: Set<String> = emptySet(),
 )
 
 data class OnboardingSelection(

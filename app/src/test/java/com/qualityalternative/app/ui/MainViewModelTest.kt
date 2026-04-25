@@ -569,6 +569,43 @@ class MainViewModelTest {
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
+    fun togglePriorityContentUpdatesSettingsRecommendationPreferencesAndAnalytics() = runTest {
+        val recommendationEngine = RecordingRecommendationEngine()
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val settingsRepository = FakeSettingsRepository()
+        val contentRepository = FakeContentRepository()
+        val priorityItem = contentRepository.inventory().first()
+        val viewModel = createViewModel(
+            settingsRepository = settingsRepository,
+            contentRepository = contentRepository,
+            recommendationEngine = recommendationEngine,
+            analyticsTracker = analyticsTracker,
+        )
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+        viewModel.togglePriorityContent(priorityItem)
+        advanceUntilIdle()
+        viewModel.triggerDebugIntervention(nowMillis = 2_000L)
+        advanceUntilIdle()
+
+        assertTrue(priorityItem.id in viewModel.uiState.priorityContentIds)
+        assertEquals(setOf(priorityItem.id), settingsRepository.state.value.priorityContentIds)
+        assertEquals(setOf(priorityItem.id), recommendationEngine.lastPreferences?.priorityContentIds)
+        val event = analyticsTracker.allEvents().first { it.type == AnalyticsEventType.PRIORITY_CONTENT_TOGGLED }
+        assertEquals(priorityItem.id, event.contentId)
+        assertEquals("true", event.metadata["priorityEnabled"])
+
+        viewModel.togglePriorityContent(priorityItem)
+        advanceUntilIdle()
+
+        assertFalse(priorityItem.id in viewModel.uiState.priorityContentIds)
+        assertEquals(emptySet<String>(), settingsRepository.state.value.priorityContentIds)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
     fun skippingMeditationMarksSessionSkippedAndRecordsMeditationEvent() = runTest {
         val analyticsTracker = InMemoryAnalyticsTracker()
         val historyRepository = FakeHistoryRepository()
@@ -1846,6 +1883,7 @@ class MainViewModelTest {
                 themeMode = state.value.themeMode,
                 meditationDurationMinutes = state.value.meditationDurationMinutes,
                 contentPriority = state.value.contentPriority,
+                priorityContentIds = state.value.priorityContentIds,
             )
         }
 
@@ -1867,6 +1905,10 @@ class MainViewModelTest {
 
         override suspend fun saveContentPriority(priority: ContentPriority) {
             state.value = state.value.copy(contentPriority = priority)
+        }
+
+        override suspend fun savePriorityContentIds(contentIds: Set<String>) {
+            state.value = state.value.copy(priorityContentIds = contentIds)
         }
     }
 

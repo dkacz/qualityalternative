@@ -433,6 +433,34 @@ class DefaultRecommendationEngineTest {
         assertEquals(2, result?.backups?.size)
     }
 
+    @Test
+    fun generate_boostsIndividualPriorityContentWithoutExpandingFiniteSet() {
+        val preferences = UserPreferences(
+            selectedApps = listOf(DistractingApp(packageName = "pkg", displayName = "Instagram")),
+            preferredTopics = setOf(TopicTag.SCIENCE),
+            preferredDurationBucket = DurationBucket.FOCUS,
+            selectedPackIds = setOf("pack"),
+            priorityContentIds = setOf("priority"),
+        )
+        val inventory = listOf(
+            item(id = "topic-match", minutes = 6, topics = setOf(TopicTag.SCIENCE)),
+            item(id = "priority", minutes = 6, topics = setOf(TopicTag.HISTORY)),
+            item(id = "backup", minutes = 5, topics = setOf(TopicTag.SCIENCE)),
+        )
+
+        val result = engine.generate(
+            targetApp = DistractingApp(packageName = "pkg", displayName = "Instagram"),
+            preferences = preferences,
+            inventory = inventory,
+            primaryExcludedIds = emptySet(),
+            signals = RecommendationSignals(timeOfDay = TimeOfDayBucket.MIDDAY),
+            nowMillis = 0L,
+        )
+
+        assertEquals("priority", result?.primary?.id)
+        assertEquals(2, result?.backups?.size)
+    }
+
     private fun item(
         id: String,
         packId: String = "pack",

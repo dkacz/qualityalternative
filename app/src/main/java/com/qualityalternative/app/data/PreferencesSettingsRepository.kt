@@ -53,6 +53,7 @@ class PreferencesSettingsRepository(
                     meditationDurationMinutes = (preferences[MeditationDurationMinutes] ?: DEFAULT_MEDITATION_MINUTES)
                         .coerceIn(MIN_MEDITATION_MINUTES, MAX_MEDITATION_MINUTES),
                     contentPriority = parseContentPriority(preferences[ContentPriorityPreference]),
+                    priorityContentIds = preferences[PriorityContentIds].orEmpty(),
                 )
             }
     }
@@ -99,6 +100,12 @@ class PreferencesSettingsRepository(
         }
     }
 
+    override suspend fun savePriorityContentIds(contentIds: Set<String>) {
+        dataStore.edit { preferences ->
+            preferences[PriorityContentIds] = contentIds
+        }
+    }
+
     suspend fun clearForTests() {
         dataStore.edit { preferences ->
             preferences.clear()
@@ -127,5 +134,6 @@ class PreferencesSettingsRepository(
         val ThemeMode = stringPreferencesKey("theme_mode")
         val MeditationDurationMinutes = intPreferencesKey("meditation_duration_minutes")
         val ContentPriorityPreference = stringPreferencesKey("content_priority")
+        val PriorityContentIds = stringSetPreferencesKey("priority_content_ids")
     }
 }

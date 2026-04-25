@@ -101,6 +101,7 @@ data class MainUiState(
     val themeMode: AppThemeMode = AppThemeMode.LIGHT,
     val meditationDurationMinutes: Int = DEFAULT_MEDITATION_MINUTES,
     val contentPriority: ContentPriority = ContentPriority.BALANCED,
+    val priorityContentIds: Set<String> = emptySet(),
     val latestMessage: String? = null,
     val events: List<AnalyticsEvent> = emptyList(),
     val screen: MainScreen = MainScreen.Onboarding,
@@ -394,6 +395,41 @@ class MainViewModel(
         )
         viewModelScope.launch {
             settingsRepository.saveContentPriority(priority)
+        }
+    }
+
+    fun togglePriorityContent(item: ContentItem) {
+        val selectedIds = uiState.priorityContentIds.toMutableSet()
+        val isPrioritized = if (selectedIds.add(item.id)) {
+            true
+        } else {
+            selectedIds.remove(item.id)
+            false
+        }
+        val updatedIds = selectedIds.toSet()
+        val preferences = uiState.preferences
+        uiState = uiState.copy(
+            priorityContentIds = updatedIds,
+            preferences = preferences?.copy(priorityContentIds = updatedIds),
+            latestMessage = if (isPrioritized) {
+                "Prioritizing ${item.title}."
+            } else {
+                "Removed ${item.title} from priority picks."
+            },
+        )
+        viewModelScope.launch {
+            settingsRepository.savePriorityContentIds(updatedIds)
+            recordEventDurably(
+                AnalyticsEvent(
+                    type = AnalyticsEventType.PRIORITY_CONTENT_TOGGLED,
+                    timestampMillis = nowProvider(),
+                    contentId = item.id,
+                    metadata = item.analyticsMetadata() + mapOf(
+                        "priorityEnabled" to isPrioritized.toString(),
+                        "priorityContentCount" to updatedIds.size.toString(),
+                    ),
+                ),
+            )
         }
     }
 
@@ -1244,6 +1280,7 @@ class MainViewModel(
             themeMode = settings.themeMode,
             meditationDurationMinutes = settings.meditationDurationMinutes,
             contentPriority = settings.contentPriority,
+            priorityContentIds = settings.priorityContentIds,
             onboardingSelection = settings.toOnboardingSelection(
                 supportedApps = supportedApps,
                 starterPacks = starterPacks,
@@ -1882,6 +1919,7 @@ private fun AppSettings.toUserPreferences(
         selectedPackIds = packs,
         meditationDurationMinutes = meditationDurationMinutes,
         contentPriority = contentPriority,
+        priorityContentIds = priorityContentIds,
     )
 }
 
@@ -2155,6 +2193,7 @@ private fun inventoryDiagnostics(
         "unavailableUserLinkCount" to unavailableUserLinkIds.size.toString(),
         "unavailableUserDocumentCount" to unavailableUserDocumentIds.size.toString(),
         "completedContentCount" to completedContentIds.size.toString(),
+        "priorityContentCount" to preferences.priorityContentIds.size.toString(),
     )
 }
 

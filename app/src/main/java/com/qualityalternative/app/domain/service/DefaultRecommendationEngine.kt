@@ -92,6 +92,7 @@ class DefaultRecommendationEngine : RecommendationEngine {
         val packBoost = if (item.packId in signals.successfulPackIds) 20 else 0
         val utilityBoost = if (item.sourceType == ContentSourceType.MEDITATION) 24 else 0
         val priorityBoost = preferences.contentPriority.boostFor(item.sourceType)
+        val priorityPickBoost = if (item.id in preferences.priorityContentIds) 96 else 0
         val timeOfDayBoost = when (signals.timeOfDay) {
             TimeOfDayBucket.MORNING -> when {
                 item.durationMinutes <= DurationBucket.QUICK.maxMinutes -> 18
@@ -103,7 +104,7 @@ class DefaultRecommendationEngine : RecommendationEngine {
             TimeOfDayBucket.EVENING -> if (DurationBucket.DEEP.contains(item.durationMinutes)) 18 else 6
             TimeOfDayBucket.NIGHT -> if (item.durationMinutes <= DurationBucket.FOCUS.maxMinutes) 14 else 0
         }
-        return topicScore + durationScore + completionBoost + packBoost + utilityBoost + priorityBoost + timeOfDayBoost - skipPenalty
+        return topicScore + durationScore + completionBoost + packBoost + utilityBoost + priorityBoost + priorityPickBoost + timeOfDayBoost - skipPenalty
     }
 
     private data class ScoredCandidate(

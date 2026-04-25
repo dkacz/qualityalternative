@@ -679,6 +679,7 @@ class RoomAnalyticsTrackerTest {
                 themeMode = state.value.themeMode,
                 meditationDurationMinutes = state.value.meditationDurationMinutes,
                 contentPriority = state.value.contentPriority,
+                priorityContentIds = state.value.priorityContentIds,
             )
         }
 
@@ -700,6 +701,10 @@ class RoomAnalyticsTrackerTest {
 
         override suspend fun saveContentPriority(priority: ContentPriority) {
             state.value = state.value.copy(contentPriority = priority)
+        }
+
+        override suspend fun savePriorityContentIds(contentIds: Set<String>) {
+            state.value = state.value.copy(priorityContentIds = contentIds)
         }
     }
 

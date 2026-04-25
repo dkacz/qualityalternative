@@ -285,6 +285,7 @@ private fun MainRoute(
                 onAddLink = viewModel::openAddLink,
                 onImportDocument = onImportDocument,
                 onOpen = viewModel::openLibraryItem,
+                onTogglePriorityContent = viewModel::togglePriorityContent,
             )
         }
 
@@ -926,12 +927,16 @@ private fun LibraryTab(
     onAddLink: () -> Unit,
     onImportDocument: () -> Unit,
     onOpen: (ContentItem) -> Unit,
+    onTogglePriorityContent: (ContentItem) -> Unit,
 ) {
     var filter by remember { mutableStateOf("all") }
     val editorial = state.starterPacks
         .filter { it.id in state.preferences?.selectedPackIds.orEmpty() }
         .flatMap { it.items }
+    val priority = (editorial + state.userLinks + state.userDocuments)
+        .filter { it.id in state.priorityContentIds }
     val list = when (filter) {
+        "priority" -> priority
         "editorial" -> editorial
         "yours" -> state.userLinks
         "files" -> state.userDocuments
@@ -973,8 +978,13 @@ private fun LibraryTab(
             )
         }
         item {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(bottom = 8.dp)) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.padding(bottom = 8.dp),
+            ) {
                 QaChip("All", selected = filter == "all", onClick = { filter = "all" })
+                QaChip("Priority", selected = filter == "priority", onClick = { filter = "priority" })
                 QaChip("Editorial", selected = filter == "editorial", onClick = { filter = "editorial" })
                 QaChip("Your links", selected = filter == "yours", onClick = { filter = "yours" })
                 QaChip("Files", selected = filter == "files", onClick = { filter = "files" })
@@ -984,14 +994,23 @@ private fun LibraryTab(
             item {
                 QaCard {
                     BodyText(
-                        text = "Nothing here yet. Add one piece you'd actually read instead of scrolling.",
+                        text = if (filter == "priority") {
+                            "No priority picks yet. Mark individual pieces in Library to make them more likely during an intervention."
+                        } else {
+                            "Nothing here yet. Add one piece you'd actually read instead of scrolling."
+                        },
                         color = QualityAlternativeThemeTokens.colors.mutedText,
                     )
                 }
             }
         } else {
             items(list, key = ContentItem::id) { item ->
-                LibraryItemCard(item = item, onOpen = { onOpen(item) })
+                LibraryItemCard(
+                    item = item,
+                    prioritized = item.id in state.priorityContentIds,
+                    onOpen = { onOpen(item) },
+                    onTogglePriority = { onTogglePriorityContent(item) },
+                )
             }
         }
     }
@@ -1918,14 +1937,27 @@ private fun SettingsTab(
             }
         }
         item {
-            SectionLabel("Intercepting")
+            SectionLabel("Apps to interrupt", right = "${state.availableTargetApps.size} active")
             QaCard {
-                AppPills(
-                    apps = state.allSupportedApps,
-                    selectedApp = state.selectedTargetApp,
-                    selectedPackages = state.availableTargetApps.mapTo(mutableSetOf(), DistractingApp::packageName),
-                    onSelect = onToggleApp,
-                    dimUnselected = true,
+                BodyText(
+                    text = "Checked apps trigger the replacement prompt. The Home screen only chooses which checked app to preview.",
+                    color = colors.mutedText,
+                    modifier = Modifier.padding(bottom = 12.dp),
+                )
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    state.allSupportedApps.forEach { app ->
+                        AppSelectionRow(
+                            app = app,
+                            selected = state.availableTargetApps.any { it.packageName == app.packageName },
+                            onClick = { onToggleApp(app) },
+                        )
+                    }
+                }
+                BodyText(
+                    text = "Keep at least 3 selected for the alpha.",
+                    color = colors.mutedText,
+                    fontSize = 12.5.sp,
+                    modifier = Modifier.padding(top = 10.dp),
                 )
             }
         }
@@ -1957,6 +1989,13 @@ private fun SettingsTab(
                     fontSize = 12.5.sp,
                     lineHeight = 17.sp,
                     modifier = Modifier.padding(top = 10.dp),
+                )
+                BodyText(
+                    text = "${state.priorityContentIds.size} individual priority ${if (state.priorityContentIds.size == 1) "pick" else "picks"} selected in Library.",
+                    color = colors.mutedText,
+                    fontSize = 12.5.sp,
+                    lineHeight = 17.sp,
+                    modifier = Modifier.padding(top = 6.dp),
                 )
             }
         }
@@ -2022,7 +2061,7 @@ private fun SettingsTab(
         }
         item {
             MonoText(
-                text = "Quality Alternative - v0.1 MVP",
+                text = "Quality Alternative - v${BuildConfig.VERSION_NAME}",
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 20.dp),
@@ -2295,9 +2334,13 @@ private fun LibrarySummaryRow(label: String, value: String, sourceType: ContentS
 }
 
 @Composable
-private fun LibraryItemCard(item: ContentItem, onOpen: () -> Unit) {
+private fun LibraryItemCard(
+    item: ContentItem,
+    prioritized: Boolean,
+    onOpen: () -> Unit,
+    onTogglePriority: () -> Unit,
+) {
     QaCard(
-        modifier = Modifier.clickable(onClick = onOpen),
         padding = 16.dp,
     ) {
         ContentMetaRow(item)
@@ -2311,6 +2354,36 @@ private fun LibraryItemCard(item: ContentItem, onOpen: () -> Unit) {
             overflow = TextOverflow.Ellipsis,
         )
         BodyText(item.sourceLabel(), color = QualityAlternativeThemeTokens.colors.mutedText, fontSize = 12.5.sp, modifier = Modifier.padding(top = 4.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 14.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            QaChip(
+                text = if (prioritized) "Priority" else "Prioritize",
+                selected = prioritized,
+                accentSelected = true,
+                onClick = onTogglePriority,
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("priority-content-${item.id}"),
+                centered = true,
+                minHeight = 34.dp,
+                horizontalPadding = 8.dp,
+                verticalPadding = 7.dp,
+            )
+            QaChip(
+                text = "Open",
+                selected = false,
+                onClick = onOpen,
+                modifier = Modifier.weight(1f),
+                centered = true,
+                minHeight = 34.dp,
+                horizontalPadding = 8.dp,
+                verticalPadding = 7.dp,
+            )
+        }
     }
 }
 
