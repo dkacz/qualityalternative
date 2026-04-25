@@ -1,6 +1,6 @@
 # Sprint 9 Content Source Expansion
 
-Status: Slice 9.1 implemented for Pro review.
+Status: Slice 9.2 implemented for Pro review.
 
 ## Goal
 
@@ -57,15 +57,30 @@ Slice 9.1 adds 24 sourcing-only candidate rows for Attention Reset and Practical
 - 0 new app content integrations.
 - 0 runtime scraping, caching, rehosting, reader-mode extraction, or AI summary behavior.
 
+Slice 9.1 Pro result: `10/10 PASS` after the source-risk metadata fix.
+
+## Slice 9.2 Artifacts
+
+- `docs/content-sourcing/content_candidate_backlog.csv`
+- `docs/content-sourcing/slice9_2_embodied_calm_summary.md`
+
+Slice 9.2 adds 20 sourcing-only candidate rows for Embodied Reset and Calm Philosophy:
+
+- 8 renderable candidates marked `rights_pending`.
+- 12 link-only candidates marked `EXTERNAL_HANDOFF`.
+- 0 new `Aeon/Psyche` rows because Slice 9.1 already reached that full-pool cap.
+- 0 new app content integrations.
+- 0 runtime scraping, caching, rehosting, reader-mode extraction, or AI summary behavior.
+
 ## Current Inventory Baseline
 
 - 5 editorial packs.
 - 45 editorial items.
 - 25 renderable in-app reader items.
 - 20 link-only external handoff items.
-- 24 new Sprint 9 candidates added in Slice 9.1.
-- 9 renderable candidate rows.
-- 15 link-only candidate rows.
+- 44 new Sprint 9 candidates added through Slice 9.2.
+- 17 renderable candidate rows.
+- 27 link-only candidate rows.
 
 The current 45 items are audited as `already_integrated` and explicitly do not count toward the new 100-candidate pool.
 
@@ -73,6 +88,7 @@ The current 45 items are audited as `already_integrated` and explicitly do not c
 
 - 100 new shared editorial candidates.
 - Default mix: 42 renderable candidates and 58 link-only candidates.
+- Current remaining target after Slice 9.2: 56 candidates, with 25 renderable candidates and 31 link-only candidates.
 - Default duration mix: 40 candidates at 3-5 minutes, 40 at 5-10 minutes, 20 at 10-20 minutes.
 - Every link-only candidate must keep `must_not_scrape_cache_or_summarize = true`.
 - Every renderable candidate must include rights basis, attribution draft, jurisdiction note, and edition/translation note before it can become Pro-ready.

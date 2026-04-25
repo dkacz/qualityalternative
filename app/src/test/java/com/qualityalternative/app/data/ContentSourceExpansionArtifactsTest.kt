@@ -21,7 +21,7 @@ class ContentSourceExpansionArtifactsTest {
 
         assertTrue("Schema should define candidate backlog fields.", schemaFields.isNotEmpty())
         assertEquals(schemaFields, header)
-        assertEquals("Slice 9.1 should add 24 candidate rows plus the header.", 25, backlogLines.size)
+        assertEquals("Slices 9.1 and 9.2 should add 44 candidate rows plus the header.", 45, backlogLines.size)
         assertTrue(schema.contains("\"targetNewCandidateCount\": 100"))
         assertTrue(schema.contains("\"renderable\": 42"))
         assertTrue(schema.contains("\"linkOnly\": 58"))
@@ -30,6 +30,7 @@ class ContentSourceExpansionArtifactsTest {
     @Test
     fun slice91BacklogPreservesSourcingOnlyMixAndRightsPolicy() {
         val rows = readCandidateBacklogRows()
+            .filter { row -> row["vertical_slice"] == "9.1" }
         val existingTitles = File(docsRoot, "existing_inventory_audit.csv").readLines()
             .drop(1)
             .map(::parseCsvLine)
@@ -87,7 +88,9 @@ class ContentSourceExpansionArtifactsTest {
 
     @Test
     fun slice91BacklogEncodesKnownRiskSpotChecks() {
-        val rows = readCandidateBacklogRows().associateBy { row -> row["candidate_id"] }
+        val rows = readCandidateBacklogRows()
+            .filter { row -> row["vertical_slice"] == "9.1" }
+            .associateBy { row -> row["candidate_id"] }
 
         val repose = rows.getValue("s9-1-r07-call-power-through-repose")
         assertEquals("medium", repose["medical_health_claim_risk"])
@@ -108,6 +111,102 @@ class ContentSourceExpansionArtifactsTest {
         assertEquals("medium", temptation["medical_health_claim_risk"])
         assertEquals("clinical_impulsivity_addiction_mentions", temptation["sensitivity_flags"])
         assertTrue(temptation["card_description_draft"].orEmpty().contains("non-clinical"))
+    }
+
+    @Test
+    fun slice92BacklogPreservesEmbodiedCalmMixAndPolicy() {
+        val rows = readCandidateBacklogRows()
+            .filter { row -> row["vertical_slice"] == "9.2" }
+        val existingTitles = File(docsRoot, "existing_inventory_audit.csv").readLines()
+            .drop(1)
+            .map(::parseCsvLine)
+            .map { row -> row[2] }
+            .toSet()
+
+        assertEquals(20, rows.size)
+        assertTrue(rows.all { row -> row["candidate_type"] == "shared_editorial_candidate" })
+        assertTrue(rows.none { row -> row["candidate_status"] == "already_integrated" })
+        assertTrue(rows.none { row -> row["candidate_title"].orEmpty() in existingTitles })
+        assertTrue(rows.all { row -> row["pro_review_status"] == "not_submitted" })
+        assertTrue(rows.all { row -> row["legal_review_needed"] == "yes" })
+        assertTrue(rows.all { row ->
+            row["verification_label"] == "manually_verified_candidate" ||
+                row["canonical_url_verified_at"].isNullOrBlank()
+        })
+        assertTrue(rows.all { row ->
+            row["verification_label"] == "manually_verified_candidate" ||
+                row["canonical_url_verified_by"].isNullOrBlank()
+        })
+        assertTrue(rows.all { row ->
+            row["replacement_moment"] == "BODY_RESET" ||
+                row["replacement_moment"] == "CALM_PHILOSOPHY"
+        })
+        assertTrue(rows.none { row -> row["source_family_cap_group"] == "Aeon/Psyche" })
+
+        val renderableRows = rows.filter { row -> row["rights_class_candidate"] == "RENDERABLE" }
+        val linkOnlyRows = rows.filter { row -> row["rights_class_candidate"] == "LINK_ONLY" }
+
+        assertEquals(8, renderableRows.size)
+        assertEquals(12, linkOnlyRows.size)
+        assertTrue(renderableRows.all { row -> row["render_mode_candidate"] == "IN_APP_READER" })
+        assertTrue(renderableRows.all { row -> row["candidate_status"] == "rights_pending" })
+        assertTrue(renderableRows.all { row -> row["android_reader_viability"] == "needs_excerpt_selection" })
+        assertTrue(renderableRows.all { row -> row["must_not_scrape_cache_or_summarize"] == "false" })
+        assertTrue(linkOnlyRows.all { row -> row["render_mode_candidate"] == "EXTERNAL_HANDOFF" })
+        assertTrue(linkOnlyRows.all { row -> row["must_not_scrape_cache_or_summarize"] == "true" })
+        assertTrue(linkOnlyRows.all { row -> row["android_reader_viability"] == "not_applicable" })
+        assertTrue(linkOnlyRows.all { row -> !row["canonical_url"].isNullOrBlank() })
+
+        val sourceCapCounts = rows.groupingBy { row -> row["source_family_cap_group"].orEmpty() }.eachCount()
+        assertEquals(8, sourceCapCounts["Project Gutenberg"])
+        assertEquals(4, sourceCapCounts["SAPIENS"])
+        assertEquals(3, sourceCapCounts["IEP"])
+        assertEquals(3, sourceCapCounts["Museum/Public Institution"])
+        assertEquals(2, sourceCapCounts["SEP"])
+    }
+
+    @Test
+    fun slice92BacklogEncodesSensitiveBodyAndCalmSpotChecks() {
+        val rows = readCandidateBacklogRows()
+            .filter { row -> row["vertical_slice"] == "9.2" }
+            .associateBy { row -> row["candidate_id"] }
+
+        val bookOfTea = rows.getValue("s9-2-r04-okakura-book-of-tea")
+        assertEquals("medium", bookOfTea["religious_spiritual_framing_risk"])
+        assertEquals("medium", bookOfTea["cultural_context_risk"])
+        assertEquals("taoism_zennism_cultural_context", bookOfTea["sensitivity_flags"])
+
+        val boethius = rows.getValue("s9-2-r06-boethius-consolation")
+        assertEquals("medium", boethius["political_current_events_risk"])
+        assertEquals("medium", boethius["religious_spiritual_framing_risk"])
+        assertEquals("imprisonment_execution_religious_context", boethius["sensitivity_flags"])
+
+        val bodilyAwareness = rows.getValue("s9-2-l01-sep-bodily-awareness")
+        assertEquals("medium", bodilyAwareness["medical_health_claim_risk"])
+        assertEquals("body_sensation_pain_interoception_discussion", bodilyAwareness["sensitivity_flags"])
+
+        val coffeeRituals = rows.getValue("s9-2-l07-sapiens-coffee-rituals")
+        assertEquals("mostly_evergreen", coffeeRituals["durability"])
+        assertEquals("medium", coffeeRituals["cultural_context_risk"])
+        assertEquals("pandemic_context_ritual_cultural_framing", coffeeRituals["sensitivity_flags"])
+
+        val exerciseHistory = rows.getValue("s9-2-l09-sapiens-exercise-history")
+        assertEquals("medium", exerciseHistory["medical_health_claim_risk"])
+        assertEquals("mostly_evergreen", exerciseHistory["durability"])
+        assertEquals("pandemic_context_exercise_health_claims", exerciseHistory["sensitivity_flags"])
+    }
+
+    @Test
+    fun sprint9CandidatePoolKeepsModernSourceCapsAndNoApprovedRows() {
+        val rows = readCandidateBacklogRows()
+        val sourceCapCounts = rows.groupingBy { row -> row["source_family_cap_group"].orEmpty() }.eachCount()
+
+        assertEquals(44, rows.size)
+        assertEquals(17, rows.count { row -> row["rights_class_candidate"] == "RENDERABLE" })
+        assertEquals(27, rows.count { row -> row["rights_class_candidate"] == "LINK_ONLY" })
+        assertTrue(rows.none { row -> row["candidate_status"] == "approved_for_future_integration" })
+        assertTrue(sourceCapCounts.filterKeys { key -> key != "Project Gutenberg" }.values.all { count -> count <= 10 })
+        assertEquals(10, sourceCapCounts["Aeon/Psyche"])
     }
 
     @Test
