@@ -44,6 +44,14 @@ class ContentSourceExpansionArtifactsTest {
         assertTrue(rows.all { row -> row["pro_review_status"] == "not_submitted" })
         assertTrue(rows.all { row -> row["legal_review_needed"] == "yes" })
         assertTrue(rows.all { row ->
+            row["verification_label"] == "manually_verified_candidate" ||
+                row["canonical_url_verified_at"].isNullOrBlank()
+        })
+        assertTrue(rows.all { row ->
+            row["verification_label"] == "manually_verified_candidate" ||
+                row["canonical_url_verified_by"].isNullOrBlank()
+        })
+        assertTrue(rows.all { row ->
             row["replacement_moment"] == "ATTENTION_RESET" ||
                 row["replacement_moment"] == "PRACTICAL_AGENCY"
         })
@@ -58,7 +66,7 @@ class ContentSourceExpansionArtifactsTest {
         assertTrue(renderableRows.all { row -> row["renderable_rights_status"] == "rights_pending" })
         assertTrue(renderableRows.all { row -> row["android_reader_viability"] == "needs_excerpt_selection" })
         assertTrue(renderableRows.all { row -> row["must_not_scrape_cache_or_summarize"] == "false" })
-        assertTrue(renderableRows.all { row -> row["next_action"] == "manual rights and excerpt review" })
+        assertTrue(renderableRows.all { row -> row["next_action"].orEmpty().startsWith("manual rights") })
 
         assertTrue(linkOnlyRows.all { row -> row["render_mode_candidate"] == "EXTERNAL_HANDOFF" })
         assertTrue(linkOnlyRows.all { row -> row["must_not_scrape_cache_or_summarize"] == "true" })
@@ -75,6 +83,31 @@ class ContentSourceExpansionArtifactsTest {
         assertEquals(3, sourceCapCounts["Nautilus"])
         assertEquals(2, sourceCapCounts["SEP"])
         assertTrue(sourceCapCounts.filterKeys { key -> key != "Project Gutenberg" }.values.all { count -> count <= 10 })
+    }
+
+    @Test
+    fun slice91BacklogEncodesKnownRiskSpotChecks() {
+        val rows = readCandidateBacklogRows().associateBy { row -> row["candidate_id"] }
+
+        val repose = rows.getValue("s9-1-r07-call-power-through-repose")
+        assertEquals("medium", repose["medical_health_claim_risk"])
+        assertEquals("dated_health_mental_health_language", repose["sensitivity_flags"])
+        assertEquals("low", repose["first_batch_priority"])
+        assertTrue(repose["next_action"].orEmpty().contains("excluding medical nervous-system"))
+
+        val modernMedia = rows.getValue("s9-1-l07-nautilus-modern-media-free-will")
+        assertEquals("medium", modernMedia["political_current_events_risk"])
+        assertEquals("attention_economy_democracy_political_framing", modernMedia["sensitivity_flags"])
+        assertEquals("low", modernMedia["first_batch_priority"])
+
+        val spaceCase = rows.getValue("s9-1-l09-nautilus-space-case")
+        assertEquals("mostly_evergreen", spaceCase["durability"])
+        assertTrue(spaceCase["source_reference_note"].orEmpty().contains("pandemic-era opening"))
+
+        val temptation = rows.getValue("s9-1-l13-psyche-resist-temptations")
+        assertEquals("medium", temptation["medical_health_claim_risk"])
+        assertEquals("clinical_impulsivity_addiction_mentions", temptation["sensitivity_flags"])
+        assertTrue(temptation["card_description_draft"].orEmpty().contains("non-clinical"))
     }
 
     @Test

@@ -1,6 +1,6 @@
 # Slice 9.1 Attention Reset and Practical Agency Summary
 
-Status: Implemented for Pro review.
+Status: Implemented for Pro follow-up review.
 
 ## Scope
 
@@ -33,4 +33,14 @@ Source-family distribution:
 
 Rows labeled `exact_candidate_from_attached_docs` come from prior candidate notes and still need canonical URL recheck before Pro-ready status. Rows labeled `example_needs_manual_verification` were located through current web search and still need open-page verification before Pro-ready status.
 
+Rows that still need manual verification intentionally leave `canonical_url_verified_at` and `canonical_url_verified_by` blank. Their current URL provenance lives in `source_reference_note` and `url_verification_method`, not in canonical-verification fields.
+
 No row is marked `approved_for_future_integration`.
+
+## Follow-Up Guardrails
+
+- `Aeon/Psyche` reaches the full-pool cap of 10 rows in Slice 9.1; future Sprint 9 slices should add zero additional `Aeon/Psyche` rows unless the cap decision is explicitly revised.
+- `s9-1-r07-call-power-through-repose` is backup-only until dated health and mental-health language is reviewed and any excerpt excludes medical, nervous-system, pain, sickness, or therapeutic-claim material.
+- `s9-1-l07-nautilus-modern-media-free-will` remains link-only and backup-priority because it contains attention-economy democracy and political framing.
+- `s9-1-l13-psyche-resist-temptations` remains link-only with non-clinical card wording because the source discusses clinical and addictive-behavior contexts.
+- `s9-1-l09-nautilus-space-case` is marked `mostly_evergreen` because its opening is time-stamped by pandemic-era framing.
