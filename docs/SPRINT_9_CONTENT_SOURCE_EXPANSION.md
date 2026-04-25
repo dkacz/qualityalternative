@@ -1,6 +1,6 @@
 # Sprint 9 Content Source Expansion
 
-Status: Slice 9.2 review fix implemented for Pro follow-up.
+Status: Slice 9.3 implemented for Pro review.
 
 ## Goal
 
@@ -73,15 +73,31 @@ Slice 9.2 adds 20 sourcing-only candidate rows for Embodied Reset and Calm Philo
 - 0 new app content integrations.
 - 0 runtime scraping, caching, rehosting, reader-mode extraction, or AI summary behavior.
 
+Slice 9.2 Pro result: `10/10 PASS` after the duplicate-source replacement fix.
+
+## Slice 9.3 Artifacts
+
+- `docs/content-sourcing/content_candidate_backlog.csv`
+- `docs/content-sourcing/slice9_3_wonder_science_summary.md`
+
+Slice 9.3 adds 26 sourcing-only candidate rows for Wonder, Curiosity, and Science:
+
+- 11 renderable Project Gutenberg candidates marked `rights_pending`.
+- 15 link-only candidates marked `EXTERNAL_HANDOFF`.
+- 14 rows map to `WONDER_CURIOSITY`; 12 rows map to `SCIENCE_CURIOSITY`.
+- Chart-heavy, image-dependent, and recent-research candidates stay link-only or require text-only excerpt selection.
+- 0 new app content integrations.
+- 0 runtime scraping, caching, rehosting, reader-mode extraction, or AI summary behavior.
+
 ## Current Inventory Baseline
 
 - 5 editorial packs.
 - 45 editorial items.
 - 25 renderable in-app reader items.
 - 20 link-only external handoff items.
-- 44 new Sprint 9 candidates added through Slice 9.2.
-- 17 renderable candidate rows.
-- 27 link-only candidate rows.
+- 70 new Sprint 9 candidates added through Slice 9.3.
+- 28 renderable candidate rows.
+- 42 link-only candidate rows.
 
 The current 45 items are audited as `already_integrated` and explicitly do not count toward the new 100-candidate pool.
 
@@ -89,7 +105,7 @@ The current 45 items are audited as `already_integrated` and explicitly do not c
 
 - 100 new shared editorial candidates.
 - Default mix: 42 renderable candidates and 58 link-only candidates.
-- Current remaining target after Slice 9.2: 56 candidates, with 25 renderable candidates and 31 link-only candidates.
+- Current remaining target after Slice 9.3: 30 candidates, with 14 renderable candidates and 16 link-only candidates.
 - Default duration mix: 40 candidates at 3-5 minutes, 40 at 5-10 minutes, 20 at 10-20 minutes.
 - Every link-only candidate must keep `must_not_scrape_cache_or_summarize = true`.
 - Every renderable candidate must include rights basis, attribution draft, jurisdiction note, and edition/translation note before it can become Pro-ready.

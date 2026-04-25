@@ -21,7 +21,7 @@ class ContentSourceExpansionArtifactsTest {
 
         assertTrue("Schema should define candidate backlog fields.", schemaFields.isNotEmpty())
         assertEquals(schemaFields, header)
-        assertEquals("Slices 9.1 and 9.2 should add 44 candidate rows plus the header.", 45, backlogLines.size)
+        assertEquals("Slices 9.1 through 9.3 should add 70 candidate rows plus the header.", 71, backlogLines.size)
         assertTrue(schema.contains("\"targetNewCandidateCount\": 100"))
         assertTrue(schema.contains("\"renderable\": 42"))
         assertTrue(schema.contains("\"linkOnly\": 58"))
@@ -207,16 +207,117 @@ class ContentSourceExpansionArtifactsTest {
     }
 
     @Test
+    fun slice93BacklogPreservesWonderScienceMixAndPolicy() {
+        val rows = readCandidateBacklogRows()
+            .filter { row -> row["vertical_slice"] == "9.3" }
+        val existingTitles = File(docsRoot, "existing_inventory_audit.csv").readLines()
+            .drop(1)
+            .map(::parseCsvLine)
+            .map { row -> row[2] }
+            .toSet()
+
+        assertEquals(26, rows.size)
+        assertTrue(rows.all { row -> row["candidate_type"] == "shared_editorial_candidate" })
+        assertTrue(rows.none { row -> row["candidate_status"] == "already_integrated" })
+        assertTrue(rows.none { row -> row["candidate_title"].orEmpty() in existingTitles })
+        assertTrue(rows.all { row -> row["pro_review_status"] == "not_submitted" })
+        assertTrue(rows.all { row -> row["legal_review_needed"] == "yes" })
+        assertTrue(rows.all { row ->
+            row["verification_label"] == "manually_verified_candidate" ||
+                row["canonical_url_verified_at"].isNullOrBlank()
+        })
+        assertTrue(rows.all { row ->
+            row["verification_label"] == "manually_verified_candidate" ||
+                row["canonical_url_verified_by"].isNullOrBlank()
+        })
+        assertEquals(14, rows.count { row -> row["replacement_moment"] == "WONDER_CURIOSITY" })
+        assertEquals(12, rows.count { row -> row["replacement_moment"] == "SCIENCE_CURIOSITY" })
+
+        val renderableRows = rows.filter { row -> row["rights_class_candidate"] == "RENDERABLE" }
+        val linkOnlyRows = rows.filter { row -> row["rights_class_candidate"] == "LINK_ONLY" }
+
+        assertEquals(11, renderableRows.size)
+        assertEquals(15, linkOnlyRows.size)
+        assertTrue(renderableRows.all { row -> row["render_mode_candidate"] == "IN_APP_READER" })
+        assertTrue(renderableRows.all { row -> row["candidate_status"] == "rights_pending" })
+        assertTrue(renderableRows.all { row -> row["renderable_rights_status"] == "rights_pending" })
+        assertTrue(renderableRows.all { row -> row["android_reader_viability"] == "needs_excerpt_selection" })
+        assertTrue(renderableRows.all { row -> row["must_not_scrape_cache_or_summarize"] == "false" })
+        assertTrue(linkOnlyRows.all { row -> row["render_mode_candidate"] == "EXTERNAL_HANDOFF" })
+        assertTrue(linkOnlyRows.all { row -> row["must_not_scrape_cache_or_summarize"] == "true" })
+        assertTrue(linkOnlyRows.all { row -> row["renderable_rights_status"] == "not_applicable" })
+        assertTrue(linkOnlyRows.all { row -> row["android_reader_viability"] == "not_applicable" })
+
+        val shippedSourceUrls = Regex("\"sourceUrl\"\\s*:\\s*\"([^\"]+)\"")
+            .findAll(File("src/main/assets/editorial/starter_packs.json").readText())
+            .map { match -> match.groupValues[1] }
+            .toSet()
+        assertTrue(rows.none { row -> row["canonical_url"].orEmpty() in shippedSourceUrls })
+
+        val sourceCapCounts = rows.groupingBy { row -> row["source_family_cap_group"].orEmpty() }.eachCount()
+        assertEquals(11, sourceCapCounts["Project Gutenberg"])
+        assertEquals(5, sourceCapCounts["Quanta"])
+        assertEquals(3, sourceCapCounts["NASA"])
+        assertEquals(2, sourceCapCounts["NOAA"])
+        assertEquals(2, sourceCapCounts["OWID"])
+        assertEquals(2, sourceCapCounts["Nautilus"])
+        assertEquals(1, sourceCapCounts["Museum/Public Institution"])
+    }
+
+    @Test
+    fun slice93BacklogFlagsChartImageAndDurabilityRisks() {
+        val rows = readCandidateBacklogRows()
+            .filter { row -> row["vertical_slice"] == "9.3" }
+            .associateBy { row -> row["candidate_id"] }
+
+        val owidEnergy = rows.getValue("s9-3-l11-owid-energy")
+        assertEquals("chart_dependent_external_only", owidEnergy["image_chart_dependency"])
+        assertEquals("medium", owidEnergy["political_current_events_risk"])
+        assertEquals("true", owidEnergy["must_not_scrape_cache_or_summarize"])
+
+        val owidGreenhouse = rows.getValue("s9-3-l12-owid-greenhouse-gases")
+        assertEquals("chart_dependent_external_only", owidGreenhouse["image_chart_dependency"])
+        assertEquals("medium", owidGreenhouse["political_current_events_risk"])
+        assertEquals("true", owidGreenhouse["must_not_scrape_cache_or_summarize"])
+
+        val carbonCycle = rows.getValue("s9-3-l06-nasa-carbon-cycle-seawifs")
+        assertEquals("image_and_data_context_required", carbonCycle["image_chart_dependency"])
+        assertEquals("image_credit_review_needed", carbonCycle["third_party_asset_risk"])
+
+        val storyHeavens = rows.getValue("s9-3-r06-ball-story-heavens")
+        assertEquals("image_dependent_sections_avoid", storyHeavens["image_chart_dependency"])
+        assertEquals("diagram_image_review_needed", storyHeavens["third_party_asset_risk"])
+
+        val coal = rows.getValue("s9-3-r07-martin-piece-coal")
+        assertEquals("medium", coal["political_current_events_risk"])
+        assertEquals("dated_energy_industrial_language_review", coal["sensitivity_flags"])
+
+        val universeShape = rows.getValue("s9-3-l04-quanta-universe-shape")
+        assertEquals("mostly_evergreen", universeShape["durability"])
+        assertEquals("recent_research_durability_review", universeShape["sensitivity_flags"])
+
+        val vertebrateIntelligence = rows.getValue("s9-3-l05-quanta-vertebrate-intelligence")
+        assertEquals("mostly_evergreen", vertebrateIntelligence["durability"])
+        assertEquals("recent_research_durability_review", vertebrateIntelligence["sensitivity_flags"])
+    }
+
+    @Test
     fun sprint9CandidatePoolKeepsModernSourceCapsAndNoApprovedRows() {
         val rows = readCandidateBacklogRows()
         val sourceCapCounts = rows.groupingBy { row -> row["source_family_cap_group"].orEmpty() }.eachCount()
 
-        assertEquals(44, rows.size)
-        assertEquals(17, rows.count { row -> row["rights_class_candidate"] == "RENDERABLE" })
-        assertEquals(27, rows.count { row -> row["rights_class_candidate"] == "LINK_ONLY" })
+        assertEquals(70, rows.size)
+        assertEquals(28, rows.count { row -> row["rights_class_candidate"] == "RENDERABLE" })
+        assertEquals(42, rows.count { row -> row["rights_class_candidate"] == "LINK_ONLY" })
         assertTrue(rows.none { row -> row["candidate_status"] == "approved_for_future_integration" })
         assertTrue(sourceCapCounts.filterKeys { key -> key != "Project Gutenberg" }.values.all { count -> count <= 10 })
         assertEquals(10, sourceCapCounts["Aeon/Psyche"])
+        assertEquals(5, sourceCapCounts["Quanta"])
+        assertEquals(5, sourceCapCounts["Nautilus"])
+        assertEquals(3, sourceCapCounts["NASA"])
+        assertEquals(2, sourceCapCounts["NOAA"])
+        assertEquals(2, sourceCapCounts["OWID"])
+        assertEquals(4, sourceCapCounts["Museum/Public Institution"])
     }
 
     @Test
