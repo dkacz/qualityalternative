@@ -724,7 +724,7 @@
         {
           "id": "sep-attention",
           "title": "Attention",
-          "description": "A deep reference on attention for moments when the user wants rigor rather than a quick hit.",
+          "description": "A deep reference on attention for moments when rigor would help more than a quick hit.",
           "whyThisNow": "A deliberate deep read when the easiest default is not enough.",
           "durationMinutes": 18,
           "format": "HTML",

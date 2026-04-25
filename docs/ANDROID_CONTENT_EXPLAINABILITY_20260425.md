@@ -29,7 +29,8 @@ Mapped PRD scope:
 - Compressed the intervention primary card, explanation panel, and backup rows so two finite backups or the explicit no-backups state remain visible above the bottom action row on the baseline visual device.
 - Removed scroll reliance from the intervention alternatives area.
 - Rewrote shipped `whyThisNow` metadata to remove internal curation phrasing such as "the user", "the product", and "backup".
-- Added a unit guard that rejects internal/editorial curation language in surfaced `whyThisNow` copy.
+- Rewrote the remaining primary-card-visible description that used internal third-person phrasing.
+- Added a unit guard that rejects internal/editorial curation language in surfaced `whyThisNow` and description copy.
 - Strengthened visual QA assertions to prove backup rows or the empty-backup message are above `intervention-bottom-actions`.
 
 ## Explicit Non-Goals

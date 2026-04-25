@@ -72,21 +72,21 @@ class RecommendationExplainerTest {
     }
 
     @Test
-    fun editorialWhyThisNowCopyDoesNotExposeInternalCurationLanguage() {
+    fun surfacedStarterPackCopyDoesNotExposeInternalCurationLanguage() {
         val asset = File("src/main/assets/editorial/starter_packs.json").readText()
-        val whyThisValues = Regex("\"whyThisNow\"\\s*:\\s*\"([^\"]+)\"")
+        val surfacedValues = Regex("\"(description|whyThisNow)\"\\s*:\\s*\"([^\"]+)\"")
             .findAll(asset)
-            .map { match -> match.groupValues[1] }
+            .map { match -> "${match.groupValues[1]}: ${match.groupValues[2]}" }
             .toList()
 
-        assertTrue("Expected editorial whyThisNow copy in starter inventory.", whyThisValues.isNotEmpty())
+        assertTrue("Expected surfaced starter-pack copy in starter inventory.", surfacedValues.isNotEmpty())
         val forbidden = Regex(
             pattern = "\\b(the user|the product|backup|use when|use as|works as)\\b",
             option = RegexOption.IGNORE_CASE,
         )
-        val internalCopy = whyThisValues.filter { value -> forbidden.containsMatchIn(value) }
+        val internalCopy = surfacedValues.filter { value -> forbidden.containsMatchIn(value) }
 
-        assertFalse("Internal curation language leaked into surfaced whyThisNow copy: $internalCopy", internalCopy.isNotEmpty())
+        assertFalse("Internal curation language leaked into surfaced starter-pack copy: $internalCopy", internalCopy.isNotEmpty())
     }
 
     private fun preferences(
