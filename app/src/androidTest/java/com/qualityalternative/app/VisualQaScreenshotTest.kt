@@ -4,6 +4,8 @@ import android.content.Intent
 import android.net.Uri
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
@@ -270,6 +272,7 @@ class VisualQaScreenshotTest {
         composeRule.onNodeWithText("APPS TO INTERRUPT").assertIsDisplayed()
         composeRule.onNodeWithText("Instagram").assertIsDisplayed()
         composeRule.onNodeWithText("X").assertIsDisplayed()
+        assertSupportedAppRowsShowCheckedAndUncheckedState()
         captureSprint10("08b_settings_app_selection_light")
         composeRule.onNodeWithTag("settings-list")
             .performScrollToNode(hasTestTag("content-priority-MEDITATION"))
@@ -294,6 +297,11 @@ class VisualQaScreenshotTest {
 
         composeRule.onNodeWithText("End early").performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("home-list") }
+        seedSupportedAppSelection()
+        scenario?.close()
+        scenario = null
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+        launchOnboardedApp()
 
         openTab("tab-settings", "settings-list")
         composeRule.onNodeWithTag("settings-list")
@@ -306,6 +314,7 @@ class VisualQaScreenshotTest {
         composeRule.onNodeWithText("APPS TO INTERRUPT").assertIsDisplayed()
         composeRule.onNodeWithText("Instagram").assertIsDisplayed()
         composeRule.onNodeWithText("X").assertIsDisplayed()
+        assertSupportedAppRowsShowCheckedAndUncheckedState()
         captureSprint10("11b_settings_app_selection_dark")
         composeRule.onNodeWithTag("settings-list")
             .performScrollToNode(hasTestTag("content-priority-BALANCED"))
@@ -658,6 +667,13 @@ class VisualQaScreenshotTest {
                 ),
             ),
         )
+    }
+
+    private fun assertSupportedAppRowsShowCheckedAndUncheckedState() {
+        composeRule.onNodeWithTag("settings-app-com.instagram.android")
+            .assertIsSelected()
+        composeRule.onNodeWithTag("settings-app-com.google.android.youtube")
+            .assertIsNotSelected()
     }
 
     private fun seedMeditationSelection() = runBlocking {

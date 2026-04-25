@@ -78,6 +78,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
@@ -2120,6 +2122,8 @@ private fun AppSelectionRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .testTag("settings-app-${app.packageName}")
+            .semantics { this.selected = selected }
             .clip(RoundedCornerShape(10.dp))
             .border(
                 BorderStroke(1.dp, if (selected) colors.primaryText else colors.line),
