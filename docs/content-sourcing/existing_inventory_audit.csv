@@ -24,9 +24,9 @@ rest-satisfied-with-what-we-have,public-domain-expansion-v2,Rest Satisfied With 
 anger-divides-what-life-joins,public-domain-expansion-v2,Anger Divides What Life Joins,Seneca,RENDERABLE,IN_APP_READER,MARKDOWN,3,PHILOSOPHY|PSYCHOLOGY,ATTENTION,ATTENTION_RESET,already_integrated,false
 earnestness-as-an-island,public-domain-expansion-v2,Earnestness as an Island,The Dhammapada,RENDERABLE,IN_APP_READER,MARKDOWN,3,PHILOSOPHY|POETRY,PHILOSOPHY,CALM_PHILOSOPHY,already_integrated,false
 the-examined-life,public-domain-expansion-v2,The Examined Life,Plato,RENDERABLE,IN_APP_READER,MARKDOWN,3,PHILOSOPHY,PHILOSOPHY,CALM_PHILOSOPHY,already_integrated,false
-big-here-long-now,link-only-modern-v1,The Big Here and Long Now,Long Now,LINK_ONLY,EXTERNAL_HANDOFF,HTML,10,ESSAYS|PHILOSOPHY,PHILOSOPHY,CALM_PHILOSOPHY,already_integrated,false
-brian-eno-long-now,link-only-modern-v1,"Brian Eno, The Long Now",Long Now,LINK_ONLY,EXTERNAL_HANDOFF,HTML,8,ESSAYS|PHILOSOPHY,PHILOSOPHY,CALM_PHILOSOPHY,already_integrated,false
-taking-the-long-view,link-only-modern-v1,Taking the Long View,Long Now,LINK_ONLY,EXTERNAL_HANDOFF,HTML,8,ESSAYS|PHILOSOPHY,PHILOSOPHY,CALM_PHILOSOPHY,already_integrated,false
+big-here-long-now,link-only-modern-v1,The Big Here and Long Now,Long Now,LINK_ONLY,EXTERNAL_HANDOFF,HTML,10,ESSAYS|PHILOSOPHY,PHILOSOPHY,LONG_VIEW,already_integrated,false
+brian-eno-long-now,link-only-modern-v1,"Brian Eno, The Long Now",Long Now,LINK_ONLY,EXTERNAL_HANDOFF,HTML,8,ESSAYS|PHILOSOPHY,PHILOSOPHY,LONG_VIEW,already_integrated,false
+taking-the-long-view,link-only-modern-v1,Taking the Long View,Long Now,LINK_ONLY,EXTERNAL_HANDOFF,HTML,8,ESSAYS|PHILOSOPHY,PHILOSOPHY,LONG_VIEW,already_integrated,false
 reclaim-your-attention,link-only-modern-v1,How to Reclaim Your Attention,Psyche,LINK_ONLY,EXTERNAL_HANDOFF,HTML,12,PSYCHOLOGY|TECH,ATTENTION,ATTENTION_RESET,already_integrated,false
 become-indistractable,link-only-modern-v1,To Become Indistractable,Psyche,LINK_ONLY,EXTERNAL_HANDOFF,HTML,10,PSYCHOLOGY|TECH,ATTENTION,ATTENTION_RESET,already_integrated,false
 attention-and-self,link-only-modern-v1,"I Attend, Therefore I Am",Aeon,LINK_ONLY,EXTERNAL_HANDOFF,HTML,16,PHILOSOPHY|PSYCHOLOGY,ATTENTION,ATTENTION_RESET,already_integrated,false

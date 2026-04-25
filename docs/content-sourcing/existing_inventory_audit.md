@@ -28,6 +28,8 @@ This audit records the current shared editorial inventory before Sprint 9 sourci
 
 Current inventory is strongest in philosophy, essays, science, and psychology. Sprint 9 should rebalance toward practical agency, body reset, nature, history/culture, creativity/play, and attention-specific items.
 
+The integrated `link-only-modern-v1` pack already contains three Long Now items mapped to `LONG_VIEW`; these remain excluded from the new 100-candidate target.
+
 ## Audit CSV
 
 The row-level audit is in `docs/content-sourcing/existing_inventory_audit.csv`.

@@ -41,6 +41,9 @@ class ContentSourceExpansionArtifactsTest {
         assertEquals(20, auditRows.count { row -> row[4] == "LINK_ONLY" && row[5] == "EXTERNAL_HANDOFF" })
         assertTrue(auditRows.all { row -> row[11] == "already_integrated" })
         assertTrue(auditRows.all { row -> row[12] == "false" })
+        val longNowRows = auditRows.filter { row -> row[3] == "Long Now" }
+        assertEquals(3, longNowRows.size)
+        assertTrue(longNowRows.all { row -> row[10] == "LONG_VIEW" })
     }
 
     @Test
