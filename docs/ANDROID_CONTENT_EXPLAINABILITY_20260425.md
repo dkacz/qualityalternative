@@ -24,6 +24,14 @@ Mapped PRD scope:
 - Added unit coverage for editorial, saved-link, and meditation explanation cases.
 - Added visual QA assertion that every captured intervention exposes the `Why this` panel.
 
+## Review Fixes
+
+- Compressed the intervention primary card, explanation panel, and backup rows so two finite backups or the explicit no-backups state remain visible above the bottom action row on the baseline visual device.
+- Removed scroll reliance from the intervention alternatives area.
+- Rewrote shipped `whyThisNow` metadata to remove internal curation phrasing such as "the user", "the product", and "backup".
+- Added a unit guard that rejects internal/editorial curation language in surfaced `whyThisNow` copy.
+- Strengthened visual QA assertions to prove backup rows or the empty-backup message are above `intervention-bottom-actions`.
+
 ## Explicit Non-Goals
 
 - No ranking behavior changes.

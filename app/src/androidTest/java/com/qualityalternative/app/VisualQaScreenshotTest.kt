@@ -558,6 +558,7 @@ class VisualQaScreenshotTest {
             hasNode("You reached for Fixture Feed One")
         }
         composeRule.onNodeWithTag("intervention-primary-explanation").assertIsDisplayed()
+        assertFiniteChoicesAboveBottomActions()
     }
 
     private fun seedAttentionClassicsSelection() = runBlocking {
@@ -993,5 +994,30 @@ class VisualQaScreenshotTest {
         assertTrue("$tag top is clipped: node=$nodeBounds root=$rootBounds", nodeBounds.top >= rootBounds.top - tolerance)
         assertTrue("$tag right is clipped: node=$nodeBounds root=$rootBounds", nodeBounds.right <= rootBounds.right + tolerance)
         assertTrue("$tag bottom is clipped: node=$nodeBounds root=$rootBounds", nodeBounds.bottom <= rootBounds.bottom + tolerance)
+    }
+
+    private fun assertFiniteChoicesAboveBottomActions() {
+        assertNodeFullyWithinRoot("intervention-bottom-actions")
+        if (hasTag("intervention-backup-action-0")) {
+            assertNodeAboveBottomActions("intervention-backup-action-0")
+        }
+        if (hasTag("intervention-backup-action-1")) {
+            assertNodeAboveBottomActions("intervention-backup-action-1")
+        }
+        if (!hasTag("intervention-backup-action-0")) {
+            composeRule.onNodeWithTag("intervention-empty-backups").assertIsDisplayed()
+            assertNodeAboveBottomActions("intervention-empty-backups")
+        }
+    }
+
+    private fun assertNodeAboveBottomActions(tag: String) {
+        composeRule.waitForIdle()
+        val nodeBounds = composeRule.onNodeWithTag(tag).fetchSemanticsNode().boundsInRoot
+        val bottomActionsBounds = composeRule.onNodeWithTag("intervention-bottom-actions").fetchSemanticsNode().boundsInRoot
+        val tolerance = 1f
+        assertTrue(
+            "$tag is obscured by bottom actions: node=$nodeBounds actions=$bottomActionsBounds",
+            nodeBounds.bottom <= bottomActionsBounds.top + tolerance,
+        )
     }
 }

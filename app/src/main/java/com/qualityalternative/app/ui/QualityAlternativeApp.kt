@@ -1345,12 +1345,12 @@ private fun InterventionScreen(
             .fillMaxSize()
             .testTag("intervention-screen")
             .background(backgroundBrush)
-            .padding(horizontal = 22.dp, vertical = 20.dp),
+            .padding(horizontal = 22.dp, vertical = 16.dp),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 10.dp),
+                .padding(bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
@@ -1363,37 +1363,37 @@ private fun InterventionScreen(
             )
             QaIconButton(icon = QaIconKind.Close, onClick = onOpenAnyway)
         }
-        MonoText("A brief detour, if you'd like one", modifier = Modifier.padding(bottom = 10.dp))
+        MonoText("A brief detour, if you'd like one", modifier = Modifier.padding(bottom = 8.dp))
         QaCard(
             borderColor = colors.lineStrong,
-            padding = 16.dp,
-            modifier = Modifier.padding(bottom = 10.dp),
+            padding = 13.dp,
+            modifier = Modifier.padding(bottom = 8.dp),
         ) {
-            ContentMetaRow(primary, stacked = true)
+            ContentMetaRow(primary)
             DisplayText(
                 text = primary.title,
-                fontSize = 26.sp,
-                lineHeight = 28.sp,
-                maxLines = 2,
+                fontSize = 23.sp,
+                lineHeight = 25.sp,
+                maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
+                modifier = Modifier.padding(top = 6.dp, bottom = 5.dp),
             )
             Text(
                 text = "\"${primary.description}\"",
                 style = MaterialTheme.typography.bodyMedium.copy(
                     fontFamily = QualityDisplayFontFamily,
                     fontStyle = FontStyle.Italic,
-                    fontSize = 14.sp,
-                    lineHeight = 20.sp,
+                    fontSize = 13.sp,
+                    lineHeight = 17.sp,
                 ),
                 color = colors.mutedText,
-                maxLines = 2,
+                maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             RecommendationExplanationBlock(
                 explanation = primaryExplanation,
                 modifier = Modifier
-                    .padding(top = 12.dp)
+                    .padding(top = 9.dp)
                     .testTag("intervention-primary-explanation"),
             )
         }
@@ -1401,33 +1401,31 @@ private fun InterventionScreen(
             text = primaryActionLabel(primary),
             onClick = onAcceptPrimary,
             variant = QaButtonVariant.Accent,
-            modifier = Modifier.padding(bottom = 10.dp),
+            modifier = Modifier.padding(bottom = 8.dp),
             size = QaButtonSize.Small,
             leadingIcon = primaryActionIcon(primary),
         )
         Column(
             modifier = Modifier
                 .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(bottom = 8.dp),
+                .padding(bottom = 6.dp),
         ) {
             if (canAdjustMeditationBeforeStart) {
                 MeditationDurationChooser(
                     selectedMinutes = state.meditationDurationMinutes,
                     onSelect = onSelectMeditationDuration,
-                    label = "Meditation length",
-                    helper = "Default is ${state.meditationDurationMinutes} min. Change it here before starting.",
-                    modifier = Modifier.padding(bottom = 14.dp),
+                    label = "Timer length",
+                    modifier = Modifier.padding(bottom = 8.dp),
                     testTagPrefix = "intervention-meditation-duration",
                 )
             }
-            MonoText("Other options", modifier = Modifier.padding(bottom = 6.dp))
+            MonoText("Other options", modifier = Modifier.padding(bottom = 4.dp))
             BodyText(
-                text = "Pick one of these instead of the main suggestion.",
+                text = "Choose another if this is not the right fit.",
                 color = colors.mutedText,
-                fontSize = 13.sp,
-                lineHeight = 18.sp,
-                modifier = Modifier.padding(bottom = 8.dp),
+                fontSize = 12.5.sp,
+                lineHeight = 16.sp,
+                modifier = Modifier.padding(bottom = 6.dp),
             )
             backups.forEachIndexed { index, backup ->
                 BackupRow(
@@ -1437,7 +1435,11 @@ private fun InterventionScreen(
                 )
             }
             if (backups.isEmpty()) {
-                BodyText("No extra choices are available right now.", color = colors.mutedText)
+                BodyText(
+                    text = "No extra choices are available right now.",
+                    color = colors.mutedText,
+                    modifier = Modifier.testTag("intervention-empty-backups"),
+                )
             }
         }
         Row(
@@ -1477,23 +1479,23 @@ private fun RecommendationExplanationBlock(
         modifier = modifier
             .clip(RoundedCornerShape(14.dp))
             .background(colors.accentSoft)
-            .padding(12.dp),
+            .padding(9.dp),
     ) {
-        MonoText("Why this", color = colors.accent, modifier = Modifier.padding(bottom = 5.dp))
+        MonoText("Why this", color = colors.accent, modifier = Modifier.padding(bottom = 3.dp))
         Text(
             text = explanation.headline,
             style = MaterialTheme.typography.bodyMedium.copy(
                 color = colors.primaryText,
-                fontSize = 13.sp,
-                lineHeight = 17.sp,
+                fontSize = 12.5.sp,
+                lineHeight = 16.sp,
             ),
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(bottom = 9.dp),
+            modifier = Modifier.padding(bottom = 7.dp),
         )
         FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+            verticalArrangement = Arrangement.spacedBy(5.dp),
         ) {
             explanation.chips.forEach { chip ->
                 RecommendationReasonPill(chip)
@@ -1510,14 +1512,14 @@ private fun RecommendationReasonPill(text: String) {
             .clip(RoundedCornerShape(100.dp))
             .border(BorderStroke(1.dp, colors.lineStrong), RoundedCornerShape(100.dp))
             .background(colors.elevatedSurface)
-            .padding(horizontal = 9.dp, vertical = 5.dp),
+            .padding(horizontal = 7.dp, vertical = 4.dp),
     ) {
         Text(
             text = text,
             style = MaterialTheme.typography.bodySmall,
             color = colors.mutedText,
             fontWeight = FontWeight.Medium,
-            fontSize = 11.sp,
+            fontSize = 10.5.sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -2490,31 +2492,31 @@ private fun BackupRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(bottom = 6.dp)
+            .padding(bottom = 5.dp)
             .clip(RoundedCornerShape(14.dp))
             .border(BorderStroke(1.dp, colors.line), RoundedCornerShape(14.dp))
             .background(colors.elevatedSurface)
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 9.dp),
+            .padding(horizontal = 10.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Box(
             modifier = Modifier
-                .size(30.dp)
+                .size(26.dp)
                 .clip(CircleShape)
                 .background(colors.accentSoft),
             contentAlignment = Alignment.Center,
         ) {
-            QaIcon(kind = primaryActionIcon(item), color = colors.accent, size = 15.dp)
+            QaIcon(kind = primaryActionIcon(item), color = colors.accent, size = 13.dp)
         }
         Column(modifier = Modifier.weight(1f)) {
             MonoText("Try instead · ${item.durationMinutes} min", color = colors.accent, modifier = Modifier.padding(bottom = 2.dp))
             Text(
                 item.title,
                 style = MaterialTheme.typography.titleMedium,
-                fontSize = 15.sp,
-                lineHeight = 18.sp,
+                fontSize = 14.sp,
+                lineHeight = 16.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )

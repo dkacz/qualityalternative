@@ -7,7 +7,9 @@ import com.qualityalternative.app.domain.model.DistractingApp
 import com.qualityalternative.app.domain.model.DurationBucket
 import com.qualityalternative.app.domain.model.TopicTag
 import com.qualityalternative.app.domain.model.UserPreferences
+import java.io.File
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -18,7 +20,7 @@ class RecommendationExplainerTest {
             id = "focus-piece",
             minutes = 7,
             topics = setOf(TopicTag.SCIENCE, TopicTag.ESSAYS),
-            whyThisNow = "Use when curiosity is a better first move than scrolling.",
+            whyThisNow = "A good fit when curiosity is a better first move than scrolling.",
         )
         val preferences = preferences(
             preferredTopics = setOf(TopicTag.SCIENCE),
@@ -27,7 +29,7 @@ class RecommendationExplainerTest {
 
         val explanation = RecommendationExplainer.explain(item = item, preferences = preferences)
 
-        assertEquals("Use when curiosity is a better first move than scrolling.", explanation.headline)
+        assertEquals("A good fit when curiosity is a better first move than scrolling.", explanation.headline)
         assertEquals(
             listOf("Priority pick", "Matches Science", "Fits 5-10 min", "Editorial"),
             explanation.chips,
@@ -67,6 +69,24 @@ class RecommendationExplainerTest {
 
         assertEquals("A short reset for creating space before opening the app.", explanation.headline)
         assertEquals(listOf("Shorter than 5-10 min", "Reset timer"), explanation.chips)
+    }
+
+    @Test
+    fun editorialWhyThisNowCopyDoesNotExposeInternalCurationLanguage() {
+        val asset = File("src/main/assets/editorial/starter_packs.json").readText()
+        val whyThisValues = Regex("\"whyThisNow\"\\s*:\\s*\"([^\"]+)\"")
+            .findAll(asset)
+            .map { match -> match.groupValues[1] }
+            .toList()
+
+        assertTrue("Expected editorial whyThisNow copy in starter inventory.", whyThisValues.isNotEmpty())
+        val forbidden = Regex(
+            pattern = "\\b(the user|the product|backup|use when|use as|works as)\\b",
+            option = RegexOption.IGNORE_CASE,
+        )
+        val internalCopy = whyThisValues.filter { value -> forbidden.containsMatchIn(value) }
+
+        assertFalse("Internal curation language leaked into surfaced whyThisNow copy: $internalCopy", internalCopy.isNotEmpty())
     }
 
     private fun preferences(
