@@ -17,7 +17,7 @@ Slice 9.2 adds sourcing backlog rows only. It does not integrate new content int
 
 The renderable set uses Project Gutenberg as a public-domain candidate source family, but every row remains rights-pending until manual rights, jurisdiction, edition, translator/editor, attribution, cultural-context, and excerpt review are complete.
 
-Renderable candidates include John Muir, Gilbert White, John Burroughs, Kakuzo Okakura, Marcus Aurelius, Boethius, Arthur Schopenhauer, and Laozi.
+Renderable candidates include John Muir, Gilbert White, John Burroughs, Kakuzo Okakura, Confucius, Boethius, Arthur Schopenhauer, and Laozi.
 
 ## Link-Only Candidates
 
@@ -42,6 +42,6 @@ No row is marked `approved_for_future_integration`.
 
 ## Risk Guardrails
 
-- Public-domain spiritual/philosophical texts such as `The Book of Tea`, `The Tao Teh King`, and `The Consolation of Philosophy` require cultural, spiritual, translator/editor, and excerpt review before integration.
+- Public-domain spiritual/philosophical texts such as `The Book of Tea`, `The Analects of Confucius`, `The Tao Teh King`, and `The Consolation of Philosophy` require cultural, spiritual, translator/editor, and excerpt review before integration.
 - Body-awareness and exercise-adjacent link-only rows are marked with medium medical/health risk where they discuss pain, interoception, exercise, or health claims.
 - SAPIENS and museum rows with cultural, pandemic-era, exhibition-date, or body-image context are marked with explicit sensitivity flags and remain link-only.

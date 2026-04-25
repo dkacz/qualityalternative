@@ -1,6 +1,6 @@
 # Sprint 9 Content Source Expansion
 
-Status: Slice 9.2 implemented for Pro review.
+Status: Slice 9.2 review fix implemented for Pro follow-up.
 
 ## Goal
 
@@ -68,6 +68,7 @@ Slice 9.2 adds 20 sourcing-only candidate rows for Embodied Reset and Calm Philo
 
 - 8 renderable candidates marked `rights_pending`.
 - 12 link-only candidates marked `EXTERNAL_HANDOFF`.
+- The initial review duplicate of an already-integrated Marcus Aurelius source URL was replaced with a non-overlapping Confucius/Analects candidate.
 - 0 new `Aeon/Psyche` rows because Slice 9.1 already reached that full-pool cap.
 - 0 new app content integrations.
 - 0 runtime scraping, caching, rehosting, reader-mode extraction, or AI summary behavior.

@@ -156,6 +156,11 @@ class ContentSourceExpansionArtifactsTest {
         assertTrue(linkOnlyRows.all { row -> row["must_not_scrape_cache_or_summarize"] == "true" })
         assertTrue(linkOnlyRows.all { row -> row["android_reader_viability"] == "not_applicable" })
         assertTrue(linkOnlyRows.all { row -> !row["canonical_url"].isNullOrBlank() })
+        val shippedSourceUrls = Regex("\"sourceUrl\"\\s*:\\s*\"([^\"]+)\"")
+            .findAll(File("src/main/assets/editorial/starter_packs.json").readText())
+            .map { match -> match.groupValues[1] }
+            .toSet()
+        assertTrue(rows.none { row -> row["canonical_url"].orEmpty() in shippedSourceUrls })
 
         val sourceCapCounts = rows.groupingBy { row -> row["source_family_cap_group"].orEmpty() }.eachCount()
         assertEquals(8, sourceCapCounts["Project Gutenberg"])
@@ -180,6 +185,11 @@ class ContentSourceExpansionArtifactsTest {
         assertEquals("medium", boethius["political_current_events_risk"])
         assertEquals("medium", boethius["religious_spiritual_framing_risk"])
         assertEquals("imprisonment_execution_religious_context", boethius["sensitivity_flags"])
+
+        val confucius = rows.getValue("s9-2-r05-confucius-analects-calm")
+        assertEquals("medium", confucius["religious_spiritual_framing_risk"])
+        assertEquals("medium", confucius["cultural_context_risk"])
+        assertEquals("confucian_classic_translation_cultural_context", confucius["sensitivity_flags"])
 
         val bodilyAwareness = rows.getValue("s9-2-l01-sep-bodily-awareness")
         assertEquals("medium", bodilyAwareness["medical_health_claim_risk"])
