@@ -1,0 +1,104 @@
+package com.qualityalternative.app.domain.service
+
+import com.qualityalternative.app.domain.model.ContentFormat
+import com.qualityalternative.app.domain.model.ContentItem
+import com.qualityalternative.app.domain.model.ContentSourceType
+import com.qualityalternative.app.domain.model.DistractingApp
+import com.qualityalternative.app.domain.model.DurationBucket
+import com.qualityalternative.app.domain.model.TopicTag
+import com.qualityalternative.app.domain.model.UserPreferences
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class RecommendationExplainerTest {
+    @Test
+    fun explain_usesEditorialWhyThisNowAndDynamicFitChips() {
+        val item = item(
+            id = "focus-piece",
+            minutes = 7,
+            topics = setOf(TopicTag.SCIENCE, TopicTag.ESSAYS),
+            whyThisNow = "Use when curiosity is a better first move than scrolling.",
+        )
+        val preferences = preferences(
+            preferredTopics = setOf(TopicTag.SCIENCE),
+            priorityContentIds = setOf("focus-piece"),
+        )
+
+        val explanation = RecommendationExplainer.explain(item = item, preferences = preferences)
+
+        assertEquals("Use when curiosity is a better first move than scrolling.", explanation.headline)
+        assertEquals(
+            listOf("Priority pick", "Matches Science", "Fits 5-10 min", "Editorial"),
+            explanation.chips,
+        )
+    }
+
+    @Test
+    fun explain_fallsBackToTopicReasonWhenItemHasNoWhyThisNow() {
+        val item = item(
+            id = "saved-link",
+            minutes = 4,
+            topics = setOf(TopicTag.HISTORY),
+            sourceType = ContentSourceType.USER_LINK,
+            whyThisNow = null,
+        )
+        val preferences = preferences(preferredTopics = setOf(TopicTag.HISTORY))
+
+        val explanation = RecommendationExplainer.explain(item = item, preferences = preferences)
+
+        assertEquals("Picked because it matches your History interest.", explanation.headline)
+        assertTrue("Shorter than 5-10 min" in explanation.chips)
+        assertTrue("Saved link" in explanation.chips)
+    }
+
+    @Test
+    fun explain_marksMeditationAsFiniteResetTimer() {
+        val item = item(
+            id = "meditation-timer",
+            minutes = 3,
+            topics = setOf(TopicTag.PSYCHOLOGY),
+            sourceType = ContentSourceType.MEDITATION,
+            whyThisNow = null,
+        )
+        val preferences = preferences(preferredTopics = setOf(TopicTag.PHILOSOPHY))
+
+        val explanation = RecommendationExplainer.explain(item = item, preferences = preferences)
+
+        assertEquals("A short reset for creating space before opening the app.", explanation.headline)
+        assertEquals(listOf("Shorter than 5-10 min", "Reset timer"), explanation.chips)
+    }
+
+    private fun preferences(
+        preferredTopics: Set<TopicTag>,
+        priorityContentIds: Set<String> = emptySet(),
+    ): UserPreferences {
+        return UserPreferences(
+            selectedApps = listOf(DistractingApp(packageName = "pkg", displayName = "Fixture Feed")),
+            preferredTopics = preferredTopics,
+            preferredDurationBucket = DurationBucket.FOCUS,
+            selectedPackIds = setOf("pack"),
+            priorityContentIds = priorityContentIds,
+        )
+    }
+
+    private fun item(
+        id: String,
+        minutes: Int,
+        topics: Set<TopicTag>,
+        sourceType: ContentSourceType = ContentSourceType.EDITORIAL,
+        whyThisNow: String?,
+    ): ContentItem {
+        return ContentItem(
+            id = id,
+            packId = "pack",
+            title = "A useful replacement",
+            description = "A short piece for a better impulse.",
+            durationMinutes = minutes,
+            format = ContentFormat.MARKDOWN,
+            topicTags = topics,
+            sourceType = sourceType,
+            whyThisNow = whyThisNow,
+        )
+    }
+}

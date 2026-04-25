@@ -114,6 +114,8 @@ import com.qualityalternative.app.domain.model.UserDocumentValidationError
 import com.qualityalternative.app.domain.model.UserLinkValidationError
 import com.qualityalternative.app.domain.model.usesExternalHandoff
 import com.qualityalternative.app.domain.model.usesMeditationTimer
+import com.qualityalternative.app.domain.service.RecommendationExplainer
+import com.qualityalternative.app.domain.service.RecommendationExplanation
 import com.qualityalternative.app.ui.theme.QualityAlternativeAppTheme
 import com.qualityalternative.app.ui.theme.QualityAlternativeThemeTokens
 import com.qualityalternative.app.ui.theme.QualityDisplayFontFamily
@@ -1324,9 +1326,11 @@ private fun InterventionScreen(
 ) {
     val recommendationSet = state.currentRecommendationSet ?: return
     val targetApp = state.selectedTargetApp ?: return
+    val preferences = state.preferences ?: return
     val colors = QualityAlternativeThemeTokens.colors
     val primary = recommendationSet.primary
     val backups = recommendationSet.backups.take(MAX_BACKUP_RECOMMENDATIONS)
+    val primaryExplanation = RecommendationExplainer.explain(primary, preferences)
     val canAdjustMeditationBeforeStart = primary.usesMeditationTimer()
     val backgroundBrush = Brush.verticalGradient(
         colors = listOf(
@@ -1385,6 +1389,12 @@ private fun InterventionScreen(
                 color = colors.mutedText,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
+            )
+            RecommendationExplanationBlock(
+                explanation = primaryExplanation,
+                modifier = Modifier
+                    .padding(top = 12.dp)
+                    .testTag("intervention-primary-explanation"),
             )
         }
         QaButton(
@@ -1454,6 +1464,63 @@ private fun InterventionScreen(
                 size = QaButtonSize.Compact,
             )
         }
+    }
+}
+
+@Composable
+private fun RecommendationExplanationBlock(
+    explanation: RecommendationExplanation,
+    modifier: Modifier = Modifier,
+) {
+    val colors = QualityAlternativeThemeTokens.colors
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(colors.accentSoft)
+            .padding(12.dp),
+    ) {
+        MonoText("Why this", color = colors.accent, modifier = Modifier.padding(bottom = 5.dp))
+        Text(
+            text = explanation.headline,
+            style = MaterialTheme.typography.bodyMedium.copy(
+                color = colors.primaryText,
+                fontSize = 13.sp,
+                lineHeight = 17.sp,
+            ),
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(bottom = 9.dp),
+        )
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            explanation.chips.forEach { chip ->
+                RecommendationReasonPill(chip)
+            }
+        }
+    }
+}
+
+@Composable
+private fun RecommendationReasonPill(text: String) {
+    val colors = QualityAlternativeThemeTokens.colors
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(100.dp))
+            .border(BorderStroke(1.dp, colors.lineStrong), RoundedCornerShape(100.dp))
+            .background(colors.elevatedSurface)
+            .padding(horizontal = 9.dp, vertical = 5.dp),
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodySmall,
+            color = colors.mutedText,
+            fontWeight = FontWeight.Medium,
+            fontSize = 11.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 

@@ -557,6 +557,7 @@ class VisualQaScreenshotTest {
         composeRule.waitUntil(timeoutMillis = 10_000) {
             hasNode("You reached for Fixture Feed One")
         }
+        composeRule.onNodeWithTag("intervention-primary-explanation").assertIsDisplayed()
     }
 
     private fun seedAttentionClassicsSelection() = runBlocking {
