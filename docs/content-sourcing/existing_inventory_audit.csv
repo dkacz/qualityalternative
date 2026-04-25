@@ -1,0 +1,46 @@
+item_id,pack_id,title,source_family,rights_class,render_mode,format,duration_minutes,current_topics,candidate_primary_topic,candidate_replacement_moment,current_status,counts_as_new_candidate
+care-for-the-soul-first,philosophy,Care for the Soul First,Plato,RENDERABLE,IN_APP_READER,MARKDOWN,3,PHILOSOPHY,PHILOSOPHY,CALM_PHILOSOPHY,already_integrated,false
+leave-the-crowd,philosophy,Leave the Crowd,Seneca,RENDERABLE,IN_APP_READER,MARKDOWN,3,PHILOSOPHY|PSYCHOLOGY,ATTENTION,ATTENTION_RESET,already_integrated,false
+let-the-pleasure-wait,philosophy,Let the Pleasure Wait,Epictetus,RENDERABLE,IN_APP_READER,MARKDOWN,3,PHILOSOPHY|PSYCHOLOGY,ATTENTION,ATTENTION_RESET,already_integrated,false
+neither-ask-nor-consent,philosophy,Neither Ask Nor Consent,Cicero,RENDERABLE,IN_APP_READER,MARKDOWN,3,PHILOSOPHY|ESSAYS,PHILOSOPHY,CALM_PHILOSOPHY,already_integrated,false
+a-candle-opens-natural-philosophy,science,A Candle Opens Natural Philosophy,Michael Faraday,RENDERABLE,IN_APP_READER,MARKDOWN,3,SCIENCE,SCIENCE,WONDER_CURIOSITY,already_integrated,false
+water-dust-becomes-a-cloud,science,Water-Dust Becomes a Cloud,John Tyndall,RENDERABLE,IN_APP_READER,MARKDOWN,3,SCIENCE,SCIENCE,WONDER_CURIOSITY,already_integrated,false
+attention-comes-in-beats,science,Attention Comes in Beats,William James,RENDERABLE,IN_APP_READER,MARKDOWN,3,SCIENCE|PSYCHOLOGY,SCIENCE,ATTENTION_RESET,already_integrated,false
+start-with-what-is-yours,attention-classics-v1,Start With What Is Yours,Epictetus,RENDERABLE,IN_APP_READER,MARKDOWN,3,PHILOSOPHY|PSYCHOLOGY,ATTENTION,ATTENTION_RESET,already_integrated,false
+the-morning-test,attention-classics-v1,The Morning Test,Marcus Aurelius,RENDERABLE,IN_APP_READER,MARKDOWN,3,PHILOSOPHY,PHILOSOPHY,CALM_PHILOSOPHY,already_integrated,false
+the-flywheel-of-habit,attention-classics-v1,The Flywheel of Habit,William James,RENDERABLE,IN_APP_READER,MARKDOWN,4,PSYCHOLOGY|SCIENCE,SCIENCE,ATTENTION_RESET,already_integrated,false
+live-deliberately,attention-classics-v1,Live Deliberately,Henry David Thoreau,RENDERABLE,IN_APP_READER,MARKDOWN,3,ESSAYS|PHILOSOPHY,PHILOSOPHY,CALM_PHILOSOPHY,already_integrated,false
+walk-before-you-scroll,attention-classics-v1,Walk Before You Scroll,Henry David Thoreau,RENDERABLE,IN_APP_READER,MARKDOWN,3,ESSAYS|PHILOSOPHY,PHILOSOPHY,CALM_PHILOSOPHY,already_integrated,false
+trust-the-first-honest-thought,attention-classics-v1,Trust the First Honest Thought,Ralph Waldo Emerson,RENDERABLE,IN_APP_READER,MARKDOWN,4,PHILOSOPHY|CREATIVITY,CREATIVITY,CREATIVITY_PLAY,already_integrated,false
+the-desert-resets-the-eye,attention-classics-v1,The Desert Resets the Eye,Mary Austin,RENDERABLE,IN_APP_READER,MARKDOWN,3,ESSAYS|HISTORY,HISTORY_CULTURE,HISTORY_CULTURE,already_integrated,false
+of-studies,attention-classics-v1,Read to Weigh,Francis Bacon,RENDERABLE,IN_APP_READER,MARKDOWN,3,ESSAYS|PHILOSOPHY,PHILOSOPHY,CALM_PHILOSOPHY,already_integrated,false
+a-naturalist-notices-everything,public-domain-expansion-v2,A Naturalist Notices Everything,Charles Darwin,RENDERABLE,IN_APP_READER,MARKDOWN,3,SCIENCE|ESSAYS,SCIENCE,WONDER_CURIOSITY,already_integrated,false
+a-doorway-into-learning,public-domain-expansion-v2,A Doorway Into Learning,Booker T. Washington,RENDERABLE,IN_APP_READER,MARKDOWN,3,HISTORY|ESSAYS,HISTORY_CULTURE,HISTORY_CULTURE,already_integrated,false
+choose-your-own-plan,public-domain-expansion-v2,Choose Your Own Plan,John Stuart Mill,RENDERABLE,IN_APP_READER,MARKDOWN,3,PHILOSOPHY|ESSAYS,PHILOSOPHY,CALM_PHILOSOPHY,already_integrated,false
+look-at-the-stars,public-domain-expansion-v2,Look at the Stars,Ralph Waldo Emerson,RENDERABLE,IN_APP_READER,MARKDOWN,3,ESSAYS|PHILOSOPHY,PHILOSOPHY,CALM_PHILOSOPHY,already_integrated,false
+a-place-of-business,public-domain-expansion-v2,A Place of Business,Henry David Thoreau,RENDERABLE,IN_APP_READER,MARKDOWN,3,ESSAYS|PHILOSOPHY,PHILOSOPHY,CALM_PHILOSOPHY,already_integrated,false
+the-minds-own-snare,public-domain-expansion-v2,The Mind's Own Snare,Michel de Montaigne,RENDERABLE,IN_APP_READER,MARKDOWN,3,ESSAYS|PHILOSOPHY,PHILOSOPHY,CALM_PHILOSOPHY,already_integrated,false
+rest-satisfied-with-what-we-have,public-domain-expansion-v2,Rest Satisfied With What We Have,Seneca,RENDERABLE,IN_APP_READER,MARKDOWN,3,PHILOSOPHY|PSYCHOLOGY,ATTENTION,ATTENTION_RESET,already_integrated,false
+anger-divides-what-life-joins,public-domain-expansion-v2,Anger Divides What Life Joins,Seneca,RENDERABLE,IN_APP_READER,MARKDOWN,3,PHILOSOPHY|PSYCHOLOGY,ATTENTION,ATTENTION_RESET,already_integrated,false
+earnestness-as-an-island,public-domain-expansion-v2,Earnestness as an Island,The Dhammapada,RENDERABLE,IN_APP_READER,MARKDOWN,3,PHILOSOPHY|POETRY,PHILOSOPHY,CALM_PHILOSOPHY,already_integrated,false
+the-examined-life,public-domain-expansion-v2,The Examined Life,Plato,RENDERABLE,IN_APP_READER,MARKDOWN,3,PHILOSOPHY,PHILOSOPHY,CALM_PHILOSOPHY,already_integrated,false
+big-here-long-now,link-only-modern-v1,The Big Here and Long Now,Long Now,LINK_ONLY,EXTERNAL_HANDOFF,HTML,10,ESSAYS|PHILOSOPHY,PHILOSOPHY,CALM_PHILOSOPHY,already_integrated,false
+brian-eno-long-now,link-only-modern-v1,"Brian Eno, The Long Now",Long Now,LINK_ONLY,EXTERNAL_HANDOFF,HTML,8,ESSAYS|PHILOSOPHY,PHILOSOPHY,CALM_PHILOSOPHY,already_integrated,false
+taking-the-long-view,link-only-modern-v1,Taking the Long View,Long Now,LINK_ONLY,EXTERNAL_HANDOFF,HTML,8,ESSAYS|PHILOSOPHY,PHILOSOPHY,CALM_PHILOSOPHY,already_integrated,false
+reclaim-your-attention,link-only-modern-v1,How to Reclaim Your Attention,Psyche,LINK_ONLY,EXTERNAL_HANDOFF,HTML,12,PSYCHOLOGY|TECH,ATTENTION,ATTENTION_RESET,already_integrated,false
+become-indistractable,link-only-modern-v1,To Become Indistractable,Psyche,LINK_ONLY,EXTERNAL_HANDOFF,HTML,10,PSYCHOLOGY|TECH,ATTENTION,ATTENTION_RESET,already_integrated,false
+attention-and-self,link-only-modern-v1,"I Attend, Therefore I Am",Aeon,LINK_ONLY,EXTERNAL_HANDOFF,HTML,16,PHILOSOPHY|PSYCHOLOGY,ATTENTION,ATTENTION_RESET,already_integrated,false
+sit-and-think,link-only-modern-v1,Time to Sit and Think,Aeon,LINK_ONLY,EXTERNAL_HANDOFF,HTML,10,ESSAYS|PHILOSOPHY,PHILOSOPHY,CALM_PHILOSOPHY,already_integrated,false
+mathematical-thinking,link-only-modern-v1,Mathematical Thinking Isn't What You Think It Is,Quanta,LINK_ONLY,EXTERNAL_HANDOFF,HTML,8,SCIENCE|CREATIVITY,CREATIVITY,CREATIVITY_PLAY,already_integrated,false
+what-is-life-quanta,link-only-modern-v1,What Is Life?,Quanta,LINK_ONLY,EXTERNAL_HANDOFF,HTML,10,SCIENCE|PHILOSOPHY,SCIENCE,WONDER_CURIOSITY,already_integrated,false
+evolution-fast-or-slow,link-only-modern-v1,"Evolution, Fast or Slow?",Quanta,LINK_ONLY,EXTERNAL_HANDOFF,HTML,8,SCIENCE,SCIENCE,WONDER_CURIOSITY,already_integrated,false
+life-in-games,link-only-modern-v1,A Life in Games,Quanta,LINK_ONLY,EXTERNAL_HANDOFF,HTML,12,SCIENCE|CREATIVITY,CREATIVITY,CREATIVITY_PLAY,already_integrated,false
+anthropology-of-smell,link-only-modern-v1,The Anthropology of Smell,SAPIENS,LINK_ONLY,EXTERNAL_HANDOFF,HTML,8,SCIENCE|HISTORY,HISTORY_CULTURE,HISTORY_CULTURE,already_integrated,false
+cargo-cult-rituals,link-only-modern-v1,What Cargo Cult Rituals Reveal,SAPIENS,LINK_ONLY,EXTERNAL_HANDOFF,HTML,9,HISTORY|PHILOSOPHY,HISTORY_CULTURE,HISTORY_CULTURE,already_integrated,false
+evolution-of-childhood,link-only-modern-v1,The Evolution of Childhood,SAPIENS,LINK_ONLY,EXTERNAL_HANDOFF,HTML,8,SCIENCE|HISTORY,HISTORY_CULTURE,HISTORY_CULTURE,already_integrated,false
+sep-attention,link-only-modern-v1,Attention,Stanford Encyclopedia of Philosophy,LINK_ONLY,EXTERNAL_HANDOFF,HTML,18,PHILOSOPHY|PSYCHOLOGY,ATTENTION,ATTENTION_RESET,already_integrated,false
+iep-free-will,link-only-modern-v1,Free Will,Internet Encyclopedia of Philosophy,LINK_ONLY,EXTERNAL_HANDOFF,HTML,16,PHILOSOPHY,PHILOSOPHY,CALM_PHILOSOPHY,already_integrated,false
+iep-stoicism,link-only-modern-v1,Stoicism,Internet Encyclopedia of Philosophy,LINK_ONLY,EXTERNAL_HANDOFF,HTML,14,PHILOSOPHY,PHILOSOPHY,CALM_PHILOSOPHY,already_integrated,false
+the-distracted-mind,link-only-modern-v1,The Distracted Mind,Nautilus,LINK_ONLY,EXTERNAL_HANDOFF,HTML,8,SCIENCE|TECH|PSYCHOLOGY,ATTENTION,ATTENTION_RESET,already_integrated,false
+why-it-pays-to-play-around,link-only-modern-v1,Why It Pays to Play Around,Nautilus,LINK_ONLY,EXTERNAL_HANDOFF,HTML,7,SCIENCE|CREATIVITY,CREATIVITY,CREATIVITY_PLAY,already_integrated,false
+new-view-of-time,link-only-modern-v1,A New View of Time,Nautilus,LINK_ONLY,EXTERNAL_HANDOFF,HTML,6,SCIENCE|PHILOSOPHY,SCIENCE,WONDER_CURIOSITY,already_integrated,false
