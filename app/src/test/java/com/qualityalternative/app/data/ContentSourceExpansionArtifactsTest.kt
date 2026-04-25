@@ -21,10 +21,60 @@ class ContentSourceExpansionArtifactsTest {
 
         assertTrue("Schema should define candidate backlog fields.", schemaFields.isNotEmpty())
         assertEquals(schemaFields, header)
-        assertEquals("Slice 9.0 should not add new candidate rows yet.", 1, backlogLines.size)
+        assertEquals("Slice 9.1 should add 24 candidate rows plus the header.", 25, backlogLines.size)
         assertTrue(schema.contains("\"targetNewCandidateCount\": 100"))
         assertTrue(schema.contains("\"renderable\": 42"))
         assertTrue(schema.contains("\"linkOnly\": 58"))
+    }
+
+    @Test
+    fun slice91BacklogPreservesSourcingOnlyMixAndRightsPolicy() {
+        val rows = readCandidateBacklogRows()
+        val existingTitles = File(docsRoot, "existing_inventory_audit.csv").readLines()
+            .drop(1)
+            .map(::parseCsvLine)
+            .map { row -> row[2] }
+            .toSet()
+
+        assertEquals(24, rows.size)
+        assertTrue(rows.all { row -> row["vertical_slice"] == "9.1" })
+        assertTrue(rows.all { row -> row["candidate_type"] == "shared_editorial_candidate" })
+        assertTrue(rows.none { row -> row["candidate_status"] == "already_integrated" })
+        assertTrue(rows.none { row -> row["candidate_title"].orEmpty() in existingTitles })
+        assertTrue(rows.all { row -> row["pro_review_status"] == "not_submitted" })
+        assertTrue(rows.all { row -> row["legal_review_needed"] == "yes" })
+        assertTrue(rows.all { row ->
+            row["replacement_moment"] == "ATTENTION_RESET" ||
+                row["replacement_moment"] == "PRACTICAL_AGENCY"
+        })
+
+        val renderableRows = rows.filter { row -> row["rights_class_candidate"] == "RENDERABLE" }
+        val linkOnlyRows = rows.filter { row -> row["rights_class_candidate"] == "LINK_ONLY" }
+
+        assertEquals(9, renderableRows.size)
+        assertEquals(15, linkOnlyRows.size)
+        assertTrue(renderableRows.all { row -> row["render_mode_candidate"] == "IN_APP_READER" })
+        assertTrue(renderableRows.all { row -> row["candidate_status"] == "rights_pending" })
+        assertTrue(renderableRows.all { row -> row["renderable_rights_status"] == "rights_pending" })
+        assertTrue(renderableRows.all { row -> row["android_reader_viability"] == "needs_excerpt_selection" })
+        assertTrue(renderableRows.all { row -> row["must_not_scrape_cache_or_summarize"] == "false" })
+        assertTrue(renderableRows.all { row -> row["next_action"] == "manual rights and excerpt review" })
+
+        assertTrue(linkOnlyRows.all { row -> row["render_mode_candidate"] == "EXTERNAL_HANDOFF" })
+        assertTrue(linkOnlyRows.all { row -> row["must_not_scrape_cache_or_summarize"] == "true" })
+        assertTrue(linkOnlyRows.all { row -> row["renderable_rights_status"] == "not_applicable" })
+        assertTrue(linkOnlyRows.all { row -> row["android_reader_viability"] == "not_applicable" })
+        assertTrue(linkOnlyRows.all { row -> !row["canonical_url"].isNullOrBlank() })
+        assertTrue(linkOnlyRows.all { row ->
+            row["modification_or_excerpt_note"] == "Do not scrape cache rehost excerpt or summarize at runtime"
+        })
+
+        val sourceCapCounts = rows.groupingBy { row -> row["source_family_cap_group"].orEmpty() }.eachCount()
+        assertEquals(10, sourceCapCounts["Aeon/Psyche"])
+        assertEquals(9, sourceCapCounts["Project Gutenberg"])
+        assertEquals(3, sourceCapCounts["Nautilus"])
+        assertEquals(2, sourceCapCounts["SEP"])
+        assertTrue(sourceCapCounts.filterKeys { key -> key != "Project Gutenberg" }.values.all { count -> count <= 10 })
     }
 
     @Test
@@ -67,6 +117,14 @@ class ContentSourceExpansionArtifactsTest {
         assertTrue(caps.contains("One source family in a future 10-item pack | 4 candidates"))
         assertTrue(caps.contains("Link-only rows from modern publications must remain `EXTERNAL_HANDOFF`"))
         assertFalse(caps.contains("infinite feed", ignoreCase = true))
+    }
+
+    private fun readCandidateBacklogRows(): List<Map<String, String>> {
+        val lines = File(docsRoot, "content_candidate_backlog.csv").readLines()
+        val header = parseCsvLine(lines.first())
+        return lines.drop(1).map { line ->
+            header.zip(parseCsvLine(line)).toMap()
+        }
     }
 
     private fun parseCsvLine(line: String): List<String> {

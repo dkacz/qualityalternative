@@ -1,6 +1,6 @@
 # Sprint 9 Content Source Expansion
 
-Status: Slice 9.0 implemented for Pro review.
+Status: Slice 9.1 implemented for Pro review.
 
 ## Goal
 
@@ -43,13 +43,29 @@ This sprint is sourcing and triage first, integration second. A candidate is not
 - `docs/content-sourcing/topic_taxonomy_decision.md`
 - `docs/content-sourcing/source_family_caps.md`
 
+Slice 9.0 Pro result: `10/10 PASS` after the Long Now audit taxonomy fix and validation transcript addition.
+
+## Slice 9.1 Artifacts
+
+- `docs/content-sourcing/content_candidate_backlog.csv`
+- `docs/content-sourcing/slice9_1_attention_practical_summary.md`
+
+Slice 9.1 adds 24 sourcing-only candidate rows for Attention Reset and Practical Agency:
+
+- 9 renderable candidates marked `rights_pending`.
+- 15 link-only candidates marked `EXTERNAL_HANDOFF`.
+- 0 new app content integrations.
+- 0 runtime scraping, caching, rehosting, reader-mode extraction, or AI summary behavior.
+
 ## Current Inventory Baseline
 
 - 5 editorial packs.
 - 45 editorial items.
 - 25 renderable in-app reader items.
 - 20 link-only external handoff items.
-- 0 new Sprint 9 candidates added in Slice 9.0.
+- 24 new Sprint 9 candidates added in Slice 9.1.
+- 9 renderable candidate rows.
+- 15 link-only candidate rows.
 
 The current 45 items are audited as `already_integrated` and explicitly do not count toward the new 100-candidate pool.
 
