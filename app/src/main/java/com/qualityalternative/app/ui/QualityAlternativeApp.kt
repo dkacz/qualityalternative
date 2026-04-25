@@ -3594,8 +3594,9 @@ private fun TopicTag.displayName(): String {
         TopicTag.ECONOMICS -> "Economics"
         TopicTag.FOOD -> "Food"
         TopicTag.ARCHITECTURE -> "Architecture"
-        TopicTag.CREATIVITY -> "Design"
+        TopicTag.CREATIVITY -> "Creativity"
         TopicTag.PSYCHOLOGY -> "Psychology"
+        TopicTag.OTHER -> "Other"
     }
 }
 
@@ -3621,13 +3622,20 @@ private fun ContentPriority.displayDescription(): String {
 
 private fun prototypeTopics(): List<TopicTag> = listOf(
     TopicTag.ESSAYS,
-    TopicTag.SCIENCE,
-    TopicTag.DESIGN,
     TopicTag.PHILOSOPHY,
-    TopicTag.POETRY,
+    TopicTag.SCIENCE,
+    TopicTag.PSYCHOLOGY,
     TopicTag.HISTORY,
     TopicTag.TECH,
+    TopicTag.ECONOMICS,
+    TopicTag.CLIMATE,
+    TopicTag.CREATIVITY,
+    TopicTag.DESIGN,
     TopicTag.FICTION,
+    TopicTag.POETRY,
+    TopicTag.FOOD,
+    TopicTag.ARCHITECTURE,
+    TopicTag.OTHER,
 )
 
 private fun DurationBucket.prototypeMinutes(): Int {

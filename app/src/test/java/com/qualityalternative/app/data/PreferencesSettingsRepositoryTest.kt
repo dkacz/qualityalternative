@@ -31,7 +31,7 @@ class PreferencesSettingsRepositoryTest {
 
         val selection = OnboardingSelection(
             selectedAppPackages = SupportedCatalog.distractingApps.take(3).mapTo(mutableSetOf()) { it.packageName },
-            preferredTopics = setOf(TopicTag.PHILOSOPHY, TopicTag.SCIENCE, TopicTag.HISTORY),
+            preferredTopics = setOf(TopicTag.PHILOSOPHY, TopicTag.SCIENCE, TopicTag.HISTORY, TopicTag.OTHER),
             preferredDurationBucket = DurationBucket.DEEP,
             selectedPackIds = setOf("science"),
         )

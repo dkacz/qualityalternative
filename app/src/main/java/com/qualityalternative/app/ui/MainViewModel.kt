@@ -1984,8 +1984,9 @@ private fun TopicTag.displayName(): String {
         TopicTag.ECONOMICS -> "Economics"
         TopicTag.FOOD -> "Food"
         TopicTag.ARCHITECTURE -> "Architecture"
-        TopicTag.CREATIVITY -> "Design"
+        TopicTag.CREATIVITY -> "Creativity"
         TopicTag.PSYCHOLOGY -> "Psychology"
+        TopicTag.OTHER -> "Other"
     }
 }
 

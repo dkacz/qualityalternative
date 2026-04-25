@@ -9,6 +9,8 @@ Status: implemented and locally validated on `codex/android-product-polish-favor
 - Added individual Library priority picks so a user can mark one concrete item as more likely to appear in finite interventions.
 - Kept the existing type-level content priority control, but added a visible count of individual priority picks.
 - Reworked Settings app selection from ambiguous pills into checked rows for apps that trigger replacement prompts.
+- Expanded user-facing topic choices to expose the full existing topic taxonomy and added an `Other` fallback.
+- Added visual QA coverage for the onboarding topic picker so `Other` and `Creativity` are auditable in screenshots.
 
 ## Guardrails
 

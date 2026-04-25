@@ -69,7 +69,7 @@ class VisualQaScreenshotTest {
 
     @Test
     fun captureCoreContentScreensInLightAndDark() {
-        launchOnboardedApp()
+        launchFreshAppThroughTopicVisualQa()
         seedAllSharedContentSelection()
 
         capture("01_home_light")
@@ -474,6 +474,24 @@ class VisualQaScreenshotTest {
     private fun launchOnboardedApp() {
         launchApp()
         completeOnboardingIfNeeded()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("home-list") }
+    }
+
+    private fun launchFreshAppThroughTopicVisualQa() {
+        launchApp()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasNodeContaining("Turn an impulse") }
+        composeRule.onNodeWithText("Begin").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasNode("Which apps pull at you?") }
+        composeRule.onNodeWithText("Continue").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasNode("What would you rather read?") }
+        composeRule.onNodeWithText("Other").assertIsDisplayed()
+        composeRule.onNodeWithText("Creativity").assertIsDisplayed()
+        capture("00_onboarding_topics_light")
+        composeRule.onNodeWithText("Continue").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasNode("How long should a session feel?") }
+        composeRule.onNodeWithText("Continue").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasNode("Two small permissions.") }
+        composeRule.onNodeWithText("Grant & finish").performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("home-list") }
     }
 

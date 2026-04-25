@@ -127,6 +127,7 @@ enum class TopicTag {
     ARCHITECTURE,
     CREATIVITY,
     PSYCHOLOGY,
+    OTHER,
 }
 
 enum class DurationBucket(val minMinutes: Int, val maxMinutes: Int) {
