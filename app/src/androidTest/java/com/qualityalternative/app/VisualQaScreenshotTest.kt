@@ -45,6 +45,7 @@ class VisualQaScreenshotTest {
     private lateinit var screenshotDir: File
     private lateinit var legacyScreenshotDir: File
     private lateinit var sprint10ScreenshotDir: File
+    private lateinit var sprint9ScreenshotDir: File
 
     @Before
     fun resetAppState() {
@@ -59,6 +60,9 @@ class VisualQaScreenshotTest {
         sprint10ScreenshotDir = File(targetContext.filesDir, "visual-qa/sprint10-reader-progress-meditation")
         sprint10ScreenshotDir.deleteRecursively()
         sprint10ScreenshotDir.mkdirs()
+        sprint9ScreenshotDir = File(targetContext.filesDir, "visual-qa/sprint9-content-expansion")
+        sprint9ScreenshotDir.deleteRecursively()
+        sprint9ScreenshotDir.mkdirs()
     }
 
     @After
@@ -389,6 +393,90 @@ class VisualQaScreenshotTest {
         captureSprint10("15_meditation_timer_5m_dark")
     }
 
+    @Test
+    fun captureSprint9ContentExpansionScreens() {
+        launchOnboardedApp()
+        seedSprint9AllSelection()
+
+        openTab("tab-library", "library-list")
+        composeRule.onNodeWithTag("library-list")
+            .performScrollToNode(hasText("How We Think"))
+        composeRule.onNodeWithText("How We Think").assertIsDisplayed()
+        captureSprint9("01_library_sprint9_light")
+
+        seedSprint9RenderableSelection()
+        launchFixtureSystemIntervention()
+        composeRule.onNodeWithText("Five Minutes of Nonsense").assertIsDisplayed()
+        captureSprint9("02_intervention_sprint9_renderable_light")
+
+        openAlternativeFromIntervention(
+            title = "Five Minutes of Nonsense",
+            primaryActionText = "Read this",
+            expectedScreenTag = "reader-screen",
+        )
+        assertSprint9RenderableReaderCopyIsDisplayed()
+        captureSprint9("03_reader_sprint9_renderable_light")
+
+        seedSprint9WonderReaderSelection("s9-3-r08-darwin-insectivorous-plants")
+        launchFixtureSystemIntervention()
+        openAlternativeFromIntervention(
+            title = "Plants That Hunt",
+            primaryActionText = "Read this",
+            expectedScreenTag = "reader-screen",
+        )
+        assertSprint9DarwinReaderCopyIsDisplayed()
+        captureSprint9("03b_reader_sprint9_darwin_light")
+
+        seedSprint9WonderReaderSelection("s9-3-r11-figuier-ocean-world")
+        launchFixtureSystemIntervention()
+        openAlternativeFromIntervention(
+            title = "The Sea as a World",
+            primaryActionText = "Read this",
+            expectedScreenTag = "reader-screen",
+        )
+        assertSprint9FiguierReaderCopyIsDisplayed()
+        captureSprint9("03c_reader_sprint9_figuier_light")
+
+        seedSprint9WonderReaderSelection("s9-3-r03-fabre-life-fly")
+        launchFixtureSystemIntervention()
+        openAlternativeFromIntervention(
+            title = "The Fly Under Attention",
+            primaryActionText = "Read this",
+            expectedScreenTag = "reader-screen",
+        )
+        assertSprint9FabreFlyReaderCopyIsDisplayed()
+        captureSprint9("03d_reader_sprint9_fabre_fly_light")
+
+        seedSprint9LinkOnlySelection()
+        launchFixtureSystemIntervention()
+        composeRule.onNodeWithText("A Six-Dot Graph Puzzle").assertIsDisplayed()
+        captureSprint9("04_intervention_sprint9_link_only_light")
+
+        openAlternativeFromIntervention(
+            title = "A Six-Dot Graph Puzzle",
+            primaryActionText = "Open link",
+            expectedScreenTag = "external-handoff-screen",
+        )
+        assertSprint9LinkOnlyHandoffCopyIsDisplayed()
+        captureSprint9("05_external_handoff_sprint9_light")
+
+        saveDarkTheme()
+        seedSprint9DarkHistorySelection()
+        launchFixtureSystemIntervention()
+        composeRule.onNodeWithText("History at Human Scale").assertIsDisplayed()
+        captureSprint9("06_intervention_sprint9_dark")
+
+        openAlternativeFromIntervention(
+            title = "History at Human Scale",
+            primaryActionText = "Read this",
+            expectedScreenTag = "reader-screen",
+        )
+        composeRule.onNodeWithText("History at Human Scale").assertIsDisplayed()
+        assertTrue("Sprint 9 dark reader should show shipped body text", hasNodeContaining("The story of our world"))
+        assertTrue("Sprint 9 dark reader should not show source boilerplate", !hasNodeContaining("Project Gutenberg"))
+        captureSprint9("07_reader_sprint9_dark")
+    }
+
     private fun capture(name: String) {
         captureTo(screenshotDir, name)
     }
@@ -399,6 +487,10 @@ class VisualQaScreenshotTest {
 
     private fun captureSprint10(name: String) {
         captureTo(sprint10ScreenshotDir, name)
+    }
+
+    private fun captureSprint9(name: String) {
+        captureTo(sprint9ScreenshotDir, name)
     }
 
     private fun captureTo(directory: File, name: String) {
@@ -510,7 +602,8 @@ class VisualQaScreenshotTest {
         composeRule.waitUntil(timeoutMillis = 10_000) { hasNode("Which apps pull at you?") }
         composeRule.onNodeWithText("Continue").performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) { hasNode("What would you rather read?") }
-        composeRule.onNodeWithText("Other").assertIsDisplayed()
+        composeRule.onNodeWithText("Attention").assertIsDisplayed()
+        composeRule.onNodeWithText("Practical").assertIsDisplayed()
         composeRule.onNodeWithText("Creativity").assertIsDisplayed()
         capture("00_onboarding_topics_light")
         composeRule.onNodeWithText("Continue").performClick()
@@ -559,6 +652,22 @@ class VisualQaScreenshotTest {
         }
         composeRule.onNodeWithTag("intervention-primary-explanation").assertIsDisplayed()
         assertFiniteChoicesAboveBottomActions()
+    }
+
+    private fun openAlternativeFromIntervention(
+        title: String,
+        primaryActionText: String,
+        expectedScreenTag: String,
+    ) {
+        val openedFromVisibleRow = runCatching {
+            composeRule.onNodeWithText(title).performClick()
+            composeRule.waitUntil(timeoutMillis = 3_000) { hasTag(expectedScreenTag) }
+            true
+        }.getOrDefault(false)
+        if (!openedFromVisibleRow) {
+            composeRule.onNodeWithText(primaryActionText, substring = true).performClick()
+            composeRule.waitUntil(timeoutMillis = 10_000) { hasTag(expectedScreenTag) }
+        }
     }
 
     private fun seedAttentionClassicsSelection() = runBlocking {
@@ -648,6 +757,96 @@ class VisualQaScreenshotTest {
             ),
         )
     }
+
+    private fun seedSprint9AllSelection() = runBlocking {
+        val repository = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication)
+            .appContainer
+            .settingsRepository
+        repository.saveOnboardingSelection(
+            OnboardingSelection(
+                selectedAppPackages = setOf(FixtureTargetRegistry.fixtureDistractors.first().packageName),
+                preferredTopics = setOf(
+                    TopicTag.ATTENTION,
+                    TopicTag.PRACTICAL,
+                    TopicTag.BODY,
+                    TopicTag.NATURE,
+                    TopicTag.HISTORY_CULTURE,
+                    TopicTag.CREATIVITY,
+                    TopicTag.SCIENCE,
+                ),
+                preferredDurationBucket = DurationBucket.FOCUS,
+                selectedPackIds = sprint9PackIds(),
+            ),
+        )
+    }
+
+    private fun seedSprint9RenderableSelection() = runBlocking {
+        val repository = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication)
+            .appContainer
+            .settingsRepository
+        repository.saveOnboardingSelection(
+            OnboardingSelection(
+                selectedAppPackages = setOf(FixtureTargetRegistry.fixtureDistractors.first().packageName),
+                preferredTopics = setOf(TopicTag.CREATIVITY, TopicTag.PHILOSOPHY, TopicTag.PSYCHOLOGY),
+                preferredDurationBucket = DurationBucket.FOCUS,
+                selectedPackIds = setOf("creativity_play_v1"),
+            ),
+        )
+        repository.savePriorityContentIds(setOf("s9-5-r02-lear-book-nonsense"))
+    }
+
+    private fun seedSprint9LinkOnlySelection() = runBlocking {
+        val repository = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication)
+            .appContainer
+            .settingsRepository
+        repository.saveOnboardingSelection(
+            OnboardingSelection(
+                selectedAppPackages = setOf(FixtureTargetRegistry.fixtureDistractors.first().packageName),
+                preferredTopics = setOf(TopicTag.CREATIVITY, TopicTag.SCIENCE, TopicTag.TECH),
+                preferredDurationBucket = DurationBucket.FOCUS,
+                selectedPackIds = setOf("creativity_play_v1"),
+            ),
+        )
+        repository.savePriorityContentIds(setOf("s9-5-l01-quanta-local-global-graph"))
+    }
+
+    private fun seedSprint9WonderReaderSelection(contentId: String) = runBlocking {
+        val repository = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication)
+            .appContainer
+            .settingsRepository
+        repository.saveOnboardingSelection(
+            OnboardingSelection(
+                selectedAppPackages = setOf(FixtureTargetRegistry.fixtureDistractors.first().packageName),
+                preferredTopics = setOf(TopicTag.SCIENCE, TopicTag.NATURE),
+                preferredDurationBucket = DurationBucket.FOCUS,
+                selectedPackIds = setOf("wonder_science_v1"),
+            ),
+        )
+        repository.savePriorityContentIds(setOf(contentId))
+    }
+
+    private fun seedSprint9DarkHistorySelection() = runBlocking {
+        val repository = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication)
+            .appContainer
+            .settingsRepository
+        repository.saveOnboardingSelection(
+            OnboardingSelection(
+                selectedAppPackages = setOf(FixtureTargetRegistry.fixtureDistractors.first().packageName),
+                preferredTopics = setOf(TopicTag.HISTORY_CULTURE, TopicTag.SCIENCE, TopicTag.PHILOSOPHY),
+                preferredDurationBucket = DurationBucket.FOCUS,
+                selectedPackIds = setOf("long_view_history_v1"),
+            ),
+        )
+        repository.savePriorityContentIds(setOf("s9-4-r01-wells-short-history-world"))
+    }
+
+    private fun sprint9PackIds(): Set<String> = setOf(
+        "attention_practical_agency_v1",
+        "embodied_calm_v1",
+        "wonder_science_v1",
+        "long_view_history_v1",
+        "creativity_play_v1",
+    )
 
     private fun seedSupportedAppSelection() = runBlocking {
         val repository = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication)
@@ -787,6 +986,13 @@ class VisualQaScreenshotTest {
             .settingsRepository
         repository.saveThemeMode(AppThemeMode.DARK)
         repository.saveMeditationDurationMinutes(5)
+    }
+
+    private fun saveDarkTheme() = runBlocking {
+        val repository = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication)
+            .appContainer
+            .settingsRepository
+        repository.saveThemeMode(AppThemeMode.DARK)
     }
 
     private fun sprint10EpubBytes(): ByteArray {
@@ -961,6 +1167,45 @@ class VisualQaScreenshotTest {
         assertTrue("Expected external reading label", hasNodeContaining("External reading"))
         assertTrue("Expected external handoff copy", hasNode("Opens in your browser"))
         assertTrue("Expected a canonical external URL", sourceHints.any(::hasNodeContaining))
+    }
+
+    private fun assertSprint9RenderableReaderCopyIsDisplayed() {
+        composeRule.onNodeWithText("Five Minutes of Nonsense").assertIsDisplayed()
+        assertTrue("Expected Sprint 9 renderable source label", hasNodeContaining("Edward Lear"))
+        assertTrue("Expected Sprint 9 reader body text", hasNodeContaining("There was an Old Derry down Derry"))
+        assertTrue("Reader should not show source boilerplate", !hasNodeContaining("Project Gutenberg"))
+        assertTrue("Reader should not show producer boilerplate", !hasNodeContaining("Produced by"))
+    }
+
+    private fun assertSprint9DarwinReaderCopyIsDisplayed() {
+        composeRule.onNodeWithText("Plants That Hunt").assertIsDisplayed()
+        assertTrue("Expected Darwin source label", hasNodeContaining("Charles Darwin"))
+        assertTrue("Expected Darwin body text", hasNodeContaining("During the summer of 1860"))
+        assertTrue("Darwin reader should not show bibliography footnote", !hasNodeContaining("bibliography of Drosera"))
+        assertTrue("Darwin reader should not show figure-list text", !hasNodeContaining("FIG. 1"))
+    }
+
+    private fun assertSprint9FiguierReaderCopyIsDisplayed() {
+        composeRule.onNodeWithText("The Sea as a World").assertIsDisplayed()
+        assertTrue("Expected Figuier source label", hasNodeContaining("Louis Figuier"))
+        assertTrue("Expected Figuier body text", hasNodeContaining("living wonders of the deep"))
+        assertTrue("Figuier reader should not show book-purpose framing", !hasNodeContaining("It is proposed in"))
+        assertTrue("Figuier reader should not show title-page framing", !hasNodeContaining("Title-page"))
+    }
+
+    private fun assertSprint9FabreFlyReaderCopyIsDisplayed() {
+        composeRule.onNodeWithText("The Fly Under Attention").assertIsDisplayed()
+        assertTrue("Expected Fabre source label", hasNodeContaining("Jean-Henri Fabre"))
+        assertTrue("Expected fly-specific body text", hasNodeContaining("flies that glitter"))
+        assertTrue("Fabre fly reader should not show laboratory mismatch", !hasNodeContaining("long-wished-for laboratory"))
+        assertTrue("Fabre fly reader should not show harmas mismatch", !hasNodeContaining("hoc erat in votis"))
+    }
+
+    private fun assertSprint9LinkOnlyHandoffCopyIsDisplayed() {
+        assertTrue("Expected external reading label", hasNodeContaining("External reading"))
+        assertTrue("Expected external handoff copy", hasNode("Opens in your browser"))
+        assertTrue("Expected Sprint 9 canonical external URL", hasNodeContaining("quantamagazine.org"))
+        assertTrue("Link-only handoff should not expose a reader body", !hasNodeContaining("There was an Old Derry down Derry"))
     }
 
     private fun resetPersistentState() = runBlocking {

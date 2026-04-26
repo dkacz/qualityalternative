@@ -188,6 +188,47 @@ class MainViewModelTest {
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
+    fun completeOnboarding_selectsSprint9PacksWhenAvailable() = runTest {
+        val viewModel = createViewModel(
+            contentRepository = FakeContentRepository(includeSprint9Packs = true),
+            recommendationEngine = DefaultRecommendationEngine(),
+        )
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+        viewModel.triggerDebugIntervention(nowMillis = 2_000L)
+        advanceUntilIdle()
+
+        val expectedSprint9PackIds = setOf(
+            "attention_practical_agency_v1",
+            "embodied_calm_v1",
+            "wonder_science_v1",
+            "long_view_history_v1",
+            "creativity_play_v1",
+        )
+        assertTrue(viewModel.uiState.preferences?.selectedPackIds.orEmpty().containsAll(expectedSprint9PackIds))
+        val shownItems = listOfNotNull(viewModel.uiState.currentRecommendationSet?.primary) +
+            viewModel.uiState.currentRecommendationSet?.backups.orEmpty()
+        assertTrue(shownItems.any { item -> item.packId in expectedSprint9PackIds })
+    }
+
+    @Test
+    fun prototypeTopicsExposeSprint9TopicsWithoutUserFacingOtherBucket() {
+        val topics = prototypeTopics()
+
+        assertTrue(topics.containsAll(listOf(
+            TopicTag.ATTENTION,
+            TopicTag.PRACTICAL,
+            TopicTag.BODY,
+            TopicTag.NATURE,
+            TopicTag.HISTORY_CULTURE,
+        )))
+        assertFalse(topics.contains(TopicTag.OTHER))
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
     fun selectThemeMode_persistsAndUpdatesUiState() = runTest {
         val settingsRepository = FakeSettingsRepository()
         val viewModel = createViewModel(settingsRepository = settingsRepository)
@@ -2084,6 +2125,7 @@ class MainViewModelTest {
         includeAttentionClassics: Boolean = false,
         includePublicDomainExpansion: Boolean = false,
         includeLinkOnlyModern: Boolean = false,
+        includeSprint9Packs: Boolean = false,
         private val failUserDocumentBodyLoad: Boolean = false,
     ) : ContentRepository {
         private val ready = MutableStateFlow(isReady)
@@ -2183,6 +2225,31 @@ class MainViewModelTest {
                         ),
                     ),
                 )
+            }
+            if (includeSprint9Packs) {
+                listOf(
+                    "attention_practical_agency_v1" to TopicTag.ATTENTION,
+                    "embodied_calm_v1" to TopicTag.BODY,
+                    "wonder_science_v1" to TopicTag.NATURE,
+                    "long_view_history_v1" to TopicTag.HISTORY_CULTURE,
+                    "creativity_play_v1" to TopicTag.CREATIVITY,
+                ).forEach { (packId, topic) ->
+                    add(
+                        EditorialPack(
+                            id = packId,
+                            title = packId,
+                            description = "Pack",
+                            items = listOf(
+                                contentItem(
+                                    id = "$packId-item",
+                                    packId = packId,
+                                    durationMinutes = 7,
+                                    topics = setOf(topic, TopicTag.PRACTICAL),
+                                ),
+                            ),
+                        ),
+                    )
+                }
             }
         }
 

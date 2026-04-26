@@ -76,6 +76,11 @@ object RecommendationExplainer {
 
     private fun TopicTag.displayName(): String {
         return when (this) {
+            TopicTag.ATTENTION -> "Attention"
+            TopicTag.PRACTICAL -> "Practical"
+            TopicTag.BODY -> "Body"
+            TopicTag.NATURE -> "Nature"
+            TopicTag.HISTORY_CULTURE -> "History & culture"
             TopicTag.ESSAYS -> "Essays"
             TopicTag.PHILOSOPHY -> "Philosophy"
             TopicTag.SCIENCE -> "Science"

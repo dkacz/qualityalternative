@@ -1,0 +1,33 @@
+My interest was first drawn in 1897 to experiments that were being made by Mr. J. D. Batten, who for two years previously had attempted, and partially succeeded in making, a print from wood and metal blocks with colour mixed with glycerine and dextrine, the glycerine being afterwards removed by washing the prints in alcohol. As the Japanese method seemed to promise greater advantages and simplicity, we began experiments together, using as our text-book the pamphlet by T. Tokuno, published by the Smithsonian Institution, Washington, and the dextrine and glycerine method was soon abandoned. The edition of prints, however, of Eve and the Serpent designed by J. D. Batten, printed by myself and published at that time, was produced partly by the earlier method and partly in the simpler Japanese way.
+
+It is slow and unsatisfactory work, however, learning manipulation from a book, and several technical difficulties that seemed insurmountable were made clear by the chance discovery in London of a Japanese printseller who, although not a printer, was sufficiently familiar with the work to give some invaluable hints and demonstrations.
+
+Further encouragement was given to the work by the institution, a little later, of a class in wood-cuts in colour under my charge, at the L.C.C. Central School of Arts and Crafts, which for several years became the chief centre of the movement.
+
+Such are the bare historical facts of the development in our country of this craft imported from the Far East.
+
+On a merely superficial acquaintance the Japanese craft of block-printing may appear to be no more than a primitive though delicate form of colour reproduction, which modern mechanical methods have long superseded, even in the land of its invention; and that to study so limited a mode of expression would be hardly of any practical value to an artist. Moreover, the craft is under the disadvantage that all the stages of the work, from making the first design to taking the final impressions, must be done by the artist himself--work which includes the delicate cutting of line and planning of colour blocks, and the preparation of colour and paper. In Japan there were trained craftsmen expert in each of these branches of the craft, and each carried out his part under the supervision of the artist. No part but the design was done by him. So that the very character of the work has an essential difference. Under our present conditions the artist must undertake the whole craft, with all its detail.
+
+(The portion of wood lying outside the points of the mass of foliage is left standing to support the paper, but is not inked in printing.)
+
+Simple as the process is, there is, from first to last, a long labour involved in planning, cutting and printing, before a satisfactory batch of prints is produced. After several attempts in delegating printing to well-trained pupils I have found it impossible to obtain the best results by that means, but the cutting of the colour-blocks and the clearing of the key-block after the first cutting of the line may well be done by assistant craftsmen.
+
+A larger demand for the prints might bring about a commercial development of the work, and the consequent employment of trained craftsmen or craftswomen, but the result would be a different one from that which has been obtained by the artists who are willing to undertake the whole production of their work.
+
+The actual value of wood-block prints for use as decoration is a matter of personal taste and experience.
+
+In my own opinion there is an element that always remains foreign in the prints of the Japanese masters, yet I know of no other kind of art that has the same telling value on a wall, or the same decorative charm in modern domestic rooms as the wood-block print. A single print well placed in a room of quiet colour will enrich and dominate a whole wall.
+
+The modern vogue still favours more expensive although less decorative forms of art, or works of reproduction without colour, yet here is an art available to all who care for expressive design and colour, and within the means of the large public to whom the cost of pictures is prohibitive. In its possibility as a decorative means of expression well suited to our modern needs and uses, and in the particular charm that colour has when printed from wood on a paper that is beautiful already by its own quality, there is no doubt of the scope and opportunity offered by this art.
+
+But as with new wine and old bottles, a new condition of simplicity in furniture and of pure colour in decoration must first be established. A wood-block print will not tell well amid a wilderness of bric-a-brac or on a gaudy wall-paper.
+
+From another and quite different point of view, the art of block-cutting and colour-printing has, however, a special and important value. To any student of pictorial art, especially to any who may wish to design for modern printed decoration, no work gives such instruction in economy of design, in the resources of line and its expressive development, and in the use and behaviour of colour. This has been the expressed opinion of many who have undertaken a course of wood-block printing for this object alone.
+
+The same opinion is emphatically stated by Professor Emil Orlik, whose prints are well known in modern exhibitions. On the occasion of a visit to the Kunstgewerbeschule of Berlin, I found him conducting a class for designers for printed decoration, in which the Japanese craft of block-printing was made the basis of their training. He held to the view that the primitive craft teaches the students the very economy and simplicity upon which the successful use of the great modern resources of colour-printing depend, yet which cannot be learnt except by recourse to simpler conditions and more narrow limitations before dealing with the greater scope of the machine.
+
+My own experience also convinces me that whatever may be the ultimate value of the Eastern craft to our artists as a mode of personal expression, there is no doubt of its effect and usefulness in training students to design with economy and simplicity for modern printing processes.
+
+The early stages of any craft are more interesting when we are familiar with the final result. For this reason it is often an advantage to begin at the end.
+
+To see a few impressions taken from a set of blocks in colour printing, or to print them oneself, gives the best possible idea of the quality and essential character of print-making. So also in describing the work it will perhaps tend to make the various stages clearer if the final act of printing is first explained.

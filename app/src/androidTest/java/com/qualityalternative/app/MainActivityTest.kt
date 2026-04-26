@@ -175,6 +175,33 @@ class MainActivityTest {
     }
 
     @Test
+    fun onboardingShowsSprint9TopicChips() {
+        launchApp()
+
+        composeRule.onNodeWithText("Begin").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasNode("Which apps pull at you?") }
+        composeRule.onNodeWithText("Continue").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasNode("What would you rather read?") }
+
+        composeRule.onNodeWithTag("onboarding-topic-ATTENTION").assertIsDisplayed()
+        composeRule.onNodeWithTag("onboarding-topic-PRACTICAL").assertIsDisplayed()
+        composeRule.onNodeWithTag("onboarding-topic-BODY").assertIsDisplayed()
+        composeRule.onNodeWithTag("onboarding-topic-NATURE").assertIsDisplayed()
+        composeRule.onNodeWithTag("onboarding-topic-HISTORY_CULTURE").assertIsDisplayed()
+    }
+
+    @Test
+    fun sprint9ContentIsReachableAfterNormalOnboarding() {
+        launchOnboardedApp()
+
+        composeRule.onNodeWithTag("tab-library", useUnmergedTree = true).performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("library-list") }
+        composeRule.onNodeWithTag("library-list")
+            .performScrollToNode(hasText("How We Think"))
+        composeRule.onNodeWithText("How We Think").assertIsDisplayed()
+    }
+
+    @Test
     fun addLinkKeepsSaveDisabledForInvalidUrl() {
         launchOnboardedApp()
 

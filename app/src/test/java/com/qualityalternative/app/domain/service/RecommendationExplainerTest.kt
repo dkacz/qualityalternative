@@ -81,7 +81,7 @@ class RecommendationExplainerTest {
 
         assertTrue("Expected surfaced starter-pack copy in starter inventory.", surfacedValues.isNotEmpty())
         val forbidden = Regex(
-            pattern = "\\b(the user|the product|backup|use when|use as|works as)\\b",
+            pattern = "\\b(the user|the product|backup|use when|use as|works as|candidate|candidates|requiring|requires|needs|review|reviewed|selection|jurisdiction|safe|external-only|link-only|in-app|rehosting|Sprint 9|if excerpt|overreach)\\b",
             option = RegexOption.IGNORE_CASE,
         )
         val internalCopy = surfacedValues.filter { value -> forbidden.containsMatchIn(value) }

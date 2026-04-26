@@ -19,7 +19,9 @@
           "sourceUrl": "https://www.gutenberg.org/ebooks/1656",
           "attribution": "Plato, Apology, translated by Benjamin Jowett",
           "rightsReviewedAt": "2026-04-22",
-          "topics": ["PHILOSOPHY"],
+          "topics": [
+            "PHILOSOPHY"
+          ],
           "whyThisNow": "A good fit when the impulse is really a question about what deserves attention.",
           "bodyAssetPath": "editorial/items/care_for_the_soul_first.md"
         },
@@ -37,7 +39,10 @@
           "sourceUrl": "https://www.gutenberg.org/ebooks/56075",
           "attribution": "Seneca, Of a Happy Life, translated and abstracted by Roger L'Estrange",
           "rightsReviewedAt": "2026-04-22",
-          "topics": ["PHILOSOPHY", "PSYCHOLOGY"],
+          "topics": [
+            "PHILOSOPHY",
+            "PSYCHOLOGY"
+          ],
           "whyThisNow": "A good fit when social proof is pulling you toward a default choice.",
           "bodyAssetPath": "editorial/items/leave_the_crowd.md"
         },
@@ -55,7 +60,10 @@
           "sourceUrl": "https://www.gutenberg.org/ebooks/10661",
           "attribution": "Epictetus, A Selection from the Discourses of Epictetus with the Encheiridion, translated by George Long",
           "rightsReviewedAt": "2026-04-22",
-          "topics": ["PHILOSOPHY", "PSYCHOLOGY"],
+          "topics": [
+            "PHILOSOPHY",
+            "PSYCHOLOGY"
+          ],
           "whyThisNow": "A good fit when delay should feel like agency, not denial.",
           "bodyAssetPath": "editorial/items/let_the_pleasure_wait.md"
         },
@@ -73,7 +81,10 @@
           "sourceUrl": "https://www.gutenberg.org/ebooks/2808",
           "attribution": "Cicero, Treatises on Friendship and Old Age, translated by E. S. Shuckburgh",
           "rightsReviewedAt": "2026-04-22",
-          "topics": ["PHILOSOPHY", "ESSAYS"],
+          "topics": [
+            "PHILOSOPHY",
+            "ESSAYS"
+          ],
           "whyThisNow": "A good fit when the social pull is tangled with approval, argument, or obligation.",
           "bodyAssetPath": "editorial/items/neither_ask_nor_consent.md"
         }
@@ -98,7 +109,9 @@
           "sourceUrl": "https://www.gutenberg.org/ebooks/14474",
           "attribution": "Michael Faraday, The Chemical History of a Candle, edited by William Crookes",
           "rightsReviewedAt": "2026-04-22",
-          "topics": ["SCIENCE"],
+          "topics": [
+            "SCIENCE"
+          ],
           "whyThisNow": "A good fit when the best replacement is to look closely at one ordinary thing.",
           "bodyAssetPath": "editorial/items/a_candle_opens_natural_philosophy.md"
         },
@@ -116,8 +129,10 @@
           "sourceUrl": "https://www.gutenberg.org/ebooks/63803",
           "attribution": "John Tyndall, The Forms of Water in Clouds and Rivers, Ice and Glaciers",
           "rightsReviewedAt": "2026-04-22",
-          "topics": ["SCIENCE"],
-          "whyThisNow": "A good fit when attention needs a calm physical explanation instead of novelty.",
+          "topics": [
+            "SCIENCE"
+          ],
+          "whyThisNow": "A good fit when attention benefits from a calm physical explanation instead of novelty.",
           "bodyAssetPath": "editorial/items/water_dust_becomes_a_cloud.md"
         },
         {
@@ -134,7 +149,10 @@
           "sourceUrl": "https://www.gutenberg.org/ebooks/16287",
           "attribution": "William James, Talks To Teachers On Psychology; And To Students On Some Of Life's Ideals",
           "rightsReviewedAt": "2026-04-22",
-          "topics": ["SCIENCE", "PSYCHOLOGY"],
+          "topics": [
+            "SCIENCE",
+            "PSYCHOLOGY"
+          ],
           "whyThisNow": "A good fit when perfect focus feels unrealistic and a smaller model helps.",
           "bodyAssetPath": "editorial/items/attention_comes_in_beats.md"
         }
@@ -159,7 +177,10 @@
           "sourceUrl": "https://www.gutenberg.org/ebooks/10661",
           "attribution": "Epictetus, A Selection from the Discourses of Epictetus with the Encheiridion, translated by George Long",
           "rightsReviewedAt": "2026-04-22",
-          "topics": ["PHILOSOPHY", "PSYCHOLOGY"],
+          "topics": [
+            "PHILOSOPHY",
+            "PSYCHOLOGY"
+          ],
           "whyThisNow": "Helps separate chosen action from reflex.",
           "bodyAssetPath": "editorial/items/start_with_what_is_yours.md"
         },
@@ -177,7 +198,9 @@
           "sourceUrl": "https://www.gutenberg.org/ebooks/2680",
           "attribution": "Marcus Aurelius, Meditations, translated by George Long",
           "rightsReviewedAt": "2026-04-22",
-          "topics": ["PHILOSOPHY"],
+          "topics": [
+            "PHILOSOPHY"
+          ],
           "whyThisNow": "Turns drifting toward default into a small test.",
           "bodyAssetPath": "editorial/items/the_morning_test.md"
         },
@@ -195,7 +218,10 @@
           "sourceUrl": "https://www.gutenberg.org/ebooks/57628",
           "attribution": "William James, The Principles of Psychology, Volume 1",
           "rightsReviewedAt": "2026-04-22",
-          "topics": ["PSYCHOLOGY", "SCIENCE"],
+          "topics": [
+            "PSYCHOLOGY",
+            "SCIENCE"
+          ],
           "whyThisNow": "Makes the repeated tap visible as a groove.",
           "bodyAssetPath": "editorial/items/the_flywheel_of_habit.md"
         },
@@ -213,7 +239,10 @@
           "sourceUrl": "https://www.gutenberg.org/ebooks/205",
           "attribution": "Henry David Thoreau, Walden",
           "rightsReviewedAt": "2026-04-22",
-          "topics": ["ESSAYS", "PHILOSOPHY"],
+          "topics": [
+            "ESSAYS",
+            "PHILOSOPHY"
+          ],
           "whyThisNow": "Reframes the minute as something to spend deliberately.",
           "bodyAssetPath": "editorial/items/live_deliberately.md"
         },
@@ -231,7 +260,10 @@
           "sourceUrl": "https://www.gutenberg.org/ebooks/9846",
           "attribution": "Henry David Thoreau, Walking, in Excursions",
           "rightsReviewedAt": "2026-04-22",
-          "topics": ["ESSAYS", "PHILOSOPHY"],
+          "topics": [
+            "ESSAYS",
+            "PHILOSOPHY"
+          ],
           "whyThisNow": "Gives a physical alternative without coercion.",
           "bodyAssetPath": "editorial/items/walk_before_you_scroll.md"
         },
@@ -249,7 +281,10 @@
           "sourceUrl": "https://www.gutenberg.org/ebooks/2944",
           "attribution": "Ralph Waldo Emerson, Self-Reliance, in Essays, First Series",
           "rightsReviewedAt": "2026-04-22",
-          "topics": ["PHILOSOPHY", "CREATIVITY"],
+          "topics": [
+            "PHILOSOPHY",
+            "CREATIVITY"
+          ],
           "whyThisNow": "Counters social comparison with inward attention.",
           "bodyAssetPath": "editorial/items/trust_the_first_honest_thought.md"
         },
@@ -267,7 +302,10 @@
           "sourceUrl": "https://www.gutenberg.org/ebooks/10217",
           "attribution": "Mary Austin, The Land of Little Rain",
           "rightsReviewedAt": "2026-04-22",
-          "topics": ["ESSAYS", "HISTORY"],
+          "topics": [
+            "ESSAYS",
+            "HISTORY"
+          ],
           "whyThisNow": "Pulls attention outward into observation.",
           "bodyAssetPath": "editorial/items/the_desert_resets_the_eye.md"
         },
@@ -285,7 +323,10 @@
           "sourceUrl": "https://www.gutenberg.org/ebooks/575",
           "attribution": "Francis Bacon, Of Studies, in The Essays or Counsels, Civil and Moral",
           "rightsReviewedAt": "2026-04-22",
-          "topics": ["ESSAYS", "PHILOSOPHY"],
+          "topics": [
+            "ESSAYS",
+            "PHILOSOPHY"
+          ],
           "whyThisNow": "A concise choice when a longer read would be too much friction.",
           "bodyAssetPath": "editorial/items/of_studies.md"
         }
@@ -311,7 +352,10 @@
           "sourceUrl": "https://www.gutenberg.org/ebooks/944",
           "attribution": "Charles Darwin, The Voyage of the Beagle",
           "rightsReviewedAt": "2026-04-22",
-          "topics": ["SCIENCE", "ESSAYS"],
+          "topics": [
+            "SCIENCE",
+            "ESSAYS"
+          ],
           "bodyAssetPath": "editorial/items/a_naturalist_notices_everything.md"
         },
         {
@@ -329,7 +373,10 @@
           "sourceUrl": "https://www.gutenberg.org/ebooks/2376",
           "attribution": "Booker T. Washington, Up From Slavery",
           "rightsReviewedAt": "2026-04-22",
-          "topics": ["HISTORY", "ESSAYS"],
+          "topics": [
+            "HISTORY",
+            "ESSAYS"
+          ],
           "bodyAssetPath": "editorial/items/a_doorway_into_learning.md"
         },
         {
@@ -347,7 +394,10 @@
           "sourceUrl": "https://www.gutenberg.org/ebooks/34901",
           "attribution": "John Stuart Mill, On Liberty",
           "rightsReviewedAt": "2026-04-22",
-          "topics": ["PHILOSOPHY", "ESSAYS"],
+          "topics": [
+            "PHILOSOPHY",
+            "ESSAYS"
+          ],
           "bodyAssetPath": "editorial/items/choose_your_own_plan.md"
         },
         {
@@ -365,7 +415,10 @@
           "sourceUrl": "https://www.gutenberg.org/ebooks/29433",
           "attribution": "Ralph Waldo Emerson, Nature",
           "rightsReviewedAt": "2026-04-22",
-          "topics": ["ESSAYS", "PHILOSOPHY"],
+          "topics": [
+            "ESSAYS",
+            "PHILOSOPHY"
+          ],
           "bodyAssetPath": "editorial/items/look_at_the_stars.md"
         },
         {
@@ -383,7 +436,10 @@
           "sourceUrl": "https://en.wikisource.org/wiki/Life_Without_Principle",
           "attribution": "Henry David Thoreau, Life Without Principle",
           "rightsReviewedAt": "2026-04-22",
-          "topics": ["ESSAYS", "PHILOSOPHY"],
+          "topics": [
+            "ESSAYS",
+            "PHILOSOPHY"
+          ],
           "bodyAssetPath": "editorial/items/a_place_of_business.md"
         },
         {
@@ -401,7 +457,10 @@
           "sourceUrl": "https://www.gutenberg.org/ebooks/3599",
           "attribution": "Michel de Montaigne, Essays, translated by Charles Cotton",
           "rightsReviewedAt": "2026-04-22",
-          "topics": ["ESSAYS", "PHILOSOPHY"],
+          "topics": [
+            "ESSAYS",
+            "PHILOSOPHY"
+          ],
           "bodyAssetPath": "editorial/items/the_minds_own_snare.md"
         },
         {
@@ -419,7 +478,10 @@
           "sourceUrl": "https://www.gutenberg.org/ebooks/56075",
           "attribution": "Seneca, A Happy Life, translated and abstracted by Roger L'Estrange",
           "rightsReviewedAt": "2026-04-22",
-          "topics": ["PHILOSOPHY", "PSYCHOLOGY"],
+          "topics": [
+            "PHILOSOPHY",
+            "PSYCHOLOGY"
+          ],
           "bodyAssetPath": "editorial/items/rest_satisfied_with_what_we_have.md"
         },
         {
@@ -437,7 +499,10 @@
           "sourceUrl": "https://www.gutenberg.org/ebooks/56075",
           "attribution": "Seneca, Of Anger, translated and abstracted by Roger L'Estrange",
           "rightsReviewedAt": "2026-04-22",
-          "topics": ["PHILOSOPHY", "PSYCHOLOGY"],
+          "topics": [
+            "PHILOSOPHY",
+            "PSYCHOLOGY"
+          ],
           "bodyAssetPath": "editorial/items/anger_divides_what_life_joins.md"
         },
         {
@@ -455,7 +520,10 @@
           "sourceUrl": "https://www.gutenberg.org/ebooks/2017",
           "attribution": "The Dhammapada, translated by F. Max Muller",
           "rightsReviewedAt": "2026-04-22",
-          "topics": ["PHILOSOPHY", "POETRY"],
+          "topics": [
+            "PHILOSOPHY",
+            "POETRY"
+          ],
           "bodyAssetPath": "editorial/items/earnestness_as_an_island.md"
         },
         {
@@ -473,7 +541,9 @@
           "sourceUrl": "https://www.gutenberg.org/ebooks/1656",
           "attribution": "Plato, Apology, translated by Benjamin Jowett",
           "rightsReviewedAt": "2026-04-22",
-          "topics": ["PHILOSOPHY"],
+          "topics": [
+            "PHILOSOPHY"
+          ],
           "bodyAssetPath": "editorial/items/the_examined_life.md"
         }
       ]
@@ -498,13 +568,16 @@
           "externalUrl": "https://longnow.org/ideas/the-big-here-and-long-now/",
           "attribution": "Brian Eno, The Long Now Foundation",
           "rightsReviewedAt": "2026-04-22",
-          "topics": ["ESSAYS", "PHILOSOPHY"]
+          "topics": [
+            "ESSAYS",
+            "PHILOSOPHY"
+          ]
         },
         {
           "id": "brian-eno-long-now",
           "title": "Brian Eno, The Long Now",
           "description": "A compact doorway into thinking beyond the next notification or headline cycle.",
-          "whyThisNow": "A good fit when the impulse needs a larger time horizon.",
+          "whyThisNow": "A good fit when the impulse benefits from a larger time horizon.",
           "durationMinutes": 8,
           "format": "HTML",
           "source": "Long Now",
@@ -515,7 +588,10 @@
           "externalUrl": "https://longnow.org/ideas/brian-eno-the-long-now/",
           "attribution": "Brian Eno, The Long Now Foundation",
           "rightsReviewedAt": "2026-04-22",
-          "topics": ["ESSAYS", "PHILOSOPHY"]
+          "topics": [
+            "ESSAYS",
+            "PHILOSOPHY"
+          ]
         },
         {
           "id": "taking-the-long-view",
@@ -532,7 +608,10 @@
           "externalUrl": "https://longnow.org/ideas/taking-the-long-view/",
           "attribution": "The Long Now Foundation",
           "rightsReviewedAt": "2026-04-22",
-          "topics": ["ESSAYS", "PHILOSOPHY"]
+          "topics": [
+            "ESSAYS",
+            "PHILOSOPHY"
+          ]
         },
         {
           "id": "reclaim-your-attention",
@@ -549,7 +628,10 @@
           "externalUrl": "https://psyche.co/guides/how-to-reclaim-your-attention",
           "attribution": "Psyche guide",
           "rightsReviewedAt": "2026-04-22",
-          "topics": ["PSYCHOLOGY", "TECH"]
+          "topics": [
+            "PSYCHOLOGY",
+            "TECH"
+          ]
         },
         {
           "id": "become-indistractable",
@@ -566,7 +648,10 @@
           "externalUrl": "https://psyche.co/guides/to-become-indistractable-recognise-that-it-starts-within-you",
           "attribution": "Psyche guide",
           "rightsReviewedAt": "2026-04-22",
-          "topics": ["PSYCHOLOGY", "TECH"]
+          "topics": [
+            "PSYCHOLOGY",
+            "TECH"
+          ]
         },
         {
           "id": "attention-and-self",
@@ -583,7 +668,10 @@
           "externalUrl": "https://aeon.co/essays/what-is-the-self-if-not-that-which-pays-attention",
           "attribution": "Carolyn Dicey Jennings, Aeon",
           "rightsReviewedAt": "2026-04-22",
-          "topics": ["PHILOSOPHY", "PSYCHOLOGY"]
+          "topics": [
+            "PHILOSOPHY",
+            "PSYCHOLOGY"
+          ]
         },
         {
           "id": "sit-and-think",
@@ -600,7 +688,10 @@
           "externalUrl": "https://aeon.co/essays/do-we-all-need-a-little-time-simply-to-sit-and-think",
           "attribution": "Andre Spicer, Aeon",
           "rightsReviewedAt": "2026-04-22",
-          "topics": ["ESSAYS", "PHILOSOPHY"]
+          "topics": [
+            "ESSAYS",
+            "PHILOSOPHY"
+          ]
         },
         {
           "id": "mathematical-thinking",
@@ -617,7 +708,10 @@
           "externalUrl": "https://www.quantamagazine.org/mathematical-thinking-isnt-what-you-think-it-is-20241118/",
           "attribution": "Quanta Magazine",
           "rightsReviewedAt": "2026-04-22",
-          "topics": ["SCIENCE", "CREATIVITY"]
+          "topics": [
+            "SCIENCE",
+            "CREATIVITY"
+          ]
         },
         {
           "id": "what-is-life-quanta",
@@ -634,7 +728,10 @@
           "externalUrl": "https://www.quantamagazine.org/what-is-life-20220615/",
           "attribution": "Quanta Magazine",
           "rightsReviewedAt": "2026-04-22",
-          "topics": ["SCIENCE", "PHILOSOPHY"]
+          "topics": [
+            "SCIENCE",
+            "PHILOSOPHY"
+          ]
         },
         {
           "id": "evolution-fast-or-slow",
@@ -651,7 +748,9 @@
           "externalUrl": "https://www.quantamagazine.org/evolution-fast-or-slow-lizards-help-resolve-a-paradox-20240102/",
           "attribution": "Quanta Magazine",
           "rightsReviewedAt": "2026-04-22",
-          "topics": ["SCIENCE"]
+          "topics": [
+            "SCIENCE"
+          ]
         },
         {
           "id": "life-in-games",
@@ -668,13 +767,16 @@
           "externalUrl": "https://www.quantamagazine.org/john-conways-life-in-games-20150828/",
           "attribution": "Quanta Magazine",
           "rightsReviewedAt": "2026-04-22",
-          "topics": ["SCIENCE", "CREATIVITY"]
+          "topics": [
+            "SCIENCE",
+            "CREATIVITY"
+          ]
         },
         {
           "id": "anthropology-of-smell",
           "title": "The Anthropology of Smell",
           "description": "A sensory anthropology read that pulls attention back into the body and the world.",
-          "whyThisNow": "A good fit when screen attention needs an embodied reset.",
+          "whyThisNow": "A good fit when screen attention benefits from an embodied reset.",
           "durationMinutes": 8,
           "format": "HTML",
           "source": "SAPIENS",
@@ -685,13 +787,16 @@
           "externalUrl": "https://www.sapiens.org/biology/anthropology-of-smell/",
           "attribution": "SAPIENS",
           "rightsReviewedAt": "2026-04-22",
-          "topics": ["SCIENCE", "HISTORY"]
+          "topics": [
+            "SCIENCE",
+            "HISTORY"
+          ]
         },
         {
           "id": "cargo-cult-rituals",
           "title": "What Cargo Cult Rituals Reveal",
           "description": "An anthropology piece about imitation, meaning, and how humans search for control.",
-          "whyThisNow": "A good fit when reflexive behavior needs a broader human frame.",
+          "whyThisNow": "A good fit when reflexive behavior benefits from a broader human frame.",
           "durationMinutes": 9,
           "format": "HTML",
           "source": "SAPIENS",
@@ -702,7 +807,10 @@
           "externalUrl": "https://www.sapiens.org/culture/cargo-cult-rituals/",
           "attribution": "SAPIENS",
           "rightsReviewedAt": "2026-04-22",
-          "topics": ["HISTORY", "PHILOSOPHY"]
+          "topics": [
+            "HISTORY",
+            "PHILOSOPHY"
+          ]
         },
         {
           "id": "evolution-of-childhood",
@@ -719,7 +827,10 @@
           "externalUrl": "https://www.sapiens.org/biology/strangest-things-evolution-childhood/",
           "attribution": "SAPIENS",
           "rightsReviewedAt": "2026-04-22",
-          "topics": ["SCIENCE", "HISTORY"]
+          "topics": [
+            "SCIENCE",
+            "HISTORY"
+          ]
         },
         {
           "id": "sep-attention",
@@ -736,7 +847,10 @@
           "externalUrl": "https://plato.stanford.edu/entries/attention/",
           "attribution": "Stanford Encyclopedia of Philosophy",
           "rightsReviewedAt": "2026-04-22",
-          "topics": ["PHILOSOPHY", "PSYCHOLOGY"]
+          "topics": [
+            "PHILOSOPHY",
+            "PSYCHOLOGY"
+          ]
         },
         {
           "id": "iep-free-will",
@@ -753,7 +867,9 @@
           "externalUrl": "https://iep.utm.edu/freewill/",
           "attribution": "Internet Encyclopedia of Philosophy",
           "rightsReviewedAt": "2026-04-22",
-          "topics": ["PHILOSOPHY"]
+          "topics": [
+            "PHILOSOPHY"
+          ]
         },
         {
           "id": "iep-stoicism",
@@ -770,7 +886,9 @@
           "externalUrl": "https://iep.utm.edu/stoicism/",
           "attribution": "Internet Encyclopedia of Philosophy",
           "rightsReviewedAt": "2026-04-22",
-          "topics": ["PHILOSOPHY"]
+          "topics": [
+            "PHILOSOPHY"
+          ]
         },
         {
           "id": "the-distracted-mind",
@@ -787,7 +905,11 @@
           "externalUrl": "https://nautil.us/the-distracted-mind-236467",
           "attribution": "Nautilus",
           "rightsReviewedAt": "2026-04-22",
-          "topics": ["SCIENCE", "TECH", "PSYCHOLOGY"]
+          "topics": [
+            "SCIENCE",
+            "TECH",
+            "PSYCHOLOGY"
+          ]
         },
         {
           "id": "why-it-pays-to-play-around",
@@ -804,7 +926,10 @@
           "externalUrl": "https://nautil.us/why-it-pays-to-play-around-237419",
           "attribution": "Nautilus",
           "rightsReviewedAt": "2026-04-22",
-          "topics": ["SCIENCE", "CREATIVITY"]
+          "topics": [
+            "SCIENCE",
+            "CREATIVITY"
+          ]
         },
         {
           "id": "new-view-of-time",
@@ -821,7 +946,2123 @@
           "externalUrl": "https://nautil.us/a-new-view-of-time-237105/",
           "attribution": "Nautilus",
           "rightsReviewedAt": "2026-04-22",
-          "topics": ["SCIENCE", "PHILOSOPHY"]
+          "topics": [
+            "SCIENCE",
+            "PHILOSOPHY"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "attention_practical_agency_v1",
+      "title": "Attention and Practical Agency",
+      "description": "Readings for interrupting reflex checks and choosing one deliberate next action.",
+      "items": [
+        {
+          "id": "s9-1-r01-dewey-how-we-think",
+          "title": "How We Think",
+          "description": "A short reflective-thinking excerpt for choosing the next deliberate move",
+          "whyThisNow": "Turns an automatic impulse into a question about evidence and next thought",
+          "durationMinutes": 14,
+          "format": "MARKDOWN",
+          "source": "John Dewey",
+          "rightsClass": "RENDERABLE",
+          "renderMode": "IN_APP_READER",
+          "licenseName": "Project Gutenberg License",
+          "sourceUrl": "https://www.gutenberg.org/ebooks/37423",
+          "attribution": "John Dewey, How We Think, via Project Gutenberg",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "PRACTICAL",
+            "PSYCHOLOGY"
+          ],
+          "licenseUrl": "https://www.gutenberg.org/policy/license.html",
+          "bodyAssetPath": "editorial/items/s9_1_r01_dewey_how_we_think.md"
+        },
+        {
+          "id": "s9-1-r02-bennett-24-hours",
+          "title": "How to Use the Next Hour",
+          "description": "A compact time-attention reset drawn from a public-domain practical classic",
+          "whyThisNow": "Offers a concrete reframing of unused time without adding feed behavior",
+          "durationMinutes": 8,
+          "format": "MARKDOWN",
+          "source": "Arnold Bennett",
+          "rightsClass": "RENDERABLE",
+          "renderMode": "IN_APP_READER",
+          "licenseName": "Project Gutenberg License",
+          "sourceUrl": "https://www.gutenberg.org/ebooks/2274",
+          "attribution": "Arnold Bennett, How to Live on Twenty-Four Hours a Day, via Project Gutenberg",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "PRACTICAL",
+            "PSYCHOLOGY"
+          ],
+          "licenseUrl": "https://www.gutenberg.org/policy/license.html",
+          "bodyAssetPath": "editorial/items/s9_1_r02_bennett_24_hours.md"
+        },
+        {
+          "id": "s9-1-r03-betts-mind-education",
+          "title": "Attention Can Be Trained",
+          "description": "A short public-domain attention excerpt for interrupting automatic checking",
+          "whyThisNow": "Offers a finite attention-training frame without duplicating the existing William James source",
+          "durationMinutes": 5,
+          "format": "MARKDOWN",
+          "source": "George Herbert Betts",
+          "rightsClass": "RENDERABLE",
+          "renderMode": "IN_APP_READER",
+          "licenseName": "Project Gutenberg License",
+          "sourceUrl": "https://www.gutenberg.org/ebooks/20220",
+          "attribution": "George Herbert Betts - The Mind and Its Education via Project Gutenberg",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "ATTENTION",
+            "PSYCHOLOGY",
+            "PRACTICAL"
+          ],
+          "licenseUrl": "https://www.gutenberg.org/policy/license.html",
+          "bodyAssetPath": "editorial/items/s9_1_r03_betts_mind_education.md"
+        },
+        {
+          "id": "s9-1-r04-smiles-character-agency",
+          "title": "Conduct Is Practice",
+          "description": "A concise public-domain practical-agency reading with a steady, non-moralizing tone",
+          "whyThisNow": "Reframes agency as the next conduct choice while avoiding the already-integrated Mill source",
+          "durationMinutes": 5,
+          "format": "MARKDOWN",
+          "source": "Samuel Smiles",
+          "rightsClass": "RENDERABLE",
+          "renderMode": "IN_APP_READER",
+          "licenseName": "Project Gutenberg License",
+          "sourceUrl": "https://www.gutenberg.org/ebooks/2541",
+          "attribution": "Samuel Smiles - Character via Project Gutenberg",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "PRACTICAL",
+            "PHILOSOPHY",
+            "PSYCHOLOGY"
+          ],
+          "licenseUrl": "https://www.gutenberg.org/policy/license.html",
+          "bodyAssetPath": "editorial/items/s9_1_r04_smiles_character_agency.md"
+        },
+        {
+          "id": "s9-1-r05-aristotle-habit-character",
+          "title": "Habit and Character",
+          "description": "A public-domain habit excerpt for choosing a better repeated action",
+          "whyThisNow": "Makes habit visible as something trained by repeated action",
+          "durationMinutes": 8,
+          "format": "MARKDOWN",
+          "source": "Aristotle",
+          "rightsClass": "RENDERABLE",
+          "renderMode": "IN_APP_READER",
+          "licenseName": "Project Gutenberg License",
+          "sourceUrl": "https://www.gutenberg.org/ebooks/8438",
+          "attribution": "Aristotle, The Nicomachean Ethics of Aristotle, via Project Gutenberg",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "PRACTICAL",
+            "PSYCHOLOGY"
+          ],
+          "licenseUrl": "https://www.gutenberg.org/policy/license.html",
+          "bodyAssetPath": "editorial/items/s9_1_r05_aristotle_habit_character.md"
+        },
+        {
+          "id": "s9-1-r06-emerson-conduct-life",
+          "title": "Conduct and Choice",
+          "description": "A compact Emerson excerpt on conduct as an intentional act",
+          "whyThisNow": "Gives a high-agency alternative to passive scrolling",
+          "durationMinutes": 8,
+          "format": "MARKDOWN",
+          "source": "Ralph Waldo Emerson",
+          "rightsClass": "RENDERABLE",
+          "renderMode": "IN_APP_READER",
+          "licenseName": "Project Gutenberg License",
+          "sourceUrl": "https://www.gutenberg.org/ebooks/39827",
+          "attribution": "Ralph Waldo Emerson, The Conduct of Life, via Project Gutenberg",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "PRACTICAL",
+            "PSYCHOLOGY"
+          ],
+          "licenseUrl": "https://www.gutenberg.org/policy/license.html",
+          "bodyAssetPath": "editorial/items/s9_1_r06_emerson_conduct_life.md"
+        },
+        {
+          "id": "s9-1-r07-call-power-through-repose",
+          "title": "Repose Before Action",
+          "description": "A short embodied reset reading with practical, non-clinical language",
+          "whyThisNow": "Offers a body-based pause before choosing the next action",
+          "durationMinutes": 7,
+          "format": "MARKDOWN",
+          "source": "Annie Payson Call",
+          "rightsClass": "RENDERABLE",
+          "renderMode": "IN_APP_READER",
+          "licenseName": "Project Gutenberg License",
+          "sourceUrl": "https://www.gutenberg.org/ebooks/4337",
+          "attribution": "Annie Payson Call, Power Through Repose, via Project Gutenberg",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "BODY",
+            "PSYCHOLOGY"
+          ],
+          "licenseUrl": "https://www.gutenberg.org/policy/license.html",
+          "bodyAssetPath": "editorial/items/s9_1_r07_call_power_through_repose.md"
+        },
+        {
+          "id": "s9-1-r08-whitehead-organisation-thought",
+          "title": "Organise the Thought",
+          "description": "A deeper public-domain reading for turning scattered attention into order",
+          "whyThisNow": "Replaces reflex checking with a structured thought challenge",
+          "durationMinutes": 12,
+          "format": "MARKDOWN",
+          "source": "Alfred North Whitehead",
+          "rightsClass": "RENDERABLE",
+          "renderMode": "IN_APP_READER",
+          "licenseName": "Project Gutenberg License",
+          "sourceUrl": "https://www.gutenberg.org/ebooks/77011",
+          "attribution": "Alfred North Whitehead, The Organisation of Thought, via Project Gutenberg",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "PRACTICAL",
+            "PSYCHOLOGY"
+          ],
+          "licenseUrl": "https://www.gutenberg.org/policy/license.html",
+          "bodyAssetPath": "editorial/items/s9_1_r08_whitehead_organisation_thought.md"
+        },
+        {
+          "id": "s9-1-r09-mason-home-education-attention",
+          "title": "Will and Attention",
+          "description": "A short attention-training excerpt with a focused, dated education frame",
+          "whyThisNow": "Treats attention as trainable without adding a feed or tool stack",
+          "durationMinutes": 8,
+          "format": "MARKDOWN",
+          "source": "Charlotte M. Mason",
+          "rightsClass": "RENDERABLE",
+          "renderMode": "IN_APP_READER",
+          "licenseName": "Project Gutenberg License",
+          "sourceUrl": "https://www.gutenberg.org/ebooks/71087",
+          "attribution": "Charlotte M. Mason, Home Education, via Project Gutenberg",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "PRACTICAL",
+            "PSYCHOLOGY"
+          ],
+          "licenseUrl": "https://www.gutenberg.org/policy/license.html",
+          "bodyAssetPath": "editorial/items/s9_1_r09_mason_home_education_attention.md"
+        },
+        {
+          "id": "s9-1-l01-aeon-students-devices-learn",
+          "title": "Can Device-Heavy Students Learn?",
+          "description": "A durable external read on learning attention and device pressure",
+          "whyThisNow": "Directly matches the impulse problem with a focused outside read",
+          "durationMinutes": 14,
+          "format": "HTML",
+          "source": "Aeon",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://aeon.co/essays/can-students-who-are-constantly-on-their-devices-actually-learn",
+          "attribution": "Aeon: Can Students Who Are Constantly on Their Devices Actually Learn?",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "ATTENTION",
+            "TECH"
+          ],
+          "externalUrl": "https://aeon.co/essays/can-students-who-are-constantly-on-their-devices-actually-learn"
+        },
+        {
+          "id": "s9-1-l02-aeon-screens-free-or-shackled",
+          "title": "Free or Shackled to Screens?",
+          "description": "A essay reading for stepping back from screen habit loops",
+          "whyThisNow": "Names screen compulsion without promising hard blocking",
+          "durationMinutes": 14,
+          "format": "HTML",
+          "source": "Aeon",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://aeon.co/essays/has-technology-set-us-free-or-shackled-us-to-our-screens",
+          "attribution": "Aeon: Has Technology Set Us Free or Shackled Us to Our Screens?",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "TECH",
+            "ATTENTION"
+          ],
+          "externalUrl": "https://aeon.co/essays/has-technology-set-us-free-or-shackled-us-to-our-screens"
+        },
+        {
+          "id": "s9-1-l03-aeon-literacy-design-problem",
+          "title": "Literacy as a Design Problem",
+          "description": "A reading about shaping conditions rather than scolding attention",
+          "whyThisNow": "Turns blame into environment design and agency",
+          "durationMinutes": 14,
+          "format": "HTML",
+          "source": "Aeon",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://aeon.co/essays/what-we-think-is-a-decline-in-literacy-is-a-design-problem",
+          "attribution": "Aeon: What We Think Is a Decline in Literacy Is a Design Problem",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "PRACTICAL",
+            "ATTENTION"
+          ],
+          "externalUrl": "https://aeon.co/essays/what-we-think-is-a-decline-in-literacy-is-a-design-problem"
+        },
+        {
+          "id": "s9-1-l04-aeon-sovereign-individual-digital-age",
+          "title": "The Sovereign Individual Online",
+          "description": "A digital agency essay for high-intent replacement moments",
+          "whyThisNow": "Gives a long-form alternative to compulsive autonomy theater",
+          "durationMinutes": 16,
+          "format": "HTML",
+          "source": "Aeon",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://aeon.co/essays/the-sovereign-individual-and-the-paradox-of-the-digital-age",
+          "attribution": "Aeon: The Sovereign Individual and the Paradox of the Digital Age",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "PRACTICAL",
+            "ATTENTION"
+          ],
+          "externalUrl": "https://aeon.co/essays/the-sovereign-individual-and-the-paradox-of-the-digital-age"
+        },
+        {
+          "id": "s9-1-l05-aeon-quantified-self-spirituality",
+          "title": "The Quantified Self as Ritual",
+          "description": "A critique of measurement habits for users caught in tracking loops",
+          "whyThisNow": "Useful counterweight to self-tracking and checking impulses",
+          "durationMinutes": 16,
+          "format": "HTML",
+          "source": "Aeon",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://aeon.co/essays/the-quantified-self-is-a-spirituality-for-our-times",
+          "attribution": "Aeon: The Quantified Self Is a Spirituality for Our Times",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "ATTENTION",
+            "TECH"
+          ],
+          "externalUrl": "https://aeon.co/essays/the-quantified-self-is-a-spirituality-for-our-times"
+        },
+        {
+          "id": "s9-1-l06-sep-philosophy-technology",
+          "title": "Philosophy of Technology",
+          "description": "A scholarly reference reading for users wanting a deeper technology frame",
+          "whyThisNow": "A deep reference for technology agency without feed mechanics",
+          "durationMinutes": 18,
+          "format": "HTML",
+          "source": "Stanford Encyclopedia of Philosophy",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://plato.stanford.edu/entries/technology/",
+          "attribution": "Stanford Encyclopedia of Philosophy: Philosophy of Technology",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "TECH",
+            "ATTENTION"
+          ],
+          "externalUrl": "https://plato.stanford.edu/entries/technology/"
+        },
+        {
+          "id": "s9-1-l07-nautilus-modern-media-free-will",
+          "title": "Modern Media and Free Will",
+          "description": "A attention-economy article reading for stepping out of reflex media use",
+          "whyThisNow": "Frames attention capture as decision pressure without adding a blocker promise",
+          "durationMinutes": 12,
+          "format": "HTML",
+          "source": "Nautilus",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://nautil.us/modern-media-is-a-dos-attack-on-your-free-will-236806/",
+          "attribution": "Nautilus: Modern Media Is a DoS Attack on Your Free Will",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "ATTENTION",
+            "TECH"
+          ],
+          "externalUrl": "https://nautil.us/modern-media-is-a-dos-attack-on-your-free-will-236806/"
+        },
+        {
+          "id": "s9-1-l08-nautilus-boredom-does-to-you",
+          "title": "What Boredom Does",
+          "description": "A reading for tolerating the pause before choosing another app",
+          "whyThisNow": "Makes boredom less automatically avoidable without turning into entertainment feed",
+          "durationMinutes": 9,
+          "format": "HTML",
+          "source": "Nautilus",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://nautil.us/what-boredom-does-to-you-236854/",
+          "attribution": "Nautilus: What Boredom Does to You",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "ATTENTION",
+            "TECH"
+          ],
+          "externalUrl": "https://nautil.us/what-boredom-does-to-you-236854/"
+        },
+        {
+          "id": "s9-1-l09-nautilus-space-case",
+          "title": "It Pays to Be a Space Case",
+          "description": "A reading that redirects attention without moralizing distraction",
+          "whyThisNow": "Offers a non-scolding view of mind-wandering as a reset",
+          "durationMinutes": 8,
+          "format": "HTML",
+          "source": "Nautilus",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://nautil.us/it-pays-to-be-a-space-case-237985/",
+          "attribution": "Nautilus: It Pays to Be a Space Case",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "ATTENTION",
+            "TECH"
+          ],
+          "externalUrl": "https://nautil.us/it-pays-to-be-a-space-case-237985/"
+        },
+        {
+          "id": "s9-1-l10-psyche-bayesian-decisions",
+          "title": "Think Like a Bayesian",
+          "description": "A guide reading for replacing reflex checking with probability thinking",
+          "whyThisNow": "A decision-making alternative for impulse moments that need one clear next thought",
+          "durationMinutes": 14,
+          "format": "HTML",
+          "source": "Psyche",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://psyche.co/guides/how-to-think-like-a-bayesian-and-make-better-decisions",
+          "attribution": "Psyche: How to Think Like a Bayesian and Make Better Decisions",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "PRACTICAL",
+            "ATTENTION"
+          ],
+          "externalUrl": "https://psyche.co/guides/how-to-think-like-a-bayesian-and-make-better-decisions"
+        },
+        {
+          "id": "s9-1-l11-psyche-procrastination-progress",
+          "title": "Procrastination Without Self-Judgment",
+          "description": "A guide reading for practical agency during avoidance loops",
+          "whyThisNow": "Shifts a user from shame-scrolling into one small progress move",
+          "durationMinutes": 18,
+          "format": "HTML",
+          "source": "Psyche",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://psyche.co/guides/how-to-think-differently-about-procrastination-and-make-progress",
+          "attribution": "Psyche: How to Think Differently About Procrastination and Make Progress",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "PRACTICAL",
+            "ATTENTION"
+          ],
+          "externalUrl": "https://psyche.co/guides/how-to-think-differently-about-procrastination-and-make-progress"
+        },
+        {
+          "id": "s9-1-l12-psyche-stop-procrastinating",
+          "title": "Confront Avoidance",
+          "description": "A practical agency guide for avoidance-driven app opening",
+          "whyThisNow": "Maps avoidance to a concrete next action without adding ranking complexity",
+          "durationMinutes": 16,
+          "format": "HTML",
+          "source": "Psyche",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://psyche.co/guides/how-to-stop-procrastinating-by-confronting-your-avoidance",
+          "attribution": "Psyche: How to Stop Procrastinating by Confronting Your Avoidance",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "PRACTICAL",
+            "ATTENTION"
+          ],
+          "externalUrl": "https://psyche.co/guides/how-to-stop-procrastinating-by-confronting-your-avoidance"
+        },
+        {
+          "id": "s9-1-l13-psyche-resist-temptations",
+          "title": "Resist Everyday Temptations",
+          "description": "A guide reading for everyday temptation moments with non-clinical card wording only",
+          "whyThisNow": "Provides a concrete self-control frame while preserving soft intervention",
+          "durationMinutes": 10,
+          "format": "HTML",
+          "source": "Psyche",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://psyche.co/guides/how-to-resist-everyday-temptations-and-take-back-control",
+          "attribution": "Psyche: How to Resist Everyday Temptations and Take Back Control",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "PRACTICAL",
+            "ATTENTION"
+          ],
+          "externalUrl": "https://psyche.co/guides/how-to-resist-everyday-temptations-and-take-back-control"
+        },
+        {
+          "id": "s9-1-l14-psyche-tough-decision",
+          "title": "Make a Tough Decision",
+          "description": "A decision guide reading for practical agency moments",
+          "whyThisNow": "Gives a structured alternative when the blocked app is avoidance of choice",
+          "durationMinutes": 14,
+          "format": "HTML",
+          "source": "Psyche",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://psyche.co/guides/how-to-make-a-tough-decision-break-it-down-and-listen-to-your-gut",
+          "attribution": "Psyche: How to Make a Tough Decision: Break It Down and Listen to Your Gut",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "PRACTICAL",
+            "ATTENTION"
+          ],
+          "externalUrl": "https://psyche.co/guides/how-to-make-a-tough-decision-break-it-down-and-listen-to-your-gut"
+        },
+        {
+          "id": "s9-1-l15-sep-personal-identity",
+          "title": "Personal Identity",
+          "description": "A scholarly reference reading for future-self framing",
+          "whyThisNow": "A deeper frame for agency and self-continuity without reproducing source text",
+          "durationMinutes": 18,
+          "format": "HTML",
+          "source": "Stanford Encyclopedia of Philosophy",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://plato.stanford.edu/entries/identity-personal/",
+          "attribution": "Stanford Encyclopedia of Philosophy: Personal Identity",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "PHILOSOPHY",
+            "ATTENTION"
+          ],
+          "externalUrl": "https://plato.stanford.edu/entries/identity-personal/"
+        }
+      ]
+    },
+    {
+      "id": "embodied_calm_v1",
+      "title": "Embodied Calm",
+      "description": "Readings for body reset, sensory attention, walking, nature, and calm philosophy.",
+      "items": [
+        {
+          "id": "s9-2-r01-muir-mountains-california",
+          "title": "Walk Into the Mountains",
+          "description": "A public-domain nature excerpt reading for stepping back into the body and landscape",
+          "whyThisNow": "Redirects impulse into walking scale place and outward attention",
+          "durationMinutes": 8,
+          "format": "MARKDOWN",
+          "source": "John Muir",
+          "rightsClass": "RENDERABLE",
+          "renderMode": "IN_APP_READER",
+          "licenseName": "Project Gutenberg License",
+          "sourceUrl": "https://www.gutenberg.org/ebooks/10012",
+          "attribution": "John Muir, The Mountains of California, via Project Gutenberg",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "BODY",
+            "NATURE"
+          ],
+          "licenseUrl": "https://www.gutenberg.org/policy/license.html",
+          "bodyAssetPath": "editorial/items/s9_2_r01_muir_mountains_california.md"
+        },
+        {
+          "id": "s9-2-r02-white-selborne-noticing",
+          "title": "Notice the Living World",
+          "description": "A short natural-history reading for noticing sound weather animals and place",
+          "whyThisNow": "Turns restless checking into precise sensory observation",
+          "durationMinutes": 8,
+          "format": "MARKDOWN",
+          "source": "Gilbert White",
+          "rightsClass": "RENDERABLE",
+          "renderMode": "IN_APP_READER",
+          "licenseName": "Project Gutenberg License",
+          "sourceUrl": "https://www.gutenberg.org/ebooks/1408",
+          "attribution": "Gilbert White, The Natural History of Selborne, via Project Gutenberg",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "BODY",
+            "NATURE",
+            "SCIENCE"
+          ],
+          "licenseUrl": "https://www.gutenberg.org/policy/license.html",
+          "bodyAssetPath": "editorial/items/s9_2_r02_white_selborne_noticing.md"
+        },
+        {
+          "id": "s9-2-r03-burroughs-wake-robin",
+          "title": "Wake-Robin Noticing",
+          "description": "A public-domain nature excerpt reading for slowing attention through birds and place",
+          "whyThisNow": "Offers a quiet outdoor attention target without feed dynamics",
+          "durationMinutes": 7,
+          "format": "MARKDOWN",
+          "source": "John Burroughs",
+          "rightsClass": "RENDERABLE",
+          "renderMode": "IN_APP_READER",
+          "licenseName": "Project Gutenberg License",
+          "sourceUrl": "https://www.gutenberg.org/ebooks/4203",
+          "attribution": "John Burroughs, Wake-Robin, via Project Gutenberg",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "BODY",
+            "NATURE"
+          ],
+          "licenseUrl": "https://www.gutenberg.org/policy/license.html",
+          "bodyAssetPath": "editorial/items/s9_2_r03_burroughs_wake_robin.md"
+        },
+        {
+          "id": "s9-2-r04-okakura-book-of-tea",
+          "title": "The Cup as a Pause",
+          "description": "A public-domain reading about tea ritual aesthetics and attention",
+          "whyThisNow": "Uses a small ritual object as a non-feed calm reset",
+          "durationMinutes": 8,
+          "format": "MARKDOWN",
+          "source": "Kakuzo Okakura",
+          "rightsClass": "RENDERABLE",
+          "renderMode": "IN_APP_READER",
+          "licenseName": "Project Gutenberg License",
+          "sourceUrl": "https://www.gutenberg.org/ebooks/769",
+          "attribution": "Kakuzo Okakura, The Book of Tea, via Project Gutenberg",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "HISTORY_CULTURE",
+            "BODY",
+            "PHILOSOPHY"
+          ],
+          "licenseUrl": "https://www.gutenberg.org/policy/license.html",
+          "bodyAssetPath": "editorial/items/s9_2_r04_okakura_book_of_tea.md"
+        },
+        {
+          "id": "s9-2-r05-confucius-analects-calm",
+          "title": "Choose Measure Before Reaction",
+          "description": "A short Analects excerpt reading on measured conduct and self-command",
+          "whyThisNow": "Offers a calm reset toward courtesy and measured conduct before reacting",
+          "durationMinutes": 7,
+          "format": "MARKDOWN",
+          "source": "Confucius",
+          "rightsClass": "RENDERABLE",
+          "renderMode": "IN_APP_READER",
+          "licenseName": "Project Gutenberg License",
+          "sourceUrl": "https://www.gutenberg.org/ebooks/3330",
+          "attribution": "Confucius, The Analects of Confucius, translated by James Legge, via Project Gutenberg",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "PHILOSOPHY",
+            "HISTORY_CULTURE"
+          ],
+          "licenseUrl": "https://www.gutenberg.org/policy/license.html",
+          "bodyAssetPath": "editorial/items/s9_2_r05_confucius_analects_calm.md"
+        },
+        {
+          "id": "s9-2-r06-boethius-consolation",
+          "title": "Fortune Turns the Wheel",
+          "description": "A deeper calm-philosophy reading from a public-domain consolation classic",
+          "whyThisNow": "Offers distance from immediate frustration through long-tested philosophical framing",
+          "durationMinutes": 12,
+          "format": "MARKDOWN",
+          "source": "Boethius",
+          "rightsClass": "RENDERABLE",
+          "renderMode": "IN_APP_READER",
+          "licenseName": "Project Gutenberg License",
+          "sourceUrl": "https://www.gutenberg.org/ebooks/14328",
+          "attribution": "Boethius, The Consolation of Philosophy, via Project Gutenberg",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "PHILOSOPHY",
+            "HISTORY_CULTURE"
+          ],
+          "licenseUrl": "https://www.gutenberg.org/policy/license.html",
+          "bodyAssetPath": "editorial/items/s9_2_r06_boethius_consolation.md"
+        },
+        {
+          "id": "s9-2-r07-schopenhauer-counsels-maxims",
+          "title": "Hold the Moment Lightly",
+          "description": "A calm-philosophy reading with a steady, non-despairing tone",
+          "whyThisNow": "Turns urgency into steadier distance and a lighter grip on the moment",
+          "durationMinutes": 9,
+          "format": "MARKDOWN",
+          "source": "Arthur Schopenhauer",
+          "rightsClass": "RENDERABLE",
+          "renderMode": "IN_APP_READER",
+          "licenseName": "Project Gutenberg License",
+          "sourceUrl": "https://www.gutenberg.org/ebooks/10715",
+          "attribution": "Arthur Schopenhauer, Counsels and Maxims, via Project Gutenberg",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "PHILOSOPHY",
+            "PSYCHOLOGY"
+          ],
+          "licenseUrl": "https://www.gutenberg.org/policy/license.html",
+          "bodyAssetPath": "editorial/items/s9_2_r07_schopenhauer_counsels_maxims.md"
+        },
+        {
+          "id": "s9-2-r08-laozi-tao-teh-king",
+          "title": "Return to the Unforced",
+          "description": "A public-domain Taoist philosophy reading for calm non-forcing",
+          "whyThisNow": "Gives a short non-urgent counterweight to compulsive action",
+          "durationMinutes": 7,
+          "format": "MARKDOWN",
+          "source": "Laozi",
+          "rightsClass": "RENDERABLE",
+          "renderMode": "IN_APP_READER",
+          "licenseName": "Project Gutenberg License",
+          "sourceUrl": "https://www.gutenberg.org/ebooks/216",
+          "attribution": "Laozi, The Tao Teh King, via Project Gutenberg",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "PHILOSOPHY",
+            "HISTORY_CULTURE"
+          ],
+          "licenseUrl": "https://www.gutenberg.org/policy/license.html",
+          "bodyAssetPath": "editorial/items/s9_2_r08_laozi_tao_teh_king.md"
+        },
+        {
+          "id": "s9-2-l01-sep-bodily-awareness",
+          "title": "Bodily Awareness",
+          "description": "A reference reading for embodied reset and interoception framing",
+          "whyThisNow": "Provides a deeper frame for body awareness without health claims",
+          "durationMinutes": 18,
+          "format": "HTML",
+          "source": "Stanford Encyclopedia of Philosophy",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://plato.stanford.edu/entries/bodily-awareness/",
+          "attribution": "Stanford Encyclopedia of Philosophy: Bodily Awareness",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "BODY",
+            "PHILOSOPHY",
+            "PSYCHOLOGY"
+          ],
+          "externalUrl": "https://plato.stanford.edu/entries/bodily-awareness/"
+        },
+        {
+          "id": "s9-2-l02-sep-emotion",
+          "title": "Emotion",
+          "description": "A reference reading for understanding emotion without clinical advice",
+          "whyThisNow": "Gives a deep non-self-help frame for emotional interruption moments",
+          "durationMinutes": 18,
+          "format": "HTML",
+          "source": "Stanford Encyclopedia of Philosophy",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://plato.stanford.edu/entries/emotion/",
+          "attribution": "Stanford Encyclopedia of Philosophy: Emotion",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "PHILOSOPHY",
+            "PSYCHOLOGY"
+          ],
+          "externalUrl": "https://plato.stanford.edu/entries/emotion/"
+        },
+        {
+          "id": "s9-2-l03-iep-theories-emotion",
+          "title": "Theories of Emotion",
+          "description": "A reference reading for emotions as something to understand before acting",
+          "whyThisNow": "Offers non-feed explanation when the impulse is affect-driven",
+          "durationMinutes": 16,
+          "format": "HTML",
+          "source": "Internet Encyclopedia of Philosophy",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://iep.utm.edu/theories-of-emotion/",
+          "attribution": "Internet Encyclopedia of Philosophy: Theories of Emotion",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "PSYCHOLOGY",
+            "PHILOSOPHY"
+          ],
+          "externalUrl": "https://iep.utm.edu/theories-of-emotion/"
+        },
+        {
+          "id": "s9-2-l04-iep-stoic-philosophy-mind",
+          "title": "Stoic Philosophy of Mind",
+          "description": "A reference reading for moderate and well-disposed emotion",
+          "whyThisNow": "Provides a careful counter to the myth that calm means emotional flatness",
+          "durationMinutes": 16,
+          "format": "HTML",
+          "source": "Internet Encyclopedia of Philosophy",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://iep.utm.edu/stoicmind/",
+          "attribution": "Internet Encyclopedia of Philosophy: Stoic Philosophy of Mind",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "PHILOSOPHY",
+            "PSYCHOLOGY"
+          ],
+          "externalUrl": "https://iep.utm.edu/stoicmind/"
+        },
+        {
+          "id": "s9-2-l05-iep-husserl-embodiment",
+          "title": "Embodiment and Experience",
+          "description": "A reference reading for embodied attention and movement possibility",
+          "whyThisNow": "Deepens body reset as lived experience rather than productivity advice",
+          "durationMinutes": 18,
+          "format": "HTML",
+          "source": "Internet Encyclopedia of Philosophy",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://iep.utm.edu/husspemb/",
+          "attribution": "Internet Encyclopedia of Philosophy: Husserl: Phenomenology of Embodiment",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "BODY",
+            "PHILOSOPHY"
+          ],
+          "externalUrl": "https://iep.utm.edu/husspemb/"
+        },
+        {
+          "id": "s9-2-l06-sapiens-bipedality",
+          "title": "Why Humans Walk Upright",
+          "description": "A body-reset reading about walking upright and human evolution",
+          "whyThisNow": "Turns a movement impulse into curiosity about walking as human history",
+          "durationMinutes": 9,
+          "format": "HTML",
+          "source": "SAPIENS",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://www.sapiens.org/archaeology/human-bipedality/",
+          "attribution": "SAPIENS: Unraveling the Mystery of Human Bipedality",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "BODY",
+            "HISTORY_CULTURE",
+            "SCIENCE"
+          ],
+          "externalUrl": "https://www.sapiens.org/archaeology/human-bipedality/"
+        },
+        {
+          "id": "s9-2-l07-sapiens-coffee-rituals",
+          "title": "Coffee Rituals and Calm",
+          "description": "A cultural ritual reading for calm browser handoff",
+          "whyThisNow": "Frames calm as a small ritual rather than a content feed",
+          "durationMinutes": 7,
+          "format": "HTML",
+          "source": "SAPIENS",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://www.sapiens.org/culture/coffee-rituals/",
+          "attribution": "SAPIENS: Finding Calm and Connection in Coffee Rituals",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "HISTORY_CULTURE",
+            "BODY"
+          ],
+          "externalUrl": "https://www.sapiens.org/culture/coffee-rituals/"
+        },
+        {
+          "id": "s9-2-l08-sapiens-body-positivity",
+          "title": "Bodies Beyond Appearance",
+          "description": "A body-reset read with non-prescriptive body-language framing",
+          "whyThisNow": "Redirects body attention away from appearance metrics toward capacity and culture",
+          "durationMinutes": 14,
+          "format": "HTML",
+          "source": "SAPIENS",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://www.sapiens.org/culture/kichwa-body-positivity/",
+          "attribution": "SAPIENS: Consumer Culture Will Not Lead to Body Positivity",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "BODY",
+            "HISTORY_CULTURE"
+          ],
+          "externalUrl": "https://www.sapiens.org/culture/kichwa-body-positivity/"
+        },
+        {
+          "id": "s9-2-l09-sapiens-exercise-history",
+          "title": "Why Bodies Resist Exercise",
+          "description": "An embodied-reset read about exercise history, not personal health advice",
+          "whyThisNow": "Gives context for movement resistance without turning the app into coaching",
+          "durationMinutes": 14,
+          "format": "HTML",
+          "source": "SAPIENS",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://www.sapiens.org/biology/evolutionary-history-exercise/",
+          "attribution": "SAPIENS: What Is Behind Humanity Love-Hate Relationship With Exercise?",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "BODY",
+            "SCIENCE"
+          ],
+          "externalUrl": "https://www.sapiens.org/biology/evolutionary-history-exercise/"
+        },
+        {
+          "id": "s9-2-l10-smithsonian-perception-defined",
+          "title": "Perception in the Garden",
+          "description": "A sensory perception reading for outward embodied attention",
+          "whyThisNow": "Gives a sensory garden alternative to phone-checking",
+          "durationMinutes": 9,
+          "format": "HTML",
+          "source": "Smithsonian Magazine",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://www.smithsonianmag.com/science-nature/perception-defined-100113767/",
+          "attribution": "Smithsonian Magazine: Perception, Defined",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "BODY",
+            "NATURE",
+            "CREATIVITY"
+          ],
+          "externalUrl": "https://www.smithsonianmag.com/science-nature/perception-defined-100113767/"
+        },
+        {
+          "id": "s9-2-l11-smithsonian-senses-design",
+          "title": "Design Beyond Vision",
+          "description": "A institutional reading about touch sound smell and embodied design",
+          "whyThisNow": "Uses multisensory design as a body-aware alternative to screen reflex",
+          "durationMinutes": 8,
+          "format": "HTML",
+          "source": "Cooper Hewitt Smithsonian Design Museum",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://www.si.edu/newsdesk/releases/cooper-hewitt-smithsonian-design-museum-present-senses-design-beyond-vision",
+          "attribution": "Cooper Hewitt Smithsonian Design Museum: The Senses: Design Beyond Vision",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "BODY",
+            "CREATIVITY"
+          ],
+          "externalUrl": "https://www.si.edu/newsdesk/releases/cooper-hewitt-smithsonian-design-museum-present-senses-design-beyond-vision"
+        },
+        {
+          "id": "s9-2-l12-smithsonian-engaging-senses",
+          "title": "Engaging the Senses",
+          "description": "A museum reading for sensory attention and cultural context",
+          "whyThisNow": "Offers a cultural and sensory attention reset through a museum lens",
+          "durationMinutes": 8,
+          "format": "HTML",
+          "source": "National Museum of Asian Art",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://asia-archive.si.edu/exhibition/engaging-the-senses/",
+          "attribution": "National Museum of Asian Art: Engaging the Senses",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "HISTORY_CULTURE",
+            "BODY"
+          ],
+          "externalUrl": "https://asia-archive.si.edu/exhibition/engaging-the-senses/"
+        }
+      ]
+    },
+    {
+      "id": "wonder_science_v1",
+      "title": "Wonder and Science",
+      "description": "Readings that turn feed impulse into durable curiosity and observation.",
+      "items": [
+        {
+          "id": "s9-3-r01-fabre-storybook-science",
+          "title": "Make the World Strange Again",
+          "description": "A public-domain science-wonder excerpt reading for noticing nature with fresh attention",
+          "whyThisNow": "Turns restless checking into curiosity about ordinary natural phenomena",
+          "durationMinutes": 8,
+          "format": "MARKDOWN",
+          "source": "Jean-Henri Fabre",
+          "rightsClass": "RENDERABLE",
+          "renderMode": "IN_APP_READER",
+          "licenseName": "Project Gutenberg License",
+          "sourceUrl": "https://www.gutenberg.org/ebooks/56795",
+          "attribution": "Jean-Henri Fabre - The Story-book of Science via Project Gutenberg",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "SCIENCE",
+            "NATURE"
+          ],
+          "licenseUrl": "https://www.gutenberg.org/policy/license.html",
+          "bodyAssetPath": "editorial/items/s9_3_r01_fabre_storybook_science.md"
+        },
+        {
+          "id": "s9-3-r02-fabre-life-spider",
+          "title": "A Spider as a World",
+          "description": "A public-domain natural-history reading about attention patience and intricate life",
+          "whyThisNow": "Offers a small living system to inspect instead of scrolling",
+          "durationMinutes": 7,
+          "format": "MARKDOWN",
+          "source": "Jean-Henri Fabre",
+          "rightsClass": "RENDERABLE",
+          "renderMode": "IN_APP_READER",
+          "licenseName": "Project Gutenberg License",
+          "sourceUrl": "https://www.gutenberg.org/ebooks/1887",
+          "attribution": "Jean-Henri Fabre - The Life of the Spider via Project Gutenberg",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "NATURE",
+            "SCIENCE"
+          ],
+          "licenseUrl": "https://www.gutenberg.org/policy/license.html",
+          "bodyAssetPath": "editorial/items/s9_3_r02_fabre_life_spider.md"
+        },
+        {
+          "id": "s9-3-r03-fabre-life-fly",
+          "title": "The Fly Under Attention",
+          "description": "A public-domain curiosity reading for turning irritation into close observation",
+          "whyThisNow": "Makes an ordinary ignored creature a focus object",
+          "durationMinutes": 7,
+          "format": "MARKDOWN",
+          "source": "Jean-Henri Fabre",
+          "rightsClass": "RENDERABLE",
+          "renderMode": "IN_APP_READER",
+          "licenseName": "Project Gutenberg License",
+          "sourceUrl": "https://www.gutenberg.org/ebooks/3422",
+          "attribution": "Jean-Henri Fabre - The Life of the Fly via Project Gutenberg",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "NATURE",
+            "SCIENCE"
+          ],
+          "licenseUrl": "https://www.gutenberg.org/policy/license.html",
+          "bodyAssetPath": "editorial/items/s9_3_r03_fabre_life_fly.md"
+        },
+        {
+          "id": "s9-3-r04-buckley-fairyland-science",
+          "title": "Science as Wonder",
+          "description": "A public-domain popular-science excerpt reading for wonder-driven reset",
+          "whyThisNow": "Reframes science as attention and awe rather than homework",
+          "durationMinutes": 8,
+          "format": "MARKDOWN",
+          "source": "Arabella B. Buckley",
+          "rightsClass": "RENDERABLE",
+          "renderMode": "IN_APP_READER",
+          "licenseName": "Project Gutenberg License",
+          "sourceUrl": "https://www.gutenberg.org/ebooks/5726",
+          "attribution": "Arabella B. Buckley - The Fairy-Land of Science via Project Gutenberg",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "SCIENCE",
+            "NATURE"
+          ],
+          "licenseUrl": "https://www.gutenberg.org/policy/license.html",
+          "bodyAssetPath": "editorial/items/s9_3_r04_buckley_fairyland_science.md"
+        },
+        {
+          "id": "s9-3-r05-flammarion-astronomy-amateurs",
+          "title": "Look Up for Scale",
+          "description": "A public-domain astronomy excerpt reading for scale and wonder",
+          "whyThisNow": "Uses sky-scale curiosity as an alternative to short-loop checking",
+          "durationMinutes": 8,
+          "format": "MARKDOWN",
+          "source": "Camille Flammarion",
+          "rightsClass": "RENDERABLE",
+          "renderMode": "IN_APP_READER",
+          "licenseName": "Project Gutenberg License",
+          "sourceUrl": "https://www.gutenberg.org/ebooks/25267",
+          "attribution": "Camille Flammarion - Astronomy for Amateurs via Project Gutenberg",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "SCIENCE",
+            "NATURE"
+          ],
+          "licenseUrl": "https://www.gutenberg.org/policy/license.html",
+          "bodyAssetPath": "editorial/items/s9_3_r05_flammarion_astronomy_amateurs.md"
+        },
+        {
+          "id": "s9-3-r06-ball-story-heavens",
+          "title": "The Heavens in Scale",
+          "description": "A public-domain astronomy reading using a diagram-light passage",
+          "whyThisNow": "A longer sky-scale option for replacing doomscrolling with perspective",
+          "durationMinutes": 9,
+          "format": "MARKDOWN",
+          "source": "Robert Stawell Ball",
+          "rightsClass": "RENDERABLE",
+          "renderMode": "IN_APP_READER",
+          "licenseName": "Project Gutenberg License",
+          "sourceUrl": "https://www.gutenberg.org/ebooks/27378",
+          "attribution": "Robert Stawell Ball - The Story of the Heavens via Project Gutenberg",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "SCIENCE",
+            "NATURE"
+          ],
+          "licenseUrl": "https://www.gutenberg.org/policy/license.html",
+          "bodyAssetPath": "editorial/items/s9_3_r06_ball_story_heavens.md"
+        },
+        {
+          "id": "s9-3-r07-martin-piece-coal",
+          "title": "A Lump of Coal Tells Time",
+          "description": "A public-domain science-history reading about coal formation and use",
+          "whyThisNow": "Turns an energy object into a deep-time material story",
+          "durationMinutes": 7,
+          "format": "MARKDOWN",
+          "source": "Edward A. Martin",
+          "rightsClass": "RENDERABLE",
+          "renderMode": "IN_APP_READER",
+          "licenseName": "Project Gutenberg License",
+          "sourceUrl": "https://www.gutenberg.org/ebooks/12762",
+          "attribution": "Edward A. Martin - The Story of a Piece of Coal via Project Gutenberg",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "SCIENCE",
+            "HISTORY_CULTURE",
+            "NATURE"
+          ],
+          "licenseUrl": "https://www.gutenberg.org/policy/license.html",
+          "bodyAssetPath": "editorial/items/s9_3_r07_martin_piece_coal.md"
+        },
+        {
+          "id": "s9-3-r08-darwin-insectivorous-plants",
+          "title": "Plants That Hunt",
+          "description": "A public-domain biology reading for wonder through careful plant behavior",
+          "whyThisNow": "Replaces novelty seeking with slow experimental observation",
+          "durationMinutes": 9,
+          "format": "MARKDOWN",
+          "source": "Charles Darwin",
+          "rightsClass": "RENDERABLE",
+          "renderMode": "IN_APP_READER",
+          "licenseName": "Project Gutenberg License",
+          "sourceUrl": "https://www.gutenberg.org/ebooks/5765",
+          "attribution": "Charles Darwin - Insectivorous Plants via Project Gutenberg",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "SCIENCE",
+            "NATURE"
+          ],
+          "licenseUrl": "https://www.gutenberg.org/policy/license.html",
+          "bodyAssetPath": "editorial/items/s9_3_r08_darwin_insectivorous_plants.md"
+        },
+        {
+          "id": "s9-3-r09-tyndall-lectures-light",
+          "title": "Light Has Structure",
+          "description": "A public-domain physics lecture reading for science curiosity",
+          "whyThisNow": "Uses everyday light as a route into patient scientific attention",
+          "durationMinutes": 8,
+          "format": "MARKDOWN",
+          "source": "John Tyndall",
+          "rightsClass": "RENDERABLE",
+          "renderMode": "IN_APP_READER",
+          "licenseName": "Project Gutenberg License",
+          "sourceUrl": "https://www.gutenberg.org/ebooks/14000",
+          "attribution": "John Tyndall - Six Lectures on Light via Project Gutenberg",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "SCIENCE",
+            "NATURE"
+          ],
+          "licenseUrl": "https://www.gutenberg.org/policy/license.html",
+          "bodyAssetPath": "editorial/items/s9_3_r09_tyndall_lectures_light.md"
+        },
+        {
+          "id": "s9-3-r10-munro-story-electricity",
+          "title": "Electricity Becomes Visible",
+          "description": "A public-domain electricity reading using a diagram-light passage",
+          "whyThisNow": "Turns an invisible force into a practical curiosity object",
+          "durationMinutes": 8,
+          "format": "MARKDOWN",
+          "source": "John Munro",
+          "rightsClass": "RENDERABLE",
+          "renderMode": "IN_APP_READER",
+          "licenseName": "Project Gutenberg License",
+          "sourceUrl": "https://www.gutenberg.org/ebooks/4710",
+          "attribution": "John Munro - The Story of Electricity via Project Gutenberg",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "SCIENCE",
+            "TECH",
+            "PRACTICAL"
+          ],
+          "licenseUrl": "https://www.gutenberg.org/policy/license.html",
+          "bodyAssetPath": "editorial/items/s9_3_r10_munro_story_electricity.md"
+        },
+        {
+          "id": "s9-3-r11-figuier-ocean-world",
+          "title": "The Sea as a World",
+          "description": "A public-domain marine-science reading using a text-first passage",
+          "whyThisNow": "Moves attention from screen surfaces to ocean scale and life variety",
+          "durationMinutes": 8,
+          "format": "MARKDOWN",
+          "source": "Louis Figuier",
+          "rightsClass": "RENDERABLE",
+          "renderMode": "IN_APP_READER",
+          "licenseName": "Project Gutenberg License",
+          "sourceUrl": "https://www.gutenberg.org/ebooks/47626",
+          "attribution": "Louis Figuier - The Ocean World via Project Gutenberg",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "NATURE",
+            "SCIENCE"
+          ],
+          "licenseUrl": "https://www.gutenberg.org/policy/license.html",
+          "bodyAssetPath": "editorial/items/s9_3_r11_figuier_ocean_world.md"
+        },
+        {
+          "id": "s9-3-l01-quanta-life-complexity",
+          "title": "Life Gets Complicated",
+          "description": "A science curiosity reading about how complexity can arise",
+          "whyThisNow": "Turns complexity into a careful scientific question",
+          "durationMinutes": 14,
+          "format": "HTML",
+          "source": "Quanta Magazine",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://www.quantamagazine.org/the-surprising-origins-of-lifes-complexity-20130716/",
+          "attribution": "Quanta Magazine: The Surprising Origins of Life’s Complexity",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "SCIENCE",
+            "NATURE"
+          ],
+          "externalUrl": "https://www.quantamagazine.org/the-surprising-origins-of-lifes-complexity-20130716/"
+        },
+        {
+          "id": "s9-3-l02-quanta-quantumness",
+          "title": "What Makes Quantum Quantum",
+          "description": "A quantum computing explainer for deep curiosity",
+          "whyThisNow": "Replaces reflex checking with a hard but finite puzzle",
+          "durationMinutes": 16,
+          "format": "HTML",
+          "source": "Quanta Magazine",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://www.quantamagazine.org/the-quest-to-quantify-quantumness-20231019/",
+          "attribution": "Quanta Magazine: The Quest to Quantify Quantumness",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "SCIENCE",
+            "TECH"
+          ],
+          "externalUrl": "https://www.quantamagazine.org/the-quest-to-quantify-quantumness-20231019/"
+        },
+        {
+          "id": "s9-3-l03-quanta-uncertainty-measurements",
+          "title": "Uncertainty as a Tool",
+          "description": "A physics reading about measurement and uncertainty",
+          "whyThisNow": "Uses a surprising constraint-to-tool story as an attention reset",
+          "durationMinutes": 10,
+          "format": "HTML",
+          "source": "Quanta Magazine",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://www.quantamagazine.org/physicists-show-how-quantum-uncertainty-sharpens-measurements-20220503/",
+          "attribution": "Quanta Magazine: Physicists Show How Quantum Uncertainty Sharpens Measurements",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "SCIENCE",
+            "TECH"
+          ],
+          "externalUrl": "https://www.quantamagazine.org/physicists-show-how-quantum-uncertainty-sharpens-measurements-20220503/"
+        },
+        {
+          "id": "s9-3-l04-quanta-universe-shape",
+          "title": "Can the Universe Have Shape",
+          "description": "A cosmology reading about topology and perspective",
+          "whyThisNow": "Gives a scale-shift away from phone urgency",
+          "durationMinutes": 14,
+          "format": "HTML",
+          "source": "Quanta Magazine",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://www.quantamagazine.org/cosmologists-try-a-new-way-to-measure-the-shape-of-the-universe-20250127/",
+          "attribution": "Quanta Magazine: Cosmologists Try a New Way to Measure the Shape of the Universe",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "SCIENCE",
+            "NATURE"
+          ],
+          "externalUrl": "https://www.quantamagazine.org/cosmologists-try-a-new-way-to-measure-the-shape-of-the-universe-20250127/"
+        },
+        {
+          "id": "s9-3-l05-quanta-vertebrate-intelligence",
+          "title": "Birds Think Differently",
+          "description": "A curiosity reading about convergent intelligence",
+          "whyThisNow": "Dislodges human-centered attention with a concrete animal-intelligence question",
+          "durationMinutes": 15,
+          "format": "HTML",
+          "source": "Quanta Magazine",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://www.quantamagazine.org/intelligence-evolved-at-least-twice-in-vertebrate-animals-20250407/",
+          "attribution": "Quanta Magazine: Intelligence Evolved at Least Twice in Vertebrate Animals",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "SCIENCE",
+            "PSYCHOLOGY",
+            "NATURE"
+          ],
+          "externalUrl": "https://www.quantamagazine.org/intelligence-evolved-at-least-twice-in-vertebrate-animals-20250407/"
+        },
+        {
+          "id": "s9-3-l06-nasa-carbon-cycle-seawifs",
+          "title": "Earth Breathes in Color",
+          "description": "A NASA visual-data read best opened in the browser",
+          "whyThisNow": "Turns a glance impulse into planet-scale pattern noticing",
+          "durationMinutes": 6,
+          "format": "HTML",
+          "source": "NASA Earth Observatory",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://earthobservatory.nasa.gov/images/1297/seawifs-views-the-global-carbon-cycle",
+          "attribution": "NASA Earth Observatory: SeaWiFS Views the Global Carbon Cycle",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "SCIENCE",
+            "NATURE"
+          ],
+          "externalUrl": "https://earthobservatory.nasa.gov/images/1297/seawifs-views-the-global-carbon-cycle"
+        },
+        {
+          "id": "s9-3-l07-nasa-exoplanets",
+          "title": "Worlds Beyond This One",
+          "description": "A NASA explainer reading about planets beyond our solar system",
+          "whyThisNow": "Offers wonder and scale without turning into a feed",
+          "durationMinutes": 7,
+          "format": "HTML",
+          "source": "NASA Science",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://science.nasa.gov/exoplanets/what-is-an-exoplanet/",
+          "attribution": "NASA Science: What Is an Exoplanet?",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "SCIENCE",
+            "NATURE"
+          ],
+          "externalUrl": "https://science.nasa.gov/exoplanets/what-is-an-exoplanet/"
+        },
+        {
+          "id": "s9-3-l08-nasa-pale-blue-dot",
+          "title": "Earth as One Pixel",
+          "description": "A NASA perspective read centered on its original image context",
+          "whyThisNow": "Replaces urgency with a direct perspective shift",
+          "durationMinutes": 5,
+          "format": "HTML",
+          "source": "NASA Photojournal",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://science.nasa.gov/photojournal/pale-blue-dot-revisited",
+          "attribution": "NASA Photojournal: Pale Blue Dot Revisited",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "SCIENCE",
+            "PHILOSOPHY",
+            "NATURE"
+          ],
+          "externalUrl": "https://science.nasa.gov/photojournal/pale-blue-dot-revisited"
+        },
+        {
+          "id": "s9-3-l09-noaa-ocean-acidification",
+          "title": "The Ocean Changes Chemistry",
+          "description": "A NOAA explainer reading about ocean chemistry",
+          "whyThisNow": "Turns climate anxiety into a bounded explanatory question",
+          "durationMinutes": 6,
+          "format": "HTML",
+          "source": "NOAA Ocean Service",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://oceanservice.noaa.gov/facts/acidification.html",
+          "attribution": "NOAA Ocean Service: What Is Ocean Acidification?",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "SCIENCE",
+            "NATURE"
+          ],
+          "externalUrl": "https://oceanservice.noaa.gov/facts/acidification.html"
+        },
+        {
+          "id": "s9-3-l10-noaa-el-nino",
+          "title": "A Pattern in the Pacific",
+          "description": "A NOAA reading about a recurring climate pattern",
+          "whyThisNow": "Offers a finite weather-pattern explanation instead of open-ended news checking",
+          "durationMinutes": 5,
+          "format": "HTML",
+          "source": "NOAA Ocean Explorer",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://oceanexplorer.noaa.gov/facts/elnino.html",
+          "attribution": "NOAA Ocean Explorer: What Is El Niño?",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "SCIENCE",
+            "NATURE"
+          ],
+          "externalUrl": "https://oceanexplorer.noaa.gov/facts/elnino.html"
+        },
+        {
+          "id": "s9-3-l11-owid-energy",
+          "title": "Energy Systems in Data",
+          "description": "A live data read best opened with its charts in the browser",
+          "whyThisNow": "Turns energy doomscrolling into chart-guided context outside the app",
+          "durationMinutes": 18,
+          "format": "HTML",
+          "source": "Our World in Data",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://ourworldindata.org/energy",
+          "attribution": "Our World in Data: Energy",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "SCIENCE",
+            "TECH",
+            "HISTORY_CULTURE"
+          ],
+          "externalUrl": "https://ourworldindata.org/energy"
+        },
+        {
+          "id": "s9-3-l12-owid-greenhouse-gases",
+          "title": "Emissions in Context",
+          "description": "A climate-data read best opened with its current charts in the browser",
+          "whyThisNow": "Provides context without importing political news dynamics into the app",
+          "durationMinutes": 18,
+          "format": "HTML",
+          "source": "Our World in Data",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://ourworldindata.org/greenhouse-gas-emissions",
+          "attribution": "Our World in Data: Greenhouse Gas Emissions",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "SCIENCE",
+            "HISTORY_CULTURE"
+          ],
+          "externalUrl": "https://ourworldindata.org/greenhouse-gas-emissions"
+        },
+        {
+          "id": "s9-3-l13-nautilus-brains-best-guess",
+          "title": "Reality Is a Guess",
+          "description": "A perception reading for pausing before reacting to experience",
+          "whyThisNow": "Turns certainty into curiosity about perception",
+          "durationMinutes": 9,
+          "format": "HTML",
+          "source": "Nautilus",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://nautil.us/reality-is-your-brains-best-guess-312269/",
+          "attribution": "Nautilus: Reality Is Your Brain’s Best Guess",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "PSYCHOLOGY",
+            "SCIENCE"
+          ],
+          "externalUrl": "https://nautil.us/reality-is-your-brains-best-guess-312269/"
+        },
+        {
+          "id": "s9-3-l14-nautilus-life-rules",
+          "title": "Life Has Rules",
+          "description": "An astrobiology read that opens in the browser with its full context",
+          "whyThisNow": "Replaces novelty loops with constraints on what life can be",
+          "durationMinutes": 10,
+          "format": "HTML",
+          "source": "Nautilus",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://nautil.us/life-beyond-human-has-to-play-by-the-rules-238157/",
+          "attribution": "Nautilus: Life Beyond Human Has to Play by the Rules",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "SCIENCE",
+            "NATURE"
+          ],
+          "externalUrl": "https://nautil.us/life-beyond-human-has-to-play-by-the-rules-238157/"
+        },
+        {
+          "id": "s9-3-l15-smithsonian-deep-sea",
+          "title": "The Deep Sea Is Nearby",
+          "description": "A museum reading about deep-ocean ecosystems",
+          "whyThisNow": "Uses the deep sea as a finite wonder target instead of an endless feed",
+          "durationMinutes": 8,
+          "format": "HTML",
+          "source": "Smithsonian Ocean",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://ocean.si.edu/ecosystems/deep-sea",
+          "attribution": "Smithsonian Ocean: Deep Sea",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "NATURE",
+            "SCIENCE"
+          ],
+          "externalUrl": "https://ocean.si.edu/ecosystems/deep-sea"
+        }
+      ]
+    },
+    {
+      "id": "long_view_history_v1",
+      "title": "Long View and History",
+      "description": "Readings for deep time, institutions, culture, and a longer frame of attention.",
+      "items": [
+        {
+          "id": "s9-4-r01-wells-short-history-world",
+          "title": "History at Human Scale",
+          "description": "A public-domain long-view reading for placing the present inside a wider human story",
+          "whyThisNow": "Turns an immediate impulse into a larger historical frame without becoming news",
+          "durationMinutes": 10,
+          "format": "MARKDOWN",
+          "source": "H. G. Wells",
+          "rightsClass": "RENDERABLE",
+          "renderMode": "IN_APP_READER",
+          "licenseName": "Project Gutenberg License",
+          "sourceUrl": "https://www.gutenberg.org/ebooks/35461",
+          "attribution": "H. G. Wells - A Short History of the World via Project Gutenberg",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "HISTORY_CULTURE",
+            "SCIENCE",
+            "PHILOSOPHY"
+          ],
+          "licenseUrl": "https://www.gutenberg.org/policy/license.html",
+          "bodyAssetPath": "editorial/items/s9_4_r01_wells_short_history_world.md"
+        },
+        {
+          "id": "s9-4-r02-henry-adams-education",
+          "title": "A Life Seen in Eras",
+          "description": "A public-domain memoir reading about technological and institutional change over a lifetime",
+          "whyThisNow": "Offers distance from the present by watching one life cross historical eras",
+          "durationMinutes": 9,
+          "format": "MARKDOWN",
+          "source": "Henry Adams",
+          "rightsClass": "RENDERABLE",
+          "renderMode": "IN_APP_READER",
+          "licenseName": "Project Gutenberg License",
+          "sourceUrl": "https://www.gutenberg.org/ebooks/2044",
+          "attribution": "Henry Adams - The Education of Henry Adams via Project Gutenberg",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "HISTORY_CULTURE",
+            "PHILOSOPHY",
+            "TECH"
+          ],
+          "licenseUrl": "https://www.gutenberg.org/policy/license.html",
+          "bodyAssetPath": "editorial/items/s9_4_r02_henry_adams_education.md"
+        },
+        {
+          "id": "s9-4-r03-stevenson-travels-donkey",
+          "title": "Walk Into Older Time",
+          "description": "A public-domain travel-history reading for slower attention and place-based perspective",
+          "whyThisNow": "Replaces screen urgency with walking pace landscape and older local memory",
+          "durationMinutes": 7,
+          "format": "MARKDOWN",
+          "source": "Robert Louis Stevenson",
+          "rightsClass": "RENDERABLE",
+          "renderMode": "IN_APP_READER",
+          "licenseName": "Project Gutenberg License",
+          "sourceUrl": "https://www.gutenberg.org/ebooks/535",
+          "attribution": "Robert Louis Stevenson - Travels with a Donkey in the Cevennes via Project Gutenberg",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "NATURE",
+            "HISTORY_CULTURE"
+          ],
+          "licenseUrl": "https://www.gutenberg.org/policy/license.html",
+          "bodyAssetPath": "editorial/items/s9_4_r03_stevenson_travels_donkey.md"
+        },
+        {
+          "id": "s9-4-r04-turner-frontier-history",
+          "title": "Question the Frontier",
+          "description": "A public-domain historiography reading framed as a dated thesis",
+          "whyThisNow": "Makes a familiar national myth visible as a historical argument to examine",
+          "durationMinutes": 9,
+          "format": "MARKDOWN",
+          "source": "Frederick Jackson Turner",
+          "rightsClass": "RENDERABLE",
+          "renderMode": "IN_APP_READER",
+          "licenseName": "Project Gutenberg License",
+          "sourceUrl": "https://www.gutenberg.org/ebooks/22994",
+          "attribution": "Frederick Jackson Turner - The Frontier in American History via Project Gutenberg",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "HISTORY_CULTURE",
+            "PHILOSOPHY"
+          ],
+          "licenseUrl": "https://www.gutenberg.org/policy/license.html",
+          "bodyAssetPath": "editorial/items/s9_4_r04_turner_frontier_history.md"
+        },
+        {
+          "id": "s9-4-r05-addams-hull-house",
+          "title": "A Neighborhood Learns Itself",
+          "description": "A public-domain civic-history reading about community work and social imagination",
+          "whyThisNow": "Turns the impulse outward toward neighborhood institutions and patient repair",
+          "durationMinutes": 8,
+          "format": "MARKDOWN",
+          "source": "Jane Addams",
+          "rightsClass": "RENDERABLE",
+          "renderMode": "IN_APP_READER",
+          "licenseName": "Project Gutenberg License",
+          "sourceUrl": "https://www.gutenberg.org/ebooks/1325",
+          "attribution": "Jane Addams - Twenty Years at Hull-House via Project Gutenberg",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "HISTORY_CULTURE",
+            "PRACTICAL",
+            "PSYCHOLOGY"
+          ],
+          "licenseUrl": "https://www.gutenberg.org/policy/license.html",
+          "bodyAssetPath": "editorial/items/s9_4_r05_addams_hull_house.md"
+        },
+        {
+          "id": "s9-4-r06-dubois-souls-black-folk",
+          "title": "A Nation Seen From Within",
+          "description": "A public-domain US history and culture reading with a focused historical passage",
+          "whyThisNow": "Offers a serious alternative to shallow checking by asking for attention to lived history",
+          "durationMinutes": 10,
+          "format": "MARKDOWN",
+          "source": "W. E. B. Du Bois",
+          "rightsClass": "RENDERABLE",
+          "renderMode": "IN_APP_READER",
+          "licenseName": "Project Gutenberg License",
+          "sourceUrl": "https://www.gutenberg.org/ebooks/408",
+          "attribution": "W. E. B. Du Bois - The Souls of Black Folk via Project Gutenberg",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "HISTORY_CULTURE",
+            "PHILOSOPHY",
+            "PSYCHOLOGY"
+          ],
+          "licenseUrl": "https://www.gutenberg.org/policy/license.html",
+          "bodyAssetPath": "editorial/items/s9_4_r06_dubois_souls_black_folk.md"
+        },
+        {
+          "id": "s9-4-r07-equiano-interesting-narrative",
+          "title": "Freedom Across an Ocean",
+          "description": "A public-domain abolition memoir reading with a carefully bounded historical passage",
+          "whyThisNow": "Replaces reflex novelty with a first-person account of freedom identity and history",
+          "durationMinutes": 10,
+          "format": "MARKDOWN",
+          "source": "Olaudah Equiano",
+          "rightsClass": "RENDERABLE",
+          "renderMode": "IN_APP_READER",
+          "licenseName": "Project Gutenberg License",
+          "sourceUrl": "https://www.gutenberg.org/ebooks/15399",
+          "attribution": "Olaudah Equiano - The Interesting Narrative of the Life of Olaudah Equiano via Project Gutenberg",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "HISTORY_CULTURE",
+            "PHILOSOPHY"
+          ],
+          "licenseUrl": "https://www.gutenberg.org/policy/license.html",
+          "bodyAssetPath": "editorial/items/s9_4_r07_equiano_interesting_narrative.md"
+        },
+        {
+          "id": "s9-4-r08-hearn-glimpses-japan",
+          "title": "Look Carefully Across Culture",
+          "description": "A public-domain cultural observation reading that keeps distance from outdated framing",
+          "whyThisNow": "Offers close observation while keeping distance from outdated cultural framing",
+          "durationMinutes": 8,
+          "format": "MARKDOWN",
+          "source": "Lafcadio Hearn",
+          "rightsClass": "RENDERABLE",
+          "renderMode": "IN_APP_READER",
+          "licenseName": "Project Gutenberg License",
+          "sourceUrl": "https://www.gutenberg.org/ebooks/8130",
+          "attribution": "Lafcadio Hearn - Glimpses of Unfamiliar Japan: First Series via Project Gutenberg",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "HISTORY_CULTURE",
+            "NATURE",
+            "PHILOSOPHY"
+          ],
+          "licenseUrl": "https://www.gutenberg.org/policy/license.html",
+          "bodyAssetPath": "editorial/items/s9_4_r08_hearn_glimpses_japan.md"
+        },
+        {
+          "id": "s9-4-l01-longnow-orrery-interval",
+          "title": "An Orrery for the Next Ten Thousand Years",
+          "description": "A Long Now reading using the orrery as a finite long-view object",
+          "whyThisNow": "Turns a checking impulse into a physical model of long-term time",
+          "durationMinutes": 8,
+          "format": "HTML",
+          "source": "Long Now Ideas",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://longnow.org/ideas/orrery-interval-invitation-long-term-thinking/",
+          "attribution": "Long Now Ideas: The Orrery at The Interval: An Invitation to Long-Term Thinking",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "SCIENCE",
+            "HISTORY_CULTURE",
+            "TECH"
+          ],
+          "externalUrl": "https://longnow.org/ideas/orrery-interval-invitation-long-term-thinking/"
+        },
+        {
+          "id": "s9-4-l02-longnow-reframing-education",
+          "title": "Learning at the Pace of Generations",
+          "description": "A long-view reading about education infrastructure and generational time",
+          "whyThisNow": "Reframes urgency by separating fast fixes from slower cultural change",
+          "durationMinutes": 14,
+          "format": "HTML",
+          "source": "Long Now Ideas",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://longnow.org/ideas/reframing-education-part-3/",
+          "attribution": "Long Now Ideas: Reframing Education for the Long Now: Leveraging Pace Layer Strategies for System Change in Education",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "PRACTICAL",
+            "HISTORY_CULTURE",
+            "PHILOSOPHY"
+          ],
+          "externalUrl": "https://longnow.org/ideas/reframing-education-part-3/"
+        },
+        {
+          "id": "s9-4-l03-longnow-time-machine-museums",
+          "title": "Museums as Time Machines",
+          "description": "A museum-time reading with climate and image context kept in the browser",
+          "whyThisNow": "Lets a user step out of the instant by thinking through museums as time-framing institutions",
+          "durationMinutes": 16,
+          "format": "HTML",
+          "source": "Long Now Ideas",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://longnow.org/ideas/the-time-machine/",
+          "attribution": "Long Now Ideas: The Time Machine",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "HISTORY_CULTURE",
+            "NATURE",
+            "SCIENCE"
+          ],
+          "externalUrl": "https://longnow.org/ideas/the-time-machine/"
+        },
+        {
+          "id": "s9-4-l04-longnow-manual-civilization",
+          "title": "What Would You Keep for Civilization",
+          "description": "A Long Now reading about selecting durable knowledge instead of more feed material",
+          "whyThisNow": "Converts idle checking into a compact question about what knowledge is worth preserving",
+          "durationMinutes": 7,
+          "format": "HTML",
+          "source": "Long Now Ideas",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://longnow.org/ideas/manual-for-civilization/",
+          "attribution": "Long Now Ideas: Manual for Civilization",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "HISTORY_CULTURE",
+            "PRACTICAL",
+            "CREATIVITY"
+          ],
+          "externalUrl": "https://longnow.org/ideas/manual-for-civilization/"
+        },
+        {
+          "id": "s9-4-l05-sapiens-chaco-timber",
+          "title": "Where Chaco Found Its Wood",
+          "description": "A archaeology reading about ancient building logistics and environmental context",
+          "whyThisNow": "Offers a concrete historical puzzle about labor material and landscape",
+          "durationMinutes": 9,
+          "format": "HTML",
+          "source": "SAPIENS",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://www.sapiens.org/archaeology/chaco-canyon-timber/",
+          "attribution": "SAPIENS: The Astounding Origins of Chaco Canyon Timber",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "HISTORY_CULTURE",
+            "NATURE",
+            "SCIENCE"
+          ],
+          "externalUrl": "https://www.sapiens.org/archaeology/chaco-canyon-timber/"
+        },
+        {
+          "id": "s9-4-l06-sapiens-deep-history",
+          "title": "History Before Writing Is Still History",
+          "description": "A deep-history reading that challenges a familiar timeline category",
+          "whyThisNow": "Shifts attention from presentism toward older continuities and naming choices",
+          "durationMinutes": 8,
+          "format": "HTML",
+          "source": "SAPIENS",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://www.sapiens.org/archaeology/prehistory-deep-history-southeast-asia/",
+          "attribution": "SAPIENS: It’s Time to Replace “Prehistory” With “Deep History”",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "HISTORY_CULTURE",
+            "PHILOSOPHY"
+          ],
+          "externalUrl": "https://www.sapiens.org/archaeology/prehistory-deep-history-southeast-asia/"
+        },
+        {
+          "id": "s9-4-l07-sapiens-volcanoes-societies",
+          "title": "After the Volcano",
+          "description": "A archaeology reading about environmental shock and cultural memory",
+          "whyThisNow": "Reframes disruption as a long social adaptation story rather than breaking news",
+          "durationMinutes": 10,
+          "format": "HTML",
+          "source": "SAPIENS",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://www.sapiens.org/archaeology/volcanic-archaeology-pichincha-volcano/",
+          "attribution": "SAPIENS: How Volcanoes Destroy and Nurture Societies",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "HISTORY_CULTURE",
+            "NATURE",
+            "SCIENCE"
+          ],
+          "externalUrl": "https://www.sapiens.org/archaeology/volcanic-archaeology-pichincha-volcano/"
+        },
+        {
+          "id": "s9-4-l08-sapiens-margaret-mead-femur",
+          "title": "Care in One Old Bone",
+          "description": "A anthropology reading about evidence care and how stories about civilization spread",
+          "whyThisNow": "Uses one familiar anecdote to ask what counts as care across time",
+          "durationMinutes": 7,
+          "format": "HTML",
+          "source": "SAPIENS",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://www.sapiens.org/culture/margaret-mead-femur/",
+          "attribution": "SAPIENS: Did Margaret Mead Speculate About a Healed Femur?",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "HISTORY_CULTURE",
+            "BODY",
+            "PHILOSOPHY"
+          ],
+          "externalUrl": "https://www.sapiens.org/culture/margaret-mead-femur/"
+        },
+        {
+          "id": "s9-4-l09-met-tang-internationalism",
+          "title": "Tang China as Crossroads",
+          "description": "A museum reading about Tang trade routes and cross-cultural making",
+          "whyThisNow": "Shows cultural exchange as a visible pattern of objects styles and routes",
+          "durationMinutes": 8,
+          "format": "HTML",
+          "source": "The Met Heilbrunn Timeline of Art History",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://www.metmuseum.org/essays/internationalism-in-the-tang-dynasty-618-906",
+          "attribution": "The Met Heilbrunn Timeline of Art History: Internationalism in the Tang Dynasty (618–907)",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "HISTORY_CULTURE",
+            "CREATIVITY"
+          ],
+          "externalUrl": "https://www.metmuseum.org/essays/internationalism-in-the-tang-dynasty-618-906"
+        },
+        {
+          "id": "s9-4-l10-met-roman-asia-trade",
+          "title": "Routes Between Empires",
+          "description": "A museum reading about ancient trade networks and contact across empires",
+          "whyThisNow": "Turns restless novelty into a map of exchange routes and material culture",
+          "durationMinutes": 7,
+          "format": "HTML",
+          "source": "The Met Heilbrunn Timeline of Art History",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://www.metmuseum.org/toah/hd/silk/hd_silk.htm",
+          "attribution": "The Met Heilbrunn Timeline of Art History: Trade between the Romans and the Empires of Asia",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "HISTORY_CULTURE",
+            "SCIENCE",
+            "CREATIVITY"
+          ],
+          "externalUrl": "https://www.metmuseum.org/toah/hd/silk/hd_silk.htm"
+        },
+        {
+          "id": "s9-4-l11-nmaahc-making-way",
+          "title": "Institutions That Made a Way",
+          "description": "A museum reading about agency institutions and Black community history",
+          "whyThisNow": "Replaces individual impulse with examples of durable community institutions",
+          "durationMinutes": 9,
+          "format": "HTML",
+          "source": "NMAAHC",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://nmaahc.si.edu/explore/exhibitions/making-way-out-no-way",
+          "attribution": "NMAAHC: Making a Way Out of No Way",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "HISTORY_CULTURE",
+            "PRACTICAL",
+            "CREATIVITY"
+          ],
+          "externalUrl": "https://nmaahc.si.edu/explore/exhibitions/making-way-out-no-way"
+        },
+        {
+          "id": "s9-4-l12-jstor-inventing-silk-roads",
+          "title": "The Silk Road as an Idea",
+          "description": "A historiography reading about the modern invention of a famous route-name",
+          "whyThisNow": "Shows that even familiar historical labels have histories of their own",
+          "durationMinutes": 5,
+          "format": "HTML",
+          "source": "JSTOR Daily",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://daily.jstor.org/inventing-silk-roads/",
+          "attribution": "JSTOR Daily: Inventing Silk Roads",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "HISTORY_CULTURE",
+            "PHILOSOPHY"
+          ],
+          "externalUrl": "https://daily.jstor.org/inventing-silk-roads/"
+        },
+        {
+          "id": "s9-4-l13-jstor-agarwood",
+          "title": "A Fragrance Crossing Cultures",
+          "description": "A material-culture reading about how one plant product moved through cultures",
+          "whyThisNow": "Offers a finite object of attention that connects ecology trade ritual and memory",
+          "durationMinutes": 6,
+          "format": "HTML",
+          "source": "JSTOR Daily",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://daily.jstor.org/plant-of-the-month-agarwood/",
+          "attribution": "JSTOR Daily: Plant of the Month: Agarwood",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "HISTORY_CULTURE",
+            "NATURE",
+            "CREATIVITY"
+          ],
+          "externalUrl": "https://daily.jstor.org/plant-of-the-month-agarwood/"
+        },
+        {
+          "id": "s9-4-l14-nautilus-walden-deep-time",
+          "title": "Walden in Deep Time",
+          "description": "A deep-time reading connecting Walden literary memory to environmental history",
+          "whyThisNow": "Sets today beside lake sediments lifetimes and older human presence",
+          "durationMinutes": 13,
+          "format": "HTML",
+          "source": "Nautilus",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://nautil.us/the-deep-time-of-walden-pond-237054",
+          "attribution": "Nautilus: The Deep Time of Walden Pond",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "NATURE",
+            "HISTORY_CULTURE",
+            "SCIENCE"
+          ],
+          "externalUrl": "https://nautil.us/the-deep-time-of-walden-pond-237054"
+        }
+      ]
+    },
+    {
+      "id": "creativity_play_v1",
+      "title": "Creativity and Play",
+      "description": "Readings for puzzles, craft, design, nonsense, and playful making.",
+      "items": [
+        {
+          "id": "s9-5-r01-dudeney-amusements-math",
+          "title": "Math as Play",
+          "description": "A public-domain mathematical-play reading for bounded reasoning and curiosity",
+          "whyThisNow": "Turns a checking impulse into a finite puzzle with a discoverable answer",
+          "durationMinutes": 8,
+          "format": "MARKDOWN",
+          "source": "Henry Ernest Dudeney",
+          "rightsClass": "RENDERABLE",
+          "renderMode": "IN_APP_READER",
+          "licenseName": "Project Gutenberg License",
+          "sourceUrl": "https://www.gutenberg.org/ebooks/16713",
+          "attribution": "Henry Ernest Dudeney - Amusements in Mathematics via Project Gutenberg",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "CREATIVITY",
+            "SCIENCE",
+            "PRACTICAL"
+          ],
+          "licenseUrl": "https://www.gutenberg.org/policy/license.html",
+          "bodyAssetPath": "editorial/items/s9_5_r01_dudeney_amusements_math.md"
+        },
+        {
+          "id": "s9-5-r02-lear-book-nonsense",
+          "title": "Five Minutes of Nonsense",
+          "description": "A public-domain nonsense-verse reading for low-stakes imaginative attention",
+          "whyThisNow": "Offers a brief playful reset without turning the app into entertainment browsing",
+          "durationMinutes": 5,
+          "format": "MARKDOWN",
+          "source": "Edward Lear",
+          "rightsClass": "RENDERABLE",
+          "renderMode": "IN_APP_READER",
+          "licenseName": "Project Gutenberg License",
+          "sourceUrl": "https://www.gutenberg.org/ebooks/13646",
+          "attribution": "Edward Lear - A Book of Nonsense via Project Gutenberg",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "CREATIVITY",
+            "PHILOSOPHY",
+            "PSYCHOLOGY"
+          ],
+          "licenseUrl": "https://www.gutenberg.org/policy/license.html",
+          "bodyAssetPath": "editorial/items/s9_5_r02_lear_book_nonsense.md"
+        },
+        {
+          "id": "s9-5-r03-lindsay-art-moving-picture",
+          "title": "Movies as an Art",
+          "description": "A public-domain creativity reading about film as craft and visual imagination",
+          "whyThisNow": "Redirects impulse toward seeing a familiar medium as a made artistic form",
+          "durationMinutes": 9,
+          "format": "MARKDOWN",
+          "source": "Vachel Lindsay",
+          "rightsClass": "RENDERABLE",
+          "renderMode": "IN_APP_READER",
+          "licenseName": "Project Gutenberg License",
+          "sourceUrl": "https://www.gutenberg.org/ebooks/13029",
+          "attribution": "Vachel Lindsay - The Art of the Moving Picture via Project Gutenberg",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "CREATIVITY",
+            "HISTORY_CULTURE",
+            "TECH"
+          ],
+          "licenseUrl": "https://www.gutenberg.org/policy/license.html",
+          "bodyAssetPath": "editorial/items/s9_5_r03_lindsay_art_moving_picture.md"
+        },
+        {
+          "id": "s9-5-r04-quiller-couch-art-writing",
+          "title": "Writing as Craft",
+          "description": "A public-domain writing-craft reading for attention to language and making",
+          "whyThisNow": "Converts restless checking into one concrete question about making sentences",
+          "durationMinutes": 8,
+          "format": "MARKDOWN",
+          "source": "Arthur Quiller-Couch",
+          "rightsClass": "RENDERABLE",
+          "renderMode": "IN_APP_READER",
+          "licenseName": "Project Gutenberg License",
+          "sourceUrl": "https://www.gutenberg.org/ebooks/17470",
+          "attribution": "Arthur Quiller-Couch - On the Art of Writing via Project Gutenberg",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "CREATIVITY",
+            "PRACTICAL",
+            "PHILOSOPHY"
+          ],
+          "licenseUrl": "https://www.gutenberg.org/policy/license.html",
+          "bodyAssetPath": "editorial/items/s9_5_r04_quiller_couch_art_writing.md"
+        },
+        {
+          "id": "s9-5-r05-fletcher-wood-block-printing",
+          "title": "Make a Print by Hand",
+          "description": "A public-domain craft reading about woodcutting color and patient making",
+          "whyThisNow": "Moves attention from consuming images to understanding a handmade image process",
+          "durationMinutes": 9,
+          "format": "MARKDOWN",
+          "source": "F. Morley Fletcher",
+          "rightsClass": "RENDERABLE",
+          "renderMode": "IN_APP_READER",
+          "licenseName": "Project Gutenberg License",
+          "sourceUrl": "https://www.gutenberg.org/ebooks/20195",
+          "attribution": "F. Morley Fletcher - Wood-Block Printing via Project Gutenberg",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "CREATIVITY",
+            "HISTORY_CULTURE",
+            "PRACTICAL"
+          ],
+          "licenseUrl": "https://www.gutenberg.org/policy/license.html",
+          "bodyAssetPath": "editorial/items/s9_5_r05_fletcher_wood_block_printing.md"
+        },
+        {
+          "id": "s9-5-r06-dana-bookbinding-libraries",
+          "title": "How a Book Holds Together",
+          "description": "A public-domain book-arts reading about materials repair and durable making",
+          "whyThisNow": "Replaces scroll momentum with attention to the hidden craft of keeping books usable",
+          "durationMinutes": 7,
+          "format": "MARKDOWN",
+          "source": "John Cotton Dana",
+          "rightsClass": "RENDERABLE",
+          "renderMode": "IN_APP_READER",
+          "licenseName": "Project Gutenberg License",
+          "sourceUrl": "https://www.gutenberg.org/ebooks/47456",
+          "attribution": "John Cotton Dana - Notes on Bookbinding for Libraries via Project Gutenberg",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "CREATIVITY",
+            "PRACTICAL",
+            "HISTORY_CULTURE"
+          ],
+          "licenseUrl": "https://www.gutenberg.org/policy/license.html",
+          "bodyAssetPath": "editorial/items/s9_5_r06_dana_bookbinding_libraries.md"
+        },
+        {
+          "id": "s9-5-l01-quanta-local-global-graph",
+          "title": "A Six-Dot Graph Puzzle",
+          "description": "A graph-theory puzzle read best opened with its diagrams in the browser",
+          "whyThisNow": "Turns the impulse into a small network puzzle with a finite object of attention",
+          "durationMinutes": 8,
+          "format": "HTML",
+          "source": "Quanta Magazine",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://www.quantamagazine.org/math-that-lets-you-think-locally-but-act-globally-20230721/",
+          "attribution": "Quanta Magazine: Math That Lets You Think Locally but Act Globally",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "CREATIVITY",
+            "SCIENCE",
+            "TECH"
+          ],
+          "externalUrl": "https://www.quantamagazine.org/math-that-lets-you-think-locally-but-act-globally-20230721/"
+        },
+        {
+          "id": "s9-5-l02-met-design-1900-1925",
+          "title": "Design Finds New Shapes",
+          "description": "A design-history reading about art craft industry and usable objects",
+          "whyThisNow": "Moves attention toward how everyday objects are deliberately shaped",
+          "durationMinutes": 8,
+          "format": "HTML",
+          "source": "The Met Heilbrunn Timeline of Art History",
+          "rightsClass": "LINK_ONLY",
+          "renderMode": "EXTERNAL_HANDOFF",
+          "licenseName": "Link-only canonical external recommendation; no scraping, caching, summarization, or in-app reproduction",
+          "sourceUrl": "https://www.metmuseum.org/essays/design-1900-25",
+          "attribution": "The Met Heilbrunn Timeline of Art History: Design 1900-1925",
+          "rightsReviewedAt": "2026-04-26",
+          "topics": [
+            "CREATIVITY",
+            "HISTORY_CULTURE",
+            "PRACTICAL"
+          ],
+          "externalUrl": "https://www.metmuseum.org/essays/design-1900-25"
         }
       ]
     }

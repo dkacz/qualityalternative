@@ -113,6 +113,11 @@ data class ContentRightsMetadata(
 }
 
 enum class TopicTag {
+    ATTENTION,
+    PRACTICAL,
+    BODY,
+    NATURE,
+    HISTORY_CULTURE,
     ESSAYS,
     PHILOSOPHY,
     SCIENCE,

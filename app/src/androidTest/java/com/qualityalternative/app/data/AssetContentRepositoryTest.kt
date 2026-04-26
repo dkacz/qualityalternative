@@ -325,6 +325,53 @@ class AssetContentRepositoryTest {
     }
 
     @Test
+    fun sprint9PacksShipIntegratedContentWithReaderBodiesAndExternalHandoffs() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val repository = AssetContentRepository(context)
+        val sprint9PackCounts = mapOf(
+            "attention_practical_agency_v1" to 24,
+            "embodied_calm_v1" to 20,
+            "wonder_science_v1" to 26,
+            "long_view_history_v1" to 22,
+            "creativity_play_v1" to 8,
+        )
+
+        val sprint9Packs = repository.starterPacks()
+            .filter { pack -> pack.id in sprint9PackCounts.keys }
+        val sprint9Items = sprint9Packs.flatMap { pack -> pack.items }
+        val renderable = sprint9Items.filter { item -> item.rights.rightsClass == ContentRightsClass.RENDERABLE }
+        val linkOnly = sprint9Items.filter { item -> item.rights.rightsClass == ContentRightsClass.LINK_ONLY }
+
+        assertEquals(sprint9PackCounts.keys, sprint9Packs.map { pack -> pack.id }.toSet())
+        sprint9Packs.forEach { pack ->
+            assertEquals(pack.id, sprint9PackCounts.getValue(pack.id), pack.items.size)
+        }
+        assertEquals(100, sprint9Items.size)
+        assertEquals(42, renderable.size)
+        assertEquals(58, linkOnly.size)
+        assertTrue(sprint9Items.all { item -> item.id.startsWith("s9-") })
+        assertTrue(sprint9Items.all { item -> item.rights.rightsReviewedAt == "2026-04-26" })
+
+        renderable.forEach { item ->
+            val body = repository.contentBody(item)
+            assertEquals(ContentRenderMode.IN_APP_READER, item.rights.renderMode)
+            assertFalse(item.bodyAssetPath.isNullOrBlank())
+            assertEquals(null, item.externalUrl)
+            assertTrue("${item.id} body is too thin", body.split(Regex("\\s+")).count(String::isNotBlank) >= 500)
+            assertFalse("${item.id} leaked Project Gutenberg boilerplate", body.contains("Project Gutenberg", ignoreCase = true))
+            assertFalse("${item.id} leaked producer boilerplate", body.contains("Produced by", ignoreCase = true))
+        }
+
+        linkOnly.forEach { item ->
+            assertEquals(ContentRenderMode.EXTERNAL_HANDOFF, item.rights.renderMode)
+            assertEquals(null, item.bodyAssetPath)
+            assertFalse(item.externalUrl.isNullOrBlank())
+            assertEquals(item.externalUrl, item.rights.sourceUrl)
+            assertEquals(item.description, repository.contentBody(item))
+        }
+    }
+
+    @Test
     fun starterPackItemsDoNotClaimExternalPublicationAffiliation() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val repository = AssetContentRepository(context)

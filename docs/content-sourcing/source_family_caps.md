@@ -1,6 +1,6 @@
 # Source Family Caps
 
-Status: Slice 9.0 decision for Pro review.
+Status: Slice 9.0 decision retained and applied during Sprint 9 integration.
 
 ## Purpose
 
@@ -23,6 +23,7 @@ Group by recognizable source family, not only by host:
 - `Aeon/Psyche`
 - `Quanta`
 - `SAPIENS`
+- `JSTOR Daily`
 - `Nautilus`
 - `SEP`
 - `IEP`
@@ -40,7 +41,7 @@ Group by recognizable source family, not only by host:
 - Link-only rows from modern publications must remain `EXTERNAL_HANDOFF`.
 - No source label may imply affiliation, partnership, or endorsement unless there is a real agreement.
 - Homepage, search, collection, and `Source TBD` rows cannot count as Pro-ready candidates.
-- Source-family caps are checked before any future pack is integrated into `starter_packs.json`.
+- Source-family caps are checked before integration and again during release QA. Sprint 9 keeps modern source families under the 10-row full-pool cap and keeps modern rows link-only.
 
 ## Sprint 9.0 Current Inventory Check
 

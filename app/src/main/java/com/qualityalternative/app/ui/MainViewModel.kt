@@ -1901,6 +1901,8 @@ private fun defaultStarterPackIds(starterPacks: List<EditorialPack>): Set<String
     if (starterPacks.any { pack -> pack.id == LINK_ONLY_MODERN_PACK_ID }) {
         selected += LINK_ONLY_MODERN_PACK_ID
     }
+    SPRINT9_PACK_IDS
+        .filterTo(selected) { packId -> starterPacks.any { pack -> pack.id == packId } }
     return selected
 }
 
@@ -1911,7 +1913,7 @@ private fun AppSettings.toUserPreferences(
     val selectedApps = selectedAppPackages.mapNotNull(SupportedCatalog::findByPackage)
         .ifEmpty { supportedApps.take(3) }
     val selectedTopics = preferredTopics.ifEmpty { defaultPrototypeTopics() }
-    val packs = selectedPackIds.ifEmpty { fallbackPackIds.take(1).toSet() }
+    val packs = selectedPackIds.ifEmpty { fallbackPackIds }
     return UserPreferences(
         selectedApps = selectedApps,
         preferredTopics = selectedTopics,
@@ -1972,6 +1974,11 @@ private fun String.hostLabel(): String {
 
 private fun TopicTag.displayName(): String {
     return when (this) {
+        TopicTag.ATTENTION -> "Attention"
+        TopicTag.PRACTICAL -> "Practical"
+        TopicTag.BODY -> "Body"
+        TopicTag.NATURE -> "Nature"
+        TopicTag.HISTORY_CULTURE -> "History & culture"
         TopicTag.ESSAYS -> "Essays"
         TopicTag.PHILOSOPHY -> "Philosophy"
         TopicTag.SCIENCE -> "Science"
@@ -1991,14 +1998,21 @@ private fun TopicTag.displayName(): String {
 }
 
 private fun defaultPrototypeTopics(): Set<TopicTag> = setOf(
-    TopicTag.ESSAYS,
+    TopicTag.ATTENTION,
+    TopicTag.PRACTICAL,
     TopicTag.SCIENCE,
-    TopicTag.DESIGN,
 )
 
 private const val ATTENTION_CLASSICS_PACK_ID = "attention-classics-v1"
 private const val PUBLIC_DOMAIN_EXPANSION_PACK_ID = "public-domain-expansion-v2"
 private const val LINK_ONLY_MODERN_PACK_ID = "link-only-modern-v1"
+private val SPRINT9_PACK_IDS = setOf(
+    "attention_practical_agency_v1",
+    "embodied_calm_v1",
+    "wonder_science_v1",
+    "long_view_history_v1",
+    "creativity_play_v1",
+)
 
 private fun AppSettings.toOnboardingSelection(
     supportedApps: List<DistractingApp>,

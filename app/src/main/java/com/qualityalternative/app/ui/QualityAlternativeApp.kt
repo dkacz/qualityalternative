@@ -701,6 +701,7 @@ private fun OnboardingTopics(
                     text = topic.displayName(),
                     selected = topic in selection.preferredTopics,
                     onClick = { onToggleTopic(topic) },
+                    modifier = Modifier.testTag("onboarding-topic-${topic.name}"),
                 )
             }
         }
@@ -3659,6 +3660,11 @@ private fun formatRelativeDay(timestampMillis: Long): String {
 
 private fun TopicTag.displayName(): String {
     return when (this) {
+        TopicTag.ATTENTION -> "Attention"
+        TopicTag.PRACTICAL -> "Practical"
+        TopicTag.BODY -> "Body"
+        TopicTag.NATURE -> "Nature"
+        TopicTag.HISTORY_CULTURE -> "History & culture"
         TopicTag.ESSAYS -> "Essays"
         TopicTag.PHILOSOPHY -> "Philosophy"
         TopicTag.SCIENCE -> "Science"
@@ -3697,7 +3703,12 @@ private fun ContentPriority.displayDescription(): String {
     }
 }
 
-private fun prototypeTopics(): List<TopicTag> = listOf(
+internal fun prototypeTopics(): List<TopicTag> = listOf(
+    TopicTag.ATTENTION,
+    TopicTag.PRACTICAL,
+    TopicTag.BODY,
+    TopicTag.NATURE,
+    TopicTag.HISTORY_CULTURE,
     TopicTag.ESSAYS,
     TopicTag.PHILOSOPHY,
     TopicTag.SCIENCE,
@@ -3712,7 +3723,6 @@ private fun prototypeTopics(): List<TopicTag> = listOf(
     TopicTag.POETRY,
     TopicTag.FOOD,
     TopicTag.ARCHITECTURE,
-    TopicTag.OTHER,
 )
 
 private fun DurationBucket.prototypeMinutes(): Int {
