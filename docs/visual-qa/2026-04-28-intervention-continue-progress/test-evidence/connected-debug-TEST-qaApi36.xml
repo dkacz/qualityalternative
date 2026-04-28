@@ -1,0 +1,145 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<testsuites tests="65" failures="0" errors="0" skipped="0" time="291.931" timestamp="2026-04-28T15:42:34" hostname="localhost">
+  <testsuite name="com.qualityalternative.app.AccessibilityInterceptionTest" tests="1" failures="0" errors="0" skipped="0" time="3.474" timestamp="2026-04-28T15:42:34" hostname="localhost">
+    <properties>
+      <property name="device" value="qaApi36(AVD) - 16" />
+      <property name="flavor" value="" />
+      <property name="project" value=":app" />
+    </properties>
+    <testcase name="fixtureForegroundLaunchesInterventionThroughCrossAppHarness" classname="com.qualityalternative.app.AccessibilityInterceptionTest" time="3.474" />
+  </testsuite>
+  <testsuite name="com.qualityalternative.app.AppManifestPrivacyTest" tests="1" failures="0" errors="0" skipped="0" time="0.059" timestamp="2026-04-28T15:42:34" hostname="localhost">
+    <properties>
+      <property name="device" value="qaApi36(AVD) - 16" />
+      <property name="flavor" value="" />
+      <property name="project" value=":app" />
+    </properties>
+    <testcase name="androidBackupIsDisabledForLocalPrivateInventory" classname="com.qualityalternative.app.AppManifestPrivacyTest" time="0.059" />
+  </testsuite>
+  <testsuite name="com.qualityalternative.app.MainActivityTest" tests="20" failures="0" errors="0" skipped="0" time="58.355" timestamp="2026-04-28T15:42:34" hostname="localhost">
+    <properties>
+      <property name="device" value="qaApi36(AVD) - 16" />
+      <property name="flavor" value="" />
+      <property name="project" value=":app" />
+    </properties>
+    <testcase name="systemInterventionBackupActionIsClickableWithoutScrolling" classname="com.qualityalternative.app.MainActivityTest" time="2.396" />
+    <testcase name="libraryManageModeDeletesSavedLinkAndKeepsEditorialReadOnly" classname="com.qualityalternative.app.MainActivityTest" time="8.596" />
+    <testcase name="readerFeedbackAndProgressUseFiniteReplacementCopy" classname="com.qualityalternative.app.MainActivityTest" time="2.519" />
+    <testcase name="addLinkSavesValidLinkAndReturnsLibrary" classname="com.qualityalternative.app.MainActivityTest" time="5.221" />
+    <testcase name="systemInterventionOpenAnywayActionIsClickableWithoutScrolling" classname="com.qualityalternative.app.MainActivityTest" time="1.835" />
+    <testcase name="sharedLinkOnlyAlternativeOpensExternalHandoffScreen" classname="com.qualityalternative.app.MainActivityTest" time="1.95" />
+    <testcase name="addLinkPriorityAtAddAppearsInPriorityLibraryFilter" classname="com.qualityalternative.app.MainActivityTest" time="2.633" />
+    <testcase name="sprint9ContentIsReachableAfterNormalOnboarding" classname="com.qualityalternative.app.MainActivityTest" time="1.988" />
+    <testcase name="addLinkKeepsSaveDisabledForBlankUrl" classname="com.qualityalternative.app.MainActivityTest" time="1.917" />
+    <testcase name="addLinkKeepsSaveDisabledForInvalidUrl" classname="com.qualityalternative.app.MainActivityTest" time="2.122" />
+    <testcase name="systemInterceptionIntentShowsLiveInterventionForFixtureTarget" classname="com.qualityalternative.app.MainActivityTest" time="2.022" />
+    <testcase name="onboardingShowsSprint9TopicChips" classname="com.qualityalternative.app.MainActivityTest" time="0.785" />
+    <testcase name="themeSettingSwitchesToDarkMode" classname="com.qualityalternative.app.MainActivityTest" time="1.367" />
+    <testcase name="homeShowsReadinessAndCompactLibrarySummary" classname="com.qualityalternative.app.MainActivityTest" time="1.698" />
+    <testcase name="systemInterventionDelayActionIsClickableWithoutScrolling" classname="com.qualityalternative.app.MainActivityTest" time="2.105" />
+    <testcase name="addLinkKeepsSaveDisabledForMissingTopic" classname="com.qualityalternative.app.MainActivityTest" time="1.644" />
+    <testcase name="onboardingCompletesAndPersistsAfterColdRelaunch" classname="com.qualityalternative.app.MainActivityTest" time="1.839" />
+    <testcase name="unfinishedReadingAppearsOnHomeAndLibraryAndCanContinueWithoutIntervention" classname="com.qualityalternative.app.MainActivityTest" time="10.026" />
+    <testcase name="systemInterventionShowsContinueProgressRemainingTimeAndScrollableOtherOptions" classname="com.qualityalternative.app.MainActivityTest" time="3.669" />
+    <testcase name="meditationAlternativeOpensThreeMinuteTimer" classname="com.qualityalternative.app.MainActivityTest" time="2.023" />
+  </testsuite>
+  <testsuite name="com.qualityalternative.app.UserLinkRecommendationIntegrationTest" tests="1" failures="0" errors="0" skipped="0" time="0.265" timestamp="2026-04-28T15:42:34" hostname="localhost">
+    <properties>
+      <property name="device" value="qaApi36(AVD) - 16" />
+      <property name="flavor" value="" />
+      <property name="project" value=":app" />
+    </properties>
+    <testcase name="productionContainerFeedsSavedLinkIntoInterventionAndExternalHandoff" classname="com.qualityalternative.app.UserLinkRecommendationIntegrationTest" time="0.265" />
+  </testsuite>
+  <testsuite name="com.qualityalternative.app.VisualQaScreenshotTest" tests="7" failures="0" errors="0" skipped="0" time="209.059" timestamp="2026-04-28T15:42:34" hostname="localhost">
+    <properties>
+      <property name="device" value="qaApi36(AVD) - 16" />
+      <property name="flavor" value="" />
+      <property name="project" value=":app" />
+    </properties>
+    <testcase name="captureCoreContentScreensInLightAndDark" classname="com.qualityalternative.app.VisualQaScreenshotTest" time="71.85" />
+    <testcase name="captureSprint12FinalJourneyScreens" classname="com.qualityalternative.app.VisualQaScreenshotTest" time="44.174" />
+    <testcase name="captureSprint12AddFlowScreens" classname="com.qualityalternative.app.VisualQaScreenshotTest" time="7.828" />
+    <testcase name="captureSprint9ContentExpansionScreens" classname="com.qualityalternative.app.VisualQaScreenshotTest" time="28.356" />
+    <testcase name="captureSprint12LibraryManageScreens" classname="com.qualityalternative.app.VisualQaScreenshotTest" time="5.093" />
+    <testcase name="captureSprint10ReaderProgressStreakAndMeditationScreens" classname="com.qualityalternative.app.VisualQaScreenshotTest" time="37.871" />
+    <testcase name="captureSprint12ContinueReadingScreens" classname="com.qualityalternative.app.VisualQaScreenshotTest" time="13.887" />
+  </testsuite>
+  <testsuite name="com.qualityalternative.app.data.AssetContentRepositoryTest" tests="14" failures="0" errors="0" skipped="0" time="16.567" timestamp="2026-04-28T15:42:34" hostname="localhost">
+    <properties>
+      <property name="device" value="qaApi36(AVD) - 16" />
+      <property name="flavor" value="" />
+      <property name="project" value=":app" />
+    </properties>
+    <testcase name="sprint9PacksShipIntegratedContentWithReaderBodiesAndExternalHandoffs" classname="com.qualityalternative.app.data.AssetContentRepositoryTest" time="0.112" />
+    <testcase name="modernLinkOnlyPackContainsCuratedExternalHandoffInventory" classname="com.qualityalternative.app.data.AssetContentRepositoryTest" time="0.031" />
+    <testcase name="legacyStarterPacksNoLongerContainPlaceholderEditorialItems" classname="com.qualityalternative.app.data.AssetContentRepositoryTest" time="0.002" />
+    <testcase name="sharedRenderableInventoryDoesNotShipNearDuplicateBodyAssets" classname="com.qualityalternative.app.data.AssetContentRepositoryTest" time="16.29" />
+    <testcase name="sharedLinkOnlyItemsUseExternalHandoffWithoutBodyAssets" classname="com.qualityalternative.app.data.AssetContentRepositoryTest" time="0.001" />
+    <testcase name="attentionClassicsDurationsMatchShippedMarkdownBodies" classname="com.qualityalternative.app.data.AssetContentRepositoryTest" time="0.036" />
+    <testcase name="starterInventoryContainsNoFirstPartyPlaceholderLicenses" classname="com.qualityalternative.app.data.AssetContentRepositoryTest" time="0.001" />
+    <testcase name="sharedRenderableInventoryCarriesCompleteDecisionAndRightsMetadata" classname="com.qualityalternative.app.data.AssetContentRepositoryTest" time="0.029" />
+    <testcase name="attentionClassicsPackCarriesPublicDomainSourceMetadata" classname="com.qualityalternative.app.data.AssetContentRepositoryTest" time="0.001" />
+    <testcase name="publicDomainExpansionDurationsMatchShippedMarkdownBodies" classname="com.qualityalternative.app.data.AssetContentRepositoryTest" time="0.0" />
+    <testcase name="publicDomainExpansionPackCarriesRenderableRightsAndBodies" classname="com.qualityalternative.app.data.AssetContentRepositoryTest" time="0.031" />
+    <testcase name="starterPackItemsCarryExplicitRightsAndRenderMetadata" classname="com.qualityalternative.app.data.AssetContentRepositoryTest" time="0.001" />
+    <testcase name="editorialAssetsDoNotContainUnmanifestedMarkdownFiles" classname="com.qualityalternative.app.data.AssetContentRepositoryTest" time="0.031" />
+    <testcase name="starterPackItemsDoNotClaimExternalPublicationAffiliation" classname="com.qualityalternative.app.data.AssetContentRepositoryTest" time="0.001" />
+  </testsuite>
+  <testsuite name="com.qualityalternative.app.data.RoomAnalyticsTrackerTest" tests="5" failures="0" errors="0" skipped="0" time="1.152" timestamp="2026-04-28T15:42:34" hostname="localhost">
+    <properties>
+      <property name="device" value="qaApi36(AVD) - 16" />
+      <property name="flavor" value="" />
+      <property name="project" value=":app" />
+    </properties>
+    <testcase name="activeDelayReplay_repairsPersistedMetricsExactlyOnceAfterRestart" classname="com.qualityalternative.app.data.RoomAnalyticsTrackerTest" time="0.452" />
+    <testcase name="productionActiveDelayPath_persistsRoomAnalyticsWithExpectedMetadata" classname="com.qualityalternative.app.data.RoomAnalyticsTrackerTest" time="0.146" />
+    <testcase name="returnedSessionReplay_repairsMetricsExactlyOnceAfterRestart" classname="com.qualityalternative.app.data.RoomAnalyticsTrackerTest" time="0.258" />
+    <testcase name="productionExpiryPath_persistsRoomAnalyticsWithExpectedMetadata" classname="com.qualityalternative.app.data.RoomAnalyticsTrackerTest" time="0.144" />
+    <testcase name="expiredDelayReplay_doesNotDuplicatePersistedAnalytics" classname="com.qualityalternative.app.data.RoomAnalyticsTrackerTest" time="0.152" />
+  </testsuite>
+  <testsuite name="com.qualityalternative.app.data.RoomHistoryRepositoryTest" tests="3" failures="0" errors="0" skipped="0" time="0.403" timestamp="2026-04-28T15:42:34" hostname="localhost">
+    <properties>
+      <property name="device" value="qaApi36(AVD) - 16" />
+      <property name="flavor" value="" />
+      <property name="project" value=":app" />
+    </properties>
+    <testcase name="repeatedMarkReturnedToTarget_replaysPersistedSignalWithoutMutatingTimestamp" classname="com.qualityalternative.app.data.RoomHistoryRepositoryTest" time="0.112" />
+    <testcase name="updateAcceptedSessionContent_rewritesStoredContentMetadata" classname="com.qualityalternative.app.data.RoomHistoryRepositoryTest" time="0.176" />
+    <testcase name="acceptThenImmediateMutationsRemainVisible" classname="com.qualityalternative.app.data.RoomHistoryRepositoryTest" time="0.115" />
+  </testsuite>
+  <testsuite name="com.qualityalternative.app.data.RoomReadingProgressRepositoryTest" tests="1" failures="0" errors="0" skipped="0" time="0.119" timestamp="2026-04-28T15:42:34" hostname="localhost">
+    <properties>
+      <property name="device" value="qaApi36(AVD) - 16" />
+      <property name="flavor" value="" />
+      <property name="project" value=":app" />
+    </properties>
+    <testcase name="saveCompleteDelete_roundTripsReadingProgress" classname="com.qualityalternative.app.data.RoomReadingProgressRepositoryTest" time="0.119" />
+  </testsuite>
+  <testsuite name="com.qualityalternative.app.data.RoomUserDocumentRepositoryTest" tests="6" failures="0" errors="0" skipped="0" time="0.503" timestamp="2026-04-28T15:42:34" hostname="localhost">
+    <properties>
+      <property name="device" value="qaApi36(AVD) - 16" />
+      <property name="flavor" value="" />
+      <property name="project" value=":app" />
+    </properties>
+    <testcase name="addEpubDocument_roundTripsAsPrivateReaderContent" classname="com.qualityalternative.app.data.RoomUserDocumentRepositoryTest" time="0.118" />
+    <testcase name="deleteDocument_removesPersistedDocumentAndReloadedState" classname="com.qualityalternative.app.data.RoomUserDocumentRepositoryTest" time="0.117" />
+    <testcase name="addPdfDocument_roundTripsAsExternalPrivateHandoffContent" classname="com.qualityalternative.app.data.RoomUserDocumentRepositoryTest" time="0.119" />
+    <testcase name="androidBodyLoaderReportsUnreadableMarkdownUri" classname="com.qualityalternative.app.data.RoomUserDocumentRepositoryTest" time="0.001" />
+    <testcase name="migrationFromVersion5CreatesUserDocumentsTable" classname="com.qualityalternative.app.data.RoomUserDocumentRepositoryTest" time="0.06" />
+    <testcase name="addMarkdownDocument_roundTripsAsPrivateReaderContent" classname="com.qualityalternative.app.data.RoomUserDocumentRepositoryTest" time="0.088" />
+  </testsuite>
+  <testsuite name="com.qualityalternative.app.data.RoomUserLinkRepositoryTest" tests="6" failures="0" errors="0" skipped="0" time="0.606" timestamp="2026-04-28T15:42:34" hostname="localhost">
+    <properties>
+      <property name="device" value="qaApi36(AVD) - 16" />
+      <property name="flavor" value="" />
+      <property name="project" value=":app" />
+    </properties>
+    <testcase name="migrationFromVersion3PreservesExistingRowsAndCreatesUserLinks" classname="com.qualityalternative.app.data.RoomUserLinkRepositoryTest" time="0.029" />
+    <testcase name="markUnavailable_updatesVisibleInventoryState" classname="com.qualityalternative.app.data.RoomUserLinkRepositoryTest" time="0.111" />
+    <testcase name="addLink_rejectsInvalidDraftWithoutPersisting" classname="com.qualityalternative.app.data.RoomUserLinkRepositoryTest" time="0.114" />
+    <testcase name="deleteLink_removesPersistedLinkAndReloadedState" classname="com.qualityalternative.app.data.RoomUserLinkRepositoryTest" time="0.115" />
+    <testcase name="addLink_roundTripsAsRankableUserContent" classname="com.qualityalternative.app.data.RoomUserLinkRepositoryTest" time="0.116" />
+    <testcase name="addLink_preservesContentIdentityWhenSameUrlIsAddedAgain" classname="com.qualityalternative.app.data.RoomUserLinkRepositoryTest" time="0.121" />
+  </testsuite>
+</testsuites>

@@ -14,7 +14,7 @@ Founders, product, design, engineering, and early go-to-market collaborators
 
 ## Product Decision
 
-Build an Android-first MVP that intercepts attempts to open selected distracting apps and replaces the impulse with one recommended piece of high-quality long-form content, two backup options, and a conscious override path. The core product is a replacement engine, not a blocker and not a read-later library.
+Build an Android-first MVP that intercepts attempts to open selected distracting apps and replaces the impulse with one recommended piece of high-quality long-form content, a bounded set of backup options, and a conscious override path. The core product is a replacement engine, not a blocker and not a read-later library.
 
 ## Background
 
@@ -97,7 +97,7 @@ When I reach for a distracting app out of habit, help me pause and give me one w
   - Reddit
   - TikTok
 - Soft intervention shown when a selected app is opened.
-- One primary replacement recommendation plus two backup recommendations.
+- One primary replacement recommendation plus a short, bounded backup list.
 - Three core actions in the intervention: start replacement now, delay the distracting app for 15 minutes, open anyway.
 - Replacement sources from:
   - editorial starter packs curated by the product
@@ -123,7 +123,7 @@ When I reach for a distracting app out of habit, help me pause and give me one w
 
 ## Primary Use Case
 
-The user taps Instagram on Android during an unplanned idle moment. Instead of entering Instagram immediately, the user sees a brief intervention card. The card shows one recommended essay estimated at 7 minutes, plus two backup alternatives with shorter reading times. The user chooses "Read now," spends several minutes in the replacement content, and either never returns to Instagram or returns later with more intention. After the session, the app asks whether the recommendation was a good fit and whether it helped prevent mindless scrolling.
+The user taps Instagram on Android during an unplanned idle moment. Instead of entering Instagram immediately, the user sees a brief intervention card. The card shows one recommended essay estimated at 7 minutes, plus a short backup list with lower-commitment alternatives. If an item is already partly read, the intervention shows reading progress and remaining time so the user can continue without extra setup. The user chooses "Read now," spends several minutes in the replacement content, and either never returns to Instagram or returns later with more intention. After the session, the app asks whether the recommendation was a good fit and whether it helped prevent mindless scrolling.
 
 ## End-to-End User Flow
 
@@ -152,8 +152,9 @@ The user taps Instagram on Android during an unplanned idle moment. Instead of e
 - The view shows:
   - the app the user attempted to open
   - one primary recommendation in the user's preferred session-length bucket
-  - two backup recommendations that are lower-commitment than the primary recommendation
+  - a short, bounded backup list of lower-commitment recommendations
   - estimated time for each recommendation
+  - progress already read and remaining time for unfinished continuation recommendations
   - three actions:
     - Read now
     - Pause 15 min
@@ -236,7 +237,7 @@ The system must normalize each piece of replacement content into a small, rankab
 
 ### FR5. Recommendation Selection
 
-The system must choose one primary recommendation and two backup recommendations for each intervention.
+The system must choose one primary recommendation and a short, bounded backup list for each intervention.
 
 #### Acceptance Criteria
 
@@ -247,11 +248,12 @@ The system must choose one primary recommendation and two backup recommendations
   - prior accepts
   - prior skips
   - source availability
-- The system returns exactly one primary recommendation and exactly two backups when enough inventory exists.
+- The system returns exactly one primary recommendation and at least two backups when enough inventory exists.
+- The system may expose additional finite backups in a bounded scrollable list, capped below feed-like scale.
 - The primary recommendation should target the user's selected duration bucket.
 - Backup recommendations should be shorter than or equal to the primary recommendation's estimated length.
 - If fewer than three suitable items exist, the system still returns at least one recommendation and logs an inventory-shortage event.
-- The intervention flow must not require the user to browse a larger list before making a choice.
+- The intervention flow must not require the user to browse the backup list before making a choice.
 
 ### FR6. Intervention UI
 
@@ -260,10 +262,12 @@ The intervention view must slow down the habit loop without feeling punitive.
 #### Acceptance Criteria
 
 - The intervention displays within a target of two seconds from interception trigger under normal conditions.
-- The intervention shows only one primary recommendation and two backups.
+- The intervention emphasizes one primary recommendation and keeps backup recommendations in a bounded list.
 - The intervention includes a clear path to open the original app.
-- The intervention does not contain an infinite list, feed, or scrollable recommendation stack.
+- The intervention does not contain an infinite list, feed, or discovery surface.
+- A bounded backup list may scroll when more than two finite alternatives are available.
 - The intervention copy avoids moralizing language.
+- If a recommendation continues unfinished reading, the intervention shows percent already read and remaining estimated time without requiring the user to open the reader first.
 
 ### FR7. Core User Actions
 
@@ -352,7 +356,8 @@ The product must log enough behavior to evaluate whether substitution is working
 
 ### NFR2. Calm Interaction Model
 
-- The intervention surface must fit on a single screen without requiring vertical scrolling.
+- The primary recommendation and core actions must remain usable without requiring vertical browsing.
+- Any vertical scrolling in the intervention must be limited to the bounded backup list and must not become a feed-like discovery surface.
 - The replacement session must not show unrelated recommendations while the user is actively consuming the selected item.
 
 ### NFR3. Reliability Signaling

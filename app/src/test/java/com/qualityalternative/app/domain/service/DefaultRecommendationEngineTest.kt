@@ -23,7 +23,7 @@ class DefaultRecommendationEngineTest {
     private val engine = DefaultRecommendationEngine()
 
     @Test
-    fun generate_prefersMatchingDurationAndKeepsExactlyTwoFiniteBackups() {
+    fun generate_prefersMatchingDurationAndKeepsFiniteBackups() {
         val preferences = UserPreferences(
             selectedApps = listOf(DistractingApp(packageName = "pkg", displayName = "Instagram")),
             preferredTopics = setOf(TopicTag.PHILOSOPHY, TopicTag.PSYCHOLOGY),
@@ -284,7 +284,10 @@ class DefaultRecommendationEngineTest {
         )
 
         assertEquals("leave-the-crowd", result?.primary?.id)
-        assertEquals(listOf("a-candle-opens-natural-philosophy", "fixture-link:short-convenience-essay"), result?.backups?.map(ContentItem::id))
+        assertEquals(
+            listOf("a-candle-opens-natural-philosophy", "fixture-link:short-convenience-essay"),
+            result?.backups?.map(ContentItem::id)?.take(2),
+        )
         assertTrue(result!!.backups.all { backup -> backup.durationMinutes <= result.primary.durationMinutes })
     }
 
@@ -324,7 +327,7 @@ class DefaultRecommendationEngineTest {
     }
 
     @Test
-    fun generate_keepsFiniteThreeChoiceSetWhenInventoryIsLargeAndMixed() {
+    fun generate_keepsFiniteScrollableChoiceSetWhenInventoryIsLargeAndMixed() {
         val preferences = UserPreferences(
             selectedApps = listOf(DistractingApp(packageName = "pkg", displayName = "Instagram")),
             preferredTopics = setOf(TopicTag.SCIENCE, TopicTag.PHILOSOPHY),
@@ -386,10 +389,10 @@ class DefaultRecommendationEngineTest {
         )
 
         assertNotNull(result)
-        assertEquals(2, result?.backups?.size)
-        assertEquals(3, listOfNotNull(result?.primary).plus(result?.backups.orEmpty()).size)
+        assertEquals(6, result?.backups?.size)
+        assertEquals(7, listOfNotNull(result?.primary).plus(result?.backups.orEmpty()).size)
         assertEquals(
-            3,
+            7,
             listOfNotNull(result?.primary).plus(result?.backups.orEmpty()).map(ContentItem::id).toSet().size,
         )
         assertEquals(false, result?.inventoryShortage)

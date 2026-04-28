@@ -52,20 +52,20 @@ class DefaultRecommendationEngine : RecommendationEngine {
             return RecommendationSet(
                 primary = unfinishedChoice.primary.item,
                 backups = unfinishedChoice.backups.map(ScoredCandidate::item),
-                inventoryShortage = unfinishedChoice.backups.size < 2,
+                inventoryShortage = unfinishedChoice.backups.size < MIN_BACKUP_OPTIONS,
                 generatedAtMillis = nowMillis,
             )
         }
 
-        val canBuildFullSet = candidateSets.any { it.backups.size == 2 }
+        val canBuildMinimumSet = candidateSets.any { it.backups.size >= MIN_BACKUP_OPTIONS }
         val chosen = candidateSets
-            .firstOrNull { !canBuildFullSet || it.backups.size == 2 }
+            .firstOrNull { !canBuildMinimumSet || it.backups.size >= MIN_BACKUP_OPTIONS }
             ?: return null
 
         return RecommendationSet(
             primary = chosen.primary.item,
             backups = chosen.backups.map(ScoredCandidate::item),
-            inventoryShortage = chosen.backups.size < 2,
+            inventoryShortage = chosen.backups.size < MIN_BACKUP_OPTIONS,
             generatedAtMillis = nowMillis,
         )
     }
@@ -86,7 +86,7 @@ class DefaultRecommendationEngine : RecommendationEngine {
                     .thenBy { it.durationDistance }
                     .thenBy { it.item.title },
             )
-            .take(2)
+            .take(MAX_BACKUP_OPTIONS)
     }
 
     private fun score(
@@ -150,5 +150,10 @@ class DefaultRecommendationEngine : RecommendationEngine {
             ContentPriority.SAVED_LINKS -> if (sourceType == ContentSourceType.USER_LINK) 48 else 0
             ContentPriority.MEDITATION -> if (sourceType == ContentSourceType.MEDITATION) 48 else 0
         }
+    }
+
+    private companion object {
+        const val MIN_BACKUP_OPTIONS = 2
+        const val MAX_BACKUP_OPTIONS = 6
     }
 }

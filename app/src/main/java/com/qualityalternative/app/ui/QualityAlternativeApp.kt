@@ -40,6 +40,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -1508,8 +1509,9 @@ private fun InterventionScreen(
     val preferences = state.preferences ?: return
     val colors = QualityAlternativeThemeTokens.colors
     val primary = recommendationSet.primary
-    val backups = recommendationSet.backups.take(MAX_BACKUP_RECOMMENDATIONS)
+    val backups = recommendationSet.backups
     val primaryExplanation = RecommendationExplainer.explain(primary, preferences)
+    val primaryContinueProgress = continueProgressMetaFor(item = primary, progress = state.readingProgress)
     val canAdjustMeditationBeforeStart = primary.usesMeditationTimer()
     val backgroundBrush = Brush.verticalGradient(
         colors = listOf(
@@ -1575,6 +1577,14 @@ private fun InterventionScreen(
                     .padding(top = 9.dp)
                     .testTag("intervention-primary-explanation"),
             )
+            if (primaryContinueProgress != null) {
+                ContinueProgressMetaLine(
+                    progress = primaryContinueProgress,
+                    modifier = Modifier
+                        .padding(top = 8.dp)
+                        .testTag("intervention-primary-progress"),
+                )
+            }
         }
         QaButton(
             text = primaryActionLabel(primary),
@@ -1606,19 +1616,34 @@ private fun InterventionScreen(
                 lineHeight = 16.sp,
                 modifier = Modifier.padding(bottom = 6.dp),
             )
-            backups.forEachIndexed { index, backup ->
-                BackupRow(
-                    item = backup,
-                    onClick = { onAcceptBackup(backup) },
-                    modifier = Modifier.testTag("intervention-backup-action-$index"),
-                )
-            }
             if (backups.isEmpty()) {
                 BodyText(
                     text = "No extra choices are available right now.",
                     color = colors.mutedText,
                     modifier = Modifier.testTag("intervention-empty-backups"),
                 )
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .testTag("intervention-backup-list"),
+                    verticalArrangement = Arrangement.spacedBy(5.dp),
+                    contentPadding = PaddingValues(bottom = 2.dp),
+                ) {
+                    itemsIndexed(
+                        items = backups,
+                        key = { _, backup -> backup.id },
+                    ) { index, backup ->
+                        BackupRow(
+                            item = backup,
+                            continueProgress = continueProgressMetaFor(item = backup, progress = state.readingProgress),
+                            progressTestTag = "intervention-backup-progress-$index",
+                            onClick = { onAcceptBackup(backup) },
+                            modifier = Modifier.testTag("intervention-backup-action-$index"),
+                        )
+                    }
+                }
             }
         }
         Row(
@@ -2859,10 +2884,17 @@ private fun ContentMetaRow(item: ContentItem, stacked: Boolean = false) {
 @Composable
 private fun BackupRow(
     item: ContentItem,
+    continueProgress: ContinueProgressMeta? = null,
+    progressTestTag: String? = null,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = QualityAlternativeThemeTokens.colors
+    val accessibilityLabel = if (continueProgress != null) {
+        "${item.title}, ${continueProgress.label}"
+    } else {
+        "${item.title}, ${item.durationMinutes} min"
+    }
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -2870,6 +2902,7 @@ private fun BackupRow(
             .clip(RoundedCornerShape(14.dp))
             .border(BorderStroke(1.dp, colors.line), RoundedCornerShape(14.dp))
             .background(colors.elevatedSurface)
+            .semantics { contentDescription = accessibilityLabel }
             .clickable(onClick = onClick)
             .padding(horizontal = 10.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -2885,7 +2918,32 @@ private fun BackupRow(
             QaIcon(kind = primaryActionIcon(item), color = colors.accent, size = 13.dp)
         }
         Column(modifier = Modifier.weight(1f)) {
-            MonoText("Try instead · ${item.durationMinutes} min", color = colors.accent, modifier = Modifier.padding(bottom = 2.dp))
+            if (continueProgress != null) {
+                MonoText(
+                    text = "Continue",
+                    color = colors.accent,
+                    modifier = Modifier.padding(bottom = 1.dp),
+                    maxLines = 1,
+                    preserveCase = true,
+                )
+                MonoText(
+                    text = continueProgress.label,
+                    color = colors.success,
+                    modifier = Modifier
+                        .padding(bottom = 3.dp)
+                        .then(progressTestTag?.let { Modifier.testTag(it) } ?: Modifier),
+                    maxLines = 2,
+                    preserveCase = true,
+                )
+            } else {
+                MonoText(
+                    text = "Try instead · ${item.durationMinutes} min",
+                    color = colors.accent,
+                    modifier = Modifier.padding(bottom = 2.dp),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
             Text(
                 item.title,
                 style = MaterialTheme.typography.titleMedium,
@@ -2903,6 +2961,56 @@ private fun BackupRow(
         }
         QaIcon(kind = QaIconKind.ChevronRight, color = colors.faintText, size = 16.dp)
     }
+}
+
+private data class ContinueProgressMeta(
+    val progressPercent: Int,
+    val remainingMinutes: Int,
+) {
+    val label: String = "$progressPercent% read · $remainingMinutes min left"
+}
+
+@Composable
+private fun ContinueProgressMetaLine(
+    progress: ContinueProgressMeta,
+    modifier: Modifier = Modifier,
+) {
+    val colors = QualityAlternativeThemeTokens.colors
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(colors.successSoft)
+            .padding(horizontal = 10.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        QaIcon(kind = QaIconKind.Clock, color = colors.success, size = 14.dp)
+        MonoText(
+            text = progress.label,
+            color = colors.success,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            preserveCase = true,
+        )
+    }
+}
+
+private fun continueProgressMetaFor(
+    item: ContentItem,
+    progress: List<ReadingProgress>,
+): ContinueProgressMeta? {
+    val unfinishedProgress = progress.firstOrNull { candidate ->
+        candidate.contentId == item.id && candidate.isUnfinished()
+    } ?: return null
+    return ContinueProgressMeta(
+        progressPercent = unfinishedProgress.progressPercent,
+        remainingMinutes = item.remainingMinutesAfter(unfinishedProgress.progressPercent),
+    )
+}
+
+private fun ContentItem.remainingMinutesAfter(progressPercent: Int): Int {
+    val remainingPercent = (100 - progressPercent.coerceIn(1, 99)).coerceAtLeast(1)
+    return ((durationMinutes * remainingPercent) + 99) / 100
 }
 
 @Composable
@@ -4360,7 +4468,6 @@ private fun releaseDocumentPermission(context: Context, uri: Uri) {
     }
 }
 
-private const val MAX_BACKUP_RECOMMENDATIONS = 2
 private const val READER_HEADER_ITEM_COUNT = 1
 private const val MAX_RECENT_PROGRESS_REPLACEMENTS = 3
 private const val RECENT_REPLACEMENTS_DAYS = 7

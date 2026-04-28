@@ -10,6 +10,7 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performScrollToNode
@@ -19,12 +20,19 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.uiautomator.UiDevice
+import com.qualityalternative.app.domain.model.AppThemeMode
+import com.qualityalternative.app.domain.model.ContentItem
 import com.qualityalternative.app.domain.model.DurationBucket
 import com.qualityalternative.app.domain.model.AnalyticsEventType
 import com.qualityalternative.app.domain.model.OnboardingSelection
+import com.qualityalternative.app.domain.model.ReadingProgress
 import com.qualityalternative.app.domain.model.TopicTag
+import com.qualityalternative.app.domain.model.UserDocumentDraft
+import com.qualityalternative.app.domain.service.AddUserDocumentResult
 import com.qualityalternative.app.interception.FixtureTargetRegistry
 import kotlinx.coroutines.runBlocking
+import java.io.File
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -38,6 +46,8 @@ class MainActivityTest {
     val composeRule = createEmptyComposeRule()
 
     private var scenario: ActivityScenario<MainActivity>? = null
+    private val interventionContinueProgressScreenshotDirName =
+        "intervention-continue-progress-${System.currentTimeMillis()}"
 
     @Before
     fun resetAppState() {
@@ -506,6 +516,45 @@ class MainActivityTest {
     }
 
     @Test
+    fun systemInterventionShowsContinueProgressRemainingTimeAndScrollableOtherOptions() {
+        launchOnboardedApp()
+        seedFixtureSelection()
+        val seededItems = seedScrollableUnfinishedDocumentOptions(progressPercent = 42)
+        assertTrue("Expected enough seeded options for a scrollable backup list", seededItems.size >= 4)
+
+        relaunchFixtureSystemIntervention()
+
+        composeRule.onNodeWithTag("intervention-primary-progress").assertIsDisplayed()
+        val recommendationSet = currentRecommendationSet()
+        val primaryLabel = continueProgressLabel(item = recommendationSet.primary, progressPercent = 42)
+        composeRule.onNodeWithText(primaryLabel, substring = true).assertIsDisplayed()
+        captureInterventionContinueProgressScreenshot("01_intervention_continue_progress_light")
+
+        assertTrue(
+            "Expected more than two backup options, got ${recommendationSet.backups.size}",
+            recommendationSet.backups.size > 2,
+        )
+        composeRule.onNodeWithTag("intervention-backup-list").assertIsDisplayed()
+        composeRule.onNodeWithTag("intervention-backup-list")
+            .performScrollToNode(hasTestTag("intervention-backup-action-2"))
+        composeRule.onNodeWithTag("intervention-backup-action-2").assertIsDisplayed()
+
+        val seededIds = seededItems.mapTo(mutableSetOf(), ContentItem::id)
+        val backup = recommendationSet.backups[2]
+        assertTrue("Expected the scrolled backup option to be unfinished", backup.id in seededIds)
+        composeRule.onNodeWithContentDescription(
+            "${backup.title}, ${continueProgressLabel(item = backup, progressPercent = 42)}",
+        ).assertIsDisplayed()
+        captureInterventionContinueProgressScreenshot("02_intervention_other_options_scrolled_light")
+
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.selectThemeMode(AppThemeMode.DARK)
+        }
+        composeRule.waitForIdle()
+        captureInterventionContinueProgressScreenshot("03_intervention_continue_progress_dark")
+    }
+
+    @Test
     fun meditationAlternativeOpensThreeMinuteTimer() {
         launchMeditationFixtureSystemIntervention()
 
@@ -709,7 +758,10 @@ class MainActivityTest {
     private fun launchFixtureSystemIntervention() {
         launchOnboardedApp()
         seedFixtureSelection()
+        relaunchFixtureSystemIntervention()
+    }
 
+    private fun relaunchFixtureSystemIntervention() {
         scenario?.close()
         scenario = null
         InstrumentationRegistry.getInstrumentation().waitForIdleSync()
@@ -770,6 +822,60 @@ class MainActivityTest {
         composeRule.waitUntil(timeoutMillis = 10_000) {
             hasNode("You reached for Fixture Feed One")
         }
+    }
+
+    private fun seedScrollableUnfinishedDocumentOptions(progressPercent: Int): List<ContentItem> = runBlocking {
+        val app = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication)
+        val durations = listOf(7, 6, 5, 4, 3, 3)
+        durations.mapIndexed { index, minutes ->
+            val result = app.appContainer.userDocumentRepository.addDocument(
+                draft = UserDocumentDraft(
+                    uri = "content://qa-test/continue-option-$index",
+                    displayName = "continue-option-$index.md",
+                    mimeType = "text/markdown",
+                    title = "Continue option ${index + 1}",
+                    durationMinutes = minutes,
+                    topicTags = setOf(TopicTag.SCIENCE, TopicTag.PHILOSOPHY),
+                ),
+                nowMillis = 10_000L + index,
+            )
+            assertTrue("Expected unfinished option document to be saved", result is AddUserDocumentResult.Added)
+            (result as AddUserDocumentResult.Added).item.also { item ->
+                app.appContainer.readingProgressRepository.saveProgress(
+                    ReadingProgress(
+                        contentId = item.id,
+                        progressPercent = progressPercent,
+                        lastVisibleParagraphIndex = 4 + index,
+                        paragraphCount = 12,
+                        updatedAtMillis = 20_000L + index,
+                    ),
+                )
+            }
+        }
+    }
+
+    private fun currentRecommendationSet(): com.qualityalternative.app.domain.model.RecommendationSet {
+        var recommendationSet: com.qualityalternative.app.domain.model.RecommendationSet? = null
+        scenario?.onActivity { activity ->
+            recommendationSet = activity.mainViewModel.uiState.currentRecommendationSet
+        }
+        return requireNotNull(recommendationSet)
+    }
+
+    private fun continueProgressLabel(item: ContentItem, progressPercent: Int): String {
+        val remainingPercent = (100 - progressPercent.coerceIn(1, 99)).coerceAtLeast(1)
+        val remainingMinutes = ((item.durationMinutes * remainingPercent) + 99) / 100
+        return "$progressPercent% read · $remainingMinutes min left"
+    }
+
+    private fun captureInterventionContinueProgressScreenshot(name: String) {
+        val outputDir = File("/sdcard/Download/qualityalternative/$interventionContinueProgressScreenshotDirName")
+        assertTrue("Expected screenshot output directory for $name", outputDir.mkdirs() || outputDir.exists())
+        composeRule.waitForIdle()
+        Thread.sleep(300)
+        val output = File(outputDir, "$name.png")
+        assertTrue("Expected screenshot capture for $name", UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).takeScreenshot(output))
+        assertTrue("Expected screenshot file for $name", output.exists() && output.length() > 0L)
     }
 
     private fun assertHomeHeroIsDisplayed() {

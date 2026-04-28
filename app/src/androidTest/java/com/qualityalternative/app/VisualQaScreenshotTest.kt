@@ -1871,11 +1871,11 @@ class VisualQaScreenshotTest {
 
     private fun assertFiniteChoicesAboveBottomActions() {
         assertNodeFullyWithinRoot("intervention-bottom-actions")
+        if (hasTag("intervention-backup-list")) {
+            assertNodeAboveBottomActions("intervention-backup-list")
+        }
         if (hasTag("intervention-backup-action-0")) {
             assertNodeAboveBottomActions("intervention-backup-action-0")
-        }
-        if (hasTag("intervention-backup-action-1")) {
-            assertNodeAboveBottomActions("intervention-backup-action-1")
         }
         if (!hasTag("intervention-backup-action-0")) {
             composeRule.onNodeWithTag("intervention-empty-backups").assertIsDisplayed()
