@@ -62,8 +62,8 @@ Sprint 12 turns the app from a one-way content intake flow into a manageable loc
 ## APK Assets
 
 - Installable alpha APK: `quality-alternative-v0.6.0-content-management-alpha-debug.apk`
-- Release-variant APK for signing pipeline: `quality-alternative-v0.6.0-content-management-alpha-release-unsigned.apk`
-- Both APKs are versionCode 7 / versionName `0.6.0-alpha`.
+- APK versionCode: 7
+- APK versionName: `0.6.0-alpha`
 
 ## Evidence
 

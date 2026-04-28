@@ -23,7 +23,8 @@ Timestamp: 2026-04-28 14:03 Europe/Warsaw
 - Release APK versionCode: 7
 - Release APK versionName: `0.6.0-alpha`
 - Release build output: `app-release-unsigned.apk`
-- Installable alpha APK output: `app-debug.apk`
+- Published installable alpha APK output: `app-debug.apk`
+- GitHub Release publishes only the installable alpha APK and its checksum, matching previous alpha-release convention.
 
 ## Evidence Files
 
