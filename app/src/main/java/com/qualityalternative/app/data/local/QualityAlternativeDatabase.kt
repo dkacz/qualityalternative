@@ -13,8 +13,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ReplacementSessionEntity::class,
         UserLinkEntity::class,
         UserDocumentEntity::class,
+        ReadingProgressEntity::class,
     ],
-    version = 7,
+    version = 8,
     exportSchema = true,
 )
 abstract class QualityAlternativeDatabase : RoomDatabase() {
@@ -25,6 +26,8 @@ abstract class QualityAlternativeDatabase : RoomDatabase() {
     abstract fun userLinkDao(): UserLinkDao
 
     abstract fun userDocumentDao(): UserDocumentDao
+
+    abstract fun readingProgressDao(): ReadingProgressDao
 
     companion object {
         fun build(
@@ -43,6 +46,7 @@ abstract class QualityAlternativeDatabase : RoomDatabase() {
                     MIGRATION_4_5,
                     MIGRATION_5_6,
                     MIGRATION_6_7,
+                    MIGRATION_7_8,
                 )
                 .build()
         }
@@ -203,6 +207,27 @@ abstract class QualityAlternativeDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
                     "ALTER TABLE replacement_sessions ADD COLUMN contentDurationMinutes INTEGER NOT NULL DEFAULT 10",
+                )
+            }
+        }
+
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS reading_progress (
+                        contentId TEXT NOT NULL,
+                        progressPercent INTEGER NOT NULL,
+                        lastVisibleParagraphIndex INTEGER NOT NULL,
+                        paragraphCount INTEGER NOT NULL,
+                        updatedAtMillis INTEGER NOT NULL,
+                        completedAtMillis INTEGER,
+                        PRIMARY KEY(contentId)
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_reading_progress_updatedAtMillis ON reading_progress(updatedAtMillis)",
                 )
             }
         }

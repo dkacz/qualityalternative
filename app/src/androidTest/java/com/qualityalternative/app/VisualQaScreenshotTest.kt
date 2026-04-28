@@ -13,18 +13,26 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.UiDevice
 import com.qualityalternative.app.domain.model.AppThemeMode
+import com.qualityalternative.app.domain.model.ContentFormat
+import com.qualityalternative.app.domain.model.ContentItem
 import com.qualityalternative.app.domain.model.DurationBucket
 import com.qualityalternative.app.domain.model.OnboardingSelection
 import com.qualityalternative.app.domain.model.TopicTag
 import com.qualityalternative.app.domain.model.UserDocumentDraft
+import com.qualityalternative.app.domain.model.UserLinkDraft
 import com.qualityalternative.app.domain.service.AddUserDocumentResult
+import com.qualityalternative.app.domain.service.AddUserLinkResult
 import com.qualityalternative.app.interception.FixtureTargetRegistry
+import com.qualityalternative.app.data.ReadingTimeEstimateSource
+import com.qualityalternative.app.ui.DocumentImportCandidate
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.zip.ZipEntry
@@ -46,6 +54,8 @@ class VisualQaScreenshotTest {
     private lateinit var legacyScreenshotDir: File
     private lateinit var sprint10ScreenshotDir: File
     private lateinit var sprint9ScreenshotDir: File
+    private lateinit var sprint12ScreenshotDir: File
+    private lateinit var sprint12FinalScreenshotDir: File
 
     @Before
     fun resetAppState() {
@@ -63,6 +73,13 @@ class VisualQaScreenshotTest {
         sprint9ScreenshotDir = File(targetContext.filesDir, "visual-qa/sprint9-content-expansion")
         sprint9ScreenshotDir.deleteRecursively()
         sprint9ScreenshotDir.mkdirs()
+        sprint12ScreenshotDir = File(targetContext.filesDir, "visual-qa/sprint12-content-management")
+        sprint12ScreenshotDir.deleteRecursively()
+        sprint12ScreenshotDir.mkdirs()
+        val sprint12FinalRoot = targetContext.getExternalFilesDir(null) ?: targetContext.filesDir
+        sprint12FinalScreenshotDir = File(sprint12FinalRoot, "visual-qa/sprint12-final-journey")
+        sprint12FinalScreenshotDir.deleteRecursively()
+        sprint12FinalScreenshotDir.mkdirs()
     }
 
     @After
@@ -477,6 +494,541 @@ class VisualQaScreenshotTest {
         captureSprint9("07_reader_sprint9_dark")
     }
 
+    @Test
+    fun captureSprint12LibraryManageScreens() {
+        launchOnboardedApp()
+        seedSprint12LibraryManageContent()
+
+        openTab("tab-library", "library-list")
+        composeRule.onNodeWithTag("library-manage-toggle")
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("library-manage-panel") }
+        captureSprint12("01_library_manage_panel_light")
+        composeRule.onNodeWithTag("library-list")
+            .performScrollToNode(hasTestTag("library-editorial-note-start-with-what-is-yours"))
+        composeRule.onNodeWithTag("library-editorial-note-start-with-what-is-yours")
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag("library-list")
+            .performScrollToNode(hasText("Saved Sprint 12 link"))
+        captureSprint12("02_library_manage_content_light")
+
+        composeRule.onNodeWithTag("library-list")
+            .performScrollToNode(hasText("Your links"))
+        composeRule.onNodeWithText("Your links")
+            .assertIsDisplayed()
+            .performClick()
+
+        val selectTag = "library-select-user-link:9fc84fe76d22668b6556dad16b5e5f6dc6667b571c585ff3766449738cf56cb8"
+        composeRule.onNodeWithTag("library-list")
+            .performScrollToNode(hasTestTag(selectTag))
+        composeRule.onNodeWithTag(selectTag)
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.onNodeWithTag("library-list")
+            .performScrollToNode(hasText("Saved Sprint 12 link"))
+        composeRule.onNodeWithText("Selected").assertIsDisplayed()
+        captureSprint12("03_library_selected_light")
+
+        openTab("tab-settings", "settings-list")
+        composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasTestTag("theme-DARK"))
+        composeRule.onNodeWithTag("theme-DARK")
+            .performSemanticsAction(SemanticsActions.OnClick)
+        composeRule.waitForIdle()
+        openTab("tab-library", "library-list")
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("library-manage-panel") }
+        composeRule.onNodeWithTag("library-list")
+            .performScrollToNode(hasText("Your links"))
+        composeRule.onNodeWithText("Your links")
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasNode("Saved Sprint 12 link") }
+        captureSprint12("04_library_selected_dark")
+
+        composeRule.onNodeWithTag("library-list")
+            .performScrollToNode(hasTestTag("library-delete-selected"))
+        composeRule.onNodeWithTag("library-delete-selected")
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { !hasNode("Saved Sprint 12 link") }
+        captureSprint12("05_library_after_delete_dark")
+    }
+
+    @Test
+    fun captureSprint12AddFlowScreens() {
+        launchOnboardedApp()
+
+        scenario?.onActivity { activity -> activity.mainViewModel.openAddLink() }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("add-link-screen") }
+        captureSprint12("06_add_content_light")
+
+        scenario?.onActivity { activity -> activity.mainViewModel.selectThemeMode(AppThemeMode.DARK) }
+        composeRule.waitForIdle()
+        captureSprint12("07_add_content_dark")
+
+        scenario?.onActivity { activity -> activity.mainViewModel.selectThemeMode(AppThemeMode.LIGHT) }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("add-link-url").performTextInput("https://example.com/sprint-12-priority")
+        composeRule.onNodeWithTag("add-link-title").performTextInput("Priority link")
+        UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).pressBack()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("add-link-topic-SCIENCE")
+            .performScrollTo()
+            .performClick()
+        composeRule.onNodeWithTag("add-link-priority")
+            .performScrollTo()
+            .performClick()
+        captureSprint12("08_add_link_priority_light")
+
+        scenario?.onActivity { activity -> activity.mainViewModel.selectThemeMode(AppThemeMode.DARK) }
+        composeRule.waitForIdle()
+        captureSprint12("09_add_link_priority_dark")
+
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.selectThemeMode(AppThemeMode.LIGHT)
+            activity.mainViewModel.prepareUserDocumentBatchImport(
+                candidates = listOf(
+                    DocumentImportCandidate(
+                        uri = "content://visual/short-notes",
+                        displayName = "short-notes.md",
+                        mimeType = "text/markdown",
+                        title = "Short notes",
+                        durationMinutes = "3",
+                        format = ContentFormat.MARKDOWN,
+                        estimateSource = ReadingTimeEstimateSource.EXTRACTED_TEXT,
+                        estimatedWordCount = 420,
+                    ),
+                    DocumentImportCandidate(
+                        uri = "content://visual/deep-book",
+                        displayName = "deep-book.epub",
+                        mimeType = "application/epub+zip",
+                        title = "Deep book",
+                        durationMinutes = "20",
+                        format = ContentFormat.EPUB,
+                        estimateSource = ReadingTimeEstimateSource.EXTRACTED_TEXT,
+                        estimatedWordCount = 12_000,
+                    ),
+                    DocumentImportCandidate(
+                        uri = "content://visual/archive",
+                        displayName = "archive.zip",
+                        mimeType = "application/zip",
+                        title = "Archive",
+                        durationMinutes = "10",
+                        format = null,
+                    ),
+                ),
+            )
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("add-document-screen") }
+        captureSprint12("10_batch_import_files_light")
+
+        composeRule.onNodeWithTag("add-document-topic-SCIENCE")
+            .performScrollTo()
+            .performClick()
+        composeRule.onNodeWithTag("add-document-priority")
+            .performScrollTo()
+            .performClick()
+        captureSprint12("11_batch_import_priority_light")
+
+        scenario?.onActivity { activity -> activity.mainViewModel.selectThemeMode(AppThemeMode.DARK) }
+        composeRule.waitForIdle()
+        captureSprint12("12_batch_import_priority_dark")
+
+        scenario?.onActivity { activity -> activity.mainViewModel.selectThemeMode(AppThemeMode.LIGHT) }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("add-document-save")
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("add-link-success-screen") }
+        captureSprint12("13_batch_import_result_light")
+
+        scenario?.onActivity { activity -> activity.mainViewModel.selectThemeMode(AppThemeMode.DARK) }
+        composeRule.waitForIdle()
+        captureSprint12("14_batch_import_result_dark")
+    }
+
+    @Test
+    fun captureSprint12ContinueReadingScreens() {
+        val document = seedSprint12ContinueReadingDocument()
+        launchApp()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("home-list") }
+
+        openTab("tab-library", "library-list")
+        composeRule.onNodeWithTag("library-list")
+            .performScrollToNode(hasText(document.title))
+        composeRule.onNodeWithTag("library-open-${document.id}")
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
+        captureSprint12("15_reader_start_light")
+
+        composeRule.onNodeWithTag("reader-list")
+            .performScrollToNode(hasText("Chapter Two"))
+        captureSprint12("16_reader_mid_light")
+
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.saveCurrentReadingProgress(
+                progressPercent = 58,
+                lastVisibleParagraphIndex = 6,
+                paragraphCount = 14,
+            )
+            activity.mainViewModel.openHome()
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("home-continue-card") }
+        captureSprint12("17_home_continue_light")
+
+        composeRule.onNodeWithTag("home-continue-action")
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
+        captureSprint12("18_reader_continued_light")
+
+        scenario?.onActivity { activity -> activity.mainViewModel.openLibrary() }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("library-list") }
+        composeRule.onNodeWithText("Unfinished")
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.onNodeWithTag("library-manage-toggle")
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("library-manage-panel") && hasNodeContaining("58% read") }
+        captureSprint12("19_library_unfinished_manage_light")
+
+        scenario?.onActivity { activity -> activity.mainViewModel.triggerDebugIntervention(nowMillis = 2_500L) }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("intervention-screen") && hasNode("Unfinished") }
+        captureSprint12("20_intervention_unfinished_priority_light")
+
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.selectThemeMode(AppThemeMode.DARK)
+            activity.mainViewModel.openHome()
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("home-continue-card") }
+        captureSprint12("21_home_continue_dark")
+
+        composeRule.onNodeWithTag("home-continue-action")
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
+        captureSprint12("22_reader_continued_dark")
+
+        scenario?.onActivity { activity -> activity.mainViewModel.openLibrary() }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("library-list") }
+        composeRule.onNodeWithText("Unfinished")
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.onNodeWithTag("library-manage-toggle")
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("library-manage-panel") && hasNodeContaining("58% read") }
+        captureSprint12("23_library_unfinished_manage_dark")
+
+        scenario?.onActivity { activity -> activity.mainViewModel.triggerDebugIntervention(nowMillis = 3_500L) }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("intervention-screen") && hasNode("Unfinished") }
+        captureSprint12("24_intervention_unfinished_priority_dark")
+
+        val darkReaderDocument = seedSprint12ContinueReadingDocument(
+            fileName = "sprint12-dark-reader.epub",
+            title = "Dark Reader Fixture",
+            nowMillis = 2_100L,
+        )
+        scenario?.onActivity { activity -> activity.mainViewModel.openLibrary() }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("library-list") }
+        composeRule.onNodeWithTag("library-list")
+            .performScrollToNode(hasText(darkReaderDocument.title))
+        composeRule.onNodeWithTag("library-open-${darkReaderDocument.id}")
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
+        captureSprint12("25_reader_start_dark")
+
+        composeRule.onNodeWithTag("reader-list")
+            .performScrollToNode(hasText("Chapter Two"))
+        captureSprint12("26_reader_mid_dark")
+    }
+
+    @Test
+    fun captureSprint12FinalJourneyScreens() {
+        launchOnboardedApp()
+        captureSprint12Final("01_home_light")
+
+        openAddLinkFromHome()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("add-link-screen") }
+        captureSprint12Final("02_add_content_light")
+
+        composeRule.onNodeWithTag("add-link-url").performTextInput("https://example.com/final-sprint-12-link")
+        composeRule.onNodeWithTag("add-link-title").performTextInput("Final Sprint 12 link")
+        UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).pressBack()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("add-link-topic-SCIENCE")
+            .performScrollTo()
+            .performClick()
+        composeRule.onNodeWithTag("add-link-priority")
+            .performScrollTo()
+            .performClick()
+        captureSprint12Final("03_add_link_priority_light")
+
+        composeRule.onNodeWithTag("add-link-save")
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("add-link-success-screen") }
+        captureSprint12Final("04_add_link_success_light")
+        composeRule.onNodeWithTag("add-link-done").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("library-list") }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            !hasNodeContaining("Saved for future replacement moments.")
+        }
+
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.prepareUserDocumentBatchImport(
+                candidates = listOf(
+                    DocumentImportCandidate(
+                        uri = "content://final-visual/short-notes",
+                        displayName = "final-short-notes.md",
+                        mimeType = "text/markdown",
+                        title = "Final short notes",
+                        durationMinutes = "3",
+                        format = ContentFormat.MARKDOWN,
+                        estimateSource = ReadingTimeEstimateSource.EXTRACTED_TEXT,
+                        estimatedWordCount = 420,
+                    ),
+                    DocumentImportCandidate(
+                        uri = "content://final-visual/deep-book",
+                        displayName = "final-deep-book.epub",
+                        mimeType = "application/epub+zip",
+                        title = "Final deep book",
+                        durationMinutes = "20",
+                        format = ContentFormat.EPUB,
+                        estimateSource = ReadingTimeEstimateSource.EXTRACTED_TEXT,
+                        estimatedWordCount = 12_000,
+                    ),
+                    DocumentImportCandidate(
+                        uri = "content://final-visual/archive",
+                        displayName = "final-archive.zip",
+                        mimeType = "application/zip",
+                        title = "Archive",
+                        durationMinutes = "10",
+                        format = null,
+                    ),
+                ),
+            )
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("add-document-screen") }
+        captureSprint12Final("05_batch_import_files_light")
+
+        composeRule.onNodeWithTag("add-document-topic-SCIENCE")
+            .performScrollTo()
+            .performClick()
+        composeRule.onNodeWithTag("add-document-priority")
+            .performScrollTo()
+            .performClick()
+        captureSprint12Final("06_batch_import_priority_light")
+
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.saveUserDocument(persistReadPermission = {})
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("add-link-success-screen") }
+        captureSprint12Final("07_batch_import_result_light")
+        composeRule.onNodeWithTag("add-link-done").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("library-list") }
+        composeRule.onNodeWithTag("library-manage-toggle")
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("library-manage-panel") }
+        composeRule.onNodeWithTag("library-list")
+            .performScrollToNode(hasText("Final Sprint 12 link"))
+        captureSprint12Final("08_library_manage_light")
+
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.selectThemeMode(AppThemeMode.DARK)
+            activity.mainViewModel.openHome()
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("home-list") }
+        openAddLinkFromHome()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("add-link-screen") }
+        captureSprint12Final("09_add_content_dark")
+
+        composeRule.onNodeWithTag("add-link-url").performTextInput("https://example.com/final-sprint-12-dark-link")
+        composeRule.onNodeWithTag("add-link-title").performTextInput("Final Sprint 12 dark link")
+        UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).pressBack()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("add-link-topic-SCIENCE")
+            .performScrollTo()
+            .performClick()
+        composeRule.onNodeWithTag("add-link-priority")
+            .performScrollTo()
+            .performClick()
+        captureSprint12Final("10_add_link_priority_dark")
+
+        composeRule.onNodeWithTag("add-link-save")
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("add-link-success-screen") }
+        captureSprint12Final("11_add_link_success_dark")
+        composeRule.onNodeWithTag("add-link-done").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("library-list") }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            !hasNodeContaining("Saved for future replacement moments.")
+        }
+
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.prepareUserDocumentBatchImport(
+                candidates = listOf(
+                    DocumentImportCandidate(
+                        uri = "content://final-visual-dark/short-notes",
+                        displayName = "final-dark-short-notes.md",
+                        mimeType = "text/markdown",
+                        title = "Final dark short notes",
+                        durationMinutes = "3",
+                        format = ContentFormat.MARKDOWN,
+                        estimateSource = ReadingTimeEstimateSource.EXTRACTED_TEXT,
+                        estimatedWordCount = 420,
+                    ),
+                    DocumentImportCandidate(
+                        uri = "content://final-visual-dark/deep-book",
+                        displayName = "final-dark-deep-book.epub",
+                        mimeType = "application/epub+zip",
+                        title = "Final dark deep book",
+                        durationMinutes = "20",
+                        format = ContentFormat.EPUB,
+                        estimateSource = ReadingTimeEstimateSource.EXTRACTED_TEXT,
+                        estimatedWordCount = 12_000,
+                    ),
+                    DocumentImportCandidate(
+                        uri = "content://final-visual-dark/archive",
+                        displayName = "final-dark-archive.zip",
+                        mimeType = "application/zip",
+                        title = "Archive",
+                        durationMinutes = "10",
+                        format = null,
+                    ),
+                ),
+            )
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("add-document-screen") }
+        captureSprint12Final("12_batch_import_files_dark")
+
+        composeRule.onNodeWithTag("add-document-topic-SCIENCE")
+            .performScrollTo()
+            .performClick()
+        composeRule.onNodeWithTag("add-document-priority")
+            .performScrollTo()
+            .performClick()
+        captureSprint12Final("13_batch_import_priority_dark")
+
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.saveUserDocument(persistReadPermission = {})
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("add-link-success-screen") }
+        captureSprint12Final("14_batch_import_result_dark")
+        composeRule.onNodeWithTag("add-link-done").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("library-list") }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            !hasNodeContaining("Saved for future replacement moments.")
+        }
+        if (!hasTag("library-manage-panel")) {
+            composeRule.onNodeWithTag("library-manage-toggle")
+                .assertIsDisplayed()
+                .performClick()
+            composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("library-manage-panel") }
+        }
+        composeRule.onNodeWithTag("library-list")
+            .performScrollToNode(hasText("Final Sprint 12 dark link"))
+        captureSprint12Final("15_library_manage_dark")
+
+        val continueDocument = seedSprint12ContinueReadingDocument(
+            fileName = "final-journey-continue.epub",
+            title = "Final Journey Continue",
+            nowMillis = 2_300L,
+        )
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.selectThemeMode(AppThemeMode.LIGHT)
+            activity.mainViewModel.openHome()
+            activity.mainViewModel.openLibrary()
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("library-list") }
+        composeRule.onNodeWithTag("library-list")
+            .performScrollToNode(hasText(continueDocument.title))
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.openLibraryItem(continueDocument)
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
+        captureSprint12Final("16_reader_start_light")
+
+        composeRule.onNodeWithTag("reader-list")
+            .performScrollToNode(hasText("Chapter Two"))
+        captureSprint12Final("17_reader_mid_light")
+
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.saveCurrentReadingProgress(
+                progressPercent = 58,
+                lastVisibleParagraphIndex = 6,
+                paragraphCount = 14,
+            )
+            activity.mainViewModel.openHome()
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("home-continue-card") }
+        captureSprint12Final("18_home_continue_light")
+
+        scenario?.onActivity { activity -> activity.mainViewModel.openLibrary() }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("library-list") }
+        composeRule.onNodeWithText("Unfinished")
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.onNodeWithTag("library-manage-toggle")
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("library-manage-panel") && hasNodeContaining("58% read") }
+        captureSprint12Final("19_library_unfinished_light")
+
+        scenario?.onActivity { activity -> activity.mainViewModel.triggerDebugIntervention(nowMillis = 4_500L) }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("intervention-screen") && hasNode("Unfinished") }
+        captureSprint12Final("20_intervention_unfinished_light")
+
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.selectThemeMode(AppThemeMode.DARK)
+            activity.mainViewModel.openHome()
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("home-list") }
+        captureSprint12Final("21_home_dark")
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("home-continue-card") }
+        captureSprint12Final("22_home_continue_dark")
+
+        composeRule.onNodeWithTag("home-continue-action")
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
+        captureSprint12Final("23_reader_continued_dark")
+
+        scenario?.onActivity { activity -> activity.mainViewModel.openLibrary() }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("library-list") }
+        composeRule.onNodeWithText("Unfinished")
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.onNodeWithTag("library-manage-toggle")
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("library-manage-panel") && hasNodeContaining("58% read") }
+        captureSprint12Final("24_library_unfinished_dark")
+
+        scenario?.onActivity { activity -> activity.mainViewModel.triggerDebugIntervention(nowMillis = 5_500L) }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("intervention-screen") && hasNode("Unfinished") }
+        captureSprint12Final("25_intervention_unfinished_dark")
+
+        val darkReaderProofDocument = seedSprint12ContinueReadingDocument(
+            fileName = "final-dark-reader-proof.epub",
+            title = "Final Dark Reader Proof",
+            nowMillis = 2_700L,
+        )
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.openLibrary()
+            activity.mainViewModel.openLibraryItem(darkReaderProofDocument)
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
+        captureSprint12Final("26_reader_start_dark")
+
+        composeRule.onNodeWithTag("reader-list")
+            .performScrollToNode(hasText("Chapter Two"))
+        captureSprint12Final("27_reader_mid_dark")
+    }
+
     private fun capture(name: String) {
         captureTo(screenshotDir, name)
     }
@@ -491,6 +1043,14 @@ class VisualQaScreenshotTest {
 
     private fun captureSprint9(name: String) {
         captureTo(sprint9ScreenshotDir, name)
+    }
+
+    private fun captureSprint12(name: String) {
+        captureTo(sprint12ScreenshotDir, name)
+    }
+
+    private fun captureSprint12Final(name: String) {
+        captureTo(sprint12FinalScreenshotDir, name)
     }
 
     private fun captureTo(directory: File, name: String) {
@@ -578,6 +1138,14 @@ class VisualQaScreenshotTest {
         composeRule.onNodeWithTag(tabTag, useUnmergedTree = true)
             .performSemanticsAction(SemanticsActions.OnClick)
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag(expectedScreenTag) }
+    }
+
+    private fun openAddLinkFromHome() {
+        composeRule.onNodeWithTag("home-list")
+            .performScrollToNode(hasTestTag("home-add-link"))
+        composeRule.onNodeWithTag("home-add-link")
+            .assertIsDisplayed()
+            .performClick()
     }
 
     private fun launchApp(intent: Intent? = null) {
@@ -848,6 +1416,30 @@ class VisualQaScreenshotTest {
         "creativity_play_v1",
     )
 
+    private fun seedSprint12LibraryManageContent() = runBlocking {
+        val app = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication)
+        app.appContainer.userLinkRepository.observeReady().first { it }
+        val result = app.appContainer.userLinkRepository.addLink(
+            draft = UserLinkDraft(
+                url = "https://example.com/sprint-12-manage",
+                title = "Saved Sprint 12 link",
+                description = "A saved link for visual deletion coverage.",
+                durationMinutes = 8,
+                topicTags = setOf(TopicTag.SCIENCE, TopicTag.ESSAYS),
+            ),
+            nowMillis = 12_000L,
+        )
+        assertTrue("Expected Sprint 12 visual link to be saved", result is AddUserLinkResult.Added)
+        app.appContainer.settingsRepository.saveOnboardingSelection(
+            OnboardingSelection(
+                selectedAppPackages = setOf(FixtureTargetRegistry.fixtureDistractors.first().packageName),
+                preferredTopics = setOf(TopicTag.SCIENCE, TopicTag.ESSAYS),
+                preferredDurationBucket = DurationBucket.FOCUS,
+                selectedPackIds = setOf("attention-classics-v1"),
+            ),
+        )
+    }
+
     private fun seedSupportedAppSelection() = runBlocking {
         val repository = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication)
             .appContainer
@@ -968,6 +1560,42 @@ class VisualQaScreenshotTest {
                 selectedPackIds = emptySet(),
             ),
         )
+    }
+
+    private fun seedSprint12ContinueReadingDocument(
+        fileName: String = "sprint12-continue.epub",
+        title: String = "Continue Reading Fixture",
+        nowMillis: Long = 1_900L,
+    ): ContentItem = runBlocking {
+        val targetContext = InstrumentationRegistry.getInstrumentation().targetContext
+        val app = targetContext.applicationContext as QualityAlternativeApplication
+        val fixture = File(targetContext.filesDir, "visual-qa-fixtures/$fileName")
+        fixture.parentFile?.mkdirs()
+        fixture.writeBytes(sprint10EpubBytes())
+
+        app.appContainer.userDocumentRepository.observeReady().first { it }
+        val result = app.appContainer.userDocumentRepository.addDocument(
+            draft = UserDocumentDraft(
+                uri = Uri.fromFile(fixture).toString(),
+                displayName = fileName,
+                mimeType = "application/epub+zip",
+                title = title,
+                durationMinutes = 12,
+                topicTags = setOf(TopicTag.ESSAYS, TopicTag.PSYCHOLOGY),
+            ),
+            nowMillis = nowMillis,
+        )
+        assertTrue("Expected Sprint 12 continue fixture to be saved", result is AddUserDocumentResult.Added)
+        val item = (result as AddUserDocumentResult.Added).item
+        app.appContainer.settingsRepository.saveOnboardingSelection(
+            OnboardingSelection(
+                selectedAppPackages = setOf(FixtureTargetRegistry.fixtureDistractors.first().packageName),
+                preferredTopics = setOf(TopicTag.ESSAYS, TopicTag.PSYCHOLOGY),
+                preferredDurationBucket = DurationBucket.FOCUS,
+                selectedPackIds = emptySet(),
+            ),
+        )
+        item
     }
 
     private fun resetForDarkMeditationFixture() {

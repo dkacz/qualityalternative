@@ -136,6 +136,62 @@ class RoomUserLinkRepositoryTest {
     }
 
     @Test
+    fun deleteLink_removesPersistedLinkAndReloadedState() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val database = Room.inMemoryDatabaseBuilder(
+            context,
+            QualityAlternativeDatabase::class.java,
+        ).allowMainThreadQueries().build()
+        val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+        try {
+            val repository = RoomUserLinkRepository(
+                dao = database.userLinkDao(),
+                scope = appScope,
+                idProvider = { _ -> "user-link:test" },
+            )
+            repository.observeReady().first { it }
+            repository.addLink(
+                draft = UserLinkDraft(
+                    url = "https://example.com/essay",
+                    title = "Saved essay",
+                    description = "",
+                    durationMinutes = 8,
+                    topicTags = setOf(TopicTag.SCIENCE),
+                ),
+                nowMillis = 1_000L,
+            )
+            withTimeout(10_000L) {
+                repository.observeUserLinks().first { it.size == 1 }
+            }
+
+            repository.deleteLink("user-link:test")
+
+            withTimeout(10_000L) {
+                repository.observeUserLinks().first { it.isEmpty() }
+            }
+            val reloadedScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+            val reloadedRepository = RoomUserLinkRepository(
+                dao = database.userLinkDao(),
+                scope = reloadedScope,
+                idProvider = { _ -> "user-link:unused" },
+            )
+            try {
+                assertEquals(
+                    emptyList<Any>(),
+                    withTimeout(10_000L) { reloadedRepository.observeUserLinks().first() },
+                )
+            } finally {
+                reloadedScope.cancel()
+            }
+        } finally {
+            appScope.cancel()
+            delay(100)
+            database.close()
+        }
+    }
+
+    @Test
     fun markUnavailable_updatesVisibleInventoryState() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val database = Room.inMemoryDatabaseBuilder(

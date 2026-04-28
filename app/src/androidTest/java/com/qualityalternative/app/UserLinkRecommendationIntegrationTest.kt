@@ -60,6 +60,7 @@ class UserLinkRecommendationIntegrationTest {
             delayGate = appContainer.delayGate,
             analyticsTracker = appContainer.analyticsTracker,
             historyRepository = appContainer.historyRepository,
+            readingProgressRepository = appContainer.readingProgressRepository,
             interceptionMonitor = appContainer.interceptionMonitor,
             enableDelayRefreshTicker = false,
         )

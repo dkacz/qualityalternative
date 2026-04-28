@@ -65,4 +65,20 @@ class UserDocumentValidatorTest {
         assertTrue(result.isValid)
         assertEquals(ContentFormat.MARKDOWN, result.format)
     }
+
+    @Test
+    fun validate_rejectsDocumentSessionEstimateOutsideThreeToTwentyMinutes() {
+        val tooLong = UserDocumentValidator.validate(
+            UserDocumentDraft(
+                uri = "content://docs/book",
+                displayName = "book.epub",
+                mimeType = "application/epub+zip",
+                title = "Book",
+                durationMinutes = 60,
+                topicTags = setOf(TopicTag.HISTORY),
+            ),
+        )
+
+        assertEquals(setOf(UserDocumentValidationError.INVALID_DURATION), tooLong.errors)
+    }
 }

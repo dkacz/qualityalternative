@@ -15,6 +15,7 @@ import com.qualityalternative.app.domain.model.PermissionReadiness
 import com.qualityalternative.app.domain.model.RecommendationSet
 import com.qualityalternative.app.domain.model.RecommendationSignals
 import com.qualityalternative.app.domain.model.RecommendationSource
+import com.qualityalternative.app.domain.model.ReadingProgress
 import com.qualityalternative.app.domain.model.ReplacementHistoryEntry
 import com.qualityalternative.app.domain.model.ReturnToTargetSignal
 import com.qualityalternative.app.domain.model.SessionFeedback
@@ -61,6 +62,8 @@ interface UserLinkRepository {
         nowMillis: Long = System.currentTimeMillis(),
     )
 
+    suspend fun deleteLink(contentId: String)
+
     fun isReady(): Boolean = true
 
     fun observeReady(): Flow<Boolean> = flowOf(isReady())
@@ -80,6 +83,8 @@ interface UserDocumentRepository {
         contentId: String,
         nowMillis: Long = System.currentTimeMillis(),
     )
+
+    suspend fun deleteDocument(contentId: String)
 
     fun contentBody(item: ContentItem): String = item.description
 
@@ -227,6 +232,30 @@ interface HistoryRepository {
         targetAppPackage: String,
         returnedAtMillis: Long = System.currentTimeMillis(),
     ): ReturnToTargetSignal?
+
+    fun isReady(): Boolean = true
+
+    fun observeReady(): Flow<Boolean> = flowOf(isReady())
+}
+
+interface ReadingProgressRepository {
+    fun readingProgress(): List<ReadingProgress>
+
+    fun observeReadingProgress(): Flow<List<ReadingProgress>> = flowOf(readingProgress())
+
+    fun observeCompletedContentIds(): Flow<Set<String>> =
+        flowOf(
+            readingProgress().filter(ReadingProgress::isCompleted)
+                .mapTo(mutableSetOf(), ReadingProgress::contentId),
+        )
+
+    suspend fun saveProgress(progress: ReadingProgress)
+
+    suspend fun deleteProgress(contentId: String)
+
+    suspend fun deleteProgressForContentIds(contentIds: Set<String>) {
+        contentIds.forEach { contentId -> deleteProgress(contentId) }
+    }
 
     fun isReady(): Boolean = true
 

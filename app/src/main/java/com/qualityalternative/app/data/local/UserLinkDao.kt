@@ -23,4 +23,7 @@ interface UserLinkDao {
         availability: String,
         updatedAtMillis: Long,
     )
+
+    @Query("DELETE FROM user_links WHERE id = :id")
+    suspend fun deleteById(id: String)
 }

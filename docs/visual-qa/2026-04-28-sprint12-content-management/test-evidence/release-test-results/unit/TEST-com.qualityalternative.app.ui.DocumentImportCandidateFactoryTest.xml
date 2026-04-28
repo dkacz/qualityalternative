@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.qualityalternative.app.ui.DocumentImportCandidateFactoryTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-04-28T11:58:09.552Z" hostname="mac-studio.home" time="0.032">
+  <properties/>
+  <testcase name="pickedPdfAndUnsupportedCandidatesUseDefaultsWithoutWordCounts" classname="com.qualityalternative.app.ui.DocumentImportCandidateFactoryTest" time="0.005"/>
+  <testcase name="pickedEpubCandidateUsesExtractedEstimateForShortNormalAndVeryLongFiles" classname="com.qualityalternative.app.ui.DocumentImportCandidateFactoryTest" time="0.024"/>
+  <testcase name="pickedMarkdownCandidateUsesExtractedEstimateForShortNormalAndVeryLongFiles" classname="com.qualityalternative.app.ui.DocumentImportCandidateFactoryTest" time="0.003"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

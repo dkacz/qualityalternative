@@ -1,6 +1,7 @@
 package com.qualityalternative.app.domain.service
 
 import com.qualityalternative.app.domain.model.ContentItem
+import com.qualityalternative.app.domain.model.ContentAvailability
 import com.qualityalternative.app.domain.model.ContentPriority
 import com.qualityalternative.app.domain.model.ContentSourceType
 import com.qualityalternative.app.domain.model.DistractingApp
@@ -21,6 +22,7 @@ class DefaultRecommendationEngine : RecommendationEngine {
         nowMillis: Long,
     ): RecommendationSet? {
         val scoredCandidates = inventory
+            .filter { item -> item.availability != ContentAvailability.UNAVAILABLE }
             .map { item ->
                 ScoredCandidate(
                     item = item,
@@ -42,6 +44,18 @@ class DefaultRecommendationEngine : RecommendationEngine {
                     backups = backupsFor(primary = primary, scoredCandidates = scoredCandidates),
                 )
             }
+
+        val unfinishedChoice = candidateSets.firstOrNull { candidate ->
+            candidate.primary.item.id in preferences.unfinishedContentIds
+        }
+        if (unfinishedChoice != null) {
+            return RecommendationSet(
+                primary = unfinishedChoice.primary.item,
+                backups = unfinishedChoice.backups.map(ScoredCandidate::item),
+                inventoryShortage = unfinishedChoice.backups.size < 2,
+                generatedAtMillis = nowMillis,
+            )
+        }
 
         val canBuildFullSet = candidateSets.any { it.backups.size == 2 }
         val chosen = candidateSets
@@ -93,6 +107,7 @@ class DefaultRecommendationEngine : RecommendationEngine {
         val utilityBoost = if (item.sourceType == ContentSourceType.MEDITATION) 24 else 0
         val priorityBoost = preferences.contentPriority.boostFor(item.sourceType)
         val priorityPickBoost = if (item.id in preferences.priorityContentIds) 96 else 0
+        val unfinishedBoost = if (item.id in preferences.unfinishedContentIds) 10_000 else 0
         val timeOfDayBoost = when (signals.timeOfDay) {
             TimeOfDayBucket.MORNING -> when {
                 item.durationMinutes <= DurationBucket.QUICK.maxMinutes -> 18
@@ -104,7 +119,7 @@ class DefaultRecommendationEngine : RecommendationEngine {
             TimeOfDayBucket.EVENING -> if (DurationBucket.DEEP.contains(item.durationMinutes)) 18 else 6
             TimeOfDayBucket.NIGHT -> if (item.durationMinutes <= DurationBucket.FOCUS.maxMinutes) 14 else 0
         }
-        return topicScore + durationScore + completionBoost + packBoost + utilityBoost + priorityBoost + priorityPickBoost + timeOfDayBoost - skipPenalty
+        return topicScore + durationScore + completionBoost + packBoost + utilityBoost + priorityBoost + priorityPickBoost + unfinishedBoost + timeOfDayBoost - skipPenalty
     }
 
     private data class ScoredCandidate(

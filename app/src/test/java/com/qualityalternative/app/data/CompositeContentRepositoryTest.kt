@@ -168,6 +168,8 @@ class CompositeContentRepositoryTest {
             nowMillis: Long,
         ) = Unit
 
+        override suspend fun deleteLink(contentId: String) = Unit
+
         override fun isReady(): Boolean = isReady.value
 
         override fun observeReady(): Flow<Boolean> = isReady
@@ -191,6 +193,8 @@ class CompositeContentRepositoryTest {
             contentId: String,
             nowMillis: Long,
         ) = Unit
+
+        override suspend fun deleteDocument(contentId: String) = Unit
 
         override fun contentBody(item: ContentItem): String = body
 

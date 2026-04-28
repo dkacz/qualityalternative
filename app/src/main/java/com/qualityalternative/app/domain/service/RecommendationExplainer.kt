@@ -23,6 +23,9 @@ object RecommendationExplainer {
             ?: fallbackHeadline(item = item, preferences = preferences, matchedTopics = matchedTopics)
 
         val chips = buildList {
+            if (item.id in preferences.unfinishedContentIds) {
+                add("Unfinished")
+            }
             if (item.id in preferences.priorityContentIds) {
                 add("Priority pick")
             }
@@ -45,6 +48,7 @@ object RecommendationExplainer {
         matchedTopics: List<TopicTag>,
     ): String {
         return when {
+            item.id in preferences.unfinishedContentIds -> "Continue what you already started."
             item.id in preferences.priorityContentIds -> "You marked this as a priority pick for replacement moments."
             matchedTopics.isNotEmpty() -> "Picked because it matches your ${matchedTopics.first().displayName()} interest."
             item.sourceType == ContentSourceType.MEDITATION -> "A short reset for creating space before opening the app."

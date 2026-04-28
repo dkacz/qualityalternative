@@ -7,6 +7,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.qualityalternative.app.data.AppContainer
+import com.qualityalternative.app.data.ReadingTimeEstimateSource
+import com.qualityalternative.app.data.ReadingTimeEstimator
 import com.qualityalternative.app.data.SupportedCatalog
 import com.qualityalternative.app.data.UserDocumentValidator
 import com.qualityalternative.app.data.UserLinkValidator
@@ -32,6 +34,7 @@ import com.qualityalternative.app.domain.model.PermissionStatus
 import com.qualityalternative.app.domain.model.RecommendationSet
 import com.qualityalternative.app.domain.model.RecommendationSignals
 import com.qualityalternative.app.domain.model.RecommendationSource
+import com.qualityalternative.app.domain.model.ReadingProgress
 import com.qualityalternative.app.domain.model.ReplacementHistoryEntry
 import com.qualityalternative.app.domain.model.ReturnToTargetSignal
 import com.qualityalternative.app.domain.model.SessionFeedback
@@ -54,10 +57,12 @@ import com.qualityalternative.app.domain.service.DelayGate
 import com.qualityalternative.app.domain.service.HistoryRepository
 import com.qualityalternative.app.domain.service.InterceptionMonitor
 import com.qualityalternative.app.domain.service.RecommendationEngine
+import com.qualityalternative.app.domain.service.ReadingProgressRepository
 import com.qualityalternative.app.domain.service.SettingsRepository
 import com.qualityalternative.app.domain.service.UserDocumentRepository
 import com.qualityalternative.app.domain.service.UserLinkRepository
 import com.qualityalternative.app.interception.InterceptionRuntimeGate
+import java.io.InputStream
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.cancel
@@ -86,6 +91,7 @@ data class MainUiState(
     val currentInterventionOrigin: InterventionOrigin? = null,
     val currentContent: ContentItem? = null,
     val currentContentBody: String = "",
+    val currentReadingProgress: ReadingProgress? = null,
     val currentSessionId: String? = null,
     val currentSessionStartedAtMillis: Long? = null,
     val activeDelayWindow: DelayWindow? = null,
@@ -93,6 +99,7 @@ data class MainUiState(
     val permissionReadiness: PermissionReadiness = unavailablePermissionReadiness(),
     val historyEntries: List<ReplacementHistoryEntry> = emptyList(),
     val completedContentIds: Set<String> = emptySet(),
+    val readingProgress: List<ReadingProgress> = emptyList(),
     val userLinks: List<ContentItem> = emptyList(),
     val userDocuments: List<ContentItem> = emptyList(),
     val addLinkForm: AddLinkFormState = AddLinkFormState(),
@@ -102,6 +109,8 @@ data class MainUiState(
     val meditationDurationMinutes: Int = DEFAULT_MEDITATION_MINUTES,
     val contentPriority: ContentPriority = ContentPriority.BALANCED,
     val priorityContentIds: Set<String> = emptySet(),
+    val isManagingLibrary: Boolean = false,
+    val selectedLibraryContentIds: Set<String> = emptySet(),
     val latestMessage: String? = null,
     val events: List<AnalyticsEvent> = emptyList(),
     val screen: MainScreen = MainScreen.Onboarding,
@@ -113,16 +122,31 @@ data class AddLinkConfirmation(
     val host: String,
     val durationMinutes: Int,
     val topicLabel: String,
+    val savedCount: Int = 1,
+    val skippedCount: Int = 0,
+    val priorityMarked: Boolean = false,
 )
 
 data class AddLinkFormState(
     val url: String = "",
     val title: String = "",
-    val durationMinutes: String = "8",
+    val durationMinutes: String = ReadingTimeEstimator.DEFAULT_LINK_MINUTES.toString(),
     val selectedTopics: Set<TopicTag> = emptySet(),
+    val markPriority: Boolean = false,
     val validationErrors: Set<UserLinkValidationError> = emptySet(),
     val canSave: Boolean = false,
     val isSaving: Boolean = false,
+)
+
+data class DocumentImportCandidate(
+    val uri: String,
+    val displayName: String,
+    val mimeType: String? = null,
+    val title: String,
+    val durationMinutes: String,
+    val format: ContentFormat? = null,
+    val estimateSource: ReadingTimeEstimateSource = ReadingTimeEstimateSource.FALLBACK_DEFAULT,
+    val estimatedWordCount: Int? = null,
 )
 
 data class AddDocumentFormState(
@@ -130,12 +154,23 @@ data class AddDocumentFormState(
     val displayName: String = "",
     val mimeType: String? = null,
     val title: String = "",
-    val durationMinutes: String = "10",
+    val durationMinutes: String = ReadingTimeEstimator.DEFAULT_DOCUMENT_MINUTES.toString(),
+    val candidates: List<DocumentImportCandidate> = emptyList(),
     val selectedTopics: Set<TopicTag> = emptySet(),
+    val markPriority: Boolean = false,
     val validationErrors: Set<UserDocumentValidationError> = emptySet(),
     val canSave: Boolean = false,
     val isSaving: Boolean = false,
-)
+) {
+    val importCount: Int
+        get() = candidates.size.coerceAtLeast(if (uri.isBlank()) 0 else 1)
+
+    val supportedImportCount: Int
+        get() = documentCandidates().count { candidate -> candidate.format != null }
+
+    val unsupportedImportCount: Int
+        get() = documentCandidates().count { candidate -> candidate.format == null }
+}
 
 enum class MainScreen {
     Onboarding,
@@ -167,6 +202,7 @@ class MainViewModel(
     private val delayGate: DelayGate,
     private val analyticsTracker: AnalyticsTracker,
     private val historyRepository: HistoryRepository,
+    private val readingProgressRepository: ReadingProgressRepository = EmptyReadingProgressRepository,
     private val interceptionMonitor: InterceptionMonitor,
     private val enableDelayRefreshTicker: Boolean = true,
     private val nowProvider: () -> Long = System::currentTimeMillis,
@@ -178,7 +214,10 @@ class MainViewModel(
     private var contentReady = contentRepository.isReady()
     private var analyticsReady = analyticsTracker.isReady()
     private var historyReady = historyRepository.isReady()
+    private var readingProgressReady = readingProgressRepository.isReady()
     private var delayReady = delayGate.isReady()
+    private var historyCompletedContentIds: Set<String> = emptySet()
+    private var readingProgressCompletedContentIds: Set<String> = emptySet()
     private var pendingSystemInterception: PendingSystemInterception? = null
 
     var uiState by mutableStateOf(
@@ -191,6 +230,7 @@ class MainViewModel(
             ),
             events = analyticsTracker.allEvents(),
             historyEntries = historyRepository.recentHistory(),
+            readingProgress = readingProgressRepository.readingProgress(),
             permissionReadiness = interceptionMonitor.currentReadiness(),
         ),
     )
@@ -240,12 +280,40 @@ class MainViewModel(
         }
         viewModelScope.launch {
             historyRepository.observeCompletedContentIds().collect { completedIds ->
-                uiState = uiState.copy(completedContentIds = completedIds)
+                historyCompletedContentIds = completedIds
+                updateCompletedContentIds()
             }
         }
         viewModelScope.launch {
             historyRepository.observeReady().collect { ready ->
                 historyReady = ready
+                updateHydrationState()
+            }
+        }
+        viewModelScope.launch {
+            readingProgressRepository.observeReadingProgress().collect { progress ->
+                readingProgressCompletedContentIds = progress.filter(ReadingProgress::isCompleted)
+                    .mapTo(mutableSetOf(), ReadingProgress::contentId)
+                val unfinishedIds = progress.unfinishedContentIds()
+                uiState = uiState.copy(
+                    readingProgress = progress,
+                    preferences = uiState.preferences?.copy(unfinishedContentIds = unfinishedIds),
+                    currentReadingProgress = uiState.currentContent?.id?.let { contentId ->
+                        progress.firstOrNull { candidate -> candidate.contentId == contentId && candidate.isUnfinished() }
+                    },
+                )
+                updateCompletedContentIds()
+            }
+        }
+        viewModelScope.launch {
+            readingProgressRepository.observeCompletedContentIds().collect { completedIds ->
+                readingProgressCompletedContentIds = completedIds
+                updateCompletedContentIds()
+            }
+        }
+        viewModelScope.launch {
+            readingProgressRepository.observeReady().collect { ready ->
+                readingProgressReady = ready
                 updateHydrationState()
             }
         }
@@ -472,30 +540,163 @@ class MainViewModel(
         uri: String,
         displayName: String,
         mimeType: String?,
+        openInputStream: () -> InputStream? = { null },
     ) {
-        val cleanedName = displayName.trim().ifBlank { "Untitled document" }
-        val title = cleanedName
-            .substringBeforeLast('.', cleanedName)
-            .trim()
-            .ifBlank { cleanedName }
+        val candidate = DocumentImportCandidateFactory.fromPickedDocument(
+            uri = uri,
+            displayName = displayName,
+            mimeType = mimeType,
+            openInputStream = openInputStream,
+        )
         updateAddDocumentForm(
             form = AddDocumentFormState(
-                uri = uri,
-                displayName = cleanedName,
+                uri = candidate.uri,
+                displayName = candidate.displayName,
                 mimeType = mimeType,
-                title = title,
-                durationMinutes = defaultDocumentDuration(mimeType = mimeType, displayName = cleanedName),
+                title = candidate.title,
+                durationMinutes = candidate.durationMinutes,
+                candidates = listOf(candidate),
             ),
             screen = MainScreen.AddDocument,
         )
     }
 
+    fun prepareUserDocumentBatchImport(
+        candidates: List<DocumentImportCandidate>,
+        nowMillis: Long = nowProvider(),
+    ) {
+        val cleanedCandidates = candidates
+            .map(DocumentImportCandidate::cleaned)
+            .distinctBy(DocumentImportCandidate::uri)
+        if (cleanedCandidates.isEmpty()) {
+            uiState = uiState.copy(latestMessage = "Choose local PDF, Markdown, or EPUB files first.")
+            return
+        }
+
+        val primary = cleanedCandidates.first()
+        updateAddDocumentForm(
+            form = AddDocumentFormState(
+                uri = primary.uri,
+                displayName = primary.displayName,
+                mimeType = primary.mimeType,
+                title = primary.title,
+                durationMinutes = primary.durationMinutes,
+                candidates = cleanedCandidates,
+            ),
+            screen = MainScreen.AddDocument,
+        )
+        viewModelScope.launch {
+            recordEventDurably(
+                AnalyticsEvent(
+                    type = AnalyticsEventType.BATCH_DOCUMENT_IMPORT_ATTEMPTED,
+                    timestampMillis = nowMillis,
+                    metadata = mapOf(
+                        "selectedCount" to cleanedCandidates.size.toString(),
+                        "supportedCount" to cleanedCandidates.count { it.format != null }.toString(),
+                        "unsupportedCount" to cleanedCandidates.count { it.format == null }.toString(),
+                        "formats" to cleanedCandidates.map { it.format?.name ?: "UNSUPPORTED" }.sorted().joinToString(","),
+                    ),
+                ),
+            )
+        }
+    }
+
     fun openHome() {
-        uiState = uiState.copy(screen = MainScreen.Home, latestMessage = null)
+        uiState = uiState.copy(
+            screen = MainScreen.Home,
+            isManagingLibrary = false,
+            selectedLibraryContentIds = emptySet(),
+            latestMessage = null,
+        )
     }
 
     fun openLibrary() {
         uiState = uiState.copy(screen = MainScreen.Library, latestMessage = null)
+    }
+
+    fun toggleLibraryManageMode() {
+        val willManage = !uiState.isManagingLibrary
+        uiState = uiState.copy(
+            isManagingLibrary = willManage,
+            selectedLibraryContentIds = if (willManage) uiState.selectedLibraryContentIds else emptySet(),
+            latestMessage = null,
+        )
+    }
+
+    fun toggleLibraryContentSelection(content: ContentItem) {
+        if (!uiState.isManagingLibrary) {
+            return
+        }
+        if (!content.isUserManagedContent()) {
+            uiState = uiState.copy(latestMessage = "Editorial pieces stay in the starter packs.")
+            return
+        }
+
+        val selectedIds = uiState.selectedLibraryContentIds.toMutableSet()
+        if (!selectedIds.add(content.id)) {
+            selectedIds.remove(content.id)
+        }
+        uiState = uiState.copy(
+            selectedLibraryContentIds = selectedIds,
+            latestMessage = null,
+        )
+    }
+
+    fun deleteSelectedLibraryContent(
+        nowMillis: Long = nowProvider(),
+        releaseDocumentPermission: (String) -> Unit = {},
+    ) {
+        val userContent = (uiState.userLinks + uiState.userDocuments).associateBy(ContentItem::id)
+        val selectedItems = uiState.selectedLibraryContentIds.mapNotNull(userContent::get)
+        if (selectedItems.isEmpty()) {
+            uiState = uiState.copy(latestMessage = "Select saved links or files to delete.")
+            return
+        }
+
+        uiState = uiState.copy(latestMessage = null)
+        viewModelScope.launch {
+            try {
+                val deletedIds = selectedItems.mapTo(mutableSetOf(), ContentItem::id)
+                selectedItems.filter { item -> item.sourceType == ContentSourceType.USER_LINK }
+                    .forEach { item -> userLinkRepository.deleteLink(item.id) }
+                selectedItems.filter { item -> item.sourceType == ContentSourceType.USER_DOCUMENT }
+                    .forEach { item ->
+                        userDocumentRepository.deleteDocument(item.id)
+                        item.rights.sourceUrl?.takeIf(String::isNotBlank)?.let { uri ->
+                            runCatching { releaseDocumentPermission(uri) }
+                        }
+                    }
+                readingProgressRepository.deleteProgressForContentIds(deletedIds)
+
+                val updatedPriorityIds = uiState.priorityContentIds - deletedIds
+                if (updatedPriorityIds != uiState.priorityContentIds) {
+                    settingsRepository.savePriorityContentIds(updatedPriorityIds)
+                }
+                selectedItems.forEach { item ->
+                    recordEventDurably(
+                        AnalyticsEvent(
+                            type = AnalyticsEventType.USER_CONTENT_DELETED,
+                            timestampMillis = nowMillis,
+                            contentId = item.id,
+                            metadata = item.analyticsMetadata() + mapOf(
+                                "deletedSelectionCount" to selectedItems.size.toString(),
+                            ),
+                        ),
+                    )
+                }
+                val preferences = uiState.preferences
+                uiState = uiState.copy(
+                    priorityContentIds = updatedPriorityIds,
+                    preferences = preferences?.copy(priorityContentIds = updatedPriorityIds),
+                    selectedLibraryContentIds = emptySet(),
+                    isManagingLibrary = false,
+                    latestMessage = deletedLibraryMessage(selectedItems.size),
+                )
+            } catch (error: Throwable) {
+                if (error is CancellationException) throw error
+                uiState = uiState.copy(latestMessage = "The selected content could not be deleted.")
+            }
+        }
     }
 
     fun openProgress() {
@@ -506,7 +707,7 @@ class MainViewModel(
         uiState = uiState.copy(screen = MainScreen.Settings, latestMessage = null)
     }
 
-    fun openLibraryItem(content: ContentItem) {
+    fun openLibraryItem(content: ContentItem, origin: String = "library") {
         val startedAtMillis = nowProvider()
         val contentBody = if (content.usesRepositoryBody()) {
             try {
@@ -526,6 +727,19 @@ class MainViewModel(
         } else {
             ""
         }
+        val existingProgress = unfinishedProgressFor(content.id)
+        if (existingProgress != null) {
+            recordEvent(
+                AnalyticsEvent(
+                    type = AnalyticsEventType.MANUAL_CONTINUE_STARTED,
+                    timestampMillis = startedAtMillis,
+                    contentId = content.id,
+                    metadata = content.analyticsMetadata() + existingProgress.analyticsMetadata() + mapOf(
+                        "origin" to origin,
+                    ),
+                ),
+            )
+        }
         uiState = uiState.copy(
             currentInterventionId = null,
             currentInterventionShownAtMillis = null,
@@ -533,6 +747,7 @@ class MainViewModel(
             currentInterventionOrigin = null,
             currentContent = content,
             currentContentBody = contentBody,
+            currentReadingProgress = existingProgress,
             currentSessionId = null,
             currentSessionStartedAtMillis = startedAtMillis,
             screen = screenForReplacement(content),
@@ -570,8 +785,13 @@ class MainViewModel(
         updateAddLinkForm(uiState.addLinkForm.copy(selectedTopics = selectedTopics))
     }
 
+    fun toggleAddLinkPriority() {
+        updateAddLinkForm(uiState.addLinkForm.copy(markPriority = !uiState.addLinkForm.markPriority))
+    }
+
     fun saveUserLink(nowMillis: Long = nowProvider()) {
-        val draft = uiState.addLinkForm.toDraftOrNull()
+        val form = uiState.addLinkForm
+        val draft = form.toDraftOrNull()
         if (draft == null) {
             uiState = uiState.copy(
                 addLinkForm = uiState.addLinkForm.copy(
@@ -589,6 +809,18 @@ class MainViewModel(
             try {
                 when (val result = userLinkRepository.addLink(draft = draft, nowMillis = nowMillis)) {
                     is AddUserLinkResult.Added -> {
+                        val updatedPriorityIds = if (form.markPriority) {
+                            val ids = uiState.priorityContentIds + result.item.id
+                            settingsRepository.savePriorityContentIds(ids)
+                            recordPrioritySetDuringAdd(
+                                item = result.item,
+                                nowMillis = nowMillis,
+                                priorityContentIds = ids,
+                            )
+                            ids
+                        } else {
+                            uiState.priorityContentIds
+                        }
                         recordEventDurably(
                             AnalyticsEvent(
                                 type = AnalyticsEventType.USER_LINK_ADDED,
@@ -603,7 +835,9 @@ class MainViewModel(
                         uiState = uiState.copy(
                             screen = MainScreen.AddLinkSuccess,
                             addLinkForm = AddLinkFormState(),
-                            savedLinkConfirmation = result.item.toAddLinkConfirmation(),
+                            priorityContentIds = updatedPriorityIds,
+                            preferences = uiState.preferences?.copy(priorityContentIds = updatedPriorityIds),
+                            savedLinkConfirmation = result.item.toAddLinkConfirmation(priorityMarked = form.markPriority),
                             latestMessage = null,
                         )
                     }
@@ -654,12 +888,19 @@ class MainViewModel(
         updateAddDocumentForm(uiState.addDocumentForm.copy(selectedTopics = selectedTopics))
     }
 
+    fun toggleAddDocumentPriority() {
+        updateAddDocumentForm(uiState.addDocumentForm.copy(markPriority = !uiState.addDocumentForm.markPriority))
+    }
+
     fun saveUserDocument(
         nowMillis: Long = nowProvider(),
         persistReadPermission: (String) -> Unit = {},
     ) {
-        val draft = uiState.addDocumentForm.toDraftOrNull()
-        if (draft == null) {
+        val form = uiState.addDocumentForm
+        val candidates = form.documentCandidates()
+        val supportedCandidates = candidates.filter { candidate -> candidate.format != null }
+        val drafts = supportedCandidates.mapNotNull { candidate -> candidate.toDraftOrNull(form.selectedTopics) }
+        if (drafts.isEmpty()) {
             uiState = uiState.copy(
                 addDocumentForm = uiState.addDocumentForm.copy(
                     validationErrors = uiState.addDocumentForm.localValidationErrors(),
@@ -674,39 +915,91 @@ class MainViewModel(
         uiState = uiState.copy(addDocumentForm = uiState.addDocumentForm.copy(isSaving = true))
         viewModelScope.launch {
             try {
-                when (val result = userDocumentRepository.addDocument(draft = draft, nowMillis = nowMillis)) {
-                    is AddUserDocumentResult.Added -> {
-                        runCatching { persistReadPermission(draft.uri) }
-                        recordEventDurably(
-                            AnalyticsEvent(
-                                type = AnalyticsEventType.USER_DOCUMENT_ADDED,
-                                timestampMillis = nowMillis,
-                                contentId = result.item.id,
-                                metadata = result.item.analyticsMetadata() + mapOf(
-                                    "durationMinutes" to result.item.durationMinutes.toString(),
-                                    "topicCount" to result.item.topicTags.size.toString(),
+                val addedItems = mutableListOf<ContentItem>()
+                var rejectedCount = candidates.count { candidate -> candidate.format == null }
+                drafts.forEach { draft ->
+                    when (val result = userDocumentRepository.addDocument(draft = draft, nowMillis = nowMillis)) {
+                        is AddUserDocumentResult.Added -> {
+                            addedItems += result.item
+                            runCatching { persistReadPermission(draft.uri) }
+                            recordReadingTimeEstimateApplied(
+                                item = result.item,
+                                draft = draft,
+                                candidate = candidates.firstOrNull { candidate -> candidate.uri == draft.uri },
+                                nowMillis = nowMillis,
+                            )
+                            recordEventDurably(
+                                AnalyticsEvent(
+                                    type = AnalyticsEventType.USER_DOCUMENT_ADDED,
+                                    timestampMillis = nowMillis,
+                                    contentId = result.item.id,
+                                    metadata = result.item.analyticsMetadata() + mapOf(
+                                        "durationMinutes" to result.item.durationMinutes.toString(),
+                                        "topicCount" to result.item.topicTags.size.toString(),
+                                        "batchSelectedCount" to candidates.size.toString(),
+                                    ),
                                 ),
-                            ),
-                        )
-                        uiState = uiState.copy(
-                            screen = MainScreen.AddLinkSuccess,
-                            addDocumentForm = AddDocumentFormState(),
-                            savedLinkConfirmation = result.item.toAddLinkConfirmation(),
-                            latestMessage = null,
-                        )
-                    }
+                            )
+                        }
 
-                    is AddUserDocumentResult.Rejected -> {
-                        uiState = uiState.copy(
-                            addDocumentForm = uiState.addDocumentForm.copy(
-                                validationErrors = result.errors,
-                                canSave = false,
-                                isSaving = false,
-                            ),
-                            latestMessage = "This file needs a little cleanup before saving.",
-                        )
+                        is AddUserDocumentResult.Rejected -> {
+                            rejectedCount += 1
+                        }
                     }
                 }
+
+                if (addedItems.isEmpty()) {
+                    uiState = uiState.copy(
+                        screen = MainScreen.AddDocument,
+                        addDocumentForm = uiState.addDocumentForm.copy(
+                            validationErrors = setOf(UserDocumentValidationError.UNSUPPORTED_FORMAT),
+                            canSave = false,
+                            isSaving = false,
+                        ),
+                        latestMessage = "No selected files could be saved locally.",
+                    )
+                    return@launch
+                }
+
+                val updatedPriorityIds = if (form.markPriority) {
+                    val ids = uiState.priorityContentIds + addedItems.map(ContentItem::id)
+                    settingsRepository.savePriorityContentIds(ids)
+                    addedItems.forEach { item ->
+                        recordPrioritySetDuringAdd(
+                            item = item,
+                            nowMillis = nowMillis,
+                            priorityContentIds = ids,
+                        )
+                    }
+                    ids
+                } else {
+                    uiState.priorityContentIds
+                }
+
+                recordEventDurably(
+                    AnalyticsEvent(
+                        type = AnalyticsEventType.BATCH_DOCUMENT_IMPORT_COMPLETED,
+                        timestampMillis = nowMillis,
+                        metadata = mapOf(
+                            "selectedCount" to candidates.size.toString(),
+                            "savedCount" to addedItems.size.toString(),
+                            "rejectedCount" to rejectedCount.toString(),
+                            "priorityMarked" to form.markPriority.toString(),
+                        ),
+                    ),
+                )
+
+                uiState = uiState.copy(
+                    screen = MainScreen.AddLinkSuccess,
+                    addDocumentForm = AddDocumentFormState(),
+                    priorityContentIds = updatedPriorityIds,
+                    preferences = uiState.preferences?.copy(priorityContentIds = updatedPriorityIds),
+                    savedLinkConfirmation = addedItems.toAddLinkConfirmation(
+                        skippedCount = rejectedCount,
+                        priorityMarked = form.markPriority,
+                    ),
+                    latestMessage = null,
+                )
             } catch (error: Throwable) {
                 if (error is CancellationException) throw error
                 uiState = uiState.copy(
@@ -880,6 +1173,22 @@ class MainViewModel(
                     ),
                 )
             }
+            unfinishedProgressFor(recommendationSet.primary.id)?.let { progress ->
+                recordEvent(
+                    AnalyticsEvent(
+                        type = AnalyticsEventType.UNFINISHED_CONTENT_RECOMMENDED_AS_PRIMARY,
+                        timestampMillis = processingNowMillis,
+                        interventionId = interventionId,
+                        targetAppPackage = targetApp.packageName,
+                        primaryContentId = recommendationSet.primary.id,
+                        backupContentIds = backupIds,
+                        contentId = recommendationSet.primary.id,
+                        metadata = recommendationSet.primary.analyticsMetadata() + progress.analyticsMetadata() + mapOf(
+                            "unfinishedContentCount" to preferences.unfinishedContentIds.size.toString(),
+                        ),
+                    ),
+                )
+            }
 
             uiState = uiState.copy(
                 selectedTargetApp = targetApp,
@@ -900,7 +1209,7 @@ class MainViewModel(
         val recommendationSet = uiState.currentRecommendationSet ?: return
         val interventionId = uiState.currentInterventionId ?: return
         val interventionShownAtMillis = uiState.currentInterventionShownAtMillis ?: return
-        val nowMillis = System.currentTimeMillis()
+        val nowMillis = nowProvider()
         viewModelScope.launch {
             val sessionId = historyRepository.recordAcceptedSession(
                 targetApp = targetApp,
@@ -934,7 +1243,7 @@ class MainViewModel(
         val recommendationSet = uiState.currentRecommendationSet ?: return
         val interventionId = uiState.currentInterventionId ?: return
         val interventionShownAtMillis = uiState.currentInterventionShownAtMillis ?: return
-        val nowMillis = System.currentTimeMillis()
+        val nowMillis = nowProvider()
         viewModelScope.launch {
             val sessionId = historyRepository.recordAcceptedSession(
                 targetApp = targetApp,
@@ -1096,29 +1405,72 @@ class MainViewModel(
         return shouldExitToTarget
     }
 
+    fun saveCurrentReadingProgress(
+        progressPercent: Int,
+        lastVisibleParagraphIndex: Int,
+        paragraphCount: Int,
+        nowMillis: Long = nowProvider(),
+    ) {
+        val content = uiState.currentContent ?: return
+        if (!content.usesRepositoryBody()) {
+            return
+        }
+        val safeParagraphCount = paragraphCount.coerceAtLeast(1)
+        val progress = ReadingProgress(
+            contentId = content.id,
+            progressPercent = progressPercent.coerceIn(1, 99),
+            lastVisibleParagraphIndex = lastVisibleParagraphIndex.coerceIn(0, safeParagraphCount - 1),
+            paragraphCount = safeParagraphCount,
+            updatedAtMillis = nowMillis,
+        )
+        if (uiState.currentReadingProgress?.sameVisiblePosition(progress) == true) {
+            return
+        }
+        uiState = uiState.copy(currentReadingProgress = progress)
+        viewModelScope.launch {
+            readingProgressRepository.saveProgress(progress)
+            recordEventDurably(
+                AnalyticsEvent(
+                    type = AnalyticsEventType.READING_PROGRESS_SAVED,
+                    timestampMillis = nowMillis,
+                    interventionId = uiState.currentInterventionId,
+                    sessionId = uiState.currentSessionId,
+                    targetAppPackage = uiState.selectedTargetApp?.packageName,
+                    primaryContentId = uiState.currentRecommendationSet?.primary?.id,
+                    backupContentIds = uiState.currentRecommendationSet?.backups.orEmpty().map(ContentItem::id),
+                    contentId = content.id,
+                    metadata = content.analyticsMetadata() + progress.analyticsMetadata(),
+                ),
+            )
+        }
+    }
+
     fun finishReading() {
         val content = uiState.currentContent ?: return
         val sessionId = uiState.currentSessionId
-        val nowMillis = System.currentTimeMillis()
+        val nowMillis = nowProvider()
         viewModelScope.launch {
+            val completedProgress = completedProgressFor(content = content, completedAtMillis = nowMillis)
+            readingProgressRepository.saveProgress(completedProgress)
             if (sessionId != null) {
                 historyRepository.markCompleted(sessionId = sessionId, completedAtMillis = nowMillis)
-                recordEvent(
-                    AnalyticsEvent(
-                        type = AnalyticsEventType.READER_COMPLETED,
-                        timestampMillis = nowMillis,
-                        interventionId = uiState.currentInterventionId,
-                        sessionId = sessionId,
-                        targetAppPackage = uiState.selectedTargetApp?.packageName,
-                        primaryContentId = uiState.currentRecommendationSet?.primary?.id,
-                        backupContentIds = uiState.currentRecommendationSet?.backups.orEmpty().map(ContentItem::id),
-                        contentId = content.id,
-                        metadata = sessionDurationMetadata(nowMillis) + content.analyticsMetadata(),
-                    ),
-                )
             }
+            recordEvent(
+                AnalyticsEvent(
+                    type = AnalyticsEventType.READER_COMPLETED,
+                    timestampMillis = nowMillis,
+                    interventionId = uiState.currentInterventionId,
+                    sessionId = sessionId,
+                    targetAppPackage = uiState.selectedTargetApp?.packageName,
+                    primaryContentId = uiState.currentRecommendationSet?.primary?.id,
+                    backupContentIds = uiState.currentRecommendationSet?.backups.orEmpty().map(ContentItem::id),
+                    contentId = content.id,
+                    metadata = sessionDurationMetadata(nowMillis) + content.analyticsMetadata() + completedProgress.analyticsMetadata(),
+                ),
+            )
             uiState = uiState.copy(
                 screen = MainScreen.Feedback,
+                currentReadingProgress = completedProgress,
             )
         }
     }
@@ -1261,7 +1613,7 @@ class MainViewModel(
         val preferences = settings.toUserPreferences(
             supportedApps = supportedApps,
             fallbackPackIds = defaultSelectedPackIds,
-        )
+        ).withReadingProgress(uiState.readingProgress)
         val availableTargetApps = if (settings.hasCompletedOnboarding) preferences.selectedApps else emptyList()
         val selectedTargetApp = if (settings.hasCompletedOnboarding) {
             uiState.selectedTargetApp.takeIf { candidate ->
@@ -1645,9 +1997,11 @@ class MainViewModel(
         } else {
             ""
         }
+        val existingProgress = unfinishedProgressFor(content.id)
         uiState = uiState.copy(
             currentContent = content,
             currentContentBody = contentBody,
+            currentReadingProgress = existingProgress,
             currentSessionId = sessionId,
             currentSessionStartedAtMillis = startedAtMillis,
             screen = screenForReplacement(content),
@@ -1717,6 +2071,7 @@ class MainViewModel(
             currentInterventionOrigin = null,
             currentSessionId = null,
             currentSessionStartedAtMillis = null,
+            currentReadingProgress = null,
             lastFeedback = lastFeedback,
             latestMessage = latestMessage,
         )
@@ -1726,6 +2081,46 @@ class MainViewModel(
         val startedAtMillis = uiState.currentSessionStartedAtMillis ?: return emptyMap()
         val durationSeconds = ((nowMillis - startedAtMillis) / 1000L).coerceAtLeast(0)
         return mapOf("sessionDurationSeconds" to durationSeconds.toString())
+    }
+
+    private suspend fun recordPrioritySetDuringAdd(
+        item: ContentItem,
+        nowMillis: Long,
+        priorityContentIds: Set<String>,
+    ) {
+        recordEventDurably(
+            AnalyticsEvent(
+                type = AnalyticsEventType.PRIORITY_SET_DURING_ADD,
+                timestampMillis = nowMillis,
+                contentId = item.id,
+                metadata = item.analyticsMetadata() + mapOf(
+                    "priorityContentCount" to priorityContentIds.size.toString(),
+                    "source" to "add_flow",
+                ),
+            ),
+        )
+    }
+
+    private suspend fun recordReadingTimeEstimateApplied(
+        item: ContentItem,
+        draft: UserDocumentDraft,
+        candidate: DocumentImportCandidate?,
+        nowMillis: Long,
+    ) {
+        val source = candidate?.estimateSource ?: return
+        recordEventDurably(
+            AnalyticsEvent(
+                type = AnalyticsEventType.READING_TIME_ESTIMATE_APPLIED,
+                timestampMillis = nowMillis,
+                contentId = item.id,
+                metadata = item.analyticsMetadata() + mapOf(
+                    "estimateSource" to source.name,
+                    "durationMinutes" to draft.durationMinutes.toString(),
+                    "displayName" to draft.displayName,
+                    "wordCount" to candidate.estimatedWordCount.orZeroString(),
+                ),
+            ),
+        )
     }
 
     private fun recordEvent(event: AnalyticsEvent) {
@@ -1796,7 +2191,7 @@ class MainViewModel(
     }
 
     private fun updateHydrationState() {
-        val isReady = settingsLoaded && contentReady && analyticsReady && historyReady && delayReady
+        val isReady = settingsLoaded && contentReady && analyticsReady && historyReady && readingProgressReady && delayReady
         if (uiState.isLoadingSettings != !isReady) {
             uiState = uiState.copy(isLoadingSettings = !isReady)
         }
@@ -1808,6 +2203,37 @@ class MainViewModel(
                 nowMillis = pending.triggeredAtMillis,
             )
         }
+    }
+
+    private fun updateCompletedContentIds() {
+        val completedIds = historyCompletedContentIds + readingProgressCompletedContentIds
+        if (uiState.completedContentIds != completedIds) {
+            uiState = uiState.copy(completedContentIds = completedIds)
+        }
+    }
+
+    private fun unfinishedProgressFor(contentId: String): ReadingProgress? {
+        return uiState.readingProgress.firstOrNull { progress ->
+            progress.contentId == contentId && progress.isUnfinished()
+        }
+    }
+
+    private fun completedProgressFor(
+        content: ContentItem,
+        completedAtMillis: Long,
+    ): ReadingProgress {
+        val current = uiState.currentReadingProgress
+            ?.takeIf { progress -> progress.contentId == content.id }
+        val paragraphCount = current?.paragraphCount ?: 1
+        return ReadingProgress(
+            contentId = content.id,
+            progressPercent = 100,
+            lastVisibleParagraphIndex = (current?.lastVisibleParagraphIndex ?: (paragraphCount - 1))
+                .coerceIn(0, paragraphCount - 1),
+            paragraphCount = paragraphCount,
+            updatedAtMillis = completedAtMillis,
+            completedAtMillis = completedAtMillis,
+        )
     }
 
     internal fun closeForTests() {
@@ -1841,6 +2267,7 @@ class MainViewModel(
                 isSaving = false,
             ),
             savedLinkConfirmation = null,
+            latestMessage = null,
         )
     }
 }
@@ -1860,6 +2287,7 @@ class MainViewModelFactory(
             delayGate = appContainer.delayGate,
             analyticsTracker = appContainer.analyticsTracker,
             historyRepository = appContainer.historyRepository,
+            readingProgressRepository = appContainer.readingProgressRepository,
             interceptionMonitor = appContainer.interceptionMonitor,
         ) as T
     }
@@ -1932,11 +2360,39 @@ private fun RecommendationSet.withMeditationDuration(meditation: ContentItem): R
     )
 }
 
+private fun UserPreferences.withReadingProgress(progress: List<ReadingProgress>): UserPreferences {
+    return copy(unfinishedContentIds = progress.unfinishedContentIds())
+}
+
+private fun List<ReadingProgress>.unfinishedContentIds(): Set<String> {
+    return filter(ReadingProgress::isUnfinished)
+        .mapTo(mutableSetOf(), ReadingProgress::contentId)
+}
+
+private fun ReadingProgress.sameVisiblePosition(other: ReadingProgress): Boolean {
+    return contentId == other.contentId &&
+        progressPercent == other.progressPercent &&
+        lastVisibleParagraphIndex == other.lastVisibleParagraphIndex &&
+        paragraphCount == other.paragraphCount &&
+        completedAtMillis == other.completedAtMillis
+}
+
+private fun ReadingProgress.analyticsMetadata(): Map<String, String> {
+    return mapOf(
+        "progressPercent" to progressPercent.toString(),
+        "lastVisibleParagraphIndex" to lastVisibleParagraphIndex.toString(),
+        "paragraphCount" to paragraphCount.toString(),
+        "completed" to isCompleted().toString(),
+        "updatedAtMillis" to updatedAtMillis.toString(),
+        "completedAtMillis" to (completedAtMillis?.toString() ?: ""),
+    )
+}
+
 private fun ContentItem.replaceIfMeditation(meditation: ContentItem): ContentItem {
     return if (usesMeditationTimer()) meditation else this
 }
 
-private fun ContentItem.toAddLinkConfirmation(): AddLinkConfirmation {
+private fun ContentItem.toAddLinkConfirmation(priorityMarked: Boolean = false): AddLinkConfirmation {
     return AddLinkConfirmation(
         title = title,
         host = when (sourceType) {
@@ -1945,15 +2401,35 @@ private fun ContentItem.toAddLinkConfirmation(): AddLinkConfirmation {
         },
         durationMinutes = durationMinutes,
         topicLabel = topicTags.firstOrNull()?.displayName().orEmpty().ifBlank { "Reading" },
+        priorityMarked = priorityMarked,
+    )
+}
+
+private fun List<ContentItem>.toAddLinkConfirmation(
+    skippedCount: Int,
+    priorityMarked: Boolean,
+): AddLinkConfirmation {
+    if (size == 1) {
+        return single().toAddLinkConfirmation(priorityMarked = priorityMarked).copy(skippedCount = skippedCount)
+    }
+    val firstTopic = flatMap { item -> item.topicTags }.firstOrNull()?.displayName().orEmpty().ifBlank { "Reading" }
+    return AddLinkConfirmation(
+        title = "$size files saved",
+        host = "Batch import",
+        durationMinutes = maxOf(1, maxOfOrNull(ContentItem::durationMinutes) ?: ReadingTimeEstimator.DEFAULT_DOCUMENT_MINUTES),
+        topicLabel = firstTopic,
+        savedCount = size,
+        skippedCount = skippedCount,
+        priorityMarked = priorityMarked,
     )
 }
 
 private fun defaultDocumentDuration(mimeType: String?, displayName: String): String {
     return when (UserDocumentValidator.detectFormat(displayName = displayName, mimeType = mimeType)) {
-        ContentFormat.MARKDOWN -> "8"
-        ContentFormat.PDF -> "15"
-        ContentFormat.EPUB -> "20"
-        else -> "10"
+        ContentFormat.MARKDOWN -> ReadingTimeEstimator.DEFAULT_DOCUMENT_MINUTES.toString()
+        ContentFormat.PDF -> ReadingTimeEstimator.DEFAULT_PDF_MINUTES.toString()
+        ContentFormat.EPUB -> ReadingTimeEstimator.MAX_SESSION_MINUTES.toString()
+        else -> ReadingTimeEstimator.DEFAULT_DOCUMENT_MINUTES.toString()
     }
 }
 
@@ -2069,18 +2545,10 @@ private fun AddLinkFormState.toDraftOrNull(): UserLinkDraft? {
 }
 
 private fun AddDocumentFormState.toDraftOrNull(): UserDocumentDraft? {
-    val duration = durationMinutes.toIntOrNull() ?: return null
-    if (localValidationErrors().isNotEmpty()) {
-        return null
-    }
-    return UserDocumentDraft(
-        uri = uri,
-        displayName = displayName,
-        mimeType = mimeType,
-        title = title,
-        durationMinutes = duration,
-        topicTags = selectedTopics,
-    )
+    return documentCandidates()
+        .singleOrNull()
+        ?.toDraftOrNull(selectedTopics)
+        ?.takeIf { localValidationErrors().isEmpty() }
 }
 
 private fun AddLinkFormState.localValidationErrors(): Set<UserLinkValidationError> {
@@ -2101,17 +2569,19 @@ private fun AddLinkFormState.localValidationErrors(): Set<UserLinkValidationErro
 }
 
 private fun AddDocumentFormState.localValidationErrors(): Set<UserDocumentValidationError> {
-    val duration = durationMinutes.toIntOrNull()
-    return UserDocumentValidator.validate(
-        UserDocumentDraft(
-            uri = uri,
-            displayName = displayName,
-            mimeType = mimeType,
-            title = title,
-            durationMinutes = duration ?: -1,
-            topicTags = selectedTopics,
-        ),
-    ).errors
+    val candidates = documentCandidates()
+    if (candidates.isEmpty()) {
+        return setOf(UserDocumentValidationError.EMPTY_URI)
+    }
+    val supported = candidates.filter { candidate -> candidate.format != null }
+    if (supported.isEmpty()) {
+        return setOf(UserDocumentValidationError.UNSUPPORTED_FORMAT)
+    }
+    val errors = mutableSetOf<UserDocumentValidationError>()
+    supported.forEach { candidate ->
+        errors += candidate.validationErrors(selectedTopics)
+    }
+    return errors
 }
 
 private fun AddLinkFormState.visibleValidationErrors(): Set<UserLinkValidationError> {
@@ -2141,29 +2611,118 @@ private fun AddLinkFormState.visibleValidationErrors(): Set<UserLinkValidationEr
 }
 
 private fun AddDocumentFormState.visibleValidationErrors(): Set<UserDocumentValidationError> {
-    val errors = mutableSetOf<UserDocumentValidationError>()
-    val duration = durationMinutes.trim()
-    val validDuration = duration.toIntOrNull()?.let { it in 1..120 } == true
-    val format = UserDocumentValidator.detectFormat(displayName = displayName, mimeType = mimeType)
-    if (uri.isBlank()) {
-        errors += UserDocumentValidationError.EMPTY_URI
+    val candidates = documentCandidates()
+    if (candidates.isEmpty()) {
+        return setOf(UserDocumentValidationError.EMPTY_URI)
     }
-    if (format == null) {
+    val errors = mutableSetOf<UserDocumentValidationError>()
+    if (candidates.all { candidate -> candidate.format == null }) {
         errors += UserDocumentValidationError.UNSUPPORTED_FORMAT
     }
-    if (duration.isNotBlank() && !validDuration) {
-        errors += UserDocumentValidationError.INVALID_DURATION
+    val editableCandidate = candidates.singleOrNull()
+    val duration = editableCandidate?.durationMinutes?.trim().orEmpty()
+    val validDuration = duration.toIntOrNull()?.let { it in 1..ReadingTimeEstimator.MAX_SESSION_MINUTES } == true
+    if (editableCandidate != null && editableCandidate.uri.isBlank()) {
+        errors += UserDocumentValidationError.EMPTY_URI
     }
-    if (duration.isBlank() && (title.isNotBlank() || selectedTopics.isNotEmpty())) {
-        errors += UserDocumentValidationError.INVALID_DURATION
-    }
-    if (title.isBlank() && (uri.isNotBlank() || selectedTopics.isNotEmpty())) {
-        errors += UserDocumentValidationError.BLANK_TITLE
-    }
-    if (selectedTopics.isEmpty() && uri.isNotBlank() && title.isNotBlank() && validDuration) {
+    if (editableCandidate != null) {
+        if (editableCandidate.format == null) {
+            errors += UserDocumentValidationError.UNSUPPORTED_FORMAT
+        }
+        if (duration.isNotBlank() && !validDuration) {
+            errors += UserDocumentValidationError.INVALID_DURATION
+        }
+        if (duration.isBlank() && (editableCandidate.title.isNotBlank() || selectedTopics.isNotEmpty())) {
+            errors += UserDocumentValidationError.INVALID_DURATION
+        }
+        if (editableCandidate.title.isBlank() && (editableCandidate.uri.isNotBlank() || selectedTopics.isNotEmpty())) {
+            errors += UserDocumentValidationError.BLANK_TITLE
+        }
+        if (selectedTopics.isEmpty() && editableCandidate.uri.isNotBlank() && editableCandidate.title.isNotBlank() && validDuration) {
+            errors += UserDocumentValidationError.NO_TOPICS
+        }
+    } else if (selectedTopics.isEmpty() && candidates.any { candidate -> candidate.format != null }) {
         errors += UserDocumentValidationError.NO_TOPICS
     }
     return errors
+}
+
+private fun AddDocumentFormState.documentCandidates(): List<DocumentImportCandidate> {
+    if (candidates.isNotEmpty()) {
+        return if (candidates.size == 1) {
+            listOf(
+                candidates.first().copy(
+                    uri = uri.ifBlank { candidates.first().uri },
+                    displayName = displayName.ifBlank { candidates.first().displayName },
+                    mimeType = mimeType ?: candidates.first().mimeType,
+                    title = title,
+                    durationMinutes = durationMinutes,
+                ).cleaned(),
+            )
+        } else {
+            candidates.map(DocumentImportCandidate::cleaned)
+        }
+    }
+    if (uri.isBlank()) {
+        return emptyList()
+    }
+    return listOf(
+        DocumentImportCandidate(
+            uri = uri,
+            displayName = displayName,
+            mimeType = mimeType,
+            title = title,
+            durationMinutes = durationMinutes,
+            format = UserDocumentValidator.detectFormat(displayName = displayName, mimeType = mimeType),
+        ).cleaned(),
+    )
+}
+
+private fun DocumentImportCandidate.cleaned(): DocumentImportCandidate {
+    val cleanedName = displayName.trim().ifBlank { "Untitled document" }
+    val cleanedTitle = title.trim().ifBlank {
+        cleanedName.substringBeforeLast('.', cleanedName).trim().ifBlank { cleanedName }
+    }
+    val detectedFormat = format ?: UserDocumentValidator.detectFormat(displayName = cleanedName, mimeType = mimeType)
+    val cleanedDuration = durationMinutes.trim().ifBlank {
+        defaultDocumentDuration(mimeType = mimeType, displayName = cleanedName)
+    }
+    return copy(
+        uri = uri.trim(),
+        displayName = cleanedName,
+        title = cleanedTitle,
+        durationMinutes = cleanedDuration,
+        format = detectedFormat,
+    )
+}
+
+private fun DocumentImportCandidate.validationErrors(selectedTopics: Set<TopicTag>): Set<UserDocumentValidationError> {
+    val duration = durationMinutes.toIntOrNull() ?: -1
+    return UserDocumentValidator.validate(
+        UserDocumentDraft(
+            uri = uri,
+            displayName = displayName,
+            mimeType = mimeType,
+            title = title,
+            durationMinutes = duration,
+            topicTags = selectedTopics,
+        ),
+    ).errors
+}
+
+private fun DocumentImportCandidate.toDraftOrNull(selectedTopics: Set<TopicTag>): UserDocumentDraft? {
+    val duration = durationMinutes.toIntOrNull() ?: return null
+    if (validationErrors(selectedTopics).isNotEmpty()) {
+        return null
+    }
+    return UserDocumentDraft(
+        uri = uri,
+        displayName = displayName,
+        mimeType = mimeType,
+        title = title,
+        durationMinutes = duration,
+        topicTags = selectedTopics,
+    )
 }
 
 private fun RecommendationSet.analyticsMetadata(): Map<String, String> {
@@ -2209,6 +2768,7 @@ private fun inventoryDiagnostics(
         "unavailableUserDocumentCount" to unavailableUserDocumentIds.size.toString(),
         "completedContentCount" to completedContentIds.size.toString(),
         "priorityContentCount" to preferences.priorityContentIds.size.toString(),
+        "unfinishedContentCount" to preferences.unfinishedContentIds.size.toString(),
     )
 }
 
@@ -2225,6 +2785,16 @@ private fun ContentItem.analyticsMetadata(prefix: String? = null): Map<String, S
     }
 }
 
+private fun ContentItem.isUserManagedContent(): Boolean {
+    return sourceType == ContentSourceType.USER_LINK || sourceType == ContentSourceType.USER_DOCUMENT
+}
+
+private fun deletedLibraryMessage(count: Int): String {
+    return if (count == 1) "Deleted 1 saved item." else "Deleted $count saved items."
+}
+
+private fun Int?.orZeroString(): String = (this ?: 0).toString()
+
 private object EmptyUserLinkRepository : UserLinkRepository {
     override fun userLinks(): List<ContentItem> = emptyList()
 
@@ -2239,6 +2809,8 @@ private object EmptyUserLinkRepository : UserLinkRepository {
         contentId: String,
         nowMillis: Long,
     ) = Unit
+
+    override suspend fun deleteLink(contentId: String) = Unit
 }
 
 private object EmptyUserDocumentRepository : UserDocumentRepository {
@@ -2255,4 +2827,16 @@ private object EmptyUserDocumentRepository : UserDocumentRepository {
         contentId: String,
         nowMillis: Long,
     ) = Unit
+
+    override suspend fun deleteDocument(contentId: String) = Unit
+}
+
+private object EmptyReadingProgressRepository : ReadingProgressRepository {
+    override fun readingProgress(): List<ReadingProgress> = emptyList()
+
+    override fun observeReadingProgress() = flowOf(emptyList<ReadingProgress>())
+
+    override suspend fun saveProgress(progress: ReadingProgress) = Unit
+
+    override suspend fun deleteProgress(contentId: String) = Unit
 }

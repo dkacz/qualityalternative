@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.qualityalternative.app.domain.service.DefaultRecommendationEngineTest" tests="14" skipped="0" failures="0" errors="0" timestamp="2026-04-28T11:58:09.532Z" hostname="mac-studio.home" time="0.006">
+  <properties/>
+  <testcase name="generate_prefersEditorialBeforeUserLinksWhenBackupScoresTie" classname="com.qualityalternative.app.domain.service.DefaultRecommendationEngineTest" time="0.002"/>
+  <testcase name="generate_excludesCompletedItemsFromPrimaryButCanReuseThemAsBackups" classname="com.qualityalternative.app.domain.service.DefaultRecommendationEngineTest" time="0.0"/>
+  <testcase name="generate_excludesCompletedUserLinksFromPrimary" classname="com.qualityalternative.app.domain.service.DefaultRecommendationEngineTest" time="0.0"/>
+  <testcase name="generate_boostsIndividualPriorityContentWithoutExpandingFiniteSet" classname="com.qualityalternative.app.domain.service.DefaultRecommendationEngineTest" time="0.0"/>
+  <testcase name="generate_keepsFiniteThreeChoiceSetWhenInventoryIsLargeAndMixed" classname="com.qualityalternative.app.domain.service.DefaultRecommendationEngineTest" time="0.002"/>
+  <testcase name="generate_canMixEditorialAndUserLinkBackups" classname="com.qualityalternative.app.domain.service.DefaultRecommendationEngineTest" time="0.0"/>
+  <testcase name="generate_doesNotRecommendUnavailableUnfinishedContentAsPrimary" classname="com.qualityalternative.app.domain.service.DefaultRecommendationEngineTest" time="0.0"/>
+  <testcase name="generate_prefersBestScoredPrimaryAndStillKeepsTwoBackupsWhenInventoryAllowsIt" classname="com.qualityalternative.app.domain.service.DefaultRecommendationEngineTest" time="0.0"/>
+  <testcase name="generate_boostsSelectedContentPriorityWithoutExpandingFiniteSet" classname="com.qualityalternative.app.domain.service.DefaultRecommendationEngineTest" time="0.001"/>
+  <testcase name="generate_penalizesSkippedTopicsAndBoostsSuccessfulPacks" classname="com.qualityalternative.app.domain.service.DefaultRecommendationEngineTest" time="0.0"/>
+  <testcase name="generate_canSelectUserLinkWhenItIsTheBestFit" classname="com.qualityalternative.app.domain.service.DefaultRecommendationEngineTest" time="0.0"/>
+  <testcase name="generate_prefersMatchingDurationAndKeepsExactlyTwoFiniteBackups" classname="com.qualityalternative.app.domain.service.DefaultRecommendationEngineTest" time="0.0"/>
+  <testcase name="generate_returnsNullWhenOnlyCompletedCandidatesRemainForPrimary" classname="com.qualityalternative.app.domain.service.DefaultRecommendationEngineTest" time="0.0"/>
+  <testcase name="generate_givesUnfinishedContentAbsolutePrimaryPriorityUnlessCompleted" classname="com.qualityalternative.app.domain.service.DefaultRecommendationEngineTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

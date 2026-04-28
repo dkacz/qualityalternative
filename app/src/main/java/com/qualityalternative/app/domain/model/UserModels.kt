@@ -13,6 +13,7 @@ data class UserPreferences(
     val meditationDurationMinutes: Int = DEFAULT_MEDITATION_MINUTES,
     val contentPriority: ContentPriority = ContentPriority.BALANCED,
     val priorityContentIds: Set<String> = emptySet(),
+    val unfinishedContentIds: Set<String> = emptySet(),
 )
 
 enum class AppThemeMode {

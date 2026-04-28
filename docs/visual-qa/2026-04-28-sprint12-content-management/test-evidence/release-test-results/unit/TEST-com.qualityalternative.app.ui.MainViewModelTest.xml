@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.qualityalternative.app.ui.MainViewModelTest" tests="63" skipped="0" failures="0" errors="0" timestamp="2026-04-28T11:58:09.590Z" hostname="mac-studio.home" time="0.159">
+  <properties/>
+  <testcase name="acceptingMeditationRoutesToTimerAndCompletionRecordsMeditationEvent" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.031"/>
+  <testcase name="prototypeTopicsExposeSprint9TopicsWithoutUserFacingOtherBucket" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.0"/>
+  <testcase name="requestSystemInterception_ignoresUnselectedTargetPackage" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.002"/>
+  <testcase name="triggerDebugIntervention_recordsStructuredDelayReturnEvents" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.004"/>
+  <testcase name="expiredDelayReturnDoesNotAlsoRecordSessionReturnForSameAttempt" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.003"/>
+  <testcase name="triggerDebugIntervention_clearsExpiredDelayWindowFromUiState" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.003"/>
+  <testcase name="meditationDurationChangeOnTimerKeepsAcceptedSessionConsistent" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.003"/>
+  <testcase name="requestSystemInterception_opensFixtureTargetAndOpenAnywayReturnsTrue" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.003"/>
+  <testcase name="addLinkWithNoTopic_staysDisabledAndShowsTopicError" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.003"/>
+  <testcase name="hydrationWaitsForContentRepositoryReadiness" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.002"/>
+  <testcase name="togglePriorityContentUpdatesSettingsRecommendationPreferencesAndAnalytics" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.003"/>
+  <testcase name="failedUserDocumentHandoffMarksDocumentUnavailableAndDiagnosticsCountIt" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.004"/>
+  <testcase name="finishReading_marksHistoryCompletedAndExcludesContent" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.004"/>
+  <testcase name="saveUserLinkFromForm_persistsLinkAndRecordsAnalytics" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.003"/>
+  <testcase name="selectThemeMode_persistsAndUpdatesUiState" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.002"/>
+  <testcase name="triggerDebugIntervention_keepsMeditationAvailableWhenReadingInventoryIsCompleted" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.002"/>
+  <testcase name="saveUserLinkWithRejectedDraft_keepsAddLinkOpenWithErrors" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.001"/>
+  <testcase name="inAppRenderModeRoutesToReaderWithoutRuntimeRightsBlocking" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.001"/>
+  <testcase name="libraryUnreadableMarkdownDocumentIsMarkedUnavailableInsteadOfCrashing" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.003"/>
+  <testcase name="deleteSelectedLibraryContentDeletesUserItemsCleansPriorityReleasesDocumentPermissionAndExcludesRecommendations" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.004"/>
+  <testcase name="requestSystemInterception_recordsDegradedPerformanceWhenShownTooLate" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.003"/>
+  <testcase name="completeOnboarding_selectsAllDefaultSharedPacksWhenAvailable" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.002"/>
+  <testcase name="startActiveDelayAlternativeRefusesUnavailableSuggestion" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.002"/>
+  <testcase name="saveUserDocumentFromForm_persistsFileAndRecordsAnalytics" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.003"/>
+  <testcase name="requestSystemInterception_waitsUntilHydrationCompletes" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.002"/>
+  <testcase name="unfinishedContentGetsAbsolutePrimaryPriorityAndAnalytics" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.002"/>
+  <testcase name="meditationDurationCanBeChangedBeforeStartingCurrentMeditation" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.002"/>
+  <testcase name="inventoryShortageRecordsSourceDiagnostics" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.002"/>
+  <testcase name="completeOnboarding_updatesUiStateFromRepositoryFlow" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.001"/>
+  <testcase name="triggerDebugIntervention_preservesExpiredDelayProvenanceAcrossActiveDelayReads" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.002"/>
+  <testcase name="triggerDebugIntervention_marksReturnSignalForRecentSession" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.002"/>
+  <testcase name="startActiveDelayAlternativeRefusesExpiredDelayWindow" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.001"/>
+  <testcase name="malformedWebUrl_staysDisabledAndShowsMissingHostError" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.002"/>
+  <testcase name="saveUserLinkWithPriorityAtAddPersistsPriorityAndRecordsDistinctAnalytics" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.001"/>
+  <testcase name="interventionInventoryIncludesUserLinksOnceFallbackFlowExists" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.001"/>
+  <testcase name="setContentPriorityUpdatesSettingsAndRecommendationPreferences" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.002"/>
+  <testcase name="completeOnboarding_selectsModernLinkOnlyPackWhenItIsAvailable" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.002"/>
+  <testcase name="acceptingSharedLinkOnlyRoutesToExternalHandoffAndRecordsGenericOpen" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.001"/>
+  <testcase name="addLinkWithBlankUrl_staysDisabledAndShowsUrlError" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.002"/>
+  <testcase name="prepareUserDocumentImportUsesSharedCandidateFactoryEstimate" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.001"/>
+  <testcase name="acceptingUserLinkRoutesToExternalHandoffAndRecordsFallbackOpen" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.002"/>
+  <testcase name="saveUserLinkWithRepositoryFailure_keepsAddLinkOpenAndClearsSaving" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.001"/>
+  <testcase name="toggleSettingsAppRecalculatesActiveDelaySuggestionForNewSelectedApp" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.002"/>
+  <testcase name="addLinkWithBlankTitle_staysDisabledAndShowsTitleError" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.001"/>
+  <testcase name="unreadableMarkdownDocumentIsMarkedUnavailableInsteadOfOpeningBlankReader" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.001"/>
+  <testcase name="completeOnboarding_selectsAttentionClassicsPackWhenItIsAvailable" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.002"/>
+  <testcase name="failedUserLinkHandoffMarksLinkUnavailableAndDoesNotRecordSuccessfulOpen" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.001"/>
+  <testcase name="libraryPdfHandoffFailureMarksDocumentUnavailableWithoutSession" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.002"/>
+  <testcase name="skippingMeditationMarksSessionSkippedAndRecordsMeditationEvent" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.002"/>
+  <testcase name="acceptingPrivatePdfDocumentRoutesToExternalHandoffAndRecordsGenericOpen" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.002"/>
+  <testcase name="saveUserDocument_retainsReadPermissionOnlyAfterSuccessfulSave" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.002"/>
+  <testcase name="manualLibraryReadingSavesRestoresAndCompletesProgressWithoutInterventionSession" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.002"/>
+  <testcase name="triggerDebugIntervention_keepsLoadingUntilPersistedSourcesAreReady" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.001"/>
+  <testcase name="delayActionKeepsShortAlternativeAvailableWithSeparateAnalytics" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.002"/>
+  <testcase name="completedExclusion_usesAllCompletedIdsNotJustVisibleHistoryWindow" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.001"/>
+  <testcase name="acceptingPrivateMarkdownDocumentRoutesToReaderAndRecordsPrivateMetadata" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.002"/>
+  <testcase name="meditationDurationSettingUpdatesUtilityReplacementInventory" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.001"/>
+  <testcase name="addLinkWithBlankDuration_staysDisabledAndShowsDurationError" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.002"/>
+  <testcase name="completeOnboarding_selectsSprint9PacksWhenAvailable" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.001"/>
+  <testcase name="batchDocumentImportSavesSupportedFilesSkipsUnsupportedPersistsPriorityAndAnalytics" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.003"/>
+  <testcase name="triggerDebugIntervention_preservesExpiredDelayProvenanceWithPreferencesDelayGate" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.004"/>
+  <testcase name="triggerDebugIntervention_doesNotExcludeCompletedMeditationFromPrimaryCandidates" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.002"/>
+  <testcase name="libraryManageModeDoesNotSelectOrDeleteEditorialContent" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

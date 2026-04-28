@@ -4,8 +4,10 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import com.qualityalternative.app.analytics.InMemoryAnalyticsTracker
+import com.qualityalternative.app.data.CompositeContentRepository
 import com.qualityalternative.app.data.InMemoryDelayGate
 import com.qualityalternative.app.data.PreferencesDelayGate
+import com.qualityalternative.app.data.ReadingTimeEstimateSource
 import com.qualityalternative.app.data.SupportedCatalog
 import com.qualityalternative.app.domain.model.AppSettings
 import com.qualityalternative.app.domain.model.AnalyticsEventType
@@ -29,6 +31,7 @@ import com.qualityalternative.app.domain.model.PermissionStatus
 import com.qualityalternative.app.domain.model.RecommendationSet
 import com.qualityalternative.app.domain.model.RecommendationSignals
 import com.qualityalternative.app.domain.model.RecommendationSource
+import com.qualityalternative.app.domain.model.ReadingProgress
 import com.qualityalternative.app.domain.model.ReplacementHistoryEntry
 import com.qualityalternative.app.domain.model.ReturnToTargetSignal
 import com.qualityalternative.app.domain.model.SessionFeedback
@@ -46,17 +49,20 @@ import com.qualityalternative.app.domain.service.DelayGate
 import com.qualityalternative.app.domain.service.HistoryRepository
 import com.qualityalternative.app.domain.service.InterceptionMonitor
 import com.qualityalternative.app.domain.service.RecommendationEngine
+import com.qualityalternative.app.domain.service.ReadingProgressRepository
 import com.qualityalternative.app.domain.service.SettingsRepository
 import com.qualityalternative.app.domain.service.UserDocumentRepository
 import com.qualityalternative.app.domain.service.UserLinkRepository
 import com.qualityalternative.app.interception.FixtureTargetRegistry
 import com.qualityalternative.app.interception.InterceptionRuntimeGate
+import java.io.ByteArrayInputStream
 import java.io.File
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -647,6 +653,242 @@ class MainViewModelTest {
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
+    fun deleteSelectedLibraryContentDeletesUserItemsCleansPriorityReleasesDocumentPermissionAndExcludesRecommendations() = runTest {
+        val userLink = savedUserLink(id = "user-link:delete")
+        val userDocument = savedUserDocument(format = ContentFormat.MARKDOWN)
+        val readingProgressRepository = FakeReadingProgressRepository(
+            initialProgress = listOf(
+                ReadingProgress(
+                    contentId = userLink.id,
+                    progressPercent = 35,
+                    lastVisibleParagraphIndex = 2,
+                    paragraphCount = 8,
+                    updatedAtMillis = 1_500L,
+                ),
+                ReadingProgress(
+                    contentId = userDocument.id,
+                    progressPercent = 60,
+                    lastVisibleParagraphIndex = 4,
+                    paragraphCount = 10,
+                    updatedAtMillis = 1_600L,
+                ),
+            ),
+        )
+        val userLinkRepository = FakeUserLinkRepository(initialLinks = listOf(userLink))
+        val userDocumentRepository = FakeUserDocumentRepository(initialDocuments = listOf(userDocument))
+        val editorialRepository = FakeContentRepository()
+        val contentRepository = CompositeContentRepository(
+            editorialRepository = editorialRepository,
+            userLinkRepository = userLinkRepository,
+            userDocumentRepository = userDocumentRepository,
+        )
+        val recommendationEngine = RecordingRecommendationEngine()
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val settingsRepository = FakeSettingsRepository(
+            initial = completedSettings(
+                selectedAppPackages = setOf(FixtureTargetRegistry.fixtureDistractors.first().packageName),
+            ).copy(
+                priorityContentIds = setOf(userLink.id, userDocument.id, "p1"),
+            ),
+        )
+        val releasedUris = mutableListOf<String>()
+        val viewModel = createViewModel(
+            settingsRepository = settingsRepository,
+            contentRepository = contentRepository,
+            userLinkRepository = userLinkRepository,
+            userDocumentRepository = userDocumentRepository,
+            recommendationEngine = recommendationEngine,
+            analyticsTracker = analyticsTracker,
+            readingProgressRepository = readingProgressRepository,
+        )
+
+        advanceUntilIdle()
+        viewModel.openLibrary()
+        viewModel.toggleLibraryManageMode()
+        viewModel.toggleLibraryContentSelection(userLink)
+        viewModel.toggleLibraryContentSelection(userDocument)
+        advanceUntilIdle()
+
+        assertEquals(setOf(userLink.id, userDocument.id), viewModel.uiState.selectedLibraryContentIds)
+
+        viewModel.deleteSelectedLibraryContent(
+            nowMillis = 2_000L,
+            releaseDocumentPermission = releasedUris::add,
+        )
+        advanceUntilIdle()
+        viewModel.triggerDebugIntervention(nowMillis = 3_000L)
+        advanceUntilIdle()
+
+        assertEquals(listOf(userLink.id), userLinkRepository.deletedIds)
+        assertEquals(listOf(userDocument.id), userDocumentRepository.deletedIds)
+        assertEquals(emptyList<ContentItem>(), userLinkRepository.links.value)
+        assertEquals(emptyList<ContentItem>(), userDocumentRepository.documents.value)
+        assertEquals(emptyList<ContentItem>(), viewModel.uiState.userLinks)
+        assertEquals(emptyList<ContentItem>(), viewModel.uiState.userDocuments)
+        assertEquals(setOf(userLink.id, userDocument.id), readingProgressRepository.deletedIds)
+        assertEquals(emptyList<ReadingProgress>(), viewModel.uiState.readingProgress)
+        assertEquals(listOf("content://quality/notes.md"), releasedUris)
+        assertEquals(setOf("p1"), viewModel.uiState.priorityContentIds)
+        assertEquals(setOf("p1"), settingsRepository.state.value.priorityContentIds)
+        assertFalse(viewModel.uiState.isManagingLibrary)
+        assertEquals(emptySet<String>(), viewModel.uiState.selectedLibraryContentIds)
+        assertFalse(recommendationEngine.lastInventory.any { item -> item.id == userLink.id || item.id == userDocument.id })
+        assertFalse(viewModel.uiState.preferences?.unfinishedContentIds.orEmpty().any { it == userLink.id || it == userDocument.id })
+
+        val deletedEvents = analyticsTracker.allEvents().filter { it.type == AnalyticsEventType.USER_CONTENT_DELETED }
+        assertEquals(2, deletedEvents.size)
+        assertTrue(deletedEvents.any { event ->
+            event.contentId == userLink.id && event.metadata["sourceType"] == "USER_LINK"
+        })
+        assertTrue(deletedEvents.any { event ->
+            event.contentId == userDocument.id && event.metadata["sourceType"] == "USER_DOCUMENT"
+        })
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun manualLibraryReadingSavesRestoresAndCompletesProgressWithoutInterventionSession() = runTest {
+        val document = savedUserDocument(format = ContentFormat.MARKDOWN)
+        val readingProgressRepository = FakeReadingProgressRepository()
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val viewModel = createViewModel(
+            contentRepository = FakeContentRepository(extraItems = listOf(document)),
+            readingProgressRepository = readingProgressRepository,
+            analyticsTracker = analyticsTracker,
+            nowProvider = { 5_000L },
+        )
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+        viewModel.openLibraryItem(document)
+        advanceUntilIdle()
+
+        assertEquals(MainScreen.Reader, viewModel.uiState.screen)
+        assertEquals(null, viewModel.uiState.currentSessionId)
+
+        viewModel.saveCurrentReadingProgress(
+            progressPercent = 42,
+            lastVisibleParagraphIndex = 3,
+            paragraphCount = 9,
+            nowMillis = 5_100L,
+        )
+        advanceUntilIdle()
+
+        assertEquals(42, readingProgressRepository.progress.value.single().progressPercent)
+        assertTrue(analyticsTracker.allEvents().any { event -> event.type == AnalyticsEventType.READING_PROGRESS_SAVED })
+
+        viewModel.skipReading()
+        advanceUntilIdle()
+        viewModel.openLibraryItem(document)
+        advanceUntilIdle()
+
+        assertEquals(42, viewModel.uiState.currentReadingProgress?.progressPercent)
+        val continueEvent = analyticsTracker.allEvents().first { it.type == AnalyticsEventType.MANUAL_CONTINUE_STARTED }
+        assertEquals(document.id, continueEvent.contentId)
+        assertEquals("library", continueEvent.metadata["origin"])
+
+        viewModel.finishReading()
+        advanceUntilIdle()
+
+        assertTrue(readingProgressRepository.progress.value.single().isCompleted())
+        assertTrue(document.id in viewModel.uiState.completedContentIds)
+        val completedEvent = analyticsTracker.allEvents().last { it.type == AnalyticsEventType.READER_COMPLETED }
+        assertEquals(document.id, completedEvent.contentId)
+        assertEquals(null, completedEvent.sessionId)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun unfinishedContentGetsAbsolutePrimaryPriorityAndAnalytics() = runTest {
+        val unfinished = savedUserDocument(format = ContentFormat.MARKDOWN).copy(
+            id = "unfinished-doc",
+            title = "Half-read private essay",
+            durationMinutes = 5,
+            topicTags = setOf(TopicTag.HISTORY),
+        )
+        val strongMatch = savedUserLink(
+            id = "fresh-link",
+            durationMinutes = 7,
+            topics = setOf(TopicTag.PHILOSOPHY, TopicTag.SCIENCE),
+        )
+        val readingProgressRepository = FakeReadingProgressRepository(
+            initialProgress = listOf(
+                ReadingProgress(
+                    contentId = unfinished.id,
+                    progressPercent = 55,
+                    lastVisibleParagraphIndex = 5,
+                    paragraphCount = 12,
+                    updatedAtMillis = 1_500L,
+                ),
+            ),
+        )
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val viewModel = createViewModel(
+            contentRepository = FakeContentRepository(extraItems = listOf(strongMatch, unfinished)),
+            recommendationEngine = DefaultRecommendationEngine(),
+            readingProgressRepository = readingProgressRepository,
+            analyticsTracker = analyticsTracker,
+        )
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+        viewModel.triggerDebugIntervention(nowMillis = 2_000L)
+        advanceUntilIdle()
+
+        assertEquals(unfinished.id, viewModel.uiState.currentRecommendationSet?.primary?.id)
+        assertEquals(setOf(unfinished.id), viewModel.uiState.preferences?.unfinishedContentIds)
+        val event = analyticsTracker.allEvents().first {
+            it.type == AnalyticsEventType.UNFINISHED_CONTENT_RECOMMENDED_AS_PRIMARY
+        }
+        assertEquals(unfinished.id, event.contentId)
+        assertEquals("55", event.metadata["progressPercent"])
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun libraryManageModeDoesNotSelectOrDeleteEditorialContent() = runTest {
+        val editorialRepository = FakeContentRepository()
+        val editorialItem = editorialRepository.inventory().first()
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val recommendationEngine = RecordingRecommendationEngine()
+        val releasedUris = mutableListOf<String>()
+        val viewModel = createViewModel(
+            contentRepository = editorialRepository,
+            recommendationEngine = recommendationEngine,
+            analyticsTracker = analyticsTracker,
+            settingsRepository = FakeSettingsRepository(
+                initial = completedSettings(
+                    selectedAppPackages = setOf(FixtureTargetRegistry.fixtureDistractors.first().packageName),
+                ),
+            ),
+        )
+
+        advanceUntilIdle()
+        viewModel.openLibrary()
+        viewModel.toggleLibraryManageMode()
+        viewModel.toggleLibraryContentSelection(editorialItem)
+        advanceUntilIdle()
+
+        assertEquals(emptySet<String>(), viewModel.uiState.selectedLibraryContentIds)
+
+        viewModel.deleteSelectedLibraryContent(
+            nowMillis = 2_000L,
+            releaseDocumentPermission = releasedUris::add,
+        )
+        advanceUntilIdle()
+        viewModel.triggerDebugIntervention(nowMillis = 3_000L)
+        advanceUntilIdle()
+
+        assertTrue(releasedUris.isEmpty())
+        assertTrue(editorialItem.id in editorialRepository.inventory().map(ContentItem::id))
+        assertTrue(editorialItem.id in recommendationEngine.lastInventory.map(ContentItem::id))
+        assertFalse(analyticsTracker.allEvents().any { it.type == AnalyticsEventType.USER_CONTENT_DELETED })
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
     fun skippingMeditationMarksSessionSkippedAndRecordsMeditationEvent() = runTest {
         val analyticsTracker = InMemoryAnalyticsTracker()
         val historyRepository = FakeHistoryRepository()
@@ -816,6 +1058,28 @@ class MainViewModelTest {
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
+    fun prepareUserDocumentImportUsesSharedCandidateFactoryEstimate() = runTest {
+        val viewModel = createViewModel()
+
+        advanceUntilIdle()
+        viewModel.prepareUserDocumentImport(
+            uri = "content://quality/normal.md",
+            displayName = "normal.md",
+            mimeType = "text/markdown",
+        ) {
+            ByteArrayInputStream(List(1_125) { "word" }.joinToString(" ").toByteArray(Charsets.UTF_8))
+        }
+        advanceUntilIdle()
+
+        val candidate = viewModel.uiState.addDocumentForm.candidates.single()
+        assertEquals("5", viewModel.uiState.addDocumentForm.durationMinutes)
+        assertEquals("5", candidate.durationMinutes)
+        assertEquals(1_125, candidate.estimatedWordCount)
+        assertEquals(ReadingTimeEstimateSource.EXTRACTED_TEXT, candidate.estimateSource)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
     fun saveUserDocument_retainsReadPermissionOnlyAfterSuccessfulSave() = runTest {
         val userDocumentRepository = FakeUserDocumentRepository()
         val retainedUris = mutableListOf<String>()
@@ -852,6 +1116,142 @@ class MainViewModelTest {
 
         assertEquals(listOf("content://quality/notes"), retainedUris)
         assertEquals(MainScreen.AddLinkSuccess, viewModel.uiState.screen)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun saveUserLinkWithPriorityAtAddPersistsPriorityAndRecordsDistinctAnalytics() = runTest {
+        val userLinkRepository = FakeUserLinkRepository()
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val settingsRepository = FakeSettingsRepository(
+            initial = completedSettings(
+                selectedAppPackages = setOf(FixtureTargetRegistry.fixtureDistractors.first().packageName),
+            ),
+        )
+        val viewModel = createViewModel(
+            userLinkRepository = userLinkRepository,
+            analyticsTracker = analyticsTracker,
+            settingsRepository = settingsRepository,
+        )
+
+        advanceUntilIdle()
+        viewModel.openAddLink()
+        viewModel.updateAddLinkUrl("https://example.com/priority")
+        viewModel.updateAddLinkTitle("Priority essay")
+        viewModel.updateAddLinkDuration("8")
+        viewModel.toggleAddLinkTopic(TopicTag.SCIENCE)
+        viewModel.toggleAddLinkPriority()
+        advanceUntilIdle()
+
+        viewModel.saveUserLink(nowMillis = 2_000L)
+        advanceUntilIdle()
+
+        val saved = userLinkRepository.links.value.single()
+        assertEquals(setOf(saved.id), viewModel.uiState.priorityContentIds)
+        assertEquals(setOf(saved.id), settingsRepository.state.value.priorityContentIds)
+        assertEquals(true, viewModel.uiState.savedLinkConfirmation?.priorityMarked)
+        assertTrue(analyticsTracker.allEvents().any { event ->
+            event.type == AnalyticsEventType.PRIORITY_SET_DURING_ADD &&
+                event.contentId == saved.id &&
+                event.metadata["source"] == "add_flow"
+        })
+        assertTrue(analyticsTracker.allEvents().none { event ->
+            event.type == AnalyticsEventType.PRIORITY_CONTENT_TOGGLED &&
+                event.contentId == saved.id
+        })
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun batchDocumentImportSavesSupportedFilesSkipsUnsupportedPersistsPriorityAndAnalytics() = runTest {
+        val userDocumentRepository = FakeUserDocumentRepository()
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val settingsRepository = FakeSettingsRepository(
+            initial = completedSettings(
+                selectedAppPackages = setOf(FixtureTargetRegistry.fixtureDistractors.first().packageName),
+            ),
+        )
+        val retainedUris = mutableListOf<String>()
+        val viewModel = createViewModel(
+            userDocumentRepository = userDocumentRepository,
+            analyticsTracker = analyticsTracker,
+            settingsRepository = settingsRepository,
+        )
+
+        advanceUntilIdle()
+        viewModel.prepareUserDocumentBatchImport(
+            candidates = listOf(
+                DocumentImportCandidate(
+                    uri = "content://quality/notes",
+                    displayName = "notes.md",
+                    mimeType = "text/markdown",
+                    title = "Notes",
+                    durationMinutes = "4",
+                    format = ContentFormat.MARKDOWN,
+                    estimateSource = ReadingTimeEstimateSource.EXTRACTED_TEXT,
+                    estimatedWordCount = 800,
+                ),
+                DocumentImportCandidate(
+                    uri = "content://quality/book",
+                    displayName = "book.epub",
+                    mimeType = "application/epub+zip",
+                    title = "Book",
+                    durationMinutes = "20",
+                    format = ContentFormat.EPUB,
+                    estimateSource = ReadingTimeEstimateSource.EXTRACTED_TEXT,
+                    estimatedWordCount = 10_000,
+                ),
+                DocumentImportCandidate(
+                    uri = "content://quality/archive",
+                    displayName = "archive.zip",
+                    mimeType = "application/zip",
+                    title = "Archive",
+                    durationMinutes = "10",
+                    format = null,
+                    estimateSource = ReadingTimeEstimateSource.FALLBACK_DEFAULT,
+                ),
+            ),
+            nowMillis = 1_000L,
+        )
+        viewModel.toggleAddDocumentTopic(TopicTag.SCIENCE)
+        viewModel.toggleAddDocumentPriority()
+        advanceUntilIdle()
+
+        assertEquals(MainScreen.AddDocument, viewModel.uiState.screen)
+        assertTrue(viewModel.uiState.addDocumentForm.canSave)
+        assertEquals(3, viewModel.uiState.addDocumentForm.importCount)
+        assertEquals(2, viewModel.uiState.addDocumentForm.supportedImportCount)
+        assertEquals(1, viewModel.uiState.addDocumentForm.unsupportedImportCount)
+
+        viewModel.saveUserDocument(
+            nowMillis = 2_000L,
+            persistReadPermission = retainedUris::add,
+        )
+        advanceUntilIdle()
+
+        assertEquals(listOf("content://quality/notes", "content://quality/book"), retainedUris)
+        assertEquals(listOf("content://quality/notes", "content://quality/book"), userDocumentRepository.addedDrafts.map(UserDocumentDraft::uri))
+        assertEquals(listOf(4, 20), userDocumentRepository.addedDrafts.map(UserDocumentDraft::durationMinutes))
+        val savedIds = userDocumentRepository.documents.value.map(ContentItem::id).toSet()
+        assertEquals(2, savedIds.size)
+        assertEquals(savedIds, viewModel.uiState.priorityContentIds)
+        assertEquals(savedIds, settingsRepository.state.value.priorityContentIds)
+        assertEquals(MainScreen.AddLinkSuccess, viewModel.uiState.screen)
+        assertEquals(2, viewModel.uiState.savedLinkConfirmation?.savedCount)
+        assertEquals(1, viewModel.uiState.savedLinkConfirmation?.skippedCount)
+        assertEquals(true, viewModel.uiState.savedLinkConfirmation?.priorityMarked)
+
+        val events = analyticsTracker.allEvents()
+        val attempted = events.first { it.type == AnalyticsEventType.BATCH_DOCUMENT_IMPORT_ATTEMPTED }
+        assertEquals("3", attempted.metadata["selectedCount"])
+        assertEquals("2", attempted.metadata["supportedCount"])
+        assertEquals("1", attempted.metadata["unsupportedCount"])
+        val completed = events.first { it.type == AnalyticsEventType.BATCH_DOCUMENT_IMPORT_COMPLETED }
+        assertEquals("2", completed.metadata["savedCount"])
+        assertEquals("1", completed.metadata["rejectedCount"])
+        assertEquals(2, events.count { it.type == AnalyticsEventType.USER_DOCUMENT_ADDED })
+        assertEquals(2, events.count { it.type == AnalyticsEventType.READING_TIME_ESTIMATE_APPLIED })
+        assertEquals(2, events.count { it.type == AnalyticsEventType.PRIORITY_SET_DURING_ADD })
     }
 
     @Test
@@ -1874,6 +2274,7 @@ class MainViewModelTest {
         contentRepository: ContentRepository = FakeContentRepository(),
         userLinkRepository: UserLinkRepository = FakeUserLinkRepository(),
         userDocumentRepository: UserDocumentRepository = FakeUserDocumentRepository(),
+        readingProgressRepository: ReadingProgressRepository = FakeReadingProgressRepository(),
         recommendationEngine: RecommendationEngine = DefaultRecommendationEngine(),
         nowProvider: () -> Long = { 1_000L },
     ): MainViewModel {
@@ -1887,6 +2288,7 @@ class MainViewModelTest {
                 delayGate = delayGate,
                 analyticsTracker = analyticsTracker,
                 historyRepository = historyRepository,
+                readingProgressRepository = readingProgressRepository,
                 interceptionMonitor = FakeInterceptionMonitor(),
                 enableDelayRefreshTicker = false,
                 nowProvider = nowProvider,
@@ -2074,6 +2476,47 @@ class MainViewModelTest {
                 within60Minutes = true,
             )
         }
+    }
+
+    private class FakeReadingProgressRepository(
+        initialProgress: List<ReadingProgress> = emptyList(),
+        isReady: Boolean = true,
+    ) : ReadingProgressRepository {
+        val progress = MutableStateFlow(initialProgress)
+        val deletedIds = mutableSetOf<String>()
+        private val ready = MutableStateFlow(isReady)
+
+        override fun readingProgress(): List<ReadingProgress> = progress.value
+
+        override fun observeReadingProgress(): Flow<List<ReadingProgress>> = progress.asStateFlow()
+
+        override fun observeCompletedContentIds(): Flow<Set<String>> {
+            return progress.asStateFlow().map { currentProgress ->
+                currentProgress.filter(ReadingProgress::isCompleted)
+                    .mapTo(mutableSetOf(), ReadingProgress::contentId)
+            }
+        }
+
+        override suspend fun saveProgress(progress: ReadingProgress) {
+            this.progress.value = this.progress.value
+                .filterNot { it.contentId == progress.contentId }
+                .plus(progress)
+                .sortedByDescending(ReadingProgress::updatedAtMillis)
+        }
+
+        override suspend fun deleteProgress(contentId: String) {
+            deletedIds += contentId
+            progress.value = progress.value.filterNot { it.contentId == contentId }
+        }
+
+        override suspend fun deleteProgressForContentIds(contentIds: Set<String>) {
+            deletedIds += contentIds
+            progress.value = progress.value.filterNot { it.contentId in contentIds }
+        }
+
+        override fun isReady(): Boolean = ready.value
+
+        override fun observeReady(): Flow<Boolean> = ready
     }
 
     private class FakeDelayGate(isReady: Boolean) : DelayGate {
@@ -2305,6 +2748,7 @@ class MainViewModelTest {
     ) : UserLinkRepository {
         val links = MutableStateFlow(initialLinks)
         val markedUnavailableIds = mutableListOf<String>()
+        val deletedIds = mutableListOf<String>()
         private var nextId = 0
 
         override fun userLinks(): List<ContentItem> = links.value
@@ -2351,6 +2795,11 @@ class MainViewModelTest {
                 }
             }
         }
+
+        override suspend fun deleteLink(contentId: String) {
+            deletedIds += contentId
+            links.value = links.value.filterNot { item -> item.id == contentId }
+        }
     }
 
     private class FakeUserDocumentRepository(
@@ -2359,6 +2808,8 @@ class MainViewModelTest {
     ) : UserDocumentRepository {
         val documents = MutableStateFlow(initialDocuments)
         val markedUnavailableIds = mutableListOf<String>()
+        val deletedIds = mutableListOf<String>()
+        val addedDrafts = mutableListOf<UserDocumentDraft>()
         private var nextId = 0
 
         override fun userDocuments(): List<ContentItem> = documents.value
@@ -2372,6 +2823,7 @@ class MainViewModelTest {
             if (throwOnAdd) {
                 error("Simulated local persistence failure")
             }
+            addedDrafts += draft
             val item = ContentItem(
                 id = "user-document:${++nextId}",
                 packId = "user-documents",
@@ -2401,6 +2853,11 @@ class MainViewModelTest {
                     item
                 }
             }
+        }
+
+        override suspend fun deleteDocument(contentId: String) {
+            deletedIds += contentId
+            documents.value = documents.value.filterNot { item -> item.id == contentId }
         }
     }
 

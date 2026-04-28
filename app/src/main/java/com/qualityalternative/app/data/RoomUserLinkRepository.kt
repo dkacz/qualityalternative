@@ -93,6 +93,11 @@ class RoomUserLinkRepository(
         }
     }
 
+    override suspend fun deleteLink(contentId: String) {
+        dao.deleteById(contentId)
+        links.value = links.value.filterNot { item -> item.id == contentId }
+    }
+
     override fun isReady(): Boolean = ready.value
 
     override fun observeReady(): Flow<Boolean> = ready.asStateFlow()

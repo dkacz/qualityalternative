@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.qualityalternative.app.ui.ProgressSnapshotTest" tests="17" skipped="0" failures="0" errors="0" timestamp="2026-04-28T11:58:09.751Z" hostname="mac-studio.home" time="0.017">
+  <properties/>
+  <testcase name="readerBlocksForDisplayDoesNotTreatIntrawordUnderscoresAsItalic" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.0"/>
+  <testcase name="readerParagraphsForDisplayDoesNotCapLongAssets" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.0"/>
+  <testcase name="progressSnapshotShowsOnlyRecentSevenDayReplacements" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.002"/>
+  <testcase name="readerProgressPercentTracksVisibleParagraphsInsteadOfElapsedTime" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.0"/>
+  <testcase name="progressSnapshotCountsCurrentReadingStreakFromCompletedSessions" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.0"/>
+  <testcase name="readerBlocksForDisplayPreservesIndentedNestedMarkdownListLines" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.0"/>
+  <testcase name="finiteReaderParagraphsReturnsOnlyRealParagraphs" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.0"/>
+  <testcase name="readerProgressPercentForReaderListIgnoresHeaderItem" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.0"/>
+  <testcase name="progressSnapshotLetsConvertedDayWinOverPartialDelayDay" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.0"/>
+  <testcase name="recentReplacementDurationLabelUsesPersistedDuration" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.0"/>
+  <testcase name="readerParagraphsForDisplayUsesFallbackWhenBodyIsBlank" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.001"/>
+  <testcase name="progressSnapshotCountsConstructiveOutcomesWithoutDuplicateDelayEvents" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.0"/>
+  <testcase name="readerBlocksForDisplayPreservesBasicMarkdownFormatting" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.013"/>
+  <testcase name="dayLabelsUseSingularAndPluralCopy" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.001"/>
+  <testcase name="progressSnapshotBuildsDynamicCalendarStripFromReplacementsAndDelays" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.0"/>
+  <testcase name="progressSnapshotKeepsDaysConvertedAlignedToTwentyOneDayStrip" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.0"/>
+  <testcase name="readerBlocksForDisplayPreservesThreeLevelMarkdownListDepth" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

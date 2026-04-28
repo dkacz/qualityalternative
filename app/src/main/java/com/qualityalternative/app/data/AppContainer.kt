@@ -10,6 +10,7 @@ import com.qualityalternative.app.domain.service.DelayGate
 import com.qualityalternative.app.domain.service.HistoryRepository
 import com.qualityalternative.app.domain.service.InterceptionMonitor
 import com.qualityalternative.app.domain.service.RecommendationEngine
+import com.qualityalternative.app.domain.service.ReadingProgressRepository
 import com.qualityalternative.app.domain.service.SettingsRepository
 import com.qualityalternative.app.domain.service.UserDocumentRepository
 import com.qualityalternative.app.domain.service.UserLinkRepository
@@ -47,6 +48,10 @@ class AppContainer(context: Context) {
     )
     val historyRepository: HistoryRepository = RoomHistoryRepository(
         dao = database.replacementSessionDao(),
+        scope = appScope,
+    )
+    val readingProgressRepository: ReadingProgressRepository = RoomReadingProgressRepository(
+        dao = database.readingProgressDao(),
         scope = appScope,
     )
     val settingsRepository: SettingsRepository = PreferencesSettingsRepository(

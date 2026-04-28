@@ -78,6 +78,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
@@ -93,6 +94,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import com.qualityalternative.app.BuildConfig
+import com.qualityalternative.app.data.ReadingTimeEstimateSource
 import com.qualityalternative.app.data.UserDocumentValidator
 import com.qualityalternative.app.domain.model.AnalyticsEvent
 import com.qualityalternative.app.domain.model.AnalyticsEventType
@@ -108,6 +110,7 @@ import com.qualityalternative.app.domain.model.EditorialPack
 import com.qualityalternative.app.domain.model.OnboardingSelection
 import com.qualityalternative.app.domain.model.PermissionReadiness
 import com.qualityalternative.app.domain.model.PermissionStatus
+import com.qualityalternative.app.domain.model.ReadingProgress
 import com.qualityalternative.app.domain.model.ReplacementHistoryEntry
 import com.qualityalternative.app.domain.model.TopicTag
 import com.qualityalternative.app.domain.model.UserDocumentValidationError
@@ -142,14 +145,23 @@ fun QualityAlternativeApp(
             val snackbarHostState = remember { SnackbarHostState() }
 
             LaunchedEffect(uiState.latestMessage) {
-                val message = uiState.latestMessage ?: return@LaunchedEffect
+                val message = uiState.latestMessage
+                if (message == null) {
+                    snackbarHostState.currentSnackbarData?.dismiss()
+                    return@LaunchedEffect
+                }
                 snackbarHostState.showSnackbar(message)
                 viewModel.dismissMessage()
             }
 
             Scaffold(
                 modifier = Modifier.fillMaxSize(),
-                snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+                snackbarHost = {
+                    SnackbarHost(
+                        hostState = snackbarHostState,
+                        modifier = Modifier.padding(bottom = uiState.screen.snackbarBottomPadding()),
+                    )
+                },
                 containerColor = QualityAlternativeThemeTokens.colors.background,
             ) { paddingValues ->
                 Surface(
@@ -236,17 +248,19 @@ private fun MainRoute(
     onExitToTarget: () -> Unit,
 ) {
     val context = LocalContext.current
-    val documentPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        uri ?: return@rememberLauncherForActivityResult
-        val metadata = context.documentMetadata(uri)
-        viewModel.prepareUserDocumentImport(
-            uri = uri.toString(),
-            displayName = metadata.displayName,
-            mimeType = metadata.mimeType,
+    val documentPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        if (uris.isEmpty()) {
+            return@rememberLauncherForActivityResult
+        }
+        viewModel.prepareUserDocumentBatchImport(
+            candidates = uris.map { uri -> context.documentImportCandidate(uri) },
         )
     }
     val onImportDocument = {
         documentPicker.launch(USER_DOCUMENT_PICKER_MIME_TYPES)
+    }
+    val releasePersistedDocumentPermission: (String) -> Unit = { uri ->
+        releaseDocumentPermission(context = context, uri = Uri.parse(uri))
     }
 
     when (state.screen) {
@@ -274,6 +288,7 @@ private fun MainRoute(
                 onImportDocument = onImportDocument,
                 onOpenSettings = viewModel::openSettings,
                 onStartDelayAlternative = viewModel::startActiveDelayAlternative,
+                onContinueReading = { content -> viewModel.openLibraryItem(content, origin = "home") },
             )
         }
 
@@ -288,8 +303,13 @@ private fun MainRoute(
                 state = state,
                 onAddLink = viewModel::openAddLink,
                 onImportDocument = onImportDocument,
-                onOpen = viewModel::openLibraryItem,
+                onOpen = { content -> viewModel.openLibraryItem(content, origin = "library") },
                 onTogglePriorityContent = viewModel::togglePriorityContent,
+                onToggleManageMode = viewModel::toggleLibraryManageMode,
+                onToggleSelection = viewModel::toggleLibraryContentSelection,
+                onDeleteSelected = {
+                    viewModel.deleteSelectedLibraryContent(releaseDocumentPermission = releasePersistedDocumentPermission)
+                },
             )
         }
 
@@ -327,6 +347,7 @@ private fun MainRoute(
             onTitleChange = viewModel::updateAddLinkTitle,
             onDurationChange = viewModel::updateAddLinkDuration,
             onToggleTopic = viewModel::toggleAddLinkTopic,
+            onTogglePriority = viewModel::toggleAddLinkPriority,
             onSave = viewModel::saveUserLink,
             onCancel = viewModel::cancelAddLink,
             onImportDocument = onImportDocument,
@@ -337,6 +358,7 @@ private fun MainRoute(
             onTitleChange = viewModel::updateAddDocumentTitle,
             onDurationChange = viewModel::updateAddDocumentDuration,
             onToggleTopic = viewModel::toggleAddDocumentTopic,
+            onTogglePriority = viewModel::toggleAddDocumentPriority,
             onSave = {
                 viewModel.saveUserDocument(
                     persistReadPermission = { uriString ->
@@ -368,6 +390,13 @@ private fun MainRoute(
 
         MainScreen.Reader -> ReaderScreen(
             state = state,
+            onProgressChanged = { progressPercent, lastVisibleParagraphIndex, paragraphCount ->
+                viewModel.saveCurrentReadingProgress(
+                    progressPercent = progressPercent,
+                    lastVisibleParagraphIndex = lastVisibleParagraphIndex,
+                    paragraphCount = paragraphCount,
+                )
+            },
             onDone = viewModel::finishReading,
             onBack = viewModel::skipReading,
         )
@@ -490,6 +519,15 @@ private enum class QaIconKind {
     Bell,
     ChevronRight,
     Dot,
+}
+
+private fun MainScreen.snackbarBottomPadding() = when (this) {
+    MainScreen.Home,
+    MainScreen.Library,
+    MainScreen.Progress,
+    MainScreen.Settings -> 88.dp
+
+    else -> 0.dp
 }
 
 @Composable
@@ -823,9 +861,13 @@ private fun HomeTab(
     onImportDocument: () -> Unit,
     onOpenSettings: () -> Unit,
     onStartDelayAlternative: () -> Unit,
+    onContinueReading: (ContentItem) -> Unit,
 ) {
     val selectedPacks = state.starterPacks.filter { it.id in state.preferences?.selectedPackIds.orEmpty() }
     val editorialItems = selectedPacks.flatMap { it.items }
+    val allLibraryItems = editorialItems + state.userLinks + state.userDocuments
+    val topContinue = allLibraryItems.unfinishedSortedByProgress(state.readingProgress).firstOrNull()
+    val topContinueProgress = topContinue?.let { item -> state.readingProgress.unfinishedProgressFor(item.id) }
     val totalItems = editorialItems.size + state.userLinks.size + state.userDocuments.size
     val totalMins = editorialItems.sumOf(ContentItem::durationMinutes) +
         state.userLinks.sumOf(ContentItem::durationMinutes) +
@@ -862,6 +904,15 @@ private fun HomeTab(
                     delayWindow = delayWindow,
                     suggestion = state.activeDelaySuggestion,
                     onReadAlternative = onStartDelayAlternative,
+                )
+            }
+        }
+        if (topContinue != null && topContinueProgress != null) {
+            item {
+                ContinueReadingCard(
+                    item = topContinue,
+                    progress = topContinueProgress,
+                    onContinue = { onContinueReading(topContinue) },
                 )
             }
         }
@@ -933,20 +984,28 @@ private fun LibraryTab(
     onImportDocument: () -> Unit,
     onOpen: (ContentItem) -> Unit,
     onTogglePriorityContent: (ContentItem) -> Unit,
+    onToggleManageMode: () -> Unit,
+    onToggleSelection: (ContentItem) -> Unit,
+    onDeleteSelected: () -> Unit,
 ) {
     var filter by remember { mutableStateOf("all") }
     val editorial = state.starterPacks
         .filter { it.id in state.preferences?.selectedPackIds.orEmpty() }
         .flatMap { it.items }
-    val priority = (editorial + state.userLinks + state.userDocuments)
+    val allItems = editorial + state.userLinks + state.userDocuments
+    val progressById = state.readingProgress.associateBy(ReadingProgress::contentId)
+    val unfinished = allItems.unfinishedSortedByProgress(state.readingProgress)
+    val priority = allItems
         .filter { it.id in state.priorityContentIds }
     val list = when (filter) {
         "priority" -> priority
+        "unfinished" -> unfinished
         "editorial" -> editorial
         "yours" -> state.userLinks
         "files" -> state.userDocuments
-        else -> editorial + state.userLinks + state.userDocuments
+        else -> allItems
     }
+    val selectedCount = state.selectedLibraryContentIds.size
 
     LazyColumn(
         modifier = Modifier
@@ -971,6 +1030,50 @@ private fun LibraryTab(
                     fullWidth = false,
                     leadingIcon = QaIconKind.Plus,
                 )
+                Spacer(modifier = Modifier.width(8.dp))
+                QaButton(
+                    text = if (state.isManagingLibrary) "Done" else "Manage",
+                    onClick = onToggleManageMode,
+                    variant = QaButtonVariant.Outline,
+                    size = QaButtonSize.Small,
+                    fullWidth = false,
+                    leadingIcon = if (state.isManagingLibrary) QaIconKind.Check else QaIconKind.Library,
+                    modifier = Modifier.testTag("library-manage-toggle"),
+                )
+            }
+        }
+        if (state.isManagingLibrary) {
+            item {
+                QaCard(
+                    padding = 14.dp,
+                    modifier = Modifier.testTag("library-manage-panel"),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            MonoText("$selectedCount selected")
+                            BodyText(
+                                text = "Only your saved links and files can be deleted.",
+                                color = QualityAlternativeThemeTokens.colors.mutedText,
+                                fontSize = 12.5.sp,
+                                modifier = Modifier.padding(top = 2.dp),
+                            )
+                        }
+                        QaButton(
+                            text = "Delete selected",
+                            onClick = onDeleteSelected,
+                            enabled = selectedCount > 0,
+                            variant = QaButtonVariant.Accent,
+                            size = QaButtonSize.Small,
+                            fullWidth = false,
+                            leadingIcon = QaIconKind.Close,
+                            modifier = Modifier.testTag("library-delete-selected"),
+                        )
+                    }
+                }
             }
         }
         item {
@@ -989,6 +1092,7 @@ private fun LibraryTab(
                 modifier = Modifier.padding(bottom = 8.dp),
             ) {
                 QaChip("All", selected = filter == "all", onClick = { filter = "all" })
+                QaChip("Unfinished", selected = filter == "unfinished", onClick = { filter = "unfinished" })
                 QaChip("Priority", selected = filter == "priority", onClick = { filter = "priority" })
                 QaChip("Editorial", selected = filter == "editorial", onClick = { filter = "editorial" })
                 QaChip("Your links", selected = filter == "yours", onClick = { filter = "yours" })
@@ -1001,6 +1105,8 @@ private fun LibraryTab(
                     BodyText(
                         text = if (filter == "priority") {
                             "No priority picks yet. Mark individual pieces in Library to make them more likely during an intervention."
+                        } else if (filter == "unfinished") {
+                            "No unfinished reading yet. Open a saved piece and it will stay easy to continue."
                         } else {
                             "Nothing here yet. Add one piece you'd actually read instead of scrolling."
                         },
@@ -1012,9 +1118,13 @@ private fun LibraryTab(
             items(list, key = ContentItem::id) { item ->
                 LibraryItemCard(
                     item = item,
+                    progress = progressById[item.id]?.takeIf(ReadingProgress::isUnfinished),
                     prioritized = item.id in state.priorityContentIds,
+                    isManaging = state.isManagingLibrary,
+                    selected = item.id in state.selectedLibraryContentIds,
                     onOpen = { onOpen(item) },
                     onTogglePriority = { onTogglePriorityContent(item) },
+                    onToggleSelection = { onToggleSelection(item) },
                 )
             }
         }
@@ -1028,6 +1138,7 @@ private fun AddLinkScreen(
     onTitleChange: (String) -> Unit,
     onDurationChange: (String) -> Unit,
     onToggleTopic: (TopicTag) -> Unit,
+    onTogglePriority: () -> Unit,
     onSave: () -> Unit,
     onCancel: () -> Unit,
     onImportDocument: () -> Unit,
@@ -1046,14 +1157,14 @@ private fun AddLinkScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 28.dp),
         ) {
-            DisplayText("Add to your quality\nalternative.", fontSize = 30.sp, lineHeight = 33.sp)
+            DisplayText("Add content.", fontSize = 30.sp, lineHeight = 33.sp)
             BodyText(
-                text = "One piece you'd rather read than scroll. Not a bookmark graveyard — only things you'd actually open.",
+                text = "Save one piece you'd actually choose at the moment of impulse.",
                 color = QualityAlternativeThemeTokens.colors.mutedText,
                 modifier = Modifier.padding(top = 6.dp, bottom = 16.dp),
             )
             QaButton(
-                text = "Import PDF / MD / EPUB instead",
+                text = "Import PDF / MD / EPUB",
                 onClick = onImportDocument,
                 variant = QaButtonVariant.Outline,
                 leadingIcon = QaIconKind.Book,
@@ -1117,6 +1228,16 @@ private fun AddLinkScreen(
                     modifier = Modifier.padding(top = 8.dp),
                 )
             }
+            InputLabel("Priority", Modifier.padding(top = 14.dp))
+            QaChip(
+                text = if (form.markPriority) "Priority on add" else "Mark as priority",
+                selected = form.markPriority,
+                accentSelected = true,
+                onClick = onTogglePriority,
+                modifier = Modifier.testTag("add-link-priority"),
+                centered = true,
+                minHeight = 34.dp,
+            )
             Spacer(modifier = Modifier.height(30.dp))
         }
         Column(
@@ -1142,10 +1263,16 @@ private fun AddDocumentScreen(
     onTitleChange: (String) -> Unit,
     onDurationChange: (String) -> Unit,
     onToggleTopic: (TopicTag) -> Unit,
+    onTogglePriority: () -> Unit,
     onSave: () -> Unit,
     onCancel: () -> Unit,
     onPickAnother: () -> Unit,
 ) {
+    val saveLabel = when {
+        form.isSaving -> "Saving..."
+        form.supportedImportCount > 1 -> "Add files to library"
+        else -> "Add file to library"
+    }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -1158,30 +1285,31 @@ private fun AddDocumentScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 28.dp),
         ) {
-            DisplayText("Add a private\nreading file.", fontSize = 30.sp, lineHeight = 33.sp)
+            DisplayText("Import reading\nfiles.", fontSize = 30.sp, lineHeight = 33.sp)
             BodyText(
-                text = "PDF opens through Android's document viewer. Markdown and EPUB open in the calm in-app reader. The file stays on this device.",
+                text = "Choose one or several PDF, Markdown, or EPUB files. Valid files are saved together; unsupported files are skipped.",
                 color = QualityAlternativeThemeTokens.colors.mutedText,
                 modifier = Modifier.padding(top = 6.dp, bottom = 16.dp),
             )
             QaCard(modifier = Modifier.padding(bottom = 18.dp), padding = 16.dp) {
-                MonoText(documentFormatLabel(form), modifier = Modifier.padding(bottom = 6.dp))
-                Text(
-                    text = form.displayName.ifBlank { "No file selected" },
-                    style = MaterialTheme.typography.titleMedium,
-                    fontSize = 16.sp,
-                    lineHeight = 20.sp,
-                )
-                BodyText(
-                    text = form.uri,
-                    color = QualityAlternativeThemeTokens.colors.mutedText,
-                    fontSize = 12.sp,
-                    lineHeight = 17.sp,
-                    modifier = Modifier.padding(top = 6.dp),
-                )
+                MonoText("${form.supportedImportCount} ready · ${form.unsupportedImportCount} skipped", modifier = Modifier.padding(bottom = 8.dp))
+                form.candidates.ifEmpty {
+                    listOf(
+                        DocumentImportCandidate(
+                            uri = form.uri,
+                            displayName = form.displayName,
+                            mimeType = form.mimeType,
+                            title = form.title,
+                            durationMinutes = form.durationMinutes,
+                            format = UserDocumentValidator.detectFormat(form.displayName, form.mimeType),
+                        ),
+                    )
+                }.forEach { candidate ->
+                    DocumentImportRow(candidate = candidate)
+                }
             }
             QaButton(
-                text = "Choose a different file",
+                text = "Choose files",
                 onClick = onPickAnother,
                 variant = QaButtonVariant.Outline,
                 size = QaButtonSize.Small,
@@ -1191,29 +1319,38 @@ private fun AddDocumentScreen(
                     .testTag("add-document-pick-another"),
             )
             AddDocumentValidationLine(form)
-            InputLabel("Title", Modifier.padding(top = 14.dp))
-            QaTextField(
-                value = form.title,
-                onValueChange = onTitleChange,
-                placeholder = "How you'd recognize it",
-                modifier = Modifier.testTag("add-document-title"),
-                isError = UserDocumentValidationError.BLANK_TITLE in form.validationErrors,
-            )
-            InputLabel("Estimated session", Modifier.padding(top = 14.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                listOf("5", "10", "15", "20", "30").forEach { mins ->
-                    QaChip(
-                        "$mins min",
-                        selected = form.durationMinutes == mins,
-                        onClick = { onDurationChange(mins) },
-                        modifier = Modifier.weight(1f),
-                        centered = true,
-                        minHeight = 32.dp,
-                        horizontalPadding = 0.dp,
-                        verticalPadding = 6.dp,
-                        fontSize = 11.sp,
-                    )
+            if (form.importCount <= 1) {
+                InputLabel("Title", Modifier.padding(top = 14.dp))
+                QaTextField(
+                    value = form.title,
+                    onValueChange = onTitleChange,
+                    placeholder = "How you'd recognize it",
+                    modifier = Modifier.testTag("add-document-title"),
+                    isError = UserDocumentValidationError.BLANK_TITLE in form.validationErrors,
+                )
+                InputLabel("Estimated session", Modifier.padding(top = 14.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf("3", "5", "10", "15", "20").forEach { mins ->
+                        QaChip(
+                            "$mins min",
+                            selected = form.durationMinutes == mins,
+                            onClick = { onDurationChange(mins) },
+                            modifier = Modifier.weight(1f),
+                            centered = true,
+                            minHeight = 32.dp,
+                            horizontalPadding = 0.dp,
+                            verticalPadding = 6.dp,
+                            fontSize = 11.sp,
+                        )
+                    }
                 }
+            } else {
+                BodyText(
+                    text = "Reading time is estimated per file. Topics and priority apply to every saved file in this batch.",
+                    color = QualityAlternativeThemeTokens.colors.mutedText,
+                    fontSize = 12.5.sp,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
             }
             InputLabel("Topic", Modifier.padding(top = 14.dp))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -1238,6 +1375,16 @@ private fun AddDocumentScreen(
                     modifier = Modifier.padding(top = 8.dp),
                 )
             }
+            InputLabel("Priority", Modifier.padding(top = 14.dp))
+            QaChip(
+                text = if (form.markPriority) "Priority on add" else "Mark saved files as priority",
+                selected = form.markPriority,
+                accentSelected = true,
+                onClick = onTogglePriority,
+                modifier = Modifier.testTag("add-document-priority"),
+                centered = true,
+                minHeight = 34.dp,
+            )
             Spacer(modifier = Modifier.height(30.dp))
         }
         Column(
@@ -1247,13 +1394,40 @@ private fun AddDocumentScreen(
                 .padding(horizontal = 28.dp, vertical = 10.dp),
         ) {
             QaButton(
-                text = if (form.isSaving) "Saving..." else "Add file to library",
+                text = saveLabel,
                 onClick = onSave,
                 enabled = form.canSave && !form.isSaving,
                 variant = QaButtonVariant.Primary,
                 modifier = Modifier.testTag("add-document-save"),
             )
         }
+    }
+}
+
+@Composable
+private fun DocumentImportRow(candidate: DocumentImportCandidate) {
+    Column(modifier = Modifier.padding(vertical = 6.dp)) {
+        MonoText(documentFormatLabel(candidate))
+        Text(
+            text = candidate.title,
+            style = MaterialTheme.typography.titleMedium,
+            fontSize = 16.sp,
+            lineHeight = 20.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(top = 3.dp),
+        )
+        Text(
+            text = "${candidate.displayName} · ${candidate.durationMinutes} min · ${candidate.estimateSource.displayLabel()}",
+            style = MaterialTheme.typography.bodyMedium.copy(
+                fontSize = 12.sp,
+                lineHeight = 16.sp,
+                color = QualityAlternativeThemeTokens.colors.mutedText,
+            ),
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(top = 2.dp),
+        )
     }
 }
 
@@ -1292,13 +1466,17 @@ private fun AddLinkSuccess(
             textAlign = TextAlign.Center,
         )
         BodyText(
-            text = "We'll offer this next time you reach for one of your chosen apps.",
+            text = if (saved.savedCount > 1) {
+                "We'll offer these next time you reach for one of your chosen apps."
+            } else {
+                "We'll offer this next time you reach for one of your chosen apps."
+            },
             color = QualityAlternativeThemeTokens.colors.mutedText,
             textAlign = TextAlign.Center,
             modifier = Modifier.widthIn(max = 280.dp),
         )
         QaCard(modifier = Modifier.padding(top = 32.dp, bottom = 24.dp), padding = 16.dp) {
-            MonoText("${saved.host} · ${saved.durationMinutes} min · ${saved.topicLabel}")
+            MonoText(addSuccessMeta(saved))
             Text(
                 text = saved.title,
                 style = MaterialTheme.typography.titleMedium,
@@ -1530,6 +1708,7 @@ private fun RecommendationReasonPill(text: String) {
 @Composable
 private fun ReaderScreen(
     state: MainUiState,
+    onProgressChanged: (Int, Int, Int) -> Unit,
     onDone: () -> Unit,
     onBack: () -> Unit,
 ) {
@@ -1539,14 +1718,75 @@ private fun ReaderScreen(
         fallback = content.description,
     )
     val listState = rememberLazyListState()
+    var hasRestoredProgress by remember(content.id) { mutableStateOf(false) }
+    var hasUserScrolledAfterOpen by remember(content.id) { mutableStateOf(false) }
+    val restoredProgress = remember(content.id) {
+        state.currentReadingProgress?.takeIf { it.contentId == content.id && it.isUnfinished() }
+    }
+    val firstVisibleParagraphIndex by remember(content.id, blocks.size) {
+        derivedStateOf {
+            val firstVisibleIndex = listState.layoutInfo.visibleItemsInfo.firstOrNull()?.index ?: 0
+            (firstVisibleIndex - READER_HEADER_ITEM_COUNT).coerceIn(0, (blocks.size - 1).coerceAtLeast(0))
+        }
+    }
+    val lastVisibleParagraphIndex by remember(content.id, blocks.size) {
+        derivedStateOf {
+            val lastVisibleIndex = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            (lastVisibleIndex - READER_HEADER_ITEM_COUNT).coerceIn(0, (blocks.size - 1).coerceAtLeast(0))
+        }
+    }
     val progress by remember(content.id, blocks.size) {
         derivedStateOf {
             val lastVisibleIndex = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
             readerProgressPercentForReaderList(lastVisibleItemIndex = lastVisibleIndex, paragraphCount = blocks.size)
         }
     }
+    val shouldRecordScrollProgress by remember(content.id, blocks.size) {
+        derivedStateOf {
+            hasRestoredProgress &&
+                blocks.isNotEmpty() &&
+                listState.isScrollInProgress &&
+                listState.firstVisibleItemIndex > 0
+        }
+    }
+    val displayedProgress by remember(content.id, blocks.size) {
+        derivedStateOf {
+            restoredProgress
+                ?.progressPercent
+                ?.takeUnless { hasUserScrolledAfterOpen }
+                ?: progress
+        }
+    }
+
+    LaunchedEffect(content.id, blocks.size) {
+        val targetParagraph = restoredProgress?.lastVisibleParagraphIndex
+            ?.coerceIn(0, (blocks.size - 1).coerceAtLeast(0))
+            ?: 0
+        if (targetParagraph > 0) {
+            listState.scrollToItem(READER_HEADER_ITEM_COUNT + targetParagraph)
+        }
+        hasRestoredProgress = true
+    }
+
+    LaunchedEffect(content.id, progress, lastVisibleParagraphIndex, blocks.size, shouldRecordScrollProgress) {
+        if (shouldRecordScrollProgress) {
+            hasUserScrolledAfterOpen = true
+            onProgressChanged(progress, lastVisibleParagraphIndex, blocks.size)
+        }
+    }
 
     Column(modifier = Modifier.fillMaxSize().testTag("reader-screen")) {
+        if (BuildConfig.DEBUG) {
+            Spacer(
+                modifier = Modifier
+                    .size(1.dp)
+                    .alpha(0f)
+                    .semantics {
+                        contentDescription = "reader-first-visible-paragraph-$firstVisibleParagraphIndex"
+                    }
+                    .testTag("reader-first-visible-paragraph-$firstVisibleParagraphIndex"),
+            )
+        }
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1555,8 +1795,8 @@ private fun ReaderScreen(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             QaIconButton(icon = QaIconKind.Close, onClick = onBack)
-            ProgressLine(progress = progress, modifier = Modifier.weight(1f))
-            MonoText("$progress% read")
+            ProgressLine(progress = displayedProgress, modifier = Modifier.weight(1f))
+            MonoText("$displayedProgress% read")
         }
         LazyColumn(
             state = listState,
@@ -1566,7 +1806,19 @@ private fun ReaderScreen(
             contentPadding = PaddingValues(start = 28.dp, top = 18.dp, end = 28.dp, bottom = 24.dp),
         ) {
             item {
-                MonoText("${content.sourceLabel()} · ${content.topicLine()}", modifier = Modifier.padding(bottom = 10.dp))
+                MonoText(
+                    text = buildString {
+                        append(content.sourceLabel())
+                        append(" · ")
+                        append(content.topicLine())
+                        if (restoredProgress != null) {
+                            append(" · continuing at ")
+                            append(restoredProgress.progressPercent)
+                            append("%")
+                        }
+                    },
+                    modifier = Modifier.padding(bottom = 10.dp),
+                )
                 DisplayText(content.title, fontSize = 27.sp, lineHeight = 31.sp, modifier = Modifier.padding(bottom = 18.dp))
             }
             items(blocks.withIndex().toList()) { indexedBlock ->
@@ -2325,6 +2577,48 @@ private fun ActiveDelayCard(
 }
 
 @Composable
+private fun ContinueReadingCard(
+    item: ContentItem,
+    progress: ReadingProgress,
+    onContinue: () -> Unit,
+) {
+    val colors = QualityAlternativeThemeTokens.colors
+    QaCard(
+        background = colors.accentSoft,
+        borderColor = colors.accent,
+        padding = 16.dp,
+        modifier = Modifier.testTag("home-continue-card"),
+    ) {
+        MonoText("Continue reading", color = colors.accent, modifier = Modifier.padding(bottom = 6.dp))
+        Text(
+            text = item.title,
+            style = MaterialTheme.typography.titleMedium,
+            fontSize = 18.sp,
+            lineHeight = 21.sp,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(bottom = 10.dp),
+        )
+        ProgressLine(progress = progress.progressPercent)
+        BodyText(
+            text = "${progress.progressPercent}% read · ${remainingMinutes(item.durationMinutes, progress.progressPercent)} min left",
+            color = colors.mutedText,
+            fontSize = 12.5.sp,
+            modifier = Modifier.padding(top = 8.dp, bottom = 12.dp),
+        )
+        QaButton(
+            text = "Continue",
+            onClick = onContinue,
+            variant = QaButtonVariant.Accent,
+            size = QaButtonSize.Small,
+            fullWidth = false,
+            leadingIcon = QaIconKind.Book,
+            modifier = Modifier.testTag("home-continue-action"),
+        )
+    }
+}
+
+@Composable
 private fun SectionLabel(text: String, right: String? = null) {
     Row(
         modifier = Modifier
@@ -2413,12 +2707,18 @@ private fun LibrarySummaryRow(label: String, value: String, sourceType: ContentS
 @Composable
 private fun LibraryItemCard(
     item: ContentItem,
+    progress: ReadingProgress?,
     prioritized: Boolean,
+    isManaging: Boolean,
+    selected: Boolean,
     onOpen: () -> Unit,
     onTogglePriority: () -> Unit,
+    onToggleSelection: () -> Unit,
 ) {
+    val canDelete = item.isUserContent()
     QaCard(
         padding = 16.dp,
+        modifier = Modifier.testTag("library-item-${item.id}"),
     ) {
         ContentMetaRow(item)
         Text(
@@ -2431,12 +2731,61 @@ private fun LibraryItemCard(
             overflow = TextOverflow.Ellipsis,
         )
         BodyText(item.sourceLabel(), color = QualityAlternativeThemeTokens.colors.mutedText, fontSize = 12.5.sp, modifier = Modifier.padding(top = 4.dp))
+        if (progress != null) {
+            Column(
+                modifier = Modifier
+                    .padding(top = 10.dp)
+                    .testTag("library-unfinished-${item.id}"),
+            ) {
+                ProgressLine(progress = progress.progressPercent)
+                BodyText(
+                    text = "${progress.progressPercent}% read · ${remainingMinutes(item.durationMinutes, progress.progressPercent)} min left",
+                    color = QualityAlternativeThemeTokens.colors.mutedText,
+                    fontSize = 12.5.sp,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+            }
+        }
+        if (isManaging && !canDelete) {
+            BodyText(
+                text = "Starter pack · not deletable",
+                color = QualityAlternativeThemeTokens.colors.mutedText,
+                fontSize = 12.5.sp,
+                modifier = Modifier
+                    .padding(top = 6.dp)
+                    .testTag("library-editorial-note-${item.id}"),
+            )
+        }
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 14.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            if (isManaging) {
+                if (canDelete) {
+                    QaChip(
+                        text = if (selected) "Selected" else "Select",
+                        selected = selected,
+                        accentSelected = true,
+                        onClick = onToggleSelection,
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("library-select-${item.id}"),
+                        centered = true,
+                        minHeight = 34.dp,
+                        horizontalPadding = 8.dp,
+                        verticalPadding = 7.dp,
+                    )
+                } else {
+                    ReadOnlyPill(
+                        text = "Locked",
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("library-editorial-locked-${item.id}"),
+                    )
+                }
+            }
             QaChip(
                 text = if (prioritized) "Priority" else "Prioritize",
                 selected = prioritized,
@@ -2451,16 +2800,40 @@ private fun LibraryItemCard(
                 verticalPadding = 7.dp,
             )
             QaChip(
-                text = "Open",
+                text = if (progress != null) "Continue" else "Open",
                 selected = false,
                 onClick = onOpen,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("library-open-${item.id}"),
                 centered = true,
                 minHeight = 34.dp,
                 horizontalPadding = 8.dp,
                 verticalPadding = 7.dp,
             )
         }
+    }
+}
+
+@Composable
+private fun ReadOnlyPill(text: String, modifier: Modifier = Modifier) {
+    val colors = QualityAlternativeThemeTokens.colors
+    Box(
+        modifier = modifier
+            .heightIn(min = 34.dp)
+            .clip(RoundedCornerShape(999.dp))
+            .border(BorderStroke(1.dp, colors.line), RoundedCornerShape(999.dp))
+            .background(colors.background)
+            .padding(horizontal = 8.dp, vertical = 7.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelMedium.copy(fontSize = 12.sp, lineHeight = 14.sp),
+            color = colors.mutedText,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -3609,8 +3982,7 @@ internal fun readerProgressPercent(lastVisibleItemIndex: Int, paragraphCount: In
 }
 
 internal fun readerProgressPercentForReaderList(lastVisibleItemIndex: Int, paragraphCount: Int): Int {
-    val headerItemCount = 1
-    val lastVisibleParagraphIndex = (lastVisibleItemIndex - headerItemCount).coerceAtLeast(0)
+    val lastVisibleParagraphIndex = (lastVisibleItemIndex - READER_HEADER_ITEM_COUNT).coerceAtLeast(0)
     return readerProgressPercent(lastVisibleItemIndex = lastVisibleParagraphIndex, paragraphCount = paragraphCount)
 }
 
@@ -3739,6 +4111,8 @@ private fun ContentItem.isUserLink(): Boolean = sourceType == ContentSourceType.
 
 private fun ContentItem.isUserDocument(): Boolean = sourceType == ContentSourceType.USER_DOCUMENT
 
+private fun ContentItem.isUserContent(): Boolean = isUserLink() || isUserDocument()
+
 private fun primaryActionLabel(item: ContentItem): String {
     return when {
         item.usesMeditationTimer() -> "Start timer · ${item.durationMinutes} min"
@@ -3784,6 +4158,23 @@ private fun remainingMinutes(totalMinutes: Int, progress: Int): Int {
     return kotlin.math.ceil(totalMinutes * (1 - progress.coerceIn(0, 100) / 100f).toDouble())
         .toInt()
         .coerceAtLeast(0)
+}
+
+private fun List<ContentItem>.unfinishedSortedByProgress(progress: List<ReadingProgress>): List<ContentItem> {
+    val progressById = progress
+        .filter(ReadingProgress::isUnfinished)
+        .associateBy(ReadingProgress::contentId)
+    return filter { item ->
+        item.id in progressById &&
+            item.availability != com.qualityalternative.app.domain.model.ContentAvailability.UNAVAILABLE
+    }.sortedWith(
+        compareByDescending<ContentItem> { item -> progressById.getValue(item.id).updatedAtMillis }
+            .thenBy(ContentItem::title),
+    )
+}
+
+private fun List<ReadingProgress>.unfinishedProgressFor(contentId: String): ReadingProgress? {
+    return firstOrNull { progress -> progress.contentId == contentId && progress.isUnfinished() }
 }
 
 private fun String.hostLabel(): String {
@@ -3858,7 +4249,7 @@ private fun UserDocumentValidationError.displayMessage(): String {
         UserDocumentValidationError.EMPTY_URI -> "Choose a local PDF, Markdown, or EPUB file first."
         UserDocumentValidationError.UNSUPPORTED_FORMAT -> "Use a PDF, .md/.markdown, or EPUB file."
         UserDocumentValidationError.BLANK_TITLE -> "Add a title so the recommendation is easy to recognize."
-        UserDocumentValidationError.INVALID_DURATION -> "Choose an estimated session time from 1 to 120 minutes."
+        UserDocumentValidationError.INVALID_DURATION -> "Choose an estimated session time from 3 to 20 minutes."
         UserDocumentValidationError.NO_TOPICS -> "Choose at least one topic so the app can rank this file."
     }
 }
@@ -3871,6 +4262,31 @@ private fun documentFormatLabel(form: AddDocumentFormState): String {
         ContentFormat.HTML -> "Document"
         null -> "Unsupported file"
     }
+}
+
+private fun documentFormatLabel(candidate: DocumentImportCandidate): String {
+    return when (candidate.format) {
+        ContentFormat.MARKDOWN -> "Markdown · private reader"
+        ContentFormat.PDF -> "PDF · external viewer"
+        ContentFormat.EPUB -> "EPUB · private reader"
+        ContentFormat.HTML -> "Document"
+        null -> "Unsupported file · skipped"
+    }
+}
+
+private fun ReadingTimeEstimateSource.displayLabel(): String {
+    return when (this) {
+        ReadingTimeEstimateSource.EXTRACTED_TEXT -> "auto estimate"
+        ReadingTimeEstimateSource.PDF_DEFAULT -> "PDF default"
+        ReadingTimeEstimateSource.FALLBACK_DEFAULT -> "default estimate"
+    }
+}
+
+private fun addSuccessMeta(saved: AddLinkConfirmation): String {
+    val savedLabel = if (saved.savedCount > 1) "${saved.savedCount} files" else saved.host
+    val skipped = if (saved.skippedCount > 0) " · ${saved.skippedCount} skipped" else ""
+    val priority = if (saved.priorityMarked) " · priority" else ""
+    return "$savedLabel · ${saved.durationMinutes} min · ${saved.topicLabel}$priority$skipped"
 }
 
 private fun launchExternalLink(
@@ -3923,13 +4339,29 @@ private fun Context.documentMetadata(uri: Uri): PickedDocumentMetadata {
     )
 }
 
+private fun Context.documentImportCandidate(uri: Uri): DocumentImportCandidate {
+    val metadata = documentMetadata(uri)
+    return DocumentImportCandidateFactory.fromPickedDocument(
+        uri = uri.toString(),
+        displayName = metadata.displayName,
+        mimeType = metadata.mimeType,
+    ) { contentResolver.openInputStream(uri) }
+}
+
 private fun persistDocumentPermission(context: Context, uri: Uri) {
     runCatching {
         context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
 }
 
+private fun releaseDocumentPermission(context: Context, uri: Uri) {
+    runCatching {
+        context.contentResolver.releasePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+}
+
 private const val MAX_BACKUP_RECOMMENDATIONS = 2
+private const val READER_HEADER_ITEM_COUNT = 1
 private const val MAX_RECENT_PROGRESS_REPLACEMENTS = 3
 private const val RECENT_REPLACEMENTS_DAYS = 7
 private const val PROGRESS_STRIP_DAYS = 21

@@ -143,6 +143,65 @@ class RoomUserDocumentRepositoryTest {
     }
 
     @Test
+    fun deleteDocument_removesPersistedDocumentAndReloadedState() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val database = Room.inMemoryDatabaseBuilder(
+            context,
+            QualityAlternativeDatabase::class.java,
+        ).allowMainThreadQueries().build()
+        val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+        try {
+            val repository = RoomUserDocumentRepository(
+                dao = database.userDocumentDao(),
+                scope = appScope,
+                bodyLoader = UserDocumentBodyLoader { _, _ -> "Private body" },
+                idProvider = { _ -> "user-document:test" },
+            )
+            repository.observeReady().first { it }
+            repository.addDocument(
+                draft = UserDocumentDraft(
+                    uri = "content://quality/notes",
+                    displayName = "notes.md",
+                    mimeType = "text/markdown",
+                    title = "Saved notes",
+                    durationMinutes = 8,
+                    topicTags = setOf(TopicTag.SCIENCE),
+                ),
+                nowMillis = 1_000L,
+            )
+            withTimeout(10_000L) {
+                repository.observeUserDocuments().first { it.size == 1 }
+            }
+
+            repository.deleteDocument("user-document:test")
+
+            withTimeout(10_000L) {
+                repository.observeUserDocuments().first { it.isEmpty() }
+            }
+            val reloadedScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+            val reloadedRepository = RoomUserDocumentRepository(
+                dao = database.userDocumentDao(),
+                scope = reloadedScope,
+                bodyLoader = UserDocumentBodyLoader { _, _ -> "Reloaded body" },
+                idProvider = { _ -> "user-document:unused" },
+            )
+            try {
+                assertEquals(
+                    emptyList<Any>(),
+                    withTimeout(10_000L) { reloadedRepository.observeUserDocuments().first() },
+                )
+            } finally {
+                reloadedScope.cancel()
+            }
+        } finally {
+            appScope.cancel()
+            delay(100)
+            database.close()
+        }
+    }
+
+    @Test
     fun addEpubDocument_roundTripsAsPrivateReaderContent() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val database = Room.inMemoryDatabaseBuilder(

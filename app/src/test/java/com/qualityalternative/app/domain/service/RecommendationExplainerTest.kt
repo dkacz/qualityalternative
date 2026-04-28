@@ -72,6 +72,25 @@ class RecommendationExplainerTest {
     }
 
     @Test
+    fun explain_marksUnfinishedContentAsContinuePath() {
+        val item = item(
+            id = "half-read",
+            minutes = 8,
+            topics = setOf(TopicTag.HISTORY),
+            whyThisNow = null,
+        )
+        val preferences = preferences(
+            preferredTopics = setOf(TopicTag.SCIENCE),
+            unfinishedContentIds = setOf("half-read"),
+        )
+
+        val explanation = RecommendationExplainer.explain(item = item, preferences = preferences)
+
+        assertEquals("Continue what you already started.", explanation.headline)
+        assertEquals(listOf("Unfinished", "Fits 5-10 min", "Editorial"), explanation.chips)
+    }
+
+    @Test
     fun surfacedStarterPackCopyDoesNotExposeInternalCurationLanguage() {
         val asset = File("src/main/assets/editorial/starter_packs.json").readText()
         val surfacedValues = Regex("\"(description|whyThisNow)\"\\s*:\\s*\"([^\"]+)\"")
@@ -92,6 +111,7 @@ class RecommendationExplainerTest {
     private fun preferences(
         preferredTopics: Set<TopicTag>,
         priorityContentIds: Set<String> = emptySet(),
+        unfinishedContentIds: Set<String> = emptySet(),
     ): UserPreferences {
         return UserPreferences(
             selectedApps = listOf(DistractingApp(packageName = "pkg", displayName = "Fixture Feed")),
@@ -99,6 +119,7 @@ class RecommendationExplainerTest {
             preferredDurationBucket = DurationBucket.FOCUS,
             selectedPackIds = setOf("pack"),
             priorityContentIds = priorityContentIds,
+            unfinishedContentIds = unfinishedContentIds,
         )
     }
 

@@ -124,6 +124,11 @@ class RoomUserDocumentRepository(
         }
     }
 
+    override suspend fun deleteDocument(contentId: String) {
+        dao.deleteById(contentId)
+        documents.value = documents.value.filterNot { item -> item.id == contentId }
+    }
+
     override fun contentBody(item: ContentItem): String {
         return if (item.sourceType == ContentSourceType.USER_DOCUMENT && item.format.usesPrivateReader()) {
             bodyLoader.loadBody(uri = item.rights.sourceUrl.orEmpty(), format = item.format)

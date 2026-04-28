@@ -5,6 +5,7 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
@@ -19,6 +20,7 @@ import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
 import com.qualityalternative.app.domain.model.DurationBucket
+import com.qualityalternative.app.domain.model.AnalyticsEventType
 import com.qualityalternative.app.domain.model.OnboardingSelection
 import com.qualityalternative.app.domain.model.TopicTag
 import com.qualityalternative.app.interception.FixtureTargetRegistry
@@ -26,6 +28,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -207,8 +210,8 @@ class MainActivityTest {
 
         openAddLinkFromHome()
 
-        composeRule.waitUntil(timeoutMillis = 10_000) { hasNodeContaining("Add to your quality") }
-        composeRule.onNodeWithText("Add to your quality", substring = true)
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("add-link-screen") }
+        composeRule.onNodeWithText("Add content.", substring = true)
             .assertIsDisplayed()
         composeRule.onNodeWithTag("add-link-url").performTextInput("quality://bad")
         composeRule.onNodeWithTag("add-link-title").performTextInput("Saved essay")
@@ -229,7 +232,7 @@ class MainActivityTest {
 
         openAddLinkFromHome()
 
-        composeRule.waitUntil(timeoutMillis = 10_000) { hasNodeContaining("Add to your quality") }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("add-link-screen") }
         composeRule.onNodeWithTag("add-link-url").performTextInput("https://example.com/essay")
         composeRule.onNodeWithTag("add-link-title").performTextInput("Saved essay")
         composeRule.onNodeWithText("Choose at least one topic so the app can rank this link.")
@@ -246,7 +249,7 @@ class MainActivityTest {
 
         openAddLinkFromHome()
 
-        composeRule.waitUntil(timeoutMillis = 10_000) { hasNodeContaining("Add to your quality") }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("add-link-screen") }
         composeRule.onNodeWithTag("add-link-title").performTextInput("Saved essay")
         composeRule.onNodeWithTag("add-link-topic-SCIENCE")
             .performScrollTo()
@@ -265,7 +268,7 @@ class MainActivityTest {
 
         openAddLinkFromHome()
 
-        composeRule.waitUntil(timeoutMillis = 10_000) { hasNodeContaining("Add to your quality") }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("add-link-screen") }
         composeRule.onNodeWithTag("add-link-url").performTextInput("https://example.com/essay")
         composeRule.onNodeWithTag("add-link-title").performTextInput("Saved essay")
         composeRule.onNodeWithTag("add-link-topic-SCIENCE")
@@ -285,6 +288,82 @@ class MainActivityTest {
         composeRule.onNodeWithTag("library-list")
             .performScrollToNode(hasText("Your link · example.com", substring = true))
         composeRule.onNodeWithText("Your link · example.com", substring = true)
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun libraryManageModeDeletesSavedLinkAndKeepsEditorialReadOnly() {
+        launchOnboardedApp()
+
+        openAddLinkFromHome()
+
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("add-link-screen") }
+        composeRule.onNodeWithTag("add-link-url").performTextInput("https://example.com/delete-me")
+        composeRule.onNodeWithTag("add-link-title").performTextInput("Delete me")
+        composeRule.onNodeWithTag("add-link-topic-SCIENCE")
+            .performScrollTo()
+            .performClick()
+        composeRule.onNodeWithTag("add-link-save")
+            .assertIsEnabled()
+            .performClick()
+
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasNode("Ready when you are") }
+        composeRule.onNodeWithTag("add-link-done").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("library-list") }
+
+        composeRule.onNodeWithTag("library-manage-toggle")
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasNode("Only your saved links and files can be deleted.") }
+        composeRule.onNodeWithTag("library-list")
+            .performScrollToNode(hasTestTag("library-editorial-note-s9-1-r01-dewey-how-we-think"))
+        composeRule.onNodeWithTag("library-editorial-note-s9-1-r01-dewey-how-we-think")
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag("library-list")
+            .performScrollToNode(hasText("Delete me"))
+        composeRule.onNodeWithText("Delete me")
+            .assertIsDisplayed()
+        val selectTag = "library-select-user-link:918123c9245605b90800494db814f2b6282ee47d915b479427b52aa7fe1b9805"
+        composeRule.onNodeWithTag("library-list")
+            .performScrollToNode(hasTestTag(selectTag))
+        composeRule.onNodeWithTag(selectTag)
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.onNodeWithTag("library-list")
+            .performScrollToNode(hasTestTag("library-delete-selected"))
+        composeRule.onNodeWithTag("library-delete-selected")
+            .assertIsEnabled()
+            .performClick()
+
+        composeRule.waitUntil(timeoutMillis = 10_000) { !hasNode("Delete me") }
+        assertFalse(hasNode("Delete me"))
+    }
+
+    @Test
+    fun addLinkPriorityAtAddAppearsInPriorityLibraryFilter() {
+        launchOnboardedApp()
+
+        openAddLinkFromHome()
+
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("add-link-screen") }
+        composeRule.onNodeWithTag("add-link-url").performTextInput("https://example.com/priority-at-add")
+        composeRule.onNodeWithTag("add-link-title").performTextInput("Priority at add")
+        composeRule.onNodeWithTag("add-link-topic-SCIENCE")
+            .performScrollTo()
+            .performClick()
+        composeRule.onNodeWithTag("add-link-priority")
+            .performScrollTo()
+            .performClick()
+        composeRule.onNodeWithTag("add-link-save")
+            .assertIsEnabled()
+            .performClick()
+
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("add-link-success-screen") }
+        composeRule.onNodeWithTag("add-link-done").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("library-list") }
+        composeRule.onNodeWithText("Priority")
+            .performClick()
+        composeRule.onNodeWithText("Priority at add")
             .assertIsDisplayed()
     }
 
@@ -346,6 +425,84 @@ class MainActivityTest {
         }
         composeRule.onNodeWithTag("progress-card").assertIsDisplayed()
         composeRule.onNodeWithText("day converted").assertIsDisplayed()
+    }
+
+    @Test
+    fun unfinishedReadingAppearsOnHomeAndLibraryAndCanContinueWithoutIntervention() {
+        launchFixtureSystemIntervention()
+
+        composeRule.onNodeWithText("Read this", substring = true)
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
+        val initiallyOpenedContentId = currentContentId()
+        assertFalse(hasUnfinishedProgressFor(initiallyOpenedContentId))
+
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.openHome()
+        }
+        waitForHome()
+        assertFalse(hasTag("home-continue-card"))
+
+        launchFixtureSystemIntervention()
+        composeRule.onNodeWithText("Read this", substring = true)
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
+        val contentId = currentContentId()
+        composeRule.onNodeWithTag("reader-list")
+            .performScrollToNode(hasText("I'm done reading"))
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasUnfinishedProgressFor(contentId) }
+        val savedPercent = savedProgressPercentFor(contentId)
+        val savedParagraphIndex = savedProgressParagraphIndexFor(contentId)
+        assertTrue(savedPercent in 1..99)
+        assertTrue(savedParagraphIndex > 0)
+
+        scenario?.onActivity { activity -> activity.mainViewModel.openHome() }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("home-continue-card") }
+        composeRule.onNodeWithTag("home-continue-card").assertIsDisplayed()
+        composeRule.onNodeWithText("$savedPercent% read", substring = true).assertIsDisplayed()
+
+        composeRule.onNodeWithTag("home-continue-action")
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
+        composeRule.onNodeWithTag("reader-screen").assertIsDisplayed()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasNodeContaining("$savedPercent%") }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            visibleReaderParagraphIndices().any { index -> index > 0 }
+        }
+        val restoredVisibleParagraphIndices = visibleReaderParagraphIndices()
+        val minimumRestoredParagraphIndex = (savedParagraphIndex - 2).coerceAtLeast(1)
+        assertTrue(
+            "Expected continued Reader to restore near saved paragraph $savedParagraphIndex, found $restoredVisibleParagraphIndices",
+            restoredVisibleParagraphIndices.any { index ->
+                index in minimumRestoredParagraphIndex..savedParagraphIndex
+            },
+        )
+        assertFalse(restoredVisibleParagraphIndices.contains(0))
+
+        scenario?.onActivity { activity -> activity.mainViewModel.openLibrary() }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("library-list") }
+        composeRule.onNodeWithText("Unfinished")
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasNodeContaining("$savedPercent% read") }
+        composeRule.onNodeWithText("$savedPercent% read", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithTag("library-open-$contentId")
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
+        composeRule.onNodeWithTag("reader-list")
+            .performScrollToNode(hasText("I'm done reading"))
+        composeRule.onNodeWithText("I'm done reading")
+            .assertIsDisplayed()
+            .performClick()
+
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasTag("feedback-screen") && hasCompletedProgressFor(contentId)
+        }
+        assertTrue(hasCompletedManualReaderEventFor(contentId))
     }
 
     @Test
@@ -421,6 +578,82 @@ class MainActivityTest {
             composeRule.onNodeWithTag(tag).fetchSemanticsNode()
             true
         }.getOrDefault(false)
+    }
+
+    private fun hasContentDescriptionNode(description: String): Boolean {
+        return runCatching {
+            composeRule.onNode(hasContentDescription(description)).fetchSemanticsNode()
+            true
+        }.getOrDefault(false)
+    }
+
+    private fun visibleReaderParagraphIndices(): List<Int> {
+        return (0..80).filter { index ->
+            hasContentDescriptionNode("reader-first-visible-paragraph-$index")
+        }
+    }
+
+    private fun currentContentId(): String {
+        var contentId = ""
+        scenario?.onActivity { activity ->
+            contentId = activity.mainViewModel.uiState.currentContent?.id.orEmpty()
+        }
+        assertTrue(contentId.isNotBlank())
+        return contentId
+    }
+
+    private fun hasUnfinishedProgressFor(contentId: String): Boolean {
+        var hasProgress = false
+        scenario?.onActivity { activity ->
+            hasProgress = activity.mainViewModel.uiState.readingProgress.any { progress ->
+                progress.contentId == contentId && progress.progressPercent in 1..99 && progress.completedAtMillis == null
+            }
+        }
+        return hasProgress
+    }
+
+    private fun savedProgressPercentFor(contentId: String): Int {
+        var percent = 0
+        scenario?.onActivity { activity ->
+            percent = activity.mainViewModel.uiState.readingProgress
+                .firstOrNull { progress -> progress.contentId == contentId && progress.completedAtMillis == null }
+                ?.progressPercent
+                ?: 0
+        }
+        return percent
+    }
+
+    private fun savedProgressParagraphIndexFor(contentId: String): Int {
+        var index = -1
+        scenario?.onActivity { activity ->
+            index = activity.mainViewModel.uiState.readingProgress
+                .firstOrNull { progress -> progress.contentId == contentId && progress.completedAtMillis == null }
+                ?.lastVisibleParagraphIndex
+                ?: -1
+        }
+        return index
+    }
+
+    private fun hasCompletedProgressFor(contentId: String): Boolean {
+        var hasCompleted = false
+        scenario?.onActivity { activity ->
+            hasCompleted = activity.mainViewModel.uiState.readingProgress.any { progress ->
+                progress.contentId == contentId && progress.progressPercent == 100 && progress.completedAtMillis != null
+            }
+        }
+        return hasCompleted
+    }
+
+    private fun hasCompletedManualReaderEventFor(contentId: String): Boolean {
+        var hasEvent = false
+        scenario?.onActivity { activity ->
+            hasEvent = activity.mainViewModel.uiState.events.any { event ->
+                event.type == AnalyticsEventType.READER_COMPLETED &&
+                    event.contentId == contentId &&
+                    event.sessionId == null
+            }
+        }
+        return hasEvent
     }
 
     private fun openAddLinkFromHome() {

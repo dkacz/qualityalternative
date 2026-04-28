@@ -12,7 +12,7 @@ import com.qualityalternative.app.ui.MainViewModelFactory
 import com.qualityalternative.app.ui.QualityAlternativeApp
 
 class MainActivity : ComponentActivity() {
-    private val mainViewModel: MainViewModel by viewModels {
+    internal val mainViewModel: MainViewModel by viewModels {
         MainViewModelFactory((application as QualityAlternativeApplication).appContainer)
     }
 

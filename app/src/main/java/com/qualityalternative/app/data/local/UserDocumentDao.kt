@@ -23,4 +23,7 @@ interface UserDocumentDao {
         availability: String,
         updatedAtMillis: Long,
     )
+
+    @Query("DELETE FROM user_documents WHERE id = :id")
+    suspend fun deleteById(id: String)
 }

@@ -461,6 +461,80 @@ class DefaultRecommendationEngineTest {
         assertEquals(2, result?.backups?.size)
     }
 
+    @Test
+    fun generate_givesUnfinishedContentAbsolutePrimaryPriorityUnlessCompleted() {
+        val preferences = UserPreferences(
+            selectedApps = listOf(DistractingApp(packageName = "pkg", displayName = "Instagram")),
+            preferredTopics = setOf(TopicTag.SCIENCE),
+            preferredDurationBucket = DurationBucket.FOCUS,
+            selectedPackIds = setOf("pack"),
+            priorityContentIds = setOf("fresh-match"),
+            unfinishedContentIds = setOf("unfinished"),
+        )
+        val inventory = listOf(
+            item(id = "fresh-match", minutes = 7, topics = setOf(TopicTag.SCIENCE)),
+            item(id = "unfinished", minutes = 5, topics = setOf(TopicTag.HISTORY)),
+            item(id = "backup-one", minutes = 4, topics = setOf(TopicTag.SCIENCE)),
+            item(id = "backup-two", minutes = 3, topics = setOf(TopicTag.SCIENCE)),
+        )
+
+        val result = engine.generate(
+            targetApp = DistractingApp(packageName = "pkg", displayName = "Instagram"),
+            preferences = preferences,
+            inventory = inventory,
+            primaryExcludedIds = emptySet(),
+            signals = RecommendationSignals(timeOfDay = TimeOfDayBucket.MIDDAY),
+            nowMillis = 0L,
+        )
+
+        assertEquals("unfinished", result?.primary?.id)
+
+        val completedResult = engine.generate(
+            targetApp = DistractingApp(packageName = "pkg", displayName = "Instagram"),
+            preferences = preferences,
+            inventory = inventory,
+            primaryExcludedIds = setOf("unfinished"),
+            signals = RecommendationSignals(timeOfDay = TimeOfDayBucket.MIDDAY),
+            nowMillis = 0L,
+        )
+
+        assertEquals("fresh-match", completedResult?.primary?.id)
+    }
+
+    @Test
+    fun generate_doesNotRecommendUnavailableUnfinishedContentAsPrimary() {
+        val preferences = UserPreferences(
+            selectedApps = listOf(DistractingApp(packageName = "pkg", displayName = "Instagram")),
+            preferredTopics = setOf(TopicTag.SCIENCE),
+            preferredDurationBucket = DurationBucket.FOCUS,
+            selectedPackIds = setOf("pack"),
+            unfinishedContentIds = setOf("unavailable-unfinished"),
+        )
+        val inventory = listOf(
+            item(
+                id = "unavailable-unfinished",
+                minutes = 5,
+                topics = setOf(TopicTag.HISTORY),
+                availability = ContentAvailability.UNAVAILABLE,
+            ),
+            item(id = "fresh-match", minutes = 7, topics = setOf(TopicTag.SCIENCE)),
+            item(id = "backup-one", minutes = 4, topics = setOf(TopicTag.SCIENCE)),
+            item(id = "backup-two", minutes = 3, topics = setOf(TopicTag.SCIENCE)),
+        )
+
+        val result = engine.generate(
+            targetApp = DistractingApp(packageName = "pkg", displayName = "Instagram"),
+            preferences = preferences,
+            inventory = inventory,
+            primaryExcludedIds = emptySet(),
+            signals = RecommendationSignals(timeOfDay = TimeOfDayBucket.MIDDAY),
+            nowMillis = 0L,
+        )
+
+        assertEquals("fresh-match", result?.primary?.id)
+        assertTrue(result?.backups.orEmpty().none { item -> item.id == "unavailable-unfinished" })
+    }
+
     private fun item(
         id: String,
         packId: String = "pack",
