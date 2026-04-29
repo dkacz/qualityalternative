@@ -12,10 +12,13 @@ import com.qualityalternative.app.domain.model.AppSettings
 import com.qualityalternative.app.domain.model.AppThemeMode
 import com.qualityalternative.app.domain.model.ContentPriority
 import com.qualityalternative.app.domain.model.DEFAULT_MEDITATION_MINUTES
+import com.qualityalternative.app.domain.model.DEFAULT_OPEN_ANYWAY_UNLOCK_MINUTES
 import com.qualityalternative.app.domain.model.DistractingApp
 import com.qualityalternative.app.domain.model.DurationBucket
 import com.qualityalternative.app.domain.model.MAX_MEDITATION_MINUTES
+import com.qualityalternative.app.domain.model.MAX_OPEN_ANYWAY_UNLOCK_MINUTES
 import com.qualityalternative.app.domain.model.MIN_MEDITATION_MINUTES
+import com.qualityalternative.app.domain.model.MIN_OPEN_ANYWAY_UNLOCK_MINUTES
 import com.qualityalternative.app.domain.model.OnboardingSelection
 import com.qualityalternative.app.domain.model.TopicTag
 import com.qualityalternative.app.domain.service.SettingsRepository
@@ -54,6 +57,9 @@ class PreferencesSettingsRepository(
                         .coerceIn(MIN_MEDITATION_MINUTES, MAX_MEDITATION_MINUTES),
                     contentPriority = parseContentPriority(preferences[ContentPriorityPreference]),
                     priorityContentIds = preferences[PriorityContentIds].orEmpty(),
+                    reactivatedCompletedContentIds = preferences[ReactivatedCompletedContentIds].orEmpty(),
+                    openAnywayUnlockMinutes = (preferences[OpenAnywayUnlockMinutes] ?: DEFAULT_OPEN_ANYWAY_UNLOCK_MINUTES)
+                        .coerceIn(MIN_OPEN_ANYWAY_UNLOCK_MINUTES, MAX_OPEN_ANYWAY_UNLOCK_MINUTES),
                 )
             }
     }
@@ -106,6 +112,19 @@ class PreferencesSettingsRepository(
         }
     }
 
+    override suspend fun saveReactivatedCompletedContentIds(contentIds: Set<String>) {
+        dataStore.edit { preferences ->
+            preferences[ReactivatedCompletedContentIds] = contentIds
+        }
+    }
+
+    override suspend fun saveOpenAnywayUnlockMinutes(minutes: Int) {
+        dataStore.edit { preferences ->
+            preferences[OpenAnywayUnlockMinutes] =
+                minutes.coerceIn(MIN_OPEN_ANYWAY_UNLOCK_MINUTES, MAX_OPEN_ANYWAY_UNLOCK_MINUTES)
+        }
+    }
+
     suspend fun clearForTests() {
         dataStore.edit { preferences ->
             preferences.clear()
@@ -135,5 +154,7 @@ class PreferencesSettingsRepository(
         val MeditationDurationMinutes = intPreferencesKey("meditation_duration_minutes")
         val ContentPriorityPreference = stringPreferencesKey("content_priority")
         val PriorityContentIds = stringSetPreferencesKey("priority_content_ids")
+        val ReactivatedCompletedContentIds = stringSetPreferencesKey("reactivated_completed_content_ids")
+        val OpenAnywayUnlockMinutes = intPreferencesKey("open_anyway_unlock_minutes")
     }
 }

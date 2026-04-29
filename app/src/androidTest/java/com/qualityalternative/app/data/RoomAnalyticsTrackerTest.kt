@@ -680,6 +680,8 @@ class RoomAnalyticsTrackerTest {
                 meditationDurationMinutes = state.value.meditationDurationMinutes,
                 contentPriority = state.value.contentPriority,
                 priorityContentIds = state.value.priorityContentIds,
+                reactivatedCompletedContentIds = state.value.reactivatedCompletedContentIds,
+                openAnywayUnlockMinutes = state.value.openAnywayUnlockMinutes,
             )
         }
 
@@ -705,6 +707,14 @@ class RoomAnalyticsTrackerTest {
 
         override suspend fun savePriorityContentIds(contentIds: Set<String>) {
             state.value = state.value.copy(priorityContentIds = contentIds)
+        }
+
+        override suspend fun saveReactivatedCompletedContentIds(contentIds: Set<String>) {
+            state.value = state.value.copy(reactivatedCompletedContentIds = contentIds)
+        }
+
+        override suspend fun saveOpenAnywayUnlockMinutes(minutes: Int) {
+            state.value = state.value.copy(openAnywayUnlockMinutes = minutes)
         }
     }
 

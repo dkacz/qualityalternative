@@ -17,6 +17,8 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeUp
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.UiDevice
@@ -24,6 +26,7 @@ import com.qualityalternative.app.domain.model.AppThemeMode
 import com.qualityalternative.app.domain.model.ContentFormat
 import com.qualityalternative.app.domain.model.ContentItem
 import com.qualityalternative.app.domain.model.DurationBucket
+import com.qualityalternative.app.domain.model.MEDITATION_TIMER_CONTENT_ID
 import com.qualityalternative.app.domain.model.OnboardingSelection
 import com.qualityalternative.app.domain.model.TopicTag
 import com.qualityalternative.app.domain.model.UserDocumentDraft
@@ -50,12 +53,14 @@ class VisualQaScreenshotTest {
     val composeRule = createEmptyComposeRule()
 
     private var scenario: ActivityScenario<MainActivity>? = null
+    private val sprint13ScreenshotDirName = "sprint13-completed-unlock-${System.currentTimeMillis()}"
     private lateinit var screenshotDir: File
     private lateinit var legacyScreenshotDir: File
     private lateinit var sprint10ScreenshotDir: File
     private lateinit var sprint9ScreenshotDir: File
     private lateinit var sprint12ScreenshotDir: File
     private lateinit var sprint12FinalScreenshotDir: File
+    private lateinit var sprint13ScreenshotDir: File
 
     @Before
     fun resetAppState() {
@@ -80,6 +85,9 @@ class VisualQaScreenshotTest {
         sprint12FinalScreenshotDir = File(sprint12FinalRoot, "visual-qa/sprint12-final-journey")
         sprint12FinalScreenshotDir.deleteRecursively()
         sprint12FinalScreenshotDir.mkdirs()
+        sprint13ScreenshotDir = File("/sdcard/Download/qualityalternative/$sprint13ScreenshotDirName")
+        sprint13ScreenshotDir.deleteRecursively()
+        sprint13ScreenshotDir.mkdirs()
     }
 
     @After
@@ -732,7 +740,7 @@ class VisualQaScreenshotTest {
         scenario?.onActivity { activity -> activity.mainViewModel.openLibrary() }
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("library-list") }
         composeRule.onNodeWithTag("library-list")
-            .performScrollToNode(hasText(darkReaderDocument.title))
+            .performScrollToNode(hasTestTag("library-open-${darkReaderDocument.id}"))
         composeRule.onNodeWithTag("library-open-${darkReaderDocument.id}")
             .assertIsDisplayed()
             .performClick()
@@ -1029,6 +1037,92 @@ class VisualQaScreenshotTest {
         captureSprint12Final("27_reader_mid_dark")
     }
 
+    @Test
+    fun captureSprint13CompletedActivationAndUnlockScreens() {
+        launchOnboardedApp()
+        seedAttentionClassicsSelection()
+        launchFixtureSystemIntervention()
+
+        composeRule.onNodeWithText("Read this", substring = true).performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
+        val completedContent = currentContentIdAndTitle()
+        composeRule.onNodeWithTag("reader-list")
+            .performScrollToNode(hasText("I'm done reading"))
+        composeRule.onNodeWithText("I'm done reading").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("feedback-screen") }
+
+        scenario?.onActivity { activity -> activity.mainViewModel.openLibrary() }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("library-list") }
+        composeRule.onNodeWithTag("library-list")
+            .performScrollToNode(hasTestTag("library-open-${completedContent.first}"))
+            .performTouchInput { swipeUp(startY = 1_850f, endY = 1_650f) }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("library-completed-status-${completedContent.first}") }
+        captureSprint13("01_library_completed_hidden_light")
+
+        composeRule.onNodeWithTag("completed-activation-${completedContent.first}").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasNode("Completed · active in suggestions") }
+        scenario?.onActivity { activity -> activity.mainViewModel.dismissMessage() }
+        composeRule.onNodeWithTag("library-list")
+            .performScrollToNode(hasTestTag("library-open-${completedContent.first}"))
+            .performTouchInput { swipeUp(startY = 1_850f, endY = 1_650f) }
+        composeRule.waitForIdle()
+        Thread.sleep(500)
+        captureSprint13("02_library_completed_reactivated_light")
+
+        seedMeditationSelection()
+        launchFixtureSystemIntervention()
+        composeRule.onNodeWithText("Start timer", substring = true).performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("meditation-timer-screen") }
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.finishMeditationReset(nowMillis = 12_000L)
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("feedback-screen") }
+        scenario?.onActivity { activity -> activity.mainViewModel.openLibrary() }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("library-list") }
+        composeRule.onNodeWithTag("library-list")
+            .performScrollToNode(hasTestTag("library-completed-status-$MEDITATION_TIMER_CONTENT_ID"))
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("library-completed-status-$MEDITATION_TIMER_CONTENT_ID") }
+        captureSprint13("03_library_completed_meditation_hidden_light")
+
+        composeRule.onNodeWithTag("completed-activation-$MEDITATION_TIMER_CONTENT_ID").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasNode("Completed · active in suggestions") }
+        scenario?.onActivity { activity -> activity.mainViewModel.dismissMessage() }
+        composeRule.waitForIdle()
+        Thread.sleep(500)
+        captureSprint13("04_library_completed_meditation_reactivated_light")
+
+        openTab("tab-settings", "settings-list")
+        composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasTestTag("open-anyway-unlock-120"))
+        composeRule.onNodeWithTag("open-anyway-unlock-120").performClick()
+        composeRule.waitForIdle()
+        captureSprint13("05_settings_open_anyway_unlock_light")
+
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.selectThemeMode(AppThemeMode.DARK)
+        }
+        composeRule.waitForIdle()
+        captureSprint13("06_settings_open_anyway_unlock_dark")
+
+        seedAttentionClassicsSelection()
+        launchFixtureSystemIntervention()
+        composeRule.onNodeWithText("Open Fixture Feed One").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            scenario?.state == androidx.lifecycle.Lifecycle.State.DESTROYED
+        }
+        scenario = null
+
+        val targetContext = InstrumentationRegistry.getInstrumentation().targetContext
+        launchApp(
+            MainActivity.createSystemInterceptionIntent(
+                context = targetContext,
+                targetAppPackage = FixtureTargetRegistry.fixtureDistractors.first().packageName,
+            ),
+        )
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("home-list") }
+        captureSprint13("07_open_anyway_unlocked_home_dark")
+    }
+
     private fun capture(name: String) {
         captureTo(screenshotDir, name)
     }
@@ -1051,6 +1145,10 @@ class VisualQaScreenshotTest {
 
     private fun captureSprint12Final(name: String) {
         captureTo(sprint12FinalScreenshotDir, name)
+    }
+
+    private fun captureSprint13(name: String) {
+        captureTo(sprint13ScreenshotDir, name)
     }
 
     private fun captureTo(directory: File, name: String) {
@@ -1857,6 +1955,19 @@ class VisualQaScreenshotTest {
         composeRule.onNodeWithTag(tag).fetchSemanticsNode()
         true
     }.getOrDefault(false)
+
+    private fun currentContentIdAndTitle(): Pair<String, String> {
+        var id = ""
+        var title = ""
+        scenario?.onActivity { activity ->
+            val content = activity.mainViewModel.uiState.currentContent
+            id = content?.id.orEmpty()
+            title = content?.title.orEmpty()
+        }
+        assertTrue("Expected current content id", id.isNotBlank())
+        assertTrue("Expected current content title", title.isNotBlank())
+        return id to title
+    }
 
     private fun assertNodeFullyWithinRoot(tag: String) {
         composeRule.waitForIdle()

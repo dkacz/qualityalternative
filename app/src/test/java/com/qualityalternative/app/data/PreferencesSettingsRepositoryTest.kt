@@ -136,6 +136,50 @@ class PreferencesSettingsRepositoryTest {
     }
 
     @Test
+    fun saveReactivatedCompletedContentIds_persistsWithoutResettingOnboarding() = runBlocking {
+        val repository = PreferencesSettingsRepository(
+            dataStore = testDataStore(),
+            supportedApps = SupportedCatalog.distractingApps,
+        )
+        val selection = OnboardingSelection(
+            selectedAppPackages = SupportedCatalog.distractingApps.take(3).mapTo(mutableSetOf()) { it.packageName },
+            preferredTopics = setOf(TopicTag.PHILOSOPHY, TopicTag.SCIENCE, TopicTag.HISTORY),
+            preferredDurationBucket = DurationBucket.FOCUS,
+            selectedPackIds = setOf("science"),
+        )
+
+        repository.saveOnboardingSelection(selection)
+        repository.saveReactivatedCompletedContentIds(setOf("p1", "doc:local"))
+
+        val restored = repository.observeAppSettings().first()
+        assertTrue(restored.hasCompletedOnboarding)
+        assertEquals(selection.selectedAppPackages, restored.selectedAppPackages)
+        assertEquals(setOf("p1", "doc:local"), restored.reactivatedCompletedContentIds)
+    }
+
+    @Test
+    fun saveOpenAnywayUnlockMinutes_persistsWithoutResettingOnboarding() = runBlocking {
+        val repository = PreferencesSettingsRepository(
+            dataStore = testDataStore(),
+            supportedApps = SupportedCatalog.distractingApps,
+        )
+        val selection = OnboardingSelection(
+            selectedAppPackages = SupportedCatalog.distractingApps.take(3).mapTo(mutableSetOf()) { it.packageName },
+            preferredTopics = setOf(TopicTag.PHILOSOPHY, TopicTag.SCIENCE, TopicTag.HISTORY),
+            preferredDurationBucket = DurationBucket.FOCUS,
+            selectedPackIds = setOf("science"),
+        )
+
+        repository.saveOnboardingSelection(selection)
+        repository.saveOpenAnywayUnlockMinutes(120)
+
+        val restored = repository.observeAppSettings().first()
+        assertTrue(restored.hasCompletedOnboarding)
+        assertEquals(selection.selectedAppPackages, restored.selectedAppPackages)
+        assertEquals(120, restored.openAnywayUnlockMinutes)
+    }
+
+    @Test
     fun observeAppSettings_mapsLegacyInkThemeToDark() = runBlocking {
         val dataStore = testDataStore()
         val repository = PreferencesSettingsRepository(

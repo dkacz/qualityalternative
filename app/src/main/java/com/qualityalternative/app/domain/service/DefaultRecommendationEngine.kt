@@ -17,12 +17,15 @@ class DefaultRecommendationEngine : RecommendationEngine {
         targetApp: DistractingApp,
         preferences: UserPreferences,
         inventory: List<ContentItem>,
-        primaryExcludedIds: Set<String>,
+        excludedContentIds: Set<String>,
         signals: RecommendationSignals,
         nowMillis: Long,
     ): RecommendationSet? {
         val scoredCandidates = inventory
-            .filter { item -> item.availability != ContentAvailability.UNAVAILABLE }
+            .filter { item ->
+                item.availability != ContentAvailability.UNAVAILABLE &&
+                    item.id !in excludedContentIds
+            }
             .map { item ->
                 ScoredCandidate(
                     item = item,
@@ -37,7 +40,6 @@ class DefaultRecommendationEngine : RecommendationEngine {
             )
 
         val candidateSets = scoredCandidates
-            .filter { it.item.id !in primaryExcludedIds }
             .map { primary ->
                 CandidateRecommendation(
                     primary = primary,

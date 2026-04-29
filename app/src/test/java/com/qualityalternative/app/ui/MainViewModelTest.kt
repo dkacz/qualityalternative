@@ -41,6 +41,7 @@ import com.qualityalternative.app.domain.model.UserLinkValidationError
 import com.qualityalternative.app.domain.model.UserDocumentDraft
 import com.qualityalternative.app.domain.model.UserDocumentValidationError
 import com.qualityalternative.app.domain.model.UserPreferences
+import com.qualityalternative.app.domain.model.meditationTimerContentItem
 import com.qualityalternative.app.domain.service.AddUserDocumentResult
 import com.qualityalternative.app.domain.service.AddUserLinkResult
 import com.qualityalternative.app.domain.service.ContentRepository
@@ -1756,6 +1757,79 @@ class MainViewModelTest {
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
+    fun completedActivation_reactivatesCompletedContentForRecommendations() = runTest {
+        val settingsRepository = FakeSettingsRepository(
+            initial = AppSettings(
+                hasCompletedOnboarding = true,
+                selectedAppPackages = SupportedCatalog.distractingApps.take(3).mapTo(mutableSetOf(), DistractingApp::packageName),
+                preferredTopics = setOf(TopicTag.PHILOSOPHY, TopicTag.SCIENCE, TopicTag.HISTORY),
+                preferredDurationBucket = DurationBucket.FOCUS,
+                selectedPackIds = setOf("philosophy", "science"),
+            ),
+        )
+        val historyRepository = FakeHistoryRepository(
+            initialHistory = emptyList(),
+            initialCompletedIds = setOf("p1"),
+        )
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val viewModel = createViewModel(
+            settingsRepository = settingsRepository,
+            historyRepository = historyRepository,
+            analyticsTracker = analyticsTracker,
+        )
+
+        advanceUntilIdle()
+        viewModel.triggerDebugIntervention(nowMillis = 2_000L)
+        advanceUntilIdle()
+        assertEquals("s1", viewModel.uiState.currentRecommendationSet?.primary?.id)
+
+        val completedItem = viewModel.uiState.starterPacks
+            .flatMap(EditorialPack::items)
+            .first { it.id == "p1" }
+        viewModel.toggleCompletedContentActivation(completedItem)
+        advanceUntilIdle()
+
+        assertEquals(setOf("p1"), settingsRepository.state.value.reactivatedCompletedContentIds)
+        assertEquals(setOf("p1"), viewModel.uiState.reactivatedCompletedContentIds)
+        assertTrue(
+            analyticsTracker.allEvents().any {
+                it.type == AnalyticsEventType.COMPLETED_CONTENT_ACTIVATION_TOGGLED &&
+                    it.contentId == "p1" &&
+                    it.metadata["reactivated"] == "true"
+            },
+        )
+
+        viewModel.triggerDebugIntervention(nowMillis = 3_000L)
+        advanceUntilIdle()
+
+        assertEquals("p1", viewModel.uiState.currentRecommendationSet?.primary?.id)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun finishReading_deactivatesReactivatedCompletedContentAgain() = runTest {
+        val settingsRepository = FakeSettingsRepository(
+            initial = completedSettings(
+                selectedAppPackages = SupportedCatalog.distractingApps.take(3).mapTo(mutableSetOf(), DistractingApp::packageName),
+            ).copy(reactivatedCompletedContentIds = setOf("p1")),
+        )
+        val viewModel = createViewModel(settingsRepository = settingsRepository)
+
+        advanceUntilIdle()
+        viewModel.triggerDebugIntervention(nowMillis = 1_000L)
+        advanceUntilIdle()
+        viewModel.acceptPrimary()
+        advanceUntilIdle()
+        viewModel.finishReading()
+        advanceUntilIdle()
+
+        assertTrue("p1" in viewModel.uiState.completedContentIds)
+        assertEquals(emptySet<String>(), settingsRepository.state.value.reactivatedCompletedContentIds)
+        assertEquals(emptySet<String>(), viewModel.uiState.reactivatedCompletedContentIds)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
     fun triggerDebugIntervention_recordsStructuredDelayReturnEvents() = runTest {
         val delayGate = InMemoryDelayGate()
         val analyticsTracker = InMemoryAnalyticsTracker()
@@ -1822,6 +1896,83 @@ class MainViewModelTest {
         assertEquals("short-link", event.contentId)
         assertEquals("active_delay_card", event.metadata["origin"])
         assertNotNull(event.semanticKey)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun finishReadingRemovesCompletedContentFromActiveDelaySuggestion() = runTest {
+        val contentRepository = FakeContentRepository()
+        val primary = contentRepository.inventory().first { it.id == "p1" }
+        val viewModel = createViewModel(
+            contentRepository = contentRepository,
+            recommendationEngine = FixedRecommendationEngine(
+                RecommendationSet(
+                    primary = primary,
+                    backups = emptyList(),
+                    inventoryShortage = true,
+                    generatedAtMillis = 1_000L,
+                ),
+            ),
+        )
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+        viewModel.triggerDebugIntervention(nowMillis = 1_000L)
+        advanceUntilIdle()
+        viewModel.delayFor15Minutes()
+        advanceUntilIdle()
+        assertEquals("p1", viewModel.uiState.activeDelaySuggestion?.id)
+
+        viewModel.startActiveDelayAlternative()
+        advanceUntilIdle()
+        viewModel.finishReading()
+        advanceUntilIdle()
+
+        assertTrue("p1" in viewModel.uiState.completedContentIds)
+        assertEquals(null, viewModel.uiState.activeDelaySuggestion)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun finishMeditationResetRemovesCompletedContentFromActiveDelaySuggestion() = runTest {
+        val meditation = meditationTimerContentItem(3)
+        val settingsRepository = FakeSettingsRepository(
+            initial = completedSettings(
+                selectedAppPackages = SupportedCatalog.distractingApps.take(3).mapTo(mutableSetOf(), DistractingApp::packageName),
+            ).copy(
+                preferredTopics = setOf(TopicTag.PSYCHOLOGY),
+                preferredDurationBucket = DurationBucket.QUICK,
+                selectedPackIds = emptySet(),
+                contentPriority = ContentPriority.MEDITATION,
+            ),
+        )
+        val viewModel = createViewModel(
+            settingsRepository = settingsRepository,
+            recommendationEngine = FixedRecommendationEngine(
+                RecommendationSet(
+                    primary = meditation,
+                    backups = emptyList(),
+                    inventoryShortage = true,
+                    generatedAtMillis = 1_000L,
+                ),
+            ),
+        )
+
+        advanceUntilIdle()
+        viewModel.triggerDebugIntervention(nowMillis = 1_000L)
+        advanceUntilIdle()
+        viewModel.delayFor15Minutes()
+        advanceUntilIdle()
+        assertEquals(MEDITATION_TIMER_CONTENT_ID, viewModel.uiState.activeDelaySuggestion?.id)
+
+        viewModel.startActiveDelayAlternative()
+        advanceUntilIdle()
+        viewModel.finishMeditationReset(nowMillis = 5_000L)
+        advanceUntilIdle()
+
+        assertTrue(MEDITATION_TIMER_CONTENT_ID in viewModel.uiState.completedContentIds)
+        assertEquals(null, viewModel.uiState.activeDelaySuggestion)
     }
 
     @Test
@@ -2031,7 +2182,7 @@ class MainViewModelTest {
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
-    fun triggerDebugIntervention_doesNotExcludeCompletedMeditationFromPrimaryCandidates() = runTest {
+    fun triggerDebugIntervention_excludesCompletedMeditationFromCandidates() = runTest {
         val recommendationEngine = RecordingRecommendationEngine()
         val historyRepository = FakeHistoryRepository(
             initialCompletedIds = setOf("p1", MEDITATION_TIMER_CONTENT_ID),
@@ -2048,7 +2199,7 @@ class MainViewModelTest {
         advanceUntilIdle()
 
         assertTrue(recommendationEngine.lastInventory.any { it.id == MEDITATION_TIMER_CONTENT_ID })
-        assertEquals(setOf("p1"), recommendationEngine.lastPrimaryExcludedIds)
+        assertEquals(setOf("p1", MEDITATION_TIMER_CONTENT_ID), recommendationEngine.lastExcludedContentIds)
     }
 
     @Test
@@ -2077,6 +2228,80 @@ class MainViewModelTest {
         assertEquals("0", event.metadata["unavailableUserLinkCount"])
         assertEquals("2", event.metadata["completedContentCount"])
         assertEquals("philosophy", event.metadata["selectedPackIds"])
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun finishMeditationReset_deactivatesReactivatedCompletedMeditationAgain() = runTest {
+        val meditation = meditationTimerContentItem(3)
+        val settingsRepository = FakeSettingsRepository(
+            initial = completedSettings(
+                selectedAppPackages = SupportedCatalog.distractingApps.take(3).mapTo(mutableSetOf(), DistractingApp::packageName),
+            ).copy(
+                preferredTopics = setOf(TopicTag.PSYCHOLOGY),
+                preferredDurationBucket = DurationBucket.QUICK,
+                selectedPackIds = emptySet(),
+                contentPriority = ContentPriority.MEDITATION,
+                reactivatedCompletedContentIds = setOf(MEDITATION_TIMER_CONTENT_ID),
+            ),
+        )
+        val viewModel = createViewModel(
+            settingsRepository = settingsRepository,
+            recommendationEngine = FixedRecommendationEngine(
+                RecommendationSet(
+                    primary = meditation,
+                    backups = emptyList(),
+                    inventoryShortage = true,
+                    generatedAtMillis = 1_000L,
+                ),
+            ),
+        )
+
+        advanceUntilIdle()
+        viewModel.triggerDebugIntervention(nowMillis = 1_000L)
+        advanceUntilIdle()
+        viewModel.acceptPrimary()
+        advanceUntilIdle()
+        viewModel.finishMeditationReset(nowMillis = 5_000L)
+        advanceUntilIdle()
+
+        assertTrue(MEDITATION_TIMER_CONTENT_ID in viewModel.uiState.completedContentIds)
+        assertEquals(emptySet<String>(), settingsRepository.state.value.reactivatedCompletedContentIds)
+        assertEquals(emptySet<String>(), viewModel.uiState.reactivatedCompletedContentIds)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun finishMeditationReset_fromLibraryMarksMeditationCompletedAndExcluded() = runTest {
+        val meditation = meditationTimerContentItem(3)
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val recommendationEngine = RecordingRecommendationEngine()
+        val viewModel = createViewModel(
+            analyticsTracker = analyticsTracker,
+            recommendationEngine = recommendationEngine,
+        )
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+        viewModel.openLibraryItem(meditation)
+        advanceUntilIdle()
+        viewModel.finishMeditationReset(nowMillis = 5_000L)
+        advanceUntilIdle()
+
+        assertTrue(MEDITATION_TIMER_CONTENT_ID in viewModel.uiState.completedContentIds)
+        assertTrue(
+            analyticsTracker.allEvents().any {
+                it.type == AnalyticsEventType.MEDITATION_TIMER_COMPLETED &&
+                    it.contentId == MEDITATION_TIMER_CONTENT_ID &&
+                    it.sessionId == null
+            },
+        )
+
+        viewModel.triggerDebugIntervention(nowMillis = 6_000L)
+        advanceUntilIdle()
+
+        assertEquals(setOf(MEDITATION_TIMER_CONTENT_ID), recommendationEngine.lastExcludedContentIds)
     }
 
     @Test
@@ -2178,6 +2403,54 @@ class MainViewModelTest {
             InterceptionRuntimeGate.shouldSuppress(
                 targetAppPackage = fixtureTarget.packageName,
                 nowMillis = 5_001L,
+            ),
+        )
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun openAnyway_usesConfiguredUnlockWindowAndSuppressesRepeatedSystemIntervention() = runTest {
+        val fixtureTarget = FixtureTargetRegistry.fixtureDistractors.first()
+        var nowMillis = 10_000L
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val viewModel = createViewModel(
+            settingsRepository = FakeSettingsRepository(
+                initial = completedSettings(selectedAppPackages = setOf(fixtureTarget.packageName))
+                    .copy(openAnywayUnlockMinutes = 120),
+            ),
+            analyticsTracker = analyticsTracker,
+            nowProvider = { nowMillis },
+        )
+
+        advanceUntilIdle()
+
+        viewModel.requestSystemInterception(targetAppPackage = fixtureTarget.packageName, nowMillis = nowMillis)
+        advanceUntilIdle()
+        assertEquals(MainScreen.Intervention, viewModel.uiState.screen)
+
+        assertTrue(viewModel.openAnyway())
+        advanceUntilIdle()
+
+        assertTrue(
+            InterceptionRuntimeGate.shouldSuppress(
+                targetAppPackage = fixtureTarget.packageName,
+                nowMillis = 10_000L + 119 * 60_000L,
+            ),
+        )
+        val openEvent = analyticsTracker.allEvents().first { it.type == AnalyticsEventType.OPEN_ANYWAY_SELECTED }
+        assertEquals("120", openEvent.metadata["openAnywayUnlockMinutes"])
+
+        nowMillis = 20_000L
+        viewModel.requestSystemInterception(targetAppPackage = fixtureTarget.packageName, nowMillis = nowMillis)
+        advanceUntilIdle()
+
+        assertEquals(MainScreen.Home, viewModel.uiState.screen)
+        assertEquals(null, viewModel.uiState.currentRecommendationSet)
+        assertEquals(null, viewModel.uiState.currentInterventionOrigin)
+        assertFalse(
+            InterceptionRuntimeGate.shouldSuppress(
+                targetAppPackage = fixtureTarget.packageName,
+                nowMillis = 10_000L + 121 * 60_000L,
             ),
         )
     }
@@ -2327,6 +2600,8 @@ class MainViewModelTest {
                 meditationDurationMinutes = state.value.meditationDurationMinutes,
                 contentPriority = state.value.contentPriority,
                 priorityContentIds = state.value.priorityContentIds,
+                reactivatedCompletedContentIds = state.value.reactivatedCompletedContentIds,
+                openAnywayUnlockMinutes = state.value.openAnywayUnlockMinutes,
             )
         }
 
@@ -2352,6 +2627,14 @@ class MainViewModelTest {
 
         override suspend fun savePriorityContentIds(contentIds: Set<String>) {
             state.value = state.value.copy(priorityContentIds = contentIds)
+        }
+
+        override suspend fun saveReactivatedCompletedContentIds(contentIds: Set<String>) {
+            state.value = state.value.copy(reactivatedCompletedContentIds = contentIds)
+        }
+
+        override suspend fun saveOpenAnywayUnlockMinutes(minutes: Int) {
+            state.value = state.value.copy(openAnywayUnlockMinutes = minutes)
         }
     }
 
@@ -2879,20 +3162,20 @@ class MainViewModelTest {
             private set
         var lastPreferences: UserPreferences? = null
             private set
-        var lastPrimaryExcludedIds: Set<String> = emptySet()
+        var lastExcludedContentIds: Set<String> = emptySet()
             private set
 
         override fun generate(
             targetApp: DistractingApp,
             preferences: UserPreferences,
             inventory: List<ContentItem>,
-            primaryExcludedIds: Set<String>,
+            excludedContentIds: Set<String>,
             signals: RecommendationSignals,
             nowMillis: Long,
         ): RecommendationSet? {
             lastPreferences = preferences
             lastInventory = inventory
-            lastPrimaryExcludedIds = primaryExcludedIds
+            lastExcludedContentIds = excludedContentIds
             return null
         }
     }
@@ -2904,7 +3187,7 @@ class MainViewModelTest {
             targetApp: DistractingApp,
             preferences: UserPreferences,
             inventory: List<ContentItem>,
-            primaryExcludedIds: Set<String>,
+            excludedContentIds: Set<String>,
             signals: RecommendationSignals,
             nowMillis: Long,
         ): RecommendationSet = recommendationSet

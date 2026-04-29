@@ -16,6 +16,12 @@ data class UserPreferences(
     val unfinishedContentIds: Set<String> = emptySet(),
 )
 
+const val DEFAULT_OPEN_ANYWAY_UNLOCK_MINUTES = 60
+const val MIN_OPEN_ANYWAY_UNLOCK_MINUTES = 15
+const val MAX_OPEN_ANYWAY_UNLOCK_MINUTES = 240
+
+val OpenAnywayUnlockMinuteOptions = listOf(15, 30, 60, 120)
+
 enum class AppThemeMode {
     LIGHT,
     DARK,
@@ -39,6 +45,8 @@ data class AppSettings(
     val meditationDurationMinutes: Int = DEFAULT_MEDITATION_MINUTES,
     val contentPriority: ContentPriority = ContentPriority.BALANCED,
     val priorityContentIds: Set<String> = emptySet(),
+    val reactivatedCompletedContentIds: Set<String> = emptySet(),
+    val openAnywayUnlockMinutes: Int = DEFAULT_OPEN_ANYWAY_UNLOCK_MINUTES,
 )
 
 data class OnboardingSelection(

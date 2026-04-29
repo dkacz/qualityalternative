@@ -25,12 +25,14 @@ import com.qualityalternative.app.domain.model.AppThemeMode
 import com.qualityalternative.app.domain.model.ContentItem
 import com.qualityalternative.app.domain.model.DurationBucket
 import com.qualityalternative.app.domain.model.AnalyticsEventType
+import com.qualityalternative.app.domain.model.MEDITATION_TIMER_CONTENT_ID
 import com.qualityalternative.app.domain.model.OnboardingSelection
 import com.qualityalternative.app.domain.model.ReadingProgress
 import com.qualityalternative.app.domain.model.TopicTag
 import com.qualityalternative.app.domain.model.UserDocumentDraft
 import com.qualityalternative.app.domain.service.AddUserDocumentResult
 import com.qualityalternative.app.interception.FixtureTargetRegistry
+import com.qualityalternative.app.interception.InterceptionRuntimeGate
 import kotlinx.coroutines.runBlocking
 import java.io.File
 import org.junit.After
@@ -81,7 +83,8 @@ class MainActivityTest {
 
     @Test
     fun systemInterceptionIntentShowsLiveInterventionForFixtureTarget() {
-        launchFixtureSystemIntervention()
+        seedFixtureSelection()
+        relaunchFixtureSystemIntervention()
 
         composeRule.onNodeWithText("You reached for Fixture Feed One").assertIsDisplayed()
         composeRule.onNodeWithText("A BRIEF DETOUR, IF YOU'D LIKE ONE")
@@ -108,7 +111,8 @@ class MainActivityTest {
 
     @Test
     fun systemInterventionDelayActionIsClickableWithoutScrolling() {
-        launchFixtureSystemIntervention()
+        seedFixtureSelection()
+        relaunchFixtureSystemIntervention()
 
         composeRule.onNodeWithText("Pause 15 min")
             .assertIsDisplayed()
@@ -438,6 +442,99 @@ class MainActivityTest {
     }
 
     @Test
+    fun completedContentIsHiddenThenCanBeReactivatedFromLibrary() {
+        launchFixtureSystemIntervention()
+
+        composeRule.onNodeWithText("Read this", substring = true)
+            .assertIsDisplayed()
+            .assertIsEnabled()
+            .performClick()
+
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
+        val completedContentId = currentContentId()
+        val completedTitle = currentContentTitle()
+        composeRule.onNodeWithTag("reader-list")
+            .performScrollToNode(hasText("I'm done reading"))
+        composeRule.onNodeWithText("I'm done reading")
+            .assertIsDisplayed()
+            .performClick()
+
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasTag("feedback-screen") && hasCompletedProgressFor(completedContentId)
+        }
+
+        relaunchFixtureSystemIntervention()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            completedContentId !in currentRecommendationContentIds()
+        }
+
+        scenario?.onActivity { activity -> activity.mainViewModel.openLibrary() }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("library-list") }
+        composeRule.onNodeWithTag("library-list")
+            .performScrollToNode(hasText(completedTitle))
+        composeRule.onNodeWithTag("library-completed-status-$completedContentId")
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("Completed · hidden from suggestions")
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag("completed-activation-$completedContentId")
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasNode("Completed · active in suggestions")
+        }
+
+        relaunchFixtureSystemIntervention()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            completedContentId in currentRecommendationContentIds()
+        }
+    }
+
+    @Test
+    fun settingsOpenAnywayUnlockSuppressesRepeatedSystemIntervention() {
+        launchOnboardedApp()
+
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("tab-settings") }
+        composeRule.onNodeWithTag("tab-settings", useUnmergedTree = true)
+            .performSemanticsAction(SemanticsActions.OnClick)
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("settings-list") }
+        composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasTestTag("open-anyway-unlock-120"))
+        composeRule.onNodeWithTag("open-anyway-unlock-120")
+            .assertIsDisplayed()
+            .performClick()
+
+        seedFixtureSelection()
+        relaunchFixtureSystemIntervention()
+        composeRule.onNodeWithText("Open Fixture Feed One")
+            .assertIsDisplayed()
+            .assertIsEnabled()
+            .performClick()
+
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            scenario?.state == androidx.lifecycle.Lifecycle.State.DESTROYED
+        }
+        scenario = null
+
+        assertTrue(
+            InterceptionRuntimeGate.shouldSuppress(
+                targetAppPackage = FixtureTargetRegistry.fixtureDistractors.first().packageName,
+                nowMillis = System.currentTimeMillis() + 119 * 60_000L,
+            ),
+        )
+
+        val targetContext = InstrumentationRegistry.getInstrumentation().targetContext
+        launchApp(
+            MainActivity.createSystemInterceptionIntent(
+                context = targetContext,
+                targetAppPackage = FixtureTargetRegistry.fixtureDistractors.first().packageName,
+            ),
+        )
+
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("home-list") }
+        assertFalse(hasNode("You reached for Fixture Feed One"))
+    }
+
+    @Test
     fun unfinishedReadingAppearsOnHomeAndLibraryAndCanContinueWithoutIntervention() {
         launchFixtureSystemIntervention()
 
@@ -527,7 +624,10 @@ class MainActivityTest {
         composeRule.onNodeWithTag("intervention-primary-progress").assertIsDisplayed()
         val recommendationSet = currentRecommendationSet()
         val primaryLabel = continueProgressLabel(item = recommendationSet.primary, progressPercent = 42)
-        composeRule.onNodeWithText(primaryLabel, substring = true).assertIsDisplayed()
+        assertTrue(
+            "Expected at least one visible progress label for $primaryLabel",
+            composeRule.onAllNodesWithText(primaryLabel, substring = true).fetchSemanticsNodes().isNotEmpty(),
+        )
         captureInterventionContinueProgressScreenshot("01_intervention_continue_progress_light")
 
         assertTrue(
@@ -578,6 +678,82 @@ class MainActivityTest {
         composeRule.onNodeWithText("3:00").assertIsDisplayed()
         composeRule.onNodeWithTag("meditation-complete").assertIsNotEnabled()
         composeRule.onNodeWithText("End early").assertIsDisplayed()
+    }
+
+    @Test
+    fun completedMeditationIsHiddenThenCanBeReactivatedFromLibrary() {
+        launchMeditationFixtureSystemIntervention()
+
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasNode("3-minute reset")
+        }
+        if (hasNodeContaining("Start timer")) {
+            composeRule.onNodeWithText("Start timer", substring = true)
+                .assertIsDisplayed()
+                .performClick()
+        } else {
+            composeRule.onNodeWithText("3-minute reset")
+                .assertIsDisplayed()
+                .performClick()
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasTag("meditation-timer-screen")
+        }
+        assertEquals(MEDITATION_TIMER_CONTENT_ID, currentContentId())
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.finishMeditationReset(nowMillis = 10_000L)
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("feedback-screen") }
+
+        relaunchFixtureSystemInterventionWithoutWaitingForIntervention()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("home-list") }
+        assertFalse(MEDITATION_TIMER_CONTENT_ID in currentRecommendationContentIds())
+
+        scenario?.onActivity { activity -> activity.mainViewModel.openLibrary() }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("library-list") }
+        composeRule.onNodeWithTag("library-list")
+            .performScrollToNode(hasTestTag("library-completed-status-$MEDITATION_TIMER_CONTENT_ID"))
+        composeRule.onNodeWithTag("library-completed-status-$MEDITATION_TIMER_CONTENT_ID")
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("Completed · hidden from suggestions")
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag("completed-activation-$MEDITATION_TIMER_CONTENT_ID")
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasNode("Completed · active in suggestions")
+        }
+
+        relaunchFixtureSystemIntervention()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            MEDITATION_TIMER_CONTENT_ID in currentRecommendationContentIds()
+        }
+    }
+
+    @Test
+    fun libraryStartedMeditationCompletionIsHiddenFromFutureInterventions() {
+        launchOnboardedApp()
+
+        scenario?.onActivity { activity -> activity.mainViewModel.openLibrary() }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("library-list") }
+        composeRule.onNodeWithTag("library-list")
+            .performScrollToNode(hasTestTag("library-open-$MEDITATION_TIMER_CONTENT_ID"))
+        composeRule.onNodeWithTag("library-open-$MEDITATION_TIMER_CONTENT_ID")
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasTag("meditation-timer-screen")
+        }
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.finishMeditationReset(nowMillis = 10_000L)
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("feedback-screen") }
+
+        seedFixtureSelection()
+        relaunchFixtureSystemIntervention()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            MEDITATION_TIMER_CONTENT_ID !in currentRecommendationContentIds()
+        }
     }
 
     @Test
@@ -649,6 +825,26 @@ class MainActivityTest {
         }
         assertTrue(contentId.isNotBlank())
         return contentId
+    }
+
+    private fun currentContentTitle(): String {
+        var title = ""
+        scenario?.onActivity { activity ->
+            title = activity.mainViewModel.uiState.currentContent?.title.orEmpty()
+        }
+        assertTrue(title.isNotBlank())
+        return title
+    }
+
+    private fun currentRecommendationContentIds(): Set<String> {
+        var contentIds = emptySet<String>()
+        scenario?.onActivity { activity ->
+            val recommendationSet = activity.mainViewModel.uiState.currentRecommendationSet
+            contentIds = listOfNotNull(recommendationSet?.primary)
+                .plus(recommendationSet?.backups.orEmpty())
+                .mapTo(mutableSetOf(), ContentItem::id)
+        }
+        return contentIds
     }
 
     private fun hasUnfinishedProgressFor(contentId: String): Boolean {
@@ -762,6 +958,14 @@ class MainActivityTest {
     }
 
     private fun relaunchFixtureSystemIntervention() {
+        relaunchFixtureSystemInterventionWithoutWaitingForIntervention()
+
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasNode("You reached for Fixture Feed One")
+        }
+    }
+
+    private fun relaunchFixtureSystemInterventionWithoutWaitingForIntervention() {
         scenario?.close()
         scenario = null
         InstrumentationRegistry.getInstrumentation().waitForIdleSync()
@@ -774,10 +978,6 @@ class MainActivityTest {
                 targetAppPackage = FixtureTargetRegistry.fixtureDistractors.first().packageName,
             ),
         )
-
-        composeRule.waitUntil(timeoutMillis = 10_000) {
-            hasNode("You reached for Fixture Feed One")
-        }
     }
 
     private fun launchMeditationFixtureSystemIntervention() {

@@ -23,11 +23,13 @@ import com.qualityalternative.app.domain.model.ContentItem
 import com.qualityalternative.app.domain.model.ContentPriority
 import com.qualityalternative.app.domain.model.ContentSourceType
 import com.qualityalternative.app.domain.model.DEFAULT_MEDITATION_MINUTES
+import com.qualityalternative.app.domain.model.DEFAULT_OPEN_ANYWAY_UNLOCK_MINUTES
 import com.qualityalternative.app.domain.model.DelayWindow
 import com.qualityalternative.app.domain.model.DistractingApp
 import com.qualityalternative.app.domain.model.DurationBucket
 import com.qualityalternative.app.domain.model.EditorialPack
-import com.qualityalternative.app.domain.model.MEDITATION_TIMER_CONTENT_ID
+import com.qualityalternative.app.domain.model.MAX_OPEN_ANYWAY_UNLOCK_MINUTES
+import com.qualityalternative.app.domain.model.MIN_OPEN_ANYWAY_UNLOCK_MINUTES
 import com.qualityalternative.app.domain.model.OnboardingSelection
 import com.qualityalternative.app.domain.model.PermissionReadiness
 import com.qualityalternative.app.domain.model.PermissionStatus
@@ -109,6 +111,8 @@ data class MainUiState(
     val meditationDurationMinutes: Int = DEFAULT_MEDITATION_MINUTES,
     val contentPriority: ContentPriority = ContentPriority.BALANCED,
     val priorityContentIds: Set<String> = emptySet(),
+    val reactivatedCompletedContentIds: Set<String> = emptySet(),
+    val openAnywayUnlockMinutes: Int = DEFAULT_OPEN_ANYWAY_UNLOCK_MINUTES,
     val isManagingLibrary: Boolean = false,
     val selectedLibraryContentIds: Set<String> = emptySet(),
     val latestMessage: String? = null,
@@ -498,6 +502,59 @@ class MainViewModel(
                     ),
                 ),
             )
+        }
+    }
+
+    fun toggleCompletedContentActivation(item: ContentItem) {
+        if (item.id !in uiState.completedContentIds) {
+            uiState = uiState.copy(latestMessage = "${item.title} is not completed yet.")
+            return
+        }
+        val activeIds = uiState.reactivatedCompletedContentIds.toMutableSet()
+        val isReactivated = if (activeIds.add(item.id)) {
+            true
+        } else {
+            activeIds.remove(item.id)
+            false
+        }
+        val updatedIds = activeIds.toSet()
+        val activeDelaySuggestion = activeDelaySuggestionFor(
+            delayWindow = uiState.activeDelayWindow,
+            excludedContentIds = uiState.completedContentIds - updatedIds,
+        )
+        uiState = uiState.copy(
+            reactivatedCompletedContentIds = updatedIds,
+            activeDelaySuggestion = activeDelaySuggestion,
+            latestMessage = if (isReactivated) {
+                "${item.title} can appear in suggestions again."
+            } else {
+                "${item.title} is hidden from suggestions again."
+            },
+        )
+        viewModelScope.launch {
+            settingsRepository.saveReactivatedCompletedContentIds(updatedIds)
+            recordEventDurably(
+                AnalyticsEvent(
+                    type = AnalyticsEventType.COMPLETED_CONTENT_ACTIVATION_TOGGLED,
+                    timestampMillis = nowProvider(),
+                    contentId = item.id,
+                    metadata = item.analyticsMetadata() + mapOf(
+                        "reactivated" to isReactivated.toString(),
+                        "reactivatedCompletedContentCount" to updatedIds.size.toString(),
+                    ),
+                ),
+            )
+        }
+    }
+
+    fun setOpenAnywayUnlockMinutes(minutes: Int) {
+        val safeMinutes = minutes.coerceIn(MIN_OPEN_ANYWAY_UNLOCK_MINUTES, MAX_OPEN_ANYWAY_UNLOCK_MINUTES)
+        uiState = uiState.copy(
+            openAnywayUnlockMinutes = safeMinutes,
+            latestMessage = null,
+        )
+        viewModelScope.launch {
+            settingsRepository.saveOpenAnywayUnlockMinutes(safeMinutes)
         }
     }
 
@@ -1062,6 +1119,24 @@ class MainViewModel(
                 shownAtMillis = processingNowMillis,
             )
 
+            if (
+                origin == InterventionOrigin.SYSTEM &&
+                InterceptionRuntimeGate.shouldSuppress(targetApp.packageName, processingNowMillis)
+            ) {
+                uiState = uiState.copy(
+                    selectedTargetApp = targetApp,
+                    currentInterventionId = null,
+                    currentInterventionShownAtMillis = null,
+                    currentRecommendationSet = null,
+                    activeDelayWindow = null,
+                    activeDelaySuggestion = null,
+                    currentInterventionOrigin = null,
+                    latestMessage = "${targetApp.displayName} is still unlocked.",
+                    screen = MainScreen.Home,
+                )
+                return@launch
+            }
+
             val delayInspection = delayGate.inspectDelay(targetApp = targetApp, nowMillis = processingNowMillis)
             if (delayInspection.activeWindow != null) {
                 recordDelayReturnDuringActiveWindow(targetApp = targetApp, nowMillis = processingNowMillis)
@@ -1115,7 +1190,7 @@ class MainViewModel(
                 targetApp = targetApp,
                 preferences = preferences,
                 inventory = filteredInventory,
-                primaryExcludedIds = primaryExcludedIdsForRecommendation(),
+                excludedContentIds = excludedContentIdsForRecommendation(),
                 signals = signals,
                 nowMillis = processingNowMillis,
             )
@@ -1294,7 +1369,7 @@ class MainViewModel(
                 currentRecommendationSet = null,
                 currentInterventionOrigin = null,
                 activeDelayWindow = window,
-                activeDelaySuggestion = recommendationSet.shortestDelaySuggestion(),
+                activeDelaySuggestion = activeDelaySuggestionFor(window),
                 latestMessage = "${targetApp.displayName} paused for 15 minutes.",
             )
         }
@@ -1375,8 +1450,11 @@ class MainViewModel(
     fun openAnyway(): Boolean {
         val targetApp = uiState.selectedTargetApp ?: return false
         val recommendationSet = uiState.currentRecommendationSet
-        val nowMillis = System.currentTimeMillis()
+        val nowMillis = nowProvider()
         val shouldExitToTarget = uiState.currentInterventionOrigin == InterventionOrigin.SYSTEM
+        val unlockMinutes = uiState.openAnywayUnlockMinutes
+            .coerceIn(MIN_OPEN_ANYWAY_UNLOCK_MINUTES, MAX_OPEN_ANYWAY_UNLOCK_MINUTES)
+        val unlockUntilMillis = nowMillis + unlockMinutes * 60_000L
         recordEvent(
             AnalyticsEvent(
                 type = AnalyticsEventType.OPEN_ANYWAY_SELECTED,
@@ -1385,12 +1463,16 @@ class MainViewModel(
                 targetAppPackage = targetApp.packageName,
                 primaryContentId = recommendationSet?.primary?.id,
                 backupContentIds = recommendationSet?.backups.orEmpty().map(ContentItem::id),
+                metadata = mapOf(
+                    "openAnywayUnlockMinutes" to unlockMinutes.toString(),
+                    "openAnywayUnlockUntilMillis" to unlockUntilMillis.toString(),
+                ),
             ),
         )
         if (shouldExitToTarget) {
             InterceptionRuntimeGate.suppressPackage(
                 targetAppPackage = targetApp.packageName,
-                untilMillis = nowMillis + OPEN_ANYWAY_SUPPRESSION_WINDOW_MILLIS,
+                untilMillis = unlockUntilMillis,
             )
         }
         uiState = uiState.copy(
@@ -1400,7 +1482,7 @@ class MainViewModel(
             currentRecommendationSet = null,
             currentInterventionOrigin = null,
             activeDelaySuggestion = null,
-            latestMessage = "Prototype override recorded for ${targetApp.displayName}.",
+            latestMessage = "${targetApp.displayName} unlocked for $unlockMinutes minutes.",
         )
         return shouldExitToTarget
     }
@@ -1455,6 +1537,7 @@ class MainViewModel(
             if (sessionId != null) {
                 historyRepository.markCompleted(sessionId = sessionId, completedAtMillis = nowMillis)
             }
+            deactivateCompletedContentOverride(contentId = content.id)
             recordEvent(
                 AnalyticsEvent(
                     type = AnalyticsEventType.READER_COMPLETED,
@@ -1479,22 +1562,25 @@ class MainViewModel(
         val content = uiState.currentContent ?: return
         val sessionId = uiState.currentSessionId
         viewModelScope.launch {
+            val completedProgress = completedProgressFor(content = content, completedAtMillis = nowMillis)
+            readingProgressRepository.saveProgress(completedProgress)
             if (sessionId != null) {
                 historyRepository.markCompleted(sessionId = sessionId, completedAtMillis = nowMillis)
-                recordEvent(
-                    AnalyticsEvent(
-                        type = AnalyticsEventType.MEDITATION_TIMER_COMPLETED,
-                        timestampMillis = nowMillis,
-                        interventionId = uiState.currentInterventionId,
-                        sessionId = sessionId,
-                        targetAppPackage = uiState.selectedTargetApp?.packageName,
-                        primaryContentId = uiState.currentRecommendationSet?.primary?.id,
-                        backupContentIds = uiState.currentRecommendationSet?.backups.orEmpty().map(ContentItem::id),
-                        contentId = content.id,
-                        metadata = sessionDurationMetadata(nowMillis) + content.analyticsMetadata(),
-                    ),
-                )
             }
+            deactivateCompletedContentOverride(contentId = content.id)
+            recordEvent(
+                AnalyticsEvent(
+                    type = AnalyticsEventType.MEDITATION_TIMER_COMPLETED,
+                    timestampMillis = nowMillis,
+                    interventionId = uiState.currentInterventionId,
+                    sessionId = sessionId,
+                    targetAppPackage = uiState.selectedTargetApp?.packageName,
+                    primaryContentId = uiState.currentRecommendationSet?.primary?.id,
+                    backupContentIds = uiState.currentRecommendationSet?.backups.orEmpty().map(ContentItem::id),
+                    contentId = content.id,
+                    metadata = sessionDurationMetadata(nowMillis) + content.analyticsMetadata() + completedProgress.analyticsMetadata(),
+                ),
+            )
             uiState = uiState.copy(screen = MainScreen.Feedback)
         }
     }
@@ -1633,6 +1719,8 @@ class MainViewModel(
             meditationDurationMinutes = settings.meditationDurationMinutes,
             contentPriority = settings.contentPriority,
             priorityContentIds = settings.priorityContentIds,
+            reactivatedCompletedContentIds = settings.reactivatedCompletedContentIds,
+            openAnywayUnlockMinutes = settings.openAnywayUnlockMinutes,
             onboardingSelection = settings.toOnboardingSelection(
                 supportedApps = supportedApps,
                 starterPacks = starterPacks,
@@ -2052,8 +2140,18 @@ class MainViewModel(
         return contentRepository.inventory() + meditationTimerContentItem(uiState.meditationDurationMinutes)
     }
 
-    private fun primaryExcludedIdsForRecommendation(): Set<String> {
-        return uiState.completedContentIds - MEDITATION_TIMER_CONTENT_ID
+    private fun excludedContentIdsForRecommendation(): Set<String> {
+        return uiState.completedContentIds -
+            uiState.reactivatedCompletedContentIds
+    }
+
+    private suspend fun deactivateCompletedContentOverride(contentId: String) {
+        if (contentId !in uiState.reactivatedCompletedContentIds) {
+            return
+        }
+        val updatedIds = uiState.reactivatedCompletedContentIds - contentId
+        uiState = uiState.copy(reactivatedCompletedContentIds = updatedIds)
+        settingsRepository.saveReactivatedCompletedContentIds(updatedIds)
     }
 
     private fun clearActiveSession(
@@ -2149,6 +2247,7 @@ class MainViewModel(
     private fun activeDelaySuggestionFor(
         delayWindow: DelayWindow?,
         nowMillis: Long = nowProvider(),
+        excludedContentIds: Set<String> = excludedContentIdsForRecommendation(),
     ): ContentItem? {
         delayWindow ?: return null
         if (!delayWindow.isActive(nowMillis)) {
@@ -2162,20 +2261,23 @@ class MainViewModel(
             .asSequence()
             .filter { item ->
                 item.id in candidateIds &&
+                    item.id !in excludedContentIds &&
                     item.availability != ContentAvailability.UNAVAILABLE
             }
             .minWithOrNull(compareBy<ContentItem> { it.durationMinutes }.thenBy { it.title })
-    }
-
-    private fun RecommendationSet.shortestDelaySuggestion(): ContentItem {
-        return (backups + primary).minWith(compareBy<ContentItem> { it.durationMinutes }.thenBy { it.title })
     }
 
     private fun recommendationSetForDelayWindow(
         delayWindow: DelayWindow,
         fallbackContent: ContentItem,
     ): RecommendationSet {
-        val candidatesById = fullReplacementInventory().associateBy(ContentItem::id)
+        val excludedContentIds = excludedContentIdsForRecommendation()
+        val candidatesById = fullReplacementInventory()
+            .filter { item ->
+                item.id !in excludedContentIds &&
+                    item.availability != ContentAvailability.UNAVAILABLE
+            }
+            .associateBy(ContentItem::id)
         val primary = delayWindow.primaryContentId
             ?.let(candidatesById::get)
             ?: fallbackContent
@@ -2208,7 +2310,14 @@ class MainViewModel(
     private fun updateCompletedContentIds() {
         val completedIds = historyCompletedContentIds + readingProgressCompletedContentIds
         if (uiState.completedContentIds != completedIds) {
-            uiState = uiState.copy(completedContentIds = completedIds)
+            val activeDelaySuggestion = activeDelaySuggestionFor(
+                delayWindow = uiState.activeDelayWindow,
+                excludedContentIds = completedIds - uiState.reactivatedCompletedContentIds,
+            )
+            uiState = uiState.copy(
+                completedContentIds = completedIds,
+                activeDelaySuggestion = activeDelaySuggestion,
+            )
         }
     }
 
@@ -2519,7 +2628,6 @@ private fun unavailablePermissionReadiness(): PermissionReadiness {
 }
 
 private const val ACTIVE_DELAY_REFRESH_INTERVAL_MILLIS = 1_000L
-private const val OPEN_ANYWAY_SUPPRESSION_WINDOW_MILLIS = 60_000L
 private const val INTERVENTION_DEGRADED_THRESHOLD_MILLIS = 2_000L
 private const val MIN_SELECTED_DISTRACTING_APPS = 3
 private const val PROGRESS_HISTORY_WINDOW_DAYS = 31

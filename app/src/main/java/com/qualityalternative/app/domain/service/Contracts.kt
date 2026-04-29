@@ -103,6 +103,8 @@ interface SettingsRepository {
     suspend fun saveMeditationDurationMinutes(minutes: Int)
     suspend fun saveContentPriority(priority: ContentPriority)
     suspend fun savePriorityContentIds(contentIds: Set<String>)
+    suspend fun saveReactivatedCompletedContentIds(contentIds: Set<String>)
+    suspend fun saveOpenAnywayUnlockMinutes(minutes: Int)
 }
 
 interface RecommendationEngine {
@@ -110,7 +112,7 @@ interface RecommendationEngine {
         targetApp: DistractingApp,
         preferences: UserPreferences,
         inventory: List<ContentItem>,
-        primaryExcludedIds: Set<String>,
+        excludedContentIds: Set<String>,
         signals: RecommendationSignals,
         nowMillis: Long = System.currentTimeMillis(),
     ): RecommendationSet?

@@ -14,6 +14,7 @@ import com.qualityalternative.app.domain.service.ReadingProgressRepository
 import com.qualityalternative.app.domain.service.SettingsRepository
 import com.qualityalternative.app.domain.service.UserDocumentRepository
 import com.qualityalternative.app.domain.service.UserLinkRepository
+import com.qualityalternative.app.interception.InterceptionRuntimeGate
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -68,6 +69,7 @@ class AppContainer(context: Context) {
         database.clearAllTables()
         (settingsRepository as PreferencesSettingsRepository).clearForTests()
         (delayGate as PreferencesDelayGate).clearForTests()
+        InterceptionRuntimeGate.clearAll()
     }
 
     fun closeForTests() {

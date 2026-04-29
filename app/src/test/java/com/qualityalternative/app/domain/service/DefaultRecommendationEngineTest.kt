@@ -42,7 +42,7 @@ class DefaultRecommendationEngineTest {
             targetApp = DistractingApp(packageName = "pkg", displayName = "Instagram"),
             preferences = preferences,
             inventory = inventory,
-            primaryExcludedIds = setOf("d"),
+            excludedContentIds = setOf("d"),
             signals = RecommendationSignals(timeOfDay = TimeOfDayBucket.MIDDAY),
             nowMillis = 0L,
         )
@@ -72,7 +72,7 @@ class DefaultRecommendationEngineTest {
             targetApp = DistractingApp(packageName = "pkg", displayName = "Instagram"),
             preferences = preferences,
             inventory = inventory,
-            primaryExcludedIds = emptySet(),
+            excludedContentIds = emptySet(),
             signals = RecommendationSignals(
                 skippedTopics = setOf(TopicTag.SCIENCE),
                 successfulPackIds = setOf("history"),
@@ -85,7 +85,7 @@ class DefaultRecommendationEngineTest {
     }
 
     @Test
-    fun generate_excludesCompletedItemsFromPrimaryButCanReuseThemAsBackups() {
+    fun generate_excludesCompletedItemsFromPrimaryAndBackups() {
         val preferences = UserPreferences(
             selectedApps = listOf(DistractingApp(packageName = "pkg", displayName = "Instagram")),
             preferredTopics = setOf(TopicTag.PHILOSOPHY),
@@ -103,13 +103,13 @@ class DefaultRecommendationEngineTest {
             targetApp = DistractingApp(packageName = "pkg", displayName = "Instagram"),
             preferences = preferences,
             inventory = inventory,
-            primaryExcludedIds = setOf("primary-done", "done-backup"),
+            excludedContentIds = setOf("primary-done", "done-backup"),
             signals = RecommendationSignals(timeOfDay = TimeOfDayBucket.MIDDAY),
             nowMillis = 0L,
         )
 
         assertEquals("fresh", result?.primary?.id)
-        assertTrue(result?.backups?.any { it.id == "done-backup" } == true)
+        assertTrue(result?.backups.orEmpty().none { it.id == "done-backup" })
     }
 
     @Test
@@ -130,7 +130,7 @@ class DefaultRecommendationEngineTest {
             targetApp = DistractingApp(packageName = "pkg", displayName = "Instagram"),
             preferences = preferences,
             inventory = inventory,
-            primaryExcludedIds = setOf("done-1", "done-2"),
+            excludedContentIds = setOf("done-1", "done-2"),
             signals = RecommendationSignals(timeOfDay = TimeOfDayBucket.MIDDAY),
             nowMillis = 0L,
         )
@@ -157,7 +157,7 @@ class DefaultRecommendationEngineTest {
             targetApp = DistractingApp(packageName = "pkg", displayName = "Instagram"),
             preferences = preferences,
             inventory = inventory,
-            primaryExcludedIds = emptySet(),
+            excludedContentIds = emptySet(),
             signals = RecommendationSignals(timeOfDay = TimeOfDayBucket.MORNING),
             nowMillis = 0L,
         )
@@ -195,7 +195,7 @@ class DefaultRecommendationEngineTest {
             targetApp = DistractingApp(packageName = "pkg", displayName = "Instagram"),
             preferences = preferences,
             inventory = inventory,
-            primaryExcludedIds = emptySet(),
+            excludedContentIds = emptySet(),
             signals = RecommendationSignals(timeOfDay = TimeOfDayBucket.MIDDAY),
             nowMillis = 0L,
         )
@@ -231,7 +231,7 @@ class DefaultRecommendationEngineTest {
             targetApp = DistractingApp(packageName = "pkg", displayName = "Instagram"),
             preferences = preferences,
             inventory = inventory,
-            primaryExcludedIds = emptySet(),
+            excludedContentIds = emptySet(),
             signals = RecommendationSignals(timeOfDay = TimeOfDayBucket.MIDDAY),
             nowMillis = 0L,
         )
@@ -278,7 +278,7 @@ class DefaultRecommendationEngineTest {
             targetApp = DistractingApp(packageName = "pkg", displayName = "Instagram"),
             preferences = preferences,
             inventory = inventory,
-            primaryExcludedIds = emptySet(),
+            excludedContentIds = emptySet(),
             signals = RecommendationSignals(timeOfDay = TimeOfDayBucket.MIDDAY),
             nowMillis = 0L,
         )
@@ -318,7 +318,7 @@ class DefaultRecommendationEngineTest {
             targetApp = DistractingApp(packageName = "pkg", displayName = "Instagram"),
             preferences = preferences,
             inventory = inventory,
-            primaryExcludedIds = setOf("completed-link"),
+            excludedContentIds = setOf("completed-link"),
             signals = RecommendationSignals(timeOfDay = TimeOfDayBucket.MIDDAY),
             nowMillis = 0L,
         )
@@ -383,7 +383,7 @@ class DefaultRecommendationEngineTest {
             targetApp = DistractingApp(packageName = "pkg", displayName = "Instagram"),
             preferences = preferences,
             inventory = renderableItems + linkOnlyItems + userLinks,
-            primaryExcludedIds = emptySet(),
+            excludedContentIds = emptySet(),
             signals = RecommendationSignals(timeOfDay = TimeOfDayBucket.MIDDAY),
             nowMillis = 0L,
         )
@@ -427,7 +427,7 @@ class DefaultRecommendationEngineTest {
             targetApp = DistractingApp(packageName = "pkg", displayName = "Instagram"),
             preferences = preferences,
             inventory = inventory,
-            primaryExcludedIds = emptySet(),
+            excludedContentIds = emptySet(),
             signals = RecommendationSignals(timeOfDay = TimeOfDayBucket.MIDDAY),
             nowMillis = 0L,
         )
@@ -455,7 +455,7 @@ class DefaultRecommendationEngineTest {
             targetApp = DistractingApp(packageName = "pkg", displayName = "Instagram"),
             preferences = preferences,
             inventory = inventory,
-            primaryExcludedIds = emptySet(),
+            excludedContentIds = emptySet(),
             signals = RecommendationSignals(timeOfDay = TimeOfDayBucket.MIDDAY),
             nowMillis = 0L,
         )
@@ -485,7 +485,7 @@ class DefaultRecommendationEngineTest {
             targetApp = DistractingApp(packageName = "pkg", displayName = "Instagram"),
             preferences = preferences,
             inventory = inventory,
-            primaryExcludedIds = emptySet(),
+            excludedContentIds = emptySet(),
             signals = RecommendationSignals(timeOfDay = TimeOfDayBucket.MIDDAY),
             nowMillis = 0L,
         )
@@ -496,7 +496,7 @@ class DefaultRecommendationEngineTest {
             targetApp = DistractingApp(packageName = "pkg", displayName = "Instagram"),
             preferences = preferences,
             inventory = inventory,
-            primaryExcludedIds = setOf("unfinished"),
+            excludedContentIds = setOf("unfinished"),
             signals = RecommendationSignals(timeOfDay = TimeOfDayBucket.MIDDAY),
             nowMillis = 0L,
         )
@@ -529,7 +529,7 @@ class DefaultRecommendationEngineTest {
             targetApp = DistractingApp(packageName = "pkg", displayName = "Instagram"),
             preferences = preferences,
             inventory = inventory,
-            primaryExcludedIds = emptySet(),
+            excludedContentIds = emptySet(),
             signals = RecommendationSignals(timeOfDay = TimeOfDayBucket.MIDDAY),
             nowMillis = 0L,
         )

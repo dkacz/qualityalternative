@@ -233,7 +233,7 @@ The system must normalize each piece of replacement content into a small, rankab
   - format
   - availability status
 - Each content item can be marked as accepted, skipped, completed, or opened anyway after recommendation.
-- The system can exclude previously completed items from primary recommendation slots.
+- The system excludes previously completed items from recommendation slots unless the user manually reactivates that item from the content library, including built-in utility content such as the meditation reset.
 
 ### FR5. Recommendation Selection
 
@@ -280,6 +280,7 @@ The intervention must provide three clear actions that map to the MVP value prop
 - User can choose Pause 15 min, which creates a 15-minute delay window.
 - User can choose Open anyway.
 - No additional mandatory step is inserted after the user chooses Open anyway.
+- After Open anyway from a system intervention, repeated opens of the same distracting app are quiet for the user-configured unlock window.
 
 ### FR8. Replacement Session Experience
 
@@ -306,6 +307,7 @@ The system must allow the user to consciously postpone access to the distracting
 - During the delay window, repeated attempts to open the same app do not create a full repeated intervention by default.
 - The delay expires automatically after 15 minutes.
 - The app logs whether the user returned after the delay window ended.
+- Settings include a configurable Open anyway unlock duration so the user can choose a longer quiet window without changing the 15-minute pause behavior.
 
 ### FR10. Feedback Loop
 

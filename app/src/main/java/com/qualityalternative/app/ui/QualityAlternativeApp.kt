@@ -109,6 +109,7 @@ import com.qualityalternative.app.domain.model.DistractingApp
 import com.qualityalternative.app.domain.model.DurationBucket
 import com.qualityalternative.app.domain.model.EditorialPack
 import com.qualityalternative.app.domain.model.OnboardingSelection
+import com.qualityalternative.app.domain.model.OpenAnywayUnlockMinuteOptions
 import com.qualityalternative.app.domain.model.PermissionReadiness
 import com.qualityalternative.app.domain.model.PermissionStatus
 import com.qualityalternative.app.domain.model.ReadingProgress
@@ -116,6 +117,7 @@ import com.qualityalternative.app.domain.model.ReplacementHistoryEntry
 import com.qualityalternative.app.domain.model.TopicTag
 import com.qualityalternative.app.domain.model.UserDocumentValidationError
 import com.qualityalternative.app.domain.model.UserLinkValidationError
+import com.qualityalternative.app.domain.model.meditationTimerContentItem
 import com.qualityalternative.app.domain.model.usesExternalHandoff
 import com.qualityalternative.app.domain.model.usesMeditationTimer
 import com.qualityalternative.app.domain.service.RecommendationExplainer
@@ -306,6 +308,7 @@ private fun MainRoute(
                 onImportDocument = onImportDocument,
                 onOpen = { content -> viewModel.openLibraryItem(content, origin = "library") },
                 onTogglePriorityContent = viewModel::togglePriorityContent,
+                onToggleCompletedActivation = viewModel::toggleCompletedContentActivation,
                 onToggleManageMode = viewModel::toggleLibraryManageMode,
                 onToggleSelection = viewModel::toggleLibraryContentSelection,
                 onDeleteSelected = {
@@ -337,6 +340,7 @@ private fun MainRoute(
                 onSelectDuration = viewModel::setPreferredDuration,
                 onSelectMeditationDuration = viewModel::setMeditationDurationMinutes,
                 onSelectContentPriority = viewModel::setContentPriority,
+                onSelectOpenAnywayUnlock = viewModel::setOpenAnywayUnlockMinutes,
                 onSelectTheme = viewModel::selectThemeMode,
                 onRefreshReadiness = viewModel::refreshPermissionReadiness,
             )
@@ -985,6 +989,7 @@ private fun LibraryTab(
     onImportDocument: () -> Unit,
     onOpen: (ContentItem) -> Unit,
     onTogglePriorityContent: (ContentItem) -> Unit,
+    onToggleCompletedActivation: (ContentItem) -> Unit,
     onToggleManageMode: () -> Unit,
     onToggleSelection: (ContentItem) -> Unit,
     onDeleteSelected: () -> Unit,
@@ -993,7 +998,8 @@ private fun LibraryTab(
     val editorial = state.starterPacks
         .filter { it.id in state.preferences?.selectedPackIds.orEmpty() }
         .flatMap { it.items }
-    val allItems = editorial + state.userLinks + state.userDocuments
+    val meditation = meditationTimerContentItem(state.meditationDurationMinutes)
+    val allItems = listOf(meditation) + editorial + state.userLinks + state.userDocuments
     val progressById = state.readingProgress.associateBy(ReadingProgress::contentId)
     val unfinished = allItems.unfinishedSortedByProgress(state.readingProgress)
     val priority = allItems
@@ -1012,7 +1018,7 @@ private fun LibraryTab(
         modifier = Modifier
             .fillMaxSize()
             .testTag("library-list"),
-        contentPadding = PaddingValues(start = 24.dp, top = 16.dp, end = 24.dp, bottom = 24.dp),
+        contentPadding = PaddingValues(start = 24.dp, top = 16.dp, end = 24.dp, bottom = 128.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         item {
@@ -1121,10 +1127,13 @@ private fun LibraryTab(
                     item = item,
                     progress = progressById[item.id]?.takeIf(ReadingProgress::isUnfinished),
                     prioritized = item.id in state.priorityContentIds,
+                    completed = item.id in state.completedContentIds,
+                    reactivated = item.id in state.reactivatedCompletedContentIds,
                     isManaging = state.isManagingLibrary,
                     selected = item.id in state.selectedLibraryContentIds,
                     onOpen = { onOpen(item) },
                     onTogglePriority = { onTogglePriorityContent(item) },
+                    onToggleCompletedActivation = { onToggleCompletedActivation(item) },
                     onToggleSelection = { onToggleSelection(item) },
                 )
             }
@@ -2235,6 +2244,7 @@ private fun SettingsTab(
     onSelectDuration: (DurationBucket) -> Unit,
     onSelectMeditationDuration: (Int) -> Unit,
     onSelectContentPriority: (ContentPriority) -> Unit,
+    onSelectOpenAnywayUnlock: (Int) -> Unit,
     onSelectTheme: (AppThemeMode) -> Unit,
     onRefreshReadiness: () -> Unit,
 ) {
@@ -2361,6 +2371,30 @@ private fun SettingsTab(
                             onClick = { onSelectDuration(bucket) },
                             modifier = Modifier.weight(1f),
                             centered = true,
+                        )
+                    }
+                }
+            }
+        }
+        item {
+            SectionLabel("Open anyway unlock")
+            QaCard {
+                BodyText(
+                    text = "After opening the original app, repeated opens stay quiet for the selected time.",
+                    color = colors.mutedText,
+                    modifier = Modifier.padding(bottom = 12.dp),
+                )
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    OpenAnywayUnlockMinuteOptions.forEach { minutes ->
+                        QaChip(
+                            text = if (minutes >= 60) "${minutes / 60} hr" else "$minutes min",
+                            selected = state.openAnywayUnlockMinutes == minutes,
+                            onClick = { onSelectOpenAnywayUnlock(minutes) },
+                            modifier = Modifier.testTag("open-anyway-unlock-$minutes"),
+                            centered = true,
+                            minHeight = 34.dp,
+                            horizontalPadding = 12.dp,
+                            verticalPadding = 7.dp,
                         )
                     }
                 }
@@ -2734,10 +2768,13 @@ private fun LibraryItemCard(
     item: ContentItem,
     progress: ReadingProgress?,
     prioritized: Boolean,
+    completed: Boolean,
+    reactivated: Boolean,
     isManaging: Boolean,
     selected: Boolean,
     onOpen: () -> Unit,
     onTogglePriority: () -> Unit,
+    onToggleCompletedActivation: () -> Unit,
     onToggleSelection: () -> Unit,
 ) {
     val canDelete = item.isUserContent()
@@ -2771,9 +2808,31 @@ private fun LibraryItemCard(
                 )
             }
         }
+        if (completed) {
+            BodyText(
+                text = if (reactivated) {
+                    "Completed · active in suggestions"
+                } else {
+                    "Completed · hidden from suggestions"
+                },
+                color = if (reactivated) {
+                    QualityAlternativeThemeTokens.colors.success
+                } else {
+                    QualityAlternativeThemeTokens.colors.mutedText
+                },
+                fontSize = 12.5.sp,
+                modifier = Modifier
+                    .padding(top = 10.dp)
+                    .testTag("library-completed-status-${item.id}"),
+            )
+        }
         if (isManaging && !canDelete) {
             BodyText(
-                text = "Starter pack · not deletable",
+                text = if (item.usesMeditationTimer()) {
+                    "Built-in reset · not deletable"
+                } else {
+                    "Starter pack · not deletable"
+                },
                 color = QualityAlternativeThemeTokens.colors.mutedText,
                 fontSize = 12.5.sp,
                 modifier = Modifier
@@ -2781,11 +2840,12 @@ private fun LibraryItemCard(
                     .testTag("library-editorial-note-${item.id}"),
             )
         }
-        Row(
+        FlowRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 14.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             if (isManaging) {
                 if (canDelete) {
@@ -2795,7 +2855,6 @@ private fun LibraryItemCard(
                         accentSelected = true,
                         onClick = onToggleSelection,
                         modifier = Modifier
-                            .weight(1f)
                             .testTag("library-select-${item.id}"),
                         centered = true,
                         minHeight = 34.dp,
@@ -2806,19 +2865,29 @@ private fun LibraryItemCard(
                     ReadOnlyPill(
                         text = "Locked",
                         modifier = Modifier
-                            .weight(1f)
                             .testTag("library-editorial-locked-${item.id}"),
                     )
                 }
+            }
+            if (completed) {
+                QaChip(
+                    text = if (reactivated) "Deactivate" else "Reactivate",
+                    selected = reactivated,
+                    accentSelected = true,
+                    onClick = onToggleCompletedActivation,
+                    modifier = Modifier.testTag("completed-activation-${item.id}"),
+                    centered = true,
+                    minHeight = 34.dp,
+                    horizontalPadding = 10.dp,
+                    verticalPadding = 7.dp,
+                )
             }
             QaChip(
                 text = if (prioritized) "Priority" else "Prioritize",
                 selected = prioritized,
                 accentSelected = true,
                 onClick = onTogglePriority,
-                modifier = Modifier
-                    .weight(1f)
-                    .testTag("priority-content-${item.id}"),
+                modifier = Modifier.testTag("priority-content-${item.id}"),
                 centered = true,
                 minHeight = 34.dp,
                 horizontalPadding = 8.dp,
@@ -2828,9 +2897,7 @@ private fun LibraryItemCard(
                 text = if (progress != null) "Continue" else "Open",
                 selected = false,
                 onClick = onOpen,
-                modifier = Modifier
-                    .weight(1f)
-                    .testTag("library-open-${item.id}"),
+                modifier = Modifier.testTag("library-open-${item.id}"),
                 centered = true,
                 minHeight = 34.dp,
                 horizontalPadding = 8.dp,
