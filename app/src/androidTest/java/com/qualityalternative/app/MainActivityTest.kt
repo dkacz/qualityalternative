@@ -681,7 +681,7 @@ class MainActivityTest {
     }
 
     @Test
-    fun completedMeditationIsHiddenThenCanBeReactivatedFromLibrary() {
+    fun completedMeditationStaysAvailableAndOutOfLibrary() {
         launchMeditationFixtureSystemIntervention()
 
         composeRule.waitUntil(timeoutMillis = 10_000) {
@@ -705,55 +705,29 @@ class MainActivityTest {
         }
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("feedback-screen") }
 
-        relaunchFixtureSystemInterventionWithoutWaitingForIntervention()
-        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("home-list") }
-        assertFalse(MEDITATION_TIMER_CONTENT_ID in currentRecommendationContentIds())
-
-        scenario?.onActivity { activity -> activity.mainViewModel.openLibrary() }
-        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("library-list") }
-        composeRule.onNodeWithTag("library-list")
-            .performScrollToNode(hasTestTag("library-completed-status-$MEDITATION_TIMER_CONTENT_ID"))
-        composeRule.onNodeWithTag("library-completed-status-$MEDITATION_TIMER_CONTENT_ID")
-            .assertIsDisplayed()
-        composeRule.onNodeWithText("Completed · hidden from suggestions")
-            .assertIsDisplayed()
-        composeRule.onNodeWithTag("completed-activation-$MEDITATION_TIMER_CONTENT_ID")
-            .assertIsDisplayed()
-            .performClick()
-        composeRule.waitUntil(timeoutMillis = 10_000) {
-            hasNode("Completed · active in suggestions")
-        }
-
         relaunchFixtureSystemIntervention()
         composeRule.waitUntil(timeoutMillis = 10_000) {
             MEDITATION_TIMER_CONTENT_ID in currentRecommendationContentIds()
         }
+
+        scenario?.onActivity { activity -> activity.mainViewModel.openLibrary() }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("library-list") }
+        composeRule.onNodeWithTag("library-item-$MEDITATION_TIMER_CONTENT_ID")
+            .assertDoesNotExist()
+        composeRule.onNodeWithTag("completed-activation-$MEDITATION_TIMER_CONTENT_ID")
+            .assertDoesNotExist()
     }
 
     @Test
-    fun libraryStartedMeditationCompletionIsHiddenFromFutureInterventions() {
+    fun meditationDoesNotLiveInLibrary() {
         launchOnboardedApp()
 
         scenario?.onActivity { activity -> activity.mainViewModel.openLibrary() }
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("library-list") }
-        composeRule.onNodeWithTag("library-list")
-            .performScrollToNode(hasTestTag("library-open-$MEDITATION_TIMER_CONTENT_ID"))
+        composeRule.onNodeWithTag("library-item-$MEDITATION_TIMER_CONTENT_ID")
+            .assertDoesNotExist()
         composeRule.onNodeWithTag("library-open-$MEDITATION_TIMER_CONTENT_ID")
-            .assertIsDisplayed()
-            .performClick()
-        composeRule.waitUntil(timeoutMillis = 10_000) {
-            hasTag("meditation-timer-screen")
-        }
-        scenario?.onActivity { activity ->
-            activity.mainViewModel.finishMeditationReset(nowMillis = 10_000L)
-        }
-        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("feedback-screen") }
-
-        seedFixtureSelection()
-        relaunchFixtureSystemIntervention()
-        composeRule.waitUntil(timeoutMillis = 10_000) {
-            MEDITATION_TIMER_CONTENT_ID !in currentRecommendationContentIds()
-        }
+            .assertDoesNotExist()
     }
 
     @Test

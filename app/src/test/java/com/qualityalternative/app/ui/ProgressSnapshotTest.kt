@@ -4,6 +4,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import com.qualityalternative.app.domain.model.AnalyticsEvent
 import com.qualityalternative.app.domain.model.AnalyticsEventType
+import com.qualityalternative.app.domain.model.MEDITATION_TIMER_CONTENT_ID
 import com.qualityalternative.app.domain.model.RecommendationSource
 import com.qualityalternative.app.domain.model.ReplacementHistoryEntry
 import com.qualityalternative.app.domain.model.TopicTag
@@ -59,6 +60,30 @@ class ProgressSnapshotTest {
         assertEquals(1, snapshot.consciousOverrides)
         assertEquals(1, snapshot.completedReads)
         assertEquals(listOf("session-1", "session-2"), snapshot.recentReplacements.map { it.sessionId })
+    }
+
+    @Test
+    fun progressSnapshotDoesNotCountMeditationAsCompletedReadOrReadingStreak() {
+        val today = LocalDate.of(2026, 4, 21)
+        val entries = listOf(
+            replacementEntry(
+                sessionId = "meditation",
+                acceptedAtMillis = today.toMillis(),
+                completedAtMillis = today.toMillis() + 1_000L,
+                contentId = MEDITATION_TIMER_CONTENT_ID,
+            ),
+        )
+
+        val snapshot = progressSnapshot(
+            entries = entries,
+            events = emptyList(),
+            zoneId = ZoneOffset.UTC,
+            nowMillis = today.toMillis(),
+        )
+
+        assertEquals(0, snapshot.completedReads)
+        assertEquals(0, snapshot.currentStreakDays)
+        assertEquals(1, snapshot.alternativesChosen)
     }
 
     @Test
@@ -379,6 +404,7 @@ class ProgressSnapshotTest {
         acceptedAtMillis: Long,
         completedAtMillis: Long? = null,
         contentDurationMinutes: Int = 10,
+        contentId: String = "content-$sessionId",
     ): ReplacementHistoryEntry {
         return ReplacementHistoryEntry(
             sessionId = sessionId,
@@ -386,9 +412,9 @@ class ProgressSnapshotTest {
             targetAppPackage = "com.fixture",
             targetAppDisplayName = "Fixture Feed",
             interventionShownAtMillis = acceptedAtMillis - 100L,
-            primaryContentId = "content-$sessionId",
+            primaryContentId = contentId,
             backupContentIds = emptyList(),
-            contentId = "content-$sessionId",
+            contentId = contentId,
             contentTitle = "Replacement $sessionId",
             contentDescription = "A finite replacement.",
             contentDurationMinutes = contentDurationMinutes,

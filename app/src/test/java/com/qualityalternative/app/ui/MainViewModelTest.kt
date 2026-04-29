@@ -453,6 +453,7 @@ class MainViewModelTest {
     @OptIn(ExperimentalCoroutinesApi::class)
     fun acceptingMeditationRoutesToTimerAndCompletionRecordsMeditationEvent() = runTest {
         val analyticsTracker = InMemoryAnalyticsTracker()
+        val historyRepository = FakeHistoryRepository()
         val viewModel = createViewModel(
             recommendationEngine = FixedRecommendationEngine(
                 RecommendationSet(
@@ -463,6 +464,7 @@ class MainViewModelTest {
                 ),
             ),
             analyticsTracker = analyticsTracker,
+            historyRepository = historyRepository,
         )
 
         advanceUntilIdle()
@@ -486,6 +488,7 @@ class MainViewModelTest {
         assertEquals(MEDITATION_TIMER_CONTENT_ID, completedEvent.contentId)
         assertEquals("MEDITATION", completedEvent.metadata["sourceType"])
         assertEquals("MEDITATION_TIMER", completedEvent.metadata["renderMode"])
+        assertFalse(historyRepository.historyEntries.value.single().isCompleted())
     }
 
     @Test
@@ -1935,7 +1938,7 @@ class MainViewModelTest {
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
-    fun finishMeditationResetRemovesCompletedContentFromActiveDelaySuggestion() = runTest {
+    fun finishMeditationResetKeepsMeditationAsActiveDelaySuggestion() = runTest {
         val meditation = meditationTimerContentItem(3)
         val settingsRepository = FakeSettingsRepository(
             initial = completedSettings(
@@ -1971,8 +1974,8 @@ class MainViewModelTest {
         viewModel.finishMeditationReset(nowMillis = 5_000L)
         advanceUntilIdle()
 
-        assertTrue(MEDITATION_TIMER_CONTENT_ID in viewModel.uiState.completedContentIds)
-        assertEquals(null, viewModel.uiState.activeDelaySuggestion)
+        assertFalse(MEDITATION_TIMER_CONTENT_ID in viewModel.uiState.completedContentIds)
+        assertEquals(MEDITATION_TIMER_CONTENT_ID, viewModel.uiState.activeDelaySuggestion?.id)
     }
 
     @Test
@@ -2182,7 +2185,7 @@ class MainViewModelTest {
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
-    fun triggerDebugIntervention_excludesCompletedMeditationFromCandidates() = runTest {
+    fun triggerDebugIntervention_ignoresCompletedMeditationForExclusions() = runTest {
         val recommendationEngine = RecordingRecommendationEngine()
         val historyRepository = FakeHistoryRepository(
             initialCompletedIds = setOf("p1", MEDITATION_TIMER_CONTENT_ID),
@@ -2199,7 +2202,40 @@ class MainViewModelTest {
         advanceUntilIdle()
 
         assertTrue(recommendationEngine.lastInventory.any { it.id == MEDITATION_TIMER_CONTENT_ID })
-        assertEquals(setOf("p1", MEDITATION_TIMER_CONTENT_ID), recommendationEngine.lastExcludedContentIds)
+        assertFalse(MEDITATION_TIMER_CONTENT_ID in viewModel.uiState.completedContentIds)
+        assertEquals(setOf("p1"), recommendationEngine.lastExcludedContentIds)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun triggerDebugIntervention_ignoresStaleCompletedMeditationReadingProgress() = runTest {
+        val recommendationEngine = RecordingRecommendationEngine()
+        val readingProgressRepository = FakeReadingProgressRepository(
+            initialProgress = listOf(
+                ReadingProgress(
+                    contentId = MEDITATION_TIMER_CONTENT_ID,
+                    progressPercent = 100,
+                    lastVisibleParagraphIndex = 1,
+                    paragraphCount = 1,
+                    updatedAtMillis = 1_000L,
+                    completedAtMillis = 1_000L,
+                ),
+            ),
+        )
+        val viewModel = createViewModel(
+            recommendationEngine = recommendationEngine,
+            readingProgressRepository = readingProgressRepository,
+        )
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+        viewModel.triggerDebugIntervention(nowMillis = 2_000L)
+        advanceUntilIdle()
+
+        assertTrue(recommendationEngine.lastInventory.any { it.id == MEDITATION_TIMER_CONTENT_ID })
+        assertFalse(MEDITATION_TIMER_CONTENT_ID in viewModel.uiState.completedContentIds)
+        assertFalse(MEDITATION_TIMER_CONTENT_ID in recommendationEngine.lastExcludedContentIds)
     }
 
     @Test
@@ -2232,7 +2268,7 @@ class MainViewModelTest {
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
-    fun finishMeditationReset_deactivatesReactivatedCompletedMeditationAgain() = runTest {
+    fun applySettingsDropsMeditationFromReactivatedCompletedContent() = runTest {
         val meditation = meditationTimerContentItem(3)
         val settingsRepository = FakeSettingsRepository(
             initial = completedSettings(
@@ -2258,6 +2294,8 @@ class MainViewModelTest {
         )
 
         advanceUntilIdle()
+        assertEquals(emptySet<String>(), viewModel.uiState.reactivatedCompletedContentIds)
+        assertEquals(emptySet<String>(), settingsRepository.state.value.reactivatedCompletedContentIds)
         viewModel.triggerDebugIntervention(nowMillis = 1_000L)
         advanceUntilIdle()
         viewModel.acceptPrimary()
@@ -2265,14 +2303,14 @@ class MainViewModelTest {
         viewModel.finishMeditationReset(nowMillis = 5_000L)
         advanceUntilIdle()
 
-        assertTrue(MEDITATION_TIMER_CONTENT_ID in viewModel.uiState.completedContentIds)
+        assertFalse(MEDITATION_TIMER_CONTENT_ID in viewModel.uiState.completedContentIds)
         assertEquals(emptySet<String>(), settingsRepository.state.value.reactivatedCompletedContentIds)
         assertEquals(emptySet<String>(), viewModel.uiState.reactivatedCompletedContentIds)
     }
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
-    fun finishMeditationReset_fromLibraryMarksMeditationCompletedAndExcluded() = runTest {
+    fun finishMeditationReset_doesNotCreateCompletedContentEvenForDefensiveDirectOpen() = runTest {
         val meditation = meditationTimerContentItem(3)
         val analyticsTracker = InMemoryAnalyticsTracker()
         val recommendationEngine = RecordingRecommendationEngine()
@@ -2289,7 +2327,7 @@ class MainViewModelTest {
         viewModel.finishMeditationReset(nowMillis = 5_000L)
         advanceUntilIdle()
 
-        assertTrue(MEDITATION_TIMER_CONTENT_ID in viewModel.uiState.completedContentIds)
+        assertFalse(MEDITATION_TIMER_CONTENT_ID in viewModel.uiState.completedContentIds)
         assertTrue(
             analyticsTracker.allEvents().any {
                 it.type == AnalyticsEventType.MEDITATION_TIMER_COMPLETED &&
@@ -2301,7 +2339,7 @@ class MainViewModelTest {
         viewModel.triggerDebugIntervention(nowMillis = 6_000L)
         advanceUntilIdle()
 
-        assertEquals(setOf(MEDITATION_TIMER_CONTENT_ID), recommendationEngine.lastExcludedContentIds)
+        assertFalse(MEDITATION_TIMER_CONTENT_ID in recommendationEngine.lastExcludedContentIds)
     }
 
     @Test

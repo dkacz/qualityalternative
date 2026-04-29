@@ -1071,38 +1071,35 @@ class VisualQaScreenshotTest {
 
         seedMeditationSelection()
         launchFixtureSystemIntervention()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasNode("3-minute reset") }
+        captureSprint13("03_intervention_meditation_available_before_completion_light")
         composeRule.onNodeWithText("Start timer", substring = true).performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("meditation-timer-screen") }
         scenario?.onActivity { activity ->
             activity.mainViewModel.finishMeditationReset(nowMillis = 12_000L)
         }
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("feedback-screen") }
+        launchFixtureSystemIntervention()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasNode("3-minute reset") }
+        captureSprint13("04_intervention_meditation_available_after_completion_light")
+
         scenario?.onActivity { activity -> activity.mainViewModel.openLibrary() }
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("library-list") }
-        composeRule.onNodeWithTag("library-list")
-            .performScrollToNode(hasTestTag("library-completed-status-$MEDITATION_TIMER_CONTENT_ID"))
-        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("library-completed-status-$MEDITATION_TIMER_CONTENT_ID") }
-        captureSprint13("03_library_completed_meditation_hidden_light")
-
-        composeRule.onNodeWithTag("completed-activation-$MEDITATION_TIMER_CONTENT_ID").performClick()
-        composeRule.waitUntil(timeoutMillis = 10_000) { hasNode("Completed · active in suggestions") }
-        scenario?.onActivity { activity -> activity.mainViewModel.dismissMessage() }
-        composeRule.waitForIdle()
-        Thread.sleep(500)
-        captureSprint13("04_library_completed_meditation_reactivated_light")
+        composeRule.onNodeWithTag("library-item-$MEDITATION_TIMER_CONTENT_ID").assertDoesNotExist()
+        captureSprint13("05_library_without_meditation_light")
 
         openTab("tab-settings", "settings-list")
         composeRule.onNodeWithTag("settings-list")
             .performScrollToNode(hasTestTag("open-anyway-unlock-120"))
         composeRule.onNodeWithTag("open-anyway-unlock-120").performClick()
         composeRule.waitForIdle()
-        captureSprint13("05_settings_open_anyway_unlock_light")
+        captureSprint13("06_settings_open_anyway_unlock_light")
 
         scenario?.onActivity { activity ->
             activity.mainViewModel.selectThemeMode(AppThemeMode.DARK)
         }
         composeRule.waitForIdle()
-        captureSprint13("06_settings_open_anyway_unlock_dark")
+        captureSprint13("07_settings_open_anyway_unlock_dark")
 
         seedAttentionClassicsSelection()
         launchFixtureSystemIntervention()
@@ -1120,7 +1117,7 @@ class VisualQaScreenshotTest {
             ),
         )
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("home-list") }
-        captureSprint13("07_open_anyway_unlocked_home_dark")
+        captureSprint13("08_open_anyway_unlocked_home_dark")
     }
 
     private fun capture(name: String) {

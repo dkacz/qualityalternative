@@ -233,7 +233,8 @@ The system must normalize each piece of replacement content into a small, rankab
   - format
   - availability status
 - Each content item can be marked as accepted, skipped, completed, or opened anyway after recommendation.
-- The system excludes previously completed items from recommendation slots unless the user manually reactivates that item from the content library, including built-in utility content such as the meditation reset.
+- The system excludes previously completed reading items from recommendation slots unless the user manually reactivates that item from the content library.
+- The meditation reset is not library content, does not count as a completed read, and is not hidden by completion state; it remains a standing intervention option.
 
 ### FR5. Recommendation Selection
 

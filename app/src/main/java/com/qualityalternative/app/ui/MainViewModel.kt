@@ -28,6 +28,7 @@ import com.qualityalternative.app.domain.model.DelayWindow
 import com.qualityalternative.app.domain.model.DistractingApp
 import com.qualityalternative.app.domain.model.DurationBucket
 import com.qualityalternative.app.domain.model.EditorialPack
+import com.qualityalternative.app.domain.model.MEDITATION_TIMER_CONTENT_ID
 import com.qualityalternative.app.domain.model.MAX_OPEN_ANYWAY_UNLOCK_MINUTES
 import com.qualityalternative.app.domain.model.MIN_OPEN_ANYWAY_UNLOCK_MINUTES
 import com.qualityalternative.app.domain.model.OnboardingSelection
@@ -284,7 +285,7 @@ class MainViewModel(
         }
         viewModelScope.launch {
             historyRepository.observeCompletedContentIds().collect { completedIds ->
-                historyCompletedContentIds = completedIds
+                historyCompletedContentIds = completedIds.trackedCompletedContentIds()
                 updateCompletedContentIds()
             }
         }
@@ -298,6 +299,7 @@ class MainViewModel(
             readingProgressRepository.observeReadingProgress().collect { progress ->
                 readingProgressCompletedContentIds = progress.filter(ReadingProgress::isCompleted)
                     .mapTo(mutableSetOf(), ReadingProgress::contentId)
+                    .trackedCompletedContentIds()
                 val unfinishedIds = progress.unfinishedContentIds()
                 uiState = uiState.copy(
                     readingProgress = progress,
@@ -311,7 +313,7 @@ class MainViewModel(
         }
         viewModelScope.launch {
             readingProgressRepository.observeCompletedContentIds().collect { completedIds ->
-                readingProgressCompletedContentIds = completedIds
+                readingProgressCompletedContentIds = completedIds.trackedCompletedContentIds()
                 updateCompletedContentIds()
             }
         }
@@ -1562,12 +1564,6 @@ class MainViewModel(
         val content = uiState.currentContent ?: return
         val sessionId = uiState.currentSessionId
         viewModelScope.launch {
-            val completedProgress = completedProgressFor(content = content, completedAtMillis = nowMillis)
-            readingProgressRepository.saveProgress(completedProgress)
-            if (sessionId != null) {
-                historyRepository.markCompleted(sessionId = sessionId, completedAtMillis = nowMillis)
-            }
-            deactivateCompletedContentOverride(contentId = content.id)
             recordEvent(
                 AnalyticsEvent(
                     type = AnalyticsEventType.MEDITATION_TIMER_COMPLETED,
@@ -1578,7 +1574,7 @@ class MainViewModel(
                     primaryContentId = uiState.currentRecommendationSet?.primary?.id,
                     backupContentIds = uiState.currentRecommendationSet?.backups.orEmpty().map(ContentItem::id),
                     contentId = content.id,
-                    metadata = sessionDurationMetadata(nowMillis) + content.analyticsMetadata() + completedProgress.analyticsMetadata(),
+                    metadata = sessionDurationMetadata(nowMillis) + content.analyticsMetadata(),
                 ),
             )
             uiState = uiState.copy(screen = MainScreen.Feedback)
@@ -1696,6 +1692,7 @@ class MainViewModel(
     }
 
     private fun applySettings(settings: AppSettings) {
+        val reactivatedCompletedContentIds = settings.reactivatedCompletedContentIds.trackedCompletedContentIds()
         val preferences = settings.toUserPreferences(
             supportedApps = supportedApps,
             fallbackPackIds = defaultSelectedPackIds,
@@ -1719,7 +1716,7 @@ class MainViewModel(
             meditationDurationMinutes = settings.meditationDurationMinutes,
             contentPriority = settings.contentPriority,
             priorityContentIds = settings.priorityContentIds,
-            reactivatedCompletedContentIds = settings.reactivatedCompletedContentIds,
+            reactivatedCompletedContentIds = reactivatedCompletedContentIds,
             openAnywayUnlockMinutes = settings.openAnywayUnlockMinutes,
             onboardingSelection = settings.toOnboardingSelection(
                 supportedApps = supportedApps,
@@ -1740,6 +1737,11 @@ class MainViewModel(
                 else -> uiState.screen
             },
         )
+        if (reactivatedCompletedContentIds != settings.reactivatedCompletedContentIds) {
+            viewModelScope.launch {
+                settingsRepository.saveReactivatedCompletedContentIds(reactivatedCompletedContentIds)
+            }
+        }
         if (settings.hasCompletedOnboarding && delayReady) {
             selectedTargetApp?.let { targetApp ->
                 viewModelScope.launch {
@@ -1752,12 +1754,12 @@ class MainViewModel(
     private fun buildRecommendationSignals(nowMillis: Long): RecommendationSignals {
         val history = historyRepository.recentHistory(nowMillis = nowMillis)
         return RecommendationSignals(
-            completedTopics = history.filter(ReplacementHistoryEntry::isCompleted)
+            completedTopics = history.filter(ReplacementHistoryEntry::isCompletedReadingReplacement)
                 .flatMapTo(mutableSetOf(), ReplacementHistoryEntry::contentTopics),
             skippedTopics = history.filter(ReplacementHistoryEntry::isSkipped)
                 .flatMapTo(mutableSetOf(), ReplacementHistoryEntry::contentTopics),
             successfulPackIds = history.filter { entry ->
-                entry.isCompleted() && entry.feedbackHelpedAvoidScrolling != false
+                entry.isCompletedReadingReplacement() && entry.feedbackHelpedAvoidScrolling != false
             }.mapTo(mutableSetOf(), ReplacementHistoryEntry::packId),
             timeOfDay = TimeOfDayBucket.from(nowMillis),
         )
@@ -2838,6 +2840,14 @@ private fun RecommendationSet.analyticsMetadata(): Map<String, String> {
         backups.flatMapIndexed { index, content ->
             content.analyticsMetadata(prefix = "backup${index + 1}").entries
         }.associate { it.toPair() }
+}
+
+private fun Set<String>.trackedCompletedContentIds(): Set<String> {
+    return this - MEDITATION_TIMER_CONTENT_ID
+}
+
+private fun ReplacementHistoryEntry.isCompletedReadingReplacement(): Boolean {
+    return isCompleted() && contentId != MEDITATION_TIMER_CONTENT_ID
 }
 
 private fun inventoryDiagnostics(

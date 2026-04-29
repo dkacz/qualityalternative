@@ -108,6 +108,7 @@ import com.qualityalternative.app.domain.model.DelayWindow
 import com.qualityalternative.app.domain.model.DistractingApp
 import com.qualityalternative.app.domain.model.DurationBucket
 import com.qualityalternative.app.domain.model.EditorialPack
+import com.qualityalternative.app.domain.model.MEDITATION_TIMER_CONTENT_ID
 import com.qualityalternative.app.domain.model.OnboardingSelection
 import com.qualityalternative.app.domain.model.OpenAnywayUnlockMinuteOptions
 import com.qualityalternative.app.domain.model.PermissionReadiness
@@ -117,7 +118,6 @@ import com.qualityalternative.app.domain.model.ReplacementHistoryEntry
 import com.qualityalternative.app.domain.model.TopicTag
 import com.qualityalternative.app.domain.model.UserDocumentValidationError
 import com.qualityalternative.app.domain.model.UserLinkValidationError
-import com.qualityalternative.app.domain.model.meditationTimerContentItem
 import com.qualityalternative.app.domain.model.usesExternalHandoff
 import com.qualityalternative.app.domain.model.usesMeditationTimer
 import com.qualityalternative.app.domain.service.RecommendationExplainer
@@ -998,8 +998,7 @@ private fun LibraryTab(
     val editorial = state.starterPacks
         .filter { it.id in state.preferences?.selectedPackIds.orEmpty() }
         .flatMap { it.items }
-    val meditation = meditationTimerContentItem(state.meditationDurationMinutes)
-    val allItems = listOf(meditation) + editorial + state.userLinks + state.userDocuments
+    val allItems = editorial + state.userLinks + state.userDocuments
     val progressById = state.readingProgress.associateBy(ReadingProgress::contentId)
     val unfinished = allItems.unfinishedSortedByProgress(state.readingProgress)
     val priority = allItems
@@ -2828,11 +2827,7 @@ private fun LibraryItemCard(
         }
         if (isManaging && !canDelete) {
             BodyText(
-                text = if (item.usesMeditationTimer()) {
-                    "Built-in reset · not deletable"
-                } else {
-                    "Starter pack · not deletable"
-                },
+                text = "Starter pack · not deletable",
                 color = QualityAlternativeThemeTokens.colors.mutedText,
                 fontSize = 12.5.sp,
                 modifier = Modifier
@@ -3878,8 +3873,8 @@ internal fun progressSnapshot(
                 .toLocalDate()
         }
         .toSet()
-    val completedDays = entries
-        .filter(ReplacementHistoryEntry::isCompleted)
+    val completedReadingEntries = entries.filter(ReplacementHistoryEntry::isCompletedReadingReplacement)
+    val completedDays = completedReadingEntries
         .map { entry ->
             Instant.ofEpochMilli(entry.completedAtMillis ?: entry.acceptedAtMillis)
                 .atZone(zoneId)
@@ -3916,7 +3911,7 @@ internal fun progressSnapshot(
         alternativesChosen = entries.size,
         delayedOpens = events.distinctProgressEventCount(AnalyticsEventType.DELAY_SELECTED),
         consciousOverrides = events.distinctProgressEventCount(AnalyticsEventType.OPEN_ANYWAY_SELECTED),
-        completedReads = entries.count(ReplacementHistoryEntry::isCompleted),
+        completedReads = completedReadingEntries.size,
         recentReplacements = entries
             .filter { entry ->
                 val acceptedDate = Instant.ofEpochMilli(entry.acceptedAtMillis)
@@ -3926,6 +3921,10 @@ internal fun progressSnapshot(
             }
             .take(MAX_RECENT_PROGRESS_REPLACEMENTS),
     )
+}
+
+private fun ReplacementHistoryEntry.isCompletedReadingReplacement(): Boolean {
+    return isCompleted() && contentId != MEDITATION_TIMER_CONTENT_ID
 }
 
 internal data class HomeHeroCopy(
