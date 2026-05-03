@@ -347,9 +347,49 @@ class ProgressSnapshotTest {
     }
 
     @Test
+    fun readerPagesSplitLongContentAndRestoreContainingParagraph() {
+        val blocks = (1..9).map { index ->
+            readerMarkdownBlock("Paragraph $index with enough text to act like ordinary reader prose.")
+        }
+
+        val pages = readerPagesForBlocks(blocks = blocks, maxPageWeight = 3)
+
+        assertEquals(
+            listOf(
+                ReaderPage(start = 0, endInclusive = 2),
+                ReaderPage(start = 3, endInclusive = 5),
+                ReaderPage(start = 6, endInclusive = 8),
+            ),
+            pages,
+        )
+        assertEquals(1, readerPageIndexForParagraph(pages = pages, paragraphIndex = 4))
+        assertEquals(66, readerProgressPercentForParagraphIndex(paragraphIndex = 5, paragraphCount = 9))
+        assertEquals(66, readerProgressPercentForPageIndex(pageIndex = 1, pageCount = 3))
+    }
+
+    @Test
+    fun readerPagesKeepLongSingleBlockOnOnePage() {
+        val blocks = listOf(
+            readerMarkdownBlock("Short first paragraph."),
+            readerMarkdownBlock("Long ".repeat(500)),
+            readerMarkdownBlock("Short final paragraph."),
+        )
+
+        val pages = readerPagesForBlocks(blocks = blocks, maxPageWeight = 3)
+
+        assertEquals(3, pages.size)
+        assertEquals(ReaderPage(start = 1, endInclusive = 1), pages[1])
+        assertEquals(2, readerPageIndexForParagraph(pages = pages, paragraphIndex = 99))
+    }
+
+    @Test
     fun dayLabelsUseSingularAndPluralCopy() {
         assertEquals("1 day", dayCountLabel(count = 1, singular = "day"))
         assertEquals("2 days", dayCountLabel(count = 2, singular = "day"))
+        assertEquals("1 app", quantityLabel(count = 1, singular = "app"))
+        assertEquals("2 apps", quantityLabel(count = 2, singular = "app"))
+        assertEquals("1 item", quantityLabel(count = 1, singular = "item"))
+        assertEquals("2 items", quantityLabel(count = 2, singular = "item"))
         assertEquals("day converted", convertedDayNounLabel(count = 1))
         assertEquals("days converted", convertedDayNounLabel(count = 2))
     }

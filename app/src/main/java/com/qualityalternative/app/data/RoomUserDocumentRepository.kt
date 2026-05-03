@@ -91,6 +91,7 @@ class RoomUserDocumentRepository(
                     attribution = displayName,
                 )
             },
+            addedAtMillis = createdAtMillis,
         )
 
         dao.insertOrReplace(
@@ -206,6 +207,7 @@ private fun UserDocumentEntity.toContentItem(): ContentItem {
                 attribution = displayName,
             )
         },
+        addedAtMillis = createdAtMillis,
     )
 }
 

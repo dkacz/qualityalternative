@@ -16,6 +16,8 @@ import com.qualityalternative.app.domain.model.RecommendationSet
 import com.qualityalternative.app.domain.model.RecommendationSignals
 import com.qualityalternative.app.domain.model.RecommendationSource
 import com.qualityalternative.app.domain.model.ReadingProgress
+import com.qualityalternative.app.domain.model.ReadingAnnotation
+import com.qualityalternative.app.domain.model.ReadingAnnotationDraft
 import com.qualityalternative.app.domain.model.ReplacementHistoryEntry
 import com.qualityalternative.app.domain.model.ReturnToTargetSignal
 import com.qualityalternative.app.domain.model.SessionFeedback
@@ -105,6 +107,10 @@ interface SettingsRepository {
     suspend fun savePriorityContentIds(contentIds: Set<String>)
     suspend fun saveReactivatedCompletedContentIds(contentIds: Set<String>)
     suspend fun saveOpenAnywayUnlockMinutes(minutes: Int)
+    suspend fun saveAnnotationExportDestination(uri: String, displayName: String)
+    suspend fun clearAnnotationExportDestination()
+    suspend fun saveAnnotationExportSuccess(timestampMillis: Long)
+    suspend fun saveAnnotationExportFailure(errorMessage: String)
 }
 
 interface RecommendationEngine {
@@ -262,4 +268,42 @@ interface ReadingProgressRepository {
     fun isReady(): Boolean = true
 
     fun observeReady(): Flow<Boolean> = flowOf(isReady())
+}
+
+interface ReadingAnnotationRepository {
+    fun readingAnnotations(): List<ReadingAnnotation>
+
+    fun observeReadingAnnotations(): Flow<List<ReadingAnnotation>> = flowOf(readingAnnotations())
+
+    fun observeAnnotationsForContent(contentId: String): Flow<List<ReadingAnnotation>> =
+        flowOf(readingAnnotations().filter { annotation -> annotation.contentId == contentId })
+
+    suspend fun saveAnnotation(
+        draft: ReadingAnnotationDraft,
+        nowMillis: Long = System.currentTimeMillis(),
+    ): ReadingAnnotation
+
+    suspend fun deleteAnnotation(
+        annotationId: String,
+        nowMillis: Long = System.currentTimeMillis(),
+    )
+
+    suspend fun deleteAnnotationsForContentIds(
+        contentIds: Set<String>,
+        nowMillis: Long = System.currentTimeMillis(),
+    ) {
+        contentIds.forEach { contentId ->
+            readingAnnotations()
+                .filter { annotation -> annotation.contentId == contentId }
+                .forEach { annotation -> deleteAnnotation(annotation.id, nowMillis) }
+        }
+    }
+
+    fun isReady(): Boolean = true
+
+    fun observeReady(): Flow<Boolean> = flowOf(isReady())
+}
+
+interface ReadingAnnotationExportWriter {
+    suspend fun writeMarkdown(uri: String, markdown: String)
 }

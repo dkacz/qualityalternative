@@ -37,6 +37,8 @@ import com.qualityalternative.app.domain.model.PermissionStatus
 import com.qualityalternative.app.domain.model.RecommendationSet
 import com.qualityalternative.app.domain.model.RecommendationSignals
 import com.qualityalternative.app.domain.model.RecommendationSource
+import com.qualityalternative.app.domain.model.ReadingAnnotation
+import com.qualityalternative.app.domain.model.ReadingAnnotationDraft
 import com.qualityalternative.app.domain.model.ReadingProgress
 import com.qualityalternative.app.domain.model.ReplacementHistoryEntry
 import com.qualityalternative.app.domain.model.ReturnToTargetSignal
@@ -60,6 +62,9 @@ import com.qualityalternative.app.domain.service.DelayGate
 import com.qualityalternative.app.domain.service.HistoryRepository
 import com.qualityalternative.app.domain.service.InterceptionMonitor
 import com.qualityalternative.app.domain.service.RecommendationEngine
+import com.qualityalternative.app.domain.service.ReadingAnnotationRepository
+import com.qualityalternative.app.domain.service.ReadingAnnotationExportFormatter
+import com.qualityalternative.app.domain.service.ReadingAnnotationExportWriter
 import com.qualityalternative.app.domain.service.ReadingProgressRepository
 import com.qualityalternative.app.domain.service.SettingsRepository
 import com.qualityalternative.app.domain.service.UserDocumentRepository
@@ -95,6 +100,7 @@ data class MainUiState(
     val currentContent: ContentItem? = null,
     val currentContentBody: String = "",
     val currentReadingProgress: ReadingProgress? = null,
+    val currentReaderStartParagraphIndex: Int? = null,
     val currentSessionId: String? = null,
     val currentSessionStartedAtMillis: Long? = null,
     val activeDelayWindow: DelayWindow? = null,
@@ -103,6 +109,7 @@ data class MainUiState(
     val historyEntries: List<ReplacementHistoryEntry> = emptyList(),
     val completedContentIds: Set<String> = emptySet(),
     val readingProgress: List<ReadingProgress> = emptyList(),
+    val readingAnnotations: List<ReadingAnnotation> = emptyList(),
     val userLinks: List<ContentItem> = emptyList(),
     val userDocuments: List<ContentItem> = emptyList(),
     val addLinkForm: AddLinkFormState = AddLinkFormState(),
@@ -114,6 +121,10 @@ data class MainUiState(
     val priorityContentIds: Set<String> = emptySet(),
     val reactivatedCompletedContentIds: Set<String> = emptySet(),
     val openAnywayUnlockMinutes: Int = DEFAULT_OPEN_ANYWAY_UNLOCK_MINUTES,
+    val annotationExportUri: String? = null,
+    val annotationExportDisplayName: String? = null,
+    val annotationExportLastSuccessfulAtMillis: Long? = null,
+    val annotationExportLastError: String? = null,
     val isManagingLibrary: Boolean = false,
     val selectedLibraryContentIds: Set<String> = emptySet(),
     val latestMessage: String? = null,
@@ -181,6 +192,7 @@ enum class MainScreen {
     Onboarding,
     Home,
     Library,
+    Annotations,
     Progress,
     Settings,
     AddLink,
@@ -208,6 +220,8 @@ class MainViewModel(
     private val analyticsTracker: AnalyticsTracker,
     private val historyRepository: HistoryRepository,
     private val readingProgressRepository: ReadingProgressRepository = EmptyReadingProgressRepository,
+    private val readingAnnotationRepository: ReadingAnnotationRepository = EmptyReadingAnnotationRepository,
+    private val readingAnnotationExportWriter: ReadingAnnotationExportWriter = NoOpReadingAnnotationExportWriter,
     private val interceptionMonitor: InterceptionMonitor,
     private val enableDelayRefreshTicker: Boolean = true,
     private val nowProvider: () -> Long = System::currentTimeMillis,
@@ -220,10 +234,12 @@ class MainViewModel(
     private var analyticsReady = analyticsTracker.isReady()
     private var historyReady = historyRepository.isReady()
     private var readingProgressReady = readingProgressRepository.isReady()
+    private var readingAnnotationReady = readingAnnotationRepository.isReady()
     private var delayReady = delayGate.isReady()
     private var historyCompletedContentIds: Set<String> = emptySet()
     private var readingProgressCompletedContentIds: Set<String> = emptySet()
     private var pendingSystemInterception: PendingSystemInterception? = null
+    private val readingAnnotationExportFormatter = ReadingAnnotationExportFormatter()
 
     var uiState by mutableStateOf(
         MainUiState(
@@ -236,6 +252,7 @@ class MainViewModel(
             events = analyticsTracker.allEvents(),
             historyEntries = historyRepository.recentHistory(),
             readingProgress = readingProgressRepository.readingProgress(),
+            readingAnnotations = readingAnnotationRepository.readingAnnotations(),
             permissionReadiness = interceptionMonitor.currentReadiness(),
         ),
     )
@@ -320,6 +337,17 @@ class MainViewModel(
         viewModelScope.launch {
             readingProgressRepository.observeReady().collect { ready ->
                 readingProgressReady = ready
+                updateHydrationState()
+            }
+        }
+        viewModelScope.launch {
+            readingAnnotationRepository.observeReadingAnnotations().collect { annotations ->
+                uiState = uiState.copy(readingAnnotations = annotations)
+            }
+        }
+        viewModelScope.launch {
+            readingAnnotationRepository.observeReady().collect { ready ->
+                readingAnnotationReady = ready
                 updateHydrationState()
             }
         }
@@ -560,6 +588,88 @@ class MainViewModel(
         }
     }
 
+    fun configureReadingAnnotationExport(
+        uri: String,
+        displayName: String,
+        persistWritePermission: (String) -> Unit = {},
+        nowMillis: Long = nowProvider(),
+    ) {
+        val normalizedUri = uri.trim()
+        if (normalizedUri.isBlank()) {
+            uiState = uiState.copy(latestMessage = "Choose a file for annotation autosave.")
+            return
+        }
+        val normalizedDisplayName = displayName.trim().ifBlank { "quality-alternative-annotations.md" }
+        viewModelScope.launch {
+            val permissionError = runCatching { persistWritePermission(normalizedUri) }.exceptionOrNull()
+            settingsRepository.saveAnnotationExportDestination(
+                uri = normalizedUri,
+                displayName = normalizedDisplayName,
+            )
+            if (permissionError != null) {
+                val message = permissionError.annotationExportErrorMessage()
+                settingsRepository.saveAnnotationExportFailure(message)
+                uiState = uiState.copy(
+                    annotationExportUri = normalizedUri,
+                    annotationExportDisplayName = normalizedDisplayName,
+                    annotationExportLastSuccessfulAtMillis = null,
+                    annotationExportLastError = message,
+                    latestMessage = "Annotation autosave needs file permission.",
+                )
+                return@launch
+            }
+            val exported = exportReadingAnnotationsTo(
+                uri = normalizedUri,
+                nowMillis = nowMillis,
+            )
+            uiState = uiState.copy(
+                annotationExportUri = normalizedUri,
+                annotationExportDisplayName = normalizedDisplayName,
+                annotationExportLastSuccessfulAtMillis = if (exported) nowMillis else null,
+                latestMessage = if (exported) {
+                    "Annotation autosave enabled."
+                } else {
+                    "Annotation autosave enabled, but the first write failed."
+                },
+            )
+        }
+    }
+
+    fun clearReadingAnnotationExport(releaseWritePermission: (String) -> Unit = {}) {
+        val uri = uiState.annotationExportUri
+        viewModelScope.launch {
+            uri?.takeIf(String::isNotBlank)?.let { configuredUri ->
+                runCatching { releaseWritePermission(configuredUri) }
+            }
+            settingsRepository.clearAnnotationExportDestination()
+            uiState = uiState.copy(
+                annotationExportUri = null,
+                annotationExportDisplayName = null,
+                annotationExportLastSuccessfulAtMillis = null,
+                annotationExportLastError = null,
+                latestMessage = "Annotation autosave disabled.",
+            )
+        }
+    }
+
+    fun retryReadingAnnotationExport(nowMillis: Long = nowProvider()) {
+        val uri = uiState.annotationExportUri
+        if (uri.isNullOrBlank()) {
+            uiState = uiState.copy(latestMessage = "Choose a file for annotation autosave.")
+            return
+        }
+        viewModelScope.launch {
+            val exported = exportReadingAnnotationsTo(uri = uri, nowMillis = nowMillis)
+            uiState = uiState.copy(
+                latestMessage = if (exported) {
+                    "Annotations autosaved."
+                } else {
+                    "Annotation autosave failed."
+                },
+            )
+        }
+    }
+
     fun toggleOnboardingPack(pack: EditorialPack) {
         val selected = uiState.onboardingSelection.selectedPackIds.toMutableSet()
         if (!selected.add(pack.id)) {
@@ -665,12 +775,17 @@ class MainViewModel(
             screen = MainScreen.Home,
             isManagingLibrary = false,
             selectedLibraryContentIds = emptySet(),
+            currentReaderStartParagraphIndex = null,
             latestMessage = null,
         )
     }
 
     fun openLibrary() {
-        uiState = uiState.copy(screen = MainScreen.Library, latestMessage = null)
+        uiState = uiState.copy(
+            screen = MainScreen.Library,
+            currentReaderStartParagraphIndex = null,
+            latestMessage = null,
+        )
     }
 
     fun toggleLibraryManageMode() {
@@ -724,8 +839,10 @@ class MainViewModel(
                         item.rights.sourceUrl?.takeIf(String::isNotBlank)?.let { uri ->
                             runCatching { releaseDocumentPermission(uri) }
                         }
-                    }
+                }
                 readingProgressRepository.deleteProgressForContentIds(deletedIds)
+                readingAnnotationRepository.deleteAnnotationsForContentIds(deletedIds, nowMillis = nowMillis)
+                val annotationExportResult = exportReadingAnnotationsIfConfigured(nowMillis = nowMillis)
 
                 val updatedPriorityIds = uiState.priorityContentIds - deletedIds
                 if (updatedPriorityIds != uiState.priorityContentIds) {
@@ -749,7 +866,7 @@ class MainViewModel(
                     preferences = preferences?.copy(priorityContentIds = updatedPriorityIds),
                     selectedLibraryContentIds = emptySet(),
                     isManagingLibrary = false,
-                    latestMessage = deletedLibraryMessage(selectedItems.size),
+                    latestMessage = deletedLibraryMessage(selectedItems.size).withAnnotationExportResult(annotationExportResult),
                 )
             } catch (error: Throwable) {
                 if (error is CancellationException) throw error
@@ -759,14 +876,58 @@ class MainViewModel(
     }
 
     fun openProgress() {
-        uiState = uiState.copy(screen = MainScreen.Progress, latestMessage = null)
+        uiState = uiState.copy(
+            screen = MainScreen.Progress,
+            currentReaderStartParagraphIndex = null,
+            latestMessage = null,
+        )
     }
 
     fun openSettings() {
-        uiState = uiState.copy(screen = MainScreen.Settings, latestMessage = null)
+        uiState = uiState.copy(
+            screen = MainScreen.Settings,
+            currentReaderStartParagraphIndex = null,
+            latestMessage = null,
+        )
     }
 
-    fun openLibraryItem(content: ContentItem, origin: String = "library") {
+    fun openAnnotationLibrary() {
+        uiState = uiState.copy(
+            screen = MainScreen.Annotations,
+            isManagingLibrary = false,
+            selectedLibraryContentIds = emptySet(),
+            currentReaderStartParagraphIndex = null,
+            latestMessage = null,
+        )
+    }
+
+    fun openAnnotationTarget(annotationId: String) {
+        val annotation = uiState.readingAnnotations.firstOrNull { candidate -> candidate.id == annotationId }
+        if (annotation == null) {
+            uiState = uiState.copy(latestMessage = "That annotation is no longer available.")
+            return
+        }
+        val content = contentForAnnotation(annotation)
+        if (content == null) {
+            uiState = uiState.copy(latestMessage = "The source for that annotation is no longer in Library.")
+            return
+        }
+        if (!content.usesRepositoryBody()) {
+            uiState = uiState.copy(latestMessage = "That source cannot be opened in the reader.")
+            return
+        }
+        openLibraryItem(
+            content = content,
+            origin = "annotation-library",
+            startParagraphIndex = annotation.paragraphIndex,
+        )
+    }
+
+    fun openLibraryItem(
+        content: ContentItem,
+        origin: String = "library",
+        startParagraphIndex: Int? = null,
+    ) {
         val startedAtMillis = nowProvider()
         val contentBody = if (content.usesRepositoryBody()) {
             try {
@@ -807,6 +968,7 @@ class MainViewModel(
             currentContent = content,
             currentContentBody = contentBody,
             currentReadingProgress = existingProgress,
+            currentReaderStartParagraphIndex = startParagraphIndex,
             currentSessionId = null,
             currentSessionStartedAtMillis = startedAtMillis,
             screen = screenForReplacement(content),
@@ -1529,6 +1691,66 @@ class MainViewModel(
         }
     }
 
+    fun saveCurrentReadingAnnotation(
+        paragraphIndex: Int,
+        quotedText: String,
+        noteText: String,
+        existingAnnotationId: String? = null,
+        nowMillis: Long = nowProvider(),
+    ) {
+        val content = uiState.currentContent ?: return
+        if (!content.usesRepositoryBody()) {
+            return
+        }
+        val normalizedQuote = quotedText.trim().take(MAX_READING_ANNOTATION_QUOTE_LENGTH)
+        val normalizedNote = noteText.trim()
+        if (normalizedQuote.isBlank() || normalizedNote.isBlank()) {
+            uiState = uiState.copy(latestMessage = "Write a note before saving.")
+            return
+        }
+        viewModelScope.launch {
+            readingAnnotationRepository.saveAnnotation(
+                draft = ReadingAnnotationDraft(
+                    id = existingAnnotationId,
+                    contentId = content.id,
+                    paragraphIndex = paragraphIndex,
+                    quotedText = normalizedQuote,
+                    noteText = normalizedNote,
+                ),
+                nowMillis = nowMillis,
+            )
+            val annotationExportResult = exportReadingAnnotationsIfConfigured(nowMillis = nowMillis)
+            val savedMessage = if (existingAnnotationId == null) {
+                "Annotation saved."
+            } else {
+                "Annotation updated."
+            }
+            uiState = uiState.copy(
+                latestMessage = savedMessage.withAnnotationExportResult(annotationExportResult),
+            )
+        }
+    }
+
+    fun deleteReadingAnnotation(
+        annotationId: String,
+        nowMillis: Long = nowProvider(),
+    ) {
+        if (uiState.readingAnnotations.none { annotation -> annotation.id == annotationId }) {
+            uiState = uiState.copy(latestMessage = "That annotation is no longer available.")
+            return
+        }
+        viewModelScope.launch {
+            readingAnnotationRepository.deleteAnnotation(
+                annotationId = annotationId,
+                nowMillis = nowMillis,
+            )
+            val annotationExportResult = exportReadingAnnotationsIfConfigured(nowMillis = nowMillis)
+            uiState = uiState.copy(
+                latestMessage = "Annotation deleted.".withAnnotationExportResult(annotationExportResult),
+            )
+        }
+    }
+
     fun finishReading() {
         val content = uiState.currentContent ?: return
         val sessionId = uiState.currentSessionId
@@ -1718,6 +1940,10 @@ class MainViewModel(
             priorityContentIds = settings.priorityContentIds,
             reactivatedCompletedContentIds = reactivatedCompletedContentIds,
             openAnywayUnlockMinutes = settings.openAnywayUnlockMinutes,
+            annotationExportUri = settings.annotationExportUri,
+            annotationExportDisplayName = settings.annotationExportDisplayName,
+            annotationExportLastSuccessfulAtMillis = settings.annotationExportLastSuccessfulAtMillis,
+            annotationExportLastError = settings.annotationExportLastError,
             onboardingSelection = settings.toOnboardingSelection(
                 supportedApps = supportedApps,
                 starterPacks = starterPacks,
@@ -1732,6 +1958,7 @@ class MainViewModel(
                 uiState.screen == MainScreen.AddDocument -> MainScreen.AddDocument
                 uiState.screen == MainScreen.AddLinkSuccess -> MainScreen.AddLinkSuccess
                 uiState.screen == MainScreen.Library -> MainScreen.Library
+                uiState.screen == MainScreen.Annotations -> MainScreen.Annotations
                 uiState.screen == MainScreen.Progress -> MainScreen.Progress
                 uiState.screen == MainScreen.Settings -> MainScreen.Settings
                 else -> uiState.screen
@@ -2092,6 +2319,7 @@ class MainViewModel(
             currentContent = content,
             currentContentBody = contentBody,
             currentReadingProgress = existingProgress,
+            currentReaderStartParagraphIndex = null,
             currentSessionId = sessionId,
             currentSessionStartedAtMillis = startedAtMillis,
             screen = screenForReplacement(content),
@@ -2142,6 +2370,35 @@ class MainViewModel(
         return contentRepository.inventory() + meditationTimerContentItem(uiState.meditationDurationMinutes)
     }
 
+    private fun contentForAnnotation(annotation: ReadingAnnotation): ContentItem? {
+        return fullReplacementInventory()
+            .firstOrNull { content -> content.id == annotation.contentId }
+    }
+
+    private suspend fun exportReadingAnnotationsIfConfigured(nowMillis: Long): Boolean? {
+        val uri = uiState.annotationExportUri?.takeIf(String::isNotBlank) ?: return null
+        return exportReadingAnnotationsTo(uri = uri, nowMillis = nowMillis)
+    }
+
+    private suspend fun exportReadingAnnotationsTo(uri: String, nowMillis: Long): Boolean {
+        return try {
+            val contentById = fullReplacementInventory()
+                .distinctBy(ContentItem::id)
+                .associateBy(ContentItem::id)
+            val markdown = readingAnnotationExportFormatter.format(
+                annotations = readingAnnotationRepository.readingAnnotations(),
+                contentById = contentById,
+            )
+            readingAnnotationExportWriter.writeMarkdown(uri = uri, markdown = markdown)
+            settingsRepository.saveAnnotationExportSuccess(timestampMillis = nowMillis)
+            true
+        } catch (error: Throwable) {
+            if (error is CancellationException) throw error
+            settingsRepository.saveAnnotationExportFailure(error.annotationExportErrorMessage())
+            false
+        }
+    }
+
     private fun excludedContentIdsForRecommendation(): Set<String> {
         return uiState.completedContentIds -
             uiState.reactivatedCompletedContentIds
@@ -2172,6 +2429,7 @@ class MainViewModel(
             currentSessionId = null,
             currentSessionStartedAtMillis = null,
             currentReadingProgress = null,
+            currentReaderStartParagraphIndex = null,
             lastFeedback = lastFeedback,
             latestMessage = latestMessage,
         )
@@ -2295,7 +2553,8 @@ class MainViewModel(
     }
 
     private fun updateHydrationState() {
-        val isReady = settingsLoaded && contentReady && analyticsReady && historyReady && readingProgressReady && delayReady
+        val isReady = settingsLoaded && contentReady && analyticsReady && historyReady && readingProgressReady &&
+            readingAnnotationReady && delayReady
         if (uiState.isLoadingSettings != !isReady) {
             uiState = uiState.copy(isLoadingSettings = !isReady)
         }
@@ -2399,6 +2658,8 @@ class MainViewModelFactory(
             analyticsTracker = appContainer.analyticsTracker,
             historyRepository = appContainer.historyRepository,
             readingProgressRepository = appContainer.readingProgressRepository,
+            readingAnnotationRepository = appContainer.readingAnnotationRepository,
+            readingAnnotationExportWriter = appContainer.readingAnnotationExportWriter,
             interceptionMonitor = appContainer.interceptionMonitor,
         ) as T
     }
@@ -2632,6 +2893,7 @@ private fun unavailablePermissionReadiness(): PermissionReadiness {
 private const val ACTIVE_DELAY_REFRESH_INTERVAL_MILLIS = 1_000L
 private const val INTERVENTION_DEGRADED_THRESHOLD_MILLIS = 2_000L
 private const val MIN_SELECTED_DISTRACTING_APPS = 3
+private const val MAX_READING_ANNOTATION_QUOTE_LENGTH = 1_200
 private const val PROGRESS_HISTORY_WINDOW_DAYS = 31
 private const val FEEDBACK_FIT_NOT = "not"
 private const val FEEDBACK_SCROLL_NO = "no"
@@ -2957,4 +3219,36 @@ private object EmptyReadingProgressRepository : ReadingProgressRepository {
     override suspend fun saveProgress(progress: ReadingProgress) = Unit
 
     override suspend fun deleteProgress(contentId: String) = Unit
+}
+
+private object EmptyReadingAnnotationRepository : ReadingAnnotationRepository {
+    override fun readingAnnotations(): List<ReadingAnnotation> = emptyList()
+
+    override fun observeReadingAnnotations() = flowOf(emptyList<ReadingAnnotation>())
+
+    override suspend fun saveAnnotation(
+        draft: com.qualityalternative.app.domain.model.ReadingAnnotationDraft,
+        nowMillis: Long,
+    ): ReadingAnnotation = error("Reading annotations are not available in this build.")
+
+    override suspend fun deleteAnnotation(
+        annotationId: String,
+        nowMillis: Long,
+    ) = Unit
+}
+
+private object NoOpReadingAnnotationExportWriter : ReadingAnnotationExportWriter {
+    override suspend fun writeMarkdown(uri: String, markdown: String) = Unit
+}
+
+private fun String.withAnnotationExportResult(result: Boolean?): String {
+    return when (result) {
+        true -> removeSuffix(".") + " and autosaved."
+        false -> this + " Autosave failed."
+        null -> this
+    }
+}
+
+private fun Throwable.annotationExportErrorMessage(): String {
+    return "Choose the file again or retry."
 }

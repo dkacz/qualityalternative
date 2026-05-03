@@ -113,6 +113,7 @@ import com.qualityalternative.app.domain.model.OnboardingSelection
 import com.qualityalternative.app.domain.model.OpenAnywayUnlockMinuteOptions
 import com.qualityalternative.app.domain.model.PermissionReadiness
 import com.qualityalternative.app.domain.model.PermissionStatus
+import com.qualityalternative.app.domain.model.ReadingAnnotation
 import com.qualityalternative.app.domain.model.ReadingProgress
 import com.qualityalternative.app.domain.model.ReplacementHistoryEntry
 import com.qualityalternative.app.domain.model.TopicTag
@@ -120,6 +121,7 @@ import com.qualityalternative.app.domain.model.UserDocumentValidationError
 import com.qualityalternative.app.domain.model.UserLinkValidationError
 import com.qualityalternative.app.domain.model.usesExternalHandoff
 import com.qualityalternative.app.domain.model.usesMeditationTimer
+import com.qualityalternative.app.domain.model.usesRepositoryBody
 import com.qualityalternative.app.domain.service.RecommendationExplainer
 import com.qualityalternative.app.domain.service.RecommendationExplanation
 import com.qualityalternative.app.ui.theme.QualityAlternativeAppTheme
@@ -259,11 +261,30 @@ private fun MainRoute(
             candidates = uris.map { uri -> context.documentImportCandidate(uri) },
         )
     }
+    val annotationExportPicker = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/markdown")) { uri ->
+        if (uri == null) {
+            return@rememberLauncherForActivityResult
+        }
+        val metadata = context.documentMetadata(uri)
+        viewModel.configureReadingAnnotationExport(
+            uri = uri.toString(),
+            displayName = metadata.displayName,
+            persistWritePermission = { uriString ->
+                persistAnnotationExportPermission(context = context, uri = Uri.parse(uriString))
+            },
+        )
+    }
     val onImportDocument = {
         documentPicker.launch(USER_DOCUMENT_PICKER_MIME_TYPES)
     }
+    val onSelectAnnotationExport = {
+        annotationExportPicker.launch("quality-alternative-annotations.md")
+    }
     val releasePersistedDocumentPermission: (String) -> Unit = { uri ->
         releaseDocumentPermission(context = context, uri = Uri.parse(uri))
+    }
+    val releasePersistedAnnotationExportPermission: (String) -> Unit = { uri ->
+        releaseAnnotationExportPermission(context = context, uri = Uri.parse(uri))
     }
 
     when (state.screen) {
@@ -289,6 +310,7 @@ private fun MainRoute(
                 onTriggerIntervention = viewModel::triggerDebugIntervention,
                 onOpenAddLink = viewModel::openAddLink,
                 onImportDocument = onImportDocument,
+                onOpenLibrary = viewModel::openLibrary,
                 onOpenSettings = viewModel::openSettings,
                 onStartDelayAlternative = viewModel::startActiveDelayAlternative,
                 onContinueReading = { content -> viewModel.openLibraryItem(content, origin = "home") },
@@ -306,6 +328,7 @@ private fun MainRoute(
                 state = state,
                 onAddLink = viewModel::openAddLink,
                 onImportDocument = onImportDocument,
+                onOpenAnnotations = viewModel::openAnnotationLibrary,
                 onOpen = { content -> viewModel.openLibraryItem(content, origin = "library") },
                 onTogglePriorityContent = viewModel::togglePriorityContent,
                 onToggleCompletedActivation = viewModel::toggleCompletedContentActivation,
@@ -324,7 +347,25 @@ private fun MainRoute(
             onProgress = viewModel::openProgress,
             onSettings = viewModel::openSettings,
         ) {
-            ProgressTab(snapshot = progressSnapshot(state.historyEntries, state.events))
+            ProgressTab(
+                snapshot = progressSnapshot(state.historyEntries, state.events),
+                annotationCount = state.readingAnnotations.size,
+                onOpenAnnotations = viewModel::openAnnotationLibrary,
+            )
+        }
+
+        MainScreen.Annotations -> TabScaffold(
+            active = MainScreen.Progress,
+            onHome = viewModel::openHome,
+            onLibrary = viewModel::openLibrary,
+            onProgress = viewModel::openProgress,
+            onSettings = viewModel::openSettings,
+        ) {
+            AnnotationLibraryScreen(
+                state = state,
+                onOpenAnnotation = viewModel::openAnnotationTarget,
+                onBack = viewModel::openProgress,
+            )
         }
 
         MainScreen.Settings -> TabScaffold(
@@ -343,6 +384,11 @@ private fun MainRoute(
                 onSelectOpenAnywayUnlock = viewModel::setOpenAnywayUnlockMinutes,
                 onSelectTheme = viewModel::selectThemeMode,
                 onRefreshReadiness = viewModel::refreshPermissionReadiness,
+                onSelectAnnotationExport = onSelectAnnotationExport,
+                onClearAnnotationExport = {
+                    viewModel.clearReadingAnnotationExport(releaseWritePermission = releasePersistedAnnotationExportPermission)
+                },
+                onRetryAnnotationExport = { viewModel.retryReadingAnnotationExport() },
             )
         }
 
@@ -402,6 +448,15 @@ private fun MainRoute(
                     paragraphCount = paragraphCount,
                 )
             },
+            onSaveAnnotation = { paragraphIndex, quotedText, noteText, existingAnnotationId ->
+                viewModel.saveCurrentReadingAnnotation(
+                    paragraphIndex = paragraphIndex,
+                    quotedText = quotedText,
+                    noteText = noteText,
+                    existingAnnotationId = existingAnnotationId,
+                )
+            },
+            onDeleteAnnotation = viewModel::deleteReadingAnnotation,
             onDone = viewModel::finishReading,
             onBack = viewModel::skipReading,
         )
@@ -523,12 +578,14 @@ private enum class QaIconKind {
     External,
     Bell,
     ChevronRight,
+    Note,
     Dot,
 }
 
 private fun MainScreen.snackbarBottomPadding() = when (this) {
     MainScreen.Home,
     MainScreen.Library,
+    MainScreen.Annotations,
     MainScreen.Progress,
     MainScreen.Settings -> 88.dp
 
@@ -864,6 +921,7 @@ private fun HomeTab(
     onTriggerIntervention: () -> Unit,
     onOpenAddLink: () -> Unit,
     onImportDocument: () -> Unit,
+    onOpenLibrary: () -> Unit,
     onOpenSettings: () -> Unit,
     onStartDelayAlternative: () -> Unit,
     onContinueReading: (ContentItem) -> Unit,
@@ -921,11 +979,20 @@ private fun HomeTab(
                 )
             }
         }
+        if (totalItems > 0) {
+            item {
+                ReadNowCard(
+                    totalItems = totalItems,
+                    totalMinutes = totalMins,
+                    onOpenLibrary = onOpenLibrary,
+                )
+            }
+        }
         item {
             SectionLabel("Setup")
             QaCard {
                 Row(horizontalArrangement = Arrangement.spacedBy(18.dp), modifier = Modifier.fillMaxWidth()) {
-                    StatCell("Intercepting", "${state.availableTargetApps.size} apps", Modifier.weight(1f))
+                    StatCell("Intercepting", quantityLabel(state.availableTargetApps.size, "app"), Modifier.weight(1f))
                     StatCell("Session length", state.preferences?.preferredDurationBucket?.prototypeMinutesLabel() ?: "10 min", Modifier.weight(1f))
                 }
                 Spacer(Modifier.height(18.dp))
@@ -943,13 +1010,13 @@ private fun HomeTab(
             }
         }
         item {
-            SectionLabel("Your library", right = "$totalItems items · $totalMins min")
+            SectionLabel("Your library", right = "${quantityLabel(totalItems, "item")} · $totalMins min")
             QaCard(padding = 0.dp) {
-                LibrarySummaryRow("Editorial picks", "${editorialItems.size} curated", ContentSourceType.EDITORIAL)
+                LibrarySummaryRow("Editorial picks", quantityLabel(editorialItems.size, "pick"), ContentSourceType.EDITORIAL)
                 HorizontalDivider(color = QualityAlternativeThemeTokens.colors.line)
-                LibrarySummaryRow("Your added links", "${state.userLinks.size} saved", ContentSourceType.USER_LINK)
+                LibrarySummaryRow("Your added links", quantityLabel(state.userLinks.size, "link"), ContentSourceType.USER_LINK)
                 HorizontalDivider(color = QualityAlternativeThemeTokens.colors.line)
-                LibrarySummaryRow("Your files", "${state.userDocuments.size} saved", ContentSourceType.USER_DOCUMENT)
+                LibrarySummaryRow("Your files", quantityLabel(state.userDocuments.size, "file"), ContentSourceType.USER_DOCUMENT)
             }
         }
         item {
@@ -987,6 +1054,7 @@ private fun LibraryTab(
     state: MainUiState,
     onAddLink: () -> Unit,
     onImportDocument: () -> Unit,
+    onOpenAnnotations: () -> Unit,
     onOpen: (ContentItem) -> Unit,
     onTogglePriorityContent: (ContentItem) -> Unit,
     onToggleCompletedActivation: (ContentItem) -> Unit,
@@ -1083,13 +1151,25 @@ private fun LibraryTab(
             }
         }
         item {
-            QaButton(
-                text = "Import PDF / MD / EPUB",
-                onClick = onImportDocument,
-                variant = QaButtonVariant.Ghost,
-                leadingIcon = QaIconKind.Book,
-                modifier = Modifier.testTag("library-import-document"),
-            )
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                QaButton(
+                    text = "Import PDF / MD / EPUB",
+                    onClick = onImportDocument,
+                    variant = QaButtonVariant.Ghost,
+                    leadingIcon = QaIconKind.Book,
+                    modifier = Modifier.testTag("library-import-document"),
+                )
+                QaButton(
+                    text = "Annotations",
+                    onClick = onOpenAnnotations,
+                    variant = QaButtonVariant.Ghost,
+                    leadingIcon = QaIconKind.Note,
+                    modifier = Modifier.testTag("library-open-annotations"),
+                )
+            }
         }
         item {
             FlowRow(
@@ -1742,6 +1822,8 @@ private fun RecommendationReasonPill(text: String) {
 private fun ReaderScreen(
     state: MainUiState,
     onProgressChanged: (Int, Int, Int) -> Unit,
+    onSaveAnnotation: (paragraphIndex: Int, quotedText: String, noteText: String, existingAnnotationId: String?) -> Unit,
+    onDeleteAnnotation: (String) -> Unit,
     onDone: () -> Unit,
     onBack: () -> Unit,
 ) {
@@ -1750,61 +1832,57 @@ private fun ReaderScreen(
         body = state.currentContentBody,
         fallback = content.description,
     )
-    val listState = rememberLazyListState()
-    var hasRestoredProgress by remember(content.id) { mutableStateOf(false) }
-    var hasUserScrolledAfterOpen by remember(content.id) { mutableStateOf(false) }
+    val readerStartParagraphIndex = state.currentReaderStartParagraphIndex
+    val pages = remember(content.id, blocks) { readerPagesForBlocks(blocks) }
     val restoredProgress = remember(content.id) {
         state.currentReadingProgress?.takeIf { it.contentId == content.id && it.isUnfinished() }
     }
-    val firstVisibleParagraphIndex by remember(content.id, blocks.size) {
-        derivedStateOf {
-            val firstVisibleIndex = listState.layoutInfo.visibleItemsInfo.firstOrNull()?.index ?: 0
-            (firstVisibleIndex - READER_HEADER_ITEM_COUNT).coerceIn(0, (blocks.size - 1).coerceAtLeast(0))
+    val initialParagraphIndex = (readerStartParagraphIndex ?: restoredProgress?.lastVisibleParagraphIndex ?: 0)
+        .coerceIn(0, (blocks.size - 1).coerceAtLeast(0))
+    val initialPageIndex = remember(content.id, readerStartParagraphIndex, restoredProgress?.lastVisibleParagraphIndex, pages.size) {
+        readerPageIndexForParagraph(pages = pages, paragraphIndex = initialParagraphIndex)
+    }
+    var currentPageIndex by remember(content.id, initialPageIndex, pages.size) { mutableStateOf(initialPageIndex) }
+    val listState = rememberLazyListState()
+    var editingParagraphIndex by remember(content.id) { mutableStateOf<Int?>(null) }
+    var annotationNoteDraft by remember(content.id) { mutableStateOf("") }
+    val annotationsByParagraph = remember(content.id, state.readingAnnotations) {
+        state.readingAnnotations
+            .filter { annotation -> annotation.contentId == content.id }
+            .associateBy(ReadingAnnotation::paragraphIndex)
+    }
+    val safeCurrentPageIndex = currentPageIndex.coerceIn(0, (pages.size - 1).coerceAtLeast(0))
+    LaunchedEffect(safeCurrentPageIndex, pages.size) {
+        if (currentPageIndex != safeCurrentPageIndex) {
+            currentPageIndex = safeCurrentPageIndex
         }
     }
-    val lastVisibleParagraphIndex by remember(content.id, blocks.size) {
-        derivedStateOf {
-            val lastVisibleIndex = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-            (lastVisibleIndex - READER_HEADER_ITEM_COUNT).coerceIn(0, (blocks.size - 1).coerceAtLeast(0))
-        }
-    }
-    val progress by remember(content.id, blocks.size) {
-        derivedStateOf {
-            val lastVisibleIndex = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-            readerProgressPercentForReaderList(lastVisibleItemIndex = lastVisibleIndex, paragraphCount = blocks.size)
-        }
-    }
-    val shouldRecordScrollProgress by remember(content.id, blocks.size) {
-        derivedStateOf {
-            hasRestoredProgress &&
-                blocks.isNotEmpty() &&
-                listState.isScrollInProgress &&
-                listState.firstVisibleItemIndex > 0
-        }
-    }
-    val displayedProgress by remember(content.id, blocks.size) {
-        derivedStateOf {
-            restoredProgress
-                ?.progressPercent
-                ?.takeUnless { hasUserScrolledAfterOpen }
-                ?: progress
-        }
+    val currentPage = pages.getOrElse(safeCurrentPageIndex) { ReaderPage(0, (blocks.size - 1).coerceAtLeast(0)) }
+    val displayedProgress = readerProgressPercentForPageIndex(
+        pageIndex = safeCurrentPageIndex,
+        pageCount = pages.size,
+    )
+    val firstVisibleParagraphIndex = currentPage.start
+    val pageParagraphIndices = currentPage.start..currentPage.endInclusive
+    LaunchedEffect(content.id, safeCurrentPageIndex, currentPage.start, currentPage.endInclusive) {
+        listState.scrollToItem(0)
     }
 
-    LaunchedEffect(content.id, blocks.size) {
-        val targetParagraph = restoredProgress?.lastVisibleParagraphIndex
-            ?.coerceIn(0, (blocks.size - 1).coerceAtLeast(0))
-            ?: 0
-        if (targetParagraph > 0) {
-            listState.scrollToItem(READER_HEADER_ITEM_COUNT + targetParagraph)
-        }
-        hasRestoredProgress = true
-    }
-
-    LaunchedEffect(content.id, progress, lastVisibleParagraphIndex, blocks.size, shouldRecordScrollProgress) {
-        if (shouldRecordScrollProgress) {
-            hasUserScrolledAfterOpen = true
-            onProgressChanged(progress, lastVisibleParagraphIndex, blocks.size)
+    fun moveToPage(targetPageIndex: Int) {
+        val nextPageIndex = targetPageIndex.coerceIn(0, pages.lastIndex)
+        val nextPage = pages[nextPageIndex]
+        currentPageIndex = nextPageIndex
+        editingParagraphIndex = null
+        annotationNoteDraft = ""
+        if (nextPageIndex > safeCurrentPageIndex) {
+            onProgressChanged(
+                readerProgressPercentForPageIndex(
+                    pageIndex = nextPageIndex,
+                    pageCount = pages.size,
+                ),
+                nextPage.endInclusive,
+                blocks.size,
+            )
         }
     }
 
@@ -1844,7 +1922,10 @@ private fun ReaderScreen(
                         append(content.sourceLabel())
                         append(" · ")
                         append(content.topicLine())
-                        if (restoredProgress != null) {
+                        if (readerStartParagraphIndex != null) {
+                            append(" · note at paragraph ")
+                            append(readerStartParagraphIndex + 1)
+                        } else if (restoredProgress != null) {
                             append(" · continuing at ")
                             append(restoredProgress.progressPercent)
                             append("%")
@@ -1853,18 +1934,290 @@ private fun ReaderScreen(
                     modifier = Modifier.padding(bottom = 10.dp),
                 )
                 DisplayText(content.title, fontSize = 27.sp, lineHeight = 31.sp, modifier = Modifier.padding(bottom = 18.dp))
-            }
-            items(blocks.withIndex().toList()) { indexedBlock ->
-                ReaderMarkdownBlockText(block = indexedBlock.value)
-            }
-            item {
-                QaButton(
-                    text = "I'm done reading",
-                    onClick = onDone,
-                    variant = QaButtonVariant.Primary,
-                    modifier = Modifier.padding(top = 24.dp),
+                MonoText(
+                    "Page ${safeCurrentPageIndex + 1}/${pages.size}",
+                    modifier = Modifier
+                        .padding(bottom = 14.dp)
+                        .testTag("reader-page-label"),
                 )
             }
+            items(pageParagraphIndices.toList(), key = { paragraphIndex -> "reader-paragraph-$paragraphIndex" }) { paragraphIndex ->
+                val block = blocks[paragraphIndex]
+                val annotation = annotationsByParagraph[paragraphIndex]
+                ReaderAnnotatedBlock(
+                    paragraphIndex = paragraphIndex,
+                    block = block,
+                    annotation = annotation,
+                    isEditing = editingParagraphIndex == paragraphIndex,
+                    noteDraft = annotationNoteDraft,
+                    onStartEditing = {
+                        editingParagraphIndex = paragraphIndex
+                        annotationNoteDraft = annotation?.noteText.orEmpty()
+                    },
+                    onNoteDraftChanged = { annotationNoteDraft = it },
+                    onCancelEditing = {
+                        editingParagraphIndex = null
+                        annotationNoteDraft = ""
+                    },
+                    onDeleteAnnotation = { annotationId ->
+                        onDeleteAnnotation(annotationId)
+                        editingParagraphIndex = null
+                        annotationNoteDraft = ""
+                    },
+                    onSave = {
+                        onSaveAnnotation(
+                            paragraphIndex,
+                            block.text.text,
+                            annotationNoteDraft,
+                            annotation?.id,
+                        )
+                        editingParagraphIndex = null
+                        annotationNoteDraft = ""
+                    },
+                )
+            }
+        }
+        ReaderPageControls(
+            pageIndex = safeCurrentPageIndex,
+            pageCount = pages.size,
+            onPrevious = { moveToPage(safeCurrentPageIndex - 1) },
+            onNext = { moveToPage(safeCurrentPageIndex + 1) },
+            onDone = onDone,
+        )
+    }
+}
+
+@Composable
+private fun ReaderPageControls(
+    pageIndex: Int,
+    pageCount: Int,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+    onDone: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 24.dp, top = 10.dp, end = 24.dp, bottom = 18.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            QaButton(
+                text = "Previous",
+                onClick = onPrevious,
+                enabled = pageIndex > 0,
+                variant = QaButtonVariant.Outline,
+                size = QaButtonSize.Small,
+                fullWidth = false,
+                leadingIcon = QaIconKind.ArrowLeft,
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("reader-previous-page"),
+            )
+            QaButton(
+                text = if (pageIndex < pageCount - 1) "Next page" else "Last page",
+                onClick = onNext,
+                enabled = pageIndex < pageCount - 1,
+                variant = if (pageIndex < pageCount - 1) QaButtonVariant.Accent else QaButtonVariant.Outline,
+                size = QaButtonSize.Small,
+                fullWidth = false,
+                trailingIcon = if (pageIndex < pageCount - 1) QaIconKind.ArrowRight else null,
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("reader-next-page"),
+            )
+        }
+        QaButton(
+            text = "I'm done reading",
+            onClick = onDone,
+            variant = if (pageIndex >= pageCount - 1) QaButtonVariant.Primary else QaButtonVariant.Ghost,
+            modifier = Modifier.testTag("reader-done"),
+        )
+    }
+}
+
+@Composable
+private fun ReaderAnnotatedBlock(
+    paragraphIndex: Int,
+    block: ReaderMarkdownBlock,
+    annotation: ReadingAnnotation?,
+    isEditing: Boolean,
+    noteDraft: String,
+    onStartEditing: () -> Unit,
+    onNoteDraftChanged: (String) -> Unit,
+    onCancelEditing: () -> Unit,
+    onDeleteAnnotation: (String) -> Unit,
+    onSave: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 6.dp)
+            .testTag("reader-annotation-block-$paragraphIndex"),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Box(modifier = Modifier.weight(1f)) {
+                ReaderMarkdownBlockText(block = block)
+            }
+            ReaderAnnotationActionButton(
+                paragraphIndex = paragraphIndex,
+                hasAnnotation = annotation != null,
+                onClick = onStartEditing,
+            )
+        }
+        if (annotation != null && !isEditing) {
+            ReaderAnnotationPreview(paragraphIndex = paragraphIndex, annotation = annotation)
+        }
+        if (isEditing) {
+            ReaderAnnotationEditor(
+                paragraphIndex = paragraphIndex,
+                quotedText = block.text.text,
+                noteDraft = noteDraft,
+                hasExistingAnnotation = annotation != null,
+                onNoteDraftChanged = onNoteDraftChanged,
+                onCancel = onCancelEditing,
+                onDelete = annotation?.id?.let { annotationId ->
+                    { onDeleteAnnotation(annotationId) }
+                },
+                onSave = onSave,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ReaderAnnotationActionButton(
+    paragraphIndex: Int,
+    hasAnnotation: Boolean,
+    onClick: () -> Unit,
+) {
+    val colors = QualityAlternativeThemeTokens.colors
+    val description = if (hasAnnotation) {
+        "Edit note for paragraph $paragraphIndex"
+    } else {
+        "Add note for paragraph $paragraphIndex"
+    }
+    Surface(
+        modifier = Modifier
+            .size(34.dp)
+            .semantics { contentDescription = description }
+            .testTag("reader-annotation-action-$paragraphIndex"),
+        onClick = onClick,
+        shape = RoundedCornerShape(10.dp),
+        color = if (hasAnnotation) colors.accentSoft else colors.elevatedSurface,
+        contentColor = if (hasAnnotation) colors.accent else colors.mutedText,
+        border = BorderStroke(1.dp, if (hasAnnotation) colors.accent else colors.lineStrong),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            QaIcon(
+                kind = QaIconKind.Note,
+                color = if (hasAnnotation) colors.accent else colors.mutedText,
+                size = 17.dp,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ReaderAnnotationPreview(
+    paragraphIndex: Int,
+    annotation: ReadingAnnotation,
+) {
+    val colors = QualityAlternativeThemeTokens.colors
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 2.dp, end = 44.dp, bottom = 14.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(colors.accentSoft)
+            .border(BorderStroke(1.dp, colors.accent.copy(alpha = 0.35f)), RoundedCornerShape(10.dp))
+            .padding(horizontal = 12.dp, vertical = 10.dp)
+            .testTag("reader-annotation-preview-$paragraphIndex"),
+    ) {
+        MonoText("Note", color = colors.accent, modifier = Modifier.padding(bottom = 4.dp))
+        Text(
+            text = annotation.noteText,
+            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp, lineHeight = 19.sp),
+            color = colors.primaryText,
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun ReaderAnnotationEditor(
+    paragraphIndex: Int,
+    quotedText: String,
+    noteDraft: String,
+    hasExistingAnnotation: Boolean,
+    onNoteDraftChanged: (String) -> Unit,
+    onCancel: () -> Unit,
+    onDelete: (() -> Unit)?,
+    onSave: () -> Unit,
+) {
+    val colors = QualityAlternativeThemeTokens.colors
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 2.dp, end = 44.dp, bottom = 14.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(colors.elevatedSurface)
+            .border(BorderStroke(1.dp, colors.lineStrong), RoundedCornerShape(12.dp))
+            .padding(12.dp)
+            .testTag("reader-annotation-editor-$paragraphIndex"),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        MonoText("Quoted fragment", color = colors.mutedText)
+        Text(
+            text = quotedText,
+            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp, lineHeight = 18.sp),
+            color = colors.primaryText,
+            maxLines = 4,
+            overflow = TextOverflow.Ellipsis,
+        )
+        QaMultilineTextField(
+            value = noteDraft,
+            onValueChange = onNoteDraftChanged,
+            placeholder = "Write a note",
+            modifier = Modifier.testTag("reader-annotation-note-input-$paragraphIndex"),
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (onDelete != null) {
+                QaButton(
+                    text = "Delete note",
+                    onClick = onDelete,
+                    variant = QaButtonVariant.Ghost,
+                    size = QaButtonSize.Small,
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("reader-annotation-delete-$paragraphIndex"),
+                )
+            }
+            QaButton(
+                text = "Cancel",
+                onClick = onCancel,
+                variant = QaButtonVariant.Ghost,
+                size = QaButtonSize.Small,
+                modifier = Modifier.weight(1f),
+            )
+            QaButton(
+                text = if (hasExistingAnnotation) "Update note" else "Save note",
+                onClick = onSave,
+                variant = QaButtonVariant.Primary,
+                size = QaButtonSize.Small,
+                enabled = noteDraft.isNotBlank(),
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("reader-annotation-save-$paragraphIndex"),
+            )
         }
     }
 }
@@ -2161,7 +2514,11 @@ private fun FeedbackScreen(
 }
 
 @Composable
-private fun ProgressTab(snapshot: ProgressSnapshot) {
+private fun ProgressTab(
+    snapshot: ProgressSnapshot,
+    annotationCount: Int,
+    onOpenAnnotations: () -> Unit,
+) {
     val colors = QualityAlternativeThemeTokens.colors
     LazyColumn(
         modifier = Modifier
@@ -2217,6 +2574,37 @@ private fun ProgressTab(snapshot: ProgressSnapshot) {
             }
         }
         item {
+            QaCard(
+                padding = 18.dp,
+                modifier = Modifier.testTag("progress-annotations-card"),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    SourceBadge(sourceType = ContentSourceType.EDITORIAL, icon = QaIconKind.Note)
+                    Column(modifier = Modifier.weight(1f)) {
+                        MonoText("ANNOTATIONS")
+                        BodyText(
+                            text = annotationCountLabel(annotationCount),
+                            color = colors.primaryText,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                    }
+                    QaButton(
+                        text = "Open",
+                        onClick = onOpenAnnotations,
+                        variant = QaButtonVariant.Outline,
+                        size = QaButtonSize.Small,
+                        fullWidth = false,
+                        leadingIcon = QaIconKind.Note,
+                        modifier = Modifier.testTag("progress-open-annotations"),
+                    )
+                }
+            }
+        }
+        item {
             SectionLabel("Recent replacements")
             QaCard(padding = 0.dp) {
                 if (snapshot.recentReplacements.isEmpty()) {
@@ -2237,6 +2625,168 @@ private fun ProgressTab(snapshot: ProgressSnapshot) {
 }
 
 @Composable
+private fun AnnotationLibraryScreen(
+    state: MainUiState,
+    onOpenAnnotation: (String) -> Unit,
+    onBack: () -> Unit,
+) {
+    val colors = QualityAlternativeThemeTokens.colors
+    val contentById = remember(state.starterPacks, state.userLinks, state.userDocuments) {
+        annotationContentIndex(state)
+    }
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .testTag("annotation-library-list"),
+        contentPadding = PaddingValues(start = 24.dp, top = 16.dp, end = 24.dp, bottom = 104.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                DisplayText("Annotations", modifier = Modifier.weight(1f), fontSize = 26.sp)
+                QaButton(
+                    text = "Progress",
+                    onClick = onBack,
+                    variant = QaButtonVariant.Outline,
+                    size = QaButtonSize.Small,
+                    fullWidth = false,
+                    leadingIcon = QaIconKind.History,
+                    modifier = Modifier.testTag("annotation-library-back"),
+                )
+            }
+        }
+        if (state.readingAnnotations.isEmpty()) {
+            item {
+                QaCard(modifier = Modifier.testTag("annotation-library-empty")) {
+                    MonoText("NO NOTES YET")
+                    BodyText(
+                        text = "Annotations saved in the reader appear here with their source fragment.",
+                        color = colors.mutedText,
+                        modifier = Modifier.padding(top = 6.dp),
+                    )
+                }
+            }
+        } else {
+            items(state.readingAnnotations, key = ReadingAnnotation::id) { annotation ->
+                val content = contentById[annotation.contentId]
+                AnnotationLibraryRow(
+                    annotation = annotation,
+                    content = content,
+                    onOpen = { onOpenAnnotation(annotation.id) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AnnotationLibraryRow(
+    annotation: ReadingAnnotation,
+    content: ContentItem?,
+    onOpen: () -> Unit,
+) {
+    val colors = QualityAlternativeThemeTokens.colors
+    val canOpen = content != null && content.usesRepositoryBody()
+    QaCard(
+        padding = 16.dp,
+        modifier = Modifier
+            .clickable(enabled = canOpen, onClick = onOpen)
+            .testTag("annotation-row-${annotation.id}"),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            SourceBadge(
+                sourceType = content?.sourceType ?: ContentSourceType.EDITORIAL,
+                icon = content?.sourceType?.annotationSourceIcon() ?: QaIconKind.Close,
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.Top,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        text = content?.title ?: "Source no longer in Library",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontSize = 17.sp,
+                        lineHeight = 21.sp,
+                        color = colors.primaryText,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.weight(1f),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    MonoText(
+                        text = "P${annotation.paragraphIndex + 1}",
+                        color = colors.mutedText,
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
+                }
+                MonoText(
+                    text = buildString {
+                        append(content?.sourceType?.annotationSourceTypeLabel() ?: "Missing source")
+                        content?.sourceLabel()?.let { sourceLabel ->
+                            append(" · ")
+                            append(sourceLabel)
+                        }
+                        append(" · ")
+                        append(annotationUpdatedLabel(annotation.updatedAtMillis))
+                    },
+                    color = colors.mutedText,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 3.dp),
+                )
+                Text(
+                    text = "\"${annotation.quotedText.trim()}\"",
+                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp, lineHeight = 19.sp),
+                    color = colors.primaryText,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .padding(top = 12.dp)
+                        .testTag("annotation-quote-${annotation.id}"),
+                )
+                Text(
+                    text = annotation.noteText,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontSize = 13.5.sp,
+                        lineHeight = 18.sp,
+                        color = colors.mutedText,
+                    ),
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .padding(top = 8.dp)
+                        .testTag("annotation-note-${annotation.id}"),
+                )
+                QaButton(
+                    text = if (canOpen) "Open fragment" else "Source missing",
+                    onClick = onOpen,
+                    enabled = canOpen,
+                    variant = QaButtonVariant.Outline,
+                    size = QaButtonSize.Small,
+                    fullWidth = false,
+                    leadingIcon = if (canOpen) QaIconKind.Book else QaIconKind.Close,
+                    modifier = Modifier
+                        .padding(top = 12.dp)
+                        .testTag("annotation-open-${annotation.id}"),
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun SettingsTab(
     state: MainUiState,
     onToggleApp: (DistractingApp) -> Unit,
@@ -2246,6 +2796,9 @@ private fun SettingsTab(
     onSelectOpenAnywayUnlock: (Int) -> Unit,
     onSelectTheme: (AppThemeMode) -> Unit,
     onRefreshReadiness: () -> Unit,
+    onSelectAnnotationExport: () -> Unit,
+    onClearAnnotationExport: () -> Unit,
+    onRetryAnnotationExport: () -> Unit,
 ) {
     val context = LocalContext.current
     val colors = QualityAlternativeThemeTokens.colors
@@ -2296,7 +2849,7 @@ private fun SettingsTab(
         }
         item {
             Column(modifier = Modifier.testTag("settings-app-selection-section")) {
-                SectionLabel("Apps to interrupt", right = "${state.availableTargetApps.size} active")
+                SectionLabel("Apps to interrupt", right = "${quantityLabel(state.availableTargetApps.size, "app")} active")
                 QaCard {
                     BodyText(
                         text = "Checked apps trigger the replacement prompt. The Home screen only chooses which checked app to preview.",
@@ -2358,6 +2911,14 @@ private fun SettingsTab(
                     modifier = Modifier.padding(top = 6.dp),
                 )
             }
+        }
+        item {
+            AnnotationAutosaveSettingsSection(
+                state = state,
+                onSelectAnnotationExport = onSelectAnnotationExport,
+                onClearAnnotationExport = onClearAnnotationExport,
+                onRetryAnnotationExport = onRetryAnnotationExport,
+            )
         }
         item {
             SectionLabel("Default session length")
@@ -2452,6 +3013,95 @@ private fun SettingsTab(
                 textAlign = TextAlign.Center,
                 preserveCase = true,
             )
+        }
+    }
+}
+
+@Composable
+private fun AnnotationAutosaveSettingsSection(
+    state: MainUiState,
+    onSelectAnnotationExport: () -> Unit,
+    onClearAnnotationExport: () -> Unit,
+    onRetryAnnotationExport: () -> Unit,
+) {
+    val colors = QualityAlternativeThemeTokens.colors
+    val configured = !state.annotationExportUri.isNullOrBlank()
+    val exportActionLabel = if (state.annotationExportLastError == null) "Save now" else "Retry"
+    Column(modifier = Modifier.testTag("settings-annotation-export-section")) {
+        SectionLabel("Annotation autosave", right = if (configured) "On" else "Off")
+        QaCard {
+            BodyText(
+                text = "Pick a Markdown file. Drive-backed files sync automatically after each saved note.",
+                color = colors.mutedText,
+                modifier = Modifier.padding(bottom = 12.dp),
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                SourceBadge(sourceType = ContentSourceType.USER_DOCUMENT, icon = QaIconKind.Note)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = state.annotationExportDisplayName ?: "No export file selected",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontSize = 16.sp,
+                        lineHeight = 20.sp,
+                        color = colors.primaryText,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    MonoText(
+                        text = annotationExportStatusText(state),
+                        color = if (state.annotationExportLastError == null) colors.mutedText else colors.accent,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .padding(top = 4.dp)
+                            .testTag("settings-annotation-export-status"),
+                    )
+                }
+            }
+            Row(
+                modifier = Modifier.padding(top = 14.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                QaButton(
+                    text = if (configured) "Change file" else "Choose file",
+                    onClick = onSelectAnnotationExport,
+                    variant = QaButtonVariant.Outline,
+                    size = QaButtonSize.Small,
+                    leadingIcon = QaIconKind.External,
+                    modifier = Modifier.weight(1f).testTag("settings-annotation-export-pick"),
+                )
+                QaButton(
+                    text = exportActionLabel,
+                    onClick = onRetryAnnotationExport,
+                    variant = QaButtonVariant.Ghost,
+                    size = QaButtonSize.Small,
+                    enabled = configured,
+                    fullWidth = false,
+                    modifier = Modifier.testTag(
+                        if (state.annotationExportLastError == null) {
+                            "settings-annotation-export-save-now"
+                        } else {
+                            "settings-annotation-export-retry"
+                        },
+                    ),
+                )
+            }
+            if (configured) {
+                QaButton(
+                    text = "Turn off autosave",
+                    onClick = onClearAnnotationExport,
+                    variant = QaButtonVariant.Ghost,
+                    size = QaButtonSize.Small,
+                    modifier = Modifier
+                        .padding(top = 4.dp)
+                        .testTag("settings-annotation-export-clear"),
+                )
+            }
         }
     }
 }
@@ -2673,6 +3323,45 @@ private fun ContinueReadingCard(
             leadingIcon = QaIconKind.Book,
             modifier = Modifier.testTag("home-continue-action"),
         )
+    }
+}
+
+@Composable
+private fun ReadNowCard(
+    totalItems: Int,
+    totalMinutes: Int,
+    onOpenLibrary: () -> Unit,
+) {
+    val colors = QualityAlternativeThemeTokens.colors
+    QaCard(
+        padding = 16.dp,
+        modifier = Modifier.testTag("home-read-now-card"),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            SourceBadge(sourceType = ContentSourceType.EDITORIAL, icon = QaIconKind.Book)
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Read now",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontSize = 18.sp,
+                    lineHeight = 21.sp,
+                )
+                MonoText("${quantityLabel(totalItems, "item")} · $totalMinutes min", modifier = Modifier.padding(top = 4.dp))
+            }
+            QaButton(
+                text = "Library",
+                onClick = onOpenLibrary,
+                variant = QaButtonVariant.Outline,
+                size = QaButtonSize.Small,
+                fullWidth = false,
+                leadingIcon = QaIconKind.Library,
+                modifier = Modifier.testTag("home-read-now-action"),
+            )
+        }
     }
 }
 
@@ -3567,6 +4256,20 @@ private fun QaIcon(
                 lineTo(x(9f), y(18f))
             }
 
+            QaIconKind.Note -> {
+                path {
+                    moveTo(x(5f), y(4f))
+                    lineTo(x(17f), y(4f))
+                    lineTo(x(20f), y(7f))
+                    lineTo(x(20f), y(20f))
+                    lineTo(x(5f), y(20f))
+                    close()
+                }
+                line(8f, 9f, 16f, 9f)
+                line(8f, 13f, 16f, 13f)
+                line(8f, 17f, 13f, 17f)
+            }
+
             QaIconKind.Dot -> drawCircle(color = color, radius = x(2f), center = p(12f, 12f))
         }
     }
@@ -3665,6 +4368,54 @@ private fun QaTextField(
                     Text(
                         text = placeholder,
                         style = MaterialTheme.typography.bodyMedium.copy(fontSize = 15.sp, lineHeight = 19.sp),
+                        color = colors.faintText,
+                    )
+                }
+                innerTextField()
+            }
+        },
+    )
+}
+
+@Composable
+private fun QaMultilineTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    modifier: Modifier = Modifier,
+    isError: Boolean = false,
+) {
+    val colors = QualityAlternativeThemeTokens.colors
+    BasicTextField(
+        value = value,
+        onValueChange = onValueChange,
+        singleLine = false,
+        textStyle = MaterialTheme.typography.bodyMedium.copy(
+            color = colors.primaryText,
+            fontSize = 15.sp,
+            lineHeight = 20.sp,
+        ),
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = 92.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(colors.background)
+            .border(
+                BorderStroke(1.dp, if (isError) colors.accent else colors.lineStrong),
+                RoundedCornerShape(10.dp),
+            )
+            .padding(horizontal = 13.dp, vertical = 12.dp),
+        decorationBox = { innerTextField ->
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 68.dp),
+                contentAlignment = Alignment.TopStart,
+            ) {
+                if (value.isBlank()) {
+                    Text(
+                        text = placeholder,
+                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 15.sp, lineHeight = 20.sp),
                         color = colors.faintText,
                     )
                 }
@@ -3942,7 +4693,7 @@ internal fun homeHeroCopy(readiness: PermissionReadiness): HomeHeroCopy {
         )
     } else {
         HomeHeroCopy(
-            title = "You're set up for quieter reading today.",
+            title = "Finish setup to intercept distracting apps.",
             body = "Finish the Android setup first, so the app can meet the impulse before a social feed opens.",
             showAddLinkAction = false,
         )
@@ -3973,9 +4724,75 @@ internal data class ReaderMarkdownBlock(
     val kind: ReaderMarkdownBlockKind,
 )
 
+internal data class ReaderPage(
+    val start: Int,
+    val endInclusive: Int,
+)
+
 internal fun readerBlocksForDisplay(body: String, fallback: String): List<ReaderMarkdownBlock> {
     return readerParagraphsForDisplay(body = body, fallback = fallback)
         .map(::readerMarkdownBlock)
+}
+
+internal fun readerPagesForBlocks(
+    blocks: List<ReaderMarkdownBlock>,
+    maxPageWeight: Int = READER_DEFAULT_PAGE_WEIGHT,
+): List<ReaderPage> {
+    if (blocks.isEmpty()) {
+        return listOf(ReaderPage(start = 0, endInclusive = 0))
+    }
+    val safeMaxWeight = maxPageWeight.coerceAtLeast(1)
+    val pages = mutableListOf<ReaderPage>()
+    var pageStart = 0
+    var pageWeight = 0
+    blocks.forEachIndexed { index, block ->
+        val blockWeight = block.readerPageWeight()
+        if (index > pageStart && pageWeight + blockWeight > safeMaxWeight) {
+            pages += ReaderPage(start = pageStart, endInclusive = index - 1)
+            pageStart = index
+            pageWeight = 0
+        }
+        pageWeight += blockWeight
+    }
+    pages += ReaderPage(start = pageStart, endInclusive = blocks.lastIndex)
+    return pages
+}
+
+internal fun readerPageIndexForParagraph(pages: List<ReaderPage>, paragraphIndex: Int): Int {
+    if (pages.isEmpty()) {
+        return 0
+    }
+    val safeParagraphIndex = paragraphIndex.coerceAtLeast(0)
+    return pages.indexOfFirst { page -> safeParagraphIndex in page.start..page.endInclusive }
+        .takeIf { index -> index >= 0 }
+        ?: pages.lastIndex
+}
+
+internal fun readerProgressPercentForParagraphIndex(paragraphIndex: Int, paragraphCount: Int): Int {
+    if (paragraphCount <= 0) {
+        return 100
+    }
+    val visibleParagraphs = (paragraphIndex + 1).coerceIn(0, paragraphCount)
+    return ((visibleParagraphs * 100) / paragraphCount).coerceIn(1, 100)
+}
+
+internal fun readerProgressPercentForPageIndex(pageIndex: Int, pageCount: Int): Int {
+    if (pageCount <= 0) {
+        return 100
+    }
+    val visiblePages = (pageIndex + 1).coerceIn(0, pageCount)
+    return ((visiblePages * 100) / pageCount).coerceIn(1, 100)
+}
+
+private fun ReaderMarkdownBlock.readerPageWeight(): Int {
+    val textWeight = ((text.text.length + 319) / 320).coerceAtLeast(1)
+    return when (kind) {
+        ReaderMarkdownBlockKind.HEADING -> textWeight + 1
+        ReaderMarkdownBlockKind.CODE,
+        ReaderMarkdownBlockKind.LIST -> textWeight + 1
+        ReaderMarkdownBlockKind.QUOTE,
+        ReaderMarkdownBlockKind.BODY -> textWeight
+    }
 }
 
 internal fun readerMarkdownBlock(rawBlock: String): ReaderMarkdownBlock {
@@ -4161,6 +4978,10 @@ internal fun readerProgressPercentForReaderList(lastVisibleItemIndex: Int, parag
 }
 
 internal fun dayCountLabel(count: Int, singular: String): String {
+    return quantityLabel(count = count, singular = singular)
+}
+
+internal fun quantityLabel(count: Int, singular: String): String {
     return "$count ${dayNounLabel(count = count, singular = singular)}"
 }
 
@@ -4326,6 +5147,52 @@ private fun ContentItem.sourceLabel(): String {
         else -> sourceLabel?.ifBlank { null }
             ?: packId.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.US) else it.toString() }
     }
+}
+
+private fun annotationContentIndex(state: MainUiState): Map<String, ContentItem> {
+    return (state.starterPacks.flatMap(EditorialPack::items) + state.userLinks + state.userDocuments)
+        .distinctBy(ContentItem::id)
+        .associateBy(ContentItem::id)
+}
+
+private fun ContentSourceType.annotationSourceIcon(): QaIconKind {
+    return when (this) {
+        ContentSourceType.USER_LINK -> QaIconKind.Link
+        ContentSourceType.USER_DOCUMENT -> QaIconKind.Book
+        ContentSourceType.MEDITATION -> QaIconKind.Pause
+        ContentSourceType.EDITORIAL -> QaIconKind.Sparkle
+    }
+}
+
+private fun ContentSourceType.annotationSourceTypeLabel(): String {
+    return when (this) {
+        ContentSourceType.USER_LINK -> "User link"
+        ContentSourceType.USER_DOCUMENT -> "User file"
+        ContentSourceType.MEDITATION -> "Meditation"
+        ContentSourceType.EDITORIAL -> "Editorial"
+    }
+}
+
+private fun annotationCountLabel(count: Int): String {
+    return if (count == 1) {
+        "1 saved note"
+    } else {
+        "$count saved notes"
+    }
+}
+
+private fun annotationUpdatedLabel(timestampMillis: Long): String {
+    val formatter = DateTimeFormatter.ofPattern("MMM d, HH:mm", Locale.US)
+    return formatter.format(Instant.ofEpochMilli(timestampMillis).atZone(ZoneId.systemDefault()))
+}
+
+private fun annotationExportStatusText(state: MainUiState): String {
+    state.annotationExportLastError?.takeIf(String::isNotBlank)?.let { error ->
+        return "Autosave failed. ${error.removeSuffix(".")}."
+    }
+    return state.annotationExportLastSuccessfulAtMillis?.let { timestampMillis ->
+        "Last saved ${annotationUpdatedLabel(timestampMillis)}"
+    } ?: "Autosave is not configured"
 }
 
 private fun remainingMinutes(totalMinutes: Int, progress: Int): Int {
@@ -4528,6 +5395,22 @@ private fun persistDocumentPermission(context: Context, uri: Uri) {
     }
 }
 
+private fun persistAnnotationExportPermission(context: Context, uri: Uri) {
+    context.contentResolver.takePersistableUriPermission(
+        uri,
+        Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+    )
+}
+
+private fun releaseAnnotationExportPermission(context: Context, uri: Uri) {
+    runCatching {
+        context.contentResolver.releasePersistableUriPermission(
+            uri,
+            Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+        )
+    }
+}
+
 private fun releaseDocumentPermission(context: Context, uri: Uri) {
     runCatching {
         context.contentResolver.releasePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
@@ -4535,6 +5418,7 @@ private fun releaseDocumentPermission(context: Context, uri: Uri) {
 }
 
 private const val READER_HEADER_ITEM_COUNT = 1
+private const val READER_DEFAULT_PAGE_WEIGHT = 9
 private const val MAX_RECENT_PROGRESS_REPLACEMENTS = 3
 private const val RECENT_REPLACEMENTS_DAYS = 7
 private const val PROGRESS_STRIP_DAYS = 21

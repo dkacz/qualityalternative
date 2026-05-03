@@ -25,6 +25,7 @@ import androidx.test.uiautomator.UiDevice
 import com.qualityalternative.app.domain.model.AppThemeMode
 import com.qualityalternative.app.domain.model.ContentFormat
 import com.qualityalternative.app.domain.model.ContentItem
+import com.qualityalternative.app.domain.model.ContentPriority
 import com.qualityalternative.app.domain.model.DurationBucket
 import com.qualityalternative.app.domain.model.MEDITATION_TIMER_CONTENT_ID
 import com.qualityalternative.app.domain.model.OnboardingSelection
@@ -140,9 +141,7 @@ class VisualQaScreenshotTest {
         assertScienceReplacementReaderCopyIsDisplayed()
         capture("05c_reader_science_replacement_light")
 
-        composeRule.onNodeWithTag("reader-list")
-            .performScrollToNode(hasText("I'm done reading"))
-        composeRule.onNodeWithText("I'm done reading").performClick()
+        composeRule.onNodeWithTag("reader-done").performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("feedback-screen") }
         capture("06_feedback_light")
 
@@ -154,7 +153,7 @@ class VisualQaScreenshotTest {
         seedMeditationSelection()
         launchFixtureSystemIntervention()
         capture("08_intervention_meditation_light")
-        composeRule.onNodeWithText("Start timer", substring = true).performClick()
+        startMeditationFromIntervention()
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("meditation-timer-screen") }
         capture("09_meditation_timer_light")
         composeRule.onNodeWithText("End early").performClick()
@@ -168,6 +167,11 @@ class VisualQaScreenshotTest {
             .performSemanticsAction(SemanticsActions.OnClick)
         composeRule.waitForIdle()
         capture("10_settings_dark")
+
+        resetPersistentState()
+        launchOnboardedApp()
+        saveDarkTheme()
+        composeRule.waitForIdle()
 
         seedAllSharedContentSelection()
         openTab("tab-library", "library-list")
@@ -205,9 +209,7 @@ class VisualQaScreenshotTest {
         assertScienceReplacementReaderCopyIsDisplayed()
         capture("14c_reader_science_replacement_dark")
 
-        composeRule.onNodeWithTag("reader-list")
-            .performScrollToNode(hasText("I'm done reading"))
-        composeRule.onNodeWithText("I'm done reading").performClick()
+        composeRule.onNodeWithTag("reader-done").performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("feedback-screen") }
         capture("15_feedback_dark")
 
@@ -219,7 +221,7 @@ class VisualQaScreenshotTest {
         seedMeditationSelection()
         launchFixtureSystemIntervention()
         capture("17_intervention_meditation_dark")
-        composeRule.onNodeWithText("Start timer", substring = true).performClick()
+        startMeditationFromIntervention()
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("meditation-timer-screen") }
         capture("18_meditation_timer_dark")
 
@@ -251,17 +253,15 @@ class VisualQaScreenshotTest {
         assertTrue("Raw EPUB bold markers should not be visible", !hasNodeContaining("**bold**"))
         captureSprint10("03_reader_epub_start_light")
 
-        composeRule.onNodeWithTag("reader-list")
-            .performScrollToNode(hasText("Chapter Two"))
+        advanceReaderToText("Chapter Two")
         composeRule.onNodeWithText("Chapter Two").assertIsDisplayed()
         captureSprint10("04_reader_epub_mid_progress_light")
 
-        composeRule.onNodeWithTag("reader-list")
-            .performScrollToNode(hasText("I'm done reading"))
-        composeRule.onNodeWithText("I'm done reading").assertIsDisplayed()
+        advanceReaderToLastPage()
+        composeRule.onNodeWithTag("reader-done").assertIsDisplayed()
         captureSprint10("05_reader_epub_done_light")
 
-        composeRule.onNodeWithText("I'm done reading").performClick()
+        composeRule.onNodeWithTag("reader-done").performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("feedback-screen") }
         captureSprint10("06_feedback_epub_light")
 
@@ -316,7 +316,7 @@ class VisualQaScreenshotTest {
         seedMeditationSelection()
         launchFixtureSystemIntervention()
         captureSprint10("09_intervention_meditation_5m_light")
-        composeRule.onNodeWithText("Start timer", substring = true).performClick()
+        startMeditationFromIntervention()
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("meditation-timer-screen") }
         composeRule.onNodeWithText("No feed. Just 5 minutes back.", substring = true).assertIsDisplayed()
         assertNodeFullyWithinRoot("meditation-countdown")
@@ -371,15 +371,13 @@ class VisualQaScreenshotTest {
         composeRule.onNodeWithText("First EPUB bullet with bold text", substring = true).assertIsDisplayed()
         assertTrue("Raw dark-mode EPUB bold markers should not be visible", !hasNodeContaining("**bold**"))
         captureSprint10("13_reader_epub_start_dark")
-        composeRule.onNodeWithTag("reader-list")
-            .performScrollToNode(hasText("Chapter Two"))
+        advanceReaderToText("Chapter Two")
         composeRule.onNodeWithText("Chapter Two").assertIsDisplayed()
         captureSprint10("13a_reader_epub_mid_progress_dark")
-        composeRule.onNodeWithTag("reader-list")
-            .performScrollToNode(hasText("I'm done reading"))
-        composeRule.onNodeWithText("I'm done reading").assertIsDisplayed()
+        advanceReaderToLastPage()
+        composeRule.onNodeWithTag("reader-done").assertIsDisplayed()
         captureSprint10("13b_reader_epub_done_dark")
-        composeRule.onNodeWithText("I'm done reading").performClick()
+        composeRule.onNodeWithTag("reader-done").performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("feedback-screen") }
         captureSprint10("13e_feedback_epub_dark")
         composeRule.onNodeWithText("Skip").performClick()
@@ -409,7 +407,7 @@ class VisualQaScreenshotTest {
         resetForDarkMeditationFixture()
         launchFixtureSystemIntervention()
         captureSprint10("14_intervention_meditation_5m_dark")
-        composeRule.onNodeWithText("Start timer", substring = true).performClick()
+        startMeditationFromIntervention()
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("meditation-timer-screen") }
         composeRule.onNodeWithText("No feed. Just 5 minutes back.", substring = true).assertIsDisplayed()
         assertNodeFullyWithinRoot("meditation-countdown")
@@ -670,8 +668,7 @@ class VisualQaScreenshotTest {
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
         captureSprint12("15_reader_start_light")
 
-        composeRule.onNodeWithTag("reader-list")
-            .performScrollToNode(hasText("Chapter Two"))
+        advanceReaderToText("Chapter Two")
         captureSprint12("16_reader_mid_light")
 
         scenario?.onActivity { activity ->
@@ -747,8 +744,7 @@ class VisualQaScreenshotTest {
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
         captureSprint12("25_reader_start_dark")
 
-        composeRule.onNodeWithTag("reader-list")
-            .performScrollToNode(hasText("Chapter Two"))
+        advanceReaderToText("Chapter Two")
         captureSprint12("26_reader_mid_dark")
     }
 
@@ -960,8 +956,7 @@ class VisualQaScreenshotTest {
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
         captureSprint12Final("16_reader_start_light")
 
-        composeRule.onNodeWithTag("reader-list")
-            .performScrollToNode(hasText("Chapter Two"))
+        advanceReaderToText("Chapter Two")
         captureSprint12Final("17_reader_mid_light")
 
         scenario?.onActivity { activity ->
@@ -1032,8 +1027,7 @@ class VisualQaScreenshotTest {
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
         captureSprint12Final("26_reader_start_dark")
 
-        composeRule.onNodeWithTag("reader-list")
-            .performScrollToNode(hasText("Chapter Two"))
+        advanceReaderToText("Chapter Two")
         captureSprint12Final("27_reader_mid_dark")
     }
 
@@ -1046,9 +1040,7 @@ class VisualQaScreenshotTest {
         composeRule.onNodeWithText("Read this", substring = true).performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
         val completedContent = currentContentIdAndTitle()
-        composeRule.onNodeWithTag("reader-list")
-            .performScrollToNode(hasText("I'm done reading"))
-        composeRule.onNodeWithText("I'm done reading").performClick()
+        composeRule.onNodeWithTag("reader-done").performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("feedback-screen") }
 
         scenario?.onActivity { activity -> activity.mainViewModel.openLibrary() }
@@ -1073,7 +1065,7 @@ class VisualQaScreenshotTest {
         launchFixtureSystemIntervention()
         composeRule.waitUntil(timeoutMillis = 10_000) { hasNode("3-minute reset") }
         captureSprint13("03_intervention_meditation_available_before_completion_light")
-        composeRule.onNodeWithText("Start timer", substring = true).performClick()
+        startMeditationFromIntervention()
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("meditation-timer-screen") }
         scenario?.onActivity { activity ->
             activity.mainViewModel.finishMeditationReset(nowMillis = 12_000L)
@@ -1180,9 +1172,7 @@ class VisualQaScreenshotTest {
         assertAttentionClassicsReaderCopyIsDisplayed()
         captureLegacy("04_reader_attention_light")
 
-        composeRule.onNodeWithTag("reader-list")
-            .performScrollToNode(hasText("I'm done reading"))
-        composeRule.onNodeWithText("I'm done reading").performClick()
+        composeRule.onNodeWithTag("reader-done").performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("feedback-screen") }
         captureLegacy("05_feedback_light")
 
@@ -1194,7 +1184,7 @@ class VisualQaScreenshotTest {
         seedMeditationSelection()
         launchFixtureSystemIntervention()
         captureLegacy("07_intervention_meditation_light")
-        composeRule.onNodeWithText("Start timer", substring = true).performClick()
+        startMeditationFromIntervention()
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("meditation-timer-screen") }
         captureLegacy("08_meditation_timer_light")
         composeRule.onNodeWithText("End early").performClick()
@@ -1224,7 +1214,7 @@ class VisualQaScreenshotTest {
         seedMeditationSelection()
         launchFixtureSystemIntervention()
         captureLegacy("13_intervention_meditation_dark")
-        composeRule.onNodeWithText("Start timer", substring = true).performClick()
+        startMeditationFromIntervention()
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("meditation-timer-screen") }
         captureLegacy("14_meditation_timer_dark")
     }
@@ -1281,7 +1271,7 @@ class VisualQaScreenshotTest {
         composeRule.waitUntil(timeoutMillis = 10_000) {
             hasNodeContaining("Turn an impulse") ||
                 hasNode("You're set up for quieter reading today.") ||
-                hasNode("Interception needs one more step.")
+                hasNode("Finish setup to intercept distracting apps.")
         }
         if (!hasNodeContaining("Turn an impulse")) {
             return
@@ -1564,10 +1554,69 @@ class VisualQaScreenshotTest {
             .assertIsNotSelected()
     }
 
+    private fun startMeditationFromIntervention() {
+        if (hasNodeContaining("Start timer")) {
+            composeRule.onNodeWithText("Start timer", substring = true).performClick()
+            return
+        }
+
+        var meditationBackupIndex = -1
+        scenario?.onActivity { activity ->
+            meditationBackupIndex = activity.mainViewModel.uiState.currentRecommendationSet
+                ?.backups
+                ?.indexOfFirst { item -> item.id == MEDITATION_TIMER_CONTENT_ID }
+                ?: -1
+        }
+        assertTrue("Expected meditation to be available as a primary or backup option", meditationBackupIndex >= 0)
+        val backupTag = "intervention-backup-action-$meditationBackupIndex"
+        composeRule.onNodeWithTag("intervention-backup-list")
+            .performScrollToNode(hasTestTag(backupTag))
+        composeRule.onNodeWithTag(backupTag)
+            .assertIsDisplayed()
+            .performClick()
+    }
+
+    private fun advanceReaderToText(text: String, maxPages: Int = 12) {
+        repeat(maxPages) {
+            if (hasNode(text)) {
+                return
+            }
+            runCatching {
+                composeRule.onNodeWithTag("reader-list")
+                    .performScrollToNode(hasText(text))
+            }
+            if (hasNode(text)) {
+                return
+            }
+            if (hasNode("Last page")) {
+                return
+            }
+            composeRule.onNodeWithTag("reader-next-page")
+                .assertIsDisplayed()
+                .performClick()
+            composeRule.waitForIdle()
+        }
+    }
+
+    private fun advanceReaderToLastPage(maxPages: Int = 20) {
+        repeat(maxPages) {
+            if (hasNode("Last page")) {
+                return
+            }
+            composeRule.onNodeWithTag("reader-next-page")
+                .assertIsDisplayed()
+                .performClick()
+            composeRule.waitForIdle()
+        }
+    }
+
     private fun seedMeditationSelection() = runBlocking {
-        val repository = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication)
+        val appContainer = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication)
             .appContainer
-            .settingsRepository
+        val repository = appContainer.settingsRepository
+        appContainer.readingProgressRepository.readingProgress()
+            .map { progress -> progress.contentId }
+            .forEach { contentId -> appContainer.readingProgressRepository.deleteProgress(contentId) }
         repository.saveOnboardingSelection(
             OnboardingSelection(
                 selectedAppPackages = setOf(FixtureTargetRegistry.fixtureDistractors.first().packageName),
@@ -1576,6 +1625,8 @@ class VisualQaScreenshotTest {
                 selectedPackIds = setOf("meditation-only-test-pack"),
             ),
         )
+        repository.savePriorityContentIds(emptySet())
+        repository.saveContentPriority(ContentPriority.MEDITATION)
     }
 
     private fun seedUserEpubSelection(

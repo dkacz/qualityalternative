@@ -1,6 +1,7 @@
 package com.qualityalternative.app
 
 import android.content.Intent
+import android.net.Uri
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
@@ -18,23 +19,31 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeUp
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.UiDevice
 import com.qualityalternative.app.domain.model.AppThemeMode
+import com.qualityalternative.app.domain.model.ContentFormat
 import com.qualityalternative.app.domain.model.ContentItem
 import com.qualityalternative.app.domain.model.DurationBucket
 import com.qualityalternative.app.domain.model.AnalyticsEventType
 import com.qualityalternative.app.domain.model.MEDITATION_TIMER_CONTENT_ID
 import com.qualityalternative.app.domain.model.OnboardingSelection
+import com.qualityalternative.app.domain.model.ReadingAnnotationDraft
 import com.qualityalternative.app.domain.model.ReadingProgress
 import com.qualityalternative.app.domain.model.TopicTag
 import com.qualityalternative.app.domain.model.UserDocumentDraft
 import com.qualityalternative.app.domain.service.AddUserDocumentResult
 import com.qualityalternative.app.interception.FixtureTargetRegistry
 import com.qualityalternative.app.interception.InterceptionRuntimeGate
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import java.io.ByteArrayOutputStream
 import java.io.File
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -50,6 +59,18 @@ class MainActivityTest {
     private var scenario: ActivityScenario<MainActivity>? = null
     private val interventionContinueProgressScreenshotDirName =
         "intervention-continue-progress-${System.currentTimeMillis()}"
+    private val sprint14RankingScreenshotDirName =
+        "sprint14-fresh-ranking-${System.currentTimeMillis()}"
+    private val sprint14AnnotationStorageScreenshotDirName =
+        "sprint14-annotation-storage-${System.currentTimeMillis()}"
+    private val sprint14ReaderAnnotationScreenshotDirName =
+        "sprint14-reader-annotation-${System.currentTimeMillis()}"
+    private val sprint14AnnotationLibraryScreenshotDirName =
+        "sprint14-annotation-library-${System.currentTimeMillis()}"
+    private val sprint14AnnotationExportScreenshotDirName =
+        "sprint14-annotation-export-${System.currentTimeMillis()}"
+    private val sprint14ReaderPaginationScreenshotDirName =
+        "sprint14-reader-pagination-${System.currentTimeMillis()}"
 
     @Before
     fun resetAppState() {
@@ -324,6 +345,16 @@ class MainActivityTest {
         composeRule.waitUntil(timeoutMillis = 10_000) { hasNode("Ready when you are") }
         composeRule.onNodeWithTag("add-link-done").performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("library-list") }
+        val deletedLinkId = "user-link:918123c9245605b90800494db814f2b6282ee47d915b479427b52aa7fe1b9805"
+        seedReadingAnnotation(
+            contentId = deletedLinkId,
+            paragraphIndex = 1,
+            quotedText = "Delete me",
+            noteText = "Remove this with the saved link.",
+        )
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasReadingAnnotationFor(deletedLinkId)
+        }
 
         composeRule.onNodeWithTag("library-manage-toggle")
             .assertIsDisplayed()
@@ -337,7 +368,7 @@ class MainActivityTest {
             .performScrollToNode(hasText("Delete me"))
         composeRule.onNodeWithText("Delete me")
             .assertIsDisplayed()
-        val selectTag = "library-select-user-link:918123c9245605b90800494db814f2b6282ee47d915b479427b52aa7fe1b9805"
+        val selectTag = "library-select-$deletedLinkId"
         composeRule.onNodeWithTag("library-list")
             .performScrollToNode(hasTestTag(selectTag))
         composeRule.onNodeWithTag(selectTag)
@@ -351,6 +382,12 @@ class MainActivityTest {
 
         composeRule.waitUntil(timeoutMillis = 10_000) { !hasNode("Delete me") }
         assertFalse(hasNode("Delete me"))
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            !hasReadingAnnotationFor(deletedLinkId) && hasReadingAnnotationDeletedEventFor(deletedLinkId)
+        }
+        scenario?.onActivity { activity -> activity.mainViewModel.dismissMessage() }
+        composeRule.waitForIdle()
+        captureSprint14AnnotationStorageScreenshot("01_library_after_annotation_cleanup_light")
     }
 
     @Test
@@ -416,9 +453,7 @@ class MainActivityTest {
         composeRule.onAllNodesWithText("figure · editorial image", ignoreCase = true)
             .fetchSemanticsNodes()
             .also { nodes -> assertEquals(0, nodes.size) }
-        composeRule.onNodeWithTag("reader-list")
-            .performScrollToNode(hasText("I'm done reading"))
-        composeRule.onNodeWithText("I'm done reading")
+        composeRule.onNodeWithTag("reader-done")
             .assertIsDisplayed()
             .performClick()
 
@@ -453,9 +488,7 @@ class MainActivityTest {
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
         val completedContentId = currentContentId()
         val completedTitle = currentContentTitle()
-        composeRule.onNodeWithTag("reader-list")
-            .performScrollToNode(hasText("I'm done reading"))
-        composeRule.onNodeWithText("I'm done reading")
+        composeRule.onNodeWithTag("reader-done")
             .assertIsDisplayed()
             .performClick()
 
@@ -551,14 +584,17 @@ class MainActivityTest {
         waitForHome()
         assertFalse(hasTag("home-continue-card"))
 
+        seedFreshDocumentRankingScenario()
         launchFixtureSystemIntervention()
         composeRule.onNodeWithText("Read this", substring = true)
             .assertIsDisplayed()
             .performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
         val contentId = currentContentId()
-        composeRule.onNodeWithTag("reader-list")
-            .performScrollToNode(hasText("I'm done reading"))
+        composeRule.onNodeWithTag("reader-next-page")
+            .assertIsDisplayed()
+            .assertIsEnabled()
+            .performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) { hasUnfinishedProgressFor(contentId) }
         val savedPercent = savedProgressPercentFor(contentId)
         val savedParagraphIndex = savedProgressParagraphIndexFor(contentId)
@@ -600,9 +636,7 @@ class MainActivityTest {
             .assertIsDisplayed()
             .performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
-        composeRule.onNodeWithTag("reader-list")
-            .performScrollToNode(hasText("I'm done reading"))
-        composeRule.onNodeWithText("I'm done reading")
+        composeRule.onNodeWithTag("reader-done")
             .assertIsDisplayed()
             .performClick()
 
@@ -610,6 +644,61 @@ class MainActivityTest {
             hasTag("feedback-screen") && hasCompletedProgressFor(contentId)
         }
         assertTrue(hasCompletedManualReaderEventFor(contentId))
+    }
+
+    @Test
+    fun homeReadNowOpensLibraryAndPaginatedReaderWithoutIntervention() {
+        launchOnboardedApp()
+        val seeded = seedFreshDocumentRankingScenario()
+        scenario?.onActivity { activity -> activity.mainViewModel.openHome() }
+        waitForHome()
+
+        composeRule.onNodeWithTag("home-list")
+            .performScrollToNode(hasTestTag("home-read-now-card"))
+        composeRule.onNodeWithTag("home-read-now-card").assertIsDisplayed()
+        captureSprint14ReaderPaginationScreenshot("01_home_read_now_light")
+        composeRule.onNodeWithTag("home-read-now-action")
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("library-list") }
+
+        composeRule.onNodeWithTag("library-list")
+            .performScrollToNode(hasTestTag("library-open-${seeded.newEpub.id}"))
+        composeRule.onNodeWithTag("library-open-${seeded.newEpub.id}")
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
+        assertEquals(seeded.newEpub.id, currentContentId())
+        composeRule.onNodeWithTag("reader-page-label").assertIsDisplayed()
+        captureSprint14ReaderPaginationScreenshot("02_reader_page_one_light")
+        composeRule.onNodeWithTag("reader-list")
+            .performTouchInput { swipeUp() }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("reader-next-page")
+            .assertIsDisplayed()
+            .assertIsEnabled()
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            visibleReaderParagraphIndices().any { index -> index > 0 }
+        }
+        composeRule.onNodeWithText("Page 2/2", ignoreCase = true)
+            .assertIsDisplayed()
+        captureSprint14ReaderPaginationScreenshot("03_reader_next_page_light")
+        scenario?.onActivity { activity -> activity.mainViewModel.selectThemeMode(AppThemeMode.DARK) }
+        composeRule.waitForIdle()
+        captureSprint14ReaderPaginationScreenshot("04_reader_next_page_dark")
+        composeRule.onNodeWithTag("reader-list")
+            .performTouchInput { swipeUp() }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("reader-previous-page")
+            .assertIsDisplayed()
+            .assertIsEnabled()
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            visibleReaderParagraphIndices().contains(0)
+        }
+        composeRule.onNodeWithText("Page 1/2", ignoreCase = true)
+            .assertIsDisplayed()
     }
 
     @Test
@@ -652,6 +741,250 @@ class MainActivityTest {
         }
         composeRule.waitForIdle()
         captureInterventionContinueProgressScreenshot("03_intervention_continue_progress_dark")
+    }
+
+    @Test
+    fun newlyAddedEpubBecomesPrimaryAfterOldFilesAreDeprioritized() {
+        launchOnboardedApp()
+        val seeded = seedFreshDocumentRankingScenario()
+
+        relaunchFixtureSystemIntervention()
+
+        val recommendationSet = currentRecommendationSet()
+        assertEquals(seeded.newEpub.id, recommendationSet.primary.id)
+        composeRule.onNodeWithText(seeded.newEpub.title)
+            .assertIsDisplayed()
+        captureSprint14RankingScreenshot("01_new_epub_primary_light")
+
+        composeRule.onNodeWithText("Read this", substring = true)
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
+        assertEquals(seeded.newEpub.title, currentContentTitle())
+        composeRule.onNodeWithTag("reader-screen").assertIsDisplayed()
+        composeRule.onNodeWithText("This newest EPUB is the fresh private document", substring = true)
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun readerAnnotationEditorSavesEditsAndShowsPreview() {
+        launchFixtureSystemIntervention()
+
+        composeRule.onNodeWithText("Read this", substring = true)
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
+        val contentId = currentContentId()
+
+        composeRule.onNodeWithTag("reader-annotation-action-0")
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-annotation-editor-0") }
+        composeRule.onNodeWithTag("reader-list")
+            .performScrollToNode(hasTestTag("reader-annotation-editor-0"))
+        composeRule.onNodeWithTag("reader-annotation-editor-0").assertIsDisplayed()
+        composeRule.onNodeWithText("QUOTED FRAGMENT").assertIsDisplayed()
+        val firstNote = "Worth remembering when the impulse hits."
+        composeRule.onNodeWithTag("reader-annotation-note-input-0")
+            .assertIsDisplayed()
+            .performTextInput(firstNote)
+        UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).pressBack()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("reader-list")
+            .performScrollToNode(hasTestTag("reader-annotation-editor-0"))
+        composeRule.onNodeWithTag("reader-annotation-save-0").assertIsDisplayed()
+        captureSprint14ReaderAnnotationScreenshot("01_reader_annotation_editor_light")
+
+        composeRule.onNodeWithTag("reader-annotation-save-0")
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasTag("reader-annotation-preview-0") && hasNode(firstNote) && hasReadingAnnotationNote(contentId, firstNote)
+        }
+        composeRule.onNodeWithTag("reader-annotation-preview-0").assertIsDisplayed()
+        captureSprint14ReaderAnnotationScreenshot("02_reader_annotation_preview_light")
+        scenario?.onActivity { activity -> activity.mainViewModel.dismissMessage() }
+        composeRule.waitUntil(timeoutMillis = 10_000) { !hasNode("Annotation saved.") }
+
+        composeRule.onNodeWithTag("reader-annotation-action-0")
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-annotation-editor-0") }
+        composeRule.onNodeWithTag("reader-list")
+            .performScrollToNode(hasTestTag("reader-annotation-editor-0"))
+        val updatedNoteSuffix = "Remember: "
+        composeRule.onNodeWithTag("reader-annotation-note-input-0")
+            .performTextInput(updatedNoteSuffix)
+        UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).pressBack()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("reader-list")
+            .performScrollToNode(hasTestTag("reader-annotation-editor-0"))
+        composeRule.onNodeWithTag("reader-annotation-save-0")
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasTag("reader-annotation-preview-0") &&
+                hasNodeContaining("Remember:") &&
+                hasSingleReadingAnnotationNoteContaining(contentId, "Remember:")
+        }
+        scenario?.onActivity { activity -> activity.mainViewModel.dismissMessage() }
+        composeRule.waitUntil(timeoutMillis = 10_000) { !hasNode("Annotation updated.") }
+
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.selectThemeMode(AppThemeMode.DARK)
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("reader-annotation-preview-0").assertIsDisplayed()
+        captureSprint14ReaderAnnotationScreenshot("03_reader_annotation_preview_dark")
+    }
+
+    @Test
+    fun annotationLibraryListsSavedNotesAndOpensSourceFragment() {
+        launchFixtureSystemIntervention()
+
+        composeRule.onNodeWithText("Read this", substring = true)
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
+        val contentId = currentContentId()
+        val title = currentContentTitle()
+
+        val firstNote = "First note from the annotation library flow."
+        val secondNote = "Second note should jump back to this paragraph."
+        saveReaderAnnotation(paragraphIndex = 0, noteText = firstNote)
+        saveReaderAnnotation(paragraphIndex = 1, noteText = secondNote)
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasReadingAnnotationNote(contentId = contentId, paragraphIndex = 0, noteText = firstNote) &&
+                hasReadingAnnotationNote(contentId = contentId, paragraphIndex = 1, noteText = secondNote)
+        }
+        val targetAnnotationId = readingAnnotationIdFor(contentId = contentId, paragraphIndex = 1)
+
+        scenario?.onActivity { activity -> activity.mainViewModel.openProgress() }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("progress-list") }
+        composeRule.onNodeWithTag("progress-list")
+            .performScrollToNode(hasTestTag("progress-open-annotations"))
+        composeRule.onNodeWithTag("progress-open-annotations")
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("annotation-library-list") }
+        composeRule.onNodeWithText("Annotations").assertIsDisplayed()
+        assertTrue(composeRule.onAllNodesWithText(title).fetchSemanticsNodes().isNotEmpty())
+        assertTrue(composeRule.onAllNodesWithText("EDITORIAL", substring = true).fetchSemanticsNodes().isNotEmpty())
+        composeRule.onNodeWithText(firstNote, substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText(secondNote, substring = true).assertIsDisplayed()
+        captureSprint14AnnotationLibraryScreenshot("01_annotation_library_light")
+
+        scenario?.onActivity { activity -> activity.mainViewModel.selectThemeMode(AppThemeMode.DARK) }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("annotation-library-list")
+            .performScrollToNode(hasTestTag("annotation-open-$targetAnnotationId"))
+        composeRule.onNodeWithTag("annotation-open-$targetAnnotationId").assertIsDisplayed()
+        captureSprint14AnnotationLibraryScreenshot("02_annotation_library_dark")
+
+        seedReadingAnnotation(
+            contentId = "missing-annotation-source",
+            paragraphIndex = 4,
+            quotedText = "This source was deleted.",
+            noteText = "Missing source should be clear and disabled.",
+            nowMillis = System.currentTimeMillis() + 1_000L,
+        )
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasNode("Source no longer in Library") }
+        composeRule.onNodeWithTag("annotation-library-list")
+            .performScrollToNode(hasText("Source no longer in Library"))
+        composeRule.onNodeWithText("Source no longer in Library").assertIsDisplayed()
+        composeRule.onNodeWithText("MISSING SOURCE", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("Source missing").assertIsDisplayed()
+        captureSprint14AnnotationLibraryScreenshot("03_annotation_missing_source_dark")
+
+        composeRule.onNodeWithTag("annotation-library-list")
+            .performScrollToNode(hasTestTag("annotation-open-$targetAnnotationId"))
+        composeRule.onNodeWithTag("annotation-open-$targetAnnotationId")
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
+        assertEquals(contentId, currentContentId())
+        assertEquals(1, currentReaderStartParagraphIndex())
+        captureSprint14AnnotationLibraryScreenshot("04_annotation_fragment_jump_dark")
+    }
+
+    @Test
+    fun annotationAutosaveWritesMarkdownAndShowsSettingsStatus() {
+        launchFixtureSystemIntervention()
+
+        composeRule.onNodeWithText("Read this", substring = true)
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
+        val contentId = currentContentId()
+        val title = currentContentTitle()
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val exportFile = File(context.filesDir, "qa-annotations-e2e.md").apply {
+            if (exists()) delete()
+        }
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.configureReadingAnnotationExport(
+                uri = Uri.fromFile(exportFile).toString(),
+                displayName = "qa-annotations-e2e.md",
+            )
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) { exportFile.exists() }
+
+        val noteText = "Autosaved to the annotation markdown file."
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.saveCurrentReadingAnnotation(
+                paragraphIndex = 0,
+                quotedText = activity.mainViewModel.uiState.currentContentBody.ifBlank { title },
+                noteText = noteText,
+            )
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            val markdown = exportFile.readText()
+            markdown.contains(noteText) && markdown.contains("## $title")
+        }
+
+        scenario?.onActivity { activity -> activity.mainViewModel.openSettings() }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("settings-list") }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasAnnotationExportSuccess() }
+        composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasTestTag("settings-annotation-export-section"))
+        composeRule.onNodeWithTag("settings-annotation-export-section").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasTestTag("settings-annotation-export-status"))
+        composeRule.onNodeWithText("qa-annotations-e2e.md").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings-annotation-export-status").assertIsDisplayed()
+        composeRule.onNodeWithText("Save now").assertIsDisplayed()
+        scenario?.onActivity { activity -> activity.mainViewModel.dismissMessage() }
+        composeRule.waitForIdle()
+        captureSprint14AnnotationExportScreenshot("01_annotation_export_success_light")
+
+        val annotationId = readingAnnotationIdFor(contentId = contentId, paragraphIndex = 0)
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.deleteReadingAnnotation(annotationId)
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            val markdown = exportFile.readText()
+            !markdown.contains(noteText) && markdown.contains("No annotations saved yet.")
+        }
+
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.configureReadingAnnotationExport(
+                uri = "content://com.qualityalternative.missing/qa-annotations.md",
+                displayName = "missing-drive-file.md",
+            )
+            activity.mainViewModel.selectThemeMode(AppThemeMode.DARK)
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasAnnotationExportFailure()
+        }
+        composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasTestTag("settings-annotation-export-section"))
+        composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasTestTag("settings-annotation-export-status"))
+        composeRule.onNodeWithText("missing-drive-file.md").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings-annotation-export-status").assertIsDisplayed()
+        composeRule.onNodeWithText("Retry").assertIsDisplayed()
+        scenario?.onActivity { activity -> activity.mainViewModel.dismissMessage() }
+        composeRule.waitForIdle()
+        captureSprint14AnnotationExportScreenshot("02_annotation_export_failure_dark")
     }
 
     @Test
@@ -810,6 +1143,15 @@ class MainActivityTest {
         return title
     }
 
+    private fun currentReaderStartParagraphIndex(): Int {
+        var paragraphIndex = -1
+        scenario?.onActivity { activity ->
+            paragraphIndex = activity.mainViewModel.uiState.currentReaderStartParagraphIndex ?: -1
+        }
+        assertTrue(paragraphIndex >= 0)
+        return paragraphIndex
+    }
+
     private fun currentRecommendationContentIds(): Set<String> {
         var contentIds = emptySet<String>()
         scenario?.onActivity { activity ->
@@ -875,6 +1217,103 @@ class MainActivityTest {
         return hasEvent
     }
 
+    private fun seedReadingAnnotation(
+        contentId: String,
+        paragraphIndex: Int,
+        quotedText: String,
+        noteText: String,
+        nowMillis: Long = 11_000L,
+    ) = runBlocking {
+        val app = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication)
+        app.appContainer.readingAnnotationRepository.saveAnnotation(
+            draft = ReadingAnnotationDraft(
+                contentId = contentId,
+                paragraphIndex = paragraphIndex,
+                quotedText = quotedText,
+                noteText = noteText,
+            ),
+            nowMillis = nowMillis,
+        )
+    }
+
+    private fun hasReadingAnnotationFor(contentId: String): Boolean {
+        var hasAnnotation = false
+        scenario?.onActivity { activity ->
+            hasAnnotation = activity.mainViewModel.uiState.readingAnnotations.any { annotation ->
+                annotation.contentId == contentId
+            }
+        }
+        return hasAnnotation
+    }
+
+    private fun hasReadingAnnotationNote(contentId: String, noteText: String): Boolean {
+        return hasReadingAnnotationNote(contentId = contentId, paragraphIndex = 0, noteText = noteText)
+    }
+
+    private fun hasReadingAnnotationNote(contentId: String, paragraphIndex: Int, noteText: String): Boolean {
+        var hasAnnotation = false
+        scenario?.onActivity { activity ->
+            hasAnnotation = activity.mainViewModel.uiState.readingAnnotations.any { annotation ->
+                annotation.contentId == contentId && annotation.paragraphIndex == paragraphIndex && annotation.noteText == noteText
+            }
+        }
+        return hasAnnotation
+    }
+
+    private fun readingAnnotationIdFor(contentId: String, paragraphIndex: Int): String {
+        var annotationId = ""
+        scenario?.onActivity { activity ->
+            annotationId = activity.mainViewModel.uiState.readingAnnotations
+                .firstOrNull { annotation ->
+                    annotation.contentId == contentId && annotation.paragraphIndex == paragraphIndex
+                }
+                ?.id
+                .orEmpty()
+        }
+        assertTrue(annotationId.isNotBlank())
+        return annotationId
+    }
+
+    private fun hasSingleReadingAnnotationNoteContaining(contentId: String, noteText: String): Boolean {
+        var hasAnnotation = false
+        scenario?.onActivity { activity ->
+            val matchingAnnotations = activity.mainViewModel.uiState.readingAnnotations.filter { annotation ->
+                annotation.contentId == contentId && annotation.paragraphIndex == 0
+            }
+            hasAnnotation = matchingAnnotations.size == 1 &&
+                matchingAnnotations.single().noteText.contains(noteText)
+        }
+        return hasAnnotation
+    }
+
+    private fun hasReadingAnnotationDeletedEventFor(contentId: String): Boolean {
+        var hasEvent = false
+        scenario?.onActivity { activity ->
+            hasEvent = activity.mainViewModel.uiState.events.any { event ->
+                event.type == AnalyticsEventType.READING_ANNOTATION_DELETED &&
+                    event.contentId == contentId
+            }
+        }
+        return hasEvent
+    }
+
+    private fun hasAnnotationExportSuccess(): Boolean {
+        var hasSuccess = false
+        scenario?.onActivity { activity ->
+            hasSuccess = activity.mainViewModel.uiState.annotationExportLastSuccessfulAtMillis != null &&
+                activity.mainViewModel.uiState.annotationExportLastError == null
+        }
+        return hasSuccess
+    }
+
+    private fun hasAnnotationExportFailure(): Boolean {
+        var hasFailure = false
+        scenario?.onActivity { activity ->
+            hasFailure = !activity.mainViewModel.uiState.annotationExportLastError.isNullOrBlank()
+        }
+        return hasFailure
+    }
+
     private fun openAddLinkFromHome() {
         composeRule.onNodeWithTag("home-list")
             .performScrollToNode(hasTestTag("home-add-link"))
@@ -882,9 +1321,35 @@ class MainActivityTest {
             .performClick()
     }
 
+    private fun saveReaderAnnotation(paragraphIndex: Int, noteText: String) {
+        composeRule.onNodeWithTag("reader-list")
+            .performScrollToNode(hasTestTag("reader-annotation-action-$paragraphIndex"))
+        composeRule.onNodeWithTag("reader-annotation-action-$paragraphIndex")
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-annotation-editor-$paragraphIndex") }
+        composeRule.onNodeWithTag("reader-list")
+            .performScrollToNode(hasTestTag("reader-annotation-editor-$paragraphIndex"))
+        composeRule.onNodeWithTag("reader-annotation-note-input-$paragraphIndex")
+            .assertIsDisplayed()
+            .performTextInput(noteText)
+        UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).pressBack()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("reader-list")
+            .performScrollToNode(hasTestTag("reader-annotation-editor-$paragraphIndex"))
+        composeRule.onNodeWithTag("reader-annotation-save-$paragraphIndex")
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasTag("reader-annotation-preview-$paragraphIndex") && hasNode(noteText)
+        }
+        scenario?.onActivity { activity -> activity.mainViewModel.dismissMessage() }
+        composeRule.waitForIdle()
+    }
+
     private fun waitForHome() {
         composeRule.waitUntil(timeoutMillis = 10_000) {
-            hasNode("You're set up for quieter reading today.") || hasNode("Interception needs one more step.")
+            hasNode("You're set up for quieter reading today.") || hasNode("Finish setup to intercept distracting apps.")
         }
     }
 
@@ -909,7 +1374,7 @@ class MainActivityTest {
         composeRule.waitUntil(timeoutMillis = 10_000) {
             hasNodeContaining("Turn an impulse") ||
                 hasNode("You're set up for quieter reading today.") ||
-                hasNode("Interception needs one more step.")
+                hasNode("Finish setup to intercept distracting apps.")
         }
         if (!hasNodeContaining("Turn an impulse")) {
             return
@@ -1028,6 +1493,138 @@ class MainActivityTest {
         }
     }
 
+    private fun seedFreshDocumentRankingScenario(): FreshDocumentRankingSeed = runBlocking {
+        val app = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication)
+        app.appContainer.userDocumentRepository.observeReady().first { it }
+
+        val oldMarkdown = addSeedDocument(
+            title = "Old Markdown Priority",
+            displayName = "old-priority.md",
+            mimeType = "text/markdown",
+            format = ContentFormat.MARKDOWN,
+            nowMillis = 10_000L,
+        )
+        val oldEpub = addSeedDocument(
+            title = "Old EPUB Priority",
+            displayName = "old-priority.epub",
+            mimeType = "application/epub+zip",
+            format = ContentFormat.EPUB,
+            nowMillis = 11_000L,
+        )
+        val newEpub = addSeedDocument(
+            title = "Newest EPUB Choice",
+            displayName = "newest-choice.epub",
+            mimeType = "application/epub+zip",
+            format = ContentFormat.EPUB,
+            nowMillis = 30_000L,
+        )
+
+        app.appContainer.settingsRepository.savePriorityContentIds(setOf(oldMarkdown.id, oldEpub.id))
+        app.appContainer.settingsRepository.savePriorityContentIds(emptySet())
+        app.appContainer.settingsRepository.saveOnboardingSelection(
+            OnboardingSelection(
+                selectedAppPackages = setOf(FixtureTargetRegistry.fixtureDistractors.first().packageName),
+                preferredTopics = setOf(TopicTag.SCIENCE, TopicTag.PHILOSOPHY, TopicTag.ESSAYS),
+                preferredDurationBucket = DurationBucket.FOCUS,
+                selectedPackIds = emptySet(),
+            ),
+        )
+
+        FreshDocumentRankingSeed(
+            oldMarkdown = oldMarkdown,
+            oldEpub = oldEpub,
+            newEpub = newEpub,
+        )
+    }
+
+    private suspend fun addSeedDocument(
+        title: String,
+        displayName: String,
+        mimeType: String,
+        format: ContentFormat,
+        nowMillis: Long,
+    ): ContentItem {
+        val targetContext = InstrumentationRegistry.getInstrumentation().targetContext
+        val app = (targetContext.applicationContext as QualityAlternativeApplication)
+        val fixture = File(targetContext.filesDir, "sprint14-ranking-fixtures/$displayName")
+        fixture.parentFile?.mkdirs()
+        when (format) {
+            ContentFormat.EPUB -> fixture.writeBytes(sprint14EpubBytes(title = title))
+            else -> fixture.writeText(
+                """
+                # $title
+
+                This private Markdown document is an older saved replacement candidate.
+
+                It should not remain ahead of the newest EPUB once its explicit priority is removed.
+                """.trimIndent(),
+            )
+        }
+        val result = app.appContainer.userDocumentRepository.addDocument(
+            draft = UserDocumentDraft(
+                uri = Uri.fromFile(fixture).toString(),
+                displayName = displayName,
+                mimeType = mimeType,
+                title = title,
+                durationMinutes = 6,
+                topicTags = setOf(TopicTag.SCIENCE, TopicTag.PHILOSOPHY),
+            ),
+            nowMillis = nowMillis,
+        )
+        assertTrue("Expected $title to be saved", result is AddUserDocumentResult.Added)
+        return (result as AddUserDocumentResult.Added).item
+    }
+
+    private fun sprint14EpubBytes(title: String): ByteArray {
+        return epubBytes(
+            "META-INF/container.xml" to """
+                <?xml version="1.0"?>
+                <container>
+                  <rootfiles>
+                    <rootfile full-path="OPS/package.opf" media-type="application/oebps-package+xml"/>
+                  </rootfiles>
+                </container>
+            """.trimIndent(),
+            "OPS/package.opf" to """
+                <package>
+                  <manifest>
+                    <item id="chapter-one" href="chapter1.xhtml" media-type="application/xhtml+xml"/>
+                  </manifest>
+                  <spine>
+                    <itemref idref="chapter-one"/>
+                  </spine>
+                </package>
+            """.trimIndent(),
+            "OPS/chapter1.xhtml" to """
+                <html><body>
+	                  <h1>$title</h1>
+	                  <p>This newest EPUB is the fresh private document the ranking test expects as the primary recommendation.</p>
+	                  <p>The reader should open it natively after the intervention, proving this is installable replacement content rather than a dead card.</p>
+	                  <p>Page controls should move through this private book without asking the app to render the entire document as one long scroll.</p>
+	                  <p>The next paragraph keeps the test fixture long enough to prove pagination, not just a renamed one-screen reader.</p>
+	                  <p>Each page still needs annotation anchors, progress, and a clear way back to the previous page.</p>
+	                  <p>Long EPUB files should feel steady on older phones, so the app only lays out the active page.</p>
+	                  <p>The reader remains finite: one piece, one page at a time, no feed and no recommendations inside the reading surface.</p>
+	                  <p>Progress should update when the user advances through pages and should restore to the same region later.</p>
+	                  <p>This paragraph exists to keep the fixture representative of a short chapter rather than a card.</p>
+	                  <p>The final fixture paragraph gives the user a clean completion path after paging forward.</p>
+	                </body></html>
+            """.trimIndent(),
+        )
+    }
+
+    private fun epubBytes(vararg entries: Pair<String, String>): ByteArray {
+        val output = ByteArrayOutputStream()
+        ZipOutputStream(output).use { zip ->
+            entries.forEach { (name, body) ->
+                zip.putNextEntry(ZipEntry(name))
+                zip.write(body.toByteArray(Charsets.UTF_8))
+                zip.closeEntry()
+            }
+        }
+        return output.toByteArray()
+    }
+
     private fun currentRecommendationSet(): com.qualityalternative.app.domain.model.RecommendationSet {
         var recommendationSet: com.qualityalternative.app.domain.model.RecommendationSet? = null
         scenario?.onActivity { activity ->
@@ -1052,9 +1649,69 @@ class MainActivityTest {
         assertTrue("Expected screenshot file for $name", output.exists() && output.length() > 0L)
     }
 
+    private fun captureSprint14RankingScreenshot(name: String) {
+        val outputDir = File("/sdcard/Download/qualityalternative/$sprint14RankingScreenshotDirName")
+        assertTrue("Expected screenshot output directory for $name", outputDir.mkdirs() || outputDir.exists())
+        composeRule.waitForIdle()
+        Thread.sleep(300)
+        val output = File(outputDir, "$name.png")
+        assertTrue("Expected screenshot capture for $name", UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).takeScreenshot(output))
+        assertTrue("Expected screenshot file for $name", output.exists() && output.length() > 0L)
+    }
+
+    private fun captureSprint14AnnotationStorageScreenshot(name: String) {
+        val outputDir = File("/sdcard/Download/qualityalternative/$sprint14AnnotationStorageScreenshotDirName")
+        assertTrue("Expected screenshot output directory for $name", outputDir.mkdirs() || outputDir.exists())
+        composeRule.waitForIdle()
+        Thread.sleep(300)
+        val output = File(outputDir, "$name.png")
+        assertTrue("Expected screenshot capture for $name", UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).takeScreenshot(output))
+        assertTrue("Expected screenshot file for $name", output.exists() && output.length() > 0L)
+    }
+
+    private fun captureSprint14ReaderAnnotationScreenshot(name: String) {
+        val outputDir = File("/sdcard/Download/qualityalternative/$sprint14ReaderAnnotationScreenshotDirName")
+        assertTrue("Expected screenshot output directory for $name", outputDir.mkdirs() || outputDir.exists())
+        composeRule.waitForIdle()
+        Thread.sleep(300)
+        val output = File(outputDir, "$name.png")
+        assertTrue("Expected screenshot capture for $name", UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).takeScreenshot(output))
+        assertTrue("Expected screenshot file for $name", output.exists() && output.length() > 0L)
+    }
+
+    private fun captureSprint14AnnotationLibraryScreenshot(name: String) {
+        val outputDir = File("/sdcard/Download/qualityalternative/$sprint14AnnotationLibraryScreenshotDirName")
+        assertTrue("Expected screenshot output directory for $name", outputDir.mkdirs() || outputDir.exists())
+        composeRule.waitForIdle()
+        Thread.sleep(300)
+        val output = File(outputDir, "$name.png")
+        assertTrue("Expected screenshot capture for $name", UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).takeScreenshot(output))
+        assertTrue("Expected screenshot file for $name", output.exists() && output.length() > 0L)
+    }
+
+    private fun captureSprint14AnnotationExportScreenshot(name: String) {
+        val outputDir = File("/sdcard/Download/qualityalternative/$sprint14AnnotationExportScreenshotDirName")
+        assertTrue("Expected screenshot output directory for $name", outputDir.mkdirs() || outputDir.exists())
+        composeRule.waitForIdle()
+        Thread.sleep(300)
+        val output = File(outputDir, "$name.png")
+        assertTrue("Expected screenshot capture for $name", UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).takeScreenshot(output))
+        assertTrue("Expected screenshot file for $name", output.exists() && output.length() > 0L)
+    }
+
+    private fun captureSprint14ReaderPaginationScreenshot(name: String) {
+        val outputDir = File("/sdcard/Download/qualityalternative/$sprint14ReaderPaginationScreenshotDirName")
+        assertTrue("Expected screenshot output directory for $name", outputDir.mkdirs() || outputDir.exists())
+        composeRule.waitForIdle()
+        Thread.sleep(300)
+        val output = File(outputDir, "$name.png")
+        assertTrue("Expected screenshot capture for $name", UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).takeScreenshot(output))
+        assertTrue("Expected screenshot file for $name", output.exists() && output.length() > 0L)
+    }
+
     private fun assertHomeHeroIsDisplayed() {
         composeRule.waitUntil(timeoutMillis = 10_000) {
-            hasNode("You're set up for quieter reading today.") || hasNode("Interception needs one more step.")
+            hasNode("You're set up for quieter reading today.") || hasNode("Finish setup to intercept distracting apps.")
         }
     }
 
@@ -1106,4 +1763,10 @@ class MainActivityTest {
             .appContainer
             .resetPersistentStateForTests()
     }
+
+    private data class FreshDocumentRankingSeed(
+        val oldMarkdown: ContentItem,
+        val oldEpub: ContentItem,
+        val newEpub: ContentItem,
+    )
 }

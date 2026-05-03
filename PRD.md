@@ -117,7 +117,8 @@ When I reach for a distracting app out of habit, help me pause and give me one w
 - Browser extensions.
 - Audio-first replacement sessions.
 - Social surface blocking at the sub-surface level, such as Reels-only or Shorts-only blocking.
-- Rich annotation, highlighting, or note-taking workflows.
+- Full writing-system annotation workflows beyond replacement reading.
+- MVP-supported reader annotations are in scope only when they stay tied to the actively shown text fragment, remain locally manageable, and can optionally export to a user-selected Android document-provider file such as Google Drive.
 - Team, family, or accountability features.
 - Hard-block mode as the default experience.
 
@@ -297,6 +298,19 @@ The system must deliver a calm replacement session that feels meaningfully diffe
 - Meditation replacement duration can be adjusted by the user and plays a completion gong.
 - The session avoids recommendation carousels or unrelated content suggestions during active reading.
 - The app can record session duration for analytics.
+- If the user annotates active reader text, the note must stay linked to the specific content item and reader fragment.
+
+### FR8A. Reader Annotations
+
+The system may let the user capture notes on actively shown reader text without turning the replacement session into a separate writing or browsing workflow.
+
+#### Acceptance Criteria
+
+- User can add or edit an annotation from a reader fragment.
+- Each annotation stores content identity, fragment position, quoted fragment text, note text, and timestamps.
+- User can review annotations in a finite annotation library and return to the source fragment.
+- User can optionally autosave/export annotations to a user-selected Android document-provider file, including a Google Drive file when chosen through Android.
+- Annotation export failures are visible and do not lose local annotations.
 
 ### FR9. Delay Behavior
 

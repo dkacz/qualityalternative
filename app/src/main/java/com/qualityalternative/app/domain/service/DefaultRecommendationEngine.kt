@@ -21,20 +21,35 @@ class DefaultRecommendationEngine : RecommendationEngine {
         signals: RecommendationSignals,
         nowMillis: Long,
     ): RecommendationSet? {
-        val scoredCandidates = inventory
+        val eligibleInventory = inventory
             .filter { item ->
                 item.availability != ContentAvailability.UNAVAILABLE &&
                     item.id !in excludedContentIds
             }
+        val newestUserDocumentAddedAtMillis = eligibleInventory
+            .asSequence()
+            .filter { item -> item.sourceType == ContentSourceType.USER_DOCUMENT }
+            .mapNotNull(ContentItem::addedAtMillis)
+            .maxOrNull()
+        val scoredCandidates = eligibleInventory
             .map { item ->
                 ScoredCandidate(
                     item = item,
-                    score = score(item = item, preferences = preferences, signals = signals),
+                    selectionRank = selectionRank(item = item, preferences = preferences),
+                    score = score(
+                        item = item,
+                        preferences = preferences,
+                        signals = signals,
+                        newestUserDocumentAddedAtMillis = newestUserDocumentAddedAtMillis,
+                    ),
                     durationDistance = abs(item.durationMinutes - preferences.preferredDurationBucket.midpoint),
+                    addedAtMillis = item.addedAtMillis ?: Long.MIN_VALUE,
                 )
             }
             .sortedWith(
-                compareByDescending<ScoredCandidate> { it.score }
+                compareByDescending<ScoredCandidate> { it.selectionRank }
+                    .thenByDescending { it.score }
+                    .thenByDescending { it.addedAtMillis }
                     .thenBy { it.durationDistance }
                     .thenBy { it.item.title },
             )
@@ -59,8 +74,11 @@ class DefaultRecommendationEngine : RecommendationEngine {
             )
         }
 
-        val canBuildMinimumSet = candidateSets.any { it.backups.size >= MIN_BACKUP_OPTIONS }
-        val chosen = candidateSets
+        val highestSelectionRank = candidateSets.firstOrNull()?.primary?.selectionRank ?: return null
+        val highestRankCandidateSets = candidateSets
+            .filter { candidate -> candidate.primary.selectionRank == highestSelectionRank }
+        val canBuildMinimumSet = highestRankCandidateSets.any { it.backups.size >= MIN_BACKUP_OPTIONS }
+        val chosen = highestRankCandidateSets
             .firstOrNull { !canBuildMinimumSet || it.backups.size >= MIN_BACKUP_OPTIONS }
             ?: return null
 
@@ -82,8 +100,10 @@ class DefaultRecommendationEngine : RecommendationEngine {
                     candidate.item.durationMinutes <= primary.item.durationMinutes
             }
             .sortedWith(
-                compareByDescending<ScoredCandidate> { it.score }
+                compareByDescending<ScoredCandidate> { it.selectionRank }
+                    .thenByDescending { it.score }
                     .thenBy { it.item.sourceType.backupPriority() }
+                    .thenByDescending { it.addedAtMillis }
                     .thenBy { abs(it.item.durationMinutes - DurationBucket.QUICK.midpoint) }
                     .thenBy { it.durationDistance }
                     .thenBy { it.item.title },
@@ -91,10 +111,19 @@ class DefaultRecommendationEngine : RecommendationEngine {
             .take(MAX_BACKUP_OPTIONS)
     }
 
+    private fun selectionRank(item: ContentItem, preferences: UserPreferences): Int {
+        return when {
+            item.id in preferences.unfinishedContentIds -> 2
+            item.id in preferences.priorityContentIds -> 1
+            else -> 0
+        }
+    }
+
     private fun score(
         item: ContentItem,
         preferences: UserPreferences,
         signals: RecommendationSignals,
+        newestUserDocumentAddedAtMillis: Long?,
     ): Int {
         val topicScore = item.topicTags.intersect(preferences.preferredTopics).size * 30
         val durationScore = if (preferences.preferredDurationBucket.contains(item.durationMinutes)) {
@@ -110,6 +139,17 @@ class DefaultRecommendationEngine : RecommendationEngine {
         val priorityBoost = preferences.contentPriority.boostFor(item.sourceType)
         val priorityPickBoost = if (item.id in preferences.priorityContentIds) 96 else 0
         val unfinishedBoost = if (item.id in preferences.unfinishedContentIds) 10_000 else 0
+        val freshUserDocumentBoost = if (
+            item.sourceType == ContentSourceType.USER_DOCUMENT &&
+            item.addedAtMillis != null &&
+            item.addedAtMillis == newestUserDocumentAddedAtMillis &&
+            item.id !in preferences.priorityContentIds &&
+            item.id !in preferences.unfinishedContentIds
+        ) {
+            72
+        } else {
+            0
+        }
         val timeOfDayBoost = when (signals.timeOfDay) {
             TimeOfDayBucket.MORNING -> when {
                 item.durationMinutes <= DurationBucket.QUICK.maxMinutes -> 18
@@ -121,13 +161,16 @@ class DefaultRecommendationEngine : RecommendationEngine {
             TimeOfDayBucket.EVENING -> if (DurationBucket.DEEP.contains(item.durationMinutes)) 18 else 6
             TimeOfDayBucket.NIGHT -> if (item.durationMinutes <= DurationBucket.FOCUS.maxMinutes) 14 else 0
         }
-        return topicScore + durationScore + completionBoost + packBoost + utilityBoost + priorityBoost + priorityPickBoost + unfinishedBoost + timeOfDayBoost - skipPenalty
+        return topicScore + durationScore + completionBoost + packBoost + utilityBoost + priorityBoost + priorityPickBoost +
+            unfinishedBoost + freshUserDocumentBoost + timeOfDayBoost - skipPenalty
     }
 
     private data class ScoredCandidate(
         val item: ContentItem,
+        val selectionRank: Int,
         val score: Int,
         val durationDistance: Int,
+        val addedAtMillis: Long,
     )
 
     private data class CandidateRecommendation(

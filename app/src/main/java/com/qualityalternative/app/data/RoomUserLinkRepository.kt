@@ -68,6 +68,7 @@ class RoomUserLinkRepository(
             sourceType = ContentSourceType.USER_LINK,
             availability = ContentAvailability.NEEDS_FALLBACK,
             rights = ContentRightsMetadata.userPrivateExternal(sourceUrl = normalizedUrl),
+            addedAtMillis = createdAtMillis,
         )
 
         dao.insertOrReplace(item.toEntity(createdAtMillis = createdAtMillis, updatedAtMillis = nowMillis))
@@ -122,6 +123,7 @@ private fun UserLinkEntity.toContentItem(): ContentItem {
         sourceType = ContentSourceType.USER_LINK,
         availability = ContentAvailability.valueOf(availability),
         rights = ContentRightsMetadata.userPrivateExternal(sourceUrl = normalizedUrl),
+        addedAtMillis = createdAtMillis,
     )
 }
 

@@ -10,6 +10,8 @@ import com.qualityalternative.app.domain.service.DelayGate
 import com.qualityalternative.app.domain.service.HistoryRepository
 import com.qualityalternative.app.domain.service.InterceptionMonitor
 import com.qualityalternative.app.domain.service.RecommendationEngine
+import com.qualityalternative.app.domain.service.ReadingAnnotationRepository
+import com.qualityalternative.app.domain.service.ReadingAnnotationExportWriter
 import com.qualityalternative.app.domain.service.ReadingProgressRepository
 import com.qualityalternative.app.domain.service.SettingsRepository
 import com.qualityalternative.app.domain.service.UserDocumentRepository
@@ -54,6 +56,14 @@ class AppContainer(context: Context) {
     val readingProgressRepository: ReadingProgressRepository = RoomReadingProgressRepository(
         dao = database.readingProgressDao(),
         scope = appScope,
+    )
+    val readingAnnotationRepository: ReadingAnnotationRepository = RoomReadingAnnotationRepository(
+        dao = database.readingAnnotationDao(),
+        analyticsTracker = analyticsTracker,
+        scope = appScope,
+    )
+    val readingAnnotationExportWriter: ReadingAnnotationExportWriter = AndroidReadingAnnotationExportWriter(
+        context = context,
     )
     val settingsRepository: SettingsRepository = PreferencesSettingsRepository(
         dataStore = context.appSettingsDataStore,

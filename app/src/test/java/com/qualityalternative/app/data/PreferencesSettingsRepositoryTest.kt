@@ -180,6 +180,45 @@ class PreferencesSettingsRepositoryTest {
     }
 
     @Test
+    fun saveAnnotationExportSettings_persistsStatusAndClearsFailureOnSuccess() = runBlocking {
+        val repository = PreferencesSettingsRepository(
+            dataStore = testDataStore(),
+            supportedApps = SupportedCatalog.distractingApps,
+        )
+
+        repository.saveAnnotationExportDestination(
+            uri = "content://drive/qa-annotations.md",
+            displayName = "qa-annotations.md",
+        )
+        repository.saveAnnotationExportSuccess(3_000L)
+        repository.saveAnnotationExportDestination(
+            uri = "content://drive/new-annotations.md",
+            displayName = "new-annotations.md",
+        )
+        repository.saveAnnotationExportFailure("Drive write unavailable")
+
+        val failed = repository.observeAppSettings().first()
+        assertEquals("content://drive/new-annotations.md", failed.annotationExportUri)
+        assertEquals("new-annotations.md", failed.annotationExportDisplayName)
+        assertEquals(null, failed.annotationExportLastSuccessfulAtMillis)
+        assertEquals("Drive write unavailable", failed.annotationExportLastError)
+
+        repository.saveAnnotationExportSuccess(4_000L)
+
+        val restored = repository.observeAppSettings().first()
+        assertEquals(4_000L, restored.annotationExportLastSuccessfulAtMillis)
+        assertEquals(null, restored.annotationExportLastError)
+
+        repository.clearAnnotationExportDestination()
+
+        val cleared = repository.observeAppSettings().first()
+        assertEquals(null, cleared.annotationExportUri)
+        assertEquals(null, cleared.annotationExportDisplayName)
+        assertEquals(null, cleared.annotationExportLastSuccessfulAtMillis)
+        assertEquals(null, cleared.annotationExportLastError)
+    }
+
+    @Test
     fun observeAppSettings_mapsLegacyInkThemeToDark() = runBlocking {
         val dataStore = testDataStore()
         val repository = PreferencesSettingsRepository(

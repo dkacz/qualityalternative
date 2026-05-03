@@ -162,6 +162,7 @@ data class ContentItem(
     val sourceType: ContentSourceType = ContentSourceType.EDITORIAL,
     val availability: ContentAvailability = ContentAvailability.AVAILABLE,
     val rights: ContentRightsMetadata = ContentRightsMetadata.safeDefault(),
+    val addedAtMillis: Long? = null,
 )
 
 fun ContentItem.usesExternalHandoff(): Boolean = rights.usesExternalHandoff

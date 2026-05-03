@@ -1,5 +1,12 @@
 # Repository Instructions
 
+## Workspace Ownership And Cleanliness
+
+- Treat every generated review bundle, GPT Pro output, validation log, APK artifact, screenshot, and temporary sprint artifact in this repository as Codex-owned unless the user explicitly marks it otherwise.
+- Keep the repository clean. Do not leave stale generated artifacts, duplicate review bundles, or obsolete outputs scattered in the repo root.
+- When using GPT Pro slice reviews, preserve only the current auditable trail needed for the sprint and move or delete superseded/generated noise before claiming release readiness.
+- Codex is responsible for the repository state it creates in this project.
+
 This repository defines an Android-first MVP for "quality replacement at the moment of impulse." Future work should protect the product thesis and avoid accidental scope drift.
 
 ## Source of Truth

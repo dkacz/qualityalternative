@@ -682,6 +682,10 @@ class RoomAnalyticsTrackerTest {
                 priorityContentIds = state.value.priorityContentIds,
                 reactivatedCompletedContentIds = state.value.reactivatedCompletedContentIds,
                 openAnywayUnlockMinutes = state.value.openAnywayUnlockMinutes,
+                annotationExportUri = state.value.annotationExportUri,
+                annotationExportDisplayName = state.value.annotationExportDisplayName,
+                annotationExportLastSuccessfulAtMillis = state.value.annotationExportLastSuccessfulAtMillis,
+                annotationExportLastError = state.value.annotationExportLastError,
             )
         }
 
@@ -715,6 +719,35 @@ class RoomAnalyticsTrackerTest {
 
         override suspend fun saveOpenAnywayUnlockMinutes(minutes: Int) {
             state.value = state.value.copy(openAnywayUnlockMinutes = minutes)
+        }
+
+        override suspend fun saveAnnotationExportDestination(uri: String, displayName: String) {
+            state.value = state.value.copy(
+                annotationExportUri = uri,
+                annotationExportDisplayName = displayName,
+                annotationExportLastSuccessfulAtMillis = null,
+                annotationExportLastError = null,
+            )
+        }
+
+        override suspend fun clearAnnotationExportDestination() {
+            state.value = state.value.copy(
+                annotationExportUri = null,
+                annotationExportDisplayName = null,
+                annotationExportLastSuccessfulAtMillis = null,
+                annotationExportLastError = null,
+            )
+        }
+
+        override suspend fun saveAnnotationExportSuccess(timestampMillis: Long) {
+            state.value = state.value.copy(
+                annotationExportLastSuccessfulAtMillis = timestampMillis,
+                annotationExportLastError = null,
+            )
+        }
+
+        override suspend fun saveAnnotationExportFailure(errorMessage: String) {
+            state.value = state.value.copy(annotationExportLastError = errorMessage)
         }
     }
 

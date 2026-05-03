@@ -465,6 +465,220 @@ class DefaultRecommendationEngineTest {
     }
 
     @Test
+    fun generate_prefersNewestUnprioritizedUserDocumentOverOlderUserDocuments() {
+        val preferences = UserPreferences(
+            selectedApps = listOf(DistractingApp(packageName = "pkg", displayName = "Instagram")),
+            preferredTopics = setOf(TopicTag.SCIENCE),
+            preferredDurationBucket = DurationBucket.FOCUS,
+            selectedPackIds = setOf("pack", "user-documents"),
+        )
+        val inventory = listOf(
+            item(
+                id = "old-markdown",
+                packId = "user-documents",
+                minutes = 6,
+                topics = setOf(TopicTag.SCIENCE),
+                sourceType = ContentSourceType.USER_DOCUMENT,
+                addedAtMillis = 1_000L,
+            ),
+            item(
+                id = "new-epub",
+                packId = "user-documents",
+                minutes = 6,
+                topics = setOf(TopicTag.SCIENCE),
+                format = ContentFormat.EPUB,
+                sourceType = ContentSourceType.USER_DOCUMENT,
+                addedAtMillis = 3_000L,
+            ),
+            item(id = "backup", minutes = 5, topics = setOf(TopicTag.SCIENCE)),
+        )
+
+        val result = engine.generate(
+            targetApp = DistractingApp(packageName = "pkg", displayName = "Instagram"),
+            preferences = preferences,
+            inventory = inventory,
+            excludedContentIds = emptySet(),
+            signals = RecommendationSignals(timeOfDay = TimeOfDayBucket.MIDDAY),
+            nowMillis = 0L,
+        )
+
+        assertEquals("new-epub", result?.primary?.id)
+    }
+
+    @Test
+    fun generate_keepsExplicitPriorityAheadOfNewestUserDocument() {
+        val preferences = UserPreferences(
+            selectedApps = listOf(DistractingApp(packageName = "pkg", displayName = "Instagram")),
+            preferredTopics = setOf(TopicTag.SCIENCE),
+            preferredDurationBucket = DurationBucket.FOCUS,
+            selectedPackIds = setOf("pack", "user-documents"),
+            priorityContentIds = setOf("old-priority"),
+        )
+        val inventory = listOf(
+            item(
+                id = "old-priority",
+                packId = "user-documents",
+                minutes = 6,
+                topics = setOf(TopicTag.SCIENCE),
+                sourceType = ContentSourceType.USER_DOCUMENT,
+                addedAtMillis = 1_000L,
+            ),
+            item(
+                id = "new-epub",
+                packId = "user-documents",
+                minutes = 6,
+                topics = setOf(TopicTag.SCIENCE),
+                format = ContentFormat.EPUB,
+                sourceType = ContentSourceType.USER_DOCUMENT,
+                addedAtMillis = 3_000L,
+            ),
+            item(id = "backup", minutes = 5, topics = setOf(TopicTag.SCIENCE)),
+        )
+
+        val result = engine.generate(
+            targetApp = DistractingApp(packageName = "pkg", displayName = "Instagram"),
+            preferences = preferences,
+            inventory = inventory,
+            excludedContentIds = emptySet(),
+            signals = RecommendationSignals(timeOfDay = TimeOfDayBucket.MIDDAY),
+            nowMillis = 0L,
+        )
+
+        assertEquals("old-priority", result?.primary?.id)
+    }
+
+    @Test
+    fun generate_keepsExplicitPriorityAheadOfFresherRelevantUserDocument() {
+        val preferences = UserPreferences(
+            selectedApps = listOf(DistractingApp(packageName = "pkg", displayName = "Instagram")),
+            preferredTopics = setOf(TopicTag.SCIENCE),
+            preferredDurationBucket = DurationBucket.FOCUS,
+            selectedPackIds = setOf("pack", "user-documents"),
+            priorityContentIds = setOf("old-priority"),
+        )
+        val inventory = listOf(
+            item(
+                id = "old-priority",
+                packId = "user-documents",
+                minutes = 6,
+                topics = setOf(TopicTag.HISTORY),
+                sourceType = ContentSourceType.USER_DOCUMENT,
+                addedAtMillis = 1_000L,
+            ),
+            item(
+                id = "new-epub",
+                packId = "user-documents",
+                minutes = 6,
+                topics = setOf(TopicTag.SCIENCE),
+                format = ContentFormat.EPUB,
+                sourceType = ContentSourceType.USER_DOCUMENT,
+                addedAtMillis = 3_000L,
+            ),
+            item(id = "backup", minutes = 5, topics = setOf(TopicTag.SCIENCE)),
+        )
+
+        val result = engine.generate(
+            targetApp = DistractingApp(packageName = "pkg", displayName = "Instagram"),
+            preferences = preferences,
+            inventory = inventory,
+            excludedContentIds = emptySet(),
+            signals = RecommendationSignals(timeOfDay = TimeOfDayBucket.MIDDAY),
+            nowMillis = 0L,
+        )
+
+        assertEquals("old-priority", result?.primary?.id)
+    }
+
+    @Test
+    fun generate_keepsShortExplicitPriorityAheadOfFreshDocumentWithMoreBackupOptions() {
+        val preferences = UserPreferences(
+            selectedApps = listOf(DistractingApp(packageName = "pkg", displayName = "Instagram")),
+            preferredTopics = setOf(TopicTag.SCIENCE),
+            preferredDurationBucket = DurationBucket.FOCUS,
+            selectedPackIds = setOf("pack", "user-documents"),
+            priorityContentIds = setOf("old-priority-short"),
+        )
+        val inventory = listOf(
+            item(
+                id = "old-priority-short",
+                packId = "user-documents",
+                minutes = 4,
+                topics = setOf(TopicTag.HISTORY),
+                sourceType = ContentSourceType.USER_DOCUMENT,
+                addedAtMillis = 1_000L,
+            ),
+            item(
+                id = "new-epub",
+                packId = "user-documents",
+                minutes = 6,
+                topics = setOf(TopicTag.SCIENCE),
+                format = ContentFormat.EPUB,
+                sourceType = ContentSourceType.USER_DOCUMENT,
+                addedAtMillis = 3_000L,
+            ),
+            item(id = "backup-one", minutes = 6, topics = setOf(TopicTag.SCIENCE)),
+            item(id = "backup-two", minutes = 5, topics = setOf(TopicTag.SCIENCE)),
+        )
+
+        val result = engine.generate(
+            targetApp = DistractingApp(packageName = "pkg", displayName = "Instagram"),
+            preferences = preferences,
+            inventory = inventory,
+            excludedContentIds = emptySet(),
+            signals = RecommendationSignals(timeOfDay = TimeOfDayBucket.MIDDAY),
+            nowMillis = 0L,
+        )
+
+        assertEquals("old-priority-short", result?.primary?.id)
+        assertEquals(true, result?.inventoryShortage)
+    }
+
+    @Test
+    fun generate_boostsNewestEligibleUserDocumentWhenNewerDocumentIsExcluded() {
+        val preferences = UserPreferences(
+            selectedApps = listOf(DistractingApp(packageName = "pkg", displayName = "Instagram")),
+            preferredTopics = setOf(TopicTag.SCIENCE, TopicTag.PHILOSOPHY, TopicTag.ESSAYS),
+            preferredDurationBucket = DurationBucket.FOCUS,
+            selectedPackIds = setOf("pack", "user-documents"),
+        )
+        val inventory = listOf(
+            item(
+                id = "editorial",
+                packId = "pack",
+                minutes = 6,
+                topics = setOf(TopicTag.SCIENCE, TopicTag.PHILOSOPHY, TopicTag.ESSAYS),
+            ),
+            item(
+                id = "eligible-new",
+                packId = "user-documents",
+                minutes = 6,
+                topics = setOf(TopicTag.SCIENCE),
+                sourceType = ContentSourceType.USER_DOCUMENT,
+                addedAtMillis = 2_000L,
+            ),
+            item(
+                id = "excluded-newer",
+                packId = "user-documents",
+                minutes = 6,
+                topics = setOf(TopicTag.SCIENCE),
+                sourceType = ContentSourceType.USER_DOCUMENT,
+                addedAtMillis = 3_000L,
+            ),
+        )
+
+        val result = engine.generate(
+            targetApp = DistractingApp(packageName = "pkg", displayName = "Instagram"),
+            preferences = preferences,
+            inventory = inventory,
+            excludedContentIds = setOf("excluded-newer"),
+            signals = RecommendationSignals(timeOfDay = TimeOfDayBucket.MIDDAY),
+            nowMillis = 0L,
+        )
+
+        assertEquals("eligible-new", result?.primary?.id)
+    }
+
+    @Test
     fun generate_givesUnfinishedContentAbsolutePrimaryPriorityUnlessCompleted() {
         val preferences = UserPreferences(
             selectedApps = listOf(DistractingApp(packageName = "pkg", displayName = "Instagram")),
@@ -549,6 +763,7 @@ class DefaultRecommendationEngineTest {
         externalUrl: String? = null,
         bodyAssetPath: String? = "unused",
         rights: ContentRightsMetadata = ContentRightsMetadata.renderableEditorial(),
+        addedAtMillis: Long? = null,
     ): ContentItem = ContentItem(
         id = id,
         packId = packId,
@@ -562,5 +777,6 @@ class DefaultRecommendationEngineTest {
         sourceType = sourceType,
         availability = availability,
         rights = rights,
+        addedAtMillis = addedAtMillis,
     )
 }

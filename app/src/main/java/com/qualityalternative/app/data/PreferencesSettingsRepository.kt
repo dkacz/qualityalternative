@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import com.qualityalternative.app.domain.model.AppSettings
@@ -60,6 +61,10 @@ class PreferencesSettingsRepository(
                     reactivatedCompletedContentIds = preferences[ReactivatedCompletedContentIds].orEmpty(),
                     openAnywayUnlockMinutes = (preferences[OpenAnywayUnlockMinutes] ?: DEFAULT_OPEN_ANYWAY_UNLOCK_MINUTES)
                         .coerceIn(MIN_OPEN_ANYWAY_UNLOCK_MINUTES, MAX_OPEN_ANYWAY_UNLOCK_MINUTES),
+                    annotationExportUri = preferences[AnnotationExportUri],
+                    annotationExportDisplayName = preferences[AnnotationExportDisplayName],
+                    annotationExportLastSuccessfulAtMillis = preferences[AnnotationExportLastSuccessfulAtMillis],
+                    annotationExportLastError = preferences[AnnotationExportLastError],
                 )
             }
     }
@@ -125,6 +130,37 @@ class PreferencesSettingsRepository(
         }
     }
 
+    override suspend fun saveAnnotationExportDestination(uri: String, displayName: String) {
+        dataStore.edit { preferences ->
+            preferences[AnnotationExportUri] = uri
+            preferences[AnnotationExportDisplayName] = displayName
+            preferences.remove(AnnotationExportLastSuccessfulAtMillis)
+            preferences.remove(AnnotationExportLastError)
+        }
+    }
+
+    override suspend fun clearAnnotationExportDestination() {
+        dataStore.edit { preferences ->
+            preferences.remove(AnnotationExportUri)
+            preferences.remove(AnnotationExportDisplayName)
+            preferences.remove(AnnotationExportLastSuccessfulAtMillis)
+            preferences.remove(AnnotationExportLastError)
+        }
+    }
+
+    override suspend fun saveAnnotationExportSuccess(timestampMillis: Long) {
+        dataStore.edit { preferences ->
+            preferences[AnnotationExportLastSuccessfulAtMillis] = timestampMillis
+            preferences.remove(AnnotationExportLastError)
+        }
+    }
+
+    override suspend fun saveAnnotationExportFailure(errorMessage: String) {
+        dataStore.edit { preferences ->
+            preferences[AnnotationExportLastError] = errorMessage
+        }
+    }
+
     suspend fun clearForTests() {
         dataStore.edit { preferences ->
             preferences.clear()
@@ -156,5 +192,9 @@ class PreferencesSettingsRepository(
         val PriorityContentIds = stringSetPreferencesKey("priority_content_ids")
         val ReactivatedCompletedContentIds = stringSetPreferencesKey("reactivated_completed_content_ids")
         val OpenAnywayUnlockMinutes = intPreferencesKey("open_anyway_unlock_minutes")
+        val AnnotationExportUri = stringPreferencesKey("annotation_export_uri")
+        val AnnotationExportDisplayName = stringPreferencesKey("annotation_export_display_name")
+        val AnnotationExportLastSuccessfulAtMillis = longPreferencesKey("annotation_export_last_successful_at_millis")
+        val AnnotationExportLastError = stringPreferencesKey("annotation_export_last_error")
     }
 }

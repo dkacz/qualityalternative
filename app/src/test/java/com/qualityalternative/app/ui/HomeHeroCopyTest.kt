@@ -25,7 +25,7 @@ class HomeHeroCopyTest {
     }
 
     @Test
-    fun missingInterceptionKeepsBrandHeadlineAndMarksSetupActionUnavailable() {
+    fun missingInterceptionUsesSetupHeadlineAndMarksSetupActionUnavailable() {
         val copy = homeHeroCopy(
             PermissionReadiness(
                 overlayStatus = PermissionStatus.MISSING,
@@ -35,7 +35,7 @@ class HomeHeroCopyTest {
             ),
         )
 
-        assertEquals("You're set up for quieter reading today.", copy.title)
+        assertEquals("Finish setup to intercept distracting apps.", copy.title)
         assertTrue(copy.body.contains("Finish the Android setup"))
         assertFalse(copy.showAddLinkAction)
     }

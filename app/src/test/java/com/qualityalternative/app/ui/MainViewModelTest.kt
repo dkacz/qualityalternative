@@ -31,6 +31,8 @@ import com.qualityalternative.app.domain.model.PermissionStatus
 import com.qualityalternative.app.domain.model.RecommendationSet
 import com.qualityalternative.app.domain.model.RecommendationSignals
 import com.qualityalternative.app.domain.model.RecommendationSource
+import com.qualityalternative.app.domain.model.ReadingAnnotation
+import com.qualityalternative.app.domain.model.ReadingAnnotationDraft
 import com.qualityalternative.app.domain.model.ReadingProgress
 import com.qualityalternative.app.domain.model.ReplacementHistoryEntry
 import com.qualityalternative.app.domain.model.ReturnToTargetSignal
@@ -50,6 +52,8 @@ import com.qualityalternative.app.domain.service.DelayGate
 import com.qualityalternative.app.domain.service.HistoryRepository
 import com.qualityalternative.app.domain.service.InterceptionMonitor
 import com.qualityalternative.app.domain.service.RecommendationEngine
+import com.qualityalternative.app.domain.service.ReadingAnnotationRepository
+import com.qualityalternative.app.domain.service.ReadingAnnotationExportWriter
 import com.qualityalternative.app.domain.service.ReadingProgressRepository
 import com.qualityalternative.app.domain.service.SettingsRepository
 import com.qualityalternative.app.domain.service.UserDocumentRepository
@@ -680,6 +684,20 @@ class MainViewModelTest {
         )
         val userLinkRepository = FakeUserLinkRepository(initialLinks = listOf(userLink))
         val userDocumentRepository = FakeUserDocumentRepository(initialDocuments = listOf(userDocument))
+        val readingAnnotationRepository = FakeReadingAnnotationRepository(
+            initialAnnotations = listOf(
+                ReadingAnnotation(
+                    id = "deleted-document-note",
+                    contentId = userDocument.id,
+                    paragraphIndex = 0,
+                    quotedText = "Private notes",
+                    noteText = "Remove when the source is deleted.",
+                    createdAtMillis = 1_400L,
+                    updatedAtMillis = 1_700L,
+                ),
+            ),
+        )
+        val exportWriter = RecordingReadingAnnotationExportWriter()
         val editorialRepository = FakeContentRepository()
         val contentRepository = CompositeContentRepository(
             editorialRepository = editorialRepository,
@@ -693,6 +711,8 @@ class MainViewModelTest {
                 selectedAppPackages = setOf(FixtureTargetRegistry.fixtureDistractors.first().packageName),
             ).copy(
                 priorityContentIds = setOf(userLink.id, userDocument.id, "p1"),
+                annotationExportUri = "content://drive/qa-annotations.md",
+                annotationExportDisplayName = "qa-annotations.md",
             ),
         )
         val releasedUris = mutableListOf<String>()
@@ -704,6 +724,8 @@ class MainViewModelTest {
             recommendationEngine = recommendationEngine,
             analyticsTracker = analyticsTracker,
             readingProgressRepository = readingProgressRepository,
+            readingAnnotationRepository = readingAnnotationRepository,
+            readingAnnotationExportWriter = exportWriter,
         )
 
         advanceUntilIdle()
@@ -731,6 +753,8 @@ class MainViewModelTest {
         assertEquals(emptyList<ContentItem>(), viewModel.uiState.userDocuments)
         assertEquals(setOf(userLink.id, userDocument.id), readingProgressRepository.deletedIds)
         assertEquals(emptyList<ReadingProgress>(), viewModel.uiState.readingProgress)
+        assertEquals(emptyList<ReadingAnnotation>(), readingAnnotationRepository.readingAnnotations())
+        assertTrue(exportWriter.writes.last().second.contains("No annotations saved yet."))
         assertEquals(listOf("content://quality/notes.md"), releasedUris)
         assertEquals(setOf("p1"), viewModel.uiState.priorityContentIds)
         assertEquals(setOf("p1"), settingsRepository.state.value.priorityContentIds)
@@ -800,6 +824,255 @@ class MainViewModelTest {
         val completedEvent = analyticsTracker.allEvents().last { it.type == AnalyticsEventType.READER_COMPLETED }
         assertEquals(document.id, completedEvent.contentId)
         assertEquals(null, completedEvent.sessionId)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun openAnnotationTargetOpensReaderAtSavedParagraph() = runTest {
+        val document = savedUserDocument(format = ContentFormat.MARKDOWN)
+        val annotationRepository = FakeReadingAnnotationRepository(
+            initialAnnotations = listOf(
+                ReadingAnnotation(
+                    id = "annotation-target",
+                    contentId = document.id,
+                    paragraphIndex = 2,
+                    quotedText = "Final paragraph",
+                    noteText = "Return here from the library.",
+                    createdAtMillis = 1_500L,
+                    updatedAtMillis = 2_500L,
+                ),
+            ),
+        )
+        val viewModel = createViewModel(
+            settingsRepository = FakeSettingsRepository(initial = completedSettings(selectedAppPackages = setOf("feed.one"))),
+            contentRepository = FakeContentRepository(extraItems = listOf(document)),
+            readingAnnotationRepository = annotationRepository,
+        )
+
+        advanceUntilIdle()
+        viewModel.openAnnotationLibrary()
+        viewModel.openAnnotationTarget("annotation-target")
+        advanceUntilIdle()
+
+        assertEquals(MainScreen.Reader, viewModel.uiState.screen)
+        assertEquals(document.id, viewModel.uiState.currentContent?.id)
+        assertEquals("Private notes", viewModel.uiState.currentContentBody)
+        assertEquals(2, viewModel.uiState.currentReaderStartParagraphIndex)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun openAnnotationTargetWithMissingSourceStaysInAnnotationLibrary() = runTest {
+        val annotationRepository = FakeReadingAnnotationRepository(
+            initialAnnotations = listOf(
+                ReadingAnnotation(
+                    id = "missing-source-annotation",
+                    contentId = "deleted-content",
+                    paragraphIndex = 4,
+                    quotedText = "Old quote",
+                    noteText = "Old note",
+                    createdAtMillis = 1_500L,
+                    updatedAtMillis = 2_500L,
+                ),
+            ),
+        )
+        val viewModel = createViewModel(
+            settingsRepository = FakeSettingsRepository(initial = completedSettings(selectedAppPackages = setOf("feed.one"))),
+            readingAnnotationRepository = annotationRepository,
+        )
+
+        advanceUntilIdle()
+        viewModel.openAnnotationLibrary()
+        viewModel.openAnnotationTarget("missing-source-annotation")
+        advanceUntilIdle()
+
+        assertEquals(MainScreen.Annotations, viewModel.uiState.screen)
+        assertEquals(null, viewModel.uiState.currentContent)
+        assertEquals("The source for that annotation is no longer in Library.", viewModel.uiState.latestMessage)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun configuredAnnotationExportAutosavesSavedReaderNotes() = runTest {
+        val document = savedUserDocument(format = ContentFormat.MARKDOWN)
+        val settingsRepository = FakeSettingsRepository(
+            initial = completedSettings(selectedAppPackages = setOf("feed.one")),
+        )
+        val annotationRepository = FakeReadingAnnotationRepository()
+        val exportWriter = RecordingReadingAnnotationExportWriter()
+        val persistedUris = mutableListOf<String>()
+        val viewModel = createViewModel(
+            settingsRepository = settingsRepository,
+            contentRepository = FakeContentRepository(extraItems = listOf(document)),
+            readingAnnotationRepository = annotationRepository,
+            readingAnnotationExportWriter = exportWriter,
+            nowProvider = { 2_000L },
+        )
+
+        advanceUntilIdle()
+        viewModel.configureReadingAnnotationExport(
+            uri = "content://drive/qa-annotations.md",
+            displayName = "qa-annotations.md",
+            persistWritePermission = persistedUris::add,
+            nowMillis = 2_500L,
+        )
+        advanceUntilIdle()
+        viewModel.openLibraryItem(document)
+        advanceUntilIdle()
+        viewModel.saveCurrentReadingAnnotation(
+            paragraphIndex = 1,
+            quotedText = "Private notes",
+            noteText = "This belongs in the intervention notes library.",
+            nowMillis = 3_000L,
+        )
+        advanceUntilIdle()
+
+        assertEquals(listOf("content://drive/qa-annotations.md"), persistedUris)
+        assertEquals("content://drive/qa-annotations.md", settingsRepository.state.value.annotationExportUri)
+        assertEquals("qa-annotations.md", settingsRepository.state.value.annotationExportDisplayName)
+        assertEquals(3_000L, settingsRepository.state.value.annotationExportLastSuccessfulAtMillis)
+        assertEquals(null, settingsRepository.state.value.annotationExportLastError)
+        assertEquals("Annotation saved and autosaved.", viewModel.uiState.latestMessage)
+        assertEquals("content://drive/qa-annotations.md", exportWriter.writes.last().first)
+        assertTrue(exportWriter.writes.last().second.contains("## Saved document"))
+        assertTrue(exportWriter.writes.last().second.contains("> Private notes"))
+        assertTrue(exportWriter.writes.last().second.contains("This belongs in the intervention notes library."))
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun configureAnnotationExportReportsPersistPermissionFailureWithoutWriting() = runTest {
+        val settingsRepository = FakeSettingsRepository(
+            initial = completedSettings(selectedAppPackages = setOf("feed.one")).copy(
+                annotationExportLastSuccessfulAtMillis = 1_500L,
+            ),
+        )
+        val exportWriter = RecordingReadingAnnotationExportWriter()
+        val viewModel = createViewModel(
+            settingsRepository = settingsRepository,
+            readingAnnotationExportWriter = exportWriter,
+        )
+
+        advanceUntilIdle()
+        viewModel.configureReadingAnnotationExport(
+            uri = "content://drive/qa-annotations.md",
+            displayName = "qa-annotations.md",
+            persistWritePermission = { error("Persistable grant denied") },
+            nowMillis = 2_500L,
+        )
+        advanceUntilIdle()
+
+        assertEquals(emptyList<Pair<String, String>>(), exportWriter.writes)
+        assertEquals("content://drive/qa-annotations.md", settingsRepository.state.value.annotationExportUri)
+        assertEquals(null, settingsRepository.state.value.annotationExportLastSuccessfulAtMillis)
+        assertEquals("Choose the file again or retry.", settingsRepository.state.value.annotationExportLastError)
+        assertEquals("Annotation autosave needs file permission.", viewModel.uiState.latestMessage)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun clearAnnotationExportReleasesPermissionAndClearsStatus() = runTest {
+        val settingsRepository = FakeSettingsRepository(
+            initial = completedSettings(selectedAppPackages = setOf("feed.one")).copy(
+                annotationExportUri = "content://drive/qa-annotations.md",
+                annotationExportDisplayName = "qa-annotations.md",
+                annotationExportLastSuccessfulAtMillis = 3_000L,
+            ),
+        )
+        val releasedUris = mutableListOf<String>()
+        val viewModel = createViewModel(settingsRepository = settingsRepository)
+
+        advanceUntilIdle()
+        viewModel.clearReadingAnnotationExport(releaseWritePermission = releasedUris::add)
+        advanceUntilIdle()
+
+        assertEquals(listOf("content://drive/qa-annotations.md"), releasedUris)
+        assertEquals(null, settingsRepository.state.value.annotationExportUri)
+        assertEquals(null, settingsRepository.state.value.annotationExportDisplayName)
+        assertEquals(null, settingsRepository.state.value.annotationExportLastSuccessfulAtMillis)
+        assertEquals(null, settingsRepository.state.value.annotationExportLastError)
+        assertEquals("Annotation autosave disabled.", viewModel.uiState.latestMessage)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun annotationAutosaveFailureKeepsSavedNoteAndShowsRecoverableStatus() = runTest {
+        val document = savedUserDocument(format = ContentFormat.MARKDOWN)
+        val settingsRepository = FakeSettingsRepository(
+            initial = completedSettings(selectedAppPackages = setOf("feed.one")).copy(
+                annotationExportUri = "content://drive/missing.md",
+                annotationExportDisplayName = "missing.md",
+            ),
+        )
+        val annotationRepository = FakeReadingAnnotationRepository()
+        val exportWriter = RecordingReadingAnnotationExportWriter(
+            failure = IllegalStateException("No content provider: content://com.qualityalternative.missing/export.md"),
+        )
+        val viewModel = createViewModel(
+            settingsRepository = settingsRepository,
+            contentRepository = FakeContentRepository(extraItems = listOf(document)),
+            readingAnnotationRepository = annotationRepository,
+            readingAnnotationExportWriter = exportWriter,
+            nowProvider = { 2_000L },
+        )
+
+        advanceUntilIdle()
+        viewModel.openLibraryItem(document)
+        advanceUntilIdle()
+        viewModel.saveCurrentReadingAnnotation(
+            paragraphIndex = 0,
+            quotedText = "Private notes",
+            noteText = "Still keep this locally.",
+            nowMillis = 3_000L,
+        )
+        advanceUntilIdle()
+
+        assertEquals(1, annotationRepository.readingAnnotations().size)
+        assertEquals("Annotation saved. Autosave failed.", viewModel.uiState.latestMessage)
+        assertEquals("Choose the file again or retry.", settingsRepository.state.value.annotationExportLastError)
+        assertEquals("Choose the file again or retry.", viewModel.uiState.annotationExportLastError)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun deleteReadingAnnotationAutosavesUpdatedMarkdown() = runTest {
+        val document = savedUserDocument(format = ContentFormat.MARKDOWN)
+        val annotationRepository = FakeReadingAnnotationRepository(
+            initialAnnotations = listOf(
+                ReadingAnnotation(
+                    id = "annotation-to-delete",
+                    contentId = document.id,
+                    paragraphIndex = 0,
+                    quotedText = "Private notes",
+                    noteText = "Delete me from export.",
+                    createdAtMillis = 1_000L,
+                    updatedAtMillis = 2_000L,
+                ),
+            ),
+        )
+        val settingsRepository = FakeSettingsRepository(
+            initial = completedSettings(selectedAppPackages = setOf("feed.one")).copy(
+                annotationExportUri = "content://drive/qa-annotations.md",
+                annotationExportDisplayName = "qa-annotations.md",
+            ),
+        )
+        val exportWriter = RecordingReadingAnnotationExportWriter()
+        val viewModel = createViewModel(
+            settingsRepository = settingsRepository,
+            contentRepository = FakeContentRepository(extraItems = listOf(document)),
+            readingAnnotationRepository = annotationRepository,
+            readingAnnotationExportWriter = exportWriter,
+        )
+
+        advanceUntilIdle()
+        viewModel.deleteReadingAnnotation(annotationId = "annotation-to-delete", nowMillis = 4_000L)
+        advanceUntilIdle()
+
+        assertEquals(emptyList<ReadingAnnotation>(), annotationRepository.readingAnnotations())
+        assertEquals("Annotation deleted and autosaved.", viewModel.uiState.latestMessage)
+        assertEquals(4_000L, settingsRepository.state.value.annotationExportLastSuccessfulAtMillis)
+        assertTrue(exportWriter.writes.last().second.contains("No annotations saved yet."))
+        assertFalse(exportWriter.writes.last().second.contains("Delete me from export."))
     }
 
     @Test
@@ -2586,6 +2859,8 @@ class MainViewModelTest {
         userLinkRepository: UserLinkRepository = FakeUserLinkRepository(),
         userDocumentRepository: UserDocumentRepository = FakeUserDocumentRepository(),
         readingProgressRepository: ReadingProgressRepository = FakeReadingProgressRepository(),
+        readingAnnotationRepository: ReadingAnnotationRepository = FakeReadingAnnotationRepository(),
+        readingAnnotationExportWriter: ReadingAnnotationExportWriter = RecordingReadingAnnotationExportWriter(),
         recommendationEngine: RecommendationEngine = DefaultRecommendationEngine(),
         nowProvider: () -> Long = { 1_000L },
     ): MainViewModel {
@@ -2600,6 +2875,8 @@ class MainViewModelTest {
                 analyticsTracker = analyticsTracker,
                 historyRepository = historyRepository,
                 readingProgressRepository = readingProgressRepository,
+                readingAnnotationRepository = readingAnnotationRepository,
+                readingAnnotationExportWriter = readingAnnotationExportWriter,
                 interceptionMonitor = FakeInterceptionMonitor(),
                 enableDelayRefreshTicker = false,
                 nowProvider = nowProvider,
@@ -2640,6 +2917,10 @@ class MainViewModelTest {
                 priorityContentIds = state.value.priorityContentIds,
                 reactivatedCompletedContentIds = state.value.reactivatedCompletedContentIds,
                 openAnywayUnlockMinutes = state.value.openAnywayUnlockMinutes,
+                annotationExportUri = state.value.annotationExportUri,
+                annotationExportDisplayName = state.value.annotationExportDisplayName,
+                annotationExportLastSuccessfulAtMillis = state.value.annotationExportLastSuccessfulAtMillis,
+                annotationExportLastError = state.value.annotationExportLastError,
             )
         }
 
@@ -2673,6 +2954,35 @@ class MainViewModelTest {
 
         override suspend fun saveOpenAnywayUnlockMinutes(minutes: Int) {
             state.value = state.value.copy(openAnywayUnlockMinutes = minutes)
+        }
+
+        override suspend fun saveAnnotationExportDestination(uri: String, displayName: String) {
+            state.value = state.value.copy(
+                annotationExportUri = uri,
+                annotationExportDisplayName = displayName,
+                annotationExportLastSuccessfulAtMillis = null,
+                annotationExportLastError = null,
+            )
+        }
+
+        override suspend fun clearAnnotationExportDestination() {
+            state.value = state.value.copy(
+                annotationExportUri = null,
+                annotationExportDisplayName = null,
+                annotationExportLastSuccessfulAtMillis = null,
+                annotationExportLastError = null,
+            )
+        }
+
+        override suspend fun saveAnnotationExportSuccess(timestampMillis: Long) {
+            state.value = state.value.copy(
+                annotationExportLastSuccessfulAtMillis = timestampMillis,
+                annotationExportLastError = null,
+            )
+        }
+
+        override suspend fun saveAnnotationExportFailure(errorMessage: String) {
+            state.value = state.value.copy(annotationExportLastError = errorMessage)
         }
     }
 
@@ -2838,6 +3148,69 @@ class MainViewModelTest {
         override fun isReady(): Boolean = ready.value
 
         override fun observeReady(): Flow<Boolean> = ready
+    }
+
+    private class FakeReadingAnnotationRepository(
+        initialAnnotations: List<ReadingAnnotation> = emptyList(),
+        isReady: Boolean = true,
+    ) : ReadingAnnotationRepository {
+        private val annotations = MutableStateFlow(initialAnnotations)
+        private val ready = MutableStateFlow(isReady)
+        private var nextId = initialAnnotations.size
+
+        override fun readingAnnotations(): List<ReadingAnnotation> = annotations.value
+
+        override fun observeReadingAnnotations(): Flow<List<ReadingAnnotation>> = annotations.asStateFlow()
+
+        override suspend fun saveAnnotation(
+            draft: ReadingAnnotationDraft,
+            nowMillis: Long,
+        ): ReadingAnnotation {
+            val existing = draft.id?.let { id -> annotations.value.firstOrNull { annotation -> annotation.id == id } }
+            val saved = ReadingAnnotation(
+                id = draft.id ?: "reading-annotation:${++nextId}",
+                contentId = draft.contentId,
+                paragraphIndex = draft.paragraphIndex,
+                quotedText = draft.quotedText,
+                noteText = draft.noteText,
+                createdAtMillis = existing?.createdAtMillis ?: nowMillis,
+                updatedAtMillis = nowMillis,
+            )
+            annotations.value = annotations.value
+                .filterNot { annotation -> annotation.id == saved.id }
+                .plus(saved)
+                .sortedByDescending(ReadingAnnotation::updatedAtMillis)
+            return saved
+        }
+
+        override suspend fun deleteAnnotation(
+            annotationId: String,
+            nowMillis: Long,
+        ) {
+            annotations.value = annotations.value.filterNot { annotation -> annotation.id == annotationId }
+        }
+
+        override suspend fun deleteAnnotationsForContentIds(
+            contentIds: Set<String>,
+            nowMillis: Long,
+        ) {
+            annotations.value = annotations.value.filterNot { annotation -> annotation.contentId in contentIds }
+        }
+
+        override fun isReady(): Boolean = ready.value
+
+        override fun observeReady(): Flow<Boolean> = ready
+    }
+
+    private class RecordingReadingAnnotationExportWriter(
+        private val failure: Throwable? = null,
+    ) : ReadingAnnotationExportWriter {
+        val writes = mutableListOf<Pair<String, String>>()
+
+        override suspend fun writeMarkdown(uri: String, markdown: String) {
+            failure?.let { throw it }
+            writes += uri to markdown
+        }
     }
 
     private class FakeDelayGate(isReady: Boolean) : DelayGate {

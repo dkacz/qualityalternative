@@ -47,6 +47,10 @@ data class AppSettings(
     val priorityContentIds: Set<String> = emptySet(),
     val reactivatedCompletedContentIds: Set<String> = emptySet(),
     val openAnywayUnlockMinutes: Int = DEFAULT_OPEN_ANYWAY_UNLOCK_MINUTES,
+    val annotationExportUri: String? = null,
+    val annotationExportDisplayName: String? = null,
+    val annotationExportLastSuccessfulAtMillis: Long? = null,
+    val annotationExportLastError: String? = null,
 )
 
 data class OnboardingSelection(

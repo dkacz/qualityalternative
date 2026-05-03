@@ -18,5 +18,31 @@ out/
 # Logs
 *.log
 
+# Generated review / release artifacts
+BUNDLE_MANIFEST_*.md
+GPT_PRO_REVIEW_PROMPT_*.md
+PRO_REVIEW_OUTPUT_*/
+PRO_SOURCE_EXPANSION_OUTPUT_*/
+PRO_SOURCE_EXPANSION_PROMPT_*.md
+QUALITY_ALTERNATIVE_*_BUNDLE_*.zip
+QUALITY_ALTERNATIVE_*_REVIEW_BUNDLE_*.zip
+SPRINT*_REVIEW_BUNDLE_*.zip
+SPRINT*_REVIEW_MANIFEST_*.md
+SPRINT*_FINAL_RELEASE_GATE_*.zip
+SPRINT*_FINAL_RELEASE_GATE_MANIFEST_*.md
+REVIEW_BUNDLE_*/
+SLICE*_VALIDATION_*.md
+SPRINT*_VALIDATION_*.md
+INTERVENTION_*_VALIDATION_*.md
+VALIDATION_LOGS_*/
+VISUAL_QA_*/
+git_diff_*.patch
+git_show_*.patch
+docs/visual-qa/
+release_artifacts/
+
+# Out-of-scope/generated iOS scratch state
+ios/
+
 # OS files
 Thumbs.db

@@ -14,8 +14,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         UserLinkEntity::class,
         UserDocumentEntity::class,
         ReadingProgressEntity::class,
+        ReadingAnnotationEntity::class,
     ],
-    version = 8,
+    version = 9,
     exportSchema = true,
 )
 abstract class QualityAlternativeDatabase : RoomDatabase() {
@@ -28,6 +29,8 @@ abstract class QualityAlternativeDatabase : RoomDatabase() {
     abstract fun userDocumentDao(): UserDocumentDao
 
     abstract fun readingProgressDao(): ReadingProgressDao
+
+    abstract fun readingAnnotationDao(): ReadingAnnotationDao
 
     companion object {
         fun build(
@@ -47,6 +50,7 @@ abstract class QualityAlternativeDatabase : RoomDatabase() {
                     MIGRATION_5_6,
                     MIGRATION_6_7,
                     MIGRATION_7_8,
+                    MIGRATION_8_9,
                 )
                 .build()
         }
@@ -232,6 +236,12 @@ abstract class QualityAlternativeDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                createReadingAnnotationsTable(db)
+            }
+        }
+
         private fun createUserLinksTable(db: SupportSQLiteDatabase) {
             db.execSQL(
                 """
@@ -276,6 +286,32 @@ abstract class QualityAlternativeDatabase : RoomDatabase() {
             )
             db.execSQL(
                 "CREATE UNIQUE INDEX IF NOT EXISTS index_user_documents_uri ON user_documents(uri)",
+            )
+        }
+
+        private fun createReadingAnnotationsTable(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS reading_annotations (
+                    id TEXT NOT NULL,
+                    contentId TEXT NOT NULL,
+                    paragraphIndex INTEGER NOT NULL,
+                    quotedText TEXT NOT NULL,
+                    noteText TEXT NOT NULL,
+                    createdAtMillis INTEGER NOT NULL,
+                    updatedAtMillis INTEGER NOT NULL,
+                    PRIMARY KEY(id)
+                )
+                """.trimIndent(),
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS index_reading_annotations_contentId ON reading_annotations(contentId)",
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS index_reading_annotations_contentId_paragraphIndex ON reading_annotations(contentId, paragraphIndex)",
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS index_reading_annotations_updatedAtMillis ON reading_annotations(updatedAtMillis)",
             )
         }
     }
