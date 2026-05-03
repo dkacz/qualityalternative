@@ -187,19 +187,19 @@ class PreferencesSettingsRepositoryTest {
         )
 
         repository.saveAnnotationExportDestination(
-            uri = "content://drive/qa-annotations.md",
-            displayName = "qa-annotations.md",
+            uri = "content://drive/qa-annotations.jsonld",
+            displayName = "qa-annotations.jsonld",
         )
         repository.saveAnnotationExportSuccess(3_000L)
         repository.saveAnnotationExportDestination(
-            uri = "content://drive/new-annotations.md",
-            displayName = "new-annotations.md",
+            uri = "content://drive/new-annotations.jsonld",
+            displayName = "new-annotations.jsonld",
         )
         repository.saveAnnotationExportFailure("Drive write unavailable")
 
         val failed = repository.observeAppSettings().first()
-        assertEquals("content://drive/new-annotations.md", failed.annotationExportUri)
-        assertEquals("new-annotations.md", failed.annotationExportDisplayName)
+        assertEquals("content://drive/new-annotations.jsonld", failed.annotationExportUri)
+        assertEquals("new-annotations.jsonld", failed.annotationExportDisplayName)
         assertEquals(null, failed.annotationExportLastSuccessfulAtMillis)
         assertEquals("Drive write unavailable", failed.annotationExportLastError)
 
@@ -216,6 +216,42 @@ class PreferencesSettingsRepositoryTest {
         assertEquals(null, cleared.annotationExportDisplayName)
         assertEquals(null, cleared.annotationExportLastSuccessfulAtMillis)
         assertEquals(null, cleared.annotationExportLastError)
+    }
+
+    @Test
+    fun saveAnnotationDriveSyncSettings_persistsConnectionStatusAndFailure() = runBlocking {
+        val repository = PreferencesSettingsRepository(
+            dataStore = testDataStore(),
+            supportedApps = SupportedCatalog.distractingApps,
+        )
+
+        repository.saveAnnotationDriveSyncConnection(folderId = null)
+        repository.saveAnnotationDriveSyncFailure("Google Drive sync failed. Retry from Settings.")
+
+        val failed = repository.observeAppSettings().first()
+        assertEquals(true, failed.annotationDriveSyncEnabled)
+        assertEquals(null, failed.annotationDriveFolderId)
+        assertEquals(null, failed.annotationDriveLastSuccessfulAtMillis)
+        assertEquals("Google Drive sync failed. Retry from Settings.", failed.annotationDriveLastError)
+
+        repository.saveAnnotationDriveSyncSuccess(
+            timestampMillis = 6_000L,
+            folderId = "drive-folder-annotations",
+        )
+
+        val synced = repository.observeAppSettings().first()
+        assertEquals(true, synced.annotationDriveSyncEnabled)
+        assertEquals("drive-folder-annotations", synced.annotationDriveFolderId)
+        assertEquals(6_000L, synced.annotationDriveLastSuccessfulAtMillis)
+        assertEquals(null, synced.annotationDriveLastError)
+
+        repository.clearAnnotationDriveSyncConnection()
+
+        val cleared = repository.observeAppSettings().first()
+        assertEquals(false, cleared.annotationDriveSyncEnabled)
+        assertEquals(null, cleared.annotationDriveFolderId)
+        assertEquals(null, cleared.annotationDriveLastSuccessfulAtMillis)
+        assertEquals(null, cleared.annotationDriveLastError)
     }
 
     @Test

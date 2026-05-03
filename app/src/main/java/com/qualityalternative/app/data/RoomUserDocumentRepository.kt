@@ -10,6 +10,7 @@ import com.qualityalternative.app.domain.model.ContentFormat
 import com.qualityalternative.app.domain.model.ContentItem
 import com.qualityalternative.app.domain.model.ContentRightsMetadata
 import com.qualityalternative.app.domain.model.ContentSourceType
+import com.qualityalternative.app.domain.model.ReaderDocument
 import com.qualityalternative.app.domain.model.TopicTag
 import com.qualityalternative.app.domain.model.UserDocumentDraft
 import com.qualityalternative.app.domain.service.AddUserDocumentResult
@@ -138,6 +139,16 @@ class RoomUserDocumentRepository(
         }
     }
 
+    override fun readerDocument(item: ContentItem): ReaderDocument {
+        return if (item.sourceType == ContentSourceType.USER_DOCUMENT && item.format.usesPrivateReader()) {
+            val structuredLoader = bodyLoader as? UserDocumentReaderDocumentLoader
+            structuredLoader?.loadReaderDocument(uri = item.rights.sourceUrl.orEmpty(), format = item.format)
+                ?: ReaderDocument.fromPlainText(contentBody(item))
+        } else {
+            ReaderDocument.fromPlainText(item.description)
+        }
+    }
+
     override fun isReady(): Boolean = ready.value
 
     override fun observeReady(): Flow<Boolean> = ready.asStateFlow()
@@ -151,22 +162,30 @@ fun interface UserDocumentBodyLoader {
     fun loadBody(uri: String, format: ContentFormat): String
 }
 
+interface UserDocumentReaderDocumentLoader : UserDocumentBodyLoader {
+    fun loadReaderDocument(uri: String, format: ContentFormat): ReaderDocument
+}
+
 class AndroidUserDocumentBodyLoader(
     context: Context,
-) : UserDocumentBodyLoader {
+) : UserDocumentReaderDocumentLoader {
     private val contentResolver: ContentResolver = context.contentResolver
 
     override fun loadBody(uri: String, format: ContentFormat): String {
+        return loadReaderDocument(uri = uri, format = format).plainText
+    }
+
+    override fun loadReaderDocument(uri: String, format: ContentFormat): ReaderDocument {
         if (!format.usesPrivateReader()) {
-            return ""
+            return ReaderDocument.fromPlainText("")
         }
         return runCatching {
             val parsedUri = Uri.parse(uri)
             contentResolver.openInputStream(parsedUri)?.use { input ->
                 when (format) {
-                    ContentFormat.MARKDOWN -> input.bufferedReader(Charsets.UTF_8).readText()
-                    ContentFormat.EPUB -> EpubTextExtractor.extract(input)
-                    else -> ""
+                    ContentFormat.MARKDOWN -> ReaderDocument.fromPlainText(input.bufferedReader(Charsets.UTF_8).readText())
+                    ContentFormat.EPUB -> EpubTextExtractor.extractDocument(input)
+                    else -> ReaderDocument.fromPlainText("")
                 }
             } ?: throw UserDocumentBodyLoadException(uri)
         }.getOrElse { error ->

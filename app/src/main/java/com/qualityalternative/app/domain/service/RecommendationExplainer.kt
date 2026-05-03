@@ -2,7 +2,6 @@ package com.qualityalternative.app.domain.service
 
 import com.qualityalternative.app.domain.model.ContentItem
 import com.qualityalternative.app.domain.model.ContentSourceType
-import com.qualityalternative.app.domain.model.DurationBucket
 import com.qualityalternative.app.domain.model.TopicTag
 import com.qualityalternative.app.domain.model.UserPreferences
 
@@ -32,7 +31,7 @@ object RecommendationExplainer {
             if (matchedTopics.isNotEmpty()) {
                 add("Matches ${matchedTopics.take(2).joinToString(" + ") { it.displayName() }}")
             }
-            add(durationChip(item.durationMinutes, preferences.preferredDurationBucket))
+            add(timeChip(item))
             add(item.sourceChip())
         }.distinct()
 
@@ -52,21 +51,16 @@ object RecommendationExplainer {
             item.id in preferences.priorityContentIds -> "You marked this as a priority pick for replacement moments."
             matchedTopics.isNotEmpty() -> "Picked because it matches your ${matchedTopics.first().displayName()} interest."
             item.sourceType == ContentSourceType.MEDITATION -> "A short reset for creating space before opening the app."
-            preferences.preferredDurationBucket.contains(item.durationMinutes) -> "A short replacement that fits your session length."
             else -> "A bounded replacement for this moment."
         }
     }
 
-    private fun durationChip(minutes: Int, bucket: DurationBucket): String {
-        return when {
-            bucket.contains(minutes) -> "Fits ${bucket.displayRange()}"
-            minutes < bucket.minMinutes -> "Shorter than ${bucket.displayRange()}"
-            else -> "Longer than ${bucket.displayRange()}"
+    private fun timeChip(item: ContentItem): String {
+        return if (item.sourceType == ContentSourceType.MEDITATION) {
+            "${item.durationMinutes} min timer"
+        } else {
+            "${item.durationMinutes} min read"
         }
-    }
-
-    private fun DurationBucket.displayRange(): String {
-        return "$minMinutes-$maxMinutes min"
     }
 
     private fun ContentItem.sourceChip(): String {

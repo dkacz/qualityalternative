@@ -42,7 +42,6 @@ class UserDocumentValidatorTest {
                 UserDocumentValidationError.EMPTY_URI,
                 UserDocumentValidationError.UNSUPPORTED_FORMAT,
                 UserDocumentValidationError.BLANK_TITLE,
-                UserDocumentValidationError.INVALID_DURATION,
                 UserDocumentValidationError.NO_TOPICS,
             ),
             result.errors,
@@ -67,8 +66,8 @@ class UserDocumentValidatorTest {
     }
 
     @Test
-    fun validate_rejectsDocumentSessionEstimateOutsideThreeToTwentyMinutes() {
-        val tooLong = UserDocumentValidator.validate(
+    fun validate_doesNotRejectDocumentsForComputedLongReadingTime() {
+        val result = UserDocumentValidator.validate(
             UserDocumentDraft(
                 uri = "content://docs/book",
                 displayName = "book.epub",
@@ -79,6 +78,6 @@ class UserDocumentValidatorTest {
             ),
         )
 
-        assertEquals(setOf(UserDocumentValidationError.INVALID_DURATION), tooLong.errors)
+        assertTrue(result.isValid)
     }
 }

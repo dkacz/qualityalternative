@@ -65,6 +65,10 @@ class PreferencesSettingsRepository(
                     annotationExportDisplayName = preferences[AnnotationExportDisplayName],
                     annotationExportLastSuccessfulAtMillis = preferences[AnnotationExportLastSuccessfulAtMillis],
                     annotationExportLastError = preferences[AnnotationExportLastError],
+                    annotationDriveSyncEnabled = preferences[AnnotationDriveSyncEnabled] ?: false,
+                    annotationDriveFolderId = preferences[AnnotationDriveFolderId],
+                    annotationDriveLastSuccessfulAtMillis = preferences[AnnotationDriveLastSuccessfulAtMillis],
+                    annotationDriveLastError = preferences[AnnotationDriveLastError],
                 )
             }
     }
@@ -161,6 +165,42 @@ class PreferencesSettingsRepository(
         }
     }
 
+    override suspend fun saveAnnotationDriveSyncConnection(folderId: String?) {
+        dataStore.edit { preferences ->
+            preferences[AnnotationDriveSyncEnabled] = true
+            if (folderId.isNullOrBlank()) {
+                preferences.remove(AnnotationDriveFolderId)
+            } else {
+                preferences[AnnotationDriveFolderId] = folderId
+            }
+            preferences.remove(AnnotationDriveLastError)
+        }
+    }
+
+    override suspend fun clearAnnotationDriveSyncConnection() {
+        dataStore.edit { preferences ->
+            preferences.remove(AnnotationDriveSyncEnabled)
+            preferences.remove(AnnotationDriveFolderId)
+            preferences.remove(AnnotationDriveLastSuccessfulAtMillis)
+            preferences.remove(AnnotationDriveLastError)
+        }
+    }
+
+    override suspend fun saveAnnotationDriveSyncSuccess(timestampMillis: Long, folderId: String) {
+        dataStore.edit { preferences ->
+            preferences[AnnotationDriveSyncEnabled] = true
+            preferences[AnnotationDriveFolderId] = folderId
+            preferences[AnnotationDriveLastSuccessfulAtMillis] = timestampMillis
+            preferences.remove(AnnotationDriveLastError)
+        }
+    }
+
+    override suspend fun saveAnnotationDriveSyncFailure(errorMessage: String) {
+        dataStore.edit { preferences ->
+            preferences[AnnotationDriveLastError] = errorMessage
+        }
+    }
+
     suspend fun clearForTests() {
         dataStore.edit { preferences ->
             preferences.clear()
@@ -196,5 +236,9 @@ class PreferencesSettingsRepository(
         val AnnotationExportDisplayName = stringPreferencesKey("annotation_export_display_name")
         val AnnotationExportLastSuccessfulAtMillis = longPreferencesKey("annotation_export_last_successful_at_millis")
         val AnnotationExportLastError = stringPreferencesKey("annotation_export_last_error")
+        val AnnotationDriveSyncEnabled = booleanPreferencesKey("annotation_drive_sync_enabled")
+        val AnnotationDriveFolderId = stringPreferencesKey("annotation_drive_folder_id")
+        val AnnotationDriveLastSuccessfulAtMillis = longPreferencesKey("annotation_drive_last_successful_at_millis")
+        val AnnotationDriveLastError = stringPreferencesKey("annotation_drive_last_error")
     }
 }

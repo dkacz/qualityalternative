@@ -12,8 +12,8 @@ android {
         applicationId = "com.qualityalternative.app"
         minSdk = 29
         targetSdk = 36
-        versionCode = 11
-        versionName = "0.7.0-alpha"
+        versionCode = 12
+        versionName = "0.8.0-alpha"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -37,6 +37,10 @@ android {
         buildConfig = true
     }
 
+    sourceSets {
+        getByName("androidTest").assets.srcDir("$projectDir/schemas")
+    }
+
     testOptions {
         animationsDisabled = true
     }
@@ -51,6 +55,16 @@ android {
 ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
     arg("room.incremental", "true")
+}
+
+configurations.configureEach {
+    resolutionStrategy.force(
+        "org.jetbrains.kotlinx:kotlinx-serialization-bom:1.8.1",
+        "org.jetbrains.kotlinx:kotlinx-serialization-core:1.8.1",
+        "org.jetbrains.kotlinx:kotlinx-serialization-core-jvm:1.8.1",
+        "org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1",
+        "org.jetbrains.kotlinx:kotlinx-serialization-json-jvm:1.8.1",
+    )
 }
 
 dependencies {
@@ -69,14 +83,18 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.room.ktx)
     implementation(libs.androidx.room.runtime)
+    implementation(libs.play.services.auth)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
 
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+    androidTestImplementation(libs.androidx.room.testing)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.uiautomator)
     androidTestImplementation(libs.kotlinx.coroutines.test)
+    androidTestImplementation(libs.kotlinx.serialization.core)
+    androidTestImplementation(libs.kotlinx.serialization.json)
 
     ksp(libs.androidx.room.compiler)
 

@@ -224,7 +224,6 @@ enum class UserDocumentValidationError {
     EMPTY_URI,
     UNSUPPORTED_FORMAT,
     BLANK_TITLE,
-    INVALID_DURATION,
     NO_TOPICS,
 }
 

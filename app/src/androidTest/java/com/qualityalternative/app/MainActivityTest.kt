@@ -2,14 +2,18 @@ package com.qualityalternative.app
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -71,6 +75,8 @@ class MainActivityTest {
         "sprint14-annotation-export-${System.currentTimeMillis()}"
     private val sprint14ReaderPaginationScreenshotDirName =
         "sprint14-reader-pagination-${System.currentTimeMillis()}"
+    private val sprint15DriveSyncScreenshotDirName =
+        "sprint15-drive-sync-${System.currentTimeMillis()}"
 
     @Before
     fun resetAppState() {
@@ -109,7 +115,7 @@ class MainActivityTest {
 
         composeRule.onNodeWithText("You reached for Fixture Feed One").assertIsDisplayed()
         composeRule.onNodeWithText("A BRIEF DETOUR, IF YOU'D LIKE ONE")
-            .assertIsDisplayed()
+            .assertDoesNotExist()
         composeRule.onNodeWithTag("intervention-backup-action-0")
             .assertIsDisplayed()
             .assertIsEnabled()
@@ -453,9 +459,7 @@ class MainActivityTest {
         composeRule.onAllNodesWithText("figure · editorial image", ignoreCase = true)
             .fetchSemanticsNodes()
             .also { nodes -> assertEquals(0, nodes.size) }
-        composeRule.onNodeWithTag("reader-done")
-            .assertIsDisplayed()
-            .performClick()
+        finishReaderFromCurrentPage()
 
         composeRule.waitUntil(timeoutMillis = 10_000) {
             hasNode("Two quick questions.")
@@ -488,9 +492,7 @@ class MainActivityTest {
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
         val completedContentId = currentContentId()
         val completedTitle = currentContentTitle()
-        composeRule.onNodeWithTag("reader-done")
-            .assertIsDisplayed()
-            .performClick()
+        finishReaderFromCurrentPage()
 
         composeRule.waitUntil(timeoutMillis = 10_000) {
             hasTag("feedback-screen") && hasCompletedProgressFor(completedContentId)
@@ -591,10 +593,7 @@ class MainActivityTest {
             .performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
         val contentId = currentContentId()
-        composeRule.onNodeWithTag("reader-next-page")
-            .assertIsDisplayed()
-            .assertIsEnabled()
-            .performClick()
+        advanceReaderPage()
         composeRule.waitUntil(timeoutMillis = 10_000) { hasUnfinishedProgressFor(contentId) }
         val savedPercent = savedProgressPercentFor(contentId)
         val savedParagraphIndex = savedProgressParagraphIndexFor(contentId)
@@ -616,12 +615,9 @@ class MainActivityTest {
             visibleReaderParagraphIndices().any { index -> index > 0 }
         }
         val restoredVisibleParagraphIndices = visibleReaderParagraphIndices()
-        val minimumRestoredParagraphIndex = (savedParagraphIndex - 2).coerceAtLeast(1)
         assertTrue(
-            "Expected continued Reader to restore near saved paragraph $savedParagraphIndex, found $restoredVisibleParagraphIndices",
-            restoredVisibleParagraphIndices.any { index ->
-                index in minimumRestoredParagraphIndex..savedParagraphIndex
-            },
+            "Expected continued Reader to restore a page at or before saved paragraph $savedParagraphIndex, found $restoredVisibleParagraphIndices",
+            restoredVisibleParagraphIndices.any { index -> index in 1..savedParagraphIndex },
         )
         assertFalse(restoredVisibleParagraphIndices.contains(0))
 
@@ -636,9 +632,7 @@ class MainActivityTest {
             .assertIsDisplayed()
             .performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
-        composeRule.onNodeWithTag("reader-done")
-            .assertIsDisplayed()
-            .performClick()
+        finishReaderFromCurrentPage()
 
         composeRule.waitUntil(timeoutMillis = 10_000) {
             hasTag("feedback-screen") && hasCompletedProgressFor(contentId)
@@ -670,19 +664,18 @@ class MainActivityTest {
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
         assertEquals(seeded.newEpub.id, currentContentId())
         composeRule.onNodeWithTag("reader-page-label").assertIsDisplayed()
+        composeRule.onNodeWithText("Next page").assertDoesNotExist()
+        composeRule.onNodeWithText("Previous").assertDoesNotExist()
+        composeRule.onNodeWithText("I'm done reading").assertDoesNotExist()
         captureSprint14ReaderPaginationScreenshot("02_reader_page_one_light")
         composeRule.onNodeWithTag("reader-list")
             .performTouchInput { swipeUp() }
         composeRule.waitForIdle()
-        composeRule.onNodeWithTag("reader-next-page")
-            .assertIsDisplayed()
-            .assertIsEnabled()
-            .performClick()
+        advanceReaderPage()
         composeRule.waitUntil(timeoutMillis = 10_000) {
             visibleReaderParagraphIndices().any { index -> index > 0 }
         }
-        composeRule.onNodeWithText("Page 2/2", ignoreCase = true)
-            .assertIsDisplayed()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasNodeContaining("2/") }
         captureSprint14ReaderPaginationScreenshot("03_reader_next_page_light")
         scenario?.onActivity { activity -> activity.mainViewModel.selectThemeMode(AppThemeMode.DARK) }
         composeRule.waitForIdle()
@@ -690,15 +683,72 @@ class MainActivityTest {
         composeRule.onNodeWithTag("reader-list")
             .performTouchInput { swipeUp() }
         composeRule.waitForIdle()
-        composeRule.onNodeWithTag("reader-previous-page")
-            .assertIsDisplayed()
-            .assertIsEnabled()
-            .performClick()
+        UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).pressBack()
         composeRule.waitUntil(timeoutMillis = 10_000) {
             visibleReaderParagraphIndices().contains(0)
         }
-        composeRule.onNodeWithText("Page 1/2", ignoreCase = true)
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasNodeContaining("1/") }
+    }
+
+    @Test
+    fun epubReaderUsesKindlePagingAndTableOfContentsNavigation() {
+        launchOnboardedApp()
+        val document = addSeedEpubDocument(
+            title = "Sprint 15 TOC Reader",
+            displayName = "sprint15-toc-reader.epub",
+            bytes = sprint15TocEpubBytes(title = "Sprint 15 TOC Reader"),
+            nowMillis = 41_000L,
+        )
+
+        scenario?.onActivity { activity -> activity.mainViewModel.openLibraryItem(document) }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
+        composeRule.onNodeWithTag("reader-page-label").assertIsDisplayed()
+        composeRule.onNodeWithTag("reader-toc-open").assertIsDisplayed()
+        composeRule.onNodeWithText("Chapter One", substring = true).assertIsDisplayed()
+
+        val firstPageIndices = visibleReaderParagraphIndices()
+        assertTrue(firstPageIndices.contains(0))
+        composeRule.onNodeWithTag("reader-list")
+            .performTouchInput { swipeUp() }
+        composeRule.waitForIdle()
+        assertEquals(
+            "Reader body should not respond to vertical swipe; paging is tap/back only.",
+            firstPageIndices,
+            visibleReaderParagraphIndices(),
+        )
+
+        composeRule.onNodeWithTag("reader-page-viewport").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            visibleReaderParagraphIndices().any { index -> index > (firstPageIndices.maxOrNull() ?: -1) }
+        }
+        assertFalse(visibleReaderParagraphIndices().contains(0))
+
+        UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).pressBack()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            visibleReaderParagraphIndices() == firstPageIndices
+        }
+
+        composeRule.onNodeWithTag("reader-toc-open")
             .assertIsDisplayed()
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-toc-sheet") }
+        captureSprint14ReaderPaginationScreenshot("05_reader_toc_sheet_light")
+        val chapterTwoIndex = readerTocEntryIndex("Chapter Two")
+        val chapterTwoBlockIndex = readerTocEntryBlockIndex("Chapter Two")
+        composeRule.onNodeWithTag("reader-toc-entry-$chapterTwoIndex")
+            .assertIsDisplayed()
+            .performSemanticsAction(SemanticsActions.OnClick)
+        composeRule.waitForIdle()
+        val postTocVisibleIndices = visibleReaderParagraphIndices()
+        assertTrue(
+            "Expected Chapter Two TOC click to close sheet and land near block $chapterTwoBlockIndex; " +
+                "visible=$postTocVisibleIndices sheetVisible=${hasTag("reader-toc-sheet")}",
+            !hasTag("reader-toc-sheet") && postTocVisibleIndices.any { index -> index >= chapterTwoBlockIndex },
+        )
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasNodeContaining("table-of-contents target") && !hasTag("reader-toc-sheet")
+        }
+        composeRule.onNodeWithText("table-of-contents target", substring = true).assertIsDisplayed()
     }
 
     @Test
@@ -710,6 +760,8 @@ class MainActivityTest {
 
         relaunchFixtureSystemIntervention()
 
+        composeRule.onNodeWithText("A brief detour, if you'd like one").assertDoesNotExist()
+        composeRule.onNodeWithText("Choose another if this is not the right fit.").assertDoesNotExist()
         composeRule.onNodeWithTag("intervention-primary-progress").assertIsDisplayed()
         val recommendationSet = currentRecommendationSet()
         val primaryLabel = continueProgressLabel(item = recommendationSet.primary, progressPercent = 42)
@@ -775,57 +827,66 @@ class MainActivityTest {
             .performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
         val contentId = currentContentId()
+        val annotationParagraph = 1
 
-        composeRule.onNodeWithTag("reader-annotation-action-0")
+        composeRule.onNodeWithTag("reader-annotation-block-$annotationParagraph")
             .assertIsDisplayed()
+            .performTouchInput { longClick(position = Offset(18f, 18f)) }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-annotation-editor-$annotationParagraph") }
+        composeRule.onNodeWithTag("reader-annotation-editor-$annotationParagraph").assertIsDisplayed()
+        composeRule.onNodeWithText("SELECTED FRAGMENT").assertDoesNotExist()
+        composeRule.onNodeWithTag("reader-annotation-selected-quote-$annotationParagraph").assertIsDisplayed()
+        val initialSelectedQuote = readerSelectedQuoteText(annotationParagraph)
+        composeRule.onNodeWithTag("reader-annotation-end-later")
+            .assertIsDisplayed()
+            .assertIsEnabled()
             .performClick()
-        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-annotation-editor-0") }
-        composeRule.onNodeWithTag("reader-list")
-            .performScrollToNode(hasTestTag("reader-annotation-editor-0"))
-        composeRule.onNodeWithTag("reader-annotation-editor-0").assertIsDisplayed()
-        composeRule.onNodeWithText("QUOTED FRAGMENT").assertIsDisplayed()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            readerSelectedQuoteText(annotationParagraph).length > initialSelectedQuote.length
+        }
+        val expandedSelectedQuote = readerSelectedQuoteText(annotationParagraph)
+        val expandedQuoteTail = expandedSelectedQuote.removePrefix(initialSelectedQuote).trim().take(40)
+        assertTrue("Expected End later to add text to the selected quote", expandedQuoteTail.isNotBlank())
         val firstNote = "Worth remembering when the impulse hits."
-        composeRule.onNodeWithTag("reader-annotation-note-input-0")
+        composeRule.onNodeWithTag("reader-annotation-note-input-$annotationParagraph")
             .assertIsDisplayed()
             .performTextInput(firstNote)
         UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).pressBack()
         composeRule.waitForIdle()
-        composeRule.onNodeWithTag("reader-list")
-            .performScrollToNode(hasTestTag("reader-annotation-editor-0"))
-        composeRule.onNodeWithTag("reader-annotation-save-0").assertIsDisplayed()
+        composeRule.onNodeWithTag("reader-annotation-save-$annotationParagraph").assertIsDisplayed()
         captureSprint14ReaderAnnotationScreenshot("01_reader_annotation_editor_light")
 
-        composeRule.onNodeWithTag("reader-annotation-save-0")
+        composeRule.onNodeWithTag("reader-annotation-save-$annotationParagraph")
             .assertIsDisplayed()
             .performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) {
-            hasTag("reader-annotation-preview-0") && hasNode(firstNote) && hasReadingAnnotationNote(contentId, firstNote)
+                hasTag("reader-annotation-highlight-$annotationParagraph") &&
+                !hasTag("reader-annotation-editor-$annotationParagraph") &&
+                hasReadingAnnotationNote(contentId = contentId, paragraphIndex = annotationParagraph, noteText = firstNote) &&
+                hasReadingAnnotationQuoteContaining(contentId, annotationParagraph, expandedQuoteTail)
         }
-        composeRule.onNodeWithTag("reader-annotation-preview-0").assertIsDisplayed()
+        composeRule.onNodeWithTag("reader-annotation-highlight-$annotationParagraph").assertIsDisplayed()
         captureSprint14ReaderAnnotationScreenshot("02_reader_annotation_preview_light")
         scenario?.onActivity { activity -> activity.mainViewModel.dismissMessage() }
         composeRule.waitUntil(timeoutMillis = 10_000) { !hasNode("Annotation saved.") }
 
-        composeRule.onNodeWithTag("reader-annotation-action-0")
+        composeRule.onNodeWithTag("reader-annotation-block-$annotationParagraph")
             .assertIsDisplayed()
-            .performClick()
-        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-annotation-editor-0") }
-        composeRule.onNodeWithTag("reader-list")
-            .performScrollToNode(hasTestTag("reader-annotation-editor-0"))
+            .performTouchInput { longClick(position = Offset(18f, 18f)) }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-annotation-editor-$annotationParagraph") }
         val updatedNoteSuffix = "Remember: "
-        composeRule.onNodeWithTag("reader-annotation-note-input-0")
+        composeRule.onNodeWithTag("reader-annotation-note-input-$annotationParagraph")
             .performTextInput(updatedNoteSuffix)
         UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).pressBack()
         composeRule.waitForIdle()
-        composeRule.onNodeWithTag("reader-list")
-            .performScrollToNode(hasTestTag("reader-annotation-editor-0"))
-        composeRule.onNodeWithTag("reader-annotation-save-0")
+        composeRule.onNodeWithTag("reader-annotation-save-$annotationParagraph")
             .assertIsDisplayed()
             .performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) {
-            hasTag("reader-annotation-preview-0") &&
-                hasNodeContaining("Remember:") &&
-                hasSingleReadingAnnotationNoteContaining(contentId, "Remember:")
+                hasTag("reader-annotation-highlight-$annotationParagraph") &&
+                !hasTag("reader-annotation-editor-$annotationParagraph") &&
+                hasSingleReadingAnnotationNoteContaining(contentId, annotationParagraph, "Remember:") &&
+                hasReadingAnnotationQuoteContaining(contentId, annotationParagraph, expandedQuoteTail)
         }
         scenario?.onActivity { activity -> activity.mainViewModel.dismissMessage() }
         composeRule.waitUntil(timeoutMillis = 10_000) { !hasNode("Annotation updated.") }
@@ -834,7 +895,7 @@ class MainActivityTest {
             activity.mainViewModel.selectThemeMode(AppThemeMode.DARK)
         }
         composeRule.waitForIdle()
-        composeRule.onNodeWithTag("reader-annotation-preview-0").assertIsDisplayed()
+        composeRule.onNodeWithTag("reader-annotation-highlight-$annotationParagraph").assertIsDisplayed()
         captureSprint14ReaderAnnotationScreenshot("03_reader_annotation_preview_dark")
     }
 
@@ -886,12 +947,14 @@ class MainActivityTest {
             paragraphIndex = 4,
             quotedText = "This source was deleted.",
             noteText = "Missing source should be clear and disabled.",
+            sourceTitle = "Deleted essay title",
             nowMillis = System.currentTimeMillis() + 1_000L,
         )
-        composeRule.waitUntil(timeoutMillis = 10_000) { hasNode("Source no longer in Library") }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasNode("Deleted essay title") }
         composeRule.onNodeWithTag("annotation-library-list")
-            .performScrollToNode(hasText("Source no longer in Library"))
-        composeRule.onNodeWithText("Source no longer in Library").assertIsDisplayed()
+            .performScrollToNode(hasText("Deleted essay title"))
+        composeRule.onNodeWithText("Deleted essay title").assertIsDisplayed()
+        composeRule.onNodeWithText("Source no longer in Library").assertDoesNotExist()
         composeRule.onNodeWithText("MISSING SOURCE", substring = true).assertIsDisplayed()
         composeRule.onNodeWithText("Source missing").assertIsDisplayed()
         captureSprint14AnnotationLibraryScreenshot("03_annotation_missing_source_dark")
@@ -907,7 +970,7 @@ class MainActivityTest {
     }
 
     @Test
-    fun annotationAutosaveWritesMarkdownAndShowsSettingsStatus() {
+    fun annotationAutosaveWritesW3cJsonLdAndShowsSettingsStatus() {
         launchFixtureSystemIntervention()
 
         composeRule.onNodeWithText("Read this", substring = true)
@@ -917,18 +980,21 @@ class MainActivityTest {
         val contentId = currentContentId()
         val title = currentContentTitle()
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val exportFile = File(context.filesDir, "qa-annotations-e2e.md").apply {
+        context.filesDir.listFiles { file -> file.name.endsWith(".annotations.jsonld") }
+            .orEmpty()
+            .forEach(File::delete)
+        val exportFile = File(context.filesDir, "qa-annotations-e2e.jsonld").apply {
             if (exists()) delete()
         }
         scenario?.onActivity { activity ->
-            activity.mainViewModel.configureReadingAnnotationExport(
-                uri = Uri.fromFile(exportFile).toString(),
-                displayName = "qa-annotations-e2e.md",
-            )
+	            activity.mainViewModel.configureReadingAnnotationExport(
+	                uri = Uri.fromFile(exportFile).toString(),
+	                displayName = "qa-annotations-e2e.jsonld",
+	            )
         }
         composeRule.waitUntil(timeoutMillis = 10_000) { exportFile.exists() }
 
-        val noteText = "Autosaved to the annotation markdown file."
+        val noteText = "Autosaved to the W3C annotation file."
         scenario?.onActivity { activity ->
             activity.mainViewModel.saveCurrentReadingAnnotation(
                 paragraphIndex = 0,
@@ -937,8 +1003,12 @@ class MainActivityTest {
             )
         }
         composeRule.waitUntil(timeoutMillis = 10_000) {
-            val markdown = exportFile.readText()
-            markdown.contains(noteText) && markdown.contains("## $title")
+            val jsonLdFiles = context.filesDir.listFiles { file -> file.name.endsWith(".annotations.jsonld") }
+                .orEmpty()
+            jsonLdFiles.size == 1 &&
+                jsonLdFiles.single().readText().contains("\"type\":\"AnnotationCollection\"") &&
+                jsonLdFiles.single().readText().contains(noteText) &&
+                jsonLdFiles.single().readText().contains(title)
         }
 
         scenario?.onActivity { activity -> activity.mainViewModel.openSettings() }
@@ -949,7 +1019,7 @@ class MainActivityTest {
         composeRule.onNodeWithTag("settings-annotation-export-section").assertIsDisplayed()
         composeRule.onNodeWithTag("settings-list")
             .performScrollToNode(hasTestTag("settings-annotation-export-status"))
-        composeRule.onNodeWithText("qa-annotations-e2e.md").assertIsDisplayed()
+        composeRule.onNodeWithText("qa-annotations-e2e.jsonld").assertIsDisplayed()
         composeRule.onNodeWithTag("settings-annotation-export-status").assertIsDisplayed()
         composeRule.onNodeWithText("Save now").assertIsDisplayed()
         scenario?.onActivity { activity -> activity.mainViewModel.dismissMessage() }
@@ -961,14 +1031,16 @@ class MainActivityTest {
             activity.mainViewModel.deleteReadingAnnotation(annotationId)
         }
         composeRule.waitUntil(timeoutMillis = 10_000) {
-            val markdown = exportFile.readText()
-            !markdown.contains(noteText) && markdown.contains("No annotations saved yet.")
+            val index = exportFile.readText()
+            val jsonLdFiles = context.filesDir.listFiles { file -> file.name.endsWith(".annotations.jsonld") }
+                .orEmpty()
+            !index.contains(noteText) && index.contains("\"files\":[]") && jsonLdFiles.isEmpty()
         }
 
         scenario?.onActivity { activity ->
             activity.mainViewModel.configureReadingAnnotationExport(
-                uri = "content://com.qualityalternative.missing/qa-annotations.md",
-                displayName = "missing-drive-file.md",
+                uri = "content://com.qualityalternative.missing/qa-annotations.jsonld",
+                displayName = "missing-drive-file.jsonld",
             )
             activity.mainViewModel.selectThemeMode(AppThemeMode.DARK)
         }
@@ -979,12 +1051,41 @@ class MainActivityTest {
             .performScrollToNode(hasTestTag("settings-annotation-export-section"))
         composeRule.onNodeWithTag("settings-list")
             .performScrollToNode(hasTestTag("settings-annotation-export-status"))
-        composeRule.onNodeWithText("missing-drive-file.md").assertIsDisplayed()
+        composeRule.onNodeWithText("missing-drive-file.jsonld").assertIsDisplayed()
         composeRule.onNodeWithTag("settings-annotation-export-status").assertIsDisplayed()
         composeRule.onNodeWithText("Retry").assertIsDisplayed()
         scenario?.onActivity { activity -> activity.mainViewModel.dismissMessage() }
         composeRule.waitForIdle()
         captureSprint14AnnotationExportScreenshot("02_annotation_export_failure_dark")
+    }
+
+    @Test
+    fun annotationDriveSyncSettingsShowsConnectAndRecoverableAuthFailure() {
+        launchOnboardedApp()
+        scenario?.onActivity { activity -> activity.mainViewModel.openSettings() }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("settings-list") }
+        composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasTestTag("settings-annotation-drive-connect"))
+        composeRule.onNodeWithText("Google Drive not connected").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings-annotation-drive-status").assertIsDisplayed()
+        composeRule.onNodeWithText("Connect").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings-annotation-drive-disconnect").assertIsNotEnabled()
+        captureSprint15DriveSyncScreenshot("01_drive_connect_light")
+
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.beginAnnotationDriveAuthorization()
+            activity.mainViewModel.reportAnnotationDriveAuthorizationFailure("Google Drive permission was not granted.")
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasNode("GOOGLE DRIVE PERMISSION WAS NOT GRANTED")
+        }
+        composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasTestTag("settings-annotation-drive-status"))
+        composeRule.onNodeWithText("GOOGLE DRIVE PERMISSION WAS NOT GRANTED", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithTag("settings-annotation-drive-connect").assertIsEnabled()
+        scenario?.onActivity { activity -> activity.mainViewModel.dismissMessage() }
+        composeRule.waitForIdle()
+        captureSprint15DriveSyncScreenshot("02_drive_auth_failure_light")
     }
 
     @Test
@@ -1125,6 +1226,24 @@ class MainActivityTest {
         }
     }
 
+    private fun advanceReaderPage() {
+        composeRule.onNodeWithTag("reader-page-viewport")
+            .assertIsDisplayed()
+            .performSemanticsAction(SemanticsActions.OnClick)
+        composeRule.waitForIdle()
+    }
+
+    private fun finishReaderFromCurrentPage(maxTaps: Int = 20) {
+        repeat(maxTaps) {
+            if (hasTag("feedback-screen")) {
+                return
+            }
+            advanceReaderPage()
+            composeRule.waitForIdle()
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("feedback-screen") }
+    }
+
     private fun currentContentId(): String {
         var contentId = ""
         scenario?.onActivity { activity ->
@@ -1143,6 +1262,13 @@ class MainActivityTest {
         return title
     }
 
+    private fun readerSelectedQuoteText(paragraphIndex: Int): String {
+        return composeRule.onNodeWithTag("reader-annotation-selected-quote-$paragraphIndex")
+            .fetchSemanticsNode()
+            .config[SemanticsProperties.Text]
+            .joinToString(separator = "\n") { text -> text.text }
+    }
+
     private fun currentReaderStartParagraphIndex(): Int {
         var paragraphIndex = -1
         scenario?.onActivity { activity ->
@@ -1150,6 +1276,31 @@ class MainActivityTest {
         }
         assertTrue(paragraphIndex >= 0)
         return paragraphIndex
+    }
+
+    private fun readerTocEntryIndex(title: String): Int {
+        var entryIndex = -1
+        scenario?.onActivity { activity ->
+            entryIndex = activity.mainViewModel.uiState.currentReaderDocument
+                ?.tableOfContents
+                ?.indexOfFirst { entry -> entry.title == title }
+                ?: -1
+        }
+        assertTrue("Expected TOC entry for $title", entryIndex >= 0)
+        return entryIndex
+    }
+
+    private fun readerTocEntryBlockIndex(title: String): Int {
+        var blockIndex = -1
+        scenario?.onActivity { activity ->
+            blockIndex = activity.mainViewModel.uiState.currentReaderDocument
+                ?.tableOfContents
+                ?.firstOrNull { entry -> entry.title == title }
+                ?.blockIndex
+                ?: -1
+        }
+        assertTrue("Expected TOC block index for $title", blockIndex >= 0)
+        return blockIndex
     }
 
     private fun currentRecommendationContentIds(): Set<String> {
@@ -1222,6 +1373,7 @@ class MainActivityTest {
         paragraphIndex: Int,
         quotedText: String,
         noteText: String,
+        sourceTitle: String = "",
         nowMillis: Long = 11_000L,
     ) = runBlocking {
         val app = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication)
@@ -1231,6 +1383,7 @@ class MainActivityTest {
                 paragraphIndex = paragraphIndex,
                 quotedText = quotedText,
                 noteText = noteText,
+                sourceTitle = sourceTitle,
             ),
             nowMillis = nowMillis,
         )
@@ -1260,6 +1413,18 @@ class MainActivityTest {
         return hasAnnotation
     }
 
+    private fun hasReadingAnnotationQuoteContaining(contentId: String, paragraphIndex: Int, quoteText: String): Boolean {
+        var hasAnnotation = false
+        scenario?.onActivity { activity ->
+            hasAnnotation = activity.mainViewModel.uiState.readingAnnotations.any { annotation ->
+                annotation.contentId == contentId &&
+                    annotation.paragraphIndex == paragraphIndex &&
+                    annotation.quotedText.contains(quoteText)
+            }
+        }
+        return hasAnnotation
+    }
+
     private fun readingAnnotationIdFor(contentId: String, paragraphIndex: Int): String {
         var annotationId = ""
         scenario?.onActivity { activity ->
@@ -1274,11 +1439,15 @@ class MainActivityTest {
         return annotationId
     }
 
-    private fun hasSingleReadingAnnotationNoteContaining(contentId: String, noteText: String): Boolean {
+    private fun hasSingleReadingAnnotationNoteContaining(
+        contentId: String,
+        paragraphIndex: Int,
+        noteText: String,
+    ): Boolean {
         var hasAnnotation = false
         scenario?.onActivity { activity ->
             val matchingAnnotations = activity.mainViewModel.uiState.readingAnnotations.filter { annotation ->
-                annotation.contentId == contentId && annotation.paragraphIndex == 0
+                annotation.contentId == contentId && annotation.paragraphIndex == paragraphIndex
             }
             hasAnnotation = matchingAnnotations.size == 1 &&
                 matchingAnnotations.single().noteText.contains(noteText)
@@ -1322,26 +1491,20 @@ class MainActivityTest {
     }
 
     private fun saveReaderAnnotation(paragraphIndex: Int, noteText: String) {
-        composeRule.onNodeWithTag("reader-list")
-            .performScrollToNode(hasTestTag("reader-annotation-action-$paragraphIndex"))
-        composeRule.onNodeWithTag("reader-annotation-action-$paragraphIndex")
+        composeRule.onNodeWithTag("reader-annotation-block-$paragraphIndex")
             .assertIsDisplayed()
-            .performClick()
+            .performTouchInput { longClick() }
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-annotation-editor-$paragraphIndex") }
-        composeRule.onNodeWithTag("reader-list")
-            .performScrollToNode(hasTestTag("reader-annotation-editor-$paragraphIndex"))
         composeRule.onNodeWithTag("reader-annotation-note-input-$paragraphIndex")
             .assertIsDisplayed()
             .performTextInput(noteText)
         UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).pressBack()
         composeRule.waitForIdle()
-        composeRule.onNodeWithTag("reader-list")
-            .performScrollToNode(hasTestTag("reader-annotation-editor-$paragraphIndex"))
         composeRule.onNodeWithTag("reader-annotation-save-$paragraphIndex")
             .assertIsDisplayed()
             .performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) {
-            hasTag("reader-annotation-preview-$paragraphIndex") && hasNode(noteText)
+            hasTag("reader-annotation-highlight-$paragraphIndex") && hasReadingAnnotationNote(currentContentId(), paragraphIndex, noteText)
         }
         scenario?.onActivity { activity -> activity.mainViewModel.dismissMessage() }
         composeRule.waitForIdle()
@@ -1575,6 +1738,33 @@ class MainActivityTest {
         return (result as AddUserDocumentResult.Added).item
     }
 
+    private fun addSeedEpubDocument(
+        title: String,
+        displayName: String,
+        bytes: ByteArray,
+        nowMillis: Long,
+    ): ContentItem = runBlocking {
+        val targetContext = InstrumentationRegistry.getInstrumentation().targetContext
+        val app = (targetContext.applicationContext as QualityAlternativeApplication)
+        app.appContainer.userDocumentRepository.observeReady().first { it }
+        val fixture = File(targetContext.filesDir, "sprint15-reader-fixtures/$displayName")
+        fixture.parentFile?.mkdirs()
+        fixture.writeBytes(bytes)
+        val result = app.appContainer.userDocumentRepository.addDocument(
+            draft = UserDocumentDraft(
+                uri = Uri.fromFile(fixture).toString(),
+                displayName = displayName,
+                mimeType = "application/epub+zip",
+                title = title,
+                durationMinutes = 6,
+                topicTags = setOf(TopicTag.SCIENCE, TopicTag.PHILOSOPHY),
+            ),
+            nowMillis = nowMillis,
+        )
+        assertTrue("Expected $title to be saved", result is AddUserDocumentResult.Added)
+        (result as AddUserDocumentResult.Added).item
+    }
+
     private fun sprint14EpubBytes(title: String): ByteArray {
         return epubBytes(
             "META-INF/container.xml" to """
@@ -1609,6 +1799,62 @@ class MainActivityTest {
 	                  <p>This paragraph exists to keep the fixture representative of a short chapter rather than a card.</p>
 	                  <p>The final fixture paragraph gives the user a clean completion path after paging forward.</p>
 	                </body></html>
+            """.trimIndent(),
+        )
+    }
+
+    private fun sprint15TocEpubBytes(title: String): ByteArray {
+        return epubBytes(
+            "META-INF/container.xml" to """
+                <?xml version="1.0"?>
+                <container>
+                  <rootfiles>
+                    <rootfile full-path="OPS/package.opf" media-type="application/oebps-package+xml"/>
+                  </rootfiles>
+                </container>
+            """.trimIndent(),
+            "OPS/package.opf" to """
+                <package>
+                  <manifest>
+                    <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
+                    <item id="chapter-one" href="chapter1.xhtml" media-type="application/xhtml+xml"/>
+                    <item id="chapter-two" href="chapter2.xhtml" media-type="application/xhtml+xml"/>
+                  </manifest>
+                  <spine>
+                    <itemref idref="chapter-one"/>
+                    <itemref idref="chapter-two"/>
+                  </spine>
+                </package>
+            """.trimIndent(),
+            "OPS/nav.xhtml" to """
+                <html xmlns:epub="http://www.idpf.org/2007/ops"><body>
+                  <nav epub:type="toc">
+                    <ol>
+                      <li><a href="chapter1.xhtml#chapter-one">Chapter One</a></li>
+                      <li><a href="chapter2.xhtml#chapter-two">Chapter Two</a></li>
+                    </ol>
+                  </nav>
+                </body></html>
+            """.trimIndent(),
+            "OPS/chapter1.xhtml" to """
+                <html><body>
+                  <h1 id="chapter-one">Chapter One</h1>
+                  <p>$title starts with a long first chapter so the reader must paginate instead of placing the whole book in one scroll surface.</p>
+                  <p>The first page is intentionally dense enough to make a vertical swipe tempting, but the app should keep it fixed like a page.</p>
+                  <p>Tap anywhere in the page body to go forward; visible controls should stay out of the reading surface.</p>
+                  <p>When the user presses the Android back gesture, the reader should move to the previous page before leaving the reading session.</p>
+                  <p>This paragraph keeps chapter one over the page weight threshold and proves the next page is a real page, not a scrolled offset.</p>
+                  <p>The page should still report stable progress and visible paragraph anchors while rendering only the current page of the EPUB.</p>
+                  <p>Chapter one ends with enough text to separate it clearly from the following table-of-contents target.</p>
+                </body></html>
+            """.trimIndent(),
+            "OPS/chapter2.xhtml" to """
+                <html><body>
+                  <h1 id="chapter-two">Chapter Two</h1>
+                  <p>Chapter Two is the table-of-contents target used by Sprint 15 to prove EPUB navigation can jump straight to a section.</p>
+                  <p>The jump should close the contents sheet and land on a normal paginated reader page without enabling vertical body scrolling.</p>
+                  <p>This final paragraph keeps the destination page representative of a source chapter rather than a tiny label-only target.</p>
+                </body></html>
             """.trimIndent(),
         )
     }
@@ -1701,6 +1947,16 @@ class MainActivityTest {
 
     private fun captureSprint14ReaderPaginationScreenshot(name: String) {
         val outputDir = File("/sdcard/Download/qualityalternative/$sprint14ReaderPaginationScreenshotDirName")
+        assertTrue("Expected screenshot output directory for $name", outputDir.mkdirs() || outputDir.exists())
+        composeRule.waitForIdle()
+        Thread.sleep(300)
+        val output = File(outputDir, "$name.png")
+        assertTrue("Expected screenshot capture for $name", UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).takeScreenshot(output))
+        assertTrue("Expected screenshot file for $name", output.exists() && output.length() > 0L)
+    }
+
+    private fun captureSprint15DriveSyncScreenshot(name: String) {
+        val outputDir = File("/sdcard/Download/qualityalternative/$sprint15DriveSyncScreenshotDirName")
         assertTrue("Expected screenshot output directory for $name", outputDir.mkdirs() || outputDir.exists())
         composeRule.waitForIdle()
         Thread.sleep(300)

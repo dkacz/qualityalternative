@@ -53,6 +53,11 @@ import com.qualityalternative.app.domain.service.HistoryRepository
 import com.qualityalternative.app.domain.service.InterceptionMonitor
 import com.qualityalternative.app.domain.service.RecommendationEngine
 import com.qualityalternative.app.domain.service.ReadingAnnotationRepository
+import com.qualityalternative.app.domain.service.ReadingAnnotationDriveSyncClient
+import com.qualityalternative.app.domain.service.ReadingAnnotationDriveSyncRequest
+import com.qualityalternative.app.domain.service.ReadingAnnotationDriveSyncResult
+import com.qualityalternative.app.domain.service.ReadingAnnotationDriveTokenProvider
+import com.qualityalternative.app.domain.service.ReadingAnnotationExportFile
 import com.qualityalternative.app.domain.service.ReadingAnnotationExportWriter
 import com.qualityalternative.app.domain.service.ReadingProgressRepository
 import com.qualityalternative.app.domain.service.SettingsRepository
@@ -711,8 +716,8 @@ class MainViewModelTest {
                 selectedAppPackages = setOf(FixtureTargetRegistry.fixtureDistractors.first().packageName),
             ).copy(
                 priorityContentIds = setOf(userLink.id, userDocument.id, "p1"),
-                annotationExportUri = "content://drive/qa-annotations.md",
-                annotationExportDisplayName = "qa-annotations.md",
+                annotationExportUri = "content://drive/qa-annotations.jsonld",
+                annotationExportDisplayName = "qa-annotations.jsonld",
             ),
         )
         val releasedUris = mutableListOf<String>()
@@ -754,7 +759,7 @@ class MainViewModelTest {
         assertEquals(setOf(userLink.id, userDocument.id), readingProgressRepository.deletedIds)
         assertEquals(emptyList<ReadingProgress>(), viewModel.uiState.readingProgress)
         assertEquals(emptyList<ReadingAnnotation>(), readingAnnotationRepository.readingAnnotations())
-        assertTrue(exportWriter.writes.last().second.contains("No annotations saved yet."))
+        assertEquals(emptyList<ReadingAnnotationExportFile>(), exportWriter.jsonWrites.last().second)
         assertEquals(listOf("content://quality/notes.md"), releasedUris)
         assertEquals(setOf("p1"), viewModel.uiState.priorityContentIds)
         assertEquals(setOf("p1"), settingsRepository.state.value.priorityContentIds)
@@ -911,8 +916,8 @@ class MainViewModelTest {
 
         advanceUntilIdle()
         viewModel.configureReadingAnnotationExport(
-            uri = "content://drive/qa-annotations.md",
-            displayName = "qa-annotations.md",
+            uri = "content://drive/qa-annotations.jsonld",
+            displayName = "qa-annotations.jsonld",
             persistWritePermission = persistedUris::add,
             nowMillis = 2_500L,
         )
@@ -927,16 +932,212 @@ class MainViewModelTest {
         )
         advanceUntilIdle()
 
-        assertEquals(listOf("content://drive/qa-annotations.md"), persistedUris)
-        assertEquals("content://drive/qa-annotations.md", settingsRepository.state.value.annotationExportUri)
-        assertEquals("qa-annotations.md", settingsRepository.state.value.annotationExportDisplayName)
+        assertEquals(listOf("content://drive/qa-annotations.jsonld"), persistedUris)
+        assertEquals("content://drive/qa-annotations.jsonld", settingsRepository.state.value.annotationExportUri)
+        assertEquals("qa-annotations.jsonld", settingsRepository.state.value.annotationExportDisplayName)
         assertEquals(3_000L, settingsRepository.state.value.annotationExportLastSuccessfulAtMillis)
         assertEquals(null, settingsRepository.state.value.annotationExportLastError)
         assertEquals("Annotation saved and autosaved.", viewModel.uiState.latestMessage)
-        assertEquals("content://drive/qa-annotations.md", exportWriter.writes.last().first)
-        assertTrue(exportWriter.writes.last().second.contains("## Saved document"))
-        assertTrue(exportWriter.writes.last().second.contains("> Private notes"))
+        assertEquals("content://drive/qa-annotations.jsonld", exportWriter.writes.last().first)
+        assertEquals("Saved document", exportWriter.jsonWrites.last().second.single().sourceTitle)
+        assertTrue(exportWriter.jsonWrites.last().second.single().fileName.contains("saved-document"))
+        assertTrue(exportWriter.writes.last().second.contains("AnnotationCollection"))
+        assertTrue(exportWriter.writes.last().second.contains("Private notes"))
         assertTrue(exportWriter.writes.last().second.contains("This belongs in the intervention notes library."))
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun googleDriveAnnotationSyncConnectsAndAutosavesPerSourceJsonLd() = runTest {
+        val document = savedUserDocument(format = ContentFormat.MARKDOWN)
+        val settingsRepository = FakeSettingsRepository(
+            initial = completedSettings(selectedAppPackages = setOf("feed.one")),
+        )
+        val annotationRepository = FakeReadingAnnotationRepository()
+        val driveClient = RecordingReadingAnnotationDriveSyncClient(folderId = "drive-folder-annotations")
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val viewModel = createViewModel(
+            settingsRepository = settingsRepository,
+            contentRepository = FakeContentRepository(extraItems = listOf(document)),
+            readingAnnotationRepository = annotationRepository,
+            readingAnnotationDriveSyncClient = driveClient,
+            analyticsTracker = analyticsTracker,
+            nowProvider = { 2_000L },
+        )
+
+        advanceUntilIdle()
+        viewModel.connectAnnotationDriveSync(accessToken = "drive-token", nowMillis = 2_500L)
+        advanceUntilIdle()
+        viewModel.openLibraryItem(document)
+        advanceUntilIdle()
+        viewModel.saveCurrentReadingAnnotation(
+            paragraphIndex = 1,
+            quotedText = "Private notes",
+            noteText = "Sync this note to Drive.",
+            nowMillis = 3_000L,
+        )
+        advanceUntilIdle()
+
+        assertEquals(true, settingsRepository.state.value.annotationDriveSyncEnabled)
+        assertEquals("drive-folder-annotations", settingsRepository.state.value.annotationDriveFolderId)
+        assertEquals(3_000L, settingsRepository.state.value.annotationDriveLastSuccessfulAtMillis)
+        assertEquals(null, settingsRepository.state.value.annotationDriveLastError)
+        assertEquals("Annotation saved and autosaved.", viewModel.uiState.latestMessage)
+        assertEquals(2, driveClient.requests.size)
+        val latestRequest = driveClient.requests.last()
+        assertEquals("drive-token", latestRequest.accessToken)
+        assertEquals("drive-folder-annotations", latestRequest.folderId)
+        assertEquals("Saved document", latestRequest.files.single().sourceTitle)
+        assertTrue(latestRequest.files.single().fileName.endsWith(".annotations.jsonld"))
+        assertTrue(latestRequest.files.single().jsonLd.contains("AnnotationCollection"))
+        assertTrue(latestRequest.files.single().jsonLd.contains("Sync this note to Drive."))
+        assertTrue(analyticsTracker.allEvents().any { event ->
+            event.type == AnalyticsEventType.ANNOTATION_DRIVE_SYNC_CONNECTED
+        })
+        assertTrue(analyticsTracker.allEvents().any { event ->
+            event.type == AnalyticsEventType.ANNOTATION_DRIVE_SYNC_SUCCEEDED &&
+                event.metadata["sourceFileCount"] == "1"
+        })
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun googleDriveAnnotationSyncFailureKeepsLocalNoteAndRecoverableStatus() = runTest {
+        val document = savedUserDocument(format = ContentFormat.MARKDOWN)
+        val settingsRepository = FakeSettingsRepository(
+            initial = completedSettings(selectedAppPackages = setOf("feed.one")),
+        )
+        val annotationRepository = FakeReadingAnnotationRepository()
+        val driveClient = RecordingReadingAnnotationDriveSyncClient(
+            failure = IllegalStateException("HTTP 503"),
+        )
+        val viewModel = createViewModel(
+            settingsRepository = settingsRepository,
+            contentRepository = FakeContentRepository(extraItems = listOf(document)),
+            readingAnnotationRepository = annotationRepository,
+            readingAnnotationDriveSyncClient = driveClient,
+            nowProvider = { 2_000L },
+        )
+
+        advanceUntilIdle()
+        viewModel.connectAnnotationDriveSync(accessToken = "drive-token", nowMillis = 2_500L)
+        advanceUntilIdle()
+        viewModel.openLibraryItem(document)
+        advanceUntilIdle()
+        viewModel.saveCurrentReadingAnnotation(
+            paragraphIndex = 0,
+            quotedText = "Private notes",
+            noteText = "Local safety is more important than Drive availability.",
+            nowMillis = 3_000L,
+        )
+        advanceUntilIdle()
+
+        assertEquals(1, annotationRepository.readingAnnotations().size)
+        assertEquals("Annotation saved. Autosave failed.", viewModel.uiState.latestMessage)
+        assertEquals(true, settingsRepository.state.value.annotationDriveSyncEnabled)
+        assertEquals("Google Drive sync failed. Retry from Settings.", settingsRepository.state.value.annotationDriveLastError)
+        assertEquals("Google Drive sync failed. Retry from Settings.", viewModel.uiState.annotationDriveLastError)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun googleDriveAnnotationAutosaveRefreshesTokenSilentlyAfterProcessRestart() = runTest {
+        val document = savedUserDocument(format = ContentFormat.MARKDOWN)
+        val settingsRepository = FakeSettingsRepository(
+            initial = completedSettings(selectedAppPackages = setOf("feed.one")).copy(
+                annotationDriveSyncEnabled = true,
+                annotationDriveFolderId = "drive-folder-annotations",
+            ),
+        )
+        val annotationRepository = FakeReadingAnnotationRepository()
+        val driveClient = RecordingReadingAnnotationDriveSyncClient(folderId = "drive-folder-annotations")
+        val viewModel = createViewModel(
+            settingsRepository = settingsRepository,
+            contentRepository = FakeContentRepository(extraItems = listOf(document)),
+            readingAnnotationRepository = annotationRepository,
+            readingAnnotationDriveSyncClient = driveClient,
+            readingAnnotationDriveTokenProvider = StaticReadingAnnotationDriveTokenProvider("silent-token"),
+            nowProvider = { 2_000L },
+        )
+
+        advanceUntilIdle()
+        viewModel.openLibraryItem(document)
+        advanceUntilIdle()
+        viewModel.saveCurrentReadingAnnotation(
+            paragraphIndex = 0,
+            quotedText = "Private notes",
+            noteText = "A restarted app should still sync when consent already exists.",
+            nowMillis = 3_000L,
+        )
+        advanceUntilIdle()
+
+        assertEquals("silent-token", driveClient.requests.single().accessToken)
+        assertEquals("drive-folder-annotations", driveClient.requests.single().folderId)
+        assertEquals(3_000L, settingsRepository.state.value.annotationDriveLastSuccessfulAtMillis)
+        assertEquals(null, settingsRepository.state.value.annotationDriveLastError)
+        assertEquals("Annotation saved and autosaved.", viewModel.uiState.latestMessage)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun googleDriveAnnotationAutosaveRefreshesTokenSilentlyWhenCachedTokenIsStale() = runTest {
+        val document = savedUserDocument(format = ContentFormat.MARKDOWN)
+        val settingsRepository = FakeSettingsRepository(
+            initial = completedSettings(selectedAppPackages = setOf("feed.one")),
+        )
+        val annotationRepository = FakeReadingAnnotationRepository()
+        val driveClient = RecordingReadingAnnotationDriveSyncClient(folderId = "drive-folder-annotations")
+        val viewModel = createViewModel(
+            settingsRepository = settingsRepository,
+            contentRepository = FakeContentRepository(extraItems = listOf(document)),
+            readingAnnotationRepository = annotationRepository,
+            readingAnnotationDriveSyncClient = driveClient,
+            readingAnnotationDriveTokenProvider = StaticReadingAnnotationDriveTokenProvider("fresh-silent-token"),
+            nowProvider = { 2_000L },
+        )
+
+        advanceUntilIdle()
+        viewModel.connectAnnotationDriveSync(accessToken = "stale-session-token", nowMillis = 2_500L)
+        advanceUntilIdle()
+        viewModel.openLibraryItem(document)
+        advanceUntilIdle()
+        viewModel.saveCurrentReadingAnnotation(
+            paragraphIndex = 0,
+            quotedText = "Private notes",
+            noteText = "Autosync should refresh a stale same-process token silently.",
+            nowMillis = 3_000L,
+        )
+        advanceUntilIdle()
+
+        assertEquals("stale-session-token", driveClient.requests.first().accessToken)
+        assertEquals("fresh-silent-token", driveClient.requests.last().accessToken)
+        assertEquals(2, driveClient.requests.size)
+        assertEquals(3_000L, settingsRepository.state.value.annotationDriveLastSuccessfulAtMillis)
+        assertEquals(null, settingsRepository.state.value.annotationDriveLastError)
+        assertEquals("Annotation saved and autosaved.", viewModel.uiState.latestMessage)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun disconnectGoogleDriveAnnotationSyncClearsPersistedState() = runTest {
+        val settingsRepository = FakeSettingsRepository(
+            initial = completedSettings(selectedAppPackages = setOf("feed.one")).copy(
+                annotationDriveSyncEnabled = true,
+                annotationDriveFolderId = "drive-folder-annotations",
+                annotationDriveLastSuccessfulAtMillis = 4_000L,
+            ),
+        )
+        val viewModel = createViewModel(settingsRepository = settingsRepository)
+
+        advanceUntilIdle()
+        viewModel.disconnectAnnotationDriveSync(nowMillis = 5_000L)
+        advanceUntilIdle()
+
+        assertEquals(false, settingsRepository.state.value.annotationDriveSyncEnabled)
+        assertEquals(null, settingsRepository.state.value.annotationDriveFolderId)
+        assertEquals(null, settingsRepository.state.value.annotationDriveLastSuccessfulAtMillis)
+        assertEquals(null, settingsRepository.state.value.annotationDriveLastError)
+        assertEquals("Google Drive sync disconnected.", viewModel.uiState.latestMessage)
     }
 
     @Test
@@ -955,15 +1156,15 @@ class MainViewModelTest {
 
         advanceUntilIdle()
         viewModel.configureReadingAnnotationExport(
-            uri = "content://drive/qa-annotations.md",
-            displayName = "qa-annotations.md",
+            uri = "content://drive/qa-annotations.jsonld",
+            displayName = "qa-annotations.jsonld",
             persistWritePermission = { error("Persistable grant denied") },
             nowMillis = 2_500L,
         )
         advanceUntilIdle()
 
         assertEquals(emptyList<Pair<String, String>>(), exportWriter.writes)
-        assertEquals("content://drive/qa-annotations.md", settingsRepository.state.value.annotationExportUri)
+        assertEquals("content://drive/qa-annotations.jsonld", settingsRepository.state.value.annotationExportUri)
         assertEquals(null, settingsRepository.state.value.annotationExportLastSuccessfulAtMillis)
         assertEquals("Choose the file again or retry.", settingsRepository.state.value.annotationExportLastError)
         assertEquals("Annotation autosave needs file permission.", viewModel.uiState.latestMessage)
@@ -974,8 +1175,8 @@ class MainViewModelTest {
     fun clearAnnotationExportReleasesPermissionAndClearsStatus() = runTest {
         val settingsRepository = FakeSettingsRepository(
             initial = completedSettings(selectedAppPackages = setOf("feed.one")).copy(
-                annotationExportUri = "content://drive/qa-annotations.md",
-                annotationExportDisplayName = "qa-annotations.md",
+                annotationExportUri = "content://drive/qa-annotations.jsonld",
+                annotationExportDisplayName = "qa-annotations.jsonld",
                 annotationExportLastSuccessfulAtMillis = 3_000L,
             ),
         )
@@ -986,7 +1187,7 @@ class MainViewModelTest {
         viewModel.clearReadingAnnotationExport(releaseWritePermission = releasedUris::add)
         advanceUntilIdle()
 
-        assertEquals(listOf("content://drive/qa-annotations.md"), releasedUris)
+        assertEquals(listOf("content://drive/qa-annotations.jsonld"), releasedUris)
         assertEquals(null, settingsRepository.state.value.annotationExportUri)
         assertEquals(null, settingsRepository.state.value.annotationExportDisplayName)
         assertEquals(null, settingsRepository.state.value.annotationExportLastSuccessfulAtMillis)
@@ -1035,7 +1236,7 @@ class MainViewModelTest {
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
-    fun deleteReadingAnnotationAutosavesUpdatedMarkdown() = runTest {
+    fun deleteReadingAnnotationAutosavesUpdatedJsonLd() = runTest {
         val document = savedUserDocument(format = ContentFormat.MARKDOWN)
         val annotationRepository = FakeReadingAnnotationRepository(
             initialAnnotations = listOf(
@@ -1052,8 +1253,8 @@ class MainViewModelTest {
         )
         val settingsRepository = FakeSettingsRepository(
             initial = completedSettings(selectedAppPackages = setOf("feed.one")).copy(
-                annotationExportUri = "content://drive/qa-annotations.md",
-                annotationExportDisplayName = "qa-annotations.md",
+                annotationExportUri = "content://drive/qa-annotations.jsonld",
+                annotationExportDisplayName = "qa-annotations.jsonld",
             ),
         )
         val exportWriter = RecordingReadingAnnotationExportWriter()
@@ -1071,7 +1272,7 @@ class MainViewModelTest {
         assertEquals(emptyList<ReadingAnnotation>(), annotationRepository.readingAnnotations())
         assertEquals("Annotation deleted and autosaved.", viewModel.uiState.latestMessage)
         assertEquals(4_000L, settingsRepository.state.value.annotationExportLastSuccessfulAtMillis)
-        assertTrue(exportWriter.writes.last().second.contains("No annotations saved yet."))
+        assertEquals(emptyList<ReadingAnnotationExportFile>(), exportWriter.jsonWrites.last().second)
         assertFalse(exportWriter.writes.last().second.contains("Delete me from export."))
     }
 
@@ -1312,7 +1513,6 @@ class MainViewModelTest {
             displayName = "notes.md",
             mimeType = "text/markdown",
         )
-        viewModel.updateAddDocumentDuration("8")
         viewModel.toggleAddDocumentTopic(TopicTag.SCIENCE)
         advanceUntilIdle()
 
@@ -1381,7 +1581,6 @@ class MainViewModelTest {
         assertTrue(retainedUris.isEmpty())
         assertEquals(MainScreen.AddDocument, viewModel.uiState.screen)
 
-        viewModel.updateAddDocumentDuration("8")
         viewModel.toggleAddDocumentTopic(TopicTag.SCIENCE)
         advanceUntilIdle()
 
@@ -1887,10 +2086,13 @@ class MainViewModelTest {
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
     fun finishReading_marksHistoryCompletedAndExcludesContent() = runTest {
-        val viewModel = createViewModel()
+        val settingsRepository = FakeSettingsRepository(
+            initial = completedSettings(
+                selectedAppPackages = SupportedCatalog.distractingApps.take(3).mapTo(mutableSetOf(), DistractingApp::packageName),
+            ).copy(contentPriority = ContentPriority.READINGS),
+        )
+        val viewModel = createViewModel(settingsRepository = settingsRepository)
 
-        advanceUntilIdle()
-        viewModel.completeOnboarding()
         advanceUntilIdle()
         viewModel.triggerDebugIntervention(nowMillis = 1_000L)
         advanceUntilIdle()
@@ -2861,6 +3063,8 @@ class MainViewModelTest {
         readingProgressRepository: ReadingProgressRepository = FakeReadingProgressRepository(),
         readingAnnotationRepository: ReadingAnnotationRepository = FakeReadingAnnotationRepository(),
         readingAnnotationExportWriter: ReadingAnnotationExportWriter = RecordingReadingAnnotationExportWriter(),
+        readingAnnotationDriveSyncClient: ReadingAnnotationDriveSyncClient = RecordingReadingAnnotationDriveSyncClient(),
+        readingAnnotationDriveTokenProvider: ReadingAnnotationDriveTokenProvider = FailingReadingAnnotationDriveTokenProvider(),
         recommendationEngine: RecommendationEngine = DefaultRecommendationEngine(),
         nowProvider: () -> Long = { 1_000L },
     ): MainViewModel {
@@ -2877,6 +3081,8 @@ class MainViewModelTest {
                 readingProgressRepository = readingProgressRepository,
                 readingAnnotationRepository = readingAnnotationRepository,
                 readingAnnotationExportWriter = readingAnnotationExportWriter,
+                readingAnnotationDriveSyncClient = readingAnnotationDriveSyncClient,
+                readingAnnotationDriveTokenProvider = readingAnnotationDriveTokenProvider,
                 interceptionMonitor = FakeInterceptionMonitor(),
                 enableDelayRefreshTicker = false,
                 nowProvider = nowProvider,
@@ -2921,6 +3127,10 @@ class MainViewModelTest {
                 annotationExportDisplayName = state.value.annotationExportDisplayName,
                 annotationExportLastSuccessfulAtMillis = state.value.annotationExportLastSuccessfulAtMillis,
                 annotationExportLastError = state.value.annotationExportLastError,
+                annotationDriveSyncEnabled = state.value.annotationDriveSyncEnabled,
+                annotationDriveFolderId = state.value.annotationDriveFolderId,
+                annotationDriveLastSuccessfulAtMillis = state.value.annotationDriveLastSuccessfulAtMillis,
+                annotationDriveLastError = state.value.annotationDriveLastError,
             )
         }
 
@@ -2983,6 +3193,38 @@ class MainViewModelTest {
 
         override suspend fun saveAnnotationExportFailure(errorMessage: String) {
             state.value = state.value.copy(annotationExportLastError = errorMessage)
+        }
+
+        override suspend fun saveAnnotationDriveSyncConnection(folderId: String?) {
+            state.value = state.value.copy(
+                annotationDriveSyncEnabled = true,
+                annotationDriveFolderId = folderId,
+                annotationDriveLastError = null,
+            )
+        }
+
+        override suspend fun clearAnnotationDriveSyncConnection() {
+            state.value = state.value.copy(
+                annotationDriveSyncEnabled = false,
+                annotationDriveFolderId = null,
+                annotationDriveLastSuccessfulAtMillis = null,
+                annotationDriveLastError = null,
+            )
+        }
+
+        override suspend fun saveAnnotationDriveSyncSuccess(timestampMillis: Long, folderId: String) {
+            state.value = state.value.copy(
+                annotationDriveSyncEnabled = true,
+                annotationDriveFolderId = folderId,
+                annotationDriveLastSuccessfulAtMillis = timestampMillis,
+                annotationDriveLastError = null,
+            )
+        }
+
+        override suspend fun saveAnnotationDriveSyncFailure(errorMessage: String) {
+            state.value = state.value.copy(
+                annotationDriveLastError = errorMessage,
+            )
         }
     }
 
@@ -3175,6 +3417,11 @@ class MainViewModelTest {
                 noteText = draft.noteText,
                 createdAtMillis = existing?.createdAtMillis ?: nowMillis,
                 updatedAtMillis = nowMillis,
+                sourceTitle = draft.sourceTitle,
+                sourceLabel = draft.sourceLabel,
+                sourceType = draft.sourceType,
+                sourceFormat = draft.sourceFormat,
+                selector = draft.selector,
             )
             annotations.value = annotations.value
                 .filterNot { annotation -> annotation.id == saved.id }
@@ -3206,11 +3453,47 @@ class MainViewModelTest {
         private val failure: Throwable? = null,
     ) : ReadingAnnotationExportWriter {
         val writes = mutableListOf<Pair<String, String>>()
+        val jsonWrites = mutableListOf<Pair<String, List<ReadingAnnotationExportFile>>>()
 
         override suspend fun writeMarkdown(uri: String, markdown: String) {
             failure?.let { throw it }
             writes += uri to markdown
         }
+
+        override suspend fun writeJsonLdFiles(uri: String, files: List<ReadingAnnotationExportFile>) {
+            failure?.let { throw it }
+            jsonWrites += uri to files
+            writes += uri to files.joinToString(separator = "\n") { file -> file.jsonLd }
+        }
+    }
+
+    private class RecordingReadingAnnotationDriveSyncClient(
+        private val folderId: String = "drive-folder-1",
+        private val failure: Throwable? = null,
+    ) : ReadingAnnotationDriveSyncClient {
+        val requests = mutableListOf<ReadingAnnotationDriveSyncRequest>()
+
+        override suspend fun syncJsonLdFiles(
+            request: ReadingAnnotationDriveSyncRequest,
+        ): ReadingAnnotationDriveSyncResult {
+            failure?.let { throw it }
+            requests += request
+            return ReadingAnnotationDriveSyncResult(
+                folderId = folderId,
+                syncedFileNames = listOf("quality-alternative-annotations.index.json") +
+                    request.files.map(ReadingAnnotationExportFile::fileName),
+            )
+        }
+    }
+
+    private class StaticReadingAnnotationDriveTokenProvider(
+        private val accessToken: String,
+    ) : ReadingAnnotationDriveTokenProvider {
+        override suspend fun driveAccessToken(): String = accessToken
+    }
+
+    private class FailingReadingAnnotationDriveTokenProvider : ReadingAnnotationDriveTokenProvider {
+        override suspend fun driveAccessToken(): String = error("No test Drive token configured.")
     }
 
     private class FakeDelayGate(isReady: Boolean) : DelayGate {

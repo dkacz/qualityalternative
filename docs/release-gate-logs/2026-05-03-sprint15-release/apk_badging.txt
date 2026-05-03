@@ -1,0 +1,5 @@
+package: name='com.qualityalternative.app' versionCode='12' versionName='0.8.0-alpha' platformBuildVersionName='16' platformBuildVersionCode='36' compileSdkVersion='36' compileSdkVersionCodename='16'
+sdkVersion:'29'
+targetSdkVersion:'36'
+uses-permission: name='android.permission.SYSTEM_ALERT_WINDOW'
+uses-permission: name='com.qualityalternative.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION'

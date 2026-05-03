@@ -15,7 +15,7 @@ import org.junit.Test
 
 class RecommendationExplainerTest {
     @Test
-    fun explain_usesEditorialWhyThisNowAndDynamicFitChips() {
+    fun explain_usesEditorialWhyThisNowAndDynamicChipsWithoutDurationFitCopy() {
         val item = item(
             id = "focus-piece",
             minutes = 7,
@@ -31,7 +31,7 @@ class RecommendationExplainerTest {
 
         assertEquals("A good fit when curiosity is a better first move than scrolling.", explanation.headline)
         assertEquals(
-            listOf("Priority pick", "Matches Science", "Fits 5-10 min", "Editorial"),
+            listOf("Priority pick", "Matches Science", "7 min read", "Editorial"),
             explanation.chips,
         )
     }
@@ -50,7 +50,7 @@ class RecommendationExplainerTest {
         val explanation = RecommendationExplainer.explain(item = item, preferences = preferences)
 
         assertEquals("Picked because it matches your History interest.", explanation.headline)
-        assertTrue("Shorter than 5-10 min" in explanation.chips)
+        assertTrue("4 min read" in explanation.chips)
         assertTrue("Saved link" in explanation.chips)
     }
 
@@ -68,7 +68,7 @@ class RecommendationExplainerTest {
         val explanation = RecommendationExplainer.explain(item = item, preferences = preferences)
 
         assertEquals("A short reset for creating space before opening the app.", explanation.headline)
-        assertEquals(listOf("Shorter than 5-10 min", "Reset timer"), explanation.chips)
+        assertEquals(listOf("3 min timer", "Reset timer"), explanation.chips)
     }
 
     @Test
@@ -87,7 +87,7 @@ class RecommendationExplainerTest {
         val explanation = RecommendationExplainer.explain(item = item, preferences = preferences)
 
         assertEquals("Continue what you already started.", explanation.headline)
-        assertEquals(listOf("Unfinished", "Fits 5-10 min", "Editorial"), explanation.chips)
+        assertEquals(listOf("Unfinished", "8 min read", "Editorial"), explanation.chips)
     }
 
     @Test

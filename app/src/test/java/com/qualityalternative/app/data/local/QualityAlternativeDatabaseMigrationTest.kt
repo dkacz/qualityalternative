@@ -1,0 +1,36 @@
+package com.qualityalternative.app.data.local
+
+import androidx.sqlite.db.SupportSQLiteDatabase
+import java.lang.reflect.Proxy
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class QualityAlternativeDatabaseMigrationTest {
+    @Test
+    fun migration9To10AddsAnnotationSelectorAndSourceColumns() {
+        val statements = mutableListOf<String>()
+        val db = Proxy.newProxyInstance(
+            SupportSQLiteDatabase::class.java.classLoader,
+            arrayOf(SupportSQLiteDatabase::class.java),
+        ) { _, method, args ->
+            if (method.name == "execSQL" && args?.firstOrNull() is String) {
+                statements += args.first() as String
+            }
+            when (method.returnType) {
+                java.lang.Boolean.TYPE -> false
+                java.lang.Integer.TYPE -> 0
+                java.lang.Long.TYPE -> 0L
+                else -> null
+            }
+        } as SupportSQLiteDatabase
+
+        QualityAlternativeDatabase.MIGRATION_9_10.migrate(db)
+
+        assertTrue(statements.any { it.contains("sourceTitle TEXT NOT NULL DEFAULT ''") })
+        assertTrue(statements.any { it.contains("sourceHref TEXT") })
+        assertTrue(statements.any { it.contains("sourceBlockIndex INTEGER NOT NULL DEFAULT 0") })
+        assertTrue(statements.any { it.contains("textStartOffset INTEGER NOT NULL DEFAULT 0") })
+        assertTrue(statements.any { it.contains("prefixText TEXT NOT NULL DEFAULT ''") })
+        assertTrue(statements.any { it.contains("suffixText TEXT NOT NULL DEFAULT ''") })
+    }
+}

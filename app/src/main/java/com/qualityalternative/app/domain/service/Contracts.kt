@@ -18,6 +18,7 @@ import com.qualityalternative.app.domain.model.RecommendationSource
 import com.qualityalternative.app.domain.model.ReadingProgress
 import com.qualityalternative.app.domain.model.ReadingAnnotation
 import com.qualityalternative.app.domain.model.ReadingAnnotationDraft
+import com.qualityalternative.app.domain.model.ReaderDocument
 import com.qualityalternative.app.domain.model.ReplacementHistoryEntry
 import com.qualityalternative.app.domain.model.ReturnToTargetSignal
 import com.qualityalternative.app.domain.model.SessionFeedback
@@ -33,6 +34,7 @@ interface ContentRepository {
     fun starterPacks(): List<EditorialPack>
     fun inventory(): List<ContentItem>
     fun contentBody(item: ContentItem): String
+    fun readerDocument(item: ContentItem): ReaderDocument = ReaderDocument.fromPlainText(contentBody(item))
     fun isReady(): Boolean = true
     fun observeReady(): Flow<Boolean> = flowOf(isReady())
 }
@@ -90,6 +92,8 @@ interface UserDocumentRepository {
 
     fun contentBody(item: ContentItem): String = item.description
 
+    fun readerDocument(item: ContentItem): ReaderDocument = ReaderDocument.fromPlainText(contentBody(item))
+
     fun isReady(): Boolean = true
 
     fun observeReady(): Flow<Boolean> = flowOf(isReady())
@@ -111,6 +115,10 @@ interface SettingsRepository {
     suspend fun clearAnnotationExportDestination()
     suspend fun saveAnnotationExportSuccess(timestampMillis: Long)
     suspend fun saveAnnotationExportFailure(errorMessage: String)
+    suspend fun saveAnnotationDriveSyncConnection(folderId: String?)
+    suspend fun clearAnnotationDriveSyncConnection()
+    suspend fun saveAnnotationDriveSyncSuccess(timestampMillis: Long, folderId: String)
+    suspend fun saveAnnotationDriveSyncFailure(errorMessage: String)
 }
 
 interface RecommendationEngine {
@@ -306,4 +314,10 @@ interface ReadingAnnotationRepository {
 
 interface ReadingAnnotationExportWriter {
     suspend fun writeMarkdown(uri: String, markdown: String)
+
+    suspend fun writeJsonLdFiles(uri: String, files: List<ReadingAnnotationExportFile>) {
+        val singleSourcePayload = files.singleOrNull()?.jsonLd
+            ?: error("Annotation export requires a folder destination for per-source JSON-LD files.")
+        writeMarkdown(uri = uri, markdown = singleSourcePayload)
+    }
 }

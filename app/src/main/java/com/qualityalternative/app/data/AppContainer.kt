@@ -12,6 +12,8 @@ import com.qualityalternative.app.domain.service.InterceptionMonitor
 import com.qualityalternative.app.domain.service.RecommendationEngine
 import com.qualityalternative.app.domain.service.ReadingAnnotationRepository
 import com.qualityalternative.app.domain.service.ReadingAnnotationExportWriter
+import com.qualityalternative.app.domain.service.ReadingAnnotationDriveSyncClient
+import com.qualityalternative.app.domain.service.ReadingAnnotationDriveTokenProvider
 import com.qualityalternative.app.domain.service.ReadingProgressRepository
 import com.qualityalternative.app.domain.service.SettingsRepository
 import com.qualityalternative.app.domain.service.UserDocumentRepository
@@ -63,6 +65,10 @@ class AppContainer(context: Context) {
         scope = appScope,
     )
     val readingAnnotationExportWriter: ReadingAnnotationExportWriter = AndroidReadingAnnotationExportWriter(
+        context = context,
+    )
+    val readingAnnotationDriveSyncClient: ReadingAnnotationDriveSyncClient = AndroidGoogleDriveAnnotationSyncClient()
+    val readingAnnotationDriveTokenProvider: ReadingAnnotationDriveTokenProvider = AndroidGoogleDriveTokenProvider(
         context = context,
     )
     val settingsRepository: SettingsRepository = PreferencesSettingsRepository(

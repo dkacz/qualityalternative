@@ -4,8 +4,11 @@ import com.qualityalternative.app.data.local.ReadingAnnotationDao
 import com.qualityalternative.app.data.local.ReadingAnnotationEntity
 import com.qualityalternative.app.domain.model.AnalyticsEvent
 import com.qualityalternative.app.domain.model.AnalyticsEventType
+import com.qualityalternative.app.domain.model.ContentFormat
+import com.qualityalternative.app.domain.model.ContentSourceType
 import com.qualityalternative.app.domain.model.ReadingAnnotation
 import com.qualityalternative.app.domain.model.ReadingAnnotationDraft
+import com.qualityalternative.app.domain.model.ReadingAnnotationSelector
 import com.qualityalternative.app.domain.service.AnalyticsTracker
 import com.qualityalternative.app.domain.service.ReadingAnnotationRepository
 import java.util.UUID
@@ -62,10 +65,23 @@ class RoomReadingAnnotationRepository(
                     contentId = normalizedContentId,
                     paragraphIndex = normalizedParagraphIndex,
                 )
-            val normalized = draft.copy(
+            val existingAnnotation = existing?.toModel()
+            val normalizedDraft = draft.copy(
                 contentId = normalizedContentId,
                 paragraphIndex = normalizedParagraphIndex,
-            ).toAnnotation(
+                sourceTitle = draft.sourceTitle
+                    .trim()
+                    .ifBlank { existingAnnotation?.sourceTitle.orEmpty() },
+                sourceLabel = draft.sourceLabel ?: existingAnnotation?.sourceLabel,
+                sourceType = draft.sourceType ?: existingAnnotation?.sourceType,
+                sourceFormat = draft.sourceFormat ?: existingAnnotation?.sourceFormat,
+                selector = if (draft.selector.hasExplicitTarget()) {
+                    draft.selector
+                } else {
+                    existingAnnotation?.selector ?: draft.selector
+                },
+            )
+            val normalized = normalizedDraft.toAnnotation(
                 id = existing?.id ?: draft.id?.takeIf(String::isNotBlank) ?: idProvider(),
                 createdAtMillis = existing?.createdAtMillis ?: nowMillis,
                 updatedAtMillis = nowMillis,
@@ -171,6 +187,11 @@ private fun ReadingAnnotationDraft.toAnnotation(
         noteText = safeNoteText,
         createdAtMillis = createdAtMillis,
         updatedAtMillis = updatedAtMillis,
+        sourceTitle = sourceTitle.trim(),
+        sourceLabel = sourceLabel?.trim()?.takeIf(String::isNotBlank),
+        sourceType = sourceType,
+        sourceFormat = sourceFormat,
+        selector = selector.normalized(safeQuotedText.length),
     )
 }
 
@@ -193,6 +214,17 @@ private fun ReadingAnnotation.toEntity(): ReadingAnnotationEntity {
         noteText = noteText,
         createdAtMillis = createdAtMillis,
         updatedAtMillis = updatedAtMillis,
+        sourceTitle = sourceTitle,
+        sourceLabel = sourceLabel,
+        sourceType = sourceType?.name,
+        sourceFormat = sourceFormat?.name,
+        sourceHref = selector.sourceHref,
+        sourceAnchor = selector.sourceAnchor,
+        sourceBlockIndex = selector.sourceBlockIndex,
+        textStartOffset = selector.textStartOffset,
+        textEndOffset = selector.textEndOffset,
+        prefixText = selector.prefixText,
+        suffixText = selector.suffixText,
     )
 }
 
@@ -205,5 +237,48 @@ private fun ReadingAnnotationEntity.toModel(): ReadingAnnotation {
         noteText = noteText,
         createdAtMillis = createdAtMillis,
         updatedAtMillis = updatedAtMillis,
+        sourceTitle = sourceTitle,
+        sourceLabel = sourceLabel,
+        sourceType = sourceType?.let { enumValueOfOrNull<ContentSourceType>(it) },
+        sourceFormat = sourceFormat?.let { enumValueOfOrNull<ContentFormat>(it) },
+        selector = ReadingAnnotationSelector(
+            sourceHref = sourceHref,
+            sourceAnchor = sourceAnchor,
+            sourceBlockIndex = sourceBlockIndex,
+            textStartOffset = textStartOffset,
+            textEndOffset = textEndOffset,
+            prefixText = prefixText,
+            suffixText = suffixText,
+        ).normalized(quotedText.length),
     )
+}
+
+private fun ReadingAnnotationSelector.normalized(quoteLength: Int): ReadingAnnotationSelector {
+    val safeStart = textStartOffset.coerceAtLeast(0)
+    val safeEnd = textEndOffset
+        .takeIf { it > safeStart }
+        ?: (safeStart + quoteLength.coerceAtLeast(0))
+    return copy(
+        sourceHref = sourceHref?.trim()?.takeIf(String::isNotBlank),
+        sourceAnchor = sourceAnchor?.trim()?.takeIf(String::isNotBlank),
+        sourceBlockIndex = sourceBlockIndex.coerceAtLeast(0),
+        textStartOffset = safeStart,
+        textEndOffset = safeEnd.coerceAtLeast(safeStart),
+        prefixText = prefixText.trim().takeLast(120),
+        suffixText = suffixText.trim().take(120),
+    )
+}
+
+private fun ReadingAnnotationSelector.hasExplicitTarget(): Boolean {
+    return !sourceHref.isNullOrBlank() ||
+        !sourceAnchor.isNullOrBlank() ||
+        sourceBlockIndex > 0 ||
+        textStartOffset > 0 ||
+        textEndOffset > 0 ||
+        prefixText.isNotBlank() ||
+        suffixText.isNotBlank()
+}
+
+private inline fun <reified T : Enum<T>> enumValueOfOrNull(raw: String): T? {
+    return runCatching { enumValueOf<T>(raw) }.getOrNull()
 }

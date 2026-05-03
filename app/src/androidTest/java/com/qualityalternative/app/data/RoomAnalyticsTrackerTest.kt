@@ -686,6 +686,10 @@ class RoomAnalyticsTrackerTest {
                 annotationExportDisplayName = state.value.annotationExportDisplayName,
                 annotationExportLastSuccessfulAtMillis = state.value.annotationExportLastSuccessfulAtMillis,
                 annotationExportLastError = state.value.annotationExportLastError,
+                annotationDriveSyncEnabled = state.value.annotationDriveSyncEnabled,
+                annotationDriveFolderId = state.value.annotationDriveFolderId,
+                annotationDriveLastSuccessfulAtMillis = state.value.annotationDriveLastSuccessfulAtMillis,
+                annotationDriveLastError = state.value.annotationDriveLastError,
             )
         }
 
@@ -748,6 +752,38 @@ class RoomAnalyticsTrackerTest {
 
         override suspend fun saveAnnotationExportFailure(errorMessage: String) {
             state.value = state.value.copy(annotationExportLastError = errorMessage)
+        }
+
+        override suspend fun saveAnnotationDriveSyncConnection(folderId: String?) {
+            state.value = state.value.copy(
+                annotationDriveSyncEnabled = true,
+                annotationDriveFolderId = folderId,
+                annotationDriveLastError = null,
+            )
+        }
+
+        override suspend fun clearAnnotationDriveSyncConnection() {
+            state.value = state.value.copy(
+                annotationDriveSyncEnabled = false,
+                annotationDriveFolderId = null,
+                annotationDriveLastSuccessfulAtMillis = null,
+                annotationDriveLastError = null,
+            )
+        }
+
+        override suspend fun saveAnnotationDriveSyncSuccess(timestampMillis: Long, folderId: String) {
+            state.value = state.value.copy(
+                annotationDriveSyncEnabled = true,
+                annotationDriveFolderId = folderId,
+                annotationDriveLastSuccessfulAtMillis = timestampMillis,
+                annotationDriveLastError = null,
+            )
+        }
+
+        override suspend fun saveAnnotationDriveSyncFailure(errorMessage: String) {
+            state.value = state.value.copy(
+                annotationDriveLastError = errorMessage,
+            )
         }
     }
 

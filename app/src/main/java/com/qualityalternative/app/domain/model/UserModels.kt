@@ -51,6 +51,10 @@ data class AppSettings(
     val annotationExportDisplayName: String? = null,
     val annotationExportLastSuccessfulAtMillis: Long? = null,
     val annotationExportLastError: String? = null,
+    val annotationDriveSyncEnabled: Boolean = false,
+    val annotationDriveFolderId: String? = null,
+    val annotationDriveLastSuccessfulAtMillis: Long? = null,
+    val annotationDriveLastError: String? = null,
 )
 
 data class OnboardingSelection(

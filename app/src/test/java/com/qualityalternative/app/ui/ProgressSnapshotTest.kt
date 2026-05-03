@@ -352,7 +352,7 @@ class ProgressSnapshotTest {
             readerMarkdownBlock("Paragraph $index with enough text to act like ordinary reader prose.")
         }
 
-        val pages = readerPagesForBlocks(blocks = blocks, maxPageWeight = 3)
+        val pages = readerPagesForBlocks(blocks = blocks, maxPageWeight = 9)
 
         assertEquals(
             listOf(
@@ -368,18 +368,25 @@ class ProgressSnapshotTest {
     }
 
     @Test
-    fun readerPagesKeepLongSingleBlockOnOnePage() {
+    fun readerLayoutSplitsLongSingleBlockBeforePagination() {
+        val longParagraph = (1..20)
+            .joinToString(separator = " ") { index ->
+                "Sentence $index has enough calm reader prose to wrap across the fixed page viewport."
+            }
         val blocks = listOf(
             readerMarkdownBlock("Short first paragraph."),
-            readerMarkdownBlock("Long ".repeat(500)),
+            readerMarkdownBlock(longParagraph),
             readerMarkdownBlock("Short final paragraph."),
         )
 
-        val pages = readerPagesForBlocks(blocks = blocks, maxPageWeight = 3)
+        val layout = splitOversizedReaderBlocks(blocks = blocks, maxBlockWeight = 8)
+        val pages = readerPagesForBlocks(blocks = layout.blocks, maxPageWeight = 8)
 
-        assertEquals(3, pages.size)
-        assertEquals(ReaderPage(start = 1, endInclusive = 1), pages[1])
-        assertEquals(2, readerPageIndexForParagraph(pages = pages, paragraphIndex = 99))
+        assertTrue(layout.blocks.size > blocks.size)
+        assertEquals(1, layout.displayBlockIndexFor(1))
+        assertTrue(layout.blocks.drop(1).dropLast(1).all { block -> block.text.text.length < longParagraph.length })
+        assertTrue(pages.size >= 4)
+        assertEquals(pages.lastIndex, readerPageIndexForParagraph(pages = pages, paragraphIndex = 99))
     }
 
     @Test

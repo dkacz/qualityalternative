@@ -23,7 +23,7 @@ class DefaultRecommendationEngineTest {
     private val engine = DefaultRecommendationEngine()
 
     @Test
-    fun generate_prefersMatchingDurationAndKeepsFiniteBackups() {
+    fun generate_prefersTopicFitAndKeepsFiniteBackups() {
         val preferences = UserPreferences(
             selectedApps = listOf(DistractingApp(packageName = "pkg", displayName = "Instagram")),
             preferredTopics = setOf(TopicTag.PHILOSOPHY, TopicTag.PSYCHOLOGY),
@@ -51,7 +51,6 @@ class DefaultRecommendationEngineTest {
         assertEquals("a", result?.primary?.id)
         assertEquals(2, result?.backups?.size)
         assertEquals(setOf("b", "c"), result!!.backups.map(ContentItem::id).toSet())
-        assertTrue(result.backups.all { backup -> backup.durationMinutes <= result.primary.durationMinutes })
     }
 
     @Test
@@ -165,7 +164,7 @@ class DefaultRecommendationEngineTest {
         assertEquals("longer-fit", result?.primary?.id)
         assertEquals(setOf("shorter-greedy", "quick-backup"), result?.backups?.map(ContentItem::id)?.toSet())
         assertEquals(false, result?.inventoryShortage)
-        assertTrue(result!!.backups.all { backup -> backup.durationMinutes <= result.primary.durationMinutes })
+        assertNotNull(result)
     }
 
     @Test
@@ -283,12 +282,12 @@ class DefaultRecommendationEngineTest {
             nowMillis = 0L,
         )
 
-        assertEquals("leave-the-crowd", result?.primary?.id)
+        assertEquals("a-candle-opens-natural-philosophy", result?.primary?.id)
         assertEquals(
-            listOf("a-candle-opens-natural-philosophy", "fixture-link:short-convenience-essay"),
+            listOf("leave-the-crowd", "fixture-link:short-convenience-essay"),
             result?.backups?.map(ContentItem::id)?.take(2),
         )
-        assertTrue(result!!.backups.all { backup -> backup.durationMinutes <= result.primary.durationMinutes })
+        assertNotNull(result)
     }
 
     @Test
@@ -590,7 +589,49 @@ class DefaultRecommendationEngineTest {
     }
 
     @Test
-    fun generate_keepsShortExplicitPriorityAheadOfFreshDocumentWithMoreBackupOptions() {
+    fun generate_prefersReadableContentOverMeditationWhenBalancedScoresTie() {
+        val preferences = UserPreferences(
+            selectedApps = listOf(DistractingApp(packageName = "pkg", displayName = "Instagram")),
+            preferredTopics = setOf(TopicTag.BODY),
+            preferredDurationBucket = DurationBucket.FOCUS,
+            selectedPackIds = setOf("pack", "meditation"),
+        )
+        val inventory = listOf(
+            item(
+                id = "a-breathing-meditation",
+                packId = "meditation",
+                minutes = 6,
+                topics = setOf(TopicTag.BODY),
+                sourceType = ContentSourceType.MEDITATION,
+            ),
+            item(id = "body-reading", minutes = 6, topics = setOf(TopicTag.BODY)),
+        )
+
+        val result = engine.generate(
+            targetApp = DistractingApp(packageName = "pkg", displayName = "Instagram"),
+            preferences = preferences,
+            inventory = inventory,
+            excludedContentIds = emptySet(),
+            signals = RecommendationSignals(timeOfDay = TimeOfDayBucket.NIGHT),
+            nowMillis = 0L,
+        )
+
+        assertEquals("body-reading", result?.primary?.id)
+
+        val meditationPriorityResult = engine.generate(
+            targetApp = DistractingApp(packageName = "pkg", displayName = "Instagram"),
+            preferences = preferences.copy(contentPriority = ContentPriority.MEDITATION),
+            inventory = inventory,
+            excludedContentIds = emptySet(),
+            signals = RecommendationSignals(timeOfDay = TimeOfDayBucket.NIGHT),
+            nowMillis = 0L,
+        )
+
+        assertEquals("a-breathing-meditation", meditationPriorityResult?.primary?.id)
+    }
+
+    @Test
+    fun generate_keepsShortExplicitPriorityAheadOfFreshDocumentWithoutDurationBackupGate() {
         val preferences = UserPreferences(
             selectedApps = listOf(DistractingApp(packageName = "pkg", displayName = "Instagram")),
             preferredTopics = setOf(TopicTag.SCIENCE),
@@ -630,7 +671,42 @@ class DefaultRecommendationEngineTest {
         )
 
         assertEquals("old-priority-short", result?.primary?.id)
-        assertEquals(true, result?.inventoryShortage)
+        assertEquals(false, result?.inventoryShortage)
+        assertTrue(result?.backups.orEmpty().any { item -> item.id == "new-epub" })
+    }
+
+    @Test
+    fun generate_doesNotPenalizeFreshUserDocumentBecauseWholeSourceIsLong() {
+        assertFreshLongUserDocumentWins(format = ContentFormat.EPUB, freshId = "fresh-long-epub")
+        assertFreshLongUserDocumentWins(format = ContentFormat.MARKDOWN, freshId = "fresh-long-markdown")
+    }
+
+    @Test
+    fun generate_allowsLongerBackupsWhenTheyAreUseful() {
+        val preferences = UserPreferences(
+            selectedApps = listOf(DistractingApp(packageName = "pkg", displayName = "Instagram")),
+            preferredTopics = setOf(TopicTag.PRACTICAL),
+            preferredDurationBucket = DurationBucket.QUICK,
+            selectedPackIds = setOf("pack"),
+            priorityContentIds = setOf("primary-short"),
+        )
+        val inventory = listOf(
+            item(id = "primary-short", minutes = 3, topics = setOf(TopicTag.PRACTICAL)),
+            item(id = "backup-long", minutes = 20, topics = setOf(TopicTag.PRACTICAL)),
+            item(id = "backup-medium", minutes = 12, topics = setOf(TopicTag.PRACTICAL)),
+        )
+
+        val result = engine.generate(
+            targetApp = DistractingApp(packageName = "pkg", displayName = "Instagram"),
+            preferences = preferences,
+            inventory = inventory,
+            excludedContentIds = emptySet(),
+            signals = RecommendationSignals(timeOfDay = TimeOfDayBucket.MORNING),
+            nowMillis = 0L,
+        )
+
+        assertEquals("primary-short", result?.primary?.id)
+        assertEquals(setOf("backup-long", "backup-medium"), result?.backups?.map(ContentItem::id)?.toSet())
     }
 
     @Test
@@ -689,7 +765,7 @@ class DefaultRecommendationEngineTest {
             unfinishedContentIds = setOf("unfinished"),
         )
         val inventory = listOf(
-            item(id = "fresh-match", minutes = 7, topics = setOf(TopicTag.SCIENCE)),
+            item(id = "fresh-match", minutes = 7, topics = setOf(TopicTag.SCIENCE, TopicTag.TECH, TopicTag.ESSAYS)),
             item(id = "unfinished", minutes = 5, topics = setOf(TopicTag.HISTORY)),
             item(id = "backup-one", minutes = 4, topics = setOf(TopicTag.SCIENCE)),
             item(id = "backup-two", minutes = 3, topics = setOf(TopicTag.SCIENCE)),
@@ -725,6 +801,7 @@ class DefaultRecommendationEngineTest {
             preferredTopics = setOf(TopicTag.SCIENCE),
             preferredDurationBucket = DurationBucket.FOCUS,
             selectedPackIds = setOf("pack"),
+            priorityContentIds = setOf("fresh-match"),
             unfinishedContentIds = setOf("unavailable-unfinished"),
         )
         val inventory = listOf(
@@ -734,7 +811,7 @@ class DefaultRecommendationEngineTest {
                 topics = setOf(TopicTag.HISTORY),
                 availability = ContentAvailability.UNAVAILABLE,
             ),
-            item(id = "fresh-match", minutes = 7, topics = setOf(TopicTag.SCIENCE)),
+            item(id = "fresh-match", minutes = 7, topics = setOf(TopicTag.SCIENCE, TopicTag.TECH, TopicTag.ESSAYS)),
             item(id = "backup-one", minutes = 4, topics = setOf(TopicTag.SCIENCE)),
             item(id = "backup-two", minutes = 3, topics = setOf(TopicTag.SCIENCE)),
         )
@@ -779,4 +856,45 @@ class DefaultRecommendationEngineTest {
         rights = rights,
         addedAtMillis = addedAtMillis,
     )
+
+    private fun assertFreshLongUserDocumentWins(format: ContentFormat, freshId: String) {
+        val preferences = UserPreferences(
+            selectedApps = listOf(DistractingApp(packageName = "pkg", displayName = "Instagram")),
+            preferredTopics = setOf(TopicTag.SCIENCE),
+            preferredDurationBucket = DurationBucket.QUICK,
+            selectedPackIds = setOf("pack", "user-documents"),
+        )
+        val inventory = listOf(
+            item(
+                id = "old-short-markdown",
+                packId = "user-documents",
+                minutes = 4,
+                topics = setOf(TopicTag.SCIENCE),
+                format = ContentFormat.MARKDOWN,
+                sourceType = ContentSourceType.USER_DOCUMENT,
+                addedAtMillis = 1_000L,
+            ),
+            item(
+                id = freshId,
+                packId = "user-documents",
+                minutes = 20,
+                topics = setOf(TopicTag.SCIENCE),
+                format = format,
+                sourceType = ContentSourceType.USER_DOCUMENT,
+                addedAtMillis = 5_000L,
+            ),
+            item(id = "editorial-backup", minutes = 5, topics = setOf(TopicTag.SCIENCE)),
+        )
+
+        val result = engine.generate(
+            targetApp = DistractingApp(packageName = "pkg", displayName = "Instagram"),
+            preferences = preferences,
+            inventory = inventory,
+            excludedContentIds = emptySet(),
+            signals = RecommendationSignals(timeOfDay = TimeOfDayBucket.MIDDAY),
+            nowMillis = 0L,
+        )
+
+        assertEquals(freshId, result?.primary?.id)
+    }
 }

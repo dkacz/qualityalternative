@@ -10,7 +10,9 @@ import android.media.ToneGenerator
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.provider.Settings
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
@@ -18,6 +20,9 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -75,14 +80,19 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -114,7 +124,9 @@ import com.qualityalternative.app.domain.model.OpenAnywayUnlockMinuteOptions
 import com.qualityalternative.app.domain.model.PermissionReadiness
 import com.qualityalternative.app.domain.model.PermissionStatus
 import com.qualityalternative.app.domain.model.ReadingAnnotation
+import com.qualityalternative.app.domain.model.ReadingAnnotationSelector
 import com.qualityalternative.app.domain.model.ReadingProgress
+import com.qualityalternative.app.domain.model.ReaderTocEntry
 import com.qualityalternative.app.domain.model.ReplacementHistoryEntry
 import com.qualityalternative.app.domain.model.TopicTag
 import com.qualityalternative.app.domain.model.UserDocumentValidationError
@@ -122,12 +134,18 @@ import com.qualityalternative.app.domain.model.UserLinkValidationError
 import com.qualityalternative.app.domain.model.usesExternalHandoff
 import com.qualityalternative.app.domain.model.usesMeditationTimer
 import com.qualityalternative.app.domain.model.usesRepositoryBody
+import com.qualityalternative.app.domain.service.ANNOTATION_DRIVE_SCOPE
 import com.qualityalternative.app.domain.service.RecommendationExplainer
 import com.qualityalternative.app.domain.service.RecommendationExplanation
 import com.qualityalternative.app.ui.theme.QualityAlternativeAppTheme
 import com.qualityalternative.app.ui.theme.QualityAlternativeThemeTokens
 import com.qualityalternative.app.ui.theme.QualityDisplayFontFamily
 import com.qualityalternative.app.ui.theme.QualityMonoFontFamily
+import com.google.android.gms.auth.api.identity.AuthorizationRequest
+import com.google.android.gms.auth.api.identity.AuthorizationResult
+import com.google.android.gms.auth.api.identity.Identity
+import com.google.android.gms.auth.api.identity.RevokeAccessRequest
+import com.google.android.gms.common.api.Scope
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -220,6 +238,11 @@ private tailrec fun Context.findActivity(): Activity? {
     }
 }
 
+private enum class AnnotationDriveSyncMode {
+    CONNECT,
+    RETRY,
+}
+
 @Composable
 private fun DebugVisualParityDensityScale(content: @Composable () -> Unit) {
     if (!BuildConfig.DEBUG) {
@@ -253,6 +276,68 @@ private fun MainRoute(
     onExitToTarget: () -> Unit,
 ) {
     val context = LocalContext.current
+    val driveAuthorizationClient = remember(context) { Identity.getAuthorizationClient(context) }
+    var driveSyncMode by remember { mutableStateOf(AnnotationDriveSyncMode.CONNECT) }
+    fun handleDriveAuthorizationResult(result: AuthorizationResult) {
+        val token = result.accessToken?.takeIf(String::isNotBlank)
+        val hasDriveScope = result.grantedScopes.orEmpty().contains(ANNOTATION_DRIVE_SCOPE)
+        if (token == null || !hasDriveScope) {
+            viewModel.reportAnnotationDriveAuthorizationFailure("Google Drive permission was not granted.")
+            return
+        }
+        if (driveSyncMode == AnnotationDriveSyncMode.RETRY || state.annotationDriveSyncEnabled) {
+            viewModel.retryAnnotationDriveSync(token)
+        } else {
+            viewModel.connectAnnotationDriveSync(token)
+        }
+    }
+    val driveAuthorizationLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult(),
+    ) { result ->
+        if (result.resultCode != Activity.RESULT_OK || result.data == null) {
+            viewModel.reportAnnotationDriveAuthorizationFailure("Google Drive authorization was cancelled.")
+            return@rememberLauncherForActivityResult
+        }
+        runCatching {
+            driveAuthorizationClient.getAuthorizationResultFromIntent(result.data!!)
+        }.onSuccess(::handleDriveAuthorizationResult).onFailure { error ->
+            viewModel.reportAnnotationDriveAuthorizationFailure(error.googleDriveAuthMessage())
+        }
+    }
+    val startGoogleDriveSyncAuthorization: (AnnotationDriveSyncMode) -> Unit = { mode ->
+        driveSyncMode = mode
+        viewModel.beginAnnotationDriveAuthorization()
+        val authorizationRequest = AuthorizationRequest.builder()
+            .setRequestedScopes(listOf(Scope(ANNOTATION_DRIVE_SCOPE)))
+            .build()
+        driveAuthorizationClient.authorize(authorizationRequest)
+            .addOnSuccessListener { authorizationResult ->
+                if (authorizationResult.hasResolution()) {
+                    val pendingIntent = authorizationResult.pendingIntent
+                    if (pendingIntent == null) {
+                        viewModel.reportAnnotationDriveAuthorizationFailure(
+                            "Google Drive authorization needs a missing consent screen.",
+                        )
+                    } else {
+                        driveAuthorizationLauncher.launch(
+                            IntentSenderRequest.Builder(pendingIntent.intentSender).build(),
+                        )
+                    }
+                } else {
+                    handleDriveAuthorizationResult(authorizationResult)
+                }
+            }
+            .addOnFailureListener { error ->
+                viewModel.reportAnnotationDriveAuthorizationFailure(error.googleDriveAuthMessage())
+            }
+    }
+    val disconnectGoogleDriveSync = {
+        val revokeRequest = RevokeAccessRequest.builder()
+            .setScopes(listOf(Scope(ANNOTATION_DRIVE_SCOPE)))
+            .build()
+        driveAuthorizationClient.revokeAccess(revokeRequest)
+        viewModel.disconnectAnnotationDriveSync()
+    }
     val documentPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         if (uris.isEmpty()) {
             return@rememberLauncherForActivityResult
@@ -261,7 +346,7 @@ private fun MainRoute(
             candidates = uris.map { uri -> context.documentImportCandidate(uri) },
         )
     }
-    val annotationExportPicker = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/markdown")) { uri ->
+    val annotationExportPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri == null) {
             return@rememberLauncherForActivityResult
         }
@@ -278,7 +363,7 @@ private fun MainRoute(
         documentPicker.launch(USER_DOCUMENT_PICKER_MIME_TYPES)
     }
     val onSelectAnnotationExport = {
-        annotationExportPicker.launch("quality-alternative-annotations.md")
+        annotationExportPicker.launch(null)
     }
     val releasePersistedDocumentPermission: (String) -> Unit = { uri ->
         releaseDocumentPermission(context = context, uri = Uri.parse(uri))
@@ -389,6 +474,9 @@ private fun MainRoute(
                     viewModel.clearReadingAnnotationExport(releaseWritePermission = releasePersistedAnnotationExportPermission)
                 },
                 onRetryAnnotationExport = { viewModel.retryReadingAnnotationExport() },
+                onConnectAnnotationDrive = { startGoogleDriveSyncAuthorization(AnnotationDriveSyncMode.CONNECT) },
+                onRetryAnnotationDrive = { startGoogleDriveSyncAuthorization(AnnotationDriveSyncMode.RETRY) },
+                onDisconnectAnnotationDrive = disconnectGoogleDriveSync,
             )
         }
 
@@ -407,7 +495,6 @@ private fun MainRoute(
         MainScreen.AddDocument -> AddDocumentScreen(
             form = state.addDocumentForm,
             onTitleChange = viewModel::updateAddDocumentTitle,
-            onDurationChange = viewModel::updateAddDocumentDuration,
             onToggleTopic = viewModel::toggleAddDocumentTopic,
             onTogglePriority = viewModel::toggleAddDocumentPriority,
             onSave = {
@@ -448,12 +535,13 @@ private fun MainRoute(
                     paragraphCount = paragraphCount,
                 )
             },
-            onSaveAnnotation = { paragraphIndex, quotedText, noteText, existingAnnotationId ->
+            onSaveAnnotation = { paragraphIndex, quotedText, noteText, existingAnnotationId, selector ->
                 viewModel.saveCurrentReadingAnnotation(
                     paragraphIndex = paragraphIndex,
                     quotedText = quotedText,
                     noteText = noteText,
                     existingAnnotationId = existingAnnotationId,
+                    selector = selector,
                 )
             },
             onDeleteAnnotation = viewModel::deleteReadingAnnotation,
@@ -1350,7 +1438,6 @@ private fun AddLinkScreen(
 private fun AddDocumentScreen(
     form: AddDocumentFormState,
     onTitleChange: (String) -> Unit,
-    onDurationChange: (String) -> Unit,
     onToggleTopic: (TopicTag) -> Unit,
     onTogglePriority: () -> Unit,
     onSave: () -> Unit,
@@ -1376,7 +1463,7 @@ private fun AddDocumentScreen(
         ) {
             DisplayText("Import reading\nfiles.", fontSize = 30.sp, lineHeight = 33.sp)
             BodyText(
-                text = "Choose one or several PDF, Markdown, or EPUB files. Valid files are saved together; unsupported files are skipped.",
+                text = "Choose one or several PDF, Markdown, or EPUB files. Reading time is calculated automatically; unsupported files are skipped.",
                 color = QualityAlternativeThemeTokens.colors.mutedText,
                 modifier = Modifier.padding(top = 6.dp, bottom = 16.dp),
             )
@@ -1417,25 +1504,9 @@ private fun AddDocumentScreen(
                     modifier = Modifier.testTag("add-document-title"),
                     isError = UserDocumentValidationError.BLANK_TITLE in form.validationErrors,
                 )
-                InputLabel("Estimated session", Modifier.padding(top = 14.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    listOf("3", "5", "10", "15", "20").forEach { mins ->
-                        QaChip(
-                            "$mins min",
-                            selected = form.durationMinutes == mins,
-                            onClick = { onDurationChange(mins) },
-                            modifier = Modifier.weight(1f),
-                            centered = true,
-                            minHeight = 32.dp,
-                            horizontalPadding = 0.dp,
-                            verticalPadding = 6.dp,
-                            fontSize = 11.sp,
-                        )
-                    }
-                }
             } else {
                 BodyText(
-                    text = "Reading time is estimated per file. Topics and priority apply to every saved file in this batch.",
+                    text = "Reading time is calculated per file. Topics and priority apply to every saved file in this batch.",
                     color = QualityAlternativeThemeTokens.colors.mutedText,
                     fontSize = 12.5.sp,
                     modifier = Modifier.padding(top = 8.dp),
@@ -1632,7 +1703,6 @@ private fun InterventionScreen(
             )
             QaIconButton(icon = QaIconKind.Close, onClick = onOpenAnyway)
         }
-        MonoText("A brief detour, if you'd like one", modifier = Modifier.padding(bottom = 8.dp))
         QaCard(
             borderColor = colors.lineStrong,
             padding = 13.dp,
@@ -1697,13 +1767,6 @@ private fun InterventionScreen(
                 )
             }
             MonoText("Other options", modifier = Modifier.padding(bottom = 4.dp))
-            BodyText(
-                text = "Choose another if this is not the right fit.",
-                color = colors.mutedText,
-                fontSize = 12.5.sp,
-                lineHeight = 16.sp,
-                modifier = Modifier.padding(bottom = 6.dp),
-            )
             if (backups.isEmpty()) {
                 BodyText(
                     text = "No extra choices are available right now.",
@@ -1766,32 +1829,13 @@ private fun RecommendationExplanationBlock(
     explanation: RecommendationExplanation,
     modifier: Modifier = Modifier,
 ) {
-    val colors = QualityAlternativeThemeTokens.colors
-    Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(14.dp))
-            .background(colors.accentSoft)
-            .padding(9.dp),
+    FlowRow(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+        verticalArrangement = Arrangement.spacedBy(5.dp),
     ) {
-        MonoText("Why this", color = colors.accent, modifier = Modifier.padding(bottom = 3.dp))
-        Text(
-            text = explanation.headline,
-            style = MaterialTheme.typography.bodyMedium.copy(
-                color = colors.primaryText,
-                fontSize = 12.5.sp,
-                lineHeight = 16.sp,
-            ),
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(bottom = 7.dp),
-        )
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(5.dp),
-            verticalArrangement = Arrangement.spacedBy(5.dp),
-        ) {
-            explanation.chips.forEach { chip ->
-                RecommendationReasonPill(chip)
-            }
+        explanation.chips.forEach { chip ->
+            RecommendationReasonPill(chip)
         }
     }
 }
@@ -1822,16 +1866,45 @@ private fun RecommendationReasonPill(text: String) {
 private fun ReaderScreen(
     state: MainUiState,
     onProgressChanged: (Int, Int, Int) -> Unit,
-    onSaveAnnotation: (paragraphIndex: Int, quotedText: String, noteText: String, existingAnnotationId: String?) -> Unit,
+    onSaveAnnotation: (
+        paragraphIndex: Int,
+        quotedText: String,
+        noteText: String,
+        existingAnnotationId: String?,
+        selector: ReadingAnnotationSelector,
+    ) -> Unit,
     onDeleteAnnotation: (String) -> Unit,
     onDone: () -> Unit,
     onBack: () -> Unit,
 ) {
     val content = state.currentContent ?: return
-    val blocks = readerBlocksForDisplay(
-        body = state.currentContentBody,
-        fallback = content.description,
-    )
+    val readerDocument = state.currentReaderDocument
+    val rawBlocks = remember(readerDocument, state.currentContentBody, content.description) {
+        readerDocument?.blocks
+            ?.takeIf { it.isNotEmpty() }
+            ?.map { block ->
+                readerMarkdownBlock(
+                    rawBlock = block.text,
+                    sourceHref = block.sourceHref,
+                    sourceAnchor = block.anchor,
+                    sourceBlockIndex = block.sourceBlockIndex,
+                )
+            }
+            ?: readerBlocksForDisplay(
+                body = state.currentContentBody,
+                fallback = content.description,
+            )
+    }
+    val readerBlockLayout = remember(rawBlocks) { splitOversizedReaderBlocks(rawBlocks) }
+    val blocks = readerBlockLayout.blocks
+    val tableOfContents = remember(readerDocument, rawBlocks.size, readerBlockLayout) {
+        readerDocument?.tableOfContents
+            .orEmpty()
+            .filter { entry -> entry.blockIndex in rawBlocks.indices }
+            .map { entry ->
+                entry.copy(blockIndex = readerBlockLayout.displayBlockIndexFor(entry.blockIndex))
+            }
+    }
     val readerStartParagraphIndex = state.currentReaderStartParagraphIndex
     val pages = remember(content.id, blocks) { readerPagesForBlocks(blocks) }
     val restoredProgress = remember(content.id) {
@@ -1844,8 +1917,9 @@ private fun ReaderScreen(
     }
     var currentPageIndex by remember(content.id, initialPageIndex, pages.size) { mutableStateOf(initialPageIndex) }
     val listState = rememberLazyListState()
-    var editingParagraphIndex by remember(content.id) { mutableStateOf<Int?>(null) }
+    var annotationSelection by remember(content.id) { mutableStateOf<ReaderAnnotationSelection?>(null) }
     var annotationNoteDraft by remember(content.id) { mutableStateOf("") }
+    var isTocOpen by remember(content.id) { mutableStateOf(false) }
     val annotationsByParagraph = remember(content.id, state.readingAnnotations) {
         state.readingAnnotations
             .filter { annotation -> annotation.contentId == content.id }
@@ -1872,8 +1946,9 @@ private fun ReaderScreen(
         val nextPageIndex = targetPageIndex.coerceIn(0, pages.lastIndex)
         val nextPage = pages[nextPageIndex]
         currentPageIndex = nextPageIndex
-        editingParagraphIndex = null
+        annotationSelection = null
         annotationNoteDraft = ""
+        isTocOpen = false
         if (nextPageIndex > safeCurrentPageIndex) {
             onProgressChanged(
                 readerProgressPercentForPageIndex(
@@ -1885,156 +1960,321 @@ private fun ReaderScreen(
             )
         }
     }
+    val canHandlePageTap = annotationSelection == null && !isTocOpen
 
-    Column(modifier = Modifier.fillMaxSize().testTag("reader-screen")) {
-        if (BuildConfig.DEBUG) {
-            Spacer(
+    BackHandler {
+        when {
+            isTocOpen -> isTocOpen = false
+            annotationSelection != null -> {
+                annotationSelection = null
+                annotationNoteDraft = ""
+            }
+            safeCurrentPageIndex > 0 -> moveToPage(safeCurrentPageIndex - 1)
+            else -> onBack()
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize().testTag("reader-screen")) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            if (BuildConfig.DEBUG) {
+                Spacer(
+                    modifier = Modifier
+                        .size(1.dp)
+                        .alpha(0f)
+                        .semantics {
+                            contentDescription = "reader-first-visible-paragraph-$firstVisibleParagraphIndex"
+                        }
+                        .testTag("reader-first-visible-paragraph-$firstVisibleParagraphIndex"),
+                )
+            }
+            Box(
                 modifier = Modifier
-                    .size(1.dp)
-                    .alpha(0f)
-                    .semantics {
-                        contentDescription = "reader-first-visible-paragraph-$firstVisibleParagraphIndex"
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .testTag("reader-list"),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .pointerInput(canHandlePageTap, safeCurrentPageIndex, pages.lastIndex) {
+                            awaitEachGesture {
+                                val down = awaitFirstDown(requireUnconsumed = false)
+                                var movedBeyondTap = false
+                                val touchSlop = viewConfiguration.touchSlop
+                                while (true) {
+                                    val event = awaitPointerEvent()
+                                    val change = event.changes.firstOrNull { pointer -> pointer.id == down.id } ?: break
+                                    if ((change.position - down.position).getDistance() > touchSlop) {
+                                        movedBeyondTap = true
+                                    }
+                                    if (change.changedToUpIgnoreConsumed()) {
+                                        val isShortTap = change.uptimeMillis - down.uptimeMillis < viewConfiguration.longPressTimeoutMillis
+                                        if (!movedBeyondTap && isShortTap && canHandlePageTap) {
+                                            if (safeCurrentPageIndex < pages.lastIndex) {
+                                                moveToPage(safeCurrentPageIndex + 1)
+                                            } else {
+                                                onDone()
+                                            }
+                                        }
+                                        break
+                                    }
+                                    if (!change.pressed) {
+                                        break
+                                    }
+                                }
+                            }
+                        }
+                        .semantics {
+                            if (canHandlePageTap) {
+                                onClick(if (safeCurrentPageIndex < pages.lastIndex) "Advance" else "Complete") {
+                                    if (safeCurrentPageIndex < pages.lastIndex) {
+                                        moveToPage(safeCurrentPageIndex + 1)
+                                    } else {
+                                        onDone()
+                                    }
+                                    true
+                                }
+                            }
+                        }
+                        .testTag("reader-page-viewport"),
+                ) {
+                    LazyColumn(
+                        state = listState,
+                        userScrollEnabled = false,
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(start = 28.dp, top = 18.dp, end = 28.dp, bottom = 24.dp),
+                    ) {
+                        items(pageParagraphIndices.toList(), key = { paragraphIndex -> "reader-paragraph-$paragraphIndex" }) { paragraphIndex ->
+                            val block = blocks[paragraphIndex]
+                            val annotation = annotationsByParagraph[paragraphIndex]
+                            val activeSelection = annotationSelection?.takeIf { selection ->
+                                selection.paragraphIndex == paragraphIndex
+                            }
+                            ReaderAnnotatedBlock(
+                                paragraphIndex = paragraphIndex,
+                                block = block,
+                                annotation = annotation,
+                                selectedQuote = activeSelection?.quotedText,
+                                onStartEditing = { charOffset ->
+	                                    annotationSelection = initialReaderAnnotationSelection(
+	                                        paragraphIndex = paragraphIndex,
+	                                        block = block,
+	                                        charOffset = charOffset,
+	                                        annotation = annotation,
+	                                    )
+                                    annotationNoteDraft = annotation?.noteText.orEmpty()
+                                },
+                            )
+                        }
                     }
-                    .testTag("reader-first-visible-paragraph-$firstVisibleParagraphIndex"),
+                }
+            }
+            ReaderMinimalFooter(
+                content = content,
+                pageIndex = safeCurrentPageIndex,
+                pageCount = pages.size,
+                progress = displayedProgress,
+                hasTableOfContents = tableOfContents.isNotEmpty(),
+                onOpenTableOfContents = { isTocOpen = true },
             )
         }
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 18.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            QaIconButton(icon = QaIconKind.Close, onClick = onBack)
-            ProgressLine(progress = displayedProgress, modifier = Modifier.weight(1f))
-            MonoText("$displayedProgress% read")
+        if (isTocOpen) {
+            ReaderTableOfContentsSheet(
+                entries = tableOfContents,
+                currentPageIndex = safeCurrentPageIndex,
+                pages = pages,
+                onSelectEntry = { entry ->
+                    moveToPage(readerPageIndexForParagraph(pages = pages, paragraphIndex = entry.blockIndex))
+                },
+                onDismiss = { isTocOpen = false },
+            )
         }
-        LazyColumn(
-            state = listState,
-            modifier = Modifier
-                .weight(1f)
-                .testTag("reader-list"),
-            contentPadding = PaddingValues(start = 28.dp, top = 18.dp, end = 28.dp, bottom = 24.dp),
-        ) {
-            item {
-                MonoText(
-                    text = buildString {
-                        append(content.sourceLabel())
-                        append(" · ")
-                        append(content.topicLine())
-                        if (readerStartParagraphIndex != null) {
-                            append(" · note at paragraph ")
-                            append(readerStartParagraphIndex + 1)
-                        } else if (restoredProgress != null) {
-                            append(" · continuing at ")
-                            append(restoredProgress.progressPercent)
-                            append("%")
-                        }
-                    },
-                    modifier = Modifier.padding(bottom = 10.dp),
-                )
-                DisplayText(content.title, fontSize = 27.sp, lineHeight = 31.sp, modifier = Modifier.padding(bottom = 18.dp))
-                MonoText(
-                    "Page ${safeCurrentPageIndex + 1}/${pages.size}",
-                    modifier = Modifier
-                        .padding(bottom = 14.dp)
-                        .testTag("reader-page-label"),
-                )
-            }
-            items(pageParagraphIndices.toList(), key = { paragraphIndex -> "reader-paragraph-$paragraphIndex" }) { paragraphIndex ->
-                val block = blocks[paragraphIndex]
-                val annotation = annotationsByParagraph[paragraphIndex]
-                ReaderAnnotatedBlock(
-                    paragraphIndex = paragraphIndex,
-                    block = block,
-                    annotation = annotation,
-                    isEditing = editingParagraphIndex == paragraphIndex,
-                    noteDraft = annotationNoteDraft,
-                    onStartEditing = {
-                        editingParagraphIndex = paragraphIndex
-                        annotationNoteDraft = annotation?.noteText.orEmpty()
-                    },
-                    onNoteDraftChanged = { annotationNoteDraft = it },
-                    onCancelEditing = {
-                        editingParagraphIndex = null
-                        annotationNoteDraft = ""
-                    },
-                    onDeleteAnnotation = { annotationId ->
+        annotationSelection?.let { selection ->
+            ReaderAnnotationEditorOverlay(
+                selection = selection,
+                noteDraft = annotationNoteDraft,
+                hasExistingAnnotation = selection.existingAnnotationId != null,
+                onSelectionChanged = { annotationSelection = it },
+                onNoteDraftChanged = { annotationNoteDraft = it },
+                onCancel = {
+                    annotationSelection = null
+                    annotationNoteDraft = ""
+                },
+                onDelete = selection.existingAnnotationId?.let { annotationId ->
+                    {
                         onDeleteAnnotation(annotationId)
-                        editingParagraphIndex = null
+                        annotationSelection = null
                         annotationNoteDraft = ""
-                    },
-                    onSave = {
-                        onSaveAnnotation(
-                            paragraphIndex,
-                            block.text.text,
-                            annotationNoteDraft,
-                            annotation?.id,
-                        )
-                        editingParagraphIndex = null
-                        annotationNoteDraft = ""
-                    },
-                )
-            }
+                    }
+                },
+                onSave = {
+	                    onSaveAnnotation(
+	                        selection.paragraphIndex,
+	                        selection.quotedText,
+	                        annotationNoteDraft,
+	                        selection.existingAnnotationId,
+	                        selection.selector,
+	                    )
+                    annotationSelection = null
+                    annotationNoteDraft = ""
+                },
+            )
         }
-        ReaderPageControls(
-            pageIndex = safeCurrentPageIndex,
-            pageCount = pages.size,
-            onPrevious = { moveToPage(safeCurrentPageIndex - 1) },
-            onNext = { moveToPage(safeCurrentPageIndex + 1) },
-            onDone = onDone,
-        )
     }
 }
 
 @Composable
-private fun ReaderPageControls(
-    pageIndex: Int,
-    pageCount: Int,
-    onPrevious: () -> Unit,
-    onNext: () -> Unit,
-    onDone: () -> Unit,
+private fun BoxScope.ReaderTableOfContentsSheet(
+    entries: List<ReaderTocEntry>,
+    currentPageIndex: Int,
+    pages: List<ReaderPage>,
+    onSelectEntry: (ReaderTocEntry) -> Unit,
+    onDismiss: () -> Unit,
 ) {
-    Column(
+    val colors = QualityAlternativeThemeTokens.colors
+    Box(
         modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.42f))
+            .testTag("reader-toc-scrim")
+            .clickable(onClick = onDismiss),
+    )
+    Surface(
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
             .fillMaxWidth()
-            .padding(start = 24.dp, top = 10.dp, end = 24.dp, bottom = 18.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+            .heightIn(max = 430.dp)
+            .padding(horizontal = 16.dp, vertical = 16.dp)
+            .testTag("reader-toc-sheet"),
+        shape = RoundedCornerShape(18.dp),
+        color = colors.elevatedSurface,
+        border = BorderStroke(1.dp, colors.line),
+    ) {
+        Column(
+            modifier = Modifier.padding(start = 18.dp, top = 16.dp, end = 18.dp, bottom = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                DisplayText("Contents", fontSize = 20.sp, lineHeight = 24.sp, modifier = Modifier.weight(1f))
+                QaIconButton(icon = QaIconKind.Close, onClick = onDismiss)
+            }
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 350.dp)
+                    .testTag("reader-toc-list"),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                itemsIndexed(entries) { index, entry ->
+                    val entryPageIndex = readerPageIndexForParagraph(pages = pages, paragraphIndex = entry.blockIndex)
+                    val isCurrent = entryPageIndex == currentPageIndex
+                    ReaderTocEntryRow(
+                        entry = entry,
+                        pageIndex = entryPageIndex,
+                        isCurrent = isCurrent,
+                        onClick = { onSelectEntry(entry) },
+                        modifier = Modifier.testTag("reader-toc-entry-$index"),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReaderTocEntryRow(
+    entry: ReaderTocEntry,
+    pageIndex: Int,
+    isCurrent: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = QualityAlternativeThemeTokens.colors
+    val rowShape = RoundedCornerShape(10.dp)
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(rowShape)
+            .clickable(onClick = onClick),
+        shape = rowShape,
+        color = if (isCurrent) colors.accentSoft else Color.Transparent,
+        border = if (isCurrent) BorderStroke(1.dp, colors.accent.copy(alpha = 0.35f)) else null,
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = (entry.level.coerceIn(0, 4) * 16).dp + 12.dp, top = 10.dp, end = 12.dp, bottom = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            QaButton(
-                text = "Previous",
-                onClick = onPrevious,
-                enabled = pageIndex > 0,
-                variant = QaButtonVariant.Outline,
-                size = QaButtonSize.Small,
-                fullWidth = false,
-                leadingIcon = QaIconKind.ArrowLeft,
-                modifier = Modifier
-                    .weight(1f)
-                    .testTag("reader-previous-page"),
+            Text(
+                text = entry.title,
+                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 15.sp, lineHeight = 20.sp),
+                color = colors.primaryText,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
             )
-            QaButton(
-                text = if (pageIndex < pageCount - 1) "Next page" else "Last page",
-                onClick = onNext,
-                enabled = pageIndex < pageCount - 1,
-                variant = if (pageIndex < pageCount - 1) QaButtonVariant.Accent else QaButtonVariant.Outline,
-                size = QaButtonSize.Small,
-                fullWidth = false,
-                trailingIcon = if (pageIndex < pageCount - 1) QaIconKind.ArrowRight else null,
-                modifier = Modifier
-                    .weight(1f)
-                    .testTag("reader-next-page"),
-            )
+            MonoText("p. ${pageIndex + 1}", color = if (isCurrent) colors.accent else colors.mutedText)
         }
-        QaButton(
-            text = "I'm done reading",
-            onClick = onDone,
-            variant = if (pageIndex >= pageCount - 1) QaButtonVariant.Primary else QaButtonVariant.Ghost,
-            modifier = Modifier.testTag("reader-done"),
+    }
+}
+
+@Composable
+private fun ReaderMinimalFooter(
+    content: ContentItem,
+    pageIndex: Int,
+    pageCount: Int,
+    progress: Int,
+    hasTableOfContents: Boolean,
+    onOpenTableOfContents: () -> Unit,
+) {
+    val colors = QualityAlternativeThemeTokens.colors
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 18.dp, top = 2.dp, end = 18.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        if (hasTableOfContents) {
+            Surface(
+                modifier = Modifier
+                    .size(24.dp)
+                    .semantics { contentDescription = "Contents" }
+                    .testTag("reader-toc-open"),
+                onClick = onOpenTableOfContents,
+                shape = RoundedCornerShape(8.dp),
+                color = Color.Transparent,
+                contentColor = colors.mutedText,
+                border = BorderStroke(1.dp, colors.line.copy(alpha = 0.7f)),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    QaIcon(kind = QaIconKind.Library, color = colors.mutedText, size = 14.dp)
+                }
+            }
+        }
+        Text(
+            text = content.title,
+            style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp, lineHeight = 12.sp),
+            color = colors.faintText,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        ProgressLine(
+            progress = progress,
+            modifier = Modifier
+                .widthIn(min = 64.dp, max = 104.dp),
+        )
+        MonoText(
+            "${pageIndex + 1}/$pageCount · $progress%",
+            color = colors.faintText,
+            modifier = Modifier.testTag("reader-page-label"),
         )
     }
 }
@@ -2044,187 +2284,200 @@ private fun ReaderAnnotatedBlock(
     paragraphIndex: Int,
     block: ReaderMarkdownBlock,
     annotation: ReadingAnnotation?,
-    isEditing: Boolean,
-    noteDraft: String,
-    onStartEditing: () -> Unit,
-    onNoteDraftChanged: (String) -> Unit,
-    onCancelEditing: () -> Unit,
-    onDeleteAnnotation: (String) -> Unit,
-    onSave: () -> Unit,
+    selectedQuote: String?,
+    onStartEditing: (Int) -> Unit,
 ) {
+    var textLayoutResult by remember(block.text) { mutableStateOf<TextLayoutResult?>(null) }
+    val highlightedQuote = selectedQuote ?: annotation?.quotedText
+    val hasHighlight = !highlightedQuote.isNullOrBlank()
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(bottom = 6.dp)
+            .pointerInput(paragraphIndex, annotation?.id) {
+                detectTapGestures(
+                    onLongPress = { offset ->
+                        val charOffset = textLayoutResult
+                            ?.getOffsetForPosition(offset)
+                            ?.coerceIn(0, block.text.text.length)
+                            ?: 0
+                        onStartEditing(charOffset)
+                    },
+                )
+            }
+            .semantics {
+                val actionLabel = if (annotation != null) {
+                    "Edit note for paragraph $paragraphIndex"
+                } else {
+                    "Add note for paragraph $paragraphIndex"
+                }
+                onLongClick(actionLabel) {
+                    onStartEditing(0)
+                    true
+                }
+            }
             .testTag("reader-annotation-block-$paragraphIndex"),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.Top,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Box(modifier = Modifier.weight(1f)) {
-                ReaderMarkdownBlockText(block = block)
-            }
-            ReaderAnnotationActionButton(
-                paragraphIndex = paragraphIndex,
-                hasAnnotation = annotation != null,
-                onClick = onStartEditing,
-            )
-        }
-        if (annotation != null && !isEditing) {
-            ReaderAnnotationPreview(paragraphIndex = paragraphIndex, annotation = annotation)
-        }
-        if (isEditing) {
-            ReaderAnnotationEditor(
-                paragraphIndex = paragraphIndex,
-                quotedText = block.text.text,
-                noteDraft = noteDraft,
-                hasExistingAnnotation = annotation != null,
-                onNoteDraftChanged = onNoteDraftChanged,
-                onCancel = onCancelEditing,
-                onDelete = annotation?.id?.let { annotationId ->
-                    { onDeleteAnnotation(annotationId) }
-                },
-                onSave = onSave,
-            )
-        }
-    }
-}
-
-@Composable
-private fun ReaderAnnotationActionButton(
-    paragraphIndex: Int,
-    hasAnnotation: Boolean,
-    onClick: () -> Unit,
-) {
-    val colors = QualityAlternativeThemeTokens.colors
-    val description = if (hasAnnotation) {
-        "Edit note for paragraph $paragraphIndex"
-    } else {
-        "Add note for paragraph $paragraphIndex"
-    }
-    Surface(
-        modifier = Modifier
-            .size(34.dp)
-            .semantics { contentDescription = description }
-            .testTag("reader-annotation-action-$paragraphIndex"),
-        onClick = onClick,
-        shape = RoundedCornerShape(10.dp),
-        color = if (hasAnnotation) colors.accentSoft else colors.elevatedSurface,
-        contentColor = if (hasAnnotation) colors.accent else colors.mutedText,
-        border = BorderStroke(1.dp, if (hasAnnotation) colors.accent else colors.lineStrong),
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            QaIcon(
-                kind = QaIconKind.Note,
-                color = if (hasAnnotation) colors.accent else colors.mutedText,
-                size = 17.dp,
-            )
-        }
-    }
-}
-
-@Composable
-private fun ReaderAnnotationPreview(
-    paragraphIndex: Int,
-    annotation: ReadingAnnotation,
-) {
-    val colors = QualityAlternativeThemeTokens.colors
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = 2.dp, end = 44.dp, bottom = 14.dp)
-            .clip(RoundedCornerShape(10.dp))
-            .background(colors.accentSoft)
-            .border(BorderStroke(1.dp, colors.accent.copy(alpha = 0.35f)), RoundedCornerShape(10.dp))
-            .padding(horizontal = 12.dp, vertical = 10.dp)
-            .testTag("reader-annotation-preview-$paragraphIndex"),
-    ) {
-        MonoText("Note", color = colors.accent, modifier = Modifier.padding(bottom = 4.dp))
-        Text(
-            text = annotation.noteText,
-            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp, lineHeight = 19.sp),
-            color = colors.primaryText,
-            maxLines = 3,
-            overflow = TextOverflow.Ellipsis,
+        ReaderMarkdownBlockText(
+            block = block,
+            highlightedText = highlightedQuote,
+            modifier = if (hasHighlight) Modifier.testTag("reader-annotation-highlight-$paragraphIndex") else Modifier,
+            onTextLayout = { layout -> textLayoutResult = layout },
         )
     }
 }
 
 @Composable
-private fun ReaderAnnotationEditor(
-    paragraphIndex: Int,
-    quotedText: String,
+private fun BoxScope.ReaderAnnotationEditorOverlay(
+    selection: ReaderAnnotationSelection,
     noteDraft: String,
     hasExistingAnnotation: Boolean,
+    onSelectionChanged: (ReaderAnnotationSelection) -> Unit,
     onNoteDraftChanged: (String) -> Unit,
     onCancel: () -> Unit,
     onDelete: (() -> Unit)?,
     onSave: () -> Unit,
 ) {
     val colors = QualityAlternativeThemeTokens.colors
-    Column(
+    Box(
         modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.30f))
+            .clickable(onClick = onCancel)
+            .testTag("reader-annotation-overlay"),
+    )
+    Surface(
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
             .fillMaxWidth()
-            .padding(start = 2.dp, end = 44.dp, bottom = 14.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(colors.elevatedSurface)
-            .border(BorderStroke(1.dp, colors.lineStrong), RoundedCornerShape(12.dp))
-            .padding(12.dp)
-            .testTag("reader-annotation-editor-$paragraphIndex"),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+            .padding(horizontal = 16.dp, vertical = 16.dp)
+            .testTag("reader-annotation-editor-${selection.paragraphIndex}"),
+        shape = RoundedCornerShape(18.dp),
+        color = colors.elevatedSurface,
+        border = BorderStroke(1.dp, colors.lineStrong),
     ) {
-        MonoText("Quoted fragment", color = colors.mutedText)
-        Text(
-            text = quotedText,
-            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp, lineHeight = 18.sp),
-            color = colors.primaryText,
-            maxLines = 4,
-            overflow = TextOverflow.Ellipsis,
-        )
-        QaMultilineTextField(
-            value = noteDraft,
-            onValueChange = onNoteDraftChanged,
-            placeholder = "Write a note",
-            modifier = Modifier.testTag("reader-annotation-note-input-$paragraphIndex"),
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (onDelete != null) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                DisplayText("Note", fontSize = 20.sp, lineHeight = 24.sp, modifier = Modifier.weight(1f))
+                QaIconButton(icon = QaIconKind.Close, onClick = onCancel)
+            }
+            Text(
+                text = selection.quotedText,
+                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp, lineHeight = 18.sp),
+                color = colors.primaryText,
+                maxLines = 4,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.testTag("reader-annotation-selected-quote-${selection.paragraphIndex}"),
+            )
+            ReaderAnnotationRangeControls(
+                selection = selection,
+                onSelectionChanged = onSelectionChanged,
+            )
+            QaMultilineTextField(
+                value = noteDraft,
+                onValueChange = onNoteDraftChanged,
+                placeholder = "Write a note",
+                modifier = Modifier.testTag("reader-annotation-note-input-${selection.paragraphIndex}"),
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (onDelete != null) {
+                    QaButton(
+                        text = "Delete note",
+                        onClick = onDelete,
+                        variant = QaButtonVariant.Ghost,
+                        size = QaButtonSize.Small,
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("reader-annotation-delete-${selection.paragraphIndex}"),
+                    )
+                }
                 QaButton(
-                    text = "Delete note",
-                    onClick = onDelete,
+                    text = "Cancel",
+                    onClick = onCancel,
                     variant = QaButtonVariant.Ghost,
                     size = QaButtonSize.Small,
+                    modifier = Modifier.weight(1f),
+                )
+                QaButton(
+                    text = if (hasExistingAnnotation) "Update note" else "Save note",
+                    onClick = onSave,
+                    variant = QaButtonVariant.Primary,
+                    size = QaButtonSize.Small,
+                    enabled = noteDraft.isNotBlank(),
                     modifier = Modifier
                         .weight(1f)
-                        .testTag("reader-annotation-delete-$paragraphIndex"),
+                        .testTag("reader-annotation-save-${selection.paragraphIndex}"),
                 )
             }
-            QaButton(
-                text = "Cancel",
-                onClick = onCancel,
-                variant = QaButtonVariant.Ghost,
-                size = QaButtonSize.Small,
-                modifier = Modifier.weight(1f),
-            )
-            QaButton(
-                text = if (hasExistingAnnotation) "Update note" else "Save note",
-                onClick = onSave,
-                variant = QaButtonVariant.Primary,
-                size = QaButtonSize.Small,
-                enabled = noteDraft.isNotBlank(),
-                modifier = Modifier
-                    .weight(1f)
-                    .testTag("reader-annotation-save-$paragraphIndex"),
-            )
         }
     }
 }
 
 @Composable
-private fun ReaderMarkdownBlockText(block: ReaderMarkdownBlock) {
+private fun ReaderAnnotationRangeControls(
+    selection: ReaderAnnotationSelection,
+    onSelectionChanged: (ReaderAnnotationSelection) -> Unit,
+) {
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        QaButton(
+            text = "Start earlier",
+            onClick = { onSelectionChanged(selection.expandStart()) },
+            variant = QaButtonVariant.Outline,
+            size = QaButtonSize.Small,
+            enabled = selection.canExpandStart,
+            fullWidth = false,
+            modifier = Modifier.weight(1f).testTag("reader-annotation-start-earlier"),
+        )
+        QaButton(
+            text = "Start later",
+            onClick = { onSelectionChanged(selection.shrinkStart()) },
+            variant = QaButtonVariant.Outline,
+            size = QaButtonSize.Small,
+            enabled = selection.canShrinkStart,
+            fullWidth = false,
+            modifier = Modifier.weight(1f).testTag("reader-annotation-start-later"),
+        )
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        QaButton(
+            text = "End earlier",
+            onClick = { onSelectionChanged(selection.shrinkEnd()) },
+            variant = QaButtonVariant.Outline,
+            size = QaButtonSize.Small,
+            enabled = selection.canShrinkEnd,
+            fullWidth = false,
+            modifier = Modifier.weight(1f).testTag("reader-annotation-end-earlier"),
+        )
+        QaButton(
+            text = "End later",
+            onClick = { onSelectionChanged(selection.expandEnd()) },
+            variant = QaButtonVariant.Outline,
+            size = QaButtonSize.Small,
+            enabled = selection.canExpandEnd,
+            fullWidth = false,
+            modifier = Modifier.weight(1f).testTag("reader-annotation-end-later"),
+        )
+    }
+}
+
+@Composable
+private fun ReaderMarkdownBlockText(
+    block: ReaderMarkdownBlock,
+    highlightedText: String? = null,
+    modifier: Modifier = Modifier,
+    onTextLayout: (TextLayoutResult) -> Unit = {},
+) {
     val colors = QualityAlternativeThemeTokens.colors
+    val displayText = remember(block.text, highlightedText) {
+        block.text.withReaderHighlight(highlightedText, colors.accent.copy(alpha = 0.22f))
+    }
     val baseStyle = MaterialTheme.typography.bodyLarge.copy(
         fontFamily = QualityDisplayFontFamily,
         fontSize = 17.sp,
@@ -2252,7 +2505,7 @@ private fun ReaderMarkdownBlockText(block: ReaderMarkdownBlock) {
         ReaderMarkdownBlockKind.QUOTE -> colors.mutedText
         else -> colors.primaryText
     }
-    val modifier = when (block.kind) {
+    val blockModifier = when (block.kind) {
         ReaderMarkdownBlockKind.CODE -> Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
@@ -2265,10 +2518,11 @@ private fun ReaderMarkdownBlockText(block: ReaderMarkdownBlock) {
     }
 
     Text(
-        text = block.text,
+        text = displayText,
         style = style,
         color = textColor,
-        modifier = modifier,
+        modifier = blockModifier.then(modifier),
+        onTextLayout = onTextLayout,
     )
 }
 
@@ -2693,6 +2947,9 @@ private fun AnnotationLibraryRow(
 ) {
     val colors = QualityAlternativeThemeTokens.colors
     val canOpen = content != null && content.usesRepositoryBody()
+    val sourceTitle = content?.title
+        ?: annotation.sourceTitle.takeIf(String::isNotBlank)
+        ?: "Source no longer in Library"
     QaCard(
         padding = 16.dp,
         modifier = Modifier
@@ -2715,7 +2972,7 @@ private fun AnnotationLibraryRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Text(
-                        text = content?.title ?: "Source no longer in Library",
+                        text = sourceTitle,
                         style = MaterialTheme.typography.titleMedium,
                         fontSize = 17.sp,
                         lineHeight = 21.sp,
@@ -2733,8 +2990,8 @@ private fun AnnotationLibraryRow(
                 }
                 MonoText(
                     text = buildString {
-                        append(content?.sourceType?.annotationSourceTypeLabel() ?: "Missing source")
-                        content?.sourceLabel()?.let { sourceLabel ->
+                        append((content?.sourceType ?: annotation.sourceType)?.annotationSourceTypeLabel() ?: "Missing source")
+                        (content?.sourceLabel() ?: annotation.sourceLabel)?.let { sourceLabel ->
                             append(" · ")
                             append(sourceLabel)
                         }
@@ -2799,6 +3056,9 @@ private fun SettingsTab(
     onSelectAnnotationExport: () -> Unit,
     onClearAnnotationExport: () -> Unit,
     onRetryAnnotationExport: () -> Unit,
+    onConnectAnnotationDrive: () -> Unit,
+    onRetryAnnotationDrive: () -> Unit,
+    onDisconnectAnnotationDrive: () -> Unit,
 ) {
     val context = LocalContext.current
     val colors = QualityAlternativeThemeTokens.colors
@@ -2918,6 +3178,9 @@ private fun SettingsTab(
                 onSelectAnnotationExport = onSelectAnnotationExport,
                 onClearAnnotationExport = onClearAnnotationExport,
                 onRetryAnnotationExport = onRetryAnnotationExport,
+                onConnectAnnotationDrive = onConnectAnnotationDrive,
+                onRetryAnnotationDrive = onRetryAnnotationDrive,
+                onDisconnectAnnotationDrive = onDisconnectAnnotationDrive,
             )
         }
         item {
@@ -3023,18 +3286,23 @@ private fun AnnotationAutosaveSettingsSection(
     onSelectAnnotationExport: () -> Unit,
     onClearAnnotationExport: () -> Unit,
     onRetryAnnotationExport: () -> Unit,
+    onConnectAnnotationDrive: () -> Unit,
+    onRetryAnnotationDrive: () -> Unit,
+    onDisconnectAnnotationDrive: () -> Unit,
 ) {
     val colors = QualityAlternativeThemeTokens.colors
     val configured = !state.annotationExportUri.isNullOrBlank()
     val exportActionLabel = if (state.annotationExportLastError == null) "Save now" else "Retry"
+    val driveConfigured = state.annotationDriveSyncEnabled
+    val driveActionLabel = when {
+        state.isAnnotationDriveSyncing -> "Syncing"
+        !driveConfigured -> "Connect"
+        state.annotationDriveLastError == null -> "Save now"
+        else -> "Retry"
+    }
     Column(modifier = Modifier.testTag("settings-annotation-export-section")) {
         SectionLabel("Annotation autosave", right = if (configured) "On" else "Off")
         QaCard {
-            BodyText(
-                text = "Pick a Markdown file. Drive-backed files sync automatically after each saved note.",
-                color = colors.mutedText,
-                modifier = Modifier.padding(bottom = 12.dp),
-            )
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -3043,7 +3311,7 @@ private fun AnnotationAutosaveSettingsSection(
                 SourceBadge(sourceType = ContentSourceType.USER_DOCUMENT, icon = QaIconKind.Note)
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = state.annotationExportDisplayName ?: "No export file selected",
+                        text = state.annotationExportDisplayName ?: "No export folder selected",
                         style = MaterialTheme.typography.titleMedium,
                         fontSize = 16.sp,
                         lineHeight = 20.sp,
@@ -3068,7 +3336,7 @@ private fun AnnotationAutosaveSettingsSection(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 QaButton(
-                    text = if (configured) "Change file" else "Choose file",
+                    text = if (configured) "Change folder" else "Choose folder",
                     onClick = onSelectAnnotationExport,
                     variant = QaButtonVariant.Outline,
                     size = QaButtonSize.Small,
@@ -3100,6 +3368,72 @@ private fun AnnotationAutosaveSettingsSection(
                     modifier = Modifier
                         .padding(top = 4.dp)
                         .testTag("settings-annotation-export-clear"),
+                )
+            }
+        }
+        QaCard(modifier = Modifier.padding(top = 10.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                SourceBadge(sourceType = ContentSourceType.USER_LINK, icon = QaIconKind.External)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (driveConfigured) "Google Drive connected" else "Google Drive not connected",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontSize = 16.sp,
+                        lineHeight = 20.sp,
+                        color = colors.primaryText,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    MonoText(
+                        text = annotationDriveStatusText(state),
+                        color = if (state.annotationDriveLastError == null) colors.mutedText else colors.accent,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .padding(top = 4.dp)
+                            .testTag("settings-annotation-drive-status"),
+                    )
+                }
+                if (state.isAnnotationDriveSyncing) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp).testTag("settings-annotation-drive-progress"),
+                        strokeWidth = 2.dp,
+                        color = colors.accent,
+                    )
+                }
+            }
+            Row(
+                modifier = Modifier.padding(top = 14.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                QaButton(
+                    text = driveActionLabel,
+                    onClick = if (driveConfigured) onRetryAnnotationDrive else onConnectAnnotationDrive,
+                    variant = QaButtonVariant.Outline,
+                    size = QaButtonSize.Small,
+                    enabled = !state.isAnnotationDriveSyncing,
+                    leadingIcon = QaIconKind.External,
+                    modifier = Modifier.weight(1f).testTag(
+                        if (driveConfigured) {
+                            "settings-annotation-drive-sync-now"
+                        } else {
+                            "settings-annotation-drive-connect"
+                        },
+                    ),
+                )
+                QaButton(
+                    text = "Disconnect",
+                    onClick = onDisconnectAnnotationDrive,
+                    variant = QaButtonVariant.Ghost,
+                    size = QaButtonSize.Small,
+                    enabled = driveConfigured && !state.isAnnotationDriveSyncing,
+                    fullWidth = false,
+                    modifier = Modifier.testTag("settings-annotation-drive-disconnect"),
                 )
             }
         }
@@ -4722,7 +5056,90 @@ internal enum class ReaderMarkdownBlockKind {
 internal data class ReaderMarkdownBlock(
     val text: AnnotatedString,
     val kind: ReaderMarkdownBlockKind,
+    val sourceHref: String? = null,
+    val sourceAnchor: String? = null,
+    val sourceBlockIndex: Int = 0,
+    val sourceTextStartOffset: Int = 0,
 )
+
+internal data class ReaderBlockLayout(
+    val blocks: List<ReaderMarkdownBlock>,
+    val originalToDisplayStart: List<Int>,
+) {
+    fun displayBlockIndexFor(originalBlockIndex: Int): Int {
+        return originalToDisplayStart.getOrElse(originalBlockIndex) {
+            blocks.lastIndex.coerceAtLeast(0)
+        }
+    }
+}
+
+internal data class ReaderSentenceRange(
+    val start: Int,
+    val endExclusive: Int,
+)
+
+private data class ReaderAnnotationSelection(
+    val paragraphIndex: Int,
+    val sourceText: String,
+    val sourceHref: String?,
+    val sourceAnchor: String?,
+    val sourceBlockIndex: Int,
+    val sourceTextStartOffset: Int,
+    val sentenceRanges: List<ReaderSentenceRange>,
+    val startSentenceIndex: Int,
+    val endSentenceIndex: Int,
+    val existingAnnotationId: String?,
+) {
+    val quotedText: String
+        get() {
+            val start = sentenceRanges[startSentenceIndex].start
+            val end = sentenceRanges[endSentenceIndex].endExclusive
+            return sourceText.substring(start, end).trim()
+        }
+
+    val selector: ReadingAnnotationSelector
+        get() {
+            val start = sentenceRanges[startSentenceIndex].start
+            val end = sentenceRanges[endSentenceIndex].endExclusive
+            return ReadingAnnotationSelector(
+                sourceHref = sourceHref,
+                sourceAnchor = sourceAnchor,
+                sourceBlockIndex = sourceBlockIndex,
+                textStartOffset = sourceTextStartOffset + start,
+                textEndOffset = sourceTextStartOffset + end,
+                prefixText = sourceText.substring(0, start).takeLast(120).trim(),
+                suffixText = sourceText.substring(end).take(120).trim(),
+            )
+        }
+
+    val canExpandStart: Boolean
+        get() = startSentenceIndex > 0
+
+    val canShrinkStart: Boolean
+        get() = startSentenceIndex < endSentenceIndex
+
+    val canShrinkEnd: Boolean
+        get() = endSentenceIndex > startSentenceIndex
+
+    val canExpandEnd: Boolean
+        get() = endSentenceIndex < sentenceRanges.lastIndex
+
+    fun expandStart(): ReaderAnnotationSelection {
+        return if (canExpandStart) copy(startSentenceIndex = startSentenceIndex - 1) else this
+    }
+
+    fun shrinkStart(): ReaderAnnotationSelection {
+        return if (canShrinkStart) copy(startSentenceIndex = startSentenceIndex + 1) else this
+    }
+
+    fun shrinkEnd(): ReaderAnnotationSelection {
+        return if (canShrinkEnd) copy(endSentenceIndex = endSentenceIndex - 1) else this
+    }
+
+    fun expandEnd(): ReaderAnnotationSelection {
+        return if (canExpandEnd) copy(endSentenceIndex = endSentenceIndex + 1) else this
+    }
+}
 
 internal data class ReaderPage(
     val start: Int,
@@ -4731,7 +5148,108 @@ internal data class ReaderPage(
 
 internal fun readerBlocksForDisplay(body: String, fallback: String): List<ReaderMarkdownBlock> {
     return readerParagraphsForDisplay(body = body, fallback = fallback)
-        .map(::readerMarkdownBlock)
+        .mapIndexed { index, paragraph ->
+            readerMarkdownBlock(rawBlock = paragraph, sourceBlockIndex = index)
+        }
+}
+
+internal fun splitOversizedReaderBlocks(
+    blocks: List<ReaderMarkdownBlock>,
+    maxBlockWeight: Int = READER_DEFAULT_PAGE_WEIGHT,
+): ReaderBlockLayout {
+    if (blocks.isEmpty()) {
+        return ReaderBlockLayout(blocks = emptyList(), originalToDisplayStart = emptyList())
+    }
+    val expanded = mutableListOf<ReaderMarkdownBlock>()
+    val originalToDisplayStart = mutableListOf<Int>()
+    blocks.forEach { block ->
+        originalToDisplayStart += expanded.size
+        val chunks = block.splitForReaderPage(maxBlockWeight = maxBlockWeight)
+        expanded += chunks
+    }
+    return ReaderBlockLayout(blocks = expanded, originalToDisplayStart = originalToDisplayStart)
+}
+
+private fun initialReaderAnnotationSelection(
+    paragraphIndex: Int,
+    block: ReaderMarkdownBlock,
+    charOffset: Int,
+    annotation: ReadingAnnotation?,
+): ReaderAnnotationSelection {
+    val blockText = block.text.text
+    val sentenceRanges = readerSentenceRanges(blockText).ifEmpty {
+        listOf(ReaderSentenceRange(start = 0, endExclusive = blockText.length))
+    }
+    val existingQuote = annotation
+        ?.quotedText
+        ?.trim()
+        ?.takeIf(String::isNotBlank)
+    val annotationStart = existingQuote
+        ?.let { quote -> blockText.indexOf(quote).takeIf { index -> index >= 0 } }
+    val annotationEndExclusive = annotationStart
+        ?.let { start -> (start + existingQuote.orEmpty().length).coerceIn(0, blockText.length) }
+    val targetOffset = (annotationStart ?: charOffset).coerceIn(0, blockText.length.coerceAtLeast(1) - 1)
+    val sentenceIndex = sentenceRanges
+        .indexOfFirst { range -> targetOffset in range.start until range.endExclusive }
+        .takeIf { index -> index >= 0 }
+        ?: sentenceRanges.indices.minByOrNull { index ->
+            val range = sentenceRanges[index]
+            minOf(kotlin.math.abs(targetOffset - range.start), kotlin.math.abs(targetOffset - range.endExclusive))
+        }
+        ?: 0
+    val endSentenceIndex = if (annotationStart != null && annotationEndExclusive != null) {
+        sentenceRanges
+            .indexOfLast { range ->
+                range.start < annotationEndExclusive && range.endExclusive > annotationStart
+            }
+            .takeIf { index -> index >= sentenceIndex }
+            ?: sentenceIndex
+    } else {
+        sentenceIndex
+    }
+    return ReaderAnnotationSelection(
+        paragraphIndex = paragraphIndex,
+        sourceText = blockText,
+        sourceHref = block.sourceHref,
+        sourceAnchor = block.sourceAnchor,
+        sourceBlockIndex = block.sourceBlockIndex,
+        sourceTextStartOffset = block.sourceTextStartOffset,
+        sentenceRanges = sentenceRanges,
+        startSentenceIndex = sentenceIndex,
+        endSentenceIndex = endSentenceIndex,
+        existingAnnotationId = annotation?.id,
+    )
+}
+
+internal fun readerSentenceRanges(text: String): List<ReaderSentenceRange> {
+    val ranges = mutableListOf<ReaderSentenceRange>()
+    var start = 0
+    while (start < text.length && text[start].isWhitespace()) {
+        start += 1
+    }
+    var index = start
+    while (index < text.length) {
+        val char = text[index]
+        val endsSentence = (char == '.' || char == '!' || char == '?' || char == ';') &&
+            (index == text.lastIndex || text[index + 1].isWhitespace())
+        if (endsSentence) {
+            val end = index + 1
+            if (start < end) {
+                ranges += ReaderSentenceRange(start = start, endExclusive = end)
+            }
+            start = end
+            while (start < text.length && text[start].isWhitespace()) {
+                start += 1
+            }
+            index = start
+        } else {
+            index += 1
+        }
+    }
+    if (start < text.length) {
+        ranges += ReaderSentenceRange(start = start, endExclusive = text.length)
+    }
+    return ranges
 }
 
 internal fun readerPagesForBlocks(
@@ -4745,14 +5263,20 @@ internal fun readerPagesForBlocks(
     val pages = mutableListOf<ReaderPage>()
     var pageStart = 0
     var pageWeight = 0
+    var pageHasBodyBlock = false
     blocks.forEachIndexed { index, block ->
         val blockWeight = block.readerPageWeight()
-        if (index > pageStart && pageWeight + blockWeight > safeMaxWeight) {
+        val startsReaderSection = block.kind == ReaderMarkdownBlockKind.HEADING && pageHasBodyBlock
+        if (index > pageStart && (startsReaderSection || pageWeight + blockWeight > safeMaxWeight)) {
             pages += ReaderPage(start = pageStart, endInclusive = index - 1)
             pageStart = index
             pageWeight = 0
+            pageHasBodyBlock = false
         }
         pageWeight += blockWeight
+        if (block.kind != ReaderMarkdownBlockKind.HEADING) {
+            pageHasBodyBlock = true
+        }
     }
     pages += ReaderPage(start = pageStart, endInclusive = blocks.lastIndex)
     return pages
@@ -4785,17 +5309,153 @@ internal fun readerProgressPercentForPageIndex(pageIndex: Int, pageCount: Int): 
 }
 
 private fun ReaderMarkdownBlock.readerPageWeight(): Int {
-    val textWeight = ((text.text.length + 319) / 320).coerceAtLeast(1)
-    return when (kind) {
-        ReaderMarkdownBlockKind.HEADING -> textWeight + 1
-        ReaderMarkdownBlockKind.CODE,
-        ReaderMarkdownBlockKind.LIST -> textWeight + 1
+    val charsPerLine = when (kind) {
+        ReaderMarkdownBlockKind.HEADING -> 24
+        ReaderMarkdownBlockKind.CODE -> 34
+        ReaderMarkdownBlockKind.LIST -> 38
         ReaderMarkdownBlockKind.QUOTE,
-        ReaderMarkdownBlockKind.BODY -> textWeight
+        ReaderMarkdownBlockKind.BODY,
+        -> 42
+    }
+    val lineWeight = text.text
+        .lines()
+        .sumOf { line ->
+            val visibleChars = line.length.coerceAtLeast(1)
+            ((visibleChars + charsPerLine - 1) / charsPerLine).coerceAtLeast(1)
+        }
+    return when (kind) {
+        ReaderMarkdownBlockKind.HEADING -> lineWeight + 2
+        ReaderMarkdownBlockKind.CODE,
+        ReaderMarkdownBlockKind.LIST,
+        ReaderMarkdownBlockKind.QUOTE,
+        ReaderMarkdownBlockKind.BODY,
+        -> lineWeight + 1
     }
 }
 
-internal fun readerMarkdownBlock(rawBlock: String): ReaderMarkdownBlock {
+private fun ReaderMarkdownBlock.splitForReaderPage(maxBlockWeight: Int): List<ReaderMarkdownBlock> {
+    val safeMaxWeight = maxBlockWeight.coerceAtLeast(6)
+    if (kind == ReaderMarkdownBlockKind.HEADING || readerPageWeight() <= safeMaxWeight) {
+        return listOf(this)
+    }
+    val targetChars = readerApproxCharsForWeight(kind = kind, weight = safeMaxWeight - 1)
+    val chunks = text.splitAnnotatedAtSentenceBoundaries(targetChars = targetChars)
+    var searchStart = 0
+    return chunks.map { chunk ->
+        val localStart = text.text.indexOf(chunk.text, startIndex = searchStart)
+            .takeIf { index -> index >= 0 }
+            ?: searchStart
+        searchStart = localStart + chunk.text.length
+        copy(
+            text = chunk,
+            sourceTextStartOffset = sourceTextStartOffset + localStart,
+        )
+    }
+}
+
+private fun readerApproxCharsForWeight(kind: ReaderMarkdownBlockKind, weight: Int): Int {
+    val charsPerLine = when (kind) {
+        ReaderMarkdownBlockKind.CODE -> 34
+        ReaderMarkdownBlockKind.LIST -> 38
+        ReaderMarkdownBlockKind.HEADING -> 24
+        ReaderMarkdownBlockKind.QUOTE,
+        ReaderMarkdownBlockKind.BODY,
+        -> 42
+    }
+    return (charsPerLine * weight.coerceAtLeast(3)).coerceAtLeast(120)
+}
+
+private fun AnnotatedString.splitAnnotatedAtSentenceBoundaries(targetChars: Int): List<AnnotatedString> {
+    val raw = text.trim()
+    if (raw.length <= targetChars) {
+        return listOf(this)
+    }
+    val chunks = mutableListOf<AnnotatedString>()
+    var start = text.indexOf(raw.first()).coerceAtLeast(0)
+    val hardEnd = start + raw.length
+    while (start < hardEnd) {
+        val desiredEnd = (start + targetChars).coerceAtMost(hardEnd)
+        val end = if (desiredEnd >= hardEnd) {
+            hardEnd
+        } else {
+            sentenceBoundaryBefore(desiredEnd = desiredEnd, minEnd = start + (targetChars / 2)) ?: desiredEnd
+        }
+        chunks += subAnnotatedString(start = start, end = end).trimAnnotated()
+        start = end
+        while (start < hardEnd && text[start].isWhitespace()) {
+            start += 1
+        }
+    }
+    return chunks.filter { chunk -> chunk.text.isNotBlank() }.ifEmpty { listOf(this) }
+}
+
+private fun AnnotatedString.sentenceBoundaryBefore(desiredEnd: Int, minEnd: Int): Int? {
+    for (index in desiredEnd.coerceAtMost(text.lastIndex) downTo minEnd.coerceAtLeast(0)) {
+        val char = text[index]
+        if ((char == '.' || char == '!' || char == '?' || char == ';') && index + 1 < text.length && text[index + 1].isWhitespace()) {
+            return index + 1
+        }
+    }
+    return null
+}
+
+private fun AnnotatedString.trimAnnotated(): AnnotatedString {
+    val startOffset = text.indexOfFirst { char -> !char.isWhitespace() }
+    if (startOffset < 0) {
+        return AnnotatedString("")
+    }
+    val endOffset = text.indexOfLast { char -> !char.isWhitespace() } + 1
+    return subAnnotatedString(start = startOffset, end = endOffset)
+}
+
+private fun AnnotatedString.subAnnotatedString(start: Int, end: Int): AnnotatedString {
+    val safeStart = start.coerceIn(0, text.length)
+    val safeEnd = end.coerceIn(safeStart, text.length)
+    val adjustedSpans = spanStyles.mapNotNull { range ->
+        val overlapStart = maxOf(range.start, safeStart)
+        val overlapEnd = minOf(range.end, safeEnd)
+        if (overlapStart < overlapEnd) {
+            AnnotatedString.Range(
+                item = range.item,
+                start = overlapStart - safeStart,
+                end = overlapEnd - safeStart,
+                tag = range.tag,
+            )
+        } else {
+            null
+        }
+    }
+    return AnnotatedString(
+        text = text.substring(safeStart, safeEnd),
+        spanStyles = adjustedSpans,
+    )
+}
+
+private fun AnnotatedString.withReaderHighlight(highlightedText: String?, highlightColor: Color): AnnotatedString {
+    val quote = highlightedText?.trim().orEmpty()
+    if (quote.isBlank()) {
+        return this
+    }
+    val start = text.indexOf(quote)
+    if (start < 0) {
+        return this
+    }
+    return buildAnnotatedString {
+        append(this@withReaderHighlight)
+        addStyle(
+            style = SpanStyle(background = highlightColor),
+            start = start,
+            end = start + quote.length,
+        )
+    }
+}
+
+internal fun readerMarkdownBlock(
+    rawBlock: String,
+    sourceHref: String? = null,
+    sourceAnchor: String? = null,
+    sourceBlockIndex: Int = 0,
+): ReaderMarkdownBlock {
     val block = rawBlock.trim()
     val fencedCode = Regex("""^```[A-Za-z0-9_-]*\n([\s\S]*?)\n?```$""")
         .matchEntire(block)
@@ -4803,6 +5463,9 @@ internal fun readerMarkdownBlock(rawBlock: String): ReaderMarkdownBlock {
         return ReaderMarkdownBlock(
             text = AnnotatedString(fencedCode.groupValues[1].trim('\n')),
             kind = ReaderMarkdownBlockKind.CODE,
+            sourceHref = sourceHref,
+            sourceAnchor = sourceAnchor,
+            sourceBlockIndex = sourceBlockIndex,
         )
     }
 
@@ -4812,6 +5475,9 @@ internal fun readerMarkdownBlock(rawBlock: String): ReaderMarkdownBlock {
             return ReaderMarkdownBlock(
                 text = parseInlineMarkdown(match.groupValues[2].trim()),
                 kind = ReaderMarkdownBlockKind.HEADING,
+                sourceHref = sourceHref,
+                sourceAnchor = sourceAnchor,
+                sourceBlockIndex = sourceBlockIndex,
             )
         }
 
@@ -4824,6 +5490,9 @@ internal fun readerMarkdownBlock(rawBlock: String): ReaderMarkdownBlock {
                 },
             ),
             kind = ReaderMarkdownBlockKind.QUOTE,
+            sourceHref = sourceHref,
+            sourceAnchor = sourceAnchor,
+            sourceBlockIndex = sourceBlockIndex,
         )
     }
 
@@ -4848,12 +5517,18 @@ internal fun readerMarkdownBlock(rawBlock: String): ReaderMarkdownBlock {
                 },
             ),
             kind = ReaderMarkdownBlockKind.LIST,
+            sourceHref = sourceHref,
+            sourceAnchor = sourceAnchor,
+            sourceBlockIndex = sourceBlockIndex,
         )
     }
 
     return ReaderMarkdownBlock(
         text = parseInlineMarkdown(block),
         kind = ReaderMarkdownBlockKind.BODY,
+        sourceHref = sourceHref,
+        sourceAnchor = sourceAnchor,
+        sourceBlockIndex = sourceBlockIndex,
     )
 }
 
@@ -5195,6 +5870,26 @@ private fun annotationExportStatusText(state: MainUiState): String {
     } ?: "Autosave is not configured"
 }
 
+private fun annotationDriveStatusText(state: MainUiState): String {
+    if (state.isAnnotationDriveSyncing) {
+        return "Syncing annotations"
+    }
+    state.annotationDriveLastError?.takeIf(String::isNotBlank)?.let { error ->
+        return error.removeSuffix(".")
+    }
+    return state.annotationDriveLastSuccessfulAtMillis?.let { timestampMillis ->
+        "Last synced ${annotationUpdatedLabel(timestampMillis)}"
+    } ?: if (state.annotationDriveSyncEnabled) {
+        "Ready to sync"
+    } else {
+        "Uses Google Drive file access only"
+    }
+}
+
+private fun Throwable.googleDriveAuthMessage(): String {
+    return message?.takeIf(String::isNotBlank) ?: "Google Drive authorization failed."
+}
+
 private fun remainingMinutes(totalMinutes: Int, progress: Int): Int {
     return kotlin.math.ceil(totalMinutes * (1 - progress.coerceIn(0, 100) / 100f).toDouble())
         .toInt()
@@ -5290,7 +5985,6 @@ private fun UserDocumentValidationError.displayMessage(): String {
         UserDocumentValidationError.EMPTY_URI -> "Choose a local PDF, Markdown, or EPUB file first."
         UserDocumentValidationError.UNSUPPORTED_FORMAT -> "Use a PDF, .md/.markdown, or EPUB file."
         UserDocumentValidationError.BLANK_TITLE -> "Add a title so the recommendation is easy to recognize."
-        UserDocumentValidationError.INVALID_DURATION -> "Choose an estimated session time from 3 to 20 minutes."
         UserDocumentValidationError.NO_TOPICS -> "Choose at least one topic so the app can rank this file."
     }
 }
@@ -5317,9 +6011,9 @@ private fun documentFormatLabel(candidate: DocumentImportCandidate): String {
 
 private fun ReadingTimeEstimateSource.displayLabel(): String {
     return when (this) {
-        ReadingTimeEstimateSource.EXTRACTED_TEXT -> "auto estimate"
-        ReadingTimeEstimateSource.PDF_DEFAULT -> "PDF default"
-        ReadingTimeEstimateSource.FALLBACK_DEFAULT -> "default estimate"
+        ReadingTimeEstimateSource.EXTRACTED_TEXT -> "auto"
+        ReadingTimeEstimateSource.PDF_DEFAULT -> "PDF"
+        ReadingTimeEstimateSource.FALLBACK_DEFAULT -> "default"
     }
 }
 
@@ -5418,7 +6112,7 @@ private fun releaseDocumentPermission(context: Context, uri: Uri) {
 }
 
 private const val READER_HEADER_ITEM_COUNT = 1
-private const val READER_DEFAULT_PAGE_WEIGHT = 9
+private const val READER_DEFAULT_PAGE_WEIGHT = 18
 private const val MAX_RECENT_PROGRESS_REPLACEMENTS = 3
 private const val RECENT_REPLACEMENTS_DAYS = 7
 private const val PROGRESS_STRIP_DAYS = 21

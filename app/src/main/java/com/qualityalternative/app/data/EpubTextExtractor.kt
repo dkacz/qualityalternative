@@ -1,13 +1,23 @@
 package com.qualityalternative.app.data
 
+import com.qualityalternative.app.domain.model.ReaderDocument
+import com.qualityalternative.app.domain.model.ReaderDocumentBlock
+import com.qualityalternative.app.domain.model.ReaderTocEntry
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
+import java.io.StringReader
 import java.util.zip.ZipInputStream
+import javax.xml.parsers.DocumentBuilderFactory
+import org.w3c.dom.Element
+import org.w3c.dom.Node
+import org.xml.sax.InputSource
 
 object EpubTextExtractor {
     private const val semanticIndentSentinel = "\uE000"
 
-    fun extract(input: InputStream): String {
+    fun extract(input: InputStream): String = extractDocument(input).plainText
+
+    fun extractDocument(input: InputStream): ReaderDocument {
         val entries = readZipEntries(input)
         val opfPath = entries["META-INF/container.xml"]
             ?.toString(Charsets.UTF_8)
@@ -44,16 +54,29 @@ object EpubTextExtractor {
         } else {
             fallbackPaths()
         }
-        val body = readablePaths
-            .mapNotNull { path -> entries[path]?.toString(Charsets.UTF_8) }
-            .map(::htmlToReadableText)
-            .filter(String::isNotBlank)
-            .joinToString(separator = "\n\n")
-            .trim()
-        if (body.isBlank()) {
+        val parsedDocuments = readablePaths.mapNotNull { path ->
+            entries[path]
+                ?.toString(Charsets.UTF_8)
+                ?.let { html -> htmlToReaderDocumentBlocks(html = html, sourceHref = path) }
+        }
+        val blocks = parsedDocuments.flatMap(ParsedSpineDocument::blocks)
+        if (blocks.isEmpty()) {
             throw IllegalArgumentException("EPUB contains no readable text")
         }
-        return body
+        val sourceFirstBlockIndexes = firstBlockIndexesBySource(blocks)
+        val anchorBlockIndexes = anchorBlockIndexesBySource(parsedDocuments)
+        return ReaderDocument(
+            blocks = blocks,
+            tableOfContents = epubTableOfContents(
+                entries = entries,
+                manifestItems = manifestItems,
+                opf = opf,
+                opfBaseDir = baseDir,
+                sourceFirstBlockIndexes = sourceFirstBlockIndexes,
+                anchorBlockIndexes = anchorBlockIndexes,
+                blocks = blocks,
+            ),
+        )
     }
 
     private fun readZipEntries(input: InputStream): Map<String, ByteArray> {
@@ -91,6 +114,30 @@ object EpubTextExtractor {
         val linear: Boolean,
     )
 
+    private data class ParsedSpineDocument(
+        val sourceHref: String,
+        val blocks: List<ReaderDocumentBlock>,
+        val anchorBlockIndexes: Map<String, Int>,
+    )
+
+    private data class AnchorPosition(
+        val anchor: String,
+        val blockIndex: Int,
+    )
+
+    private data class HrefTarget(
+        val href: String,
+        val sourceHref: String,
+        val anchor: String?,
+    )
+
+    private data class RawTocEntry(
+        val title: String,
+        val href: String,
+        val level: Int,
+        val basePath: String,
+    )
+
     private fun manifestItems(opf: String): Map<String, ManifestItem> {
         return Regex("""<item\b[^>]*>""", RegexOption.IGNORE_CASE)
             .findAll(opf)
@@ -125,6 +172,259 @@ object EpubTextExtractor {
                 }
             }
             .toList()
+    }
+
+    private fun spineTocId(opf: String): String? {
+        return Regex("""<spine\b[^>]*\btoc\s*=\s*["']([^"']+)["']""", RegexOption.IGNORE_CASE)
+            .find(opf)
+            ?.groupValues
+            ?.getOrNull(1)
+    }
+
+    private fun htmlToReaderDocumentBlocks(html: String, sourceHref: String): ParsedSpineDocument {
+        val body = bodyFragment(html)
+        val blockTexts = htmlFragmentToReadableText(body).toReaderBlockTexts()
+        val lastBlockIndex = (blockTexts.size - 1).coerceAtLeast(0)
+        val anchors = anchorsInBody(body = body)
+            .map { anchor -> anchor.copy(blockIndex = anchor.blockIndex.coerceIn(0, lastBlockIndex)) }
+        val anchorsByBlock = anchors.groupBy(AnchorPosition::blockIndex)
+        val anchorBlockIndexes = anchors.associate { anchor -> anchor.anchor to anchor.blockIndex }
+        var currentAnchor: String? = null
+        val blocks = blockTexts.mapIndexed { index, text ->
+            anchorsByBlock[index]
+                ?.lastOrNull()
+                ?.let { anchor -> currentAnchor = anchor.anchor }
+            ReaderDocumentBlock(
+                text = text,
+                sourceHref = sourceHref,
+                anchor = currentAnchor,
+                sourceBlockIndex = index,
+            )
+        }
+        return ParsedSpineDocument(
+            sourceHref = sourceHref,
+            blocks = blocks,
+            anchorBlockIndexes = anchorBlockIndexes,
+        )
+    }
+
+    private fun anchorsInBody(body: String): List<AnchorPosition> {
+        return Regex("""<[^>]+\b(?:id|name)\s*=\s*["']([^"']+)["'][^>]*>""", RegexOption.IGNORE_CASE)
+            .findAll(body)
+            .mapNotNull { match ->
+                val anchor = match.groupValues.getOrNull(1)?.trim()?.takeIf(String::isNotBlank)
+                val blockIndex = htmlFragmentToReadableText(body.substring(0, match.range.first))
+                    .toReaderBlockTexts()
+                    .size
+                anchor?.let { AnchorPosition(anchor = it, blockIndex = blockIndex) }
+            }
+            .toList()
+    }
+
+    private fun firstBlockIndexesBySource(blocks: List<ReaderDocumentBlock>): Map<String, Int> {
+        return blocks
+            .mapIndexedNotNull { index, block -> block.sourceHref?.let { sourceHref -> sourceHref to index } }
+            .groupBy({ it.first }, { it.second })
+            .mapValues { (_, indexes) -> indexes.minOrNull() ?: 0 }
+    }
+
+    private fun anchorBlockIndexesBySource(parsedDocuments: List<ParsedSpineDocument>): Map<String, Int> {
+        var globalOffset = 0
+        val indexes = mutableMapOf<String, Int>()
+        parsedDocuments.forEach { document ->
+            document.anchorBlockIndexes.forEach { (anchor, localIndex) ->
+                indexes["${document.sourceHref}#$anchor"] = globalOffset + localIndex
+            }
+            globalOffset += document.blocks.size
+        }
+        return indexes
+    }
+
+    private fun epubTableOfContents(
+        entries: Map<String, ByteArray>,
+        manifestItems: Map<String, ManifestItem>,
+        opf: String,
+        opfBaseDir: String,
+        sourceFirstBlockIndexes: Map<String, Int>,
+        anchorBlockIndexes: Map<String, Int>,
+        blocks: List<ReaderDocumentBlock>,
+    ): List<ReaderTocEntry> {
+        val navItem = manifestItems.values.firstOrNull { item -> "nav" in item.properties }
+        val navEntries = navItem
+            ?.let { item -> normalizePath(opfBaseDir, item.href) }
+            ?.let { navPath ->
+                entries[navPath]
+                    ?.toString(Charsets.UTF_8)
+                    ?.let { navXml -> parseEpub3NavToc(navXml = navXml, navPath = navPath) }
+            }
+            .orEmpty()
+        val rawEntries = navEntries.ifEmpty {
+            val tocId = spineTocId(opf)
+            val ncxItem = tocId?.let(manifestItems::get)
+                ?: manifestItems.values.firstOrNull { item ->
+                    item.mediaType?.equals("application/x-dtbncx+xml", ignoreCase = true) == true ||
+                        item.href.endsWith(".ncx", ignoreCase = true)
+                }
+            ncxItem
+                ?.let { item -> normalizePath(opfBaseDir, item.href) }
+                ?.let { ncxPath ->
+                    entries[ncxPath]
+                        ?.toString(Charsets.UTF_8)
+                        ?.let { ncxXml -> parseEpub2NcxToc(ncxXml = ncxXml, ncxPath = ncxPath) }
+                }
+                .orEmpty()
+        }
+        return rawEntries
+            .mapNotNull { raw ->
+                val target = resolveHref(basePath = raw.basePath, href = raw.href)
+                val blockIndex = blockIndexForHref(
+                    target = target,
+                    sourceFirstBlockIndexes = sourceFirstBlockIndexes,
+                    anchorBlockIndexes = anchorBlockIndexes,
+                )
+                blockIndex?.let {
+                    ReaderTocEntry(
+                        title = raw.title,
+                        href = target.href,
+                        sourceHref = target.sourceHref,
+                        anchor = target.anchor,
+                        blockIndex = it,
+                        level = raw.level,
+                    )
+                }
+            }
+            .ifEmpty { fallbackTocEntries(blocks = blocks) }
+    }
+
+    private fun parseEpub3NavToc(navXml: String, navPath: String): List<RawTocEntry> {
+        val document = parseXml(navXml) ?: return emptyList()
+        val nav = document
+            .elementsByTag("nav")
+            .firstOrNull { element ->
+                val type = element.attributeValue("epub:type").ifBlank { element.attributeValue("type") }
+                type.split(Regex("""\s+""")).any { token -> token.equals("toc", ignoreCase = true) }
+            }
+            ?: document.elementsByTag("nav").firstOrNull()
+            ?: return emptyList()
+        return nav.directChildren("ol")
+            .flatMap { ol -> ol.navListEntries(level = 0, basePath = navPath) }
+    }
+
+    private fun Element.navListEntries(level: Int, basePath: String): List<RawTocEntry> {
+        return directChildren("li").flatMap { item ->
+            val link = item.directChildren("a").firstOrNull()
+            val label = link ?: item.directChildren("span").firstOrNull()
+            val current = link?.attributeValue("href")
+                ?.takeIf(String::isNotBlank)
+                ?.let { href ->
+                    RawTocEntry(
+                        title = label?.textContent?.cleanTocTitle().orEmpty(),
+                        href = href,
+                        level = level,
+                        basePath = basePath,
+                    )
+                }
+                ?.takeIf { entry -> entry.title.isNotBlank() }
+            val nested = item.directChildren("ol")
+                .flatMap { ol -> ol.navListEntries(level = level + 1, basePath = basePath) }
+            listOfNotNull(current) + nested
+        }
+    }
+
+    private fun parseEpub2NcxToc(ncxXml: String, ncxPath: String): List<RawTocEntry> {
+        val document = parseXml(ncxXml) ?: return emptyList()
+        val navMap = document.elementsByTag("navMap").firstOrNull() ?: return emptyList()
+        return navMap.directChildren("navPoint")
+            .flatMap { point -> point.ncxNavPointEntries(level = 0, basePath = ncxPath) }
+    }
+
+    private fun Element.ncxNavPointEntries(level: Int, basePath: String): List<RawTocEntry> {
+        val label = descendantsByTag("navLabel")
+            .firstOrNull()
+            ?.descendantsByTag("text")
+            ?.firstOrNull()
+            ?.textContent
+            ?.cleanTocTitle()
+            .orEmpty()
+        val href = descendantsByTag("content")
+            .firstOrNull()
+            ?.attributeValue("src")
+        val current = href
+            ?.takeIf(String::isNotBlank)
+            ?.let { src ->
+                RawTocEntry(
+                    title = label,
+                    href = src,
+                    level = level,
+                    basePath = basePath,
+                )
+            }
+            ?.takeIf { entry -> entry.title.isNotBlank() }
+        val nested = directChildren("navPoint")
+            .flatMap { point -> point.ncxNavPointEntries(level = level + 1, basePath = basePath) }
+        return listOfNotNull(current) + nested
+    }
+
+    private fun fallbackTocEntries(blocks: List<ReaderDocumentBlock>): List<ReaderTocEntry> {
+        return blocks
+            .mapIndexedNotNull { index, block ->
+                val heading = Regex("""^(#{1,6})\s+(.+)$""")
+                    .matchEntire(block.text.trim())
+                    ?: return@mapIndexedNotNull null
+                val sourceHref = block.sourceHref ?: return@mapIndexedNotNull null
+                val anchor = block.anchor
+                ReaderTocEntry(
+                    title = heading.groupValues[2].trim(),
+                    href = sourceHref + anchor.orEmptyFragment(),
+                    sourceHref = sourceHref,
+                    anchor = anchor,
+                    blockIndex = index,
+                    level = heading.groupValues[1].length - 1,
+                )
+            }
+            .ifEmpty {
+                blocks.firstOrNull()?.sourceHref?.let { sourceHref ->
+                    listOf(
+                        ReaderTocEntry(
+                            title = "Start",
+                            href = sourceHref,
+                            sourceHref = sourceHref,
+                            blockIndex = 0,
+                        ),
+                    )
+                }.orEmpty()
+            }
+    }
+
+    private fun blockIndexForHref(
+        target: HrefTarget,
+        sourceFirstBlockIndexes: Map<String, Int>,
+        anchorBlockIndexes: Map<String, Int>,
+    ): Int? {
+        return target.anchor
+            ?.let { anchor -> anchorBlockIndexes["${target.sourceHref}#$anchor"] }
+            ?: sourceFirstBlockIndexes[target.sourceHref]
+    }
+
+    private fun resolveHref(basePath: String, href: String): HrefTarget {
+        val withoutQuery = href.substringBefore('?')
+        val rawPath = withoutQuery.substringBefore('#')
+        val anchor = withoutQuery.substringAfter('#', missingDelimiterValue = "")
+            .takeIf(String::isNotBlank)
+        val sourceHref = if (rawPath.isBlank()) {
+            basePath.substringBefore('#')
+        } else {
+            normalizePath(basePath.substringBeforeLast('/', missingDelimiterValue = ""), rawPath)
+        }
+        return HrefTarget(
+            href = sourceHref + anchor.orEmptyFragment(),
+            sourceHref = sourceHref,
+            anchor = anchor,
+        )
+    }
+
+    private fun String?.orEmptyFragment(): String {
+        return this?.takeIf(String::isNotBlank)?.let { anchor -> "#$anchor" }.orEmpty()
     }
 
     private fun ManifestItem.isReadableSpineDocument(spineItem: SpineItem): Boolean {
@@ -175,6 +475,71 @@ object EpubTextExtractor {
             ?.getOrNull(1)
     }
 
+    private fun parseXml(xml: String): org.w3c.dom.Document? {
+        return runCatching {
+            val factory = DocumentBuilderFactory.newInstance().apply {
+                isNamespaceAware = false
+                runCatching { setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false) }
+                runCatching { setFeature("http://xml.org/sax/features/external-general-entities", false) }
+                runCatching { setFeature("http://xml.org/sax/features/external-parameter-entities", false) }
+            }
+            factory.newDocumentBuilder().parse(InputSource(StringReader(xml)))
+        }.getOrNull()
+    }
+
+    private fun org.w3c.dom.Document.elementsByTag(name: String): List<Element> {
+        return documentElement?.descendantsByTag(name).orEmpty()
+    }
+
+    private fun Element.descendantsByTag(name: String): List<Element> {
+        val matches = mutableListOf<Element>()
+        fun visit(node: Node) {
+            if (node is Element) {
+                if (node.localTagName().equals(name, ignoreCase = true)) {
+                    matches += node
+                }
+                node.childNodes.asList().forEach(::visit)
+            }
+        }
+        visit(this)
+        return matches
+    }
+
+    private fun Element.directChildren(name: String): List<Element> {
+        return childNodes.asList()
+            .filterIsInstance<Element>()
+            .filter { element -> element.localTagName().equals(name, ignoreCase = true) }
+    }
+
+    private fun Element.attributeValue(name: String): String {
+        if (hasAttribute(name)) {
+            return getAttribute(name).trim()
+        }
+        val localName = name.substringAfter(':')
+        return attributes.asList()
+            .firstOrNull { attribute ->
+                attribute.nodeName.equals(name, ignoreCase = true) ||
+                    attribute.nodeName.substringAfter(':').equals(localName, ignoreCase = true)
+            }
+            ?.nodeValue
+            ?.trim()
+            .orEmpty()
+    }
+
+    private fun Element.localTagName(): String = (localName ?: tagName).substringAfter(':')
+
+    private fun org.w3c.dom.NodeList.asList(): List<Node> {
+        return (0 until length).mapNotNull(::item)
+    }
+
+    private fun org.w3c.dom.NamedNodeMap.asList(): List<Node> {
+        return (0 until length).mapNotNull(::item)
+    }
+
+    private fun String.cleanTocTitle(): String {
+        return replace(Regex("""\s+"""), " ").trim()
+    }
+
     private fun normalizePath(baseDir: String, href: String): String {
         val raw = if (baseDir.isBlank()) href else "$baseDir/$href"
         val parts = raw.replace('\\', '/')
@@ -192,12 +557,19 @@ object EpubTextExtractor {
     }
 
     private fun htmlToReadableText(html: String): String {
-        val body = Regex("""<body\b[^>]*>([\s\S]*?)</body>""", RegexOption.IGNORE_CASE)
+        return htmlFragmentToReadableText(bodyFragment(html))
+    }
+
+    private fun bodyFragment(html: String): String {
+        return Regex("""<body\b[^>]*>([\s\S]*?)</body>""", RegexOption.IGNORE_CASE)
             .find(html)
             ?.groupValues
             ?.getOrNull(1)
             ?: html
-        return body
+    }
+
+    private fun htmlFragmentToReadableText(fragment: String): String {
+        return fragment
             .replace(Regex("""<script\b[\s\S]*?</script>""", RegexOption.IGNORE_CASE), " ")
             .replace(Regex("""<style\b[\s\S]*?</style>""", RegexOption.IGNORE_CASE), " ")
             .replace(Regex("""<svg\b[\s\S]*?</svg>""", RegexOption.IGNORE_CASE), " ")
@@ -209,6 +581,13 @@ object EpubTextExtractor {
             .replace(Regex("""</(p|div|section|article|aside|header|footer|main|figure|figcaption|ul|ol|dl|table|tbody|thead|tr)>""", RegexOption.IGNORE_CASE), "\n\n")
             .toInlineReaderMarkdown(preserveLineBreaks = true)
             .normalizeReaderMarkdown()
+    }
+
+    private fun String.toReaderBlockTexts(): List<String> {
+        return trim()
+            .split(Regex("""\n[ \t\r\f]*\n"""))
+            .map { block -> block.trim() }
+            .filter(String::isNotBlank)
     }
 
     private fun String.replaceHeadings(): String {

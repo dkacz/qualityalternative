@@ -5,12 +5,11 @@ import com.qualityalternative.app.domain.model.ContentAvailability
 import com.qualityalternative.app.domain.model.ContentPriority
 import com.qualityalternative.app.domain.model.ContentSourceType
 import com.qualityalternative.app.domain.model.DistractingApp
-import com.qualityalternative.app.domain.model.DurationBucket
 import com.qualityalternative.app.domain.model.RecommendationSet
 import com.qualityalternative.app.domain.model.RecommendationSignals
 import com.qualityalternative.app.domain.model.TimeOfDayBucket
+import com.qualityalternative.app.domain.model.TopicTag
 import com.qualityalternative.app.domain.model.UserPreferences
-import kotlin.math.abs
 
 class DefaultRecommendationEngine : RecommendationEngine {
     override fun generate(
@@ -42,15 +41,14 @@ class DefaultRecommendationEngine : RecommendationEngine {
                         signals = signals,
                         newestUserDocumentAddedAtMillis = newestUserDocumentAddedAtMillis,
                     ),
-                    durationDistance = abs(item.durationMinutes - preferences.preferredDurationBucket.midpoint),
                     addedAtMillis = item.addedAtMillis ?: Long.MIN_VALUE,
                 )
             }
             .sortedWith(
                 compareByDescending<ScoredCandidate> { it.selectionRank }
                     .thenByDescending { it.score }
+                    .thenBy { it.item.sourceType.primaryTiePriority() }
                     .thenByDescending { it.addedAtMillis }
-                    .thenBy { it.durationDistance }
                     .thenBy { it.item.title },
             )
 
@@ -96,16 +94,13 @@ class DefaultRecommendationEngine : RecommendationEngine {
     ): List<ScoredCandidate> {
         return scoredCandidates
             .filter { candidate ->
-                candidate.item.id != primary.item.id &&
-                    candidate.item.durationMinutes <= primary.item.durationMinutes
+                candidate.item.id != primary.item.id
             }
             .sortedWith(
                 compareByDescending<ScoredCandidate> { it.selectionRank }
                     .thenByDescending { it.score }
                     .thenBy { it.item.sourceType.backupPriority() }
                     .thenByDescending { it.addedAtMillis }
-                    .thenBy { abs(it.item.durationMinutes - DurationBucket.QUICK.midpoint) }
-                    .thenBy { it.durationDistance }
                     .thenBy { it.item.title },
             )
             .take(MAX_BACKUP_OPTIONS)
@@ -126,16 +121,9 @@ class DefaultRecommendationEngine : RecommendationEngine {
         newestUserDocumentAddedAtMillis: Long?,
     ): Int {
         val topicScore = item.topicTags.intersect(preferences.preferredTopics).size * 30
-        val durationScore = if (preferences.preferredDurationBucket.contains(item.durationMinutes)) {
-            100
-        } else {
-            val distance = abs(item.durationMinutes - preferences.preferredDurationBucket.midpoint)
-            maxOf(0, 80 - distance * 8)
-        }
         val completionBoost = item.topicTags.intersect(signals.completedTopics).size * 12
         val skipPenalty = item.topicTags.intersect(signals.skippedTopics).size * 18
         val packBoost = if (item.packId in signals.successfulPackIds) 20 else 0
-        val utilityBoost = if (item.sourceType == ContentSourceType.MEDITATION) 24 else 0
         val priorityBoost = preferences.contentPriority.boostFor(item.sourceType)
         val priorityPickBoost = if (item.id in preferences.priorityContentIds) 96 else 0
         val unfinishedBoost = if (item.id in preferences.unfinishedContentIds) 10_000 else 0
@@ -151,17 +139,12 @@ class DefaultRecommendationEngine : RecommendationEngine {
             0
         }
         val timeOfDayBoost = when (signals.timeOfDay) {
-            TimeOfDayBucket.MORNING -> when {
-                item.durationMinutes <= DurationBucket.QUICK.maxMinutes -> 18
-                item.durationMinutes <= DurationBucket.FOCUS.maxMinutes -> 10
-                else -> 0
-            }
-
-            TimeOfDayBucket.MIDDAY -> if (DurationBucket.FOCUS.contains(item.durationMinutes)) 18 else 4
-            TimeOfDayBucket.EVENING -> if (DurationBucket.DEEP.contains(item.durationMinutes)) 18 else 6
-            TimeOfDayBucket.NIGHT -> if (item.durationMinutes <= DurationBucket.FOCUS.maxMinutes) 14 else 0
+            TimeOfDayBucket.MORNING -> item.topicFitBoost(TopicTag.PRACTICAL, TopicTag.BODY, TopicTag.SCIENCE)
+            TimeOfDayBucket.MIDDAY -> item.topicFitBoost(TopicTag.SCIENCE, TopicTag.TECH, TopicTag.ESSAYS)
+            TimeOfDayBucket.EVENING -> item.topicFitBoost(TopicTag.PHILOSOPHY, TopicTag.FICTION, TopicTag.POETRY)
+            TimeOfDayBucket.NIGHT -> item.topicFitBoost(TopicTag.BODY, TopicTag.PSYCHOLOGY, TopicTag.PHILOSOPHY)
         }
-        return topicScore + durationScore + completionBoost + packBoost + utilityBoost + priorityBoost + priorityPickBoost +
+        return topicScore + completionBoost + packBoost + priorityBoost + priorityPickBoost +
             unfinishedBoost + freshUserDocumentBoost + timeOfDayBoost - skipPenalty
     }
 
@@ -169,7 +152,6 @@ class DefaultRecommendationEngine : RecommendationEngine {
         val item: ContentItem,
         val selectionRank: Int,
         val score: Int,
-        val durationDistance: Int,
         val addedAtMillis: Long,
     )
 
@@ -187,6 +169,10 @@ class DefaultRecommendationEngine : RecommendationEngine {
         }
     }
 
+    private fun ContentSourceType.primaryTiePriority(): Int {
+        return if (this == ContentSourceType.MEDITATION) 1 else 0
+    }
+
     private fun ContentPriority.boostFor(sourceType: ContentSourceType): Int {
         return when (this) {
             ContentPriority.BALANCED -> 0
@@ -195,6 +181,10 @@ class DefaultRecommendationEngine : RecommendationEngine {
             ContentPriority.SAVED_LINKS -> if (sourceType == ContentSourceType.USER_LINK) 48 else 0
             ContentPriority.MEDITATION -> if (sourceType == ContentSourceType.MEDITATION) 48 else 0
         }
+    }
+
+    private fun ContentItem.topicFitBoost(vararg topics: TopicTag): Int {
+        return if (topicTags.any { topic -> topic in topics }) 18 else 4
     }
 
     private companion object {

@@ -104,7 +104,7 @@ When I reach for a distracting app out of habit, help me pause and give me one w
   - user-added links
   - user-owned documents, starting with PDF, Markdown, and EPUB import
   - a lightweight saved queue maintained inside the app
-- Minimal preference capture for topic interests, preferred format, and preferred session length.
+- Minimal preference capture for topic interests and preferred format. Session-length settings may shape a reading segment or reminder, but must not exclude or down-rank long source materials.
 - A simple reader or handoff experience for articles and user-owned documents.
 - Lightweight post-session feedback with two questions.
 - Event logging and analytics needed to evaluate substitution behavior.
@@ -118,13 +118,13 @@ When I reach for a distracting app out of habit, help me pause and give me one w
 - Audio-first replacement sessions.
 - Social surface blocking at the sub-surface level, such as Reels-only or Shorts-only blocking.
 - Full writing-system annotation workflows beyond replacement reading.
-- MVP-supported reader annotations are in scope only when they stay tied to the actively shown text fragment, remain locally manageable, and can optionally export to a user-selected Android document-provider file such as Google Drive.
+- MVP-supported reader annotations are in scope only when they stay tied to actively shown reader text, remain locally manageable, use a portable annotation format, and can sync to a user-authorized Google Drive destination.
 - Team, family, or accountability features.
 - Hard-block mode as the default experience.
 
 ## Primary Use Case
 
-The user taps Instagram on Android during an unplanned idle moment. Instead of entering Instagram immediately, the user sees a brief intervention card. The card shows one recommended essay estimated at 7 minutes, plus a short backup list with lower-commitment alternatives. If an item is already partly read, the intervention shows reading progress and remaining time so the user can continue without extra setup. The user chooses "Read now," spends several minutes in the replacement content, and either never returns to Instagram or returns later with more intention. After the session, the app asks whether the recommendation was a good fit and whether it helped prevent mindless scrolling.
+The user taps Instagram on Android during an unplanned idle moment. Instead of entering Instagram immediately, the user sees a brief intervention card. The card shows one recommended reading segment or utility option, plus a short backup list. A long EPUB or Markdown book can be recommended as the next manageable segment from the user's current position, without being penalized because the whole source is long. If an item is already partly read, the intervention shows reading progress and remaining time so the user can continue without extra setup. The user chooses "Read now," spends several minutes in the replacement content, and either never returns to Instagram or returns later with more intention. After the session, the app asks whether the recommendation was a good fit and whether it helped prevent mindless scrolling.
 
 ## End-to-End User Flow
 
@@ -134,10 +134,11 @@ The user taps Instagram on Android during an unplanned idle moment. Instead of e
 - User grants the required permissions for Android interception.
 - User selects at least three distracting apps from a supported list.
 - User chooses at least three topic interests.
-- User chooses a preferred replacement duration:
+- User may choose a preferred replacement-session target:
   - 3-5 minutes
   - 5-10 minutes
   - 10-20 minutes
+- The target describes the next reading segment or timer length. It is not stored as the duration of imported materials and is not an eligibility filter for recommending long materials.
 - User seeds the system by:
   - selecting at least one editorial starter pack
   - adding at least three links or one user-owned document
@@ -152,9 +153,9 @@ The user taps Instagram on Android during an unplanned idle moment. Instead of e
 
 - The view shows:
   - the app the user attempted to open
-  - one primary recommendation in the user's preferred session-length bucket
-  - a short, bounded backup list of lower-commitment recommendations
-  - estimated time for each recommendation
+  - one primary recommendation selected by topic, priority, freshness, unfinished state, availability, and past feedback rather than whole-source length
+  - a short, bounded backup list
+  - automatically calculated reading-segment time or timer time for each recommendation
   - progress already read and remaining time for unfinished continuation recommendations
   - three actions:
     - Read now
@@ -230,9 +231,11 @@ The system must normalize each piece of replacement content into a small, rankab
   - title
   - source type
   - topic tags
-  - estimated reading or listening time
   - format
+  - automatically computed reading-length metadata when the app has body text
   - availability status
+- User-added or imported materials must not require the user to save a manual reading-time estimate.
+- Long readable materials can be recommended as smaller continuation segments from the current reader position.
 - Each content item can be marked as accepted, skipped, completed, or opened anyway after recommendation.
 - The system excludes previously completed reading items from recommendation slots unless the user manually reactivates that item from the content library.
 - The meditation reset is not library content, does not count as a completed read, and is not hidden by completion state; it remains a standing intervention option.
@@ -245,15 +248,15 @@ The system must choose one primary recommendation and a short, bounded backup li
 
 - The ranking logic uses, at minimum:
   - user topic preferences
-  - preferred session length
   - time of day
   - prior accepts
   - prior skips
   - source availability
+- The ranking logic must not penalize a readable item because the whole source is longer than the user's session target.
 - The system returns exactly one primary recommendation and at least two backups when enough inventory exists.
 - The system may expose additional finite backups in a bounded scrollable list, capped below feed-like scale.
-- The primary recommendation should target the user's selected duration bucket.
-- Backup recommendations should be shorter than or equal to the primary recommendation's estimated length.
+- The primary recommendation may expose the next automatically calculated reading segment length, but the segment length is presentation metadata rather than a whole-source ranking filter.
+- Backup recommendations are ranked by usefulness, priority, unfinished state, freshness, and availability rather than being capped to the primary item's total reading length.
 - If fewer than three suitable items exist, the system still returns at least one recommendation and logs an inventory-shortage event.
 - The intervention flow must not require the user to browse the backup list before making a choice.
 
@@ -295,6 +298,10 @@ The system must deliver a calm replacement session that feels meaningfully diffe
 - If the item is a user-owned Markdown or EPUB document, the user can read it inside the app.
 - If the item is a user-owned PDF, the user can open it through a clearly controlled Android document-viewer fallback.
 - Long-form reader surfaces show reading-position progress that is based on document position, not only elapsed time.
+- The in-app reader is paginated by default. It must not rely on vertical scrolling for active reading.
+- Tapping the page advances to the next page. The Android back gesture or system back action goes to the previous page before leaving the reader.
+- The active reader uses minimal reader chrome: no persistent Previous, Next, or Done buttons; content is the primary surface, with only tiny title/progress/TOC affordances outside the text.
+- EPUB readers expose table-of-contents navigation that jumps to the matching section or nearest available page without turning the reader into a discovery surface.
 - Meditation replacement duration can be adjusted by the user and plays a completion gong.
 - The session avoids recommendation carousels or unrelated content suggestions during active reading.
 - The app can record session duration for analytics.
@@ -306,10 +313,15 @@ The system may let the user capture notes on actively shown reader text without 
 
 #### Acceptance Criteria
 
-- User can add or edit an annotation from a reader fragment.
-- Each annotation stores content identity, fragment position, quoted fragment text, note text, and timestamps.
+- User can add or edit an annotation by long-pressing actively shown text in the reader.
+- Long-press selection starts with the sentence under the press and lets the user adjust the selected range before saving.
+- Annotation creation and editing use an overlay or popup that does not expand the page, enable vertical scrolling, or change pagination.
+- Notes must not be represented as margin icons in the active reading page.
+- Each annotation stores content identity, source title, fragment position, quoted fragment text, selector/range data, note text, and timestamps.
 - User can review annotations in a finite annotation library and return to the source fragment.
-- User can optionally autosave/export annotations to a user-selected Android document-provider file, including a Google Drive file when chosen through Android.
+- User can authorize Google Drive sync for annotations from settings.
+- Drive sync writes one annotation file per annotated source material, with the source title included in the filename.
+- The canonical export format is W3C Web Annotation JSON-LD. EPUB annotations should include an EPUB locator when available, such as an EPUB CFI or stable source-section locator.
 - Annotation export failures are visible and do not lose local annotations.
 
 ### FR9. Delay Behavior
@@ -415,12 +427,12 @@ The MVP should not depend on a large-scale AI recommendation system. Instead, it
 ### Ranking Inputs
 
 - explicit topic preferences
-- preferred session length
 - time of day
 - recent acceptance history
 - recent skip history
 - item completion history
 - source freshness
+- computed reading progress and segment availability for resume/presentation
 
 ### Deliberate Exclusions
 

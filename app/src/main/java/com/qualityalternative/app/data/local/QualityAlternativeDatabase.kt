@@ -16,7 +16,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ReadingProgressEntity::class,
         ReadingAnnotationEntity::class,
     ],
-    version = 9,
+    version = 10,
     exportSchema = true,
 )
 abstract class QualityAlternativeDatabase : RoomDatabase() {
@@ -51,6 +51,7 @@ abstract class QualityAlternativeDatabase : RoomDatabase() {
                     MIGRATION_6_7,
                     MIGRATION_7_8,
                     MIGRATION_8_9,
+                    MIGRATION_9_10,
                 )
                 .build()
         }
@@ -238,7 +239,23 @@ abstract class QualityAlternativeDatabase : RoomDatabase() {
 
         val MIGRATION_8_9 = object : Migration(8, 9) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                createReadingAnnotationsTable(db)
+                createReadingAnnotationsTableV9(db)
+            }
+        }
+
+        val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE reading_annotations ADD COLUMN sourceTitle TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE reading_annotations ADD COLUMN sourceLabel TEXT")
+                db.execSQL("ALTER TABLE reading_annotations ADD COLUMN sourceType TEXT")
+                db.execSQL("ALTER TABLE reading_annotations ADD COLUMN sourceFormat TEXT")
+                db.execSQL("ALTER TABLE reading_annotations ADD COLUMN sourceHref TEXT")
+                db.execSQL("ALTER TABLE reading_annotations ADD COLUMN sourceAnchor TEXT")
+                db.execSQL("ALTER TABLE reading_annotations ADD COLUMN sourceBlockIndex INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE reading_annotations ADD COLUMN textStartOffset INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE reading_annotations ADD COLUMN textEndOffset INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE reading_annotations ADD COLUMN prefixText TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE reading_annotations ADD COLUMN suffixText TEXT NOT NULL DEFAULT ''")
             }
         }
 
@@ -289,7 +306,7 @@ abstract class QualityAlternativeDatabase : RoomDatabase() {
             )
         }
 
-        private fun createReadingAnnotationsTable(db: SupportSQLiteDatabase) {
+        private fun createReadingAnnotationsTableV9(db: SupportSQLiteDatabase) {
             db.execSQL(
                 """
                 CREATE TABLE IF NOT EXISTS reading_annotations (

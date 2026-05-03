@@ -4,6 +4,7 @@ import com.qualityalternative.app.domain.model.ContentAvailability
 import com.qualityalternative.app.domain.model.ContentItem
 import com.qualityalternative.app.domain.model.ContentSourceType
 import com.qualityalternative.app.domain.model.EditorialPack
+import com.qualityalternative.app.domain.model.ReaderDocument
 import com.qualityalternative.app.domain.service.ContentRepository
 import com.qualityalternative.app.domain.service.UserDocumentRepository
 import com.qualityalternative.app.domain.service.UserLinkRepository
@@ -34,6 +35,15 @@ class CompositeContentRepository(
             ContentSourceType.MEDITATION -> item.description
             ContentSourceType.USER_LINK -> item.description
             ContentSourceType.USER_DOCUMENT -> userDocumentRepository.contentBody(item)
+        }
+    }
+
+    override fun readerDocument(item: ContentItem): ReaderDocument {
+        return when (item.sourceType) {
+            ContentSourceType.EDITORIAL -> editorialRepository.readerDocument(item)
+            ContentSourceType.MEDITATION -> ReaderDocument.fromPlainText(item.description)
+            ContentSourceType.USER_LINK -> ReaderDocument.fromPlainText(item.description)
+            ContentSourceType.USER_DOCUMENT -> userDocumentRepository.readerDocument(item)
         }
     }
 

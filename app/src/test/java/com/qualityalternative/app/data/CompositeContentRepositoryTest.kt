@@ -6,6 +6,9 @@ import com.qualityalternative.app.domain.model.ContentItem
 import com.qualityalternative.app.domain.model.ContentSourceType
 import com.qualityalternative.app.domain.model.ContentRightsMetadata
 import com.qualityalternative.app.domain.model.EditorialPack
+import com.qualityalternative.app.domain.model.ReaderDocument
+import com.qualityalternative.app.domain.model.ReaderDocumentBlock
+import com.qualityalternative.app.domain.model.ReaderTocEntry
 import com.qualityalternative.app.domain.model.TopicTag
 import com.qualityalternative.app.domain.model.UserDocumentDraft
 import com.qualityalternative.app.domain.model.UserLinkDraft
@@ -68,6 +71,43 @@ class CompositeContentRepositoryTest {
         assertEquals("Editorial body", repository.contentBody(editorial.inventory().single()))
         assertEquals("Fallback summary", repository.contentBody(userLink))
         assertEquals("Private markdown body", repository.contentBody(userDocument))
+    }
+
+    @Test
+    fun readerDocument_delegatesStructuredUserDocumentWithoutBreakingPlainBodies() {
+        val editorial = FakeEditorialRepository()
+        val userLink = userLink(id = "link-available", description = "Fallback summary")
+        val userDocument = userDocument(id = "doc-available", description = "Document summary")
+        val structuredDocument = ReaderDocument(
+            blocks = listOf(
+                ReaderDocumentBlock(
+                    text = "# Chapter",
+                    sourceHref = "OPS/chapter.xhtml",
+                    anchor = "chapter",
+                ),
+            ),
+            tableOfContents = listOf(
+                ReaderTocEntry(
+                    title = "Chapter",
+                    href = "OPS/chapter.xhtml#chapter",
+                    sourceHref = "OPS/chapter.xhtml",
+                    anchor = "chapter",
+                    blockIndex = 0,
+                ),
+            ),
+        )
+        val repository = CompositeContentRepository(
+            editorialRepository = editorial,
+            userLinkRepository = FakeUserLinkRepository(links = listOf(userLink)),
+            userDocumentRepository = FakeUserDocumentRepository(
+                documents = listOf(userDocument),
+                readerDocument = structuredDocument,
+            ),
+        )
+
+        assertEquals("Editorial body", repository.readerDocument(editorial.inventory().single()).plainText)
+        assertEquals("Fallback summary", repository.readerDocument(userLink).plainText)
+        assertEquals(structuredDocument, repository.readerDocument(userDocument))
     }
 
     @Test
@@ -178,6 +218,7 @@ class CompositeContentRepositoryTest {
     private class FakeUserDocumentRepository(
         private val documents: List<ContentItem>,
         private val body: String = "Document body",
+        private val readerDocument: ReaderDocument = ReaderDocument.fromPlainText(body),
         private val isReady: MutableStateFlow<Boolean> = MutableStateFlow(true),
     ) : UserDocumentRepository {
         override fun userDocuments(): List<ContentItem> = documents
@@ -197,6 +238,8 @@ class CompositeContentRepositoryTest {
         override suspend fun deleteDocument(contentId: String) = Unit
 
         override fun contentBody(item: ContentItem): String = body
+
+        override fun readerDocument(item: ContentItem): ReaderDocument = readerDocument
 
         override fun isReady(): Boolean = isReady.value
 

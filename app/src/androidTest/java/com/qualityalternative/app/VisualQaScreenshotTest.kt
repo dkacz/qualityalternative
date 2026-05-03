@@ -55,6 +55,9 @@ class VisualQaScreenshotTest {
 
     private var scenario: ActivityScenario<MainActivity>? = null
     private val sprint13ScreenshotDirName = "sprint13-completed-unlock-${System.currentTimeMillis()}"
+    private val sprint15ScreenshotDirName = "sprint15-slice15-0-auto-time-${System.currentTimeMillis()}"
+    private val sprint15Slice151ScreenshotDirName = "sprint15-slice15-1-epub-toc-${System.currentTimeMillis()}"
+    private val sprint15Slice152ScreenshotDirName = "sprint15-slice15-2-kindle-toc-${System.currentTimeMillis()}"
     private lateinit var screenshotDir: File
     private lateinit var legacyScreenshotDir: File
     private lateinit var sprint10ScreenshotDir: File
@@ -62,6 +65,9 @@ class VisualQaScreenshotTest {
     private lateinit var sprint12ScreenshotDir: File
     private lateinit var sprint12FinalScreenshotDir: File
     private lateinit var sprint13ScreenshotDir: File
+    private lateinit var sprint15ScreenshotDir: File
+    private lateinit var sprint15Slice151ScreenshotDir: File
+    private lateinit var sprint15Slice152ScreenshotDir: File
 
     @Before
     fun resetAppState() {
@@ -89,6 +95,15 @@ class VisualQaScreenshotTest {
         sprint13ScreenshotDir = File("/sdcard/Download/qualityalternative/$sprint13ScreenshotDirName")
         sprint13ScreenshotDir.deleteRecursively()
         sprint13ScreenshotDir.mkdirs()
+        sprint15ScreenshotDir = File("/sdcard/Download/qualityalternative/$sprint15ScreenshotDirName")
+        sprint15ScreenshotDir.deleteRecursively()
+        sprint15ScreenshotDir.mkdirs()
+        sprint15Slice151ScreenshotDir = File("/sdcard/Download/qualityalternative/$sprint15Slice151ScreenshotDirName")
+        sprint15Slice151ScreenshotDir.deleteRecursively()
+        sprint15Slice151ScreenshotDir.mkdirs()
+        sprint15Slice152ScreenshotDir = File("/sdcard/Download/qualityalternative/$sprint15Slice152ScreenshotDirName")
+        sprint15Slice152ScreenshotDir.deleteRecursively()
+        sprint15Slice152ScreenshotDir.mkdirs()
     }
 
     @After
@@ -141,7 +156,7 @@ class VisualQaScreenshotTest {
         assertScienceReplacementReaderCopyIsDisplayed()
         capture("05c_reader_science_replacement_light")
 
-        composeRule.onNodeWithTag("reader-done").performClick()
+        finishReaderFromCurrentPage()
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("feedback-screen") }
         capture("06_feedback_light")
 
@@ -209,7 +224,7 @@ class VisualQaScreenshotTest {
         assertScienceReplacementReaderCopyIsDisplayed()
         capture("14c_reader_science_replacement_dark")
 
-        composeRule.onNodeWithTag("reader-done").performClick()
+        finishReaderFromCurrentPage()
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("feedback-screen") }
         capture("15_feedback_dark")
 
@@ -258,10 +273,10 @@ class VisualQaScreenshotTest {
         captureSprint10("04_reader_epub_mid_progress_light")
 
         advanceReaderToLastPage()
-        composeRule.onNodeWithTag("reader-done").assertIsDisplayed()
+        composeRule.onNodeWithTag("reader-page-viewport").assertIsDisplayed()
         captureSprint10("05_reader_epub_done_light")
 
-        composeRule.onNodeWithTag("reader-done").performClick()
+        finishReaderFromCurrentPage()
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("feedback-screen") }
         captureSprint10("06_feedback_epub_light")
 
@@ -375,9 +390,9 @@ class VisualQaScreenshotTest {
         composeRule.onNodeWithText("Chapter Two").assertIsDisplayed()
         captureSprint10("13a_reader_epub_mid_progress_dark")
         advanceReaderToLastPage()
-        composeRule.onNodeWithTag("reader-done").assertIsDisplayed()
+        composeRule.onNodeWithTag("reader-page-viewport").assertIsDisplayed()
         captureSprint10("13b_reader_epub_done_dark")
-        composeRule.onNodeWithTag("reader-done").performClick()
+        finishReaderFromCurrentPage()
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("feedback-screen") }
         captureSprint10("13e_feedback_epub_dark")
         composeRule.onNodeWithText("Skip").performClick()
@@ -1040,7 +1055,7 @@ class VisualQaScreenshotTest {
         composeRule.onNodeWithText("Read this", substring = true).performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
         val completedContent = currentContentIdAndTitle()
-        composeRule.onNodeWithTag("reader-done").performClick()
+        finishReaderFromCurrentPage()
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("feedback-screen") }
 
         scenario?.onActivity { activity -> activity.mainViewModel.openLibrary() }
@@ -1112,6 +1127,128 @@ class VisualQaScreenshotTest {
         captureSprint13("08_open_anyway_unlocked_home_dark")
     }
 
+    @Test
+    fun captureSprint15AutoTimeImportScreens() {
+        launchOnboardedApp()
+
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.prepareUserDocumentBatchImport(
+                candidates = listOf(
+                    DocumentImportCandidate(
+                        uri = "content://visual/deep-book",
+                        displayName = "deep-book.epub",
+                        mimeType = "application/epub+zip",
+                        title = "Deep book",
+                        durationMinutes = "20",
+                        format = ContentFormat.EPUB,
+                        estimateSource = ReadingTimeEstimateSource.EXTRACTED_TEXT,
+                        estimatedWordCount = 12_000,
+                    ),
+                    DocumentImportCandidate(
+                        uri = "content://visual/short-notes",
+                        displayName = "short-notes.md",
+                        mimeType = "text/markdown",
+                        title = "Short notes",
+                        durationMinutes = "3",
+                        format = ContentFormat.MARKDOWN,
+                        estimateSource = ReadingTimeEstimateSource.EXTRACTED_TEXT,
+                        estimatedWordCount = 420,
+                    ),
+                ),
+            )
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("add-document-screen") }
+        composeRule.onNodeWithText("Estimated session").assertDoesNotExist()
+        captureSprint15("01_auto_time_import_light")
+
+        composeRule.onNodeWithTag("add-document-topic-SCIENCE")
+            .performScrollTo()
+            .performClick()
+        composeRule.onNodeWithTag("add-document-priority")
+            .performScrollTo()
+            .performClick()
+        captureSprint15("02_auto_time_priority_light")
+
+        scenario?.onActivity { activity -> activity.mainViewModel.selectThemeMode(AppThemeMode.DARK) }
+        composeRule.waitForIdle()
+        captureSprint15("03_auto_time_priority_dark")
+    }
+
+    @Test
+    fun captureSprint15EpubStructuredDocumentSmokeScreens() {
+        launchOnboardedApp()
+        val content = seedUserEpubSelection(title = "Structured EPUB TOC Fixture", fileName = "structured-toc.epub")
+
+        scenario?.onActivity { activity -> activity.mainViewModel.openLibraryItem(content) }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
+        composeRule.onNodeWithText("Structured EPUB TOC Fixture").assertIsDisplayed()
+        composeRule.onNodeWithText("Structured EPUB Notes").assertIsDisplayed()
+        composeRule.onNodeWithText("First EPUB bullet with bold text", substring = true).assertIsDisplayed()
+        assertTrue("Raw EPUB bold markers should not be visible", !hasNodeContaining("**bold**"))
+        captureSprint15Slice151("01_epub_structured_reader_light")
+
+        advanceReaderToText("Chapter Two")
+        composeRule.onNodeWithText("Chapter Two").assertIsDisplayed()
+        captureSprint15Slice151("02_epub_structured_reader_mid_light")
+
+        scenario?.onActivity { activity -> activity.mainViewModel.selectThemeMode(AppThemeMode.DARK) }
+        composeRule.waitForIdle()
+        captureSprint15Slice151("03_epub_structured_reader_mid_dark")
+    }
+
+    @Test
+    fun captureSprint15KindlePagingAndTocScreens() {
+        launchOnboardedApp()
+        val content = seedUserEpubSelection(title = "Kindle Paging EPUB", fileName = "kindle-paging-toc.epub")
+
+        scenario?.onActivity { activity -> activity.mainViewModel.openLibraryItem(content) }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
+        composeRule.onNodeWithTag("reader-page-viewport").assertIsDisplayed()
+        composeRule.onNodeWithTag("reader-toc-open").assertIsDisplayed()
+        composeRule.onNodeWithText("Chapter One").assertIsDisplayed()
+        captureSprint15Slice152("01_page_one_fixed_viewport_light")
+
+        composeRule.onNodeWithTag("reader-list").performTouchInput { swipeUp() }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("Chapter One").assertIsDisplayed()
+        captureSprint15Slice152("02_swipe_does_not_scroll_reader_light")
+
+        composeRule.onNodeWithTag("reader-page-viewport").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasNodeContaining("2/") }
+        captureSprint15Slice152("03_tap_advances_page_light")
+
+        UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).pressBack()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasNodeContaining("1/") && hasNode("Chapter One") }
+        composeRule.onNodeWithTag("reader-toc-open").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-toc-sheet") }
+        captureSprint15Slice152("04_contents_sheet_light")
+
+        val chapterTwoIndex = readerTocEntryIndex("Chapter Two")
+        composeRule.onNodeWithTag("reader-toc-entry-$chapterTwoIndex")
+            .assertIsDisplayed()
+            .performSemanticsAction(SemanticsActions.OnClick)
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasNodeContaining("second chapter keeps") && !hasTag("reader-toc-sheet")
+        }
+        captureSprint15Slice152("05_toc_jump_chapter_two_light")
+
+        advanceReaderToTextContaining("private to the device")
+        composeRule.onNodeWithText("private to the device", substring = true).assertIsDisplayed()
+        captureSprint15Slice152("06_chapter_two_continuation_light")
+
+        advanceReaderToTextContaining("Long single paragraph starts")
+        composeRule.onNodeWithText("Long single paragraph starts", substring = true).assertIsDisplayed()
+        captureSprint15Slice152("07_long_single_paragraph_start_light")
+
+        advanceReaderToTextContaining("Long single paragraph ends")
+        composeRule.onNodeWithText("Long single paragraph ends", substring = true).assertIsDisplayed()
+        captureSprint15Slice152("08_long_single_paragraph_end_light")
+
+        scenario?.onActivity { activity -> activity.mainViewModel.selectThemeMode(AppThemeMode.DARK) }
+        composeRule.waitForIdle()
+        captureSprint15Slice152("09_long_single_paragraph_end_dark")
+    }
+
     private fun capture(name: String) {
         captureTo(screenshotDir, name)
     }
@@ -1138,6 +1275,18 @@ class VisualQaScreenshotTest {
 
     private fun captureSprint13(name: String) {
         captureTo(sprint13ScreenshotDir, name)
+    }
+
+    private fun captureSprint15(name: String) {
+        captureTo(sprint15ScreenshotDir, name)
+    }
+
+    private fun captureSprint15Slice151(name: String) {
+        captureTo(sprint15Slice151ScreenshotDir, name)
+    }
+
+    private fun captureSprint15Slice152(name: String) {
+        captureTo(sprint15Slice152ScreenshotDir, name)
     }
 
     private fun captureTo(directory: File, name: String) {
@@ -1172,7 +1321,7 @@ class VisualQaScreenshotTest {
         assertAttentionClassicsReaderCopyIsDisplayed()
         captureLegacy("04_reader_attention_light")
 
-        composeRule.onNodeWithTag("reader-done").performClick()
+        finishReaderFromCurrentPage()
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("feedback-screen") }
         captureLegacy("05_feedback_light")
 
@@ -1581,33 +1730,44 @@ class VisualQaScreenshotTest {
             if (hasNode(text)) {
                 return
             }
-            runCatching {
-                composeRule.onNodeWithTag("reader-list")
-                    .performScrollToNode(hasText(text))
-            }
-            if (hasNode(text)) {
+            advanceReaderPage()
+        }
+    }
+
+    private fun advanceReaderToTextContaining(text: String, maxPages: Int = 12) {
+        repeat(maxPages) {
+            if (hasNodeContaining(text)) {
                 return
             }
-            if (hasNode("Last page")) {
-                return
-            }
-            composeRule.onNodeWithTag("reader-next-page")
-                .assertIsDisplayed()
-                .performClick()
-            composeRule.waitForIdle()
+            advanceReaderPage()
         }
     }
 
     private fun advanceReaderToLastPage(maxPages: Int = 20) {
         repeat(maxPages) {
-            if (hasNode("Last page")) {
+            if (hasNodeContaining("100%")) {
                 return
             }
-            composeRule.onNodeWithTag("reader-next-page")
-                .assertIsDisplayed()
-                .performClick()
+            advanceReaderPage()
+        }
+    }
+
+    private fun advanceReaderPage() {
+        composeRule.onNodeWithTag("reader-page-viewport")
+            .assertIsDisplayed()
+            .performSemanticsAction(SemanticsActions.OnClick)
+        composeRule.waitForIdle()
+    }
+
+    private fun finishReaderFromCurrentPage(maxTaps: Int = 20) {
+        repeat(maxTaps) {
+            if (hasTag("feedback-screen")) {
+                return
+            }
+            advanceReaderPage()
             composeRule.waitForIdle()
         }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("feedback-screen") }
     }
 
     private fun seedMeditationSelection() = runBlocking {
@@ -1661,6 +1821,7 @@ class VisualQaScreenshotTest {
                 selectedPackIds = emptySet(),
             ),
         )
+        (result as AddUserDocumentResult.Added).item
     }
 
     private fun seedUserMarkdownSelection(
@@ -1822,6 +1983,7 @@ class VisualQaScreenshotTest {
                   <p>The replacement loop should still feel finite here: one document, one reader, one completion path.</p>
                   <p>No feed, no browsing shelf, and no accidental discovery surface should appear between the user and the next paragraph.</p>
                   <p>The imported EPUB is private to the device, but the visual standard should match the shared renderable readings.</p>
+                  <p>Long single paragraph starts with one deliberately oversized paragraph that should never be clipped by a fixed no-scroll page. It keeps adding plain reader prose so the pagination code has to split a single source block into more than one reachable page. The middle of this paragraph describes a user reading a private EPUB with no feed, no toolbar, and no vertical scrolling, while the words continue past the height that previously caused risk. The sentence keeps going with enough ordinary language to require another page turn, proving that the reader can preserve all text even when a source file uses very long paragraphs instead of short blocks. Long single paragraph ends after the continuation has been shown on a later reader page.</p>
                 </body></html>
             """.trimIndent(),
             "OPS/chapter3.xhtml" to """
@@ -1872,7 +2034,10 @@ class VisualQaScreenshotTest {
         )
 
         assertTrue("Expected an Attention Classics title in the reader", titles.any(::hasNode))
-        assertTrue("Expected an author-facing source label in the reader", authors.any(::hasNodeContaining))
+        assertTrue(
+            "Reader should keep the content surface minimal instead of showing author labels as extra chrome",
+            authors.none(::hasNodeContaining),
+        )
         assertTrue("Reader should not show provenance-heavy Project Gutenberg label", !hasNodeContaining("Project Gutenberg"))
     }
 
@@ -1902,7 +2067,10 @@ class VisualQaScreenshotTest {
         )
 
         assertTrue("Expected a public-domain v2 title in the reader", titles.any(::hasNode))
-        assertTrue("Expected an author-facing source label in the reader", authors.any(::hasNodeContaining))
+        assertTrue(
+            "Reader should keep public-domain v2 pages minimal instead of showing author labels as extra chrome",
+            authors.none(::hasNodeContaining),
+        )
         assertTrue("Reader should not show provenance-heavy Project Gutenberg label", !hasNodeContaining("Project Gutenberg"))
     }
 
@@ -1916,7 +2084,10 @@ class VisualQaScreenshotTest {
         val authors = listOf("Plato", "Seneca", "Epictetus", "Cicero")
 
         assertTrue("Expected a real philosophy starter title in the reader", titles.any(::hasNode))
-        assertTrue("Expected a public-domain philosophy source label in the reader", authors.any(::hasNodeContaining))
+        assertTrue(
+            "Reader should keep philosophy pages minimal instead of showing author labels as extra chrome",
+            authors.none(::hasNodeContaining),
+        )
         assertTrue("Reader should not show the old editorial placeholder label", !hasNodeContaining("Quality Alternative Editorial"))
         assertTrue("Reader should not show provenance-heavy Project Gutenberg label", !hasNodeContaining("Project Gutenberg"))
     }
@@ -1930,7 +2101,10 @@ class VisualQaScreenshotTest {
         val authors = listOf("Michael Faraday", "John Tyndall", "William James")
 
         assertTrue("Expected a real science starter title in the reader", titles.any(::hasNode))
-        assertTrue("Expected a public-domain science source label in the reader", authors.any(::hasNodeContaining))
+        assertTrue(
+            "Reader should keep science pages minimal instead of showing author labels as extra chrome",
+            authors.none(::hasNodeContaining),
+        )
         assertTrue("Reader should not show the old editorial placeholder label", !hasNodeContaining("Quality Alternative Editorial"))
         assertTrue("Reader should not show provenance-heavy Project Gutenberg label", !hasNodeContaining("Project Gutenberg"))
     }
@@ -1945,7 +2119,10 @@ class VisualQaScreenshotTest {
 
     private fun assertSprint9RenderableReaderCopyIsDisplayed() {
         composeRule.onNodeWithText("Five Minutes of Nonsense").assertIsDisplayed()
-        assertTrue("Expected Sprint 9 renderable source label", hasNodeContaining("Edward Lear"))
+        assertTrue(
+            "Reader should keep the Sprint 9 renderable page minimal instead of showing author labels as extra chrome",
+            !hasNodeContaining("Edward Lear"),
+        )
         assertTrue("Expected Sprint 9 reader body text", hasNodeContaining("There was an Old Derry down Derry"))
         assertTrue("Reader should not show source boilerplate", !hasNodeContaining("Project Gutenberg"))
         assertTrue("Reader should not show producer boilerplate", !hasNodeContaining("Produced by"))
@@ -1953,7 +2130,7 @@ class VisualQaScreenshotTest {
 
     private fun assertSprint9DarwinReaderCopyIsDisplayed() {
         composeRule.onNodeWithText("Plants That Hunt").assertIsDisplayed()
-        assertTrue("Expected Darwin source label", hasNodeContaining("Charles Darwin"))
+        assertTrue("Darwin reader should keep author labels out of minimal reader chrome", !hasNodeContaining("Charles Darwin"))
         assertTrue("Expected Darwin body text", hasNodeContaining("During the summer of 1860"))
         assertTrue("Darwin reader should not show bibliography footnote", !hasNodeContaining("bibliography of Drosera"))
         assertTrue("Darwin reader should not show figure-list text", !hasNodeContaining("FIG. 1"))
@@ -1961,7 +2138,7 @@ class VisualQaScreenshotTest {
 
     private fun assertSprint9FiguierReaderCopyIsDisplayed() {
         composeRule.onNodeWithText("The Sea as a World").assertIsDisplayed()
-        assertTrue("Expected Figuier source label", hasNodeContaining("Louis Figuier"))
+        assertTrue("Figuier reader should keep author labels out of minimal reader chrome", !hasNodeContaining("Louis Figuier"))
         assertTrue("Expected Figuier body text", hasNodeContaining("living wonders of the deep"))
         assertTrue("Figuier reader should not show book-purpose framing", !hasNodeContaining("It is proposed in"))
         assertTrue("Figuier reader should not show title-page framing", !hasNodeContaining("Title-page"))
@@ -1969,7 +2146,7 @@ class VisualQaScreenshotTest {
 
     private fun assertSprint9FabreFlyReaderCopyIsDisplayed() {
         composeRule.onNodeWithText("The Fly Under Attention").assertIsDisplayed()
-        assertTrue("Expected Fabre source label", hasNodeContaining("Jean-Henri Fabre"))
+        assertTrue("Fabre reader should keep author labels out of minimal reader chrome", !hasNodeContaining("Jean-Henri Fabre"))
         assertTrue("Expected fly-specific body text", hasNodeContaining("flies that glitter"))
         assertTrue("Fabre fly reader should not show laboratory mismatch", !hasNodeContaining("long-wished-for laboratory"))
         assertTrue("Fabre fly reader should not show harmas mismatch", !hasNodeContaining("hoc erat in votis"))
@@ -2015,6 +2192,18 @@ class VisualQaScreenshotTest {
         assertTrue("Expected current content id", id.isNotBlank())
         assertTrue("Expected current content title", title.isNotBlank())
         return id to title
+    }
+
+    private fun readerTocEntryIndex(title: String): Int {
+        var entryIndex = -1
+        scenario?.onActivity { activity ->
+            entryIndex = activity.mainViewModel.uiState.currentReaderDocument
+                ?.tableOfContents
+                ?.indexOfFirst { entry -> entry.title == title }
+                ?: -1
+        }
+        assertTrue("Expected TOC entry for $title", entryIndex >= 0)
+        return entryIndex
     }
 
     private fun assertNodeFullyWithinRoot(tag: String) {

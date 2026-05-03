@@ -470,6 +470,230 @@ class EpubTextExtractorTest {
         )
     }
 
+    @Test
+    fun extractDocumentParsesEpub3NavTocAndMapsAnchorsToBlocks() {
+        val epub = epubBytes(
+            "META-INF/container.xml" to """
+                <container><rootfiles><rootfile full-path="OPS/package.opf"/></rootfiles></container>
+            """.trimIndent(),
+            "OPS/package.opf" to """
+                <package>
+                  <manifest>
+                    <item id="nav" href="nav/nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
+                    <item id="chapter-one" href="chapter1.xhtml" media-type="application/xhtml+xml"/>
+                    <item id="chapter-two" href="chapter2.xhtml" media-type="application/xhtml+xml"/>
+                  </manifest>
+                  <spine>
+                    <itemref idref="chapter-one"/>
+                    <itemref idref="chapter-two"/>
+                  </spine>
+                </package>
+            """.trimIndent(),
+            "OPS/nav/nav.xhtml" to """
+                <html xmlns:epub="http://www.idpf.org/2007/ops">
+                  <body>
+                    <nav epub:type="toc">
+                      <ol>
+                        <li><a href="../chapter1.xhtml#start">Start Here</a></li>
+                        <li><a href="../chapter2.xhtml#second">Second Chapter</a></li>
+                      </ol>
+                    </nav>
+                  </body>
+                </html>
+            """.trimIndent(),
+            "OPS/chapter1.xhtml" to """
+                <html><body><h1 id="start">Opening</h1><p>Begin deliberately.</p></body></html>
+            """.trimIndent(),
+            "OPS/chapter2.xhtml" to """
+                <html><body><section id="second"><h1>Second</h1><p>Continue deliberately.</p></section></body></html>
+            """.trimIndent(),
+        )
+
+        val document = EpubTextExtractor.extractDocument(ByteArrayInputStream(epub))
+
+        assertEquals(
+            listOf("Start Here", "Second Chapter"),
+            document.tableOfContents.map { entry -> entry.title },
+        )
+        assertEquals("OPS/chapter1.xhtml", document.tableOfContents[0].sourceHref)
+        assertEquals("start", document.tableOfContents[0].anchor)
+        assertEquals(0, document.tableOfContents[0].blockIndex)
+        assertEquals("OPS/chapter2.xhtml", document.tableOfContents[1].sourceHref)
+        assertEquals("second", document.tableOfContents[1].anchor)
+        assertEquals(2, document.tableOfContents[1].blockIndex)
+        assertEquals("OPS/chapter2.xhtml", document.blocks[2].sourceHref)
+        assertEquals("second", document.blocks[2].anchor)
+    }
+
+    @Test
+    fun extractDocumentKeepsEpub3GroupedNavParentOutOfTocWhenItHasNoDirectHref() {
+        val epub = epubBytes(
+            "META-INF/container.xml" to """
+                <container><rootfiles><rootfile full-path="OPS/package.opf"/></rootfiles></container>
+            """.trimIndent(),
+            "OPS/package.opf" to """
+                <package>
+                  <manifest>
+                    <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
+                    <item id="chapter-one" href="chapter1.xhtml" media-type="application/xhtml+xml"/>
+                    <item id="chapter-two" href="chapter2.xhtml" media-type="application/xhtml+xml"/>
+                  </manifest>
+                  <spine>
+                    <itemref idref="chapter-one"/>
+                    <itemref idref="chapter-two"/>
+                  </spine>
+                </package>
+            """.trimIndent(),
+            "OPS/nav.xhtml" to """
+                <html xmlns:epub="http://www.idpf.org/2007/ops">
+                  <body>
+                    <nav epub:type="toc">
+                      <ol>
+                        <li>
+                          <span>Part I</span>
+                          <ol>
+                            <li><a href="chapter1.xhtml">Chapter One</a></li>
+                            <li><a href="chapter2.xhtml">Chapter Two</a></li>
+                          </ol>
+                        </li>
+                      </ol>
+                    </nav>
+                  </body>
+                </html>
+            """.trimIndent(),
+            "OPS/chapter1.xhtml" to "<html><body><h1>One</h1><p>First body.</p></body></html>",
+            "OPS/chapter2.xhtml" to "<html><body><h1>Two</h1><p>Second body.</p></body></html>",
+        )
+
+        val document = EpubTextExtractor.extractDocument(ByteArrayInputStream(epub))
+
+        assertEquals(listOf("Chapter One", "Chapter Two"), document.tableOfContents.map { entry -> entry.title })
+        assertEquals(listOf(1, 1), document.tableOfContents.map { entry -> entry.level })
+        assertEquals(listOf(0, 2), document.tableOfContents.map { entry -> entry.blockIndex })
+    }
+
+    @Test
+    fun extractDocumentParsesEpub2NcxToc() {
+        val epub = epubBytes(
+            "META-INF/container.xml" to """
+                <container><rootfiles><rootfile full-path="OPS/package.opf"/></rootfiles></container>
+            """.trimIndent(),
+            "OPS/package.opf" to """
+                <package>
+                  <manifest>
+                    <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>
+                    <item id="chapter-one" href="chapter1.xhtml" media-type="application/xhtml+xml"/>
+                    <item id="chapter-two" href="chapter2.xhtml" media-type="application/xhtml+xml"/>
+                  </manifest>
+                  <spine toc="ncx">
+                    <itemref idref="chapter-one"/>
+                    <itemref idref="chapter-two"/>
+                  </spine>
+                </package>
+            """.trimIndent(),
+            "OPS/toc.ncx" to """
+                <ncx>
+                  <navMap>
+                    <navPoint id="navPoint-1">
+                      <navLabel><text>Chapter One</text></navLabel>
+                      <content src="chapter1.xhtml#intro"/>
+                      <navPoint id="navPoint-1-1">
+                        <navLabel><text>First Section</text></navLabel>
+                        <content src="chapter1.xhtml#first-section"/>
+                      </navPoint>
+                    </navPoint>
+                    <navPoint id="navPoint-2">
+                      <navLabel><text>Chapter Two</text></navLabel>
+                      <content src="chapter2.xhtml"/>
+                    </navPoint>
+                  </navMap>
+                </ncx>
+            """.trimIndent(),
+            "OPS/chapter1.xhtml" to """
+                <html><body><h1 id="intro">Intro</h1><p id="first-section">First section body.</p></body></html>
+            """.trimIndent(),
+            "OPS/chapter2.xhtml" to """
+                <html><body><h1>Second</h1><p>Second body.</p></body></html>
+            """.trimIndent(),
+        )
+
+        val document = EpubTextExtractor.extractDocument(ByteArrayInputStream(epub))
+
+        assertEquals(
+            listOf("Chapter One", "First Section", "Chapter Two"),
+            document.tableOfContents.map { entry -> entry.title },
+        )
+        assertEquals(listOf(0, 1, 0), document.tableOfContents.map { entry -> entry.level })
+        assertEquals("intro", document.tableOfContents[0].anchor)
+        assertEquals(0, document.tableOfContents[0].blockIndex)
+        assertEquals("first-section", document.tableOfContents[1].anchor)
+        assertEquals(1, document.tableOfContents[1].blockIndex)
+        assertEquals("OPS/chapter2.xhtml", document.tableOfContents[2].sourceHref)
+        assertEquals(2, document.tableOfContents[2].blockIndex)
+    }
+
+    @Test
+    fun extractDocumentFallsBackToHeadingTocWhenPackageHasNoToc() {
+        val epub = epubBytes(
+            "META-INF/container.xml" to """
+                <container><rootfiles><rootfile full-path="OPS/package.opf"/></rootfiles></container>
+            """.trimIndent(),
+            "OPS/package.opf" to """
+                <package>
+                  <manifest>
+                    <item id="chapter-one" href="chapter1.xhtml" media-type="application/xhtml+xml"/>
+                    <item id="chapter-two" href="chapter2.xhtml" media-type="application/xhtml+xml"/>
+                  </manifest>
+                  <spine>
+                    <itemref idref="chapter-one"/>
+                    <itemref idref="chapter-two"/>
+                  </spine>
+                </package>
+            """.trimIndent(),
+            "OPS/chapter1.xhtml" to "<html><body><h1 id=\"one\">One</h1><p>First body.</p></body></html>",
+            "OPS/chapter2.xhtml" to "<html><body><h2 id=\"two\">Two</h2><p>Second body.</p></body></html>",
+        )
+
+        val document = EpubTextExtractor.extractDocument(ByteArrayInputStream(epub))
+
+        assertEquals(listOf("One", "Two"), document.tableOfContents.map { entry -> entry.title })
+        assertEquals(listOf(0, 1), document.tableOfContents.map { entry -> entry.level })
+        assertEquals(listOf(0, 2), document.tableOfContents.map { entry -> entry.blockIndex })
+        assertEquals("OPS/chapter1.xhtml#one", document.tableOfContents[0].href)
+        assertEquals("OPS/chapter2.xhtml#two", document.tableOfContents[1].href)
+    }
+
+    @Test
+    fun extractDocumentMapsTocHrefToNearestSourceBlockWhenAnchorIsUnavailable() {
+        val epub = epubBytes(
+            "META-INF/container.xml" to """
+                <container><rootfiles><rootfile full-path="OPS/package.opf"/></rootfiles></container>
+            """.trimIndent(),
+            "OPS/package.opf" to """
+                <package>
+                  <manifest>
+                    <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
+                    <item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/>
+                  </manifest>
+                  <spine><itemref idref="chapter"/></spine>
+                </package>
+            """.trimIndent(),
+            "OPS/nav.xhtml" to """
+                <html xmlns:epub="http://www.idpf.org/2007/ops">
+                  <body><nav epub:type="toc"><ol><li><a href="chapter.xhtml#missing">Missing Anchor</a></li></ol></nav></body>
+                </html>
+            """.trimIndent(),
+            "OPS/chapter.xhtml" to "<html><body><h1>Chapter</h1><p>Readable body.</p></body></html>",
+        )
+
+        val document = EpubTextExtractor.extractDocument(ByteArrayInputStream(epub))
+
+        assertEquals("Missing Anchor", document.tableOfContents.single().title)
+        assertEquals("missing", document.tableOfContents.single().anchor)
+        assertEquals(0, document.tableOfContents.single().blockIndex)
+        assertEquals("OPS/chapter.xhtml", document.tableOfContents.single().sourceHref)
+    }
+
     @Test(expected = IllegalArgumentException::class)
     fun extractThrowsWhenPackageDocumentIsMissing() {
         val epub = epubBytes("OPS/chapter.xhtml" to "<html><body><p>Lost.</p></body></html>")

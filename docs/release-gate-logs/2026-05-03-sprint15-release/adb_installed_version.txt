@@ -1,0 +1,2 @@
+    versionCode=12 minSdk=29 targetSdk=36
+    versionName=0.8.0-alpha

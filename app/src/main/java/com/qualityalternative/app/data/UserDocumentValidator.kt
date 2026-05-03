@@ -20,9 +20,6 @@ object UserDocumentValidator {
         if (draft.title.isBlank()) {
             errors += UserDocumentValidationError.BLANK_TITLE
         }
-        if (draft.durationMinutes !in 3..20) {
-            errors += UserDocumentValidationError.INVALID_DURATION
-        }
         if (draft.topicTags.isEmpty()) {
             errors += UserDocumentValidationError.NO_TOPICS
         }

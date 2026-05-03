@@ -6,7 +6,10 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.qualityalternative.app.data.local.QualityAlternativeDatabase
 import com.qualityalternative.app.domain.model.AnalyticsEvent
 import com.qualityalternative.app.domain.model.AnalyticsEventType
+import com.qualityalternative.app.domain.model.ContentFormat
+import com.qualityalternative.app.domain.model.ContentSourceType
 import com.qualityalternative.app.domain.model.ReadingAnnotationDraft
+import com.qualityalternative.app.domain.model.ReadingAnnotationSelector
 import com.qualityalternative.app.domain.service.AnalyticsTracker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -46,23 +49,44 @@ class RoomReadingAnnotationRepositoryTest {
                 )
                 repository.observeReady().first { it }
 
-                val created = repository.saveAnnotation(
-                    draft = ReadingAnnotationDraft(
-                        contentId = "content-1",
-                        paragraphIndex = 3,
-                        quotedText = "A sentence worth keeping.",
-                        noteText = "Connect this to the impulse loop.",
-                    ),
-                    nowMillis = 1_000L,
-                )
+	                val created = repository.saveAnnotation(
+	                    draft = ReadingAnnotationDraft(
+	                        contentId = "content-1",
+	                        paragraphIndex = 3,
+	                        quotedText = "A sentence worth keeping.",
+	                        noteText = "Connect this to the impulse loop.",
+	                        sourceTitle = "Private EPUB",
+	                        sourceLabel = "private.epub",
+	                        sourceType = ContentSourceType.USER_DOCUMENT,
+	                        sourceFormat = ContentFormat.EPUB,
+	                        selector = ReadingAnnotationSelector(
+	                            sourceHref = "EPUB/chapter-1.xhtml",
+	                            sourceAnchor = "start",
+	                            sourceBlockIndex = 4,
+	                            textStartOffset = 21,
+	                            textEndOffset = 47,
+	                            prefixText = "Before",
+	                            suffixText = "After",
+	                        ),
+	                    ),
+	                    nowMillis = 1_000L,
+	                )
 
                 assertEquals("annotation-1", created.id)
                 assertEquals("content-1", created.contentId)
                 assertEquals(3, created.paragraphIndex)
                 assertEquals("A sentence worth keeping.", created.quotedText)
-                assertEquals("Connect this to the impulse loop.", created.noteText)
-                assertEquals(1_000L, created.createdAtMillis)
-                assertEquals(1_000L, created.updatedAtMillis)
+	                assertEquals("Connect this to the impulse loop.", created.noteText)
+	                assertEquals(1_000L, created.createdAtMillis)
+	                assertEquals(1_000L, created.updatedAtMillis)
+	                assertEquals("Private EPUB", created.sourceTitle)
+	                assertEquals(ContentSourceType.USER_DOCUMENT, created.sourceType)
+	                assertEquals(ContentFormat.EPUB, created.sourceFormat)
+	                assertEquals("EPUB/chapter-1.xhtml", created.selector.sourceHref)
+	                assertEquals("start", created.selector.sourceAnchor)
+	                assertEquals(4, created.selector.sourceBlockIndex)
+	                assertEquals(21, created.selector.textStartOffset)
+	                assertEquals(47, created.selector.textEndOffset)
 
                 withTimeout(10_000L) {
                     repository.observeReadingAnnotations().first { it.singleOrNull()?.id == "annotation-1" }
@@ -79,9 +103,12 @@ class RoomReadingAnnotationRepositoryTest {
                     val reloaded = withTimeout(10_000L) {
                         reloadedRepository.observeReadingAnnotations().first { it.size == 1 }.single()
                     }
-                    assertEquals("content-1", reloaded.contentId)
-                    assertEquals(3, reloaded.paragraphIndex)
-                    assertEquals("A sentence worth keeping.", reloaded.quotedText)
+	                    assertEquals("content-1", reloaded.contentId)
+	                    assertEquals(3, reloaded.paragraphIndex)
+	                    assertEquals("A sentence worth keeping.", reloaded.quotedText)
+	                    assertEquals("Private EPUB", reloaded.sourceTitle)
+	                    assertEquals("EPUB/chapter-1.xhtml", reloaded.selector.sourceHref)
+	                    assertEquals("Before", reloaded.selector.prefixText)
                 } finally {
                     reloadedScope.cancel()
                 }
@@ -99,6 +126,17 @@ class RoomReadingAnnotationRepositoryTest {
                 assertEquals(1_000L, updated.createdAtMillis)
                 assertEquals(2_000L, updated.updatedAtMillis)
                 assertEquals("Updated note.", updated.noteText)
+                assertEquals("Private EPUB", updated.sourceTitle)
+                assertEquals("private.epub", updated.sourceLabel)
+                assertEquals(ContentSourceType.USER_DOCUMENT, updated.sourceType)
+                assertEquals(ContentFormat.EPUB, updated.sourceFormat)
+                assertEquals("EPUB/chapter-1.xhtml", updated.selector.sourceHref)
+                assertEquals("start", updated.selector.sourceAnchor)
+                assertEquals(4, updated.selector.sourceBlockIndex)
+                assertEquals(21, updated.selector.textStartOffset)
+                assertEquals(47, updated.selector.textEndOffset)
+                assertEquals("Before", updated.selector.prefixText)
+                assertEquals("After", updated.selector.suffixText)
 
                 repository.deleteAnnotation(annotationId = created.id, nowMillis = 3_000L)
                 withTimeout(10_000L) {

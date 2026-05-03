@@ -39,7 +39,9 @@ import com.qualityalternative.app.domain.model.RecommendationSignals
 import com.qualityalternative.app.domain.model.RecommendationSource
 import com.qualityalternative.app.domain.model.ReadingAnnotation
 import com.qualityalternative.app.domain.model.ReadingAnnotationDraft
+import com.qualityalternative.app.domain.model.ReadingAnnotationSelector
 import com.qualityalternative.app.domain.model.ReadingProgress
+import com.qualityalternative.app.domain.model.ReaderDocument
 import com.qualityalternative.app.domain.model.ReplacementHistoryEntry
 import com.qualityalternative.app.domain.model.ReturnToTargetSignal
 import com.qualityalternative.app.domain.model.SessionFeedback
@@ -63,6 +65,9 @@ import com.qualityalternative.app.domain.service.HistoryRepository
 import com.qualityalternative.app.domain.service.InterceptionMonitor
 import com.qualityalternative.app.domain.service.RecommendationEngine
 import com.qualityalternative.app.domain.service.ReadingAnnotationRepository
+import com.qualityalternative.app.domain.service.ReadingAnnotationDriveSyncClient
+import com.qualityalternative.app.domain.service.ReadingAnnotationDriveSyncRequest
+import com.qualityalternative.app.domain.service.ReadingAnnotationDriveTokenProvider
 import com.qualityalternative.app.domain.service.ReadingAnnotationExportFormatter
 import com.qualityalternative.app.domain.service.ReadingAnnotationExportWriter
 import com.qualityalternative.app.domain.service.ReadingProgressRepository
@@ -98,6 +103,7 @@ data class MainUiState(
     val currentRecommendationSet: RecommendationSet? = null,
     val currentInterventionOrigin: InterventionOrigin? = null,
     val currentContent: ContentItem? = null,
+    val currentReaderDocument: ReaderDocument? = null,
     val currentContentBody: String = "",
     val currentReadingProgress: ReadingProgress? = null,
     val currentReaderStartParagraphIndex: Int? = null,
@@ -125,6 +131,11 @@ data class MainUiState(
     val annotationExportDisplayName: String? = null,
     val annotationExportLastSuccessfulAtMillis: Long? = null,
     val annotationExportLastError: String? = null,
+    val annotationDriveSyncEnabled: Boolean = false,
+    val annotationDriveFolderId: String? = null,
+    val annotationDriveLastSuccessfulAtMillis: Long? = null,
+    val annotationDriveLastError: String? = null,
+    val isAnnotationDriveSyncing: Boolean = false,
     val isManagingLibrary: Boolean = false,
     val selectedLibraryContentIds: Set<String> = emptySet(),
     val latestMessage: String? = null,
@@ -222,6 +233,8 @@ class MainViewModel(
     private val readingProgressRepository: ReadingProgressRepository = EmptyReadingProgressRepository,
     private val readingAnnotationRepository: ReadingAnnotationRepository = EmptyReadingAnnotationRepository,
     private val readingAnnotationExportWriter: ReadingAnnotationExportWriter = NoOpReadingAnnotationExportWriter,
+    private val readingAnnotationDriveSyncClient: ReadingAnnotationDriveSyncClient = NoOpReadingAnnotationDriveSyncClient,
+    private val readingAnnotationDriveTokenProvider: ReadingAnnotationDriveTokenProvider = NoOpReadingAnnotationDriveTokenProvider,
     private val interceptionMonitor: InterceptionMonitor,
     private val enableDelayRefreshTicker: Boolean = true,
     private val nowProvider: () -> Long = System::currentTimeMillis,
@@ -239,6 +252,7 @@ class MainViewModel(
     private var historyCompletedContentIds: Set<String> = emptySet()
     private var readingProgressCompletedContentIds: Set<String> = emptySet()
     private var pendingSystemInterception: PendingSystemInterception? = null
+    private var annotationDriveAccessToken: String? = null
     private val readingAnnotationExportFormatter = ReadingAnnotationExportFormatter()
 
     var uiState by mutableStateOf(
@@ -599,7 +613,7 @@ class MainViewModel(
             uiState = uiState.copy(latestMessage = "Choose a file for annotation autosave.")
             return
         }
-        val normalizedDisplayName = displayName.trim().ifBlank { "quality-alternative-annotations.md" }
+        val normalizedDisplayName = displayName.trim().ifBlank { "quality-alternative-annotations.jsonld" }
         viewModelScope.launch {
             val permissionError = runCatching { persistWritePermission(normalizedUri) }.exceptionOrNull()
             settingsRepository.saveAnnotationExportDestination(
@@ -666,6 +680,98 @@ class MainViewModel(
                 } else {
                     "Annotation autosave failed."
                 },
+            )
+        }
+    }
+
+    fun beginAnnotationDriveAuthorization() {
+        uiState = uiState.copy(
+            isAnnotationDriveSyncing = true,
+            annotationDriveLastError = null,
+            latestMessage = null,
+        )
+    }
+
+    fun connectAnnotationDriveSync(accessToken: String, nowMillis: Long = nowProvider()) {
+        val normalizedToken = accessToken.trim()
+        if (normalizedToken.isBlank()) {
+            reportAnnotationDriveAuthorizationFailure("Google Drive did not return an access token.")
+            return
+        }
+        annotationDriveAccessToken = normalizedToken
+        uiState = uiState.copy(isAnnotationDriveSyncing = true, latestMessage = null)
+        viewModelScope.launch {
+            settingsRepository.saveAnnotationDriveSyncConnection(folderId = uiState.annotationDriveFolderId)
+            val synced = syncReadingAnnotationsToDrive(accessToken = normalizedToken, nowMillis = nowMillis)
+            uiState = uiState.copy(
+                isAnnotationDriveSyncing = false,
+                annotationDriveSyncEnabled = true,
+                latestMessage = if (synced) {
+                    "Google Drive sync enabled."
+                } else {
+                    "Google Drive connected, but sync failed."
+                },
+            )
+            recordEventDurably(
+                AnalyticsEvent(
+                    type = AnalyticsEventType.ANNOTATION_DRIVE_SYNC_CONNECTED,
+                    timestampMillis = nowMillis,
+                    metadata = mapOf("synced" to synced.toString()),
+                ),
+            )
+        }
+    }
+
+    fun retryAnnotationDriveSync(accessToken: String, nowMillis: Long = nowProvider()) {
+        val normalizedToken = accessToken.trim()
+        if (normalizedToken.isBlank()) {
+            reportAnnotationDriveAuthorizationFailure("Google Drive did not return an access token.")
+            return
+        }
+        annotationDriveAccessToken = normalizedToken
+        uiState = uiState.copy(isAnnotationDriveSyncing = true, latestMessage = null)
+        viewModelScope.launch {
+            val synced = syncReadingAnnotationsToDrive(accessToken = normalizedToken, nowMillis = nowMillis)
+            uiState = uiState.copy(
+                isAnnotationDriveSyncing = false,
+                latestMessage = if (synced) {
+                    "Annotations synced to Google Drive."
+                } else {
+                    "Google Drive sync failed."
+                },
+            )
+        }
+    }
+
+    fun reportAnnotationDriveAuthorizationFailure(errorMessage: String) {
+        val message = errorMessage.trim().ifBlank { "Google Drive authorization failed." }
+        uiState = uiState.copy(
+            isAnnotationDriveSyncing = false,
+            annotationDriveLastError = message,
+            latestMessage = "Google Drive connection failed.",
+        )
+        viewModelScope.launch {
+            settingsRepository.saveAnnotationDriveSyncFailure(message)
+        }
+    }
+
+    fun disconnectAnnotationDriveSync(nowMillis: Long = nowProvider()) {
+        annotationDriveAccessToken = null
+        uiState = uiState.copy(
+            annotationDriveSyncEnabled = false,
+            annotationDriveFolderId = null,
+            annotationDriveLastSuccessfulAtMillis = null,
+            annotationDriveLastError = null,
+            isAnnotationDriveSyncing = false,
+            latestMessage = "Google Drive sync disconnected.",
+        )
+        viewModelScope.launch {
+            settingsRepository.clearAnnotationDriveSyncConnection()
+            recordEventDurably(
+                AnalyticsEvent(
+                    type = AnalyticsEventType.ANNOTATION_DRIVE_SYNC_DISCONNECTED,
+                    timestampMillis = nowMillis,
+                ),
             )
         }
     }
@@ -842,7 +948,7 @@ class MainViewModel(
                 }
                 readingProgressRepository.deleteProgressForContentIds(deletedIds)
                 readingAnnotationRepository.deleteAnnotationsForContentIds(deletedIds, nowMillis = nowMillis)
-                val annotationExportResult = exportReadingAnnotationsIfConfigured(nowMillis = nowMillis)
+                val annotationAutosaveResult = autosaveReadingAnnotations(nowMillis = nowMillis)
 
                 val updatedPriorityIds = uiState.priorityContentIds - deletedIds
                 if (updatedPriorityIds != uiState.priorityContentIds) {
@@ -866,7 +972,8 @@ class MainViewModel(
                     preferences = preferences?.copy(priorityContentIds = updatedPriorityIds),
                     selectedLibraryContentIds = emptySet(),
                     isManagingLibrary = false,
-                    latestMessage = deletedLibraryMessage(selectedItems.size).withAnnotationExportResult(annotationExportResult),
+                    latestMessage = deletedLibraryMessage(selectedItems.size)
+                        .withAnnotationAutosaveResult(annotationAutosaveResult),
                 )
             } catch (error: Throwable) {
                 if (error is CancellationException) throw error
@@ -929,9 +1036,9 @@ class MainViewModel(
         startParagraphIndex: Int? = null,
     ) {
         val startedAtMillis = nowProvider()
-        val contentBody = if (content.usesRepositoryBody()) {
+        val readerDocument = if (content.usesRepositoryBody()) {
             try {
-                contentRepository.contentBody(content)
+                contentRepository.readerDocument(content)
             } catch (error: Throwable) {
                 if (error is CancellationException) throw error
                 viewModelScope.launch {
@@ -945,7 +1052,7 @@ class MainViewModel(
                 return
             }
         } else {
-            ""
+            ReaderDocument.fromPlainText("")
         }
         val existingProgress = unfinishedProgressFor(content.id)
         if (existingProgress != null) {
@@ -966,7 +1073,8 @@ class MainViewModel(
             currentRecommendationSet = null,
             currentInterventionOrigin = null,
             currentContent = content,
-            currentContentBody = contentBody,
+            currentReaderDocument = readerDocument,
+            currentContentBody = readerDocument.plainText,
             currentReadingProgress = existingProgress,
             currentReaderStartParagraphIndex = startParagraphIndex,
             currentSessionId = null,
@@ -1095,10 +1203,6 @@ class MainViewModel(
 
     fun updateAddDocumentTitle(title: String) {
         updateAddDocumentForm(uiState.addDocumentForm.copy(title = title))
-    }
-
-    fun updateAddDocumentDuration(durationMinutes: String) {
-        updateAddDocumentForm(uiState.addDocumentForm.copy(durationMinutes = durationMinutes))
     }
 
     fun toggleAddDocumentTopic(topic: TopicTag) {
@@ -1696,6 +1800,7 @@ class MainViewModel(
         quotedText: String,
         noteText: String,
         existingAnnotationId: String? = null,
+        selector: ReadingAnnotationSelector = ReadingAnnotationSelector(),
         nowMillis: Long = nowProvider(),
     ) {
         val content = uiState.currentContent ?: return
@@ -1710,23 +1815,28 @@ class MainViewModel(
         }
         viewModelScope.launch {
             readingAnnotationRepository.saveAnnotation(
-                draft = ReadingAnnotationDraft(
-                    id = existingAnnotationId,
-                    contentId = content.id,
-                    paragraphIndex = paragraphIndex,
-                    quotedText = normalizedQuote,
-                    noteText = normalizedNote,
-                ),
+	                draft = ReadingAnnotationDraft(
+	                    id = existingAnnotationId,
+	                    contentId = content.id,
+	                    paragraphIndex = paragraphIndex,
+	                    quotedText = normalizedQuote,
+	                    noteText = normalizedNote,
+	                    sourceTitle = content.title,
+	                    sourceLabel = content.sourceLabel,
+	                    sourceType = content.sourceType,
+	                    sourceFormat = content.format,
+	                    selector = selector,
+	                ),
                 nowMillis = nowMillis,
             )
-            val annotationExportResult = exportReadingAnnotationsIfConfigured(nowMillis = nowMillis)
+            val annotationAutosaveResult = autosaveReadingAnnotations(nowMillis = nowMillis)
             val savedMessage = if (existingAnnotationId == null) {
                 "Annotation saved."
             } else {
                 "Annotation updated."
             }
             uiState = uiState.copy(
-                latestMessage = savedMessage.withAnnotationExportResult(annotationExportResult),
+                latestMessage = savedMessage.withAnnotationAutosaveResult(annotationAutosaveResult),
             )
         }
     }
@@ -1744,9 +1854,9 @@ class MainViewModel(
                 annotationId = annotationId,
                 nowMillis = nowMillis,
             )
-            val annotationExportResult = exportReadingAnnotationsIfConfigured(nowMillis = nowMillis)
+            val annotationAutosaveResult = autosaveReadingAnnotations(nowMillis = nowMillis)
             uiState = uiState.copy(
-                latestMessage = "Annotation deleted.".withAnnotationExportResult(annotationExportResult),
+                latestMessage = "Annotation deleted.".withAnnotationAutosaveResult(annotationAutosaveResult),
             )
         }
     }
@@ -1944,6 +2054,10 @@ class MainViewModel(
             annotationExportDisplayName = settings.annotationExportDisplayName,
             annotationExportLastSuccessfulAtMillis = settings.annotationExportLastSuccessfulAtMillis,
             annotationExportLastError = settings.annotationExportLastError,
+            annotationDriveSyncEnabled = settings.annotationDriveSyncEnabled,
+            annotationDriveFolderId = settings.annotationDriveFolderId,
+            annotationDriveLastSuccessfulAtMillis = settings.annotationDriveLastSuccessfulAtMillis,
+            annotationDriveLastError = settings.annotationDriveLastError,
             onboardingSelection = settings.toOnboardingSelection(
                 supportedApps = supportedApps,
                 starterPacks = starterPacks,
@@ -2298,9 +2412,9 @@ class MainViewModel(
     }
 
     private suspend fun openReplacementSession(content: ContentItem, sessionId: String, startedAtMillis: Long) {
-        val contentBody = if (content.usesRepositoryBody()) {
+        val readerDocument = if (content.usesRepositoryBody()) {
             try {
-                contentRepository.contentBody(content)
+                contentRepository.readerDocument(content)
             } catch (error: Throwable) {
                 if (error is CancellationException) throw error
                 handleRepositoryBodyLoadFailure(
@@ -2312,12 +2426,13 @@ class MainViewModel(
                 return
             }
         } else {
-            ""
+            ReaderDocument.fromPlainText("")
         }
         val existingProgress = unfinishedProgressFor(content.id)
         uiState = uiState.copy(
             currentContent = content,
-            currentContentBody = contentBody,
+            currentReaderDocument = readerDocument,
+            currentContentBody = readerDocument.plainText,
             currentReadingProgress = existingProgress,
             currentReaderStartParagraphIndex = null,
             currentSessionId = sessionId,
@@ -2375,6 +2490,13 @@ class MainViewModel(
             .firstOrNull { content -> content.id == annotation.contentId }
     }
 
+    private suspend fun autosaveReadingAnnotations(nowMillis: Long): AnnotationAutosaveResult {
+        return AnnotationAutosaveResult(
+            fileResult = exportReadingAnnotationsIfConfigured(nowMillis = nowMillis),
+            driveResult = syncReadingAnnotationsToDriveIfConnected(nowMillis = nowMillis),
+        )
+    }
+
     private suspend fun exportReadingAnnotationsIfConfigured(nowMillis: Long): Boolean? {
         val uri = uiState.annotationExportUri?.takeIf(String::isNotBlank) ?: return null
         return exportReadingAnnotationsTo(uri = uri, nowMillis = nowMillis)
@@ -2385,16 +2507,91 @@ class MainViewModel(
             val contentById = fullReplacementInventory()
                 .distinctBy(ContentItem::id)
                 .associateBy(ContentItem::id)
-            val markdown = readingAnnotationExportFormatter.format(
+            val files = readingAnnotationExportFormatter.formatJsonLdFiles(
                 annotations = readingAnnotationRepository.readingAnnotations(),
                 contentById = contentById,
             )
-            readingAnnotationExportWriter.writeMarkdown(uri = uri, markdown = markdown)
+            readingAnnotationExportWriter.writeJsonLdFiles(uri = uri, files = files)
             settingsRepository.saveAnnotationExportSuccess(timestampMillis = nowMillis)
             true
         } catch (error: Throwable) {
             if (error is CancellationException) throw error
             settingsRepository.saveAnnotationExportFailure(error.annotationExportErrorMessage())
+            false
+        }
+    }
+
+    private suspend fun syncReadingAnnotationsToDriveIfConnected(nowMillis: Long): Boolean? {
+        if (!uiState.annotationDriveSyncEnabled) {
+            return null
+        }
+        val cachedAccessToken = annotationDriveAccessToken?.takeIf(String::isNotBlank)
+        val accessToken = runCatching { readingAnnotationDriveTokenProvider.driveAccessToken() }
+            .onSuccess { token -> annotationDriveAccessToken = token }
+            .getOrElse { cachedAccessToken }
+        if (accessToken == null) {
+            val message = "Open Settings and tap Save now to refresh Google Drive access."
+            settingsRepository.saveAnnotationDriveSyncFailure(message)
+            uiState = uiState.copy(annotationDriveLastError = message)
+            return false
+        }
+        return syncReadingAnnotationsToDrive(accessToken = accessToken, nowMillis = nowMillis)
+    }
+
+    private suspend fun syncReadingAnnotationsToDrive(accessToken: String, nowMillis: Long): Boolean {
+        return try {
+            val contentById = fullReplacementInventory()
+                .distinctBy(ContentItem::id)
+                .associateBy(ContentItem::id)
+            val files = readingAnnotationExportFormatter.formatJsonLdFiles(
+                annotations = readingAnnotationRepository.readingAnnotations(),
+                contentById = contentById,
+            )
+            val indexJson = readingAnnotationExportFormatter.formatIndexJson(files)
+            val result = readingAnnotationDriveSyncClient.syncJsonLdFiles(
+                ReadingAnnotationDriveSyncRequest(
+                    accessToken = accessToken,
+                    folderId = uiState.annotationDriveFolderId,
+                    files = files,
+                    indexJson = indexJson,
+                ),
+            )
+            settingsRepository.saveAnnotationDriveSyncSuccess(
+                timestampMillis = nowMillis,
+                folderId = result.folderId,
+            )
+            uiState = uiState.copy(
+                annotationDriveSyncEnabled = true,
+                annotationDriveFolderId = result.folderId,
+                annotationDriveLastSuccessfulAtMillis = nowMillis,
+                annotationDriveLastError = null,
+            )
+            recordEventDurably(
+                AnalyticsEvent(
+                    type = AnalyticsEventType.ANNOTATION_DRIVE_SYNC_SUCCEEDED,
+                    timestampMillis = nowMillis,
+                    metadata = mapOf(
+                        "syncedFileCount" to result.syncedFileNames.size.toString(),
+                        "sourceFileCount" to files.size.toString(),
+                    ),
+                ),
+            )
+            true
+        } catch (error: Throwable) {
+            if (error is CancellationException) throw error
+            val message = error.annotationDriveSyncErrorMessage()
+            settingsRepository.saveAnnotationDriveSyncFailure(message)
+            uiState = uiState.copy(
+                annotationDriveSyncEnabled = true,
+                annotationDriveLastError = message,
+            )
+            recordEventDurably(
+                AnalyticsEvent(
+                    type = AnalyticsEventType.ANNOTATION_DRIVE_SYNC_FAILED,
+                    timestampMillis = nowMillis,
+                    metadata = mapOf("reason" to message),
+                ),
+            )
             false
         }
     }
@@ -2423,6 +2620,7 @@ class MainViewModel(
             currentInterventionId = null,
             currentInterventionShownAtMillis = null,
             currentContent = null,
+            currentReaderDocument = null,
             currentContentBody = "",
             currentRecommendationSet = null,
             currentInterventionOrigin = null,
@@ -2660,6 +2858,8 @@ class MainViewModelFactory(
             readingProgressRepository = appContainer.readingProgressRepository,
             readingAnnotationRepository = appContainer.readingAnnotationRepository,
             readingAnnotationExportWriter = appContainer.readingAnnotationExportWriter,
+            readingAnnotationDriveSyncClient = appContainer.readingAnnotationDriveSyncClient,
+            readingAnnotationDriveTokenProvider = appContainer.readingAnnotationDriveTokenProvider,
             interceptionMonitor = appContainer.interceptionMonitor,
         ) as T
     }
@@ -2992,8 +3192,6 @@ private fun AddDocumentFormState.visibleValidationErrors(): Set<UserDocumentVali
         errors += UserDocumentValidationError.UNSUPPORTED_FORMAT
     }
     val editableCandidate = candidates.singleOrNull()
-    val duration = editableCandidate?.durationMinutes?.trim().orEmpty()
-    val validDuration = duration.toIntOrNull()?.let { it in 1..ReadingTimeEstimator.MAX_SESSION_MINUTES } == true
     if (editableCandidate != null && editableCandidate.uri.isBlank()) {
         errors += UserDocumentValidationError.EMPTY_URI
     }
@@ -3001,16 +3199,10 @@ private fun AddDocumentFormState.visibleValidationErrors(): Set<UserDocumentVali
         if (editableCandidate.format == null) {
             errors += UserDocumentValidationError.UNSUPPORTED_FORMAT
         }
-        if (duration.isNotBlank() && !validDuration) {
-            errors += UserDocumentValidationError.INVALID_DURATION
-        }
-        if (duration.isBlank() && (editableCandidate.title.isNotBlank() || selectedTopics.isNotEmpty())) {
-            errors += UserDocumentValidationError.INVALID_DURATION
-        }
         if (editableCandidate.title.isBlank() && (editableCandidate.uri.isNotBlank() || selectedTopics.isNotEmpty())) {
             errors += UserDocumentValidationError.BLANK_TITLE
         }
-        if (selectedTopics.isEmpty() && editableCandidate.uri.isNotBlank() && editableCandidate.title.isNotBlank() && validDuration) {
+        if (selectedTopics.isEmpty() && editableCandidate.uri.isNotBlank() && editableCandidate.title.isNotBlank()) {
             errors += UserDocumentValidationError.NO_TOPICS
         }
     } else if (selectedTopics.isEmpty() && candidates.any { candidate -> candidate.format != null }) {
@@ -3069,7 +3261,7 @@ private fun DocumentImportCandidate.cleaned(): DocumentImportCandidate {
 }
 
 private fun DocumentImportCandidate.validationErrors(selectedTopics: Set<TopicTag>): Set<UserDocumentValidationError> {
-    val duration = durationMinutes.toIntOrNull() ?: -1
+    val duration = durationMinutes.toIntOrNull() ?: ReadingTimeEstimator.DEFAULT_DOCUMENT_MINUTES
     return UserDocumentValidator.validate(
         UserDocumentDraft(
             uri = uri,
@@ -3083,7 +3275,7 @@ private fun DocumentImportCandidate.validationErrors(selectedTopics: Set<TopicTa
 }
 
 private fun DocumentImportCandidate.toDraftOrNull(selectedTopics: Set<TopicTag>): UserDocumentDraft? {
-    val duration = durationMinutes.toIntOrNull() ?: return null
+    val duration = durationMinutes.toIntOrNull() ?: ReadingTimeEstimator.DEFAULT_DOCUMENT_MINUTES
     if (validationErrors(selectedTopics).isNotEmpty()) {
         return null
     }
@@ -3241,14 +3433,42 @@ private object NoOpReadingAnnotationExportWriter : ReadingAnnotationExportWriter
     override suspend fun writeMarkdown(uri: String, markdown: String) = Unit
 }
 
-private fun String.withAnnotationExportResult(result: Boolean?): String {
-    return when (result) {
-        true -> removeSuffix(".") + " and autosaved."
-        false -> this + " Autosave failed."
-        null -> this
+private object NoOpReadingAnnotationDriveSyncClient : ReadingAnnotationDriveSyncClient {
+    override suspend fun syncJsonLdFiles(
+        request: ReadingAnnotationDriveSyncRequest,
+    ) = error("Google Drive sync is not available in this build.")
+}
+
+private object NoOpReadingAnnotationDriveTokenProvider : ReadingAnnotationDriveTokenProvider {
+    override suspend fun driveAccessToken(): String = error("Google Drive authorization is not available in this build.")
+}
+
+private data class AnnotationAutosaveResult(
+    val fileResult: Boolean?,
+    val driveResult: Boolean?,
+)
+
+private fun String.withAnnotationAutosaveResult(result: AnnotationAutosaveResult): String {
+    val successes = listOfNotNull(
+        "file".takeIf { result.fileResult == true },
+        "Drive".takeIf { result.driveResult == true },
+    )
+    val failures = listOfNotNull(
+        "file".takeIf { result.fileResult == false },
+        "Drive".takeIf { result.driveResult == false },
+    )
+    return when {
+        successes.isEmpty() && failures.isEmpty() -> this
+        failures.isEmpty() -> removeSuffix(".") + " and autosaved."
+        successes.isEmpty() -> this + " Autosave failed."
+        else -> this + " Autosaved to ${successes.joinToString(" and ")}; ${failures.joinToString(" and ")} failed."
     }
 }
 
 private fun Throwable.annotationExportErrorMessage(): String {
     return "Choose the file again or retry."
+}
+
+private fun Throwable.annotationDriveSyncErrorMessage(): String {
+    return "Google Drive sync failed. Retry from Settings."
 }
