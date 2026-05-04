@@ -299,6 +299,8 @@ The system must deliver a calm replacement session that feels meaningfully diffe
 - If the item is a user-owned PDF, the user can open it through a clearly controlled Android document-viewer fallback.
 - Long-form reader surfaces show reading-position progress that is based on document position, not only elapsed time.
 - The in-app reader is paginated by default. It must not rely on vertical scrolling for active reading.
+- Reader pagination must adapt to the actual page viewport, device size, orientation where supported, and the user's in-app reader font-size setting. It should fill the page comfortably without clipping text or leaving large avoidable empty regions.
+- Reader font size is a first-class app setting, not something the user must change at Android system level. System accessibility font scale may still be respected by the platform, but the product must expose its own reader font-size control.
 - Tapping the page advances to the next page. The Android back gesture or system back action goes to the previous page before leaving the reader.
 - The active reader uses minimal reader chrome: no persistent Previous, Next, or Done buttons; content is the primary surface, with only tiny title/progress/TOC affordances outside the text.
 - EPUB readers expose table-of-contents navigation that jumps to the matching section or nearest available page without turning the reader into a discovery surface.
@@ -376,6 +378,22 @@ The product must log enough behavior to evaluate whether substitution is working
 - Each event includes timestamp, target app, recommendation identifiers, and session context.
 - Analytics can distinguish between no recommendation available and user chose Open anyway.
 
+### FR13. Account Light Local Profile
+
+The system must provide account-like portability without requiring a Quality Alternative server account or backend authentication.
+
+#### Acceptance Criteria
+
+- The app creates and persists a local profile identifier on the device.
+- User can export a versioned `quality-alternative-profile.json` file from Settings.
+- User can import a compatible profile file from Settings and choose a safe restore mode.
+- Profile export includes portable settings, selected distracting apps, topic preferences, starter-pack choices, reader font-size preference, content priority settings, user links, user-document metadata, reading progress, completed/reactivated state, and annotation sync/export preferences that are safe to move across devices.
+- Profile export must not include Google access tokens, authorization grants, OAuth secrets, raw Drive file ids, raw Android `content://` or `file://` URIs, raw SAF tree URIs, account emails, raw analytics event logs, Android-only permission state, or unredacted platform-internal identifiers that would be misleading on another device.
+- User-owned document binaries are not exported in the initial Account Light profile. The profile may preserve document metadata, stable content identity, and safe document fingerprints, but import must clearly mark missing or unverified local document files as unavailable until the user reattaches and verifies them.
+- The profile format is schema-versioned and must reject unsupported future versions without corrupting local state.
+- Import failures are visible and must not partially overwrite local settings or library data. Merge mode must preserve local settings unless the user explicitly chooses to apply imported settings, and replace mode must show affected scope before destructive mutation.
+- Account Light may optionally autosave the profile to a user-authorized local or Google Drive destination, but imported autosave or Drive metadata must be informational only until the current device user reselects a destination or reauthorizes Drive. The canonical product behavior must remain usable without a backend server.
+
 ## Non-Functional Requirements
 
 ### NFR1. Response Time
@@ -393,6 +411,13 @@ The product must log enough behavior to evaluate whether substitution is working
 
 - The product must clearly indicate when interception permissions are missing, degraded, or device-limited.
 - The product must not silently fail while claiming protection is active.
+
+### NFR4. Local-First Portability And Privacy
+
+- Account Light data must be local-first and user-controlled.
+- Portable profile exports must be human-auditable JSON rather than opaque database backups.
+- Export/import should preserve behaviorally important state without pretending to provide server-backed identity, cross-device conflict resolution, or guaranteed document-file transfer.
+- Any cloud sync must be explicit, revocable, and scoped to user-owned files. Cloud authorization state must be re-established on each device rather than copied through profile export.
 
 ## Content Strategy for MVP
 
