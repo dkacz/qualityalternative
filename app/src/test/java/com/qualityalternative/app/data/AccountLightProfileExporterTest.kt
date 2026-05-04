@@ -61,6 +61,10 @@ class AccountLightProfileExporterTest {
         val profile = AccountLightProfileCodec().decode(rawJson)
 
         assertEquals(ACCOUNT_LIGHT_PROFILE_FILE_NAME, "quality-alternative-profile.json")
+        assertEquals(
+            "quality-alternative-profile-19700101-000020.json",
+            accountLightTimestampedBackupFileName(nowMillis = 20_000L),
+        )
         assertEquals(ACCOUNT_LIGHT_SCHEMA_VERSION, profile.schemaVersion)
         assertEquals(20_000L, profile.exportedAtMillis)
         assertEquals(ACCOUNT_LIGHT_PROFILE_FORMAT, profile.app.profileFormat)

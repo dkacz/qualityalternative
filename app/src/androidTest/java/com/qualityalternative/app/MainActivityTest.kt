@@ -79,6 +79,8 @@ class MainActivityTest {
         "sprint14-reader-pagination-${System.currentTimeMillis()}"
     private val sprint15DriveSyncScreenshotDirName =
         "sprint15-drive-sync-${System.currentTimeMillis()}"
+    private val sprint16PortableProfileScreenshotDirName =
+        "sprint16-portable-profile-${System.currentTimeMillis()}"
 
     @Before
     fun resetAppState() {
@@ -1103,6 +1105,71 @@ class MainActivityTest {
     }
 
     @Test
+    fun accountLightImportSettingsShowsPreviewErrorsConfirmationAndSuccess() {
+        launchOnboardedApp()
+        scenario?.onActivity { activity -> activity.mainViewModel.openSettings() }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("settings-list") }
+
+        scrollToAccountLightSettings()
+        composeRule.onNodeWithTag("settings-account-light-section").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings-account-light-import").assertIsDisplayed()
+        captureSprint16PortableProfileScreenshot("01_import_entry_light")
+
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.previewAccountLightImport(
+                accountLightProfileJson(
+                    schemaVersion = 1,
+                    selectedAppPackages = listOf("com.instagram.android", "com.future.reader"),
+                ),
+            )
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("settings-account-light-import-preview") }
+        scrollToAccountLightSettings()
+        composeRule.onNodeWithTag("settings-account-light-import-preview").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings-account-light-import-warning-summary").assertIsDisplayed()
+        captureSprint16PortableProfileScreenshot("02_merge_preview_with_unsupported_app_light")
+
+        composeRule.onNodeWithTag("settings-account-light-import-replace")
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.onNodeWithTag("settings-account-light-replace-confirm").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings-account-light-replace-backup").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasTestTag("settings-account-light-replace-confirm-action"))
+        captureSprint16PortableProfileScreenshot("03_replace_confirmation_light")
+
+        composeRule.onNodeWithTag("settings-account-light-replace-confirm-action")
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasNodeContaining("IMPORTED SETTINGS REPLACED LOCAL PORTABLE SETTINGS")
+        }
+        scrollToAccountLightSettings()
+        composeRule.onNodeWithTag("settings-account-light-status").assertIsDisplayed()
+        captureSprint16PortableProfileScreenshot("04_import_success_dark")
+
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.previewAccountLightImport("{not-json")
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasNodeContaining("PORTABLE PROFILE IS NOT VALID JSON")
+        }
+        scrollToAccountLightSettings()
+        composeRule.onNodeWithTag("settings-account-light-status").assertIsDisplayed()
+        captureSprint16PortableProfileScreenshot("05_invalid_import_dark")
+
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.previewAccountLightImport(accountLightProfileJson(schemaVersion = 99))
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasNodeContaining("UNSUPPORTED PORTABLE PROFILE SCHEMA VERSION 99")
+        }
+        scrollToAccountLightSettings()
+        composeRule.onNodeWithTag("settings-account-light-status").assertIsDisplayed()
+        captureSprint16PortableProfileScreenshot("06_future_schema_import_dark")
+    }
+
+    @Test
     fun meditationAlternativeOpensThreeMinuteTimer() {
         launchMeditationFixtureSystemIntervention()
 
@@ -1225,6 +1292,79 @@ class MainActivityTest {
             composeRule.onNodeWithTag(tag).fetchSemanticsNode()
             true
         }.getOrDefault(false)
+    }
+
+    private fun scrollToAccountLightSettings() {
+        composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasTestTag("settings-account-light-section"))
+        composeRule.waitForIdle()
+    }
+
+    private fun accountLightProfileJson(
+        schemaVersion: Int,
+        selectedAppPackages: List<String> = listOf("com.instagram.android"),
+    ): String {
+        val appJson = selectedAppPackages.joinToString(separator = ",") { packageName -> "\"$packageName\"" }
+        return """
+            {
+              "schemaVersion": $schemaVersion,
+              "exportedAtMillis": 20000,
+              "app": {
+                "profileFormat": "quality-alternative-account-light",
+                "packageName": "com.qualityalternative.app",
+                "appVersionName": "0.8.1-alpha",
+                "appVersionCode": 13
+              },
+              "profile": {
+                "profileId": "qa-local-22222222-2222-4222-8222-222222222222",
+                "createdAtMillis": 10000,
+                "updatedAtMillis": 20000,
+                "displayName": null
+              },
+              "settings": {
+                "hasCompletedOnboarding": true,
+                "selectedAppPackages": [$appJson],
+                "preferredTopics": ["SCIENCE", "PHILOSOPHY"],
+                "preferredDurationBucket": "FOCUS",
+                "selectedPackIds": ["starter_pack"],
+                "themeMode": "DARK",
+                "meditationDurationMinutes": 5,
+                "readerFontScale": 1.25,
+                "contentPriority": "MY_FILES",
+                "priorityContentIds": [],
+                "reactivatedCompletedContentIds": [],
+                "openAnywayUnlockMinutes": 60
+              },
+              "library": {
+                "userLinks": [],
+                "userDocuments": []
+              },
+              "reading": {
+                "progress": []
+              },
+              "annotations": {
+                "export": {
+                  "destinationDisplayName": null,
+                  "lastSuccessfulAtMillis": null
+                },
+                "driveSync": {
+                  "wasEnabledOnSourceDevice": false,
+                  "folderDisplayName": null,
+                  "lastSuccessfulAtMillis": null
+                },
+                "sidecarIndex": []
+              },
+              "sync": {
+                "profileAutosave": {
+                  "provider": "NONE",
+                  "destinationDisplayName": null,
+                  "lastSuccessfulAtMillis": null,
+                  "activationStateOnImport": "REQUIRES_LOCAL_SELECTION"
+                }
+              },
+              "warnings": []
+            }
+        """.trimIndent()
     }
 
     private fun hasContentDescriptionNode(description: String): Boolean {
@@ -1971,6 +2111,16 @@ class MainActivityTest {
 
     private fun captureSprint15DriveSyncScreenshot(name: String) {
         val outputDir = File("/sdcard/Download/qualityalternative/$sprint15DriveSyncScreenshotDirName")
+        assertTrue("Expected screenshot output directory for $name", outputDir.mkdirs() || outputDir.exists())
+        composeRule.waitForIdle()
+        Thread.sleep(300)
+        val output = File(outputDir, "$name.png")
+        assertTrue("Expected screenshot capture for $name", UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).takeScreenshot(output))
+        assertTrue("Expected screenshot file for $name", output.exists() && output.length() > 0L)
+    }
+
+    private fun captureSprint16PortableProfileScreenshot(name: String) {
+        val outputDir = File("/sdcard/Download/qualityalternative/$sprint16PortableProfileScreenshotDirName")
         assertTrue("Expected screenshot output directory for $name", outputDir.mkdirs() || outputDir.exists())
         composeRule.waitForIdle()
         Thread.sleep(300)

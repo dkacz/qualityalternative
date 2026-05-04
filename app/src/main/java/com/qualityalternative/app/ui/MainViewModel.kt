@@ -6,6 +6,11 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.qualityalternative.app.data.AccountLightImportException
+import com.qualityalternative.app.data.AccountLightImportPlan
+import com.qualityalternative.app.data.AccountLightImportPreview
+import com.qualityalternative.app.data.AccountLightProfileExporter
+import com.qualityalternative.app.data.AccountLightProfileImporter
 import com.qualityalternative.app.data.AppContainer
 import com.qualityalternative.app.data.ReadingTimeEstimateSource
 import com.qualityalternative.app.data.ReadingTimeEstimator
@@ -136,6 +141,12 @@ data class MainUiState(
     val annotationDriveLastSuccessfulAtMillis: Long? = null,
     val annotationDriveLastError: String? = null,
     val isAnnotationDriveSyncing: Boolean = false,
+    val isAccountLightExporting: Boolean = false,
+    val isAccountLightImporting: Boolean = false,
+    val accountLightImportPreview: AccountLightImportPreview? = null,
+    val accountLightImportError: String? = null,
+    val accountLightStatus: String? = null,
+    val isAccountLightReplaceConfirming: Boolean = false,
     val isManagingLibrary: Boolean = false,
     val selectedLibraryContentIds: Set<String> = emptySet(),
     val latestMessage: String? = null,
@@ -235,6 +246,12 @@ class MainViewModel(
     private val readingAnnotationExportWriter: ReadingAnnotationExportWriter = NoOpReadingAnnotationExportWriter,
     private val readingAnnotationDriveSyncClient: ReadingAnnotationDriveSyncClient = NoOpReadingAnnotationDriveSyncClient,
     private val readingAnnotationDriveTokenProvider: ReadingAnnotationDriveTokenProvider = NoOpReadingAnnotationDriveTokenProvider,
+    private val accountLightProfileExporter: AccountLightProfileExporter = AccountLightProfileExporter(
+        settingsRepository = settingsRepository,
+        appVersionName = "test",
+        appVersionCode = 1,
+    ),
+    private val accountLightProfileImporter: AccountLightProfileImporter = AccountLightProfileImporter(settingsRepository),
     private val interceptionMonitor: InterceptionMonitor,
     private val enableDelayRefreshTicker: Boolean = true,
     private val nowProvider: () -> Long = System::currentTimeMillis,
@@ -252,6 +269,7 @@ class MainViewModel(
     private var historyCompletedContentIds: Set<String> = emptySet()
     private var readingProgressCompletedContentIds: Set<String> = emptySet()
     private var pendingSystemInterception: PendingSystemInterception? = null
+    private var pendingAccountLightImportPlan: AccountLightImportPlan? = null
     private var annotationDriveAccessToken: String? = null
     private val readingAnnotationExportFormatter = ReadingAnnotationExportFormatter()
 
@@ -2023,6 +2041,146 @@ class MainViewModel(
         uiState = uiState.copy(latestMessage = null)
     }
 
+    fun exportAccountLightProfile(writeJson: suspend (String) -> Unit) {
+        viewModelScope.launch {
+            uiState = uiState.copy(
+                isAccountLightExporting = true,
+                accountLightStatus = null,
+                accountLightImportError = null,
+            )
+            try {
+                val json = accountLightProfileExporter.exportSettingsOnlyProfileJson(nowMillis = nowProvider())
+                writeJson(json)
+                uiState = uiState.copy(
+                    isAccountLightExporting = false,
+                    accountLightStatus = "Portable profile exported.",
+                    latestMessage = "Portable profile exported.",
+                )
+            } catch (exception: CancellationException) {
+                uiState = uiState.copy(isAccountLightExporting = false)
+                throw exception
+            } catch (exception: Exception) {
+                uiState = uiState.copy(
+                    isAccountLightExporting = false,
+                    accountLightImportError = "Export failed.",
+                    latestMessage = "Portable profile export failed.",
+                )
+            }
+        }
+    }
+
+    fun previewAccountLightImport(rawJson: String) {
+        val plan = try {
+            accountLightProfileImporter.validateImportProfileJson(rawJson)
+        } catch (exception: AccountLightImportException) {
+            pendingAccountLightImportPlan = null
+            uiState = uiState.copy(
+                accountLightImportPreview = null,
+                accountLightImportError = exception.message ?: "Portable profile is invalid.",
+                accountLightStatus = null,
+                isAccountLightReplaceConfirming = false,
+                latestMessage = "Portable profile import failed validation.",
+            )
+            return
+        } catch (exception: Exception) {
+            pendingAccountLightImportPlan = null
+            uiState = uiState.copy(
+                accountLightImportPreview = null,
+                accountLightImportError = "Portable profile is invalid.",
+                accountLightStatus = null,
+                isAccountLightReplaceConfirming = false,
+                latestMessage = "Portable profile import failed validation.",
+            )
+            return
+        }
+        pendingAccountLightImportPlan = plan
+        uiState = uiState.copy(
+            accountLightImportPreview = plan.preview,
+            accountLightImportError = null,
+            accountLightStatus = "Profile ready to import.",
+            isAccountLightReplaceConfirming = false,
+        )
+    }
+
+    fun reportAccountLightImportReadFailure() {
+        pendingAccountLightImportPlan = null
+        uiState = uiState.copy(
+            accountLightImportPreview = null,
+            accountLightImportError = "Could not read portable profile.",
+            accountLightStatus = null,
+            isAccountLightReplaceConfirming = false,
+            latestMessage = "Portable profile import failed.",
+        )
+    }
+
+    fun applyAccountLightMergeImport() {
+        val plan = pendingAccountLightImportPlan ?: return
+        viewModelScope.launch {
+            uiState = uiState.copy(isAccountLightImporting = true)
+            val result = accountLightProfileImporter.applyMerge(plan)
+            pendingAccountLightImportPlan = null
+            uiState = uiState.copy(
+                isAccountLightImporting = false,
+                accountLightImportPreview = null,
+                accountLightImportError = null,
+                accountLightStatus = if (result.warningCount > 0) {
+                    "Profile merged. Local settings were kept."
+                } else {
+                    "Profile merged."
+                },
+                isAccountLightReplaceConfirming = false,
+                latestMessage = "Portable profile merged.",
+            )
+        }
+    }
+
+    fun requestAccountLightReplaceConfirmation() {
+        if (pendingAccountLightImportPlan != null) {
+            uiState = uiState.copy(isAccountLightReplaceConfirming = true)
+        }
+    }
+
+    fun cancelAccountLightImport() {
+        pendingAccountLightImportPlan = null
+        uiState = uiState.copy(
+            accountLightImportPreview = null,
+            accountLightImportError = null,
+            accountLightStatus = null,
+            isAccountLightReplaceConfirming = false,
+            isAccountLightImporting = false,
+        )
+    }
+
+    fun confirmAccountLightReplaceImport() {
+        val plan = pendingAccountLightImportPlan ?: return
+        viewModelScope.launch {
+            uiState = uiState.copy(isAccountLightImporting = true)
+            try {
+                accountLightProfileImporter.applyReplace(plan)
+                pendingAccountLightImportPlan = null
+                uiState = uiState.copy(
+                    isAccountLightImporting = false,
+                    accountLightImportPreview = null,
+                    accountLightImportError = null,
+                    accountLightStatus = "Imported settings replaced local portable settings.",
+                    isAccountLightReplaceConfirming = false,
+                    latestMessage = "Portable profile restored.",
+                )
+            } catch (exception: CancellationException) {
+                uiState = uiState.copy(isAccountLightImporting = false)
+                throw exception
+            } catch (exception: Exception) {
+                uiState = uiState.copy(
+                    isAccountLightImporting = false,
+                    accountLightImportError = "Import failed before any settings were changed.",
+                    accountLightStatus = null,
+                    isAccountLightReplaceConfirming = false,
+                    latestMessage = "Portable profile import failed.",
+                )
+            }
+        }
+    }
+
     private fun applySettings(settings: AppSettings) {
         val reactivatedCompletedContentIds = settings.reactivatedCompletedContentIds.trackedCompletedContentIds()
         val preferences = settings.toUserPreferences(
@@ -2860,6 +3018,8 @@ class MainViewModelFactory(
             readingAnnotationExportWriter = appContainer.readingAnnotationExportWriter,
             readingAnnotationDriveSyncClient = appContainer.readingAnnotationDriveSyncClient,
             readingAnnotationDriveTokenProvider = appContainer.readingAnnotationDriveTokenProvider,
+            accountLightProfileExporter = appContainer.accountLightProfileExporter,
+            accountLightProfileImporter = appContainer.accountLightProfileImporter,
             interceptionMonitor = appContainer.interceptionMonitor,
         ) as T
     }

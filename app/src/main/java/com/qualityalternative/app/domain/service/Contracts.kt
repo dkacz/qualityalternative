@@ -104,6 +104,7 @@ interface SettingsRepository {
     fun observeAppSettings(): Flow<AppSettings>
     fun supportedDistractingApps(): List<DistractingApp>
     suspend fun ensureLocalProfileIdentity(nowMillis: Long = System.currentTimeMillis()): LocalProfileIdentity
+    suspend fun replacePortableSettings(settings: AppSettings, profileIdentity: LocalProfileIdentity? = null)
     suspend fun saveOnboardingSelection(selection: OnboardingSelection)
     suspend fun saveSelectedAppPackages(packages: Set<String>)
     suspend fun savePreferredDurationBucket(bucket: DurationBucket)

@@ -1,10 +1,10 @@
-# Account Light Profile Schema
+# Portable Profile Schema
 
 Status: Sprint 16 contract, schema v1
 
 ## Goal
 
-Account Light gives Quality Alternative account-like portability without a Quality Alternative backend account. The user owns a local, versioned JSON profile file that can be exported, imported, and later autosaved to a user-selected destination.
+Portable Profile gives Quality Alternative account-like portability without a Quality Alternative backend account. The user owns a local, versioned JSON profile file that can be exported, imported, and later autosaved to a user-selected destination.
 
 The product remains local-first. Google Drive can be used as a user-authorized file destination, but Drive authorization is not a Quality Alternative account and must not be copied between devices.
 
@@ -214,7 +214,7 @@ Required fields:
 
 ### `warnings[]`
 
-`warnings` is required and may be empty. Warning entries are machine-readable and must not contain raw platform identifiers, URIs, Drive ids, account emails, filesystem paths, provider document ids, access tokens, OAuth values, stack traces, or raw error strings.
+`warnings` is required and may be empty. Warning entries are machine-readable and must not contain raw platform identifiers, reverse-DNS provider/class identifiers, URIs, Drive ids, account emails, filesystem paths, provider document ids, access tokens, OAuth values, stack traces, exception names, or raw error strings.
 
 Required fields:
 
@@ -266,7 +266,7 @@ Required fields:
 
 - `contentId`: stable content id, non-blank string.
 - `normalizedUrl`: `http` or `https` URL accepted by the same validator as manual link add.
-- `title`: non-blank string, maximum 200 characters.
+- `title`: non-blank string, maximum 200 characters, display-safe; import rejects raw URIs, account-like strings, filesystem paths, provider authorities, reverse-DNS provider/class identifiers, access tokens, OAuth values, and platform identifiers.
 - `description`: string, maximum 1000 characters.
 - `durationMinutes`: integer in `1..240`; this is legacy/display metadata and must not be used as a whole-source recommendation filter.
 - `topicTags`: array of `topicTags`, minimum 1.
@@ -283,10 +283,10 @@ Optional fields:
 Required fields:
 
 - `contentId`: stable content id, non-blank string.
-- `displayName`: non-blank string, maximum 240 characters.
+- `displayName`: non-blank string, maximum 240 characters, display-safe; import rejects raw URIs, account-like strings, filesystem paths, provider authorities, access tokens, OAuth values, and platform identifiers.
 - `mimeType`: nullable string.
 - `documentFormat`: one of `MARKDOWN`, `PDF`, `EPUB`.
-- `title`: non-blank string, maximum 200 characters.
+- `title`: non-blank string, maximum 200 characters, display-safe under the same raw-value rejection rules as `displayName`.
 - `description`: string, maximum 1000 characters.
 - `durationMinutes`: integer in `1..240`; computed/display metadata only.
 - `topicTags`: array of `topicTags`, minimum 1.
@@ -307,7 +307,7 @@ Schema v1 must not export raw Android `content://` or `file://` URIs. A user-doc
 }
 ```
 
-`sourceHint.providerLabel` is display-only and must not contain a raw URI, account email, filesystem path, or provider document id.
+`sourceHint.providerLabel` is display-only and must not contain a raw URI, account email, filesystem path, Android/Google provider authority, or provider document id.
 
 ### `documentFingerprint`
 
@@ -333,6 +333,8 @@ Rules:
 - collapse internal whitespace to one ASCII space
 - lowercase with `Locale.ROOT`
 - remove file extension only when it exactly matches the exported `format`
+
+The stored `normalizedTitle` must already equal the algorithm output. Import rejects values with leading/trailing whitespace, doubled whitespace, uppercase characters, raw URI/account/provider identifiers, and leftover source extensions including `.pdf`, `.epub`, `.html`, `.htm`, `.md`, and `.markdown`.
 - maximum 200 Unicode scalar values after normalization
 
 `TEXT_SAMPLE_SHA256` algorithm:
@@ -533,6 +535,7 @@ Importer must:
 - Reject invalid primitive types.
 - Reject invalid enum values.
 - Reject invalid timestamp ranges.
+- Reject quoted string values for numeric and boolean fields before any mutation.
 - Reject invalid reading progress bounds.
 - Validate user links with the same URL rules as manual link add.
 - Validate topic tags and content priority values.
@@ -569,7 +572,7 @@ Encryption is not required for schema v1 because there is no server account or r
 
 Implementation slices that add UI must capture screenshots for:
 
-- Settings Account Light entry.
+- Settings Portable profile entry.
 - Export action and export success.
 - Export failure.
 - Import entry point.
@@ -586,4 +589,4 @@ Implementation slices that add UI must capture screenshots for:
 
 - Whether to add optional encrypted ZIP export that includes document binaries.
 - Whether to support a conflict-review screen for individual imported rows.
-- Whether Account Light profile and annotation JSON-LD files should live in one Drive folder or sibling folders.
+- Whether Portable Profile and annotation JSON-LD files should live in one Drive folder or sibling folders.

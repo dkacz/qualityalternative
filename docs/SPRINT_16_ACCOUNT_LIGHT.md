@@ -1,4 +1,4 @@
-# Sprint 16: Account Light Local Profile
+# Sprint 16: Portable Profile
 
 Status: started
 
@@ -21,8 +21,8 @@ Implement account-like portability without a Quality Alternative server account.
 
 Deliverables:
 
-- PRD Account Light requirement.
-- Account Light profile schema document.
+- PRD Portable Profile requirement.
+- Portable Profile schema document.
 - Sprint plan and acceptance criteria.
 
 Review gate:
@@ -31,7 +31,7 @@ Review gate:
 - Required result before implementation slices: `SCORE: 10/10`, `VERDICT: PASS`.
 - R1 GPT Pro review returned `SCORE: 7/10`, `VERDICT: FAIL`, `VISUAL REVIEW: PASS`; R2 hardens the schema with concrete field shapes, enum domains, document fingerprints, no raw URI export, explicit merge/replace semantics, and Drive/autosave reactivation rules before implementation proceeds.
 - R2 GPT Pro review returned `SCORE: 8/10`, `VERDICT: FAIL`, `VISUAL REVIEW: PASS`; R3 adds stable content-id format/generation/collision rules, formal `warnings[]` schema, deterministic field-level merge winners for links/documents/progress/settings, and exact text fingerprint normalization.
-- R4 GPT Pro review returned `SCORE: 9/10`, `VERDICT: FAIL`, `VISUAL REVIEW: PASS`; Account Light contract blockers were closed, but the sprint order incorrectly placed final release before the newly required adaptive reader pagination slice. R5 moves adaptive pagination before final UX/hardening/release.
+- R4 GPT Pro review returned `SCORE: 9/10`, `VERDICT: FAIL`, `VISUAL REVIEW: PASS`; Portable Profile contract blockers were closed, but the sprint order incorrectly placed final release before the newly required adaptive reader pagination slice. R5 moves adaptive pagination before final UX/hardening/release.
 
 ### Slice 16.1: Local Profile Identity And Settings Export
 
@@ -46,7 +46,7 @@ Deliverables:
 Review gate:
 
 - GPT Pro code review and Settings visual review where applicable.
-- If Settings UI is touched, screenshot Account Light entry, export action, export success, and export failure.
+- If Settings UI is touched, screenshot Portable profile entry, export action, export success, and export failure.
 
 ### Slice 16.2: Settings Import And Safe Restore
 
@@ -76,7 +76,7 @@ Review gate:
 
 - GPT Pro code, E2E, and visual review.
 
-### Slice 16.4: Account Light Autosave Destination
+### Slice 16.4: Portable Profile Autosave Destination
 
 Deliverables:
 
@@ -96,13 +96,13 @@ Context:
 - User reported that current paginated reader can leave too much empty space on a real phone.
 - The reader should remain Kindle-like: no active vertical scrolling, no persistent Previous/Next/Done controls, tap/swipe navigation still works.
 - Android Back should exit the active reader to the prior app screen, after closing TOC or annotation overlays. Previous-page navigation should be a reader gesture or a very small left-edge tap zone, not the system Back action.
-- Reader font size must be adjustable in Quality Alternative settings and exported/imported through Account Light. The user must not have to change Android system font size just to tune the reader.
-- Annotation range selection is part of this reader pass but must not be implemented during earlier Account Light slices: the current Start/End earlier/later concept is acceptable only if it becomes compact, icon-first, and works reliably.
+- Reader font size must be adjustable in Quality Alternative settings and exported/imported through Portable Profile. The user must not have to change Android system font size just to tune the reader.
+- Annotation range selection is part of this reader pass but must not be implemented during earlier Portable Profile slices: the current Start/End earlier/later concept is acceptable only if it becomes compact, icon-first, and works reliably.
 
 Deliverables:
 
 - Replace fixed paragraph/weight pagination with viewport-aware pagination that measures usable reader height.
-- Add an app-level reader font-size setting backed by the Account Light `readerFontScale` field.
+- Add an app-level reader font-size setting backed by the Portable Profile `readerFontScale` field.
 - Account for actual device dimensions and the app-level reader font-size setting when calculating pages; system font scale may be observed as an accessibility input but cannot be the only control.
 - Keep pages full enough to avoid large avoidable blank regions while preventing clipping/overflow.
 - Preserve TOC jumps, reading progress restoration, annotations, tap-to-next, swipe left/right, and Back-to-exit behavior.
@@ -123,7 +123,7 @@ Review gate:
 
 Deliverables:
 
-- Minimal Settings UX for Account Light.
+- Minimal Settings UX for Portable Profile.
 - E2E export/import on clean app state.
 - Visual screenshots for Settings, export success, import success, invalid import, missing-document state, and adaptive reader pagination on representative viewport/font-size combinations.
 - Full release validation.
@@ -131,12 +131,12 @@ Deliverables:
 
 Review gate:
 
-- GPT Pro final release gate with visual review after all Account Light and adaptive reader pagination slices pass.
+- GPT Pro final release gate with visual review after all Portable Profile and adaptive reader pagination slices pass.
 - Required result: `SCORE: 10/10`, `VERDICT: PASS`, `VISUAL REVIEW: PASS`.
 
 ## Definition Of Done
 
-- Account Light works without a server.
+- Portable Profile works without a server.
 - Exported profile is JSON and human-auditable.
 - Import validates before mutation.
 - No credentials or authorization grants are exported.

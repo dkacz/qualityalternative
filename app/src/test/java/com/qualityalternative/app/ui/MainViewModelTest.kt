@@ -4,6 +4,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import com.qualityalternative.app.analytics.InMemoryAnalyticsTracker
+import com.qualityalternative.app.data.AccountLightProfileExporter
 import com.qualityalternative.app.data.CompositeContentRepository
 import com.qualityalternative.app.data.InMemoryDelayGate
 import com.qualityalternative.app.data.PreferencesDelayGate
@@ -3042,6 +3043,106 @@ class MainViewModelTest {
         assertEquals(InterventionOrigin.SYSTEM, viewModel.uiState.currentInterventionOrigin)
     }
 
+    @Test
+    fun previewAccountLightImportShowsValidationErrorWithoutMutatingSettings() = runTest {
+        val settingsRepository = FakeSettingsRepository(
+            initial = completedSettings(selectedAppPackages = setOf("com.instagram.android")).copy(
+                themeMode = AppThemeMode.DARK,
+                contentPriority = ContentPriority.MY_FILES,
+            ),
+        )
+        val viewModel = createViewModel(settingsRepository = settingsRepository)
+        advanceUntilIdle()
+
+        viewModel.previewAccountLightImport("{not-json")
+
+        assertEquals("Portable profile is not valid JSON.", viewModel.uiState.accountLightImportError)
+        assertEquals(null, viewModel.uiState.accountLightImportPreview)
+        assertEquals(AppThemeMode.DARK, settingsRepository.state.value.themeMode)
+        assertEquals(ContentPriority.MY_FILES, settingsRepository.state.value.contentPriority)
+    }
+
+    @Test
+    fun accountLightMergeImportKeepsLocalPortableSettings() = runTest {
+        val importedSettingsRepository = FakeSettingsRepository(
+            initial = completedSettings(selectedAppPackages = setOf("com.instagram.android")).copy(
+                themeMode = AppThemeMode.DARK,
+                contentPriority = ContentPriority.MY_FILES,
+                readerFontScale = 1.35,
+            ),
+        )
+        val targetSettingsRepository = FakeSettingsRepository(
+            initial = completedSettings(selectedAppPackages = setOf("com.google.android.youtube")).copy(
+                themeMode = AppThemeMode.LIGHT,
+                contentPriority = ContentPriority.BALANCED,
+                readerFontScale = 1.0,
+            ),
+        )
+        val viewModel = createViewModel(settingsRepository = targetSettingsRepository)
+        val rawJson = AccountLightProfileExporter(
+            settingsRepository = importedSettingsRepository,
+            appVersionName = "0.8.1-alpha",
+            appVersionCode = 13,
+        ).exportSettingsOnlyProfileJson(nowMillis = 20_000L)
+        advanceUntilIdle()
+
+        viewModel.previewAccountLightImport(rawJson)
+        viewModel.applyAccountLightMergeImport()
+        advanceUntilIdle()
+
+        assertEquals(null, viewModel.uiState.accountLightImportError)
+        assertEquals(null, viewModel.uiState.accountLightImportPreview)
+        assertEquals("Profile merged. Local settings were kept.", viewModel.uiState.accountLightStatus)
+        assertEquals(AppThemeMode.LIGHT, targetSettingsRepository.state.value.themeMode)
+        assertEquals(ContentPriority.BALANCED, targetSettingsRepository.state.value.contentPriority)
+        assertEquals(1.0, targetSettingsRepository.state.value.readerFontScale, 0.0)
+    }
+
+    @Test
+    fun accountLightReplaceImportRequiresConfirmationAndAppliesPortableSettings() = runTest {
+        val importedSettingsRepository = FakeSettingsRepository(
+            initial = completedSettings(selectedAppPackages = setOf("com.instagram.android")).copy(
+                themeMode = AppThemeMode.DARK,
+                contentPriority = ContentPriority.MY_FILES,
+                readerFontScale = 1.35,
+                openAnywayUnlockMinutes = 60,
+            ),
+        )
+        val targetSettingsRepository = FakeSettingsRepository(
+            initial = completedSettings(selectedAppPackages = setOf("com.google.android.youtube")).copy(
+                themeMode = AppThemeMode.LIGHT,
+                contentPriority = ContentPriority.BALANCED,
+                readerFontScale = 1.0,
+                openAnywayUnlockMinutes = 15,
+            ),
+        )
+        val viewModel = createViewModel(settingsRepository = targetSettingsRepository)
+        val rawJson = AccountLightProfileExporter(
+            settingsRepository = importedSettingsRepository,
+            appVersionName = "0.8.1-alpha",
+            appVersionCode = 13,
+        ).exportSettingsOnlyProfileJson(nowMillis = 20_000L)
+        advanceUntilIdle()
+
+        viewModel.previewAccountLightImport(rawJson)
+        assertNotNull(viewModel.uiState.accountLightImportPreview)
+        assertFalse(viewModel.uiState.isAccountLightReplaceConfirming)
+
+        viewModel.requestAccountLightReplaceConfirmation()
+        assertTrue(viewModel.uiState.isAccountLightReplaceConfirming)
+
+        viewModel.confirmAccountLightReplaceImport()
+        advanceUntilIdle()
+
+        assertEquals("Imported settings replaced local portable settings.", viewModel.uiState.accountLightStatus)
+        assertEquals(null, viewModel.uiState.accountLightImportPreview)
+        assertFalse(viewModel.uiState.isAccountLightReplaceConfirming)
+        assertEquals(AppThemeMode.DARK, targetSettingsRepository.state.value.themeMode)
+        assertEquals(ContentPriority.MY_FILES, targetSettingsRepository.state.value.contentPriority)
+        assertEquals(1.35, targetSettingsRepository.state.value.readerFontScale, 0.0)
+        assertEquals(60, targetSettingsRepository.state.value.openAnywayUnlockMinutes)
+    }
+
     private fun completedSettings(selectedAppPackages: Set<String>): AppSettings {
         return AppSettings(
             hasCompletedOnboarding = true,
@@ -3140,6 +3241,26 @@ class MainViewModelTest {
                 profileId = "qa-local-00000000-0000-0000-0000-000000000000",
                 createdAtMillis = nowMillis,
             )
+
+        override suspend fun replacePortableSettings(
+            settings: AppSettings,
+            profileIdentity: com.qualityalternative.app.domain.model.LocalProfileIdentity?,
+        ) {
+            state.value = state.value.copy(
+                hasCompletedOnboarding = settings.hasCompletedOnboarding,
+                selectedAppPackages = settings.selectedAppPackages,
+                preferredTopics = settings.preferredTopics,
+                preferredDurationBucket = settings.preferredDurationBucket,
+                selectedPackIds = settings.selectedPackIds,
+                themeMode = settings.themeMode,
+                meditationDurationMinutes = settings.meditationDurationMinutes,
+                readerFontScale = settings.readerFontScale,
+                contentPriority = settings.contentPriority,
+                priorityContentIds = settings.priorityContentIds,
+                reactivatedCompletedContentIds = settings.reactivatedCompletedContentIds,
+                openAnywayUnlockMinutes = settings.openAnywayUnlockMinutes,
+            )
+        }
 
         override suspend fun saveSelectedAppPackages(packages: Set<String>) {
             state.value = state.value.copy(selectedAppPackages = packages)

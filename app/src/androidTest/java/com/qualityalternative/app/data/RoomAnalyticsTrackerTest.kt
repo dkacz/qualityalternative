@@ -669,6 +669,32 @@ class RoomAnalyticsTrackerTest {
 
         override fun supportedDistractingApps(): List<DistractingApp> = SupportedCatalog.distractingApps
 
+        override suspend fun ensureLocalProfileIdentity(nowMillis: Long) =
+            com.qualityalternative.app.domain.model.LocalProfileIdentity(
+                profileId = "qa-local-00000000-0000-0000-0000-000000000000",
+                createdAtMillis = nowMillis,
+            )
+
+        override suspend fun replacePortableSettings(
+            settings: AppSettings,
+            profileIdentity: com.qualityalternative.app.domain.model.LocalProfileIdentity?,
+        ) {
+            state.value = state.value.copy(
+                hasCompletedOnboarding = settings.hasCompletedOnboarding,
+                selectedAppPackages = settings.selectedAppPackages,
+                preferredTopics = settings.preferredTopics,
+                preferredDurationBucket = settings.preferredDurationBucket,
+                selectedPackIds = settings.selectedPackIds,
+                themeMode = settings.themeMode,
+                meditationDurationMinutes = settings.meditationDurationMinutes,
+                readerFontScale = settings.readerFontScale,
+                contentPriority = settings.contentPriority,
+                priorityContentIds = settings.priorityContentIds,
+                reactivatedCompletedContentIds = settings.reactivatedCompletedContentIds,
+                openAnywayUnlockMinutes = settings.openAnywayUnlockMinutes,
+            )
+        }
+
         override suspend fun saveOnboardingSelection(selection: OnboardingSelection) {
             state.value = AppSettings(
                 hasCompletedOnboarding = true,
@@ -707,6 +733,10 @@ class RoomAnalyticsTrackerTest {
 
         override suspend fun saveMeditationDurationMinutes(minutes: Int) {
             state.value = state.value.copy(meditationDurationMinutes = minutes)
+        }
+
+        override suspend fun saveReaderFontScale(scale: Double) {
+            state.value = state.value.copy(readerFontScale = scale)
         }
 
         override suspend fun saveContentPriority(priority: ContentPriority) {

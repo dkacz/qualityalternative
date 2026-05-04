@@ -1,0 +1,3156 @@
+diff --git a/PRD.md b/PRD.md
+index 253e23c..733c7f7 100644
+--- a/PRD.md
++++ b/PRD.md
+@@ -380,7 +380,7 @@ The product must log enough behavior to evaluate whether substitution is working
+ - Each event includes timestamp, target app, recommendation identifiers, and session context.
+ - Analytics can distinguish between no recommendation available and user chose Open anyway.
+
+-### FR13. Account Light Local Profile
++### FR13. Portable Profile
+
+ The system must provide account-like portability without requiring a Quality Alternative server account or backend authentication.
+
+@@ -391,10 +391,10 @@ The system must provide account-like portability without requiring a Quality Alt
+ - User can import a compatible profile file from Settings and choose a safe restore mode.
+ - Profile export includes portable settings, selected distracting apps, topic preferences, starter-pack choices, reader font-size preference, content priority settings, user links, user-document metadata, reading progress, completed/reactivated state, and annotation sync/export preferences that are safe to move across devices.
+ - Profile export must not include Google access tokens, authorization grants, OAuth secrets, raw Drive file ids, raw Android `content://` or `file://` URIs, raw SAF tree URIs, account emails, raw analytics event logs, Android-only permission state, or unredacted platform-internal identifiers that would be misleading on another device.
+-- User-owned document binaries are not exported in the initial Account Light profile. The profile may preserve document metadata, stable content identity, and safe document fingerprints, but import must clearly mark missing or unverified local document files as unavailable until the user reattaches and verifies them.
++- User-owned document binaries are not exported in the initial portable profile. The profile may preserve document metadata, stable content identity, and safe document fingerprints, but import must clearly mark missing or unverified local document files as unavailable until the user reattaches and verifies them.
+ - The profile format is schema-versioned and must reject unsupported future versions without corrupting local state.
+ - Import failures are visible and must not partially overwrite local settings or library data. Merge mode must preserve local settings unless the user explicitly chooses to apply imported settings, and replace mode must show affected scope before destructive mutation.
+-- Account Light may optionally autosave the profile to a user-authorized local or Google Drive destination, but imported autosave or Drive metadata must be informational only until the current device user reselects a destination or reauthorizes Drive. The canonical product behavior must remain usable without a backend server.
++- Portable Profile may optionally autosave the profile to a user-authorized local or Google Drive destination, but imported autosave or Drive metadata must be informational only until the current device user reselects a destination or reauthorizes Drive. The canonical product behavior must remain usable without a backend server.
+
+ ## Non-Functional Requirements
+
+@@ -416,7 +416,7 @@ The system must provide account-like portability without requiring a Quality Alt
+
+ ### NFR4. Local-First Portability And Privacy
+
+-- Account Light data must be local-first and user-controlled.
++- Portable Profile data must be local-first and user-controlled.
+ - Portable profile exports must be human-auditable JSON rather than opaque database backups.
+ - Export/import should preserve behaviorally important state without pretending to provide server-backed identity, cross-device conflict resolution, or guaranteed document-file transfer.
+ - Any cloud sync must be explicit, revocable, and scoped to user-owned files. Cloud authorization state must be re-established on each device rather than copied through profile export.
+diff --git a/app/src/androidTest/java/com/qualityalternative/app/MainActivityTest.kt b/app/src/androidTest/java/com/qualityalternative/app/MainActivityTest.kt
+index 4492550..f6b600b 100644
+--- a/app/src/androidTest/java/com/qualityalternative/app/MainActivityTest.kt
++++ b/app/src/androidTest/java/com/qualityalternative/app/MainActivityTest.kt
+@@ -79,6 +79,8 @@ class MainActivityTest {
+         "sprint14-reader-pagination-${System.currentTimeMillis()}"
+     private val sprint15DriveSyncScreenshotDirName =
+         "sprint15-drive-sync-${System.currentTimeMillis()}"
++    private val sprint16PortableProfileScreenshotDirName =
++        "sprint16-portable-profile-${System.currentTimeMillis()}"
+
+     @Before
+     fun resetAppState() {
+@@ -1102,6 +1104,71 @@ class MainActivityTest {
+         captureSprint15DriveSyncScreenshot("02_drive_auth_failure_light")
+     }
+
++    @Test
++    fun accountLightImportSettingsShowsPreviewErrorsConfirmationAndSuccess() {
++        launchOnboardedApp()
++        scenario?.onActivity { activity -> activity.mainViewModel.openSettings() }
++        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("settings-list") }
++
++        scrollToAccountLightSettings()
++        composeRule.onNodeWithTag("settings-account-light-section").assertIsDisplayed()
++        composeRule.onNodeWithTag("settings-account-light-import").assertIsDisplayed()
++        captureSprint16PortableProfileScreenshot("01_import_entry_light")
++
++        scenario?.onActivity { activity ->
++            activity.mainViewModel.previewAccountLightImport(
++                accountLightProfileJson(
++                    schemaVersion = 1,
++                    selectedAppPackages = listOf("com.instagram.android", "com.future.reader"),
++                ),
++            )
++        }
++        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("settings-account-light-import-preview") }
++        scrollToAccountLightSettings()
++        composeRule.onNodeWithTag("settings-account-light-import-preview").assertIsDisplayed()
++        composeRule.onNodeWithTag("settings-account-light-import-warning-summary").assertIsDisplayed()
++        captureSprint16PortableProfileScreenshot("02_merge_preview_with_unsupported_app_light")
++
++        composeRule.onNodeWithTag("settings-account-light-import-replace")
++            .assertIsDisplayed()
++            .performClick()
++        composeRule.onNodeWithTag("settings-account-light-replace-confirm").assertIsDisplayed()
++        composeRule.onNodeWithTag("settings-account-light-replace-backup").assertIsDisplayed()
++        composeRule.onNodeWithTag("settings-list")
++            .performScrollToNode(hasTestTag("settings-account-light-replace-confirm-action"))
++        captureSprint16PortableProfileScreenshot("03_replace_confirmation_light")
++
++        composeRule.onNodeWithTag("settings-account-light-replace-confirm-action")
++            .assertIsDisplayed()
++            .performClick()
++        composeRule.waitUntil(timeoutMillis = 10_000) {
++            hasNodeContaining("IMPORTED SETTINGS REPLACED LOCAL PORTABLE SETTINGS")
++        }
++        scrollToAccountLightSettings()
++        composeRule.onNodeWithTag("settings-account-light-status").assertIsDisplayed()
++        captureSprint16PortableProfileScreenshot("04_import_success_dark")
++
++        scenario?.onActivity { activity ->
++            activity.mainViewModel.previewAccountLightImport("{not-json")
++        }
++        composeRule.waitUntil(timeoutMillis = 10_000) {
++            hasNodeContaining("PORTABLE PROFILE IS NOT VALID JSON")
++        }
++        scrollToAccountLightSettings()
++        composeRule.onNodeWithTag("settings-account-light-status").assertIsDisplayed()
++        captureSprint16PortableProfileScreenshot("05_invalid_import_dark")
++
++        scenario?.onActivity { activity ->
++            activity.mainViewModel.previewAccountLightImport(accountLightProfileJson(schemaVersion = 99))
++        }
++        composeRule.waitUntil(timeoutMillis = 10_000) {
++            hasNodeContaining("UNSUPPORTED PORTABLE PROFILE SCHEMA VERSION 99")
++        }
++        scrollToAccountLightSettings()
++        composeRule.onNodeWithTag("settings-account-light-status").assertIsDisplayed()
++        captureSprint16PortableProfileScreenshot("06_future_schema_import_dark")
++    }
++
+     @Test
+     fun meditationAlternativeOpensThreeMinuteTimer() {
+         launchMeditationFixtureSystemIntervention()
+@@ -1227,6 +1294,79 @@ class MainActivityTest {
+         }.getOrDefault(false)
+     }
+
++    private fun scrollToAccountLightSettings() {
++        composeRule.onNodeWithTag("settings-list")
++            .performScrollToNode(hasTestTag("settings-account-light-section"))
++        composeRule.waitForIdle()
++    }
++
++    private fun accountLightProfileJson(
++        schemaVersion: Int,
++        selectedAppPackages: List<String> = listOf("com.instagram.android"),
++    ): String {
++        val appJson = selectedAppPackages.joinToString(separator = ",") { packageName -> "\"$packageName\"" }
++        return """
++            {
++              "schemaVersion": $schemaVersion,
++              "exportedAtMillis": 20000,
++              "app": {
++                "profileFormat": "quality-alternative-account-light",
++                "packageName": "com.qualityalternative.app",
++                "appVersionName": "0.8.1-alpha",
++                "appVersionCode": 13
++              },
++              "profile": {
++                "profileId": "qa-local-22222222-2222-4222-8222-222222222222",
++                "createdAtMillis": 10000,
++                "updatedAtMillis": 20000,
++                "displayName": null
++              },
++              "settings": {
++                "hasCompletedOnboarding": true,
++                "selectedAppPackages": [$appJson],
++                "preferredTopics": ["SCIENCE", "PHILOSOPHY"],
++                "preferredDurationBucket": "FOCUS",
++                "selectedPackIds": ["starter_pack"],
++                "themeMode": "DARK",
++                "meditationDurationMinutes": 5,
++                "readerFontScale": 1.25,
++                "contentPriority": "MY_FILES",
++                "priorityContentIds": [],
++                "reactivatedCompletedContentIds": [],
++                "openAnywayUnlockMinutes": 60
++              },
++              "library": {
++                "userLinks": [],
++                "userDocuments": []
++              },
++              "reading": {
++                "progress": []
++              },
++              "annotations": {
++                "export": {
++                  "destinationDisplayName": null,
++                  "lastSuccessfulAtMillis": null
++                },
++                "driveSync": {
++                  "wasEnabledOnSourceDevice": false,
++                  "folderDisplayName": null,
++                  "lastSuccessfulAtMillis": null
++                },
++                "sidecarIndex": []
++              },
++              "sync": {
++                "profileAutosave": {
++                  "provider": "NONE",
++                  "destinationDisplayName": null,
++                  "lastSuccessfulAtMillis": null,
++                  "activationStateOnImport": "REQUIRES_LOCAL_SELECTION"
++                }
++              },
++              "warnings": []
++            }
++        """.trimIndent()
++    }
++
+     private fun hasContentDescriptionNode(description: String): Boolean {
+         return runCatching {
+             composeRule.onNode(hasContentDescription(description)).fetchSemanticsNode()
+@@ -1979,6 +2119,16 @@ class MainActivityTest {
+         assertTrue("Expected screenshot file for $name", output.exists() && output.length() > 0L)
+     }
+
++    private fun captureSprint16PortableProfileScreenshot(name: String) {
++        val outputDir = File("/sdcard/Download/qualityalternative/$sprint16PortableProfileScreenshotDirName")
++        assertTrue("Expected screenshot output directory for $name", outputDir.mkdirs() || outputDir.exists())
++        composeRule.waitForIdle()
++        Thread.sleep(300)
++        val output = File(outputDir, "$name.png")
++        assertTrue("Expected screenshot capture for $name", UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).takeScreenshot(output))
++        assertTrue("Expected screenshot file for $name", output.exists() && output.length() > 0L)
++    }
++
+     private fun assertHomeHeroIsDisplayed() {
+         composeRule.waitUntil(timeoutMillis = 10_000) {
+             hasNode("You're set up for quieter reading today.") || hasNode("Finish setup to intercept distracting apps.")
+diff --git a/app/src/androidTest/java/com/qualityalternative/app/data/RoomAnalyticsTrackerTest.kt b/app/src/androidTest/java/com/qualityalternative/app/data/RoomAnalyticsTrackerTest.kt
+index a5d41f1..a447d1d 100644
+--- a/app/src/androidTest/java/com/qualityalternative/app/data/RoomAnalyticsTrackerTest.kt
++++ b/app/src/androidTest/java/com/qualityalternative/app/data/RoomAnalyticsTrackerTest.kt
+@@ -669,6 +669,32 @@ class RoomAnalyticsTrackerTest {
+
+         override fun supportedDistractingApps(): List<DistractingApp> = SupportedCatalog.distractingApps
+
++        override suspend fun ensureLocalProfileIdentity(nowMillis: Long) =
++            com.qualityalternative.app.domain.model.LocalProfileIdentity(
++                profileId = "qa-local-00000000-0000-0000-0000-000000000000",
++                createdAtMillis = nowMillis,
++            )
++
++        override suspend fun replacePortableSettings(
++            settings: AppSettings,
++            profileIdentity: com.qualityalternative.app.domain.model.LocalProfileIdentity?,
++        ) {
++            state.value = state.value.copy(
++                hasCompletedOnboarding = settings.hasCompletedOnboarding,
++                selectedAppPackages = settings.selectedAppPackages,
++                preferredTopics = settings.preferredTopics,
++                preferredDurationBucket = settings.preferredDurationBucket,
++                selectedPackIds = settings.selectedPackIds,
++                themeMode = settings.themeMode,
++                meditationDurationMinutes = settings.meditationDurationMinutes,
++                readerFontScale = settings.readerFontScale,
++                contentPriority = settings.contentPriority,
++                priorityContentIds = settings.priorityContentIds,
++                reactivatedCompletedContentIds = settings.reactivatedCompletedContentIds,
++                openAnywayUnlockMinutes = settings.openAnywayUnlockMinutes,
++            )
++        }
++
+         override suspend fun saveOnboardingSelection(selection: OnboardingSelection) {
+             state.value = AppSettings(
+                 hasCompletedOnboarding = true,
+@@ -709,6 +735,10 @@ class RoomAnalyticsTrackerTest {
+             state.value = state.value.copy(meditationDurationMinutes = minutes)
+         }
+
++        override suspend fun saveReaderFontScale(scale: Double) {
++            state.value = state.value.copy(readerFontScale = scale)
++        }
++
+         override suspend fun saveContentPriority(priority: ContentPriority) {
+             state.value = state.value.copy(contentPriority = priority)
+         }
+diff --git a/app/src/main/java/com/qualityalternative/app/data/AccountLightProfile.kt b/app/src/main/java/com/qualityalternative/app/data/AccountLightProfile.kt
+index 06f5601..30ef2fc 100644
+--- a/app/src/main/java/com/qualityalternative/app/data/AccountLightProfile.kt
++++ b/app/src/main/java/com/qualityalternative/app/data/AccountLightProfile.kt
+@@ -3,6 +3,8 @@ package com.qualityalternative.app.data
+ import com.qualityalternative.app.domain.model.AppSettings
+ import com.qualityalternative.app.domain.model.AppThemeMode
+ import com.qualityalternative.app.domain.model.ContentPriority
++import com.qualityalternative.app.domain.model.DEFAULT_READER_FONT_SCALE
++import com.qualityalternative.app.domain.model.DistractingApp
+ import com.qualityalternative.app.domain.model.DurationBucket
+ import com.qualityalternative.app.domain.model.LocalProfileIdentity
+ import com.qualityalternative.app.domain.model.MAX_OPEN_ANYWAY_UNLOCK_MINUTES
+@@ -11,19 +13,39 @@ import com.qualityalternative.app.domain.model.MIN_OPEN_ANYWAY_UNLOCK_MINUTES
+ import com.qualityalternative.app.domain.model.MIN_READER_FONT_SCALE
+ import com.qualityalternative.app.domain.model.TopicTag
+ import com.qualityalternative.app.domain.service.SettingsRepository
++import java.text.SimpleDateFormat
++import java.util.Date
++import java.util.Locale
++import java.util.TimeZone
+ import kotlin.math.roundToInt
+ import kotlinx.coroutines.flow.first
+ import kotlinx.serialization.Serializable
+ import kotlinx.serialization.SerializationException
+ import kotlinx.serialization.decodeFromString
+ import kotlinx.serialization.encodeToString
++import kotlinx.serialization.json.JsonArray
++import kotlinx.serialization.json.JsonElement
+ import kotlinx.serialization.json.Json
++import kotlinx.serialization.json.JsonObject
++import kotlinx.serialization.json.booleanOrNull
++import kotlinx.serialization.json.intOrNull
++import kotlinx.serialization.json.jsonArray
++import kotlinx.serialization.json.jsonObject
++import kotlinx.serialization.json.jsonPrimitive
++import kotlinx.serialization.json.longOrNull
+
+ const val ACCOUNT_LIGHT_SCHEMA_VERSION = 1
+ const val ACCOUNT_LIGHT_PROFILE_FORMAT = "quality-alternative-account-light"
+ const val ACCOUNT_LIGHT_PACKAGE_NAME = "com.qualityalternative.app"
+ const val ACCOUNT_LIGHT_PROFILE_FILE_NAME = "quality-alternative-profile.json"
+
++fun accountLightTimestampedBackupFileName(nowMillis: Long = System.currentTimeMillis()): String {
++    val formatter = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).apply {
++        timeZone = TimeZone.getTimeZone("UTC")
++    }
++    return "quality-alternative-profile-${formatter.format(Date(nowMillis.coerceAtLeast(0L)))}.json"
++}
++
+ @Serializable
+ data class AccountLightProfileFile(
+     val schemaVersion: Int,
+@@ -38,7 +60,7 @@ data class AccountLightProfileFile(
+     val warnings: List<AccountLightWarning> = emptyList(),
+ ) {
+     init {
+-        require(schemaVersion == ACCOUNT_LIGHT_SCHEMA_VERSION) { "Unsupported Account Light schema version." }
++        require(schemaVersion == ACCOUNT_LIGHT_SCHEMA_VERSION) { "Unsupported portable profile schema version." }
+         require(exportedAtMillis >= 0L) { "exportedAtMillis must be non-negative." }
+     }
+ }
+@@ -51,9 +73,9 @@ data class AccountLightApp(
+     val appVersionCode: Int,
+ ) {
+     init {
+-        require(profileFormat == ACCOUNT_LIGHT_PROFILE_FORMAT) { "Invalid Account Light profile format." }
++        require(profileFormat == ACCOUNT_LIGHT_PROFILE_FORMAT) { "Invalid portable profile format." }
+         require(packageName == ACCOUNT_LIGHT_PACKAGE_NAME && packageName.matches(PackageNameRegex)) {
+-            "Invalid Account Light package name."
++            "Invalid portable profile package name."
+         }
+         require(appVersionName.isNotBlank()) { "appVersionName must be non-blank." }
+         require(appVersionCode >= 1) { "appVersionCode must be positive." }
+@@ -68,7 +90,7 @@ data class AccountLightProfileIdentityDto(
+     val displayName: String? = null,
+ ) {
+     init {
+-        require(profileId.matches(ProfileIdRegex)) { "Invalid Account Light profileId." }
++        require(profileId.matches(ProfileIdRegex)) { "Invalid portable profileId." }
+         require(createdAtMillis >= 0L) { "createdAtMillis must be non-negative." }
+         require(updatedAtMillis >= createdAtMillis) { "updatedAtMillis must be >= createdAtMillis." }
+         require(displayName == null || displayName.trim().length <= 80) { "displayName is too long." }
+@@ -128,12 +150,24 @@ data class AccountLightLibrary(
+ @Serializable
+ data class AccountLightUserLink(
+     val contentId: String,
+-)
++) {
++    init {
++        require(contentId.matches(ContentIdRegex) && contentId.startsWith("user-link-")) {
++            "userLinks contentId must use the user-link prefix."
++        }
++    }
++}
+
+ @Serializable
+ data class AccountLightUserDocument(
+     val contentId: String,
+-)
++) {
++    init {
++        require(contentId.matches(ContentIdRegex) && contentId.startsWith("user-document-")) {
++            "userDocuments contentId must use the user-document prefix."
++        }
++    }
++}
+
+ @Serializable
+ data class AccountLightReading(
+@@ -143,7 +177,11 @@ data class AccountLightReading(
+ @Serializable
+ data class AccountLightReadingProgress(
+     val contentId: String,
+-)
++) {
++    init {
++        require(contentId.matches(ContentIdRegex)) { "reading progress contentId is invalid." }
++    }
++}
+
+ @Serializable
+ data class AccountLightAnnotations(
+@@ -190,7 +228,19 @@ data class AccountLightAnnotationSidecar(
+     val jsonLdFileName: String,
+     val sha256: String? = null,
+     val updatedAtMillis: Long,
+-)
++) {
++    init {
++        require(contentId.matches(ContentIdRegex)) { "annotation sidecar contentId is invalid." }
++        require(sourceTitle.isSafePortableTitle()) {
++            "annotation sidecar sourceTitle is not portable."
++        }
++        require(jsonLdFileName.isSafePortableAnnotationSidecarFileName()) {
++            "annotation sidecar file name is invalid."
++        }
++        require(sha256 == null || sha256.matches(Sha256Regex)) { "annotation sidecar sha256 is invalid." }
++        require(updatedAtMillis >= 0L) { "annotation sidecar updatedAtMillis must be non-negative." }
++    }
++}
+
+ @Serializable
+ data class AccountLightSync(
+@@ -231,7 +281,10 @@ data class AccountLightWarning(
+         require(severity in WarningSeverities) { "warning severity is invalid." }
+         require(section in WarningSections) { "warning section is invalid." }
+         require(contentId == null || contentId.matches(ContentIdRegex)) { "warning contentId is invalid." }
+-        require(message == null || (message.length <= 160 && !message.containsUnsafePortableValue())) {
++        require(
++            message == null ||
++                (message.length <= 160 && !message.containsUnsafePortableValue() && !message.containsUnsafeWarningMessage()),
++        ) {
+             "warning message must not include unsafe exported values."
+         }
+     }
+@@ -253,10 +306,10 @@ class AccountLightProfileCodec(
+         val profile = try {
+             json.decodeFromString<AccountLightProfileFile>(rawJson)
+         } catch (exception: SerializationException) {
+-            throw IllegalArgumentException("Invalid Account Light profile JSON.", exception)
++            throw IllegalArgumentException("Invalid portable profile JSON.", exception)
+         }
+         require(profile.schemaVersion == ACCOUNT_LIGHT_SCHEMA_VERSION) {
+-            "Unsupported Account Light schema version ${profile.schemaVersion}."
++            "Unsupported portable profile schema version ${profile.schemaVersion}."
+         }
+         return profile
+     }
+@@ -288,6 +341,685 @@ class AccountLightProfileExporter(
+     }
+ }
+
++enum class AccountLightImportMode {
++    MERGE,
++    REPLACE,
++}
++
++enum class AccountLightImportErrorCode {
++    MALFORMED_JSON,
++    MISSING_TOP_LEVEL_SECTION,
++    UNSUPPORTED_SCHEMA_VERSION,
++    INVALID_PROFILE,
++}
++
++class AccountLightImportException(
++    val code: AccountLightImportErrorCode,
++    message: String,
++    cause: Throwable? = null,
++) : IllegalArgumentException(message, cause)
++
++data class AccountLightImportPreview(
++    val profileId: String,
++    val appVersionName: String,
++    val exportedAtMillis: Long,
++    val importedAppCount: Int,
++    val unsupportedAppCount: Int,
++    val importedTopicCount: Int,
++    val importedPackCount: Int,
++    val warningCount: Int,
++    val warningSummaries: List<String> = emptyList(),
++)
++
++data class AccountLightImportPlan(
++    val profile: AccountLightProfileFile,
++    val preview: AccountLightImportPreview,
++    val generatedWarnings: List<AccountLightWarning> = emptyList(),
++) {
++    val allWarnings: List<AccountLightWarning>
++        get() = profile.warnings + generatedWarnings
++}
++
++data class AccountLightImportApplyResult(
++    val mode: AccountLightImportMode,
++    val settingsApplied: Boolean,
++    val warningCount: Int,
++)
++
++class AccountLightProfileImporter(
++    private val settingsRepository: SettingsRepository,
++    private val supportedApps: List<DistractingApp> = settingsRepository.supportedDistractingApps(),
++    private val knownContentIdsProvider: () -> Set<String> = { emptySet() },
++    private val codec: AccountLightProfileCodec = AccountLightProfileCodec(),
++    private val json: Json = Json { ignoreUnknownKeys = false },
++) {
++    fun validateImportProfileJson(rawJson: String): AccountLightImportPlan {
++        val root = parseRootObject(rawJson)
++        val missingSection = RequiredTopLevelKeys.firstOrNull { key -> key !in root }
++        if (missingSection != null) {
++            throw AccountLightImportException(
++                code = AccountLightImportErrorCode.MISSING_TOP_LEVEL_SECTION,
++                message = "Portable profile is missing $missingSection.",
++            )
++        }
++        val schemaVersionPrimitive = root["schemaVersion"]?.jsonPrimitive
++            ?: throw AccountLightImportException(
++                code = AccountLightImportErrorCode.INVALID_PROFILE,
++                message = "Portable profile has an invalid schema version.",
++            )
++        if (schemaVersionPrimitive.isString) {
++            throw AccountLightImportException(
++                code = AccountLightImportErrorCode.INVALID_PROFILE,
++                message = "Portable profile has an invalid schema version.",
++            )
++        }
++        val schemaVersion = schemaVersionPrimitive.intOrNull
++            ?: throw AccountLightImportException(
++                code = AccountLightImportErrorCode.INVALID_PROFILE,
++                message = "Portable profile has an invalid schema version.",
++            )
++        if (schemaVersion != ACCOUNT_LIGHT_SCHEMA_VERSION) {
++            throw AccountLightImportException(
++                code = AccountLightImportErrorCode.UNSUPPORTED_SCHEMA_VERSION,
++                message = "Unsupported portable profile schema version $schemaVersion.",
++            )
++        }
++        try {
++            validateRequiredShape(root)
++        } catch (exception: IllegalArgumentException) {
++            throw AccountLightImportException(
++                code = AccountLightImportErrorCode.INVALID_PROFILE,
++                message = exception.message ?: "Portable profile is invalid.",
++                cause = exception,
++            )
++        }
++        val profile = try {
++            codec.decode(rawJson)
++        } catch (exception: IllegalArgumentException) {
++            throw AccountLightImportException(
++                code = AccountLightImportErrorCode.INVALID_PROFILE,
++                message = exception.message ?: "Portable profile is invalid.",
++                cause = exception,
++            )
++        }
++        val supportedPackages = supportedApps.mapTo(mutableSetOf(), DistractingApp::packageName)
++        val unsupportedAppCount = profile.settings.selectedAppPackages.distinct().count { packageName ->
++            packageName !in supportedPackages
++        }
++        val generatedWarnings = unknownFieldWarnings(root) +
++            unsupportedAppWarnings(unsupportedAppCount) +
++            duplicateScalarWarnings(profile.settings)
++        val allWarnings = profile.warnings + generatedWarnings
++        return AccountLightImportPlan(
++            profile = profile,
++            generatedWarnings = generatedWarnings,
++            preview = AccountLightImportPreview(
++                profileId = profile.profile.profileId,
++                appVersionName = profile.app.appVersionName,
++                exportedAtMillis = profile.exportedAtMillis,
++                importedAppCount = profile.settings.selectedAppPackages.size,
++                unsupportedAppCount = unsupportedAppCount,
++                importedTopicCount = profile.settings.preferredTopics.size,
++                importedPackCount = profile.settings.selectedPackIds.size,
++                warningCount = allWarnings.size,
++                warningSummaries = allWarnings.map { warning ->
++                    warning.message ?: warning.code
++                }.distinct().take(5),
++            ),
++        )
++    }
++
++    suspend fun applyMerge(plan: AccountLightImportPlan): AccountLightImportApplyResult {
++        return AccountLightImportApplyResult(
++            mode = AccountLightImportMode.MERGE,
++            settingsApplied = false,
++            warningCount = plan.allWarnings.size + 1,
++        )
++    }
++
++    suspend fun applyReplace(plan: AccountLightImportPlan): AccountLightImportApplyResult {
++        val supportedPackages = supportedApps.mapTo(mutableSetOf(), DistractingApp::packageName)
++        settingsRepository.replacePortableSettings(
++            settings = plan.profile.settings.toPortableAppSettings(supportedPackages = supportedPackages),
++            profileIdentity = LocalProfileIdentity(
++                profileId = plan.profile.profile.profileId,
++                createdAtMillis = plan.profile.profile.createdAtMillis,
++            ),
++        )
++        return AccountLightImportApplyResult(
++            mode = AccountLightImportMode.REPLACE,
++            settingsApplied = true,
++            warningCount = plan.allWarnings.size,
++        )
++    }
++
++    private fun parseRootObject(rawJson: String): JsonObject {
++        return try {
++            json.parseToJsonElement(rawJson).jsonObject
++        } catch (exception: Exception) {
++            throw AccountLightImportException(
++                code = AccountLightImportErrorCode.MALFORMED_JSON,
++                message = "Portable profile is not valid JSON.",
++                cause = exception,
++            )
++        }
++    }
++
++    private fun validateRequiredShape(root: JsonObject) {
++        root.requireObject("app", "app").validateRequiredKeys(
++            path = "app",
++            required = RequiredAppKeys,
++            allowed = RequiredAppKeys,
++        )
++        root.requireObject("profile", "profile").validateRequiredKeys(
++            path = "profile",
++            required = RequiredProfileKeys,
++            allowed = RequiredProfileKeys,
++        )
++        root.requireObject("settings", "settings").validateRequiredKeys(
++            path = "settings",
++            required = RequiredSettingsKeys,
++            allowed = RequiredSettingsKeys,
++        )
++        root.requireObject("library", "library").validateLibraryShape()
++        val allowedContentIds = root.importedLibraryContentIds() + knownContentIdsProvider()
++        root.requireObject("settings", "settings").validateSettingsReferences(allowedContentIds)
++        root.requireObject("reading", "reading").validateReadingShape(
++            allowedContentIds = allowedContentIds,
++        )
++        root.requireObject("annotations", "annotations").validateAnnotationsShape()
++        root.requireObject("sync", "sync").validateSyncShape()
++        root.requireArray("warnings", "warnings").forEachIndexed { index, element ->
++            element.requireObject("warnings[$index]").validateRequiredKeys(
++                path = "warnings[$index]",
++                required = RequiredWarningKeys,
++                allowed = RequiredWarningKeys,
++            )
++        }
++    }
++
++    private fun unknownFieldWarnings(root: JsonObject): List<AccountLightWarning> {
++        return findUnknownFieldWarnings(root)
++            .sortedBy(UnknownFieldWarning::path)
++            .map { warning ->
++                AccountLightWarning(
++                    code = "UNKNOWN_FIELD_IGNORED",
++                    severity = "INFO",
++                    section = warning.section,
++                    message = "An unknown ${warning.section.toUnknownFieldMessageSection()} field was ignored",
++                )
++            }
++    }
++
++    private fun unsupportedAppWarnings(unsupportedAppCount: Int): List<AccountLightWarning> {
++        return List(unsupportedAppCount) {
++            AccountLightWarning(
++                code = "UNSUPPORTED_LOCAL_APP_PACKAGE",
++                severity = "WARNING",
++                section = "settings",
++                message = "An imported app package is not supported by this build and will stay inactive.",
++            )
++        }
++    }
++
++    private fun duplicateScalarWarnings(settings: AccountLightSettings): List<AccountLightWarning> {
++        return listOfNotNull(
++            settings.selectedAppPackages.duplicateScalarWarning("selectedAppPackages"),
++            settings.preferredTopics.duplicateScalarWarning("preferredTopics"),
++            settings.selectedPackIds.duplicateScalarWarning("selectedPackIds"),
++            settings.priorityContentIds.duplicateScalarWarning("priorityContentIds"),
++            settings.reactivatedCompletedContentIds.duplicateScalarWarning("reactivatedCompletedContentIds"),
++        )
++    }
++}
++
++private data class UnknownFieldWarning(
++    val path: String,
++    val section: String,
++)
++
++private fun String.toUnknownFieldMessageSection(): String {
++    return when (this) {
++        "library.userLinks" -> "saved link"
++        "library.userDocuments" -> "document"
++        "reading.progress" -> "reading progress"
++        else -> replace('.', ' ').substringBefore(' ')
++    }
++}
++
++private fun findUnknownFieldWarnings(root: JsonObject): List<UnknownFieldWarning> {
++    return buildList {
++        addUnknownKeys(root, RequiredTopLevelKeys, "profile", "unknown")
++        root["app"]?.jsonObjectOrNull()?.let { addUnknownKeys(it, RequiredAppKeys, "app", "app") }
++        root["profile"]?.jsonObjectOrNull()?.let { addUnknownKeys(it, RequiredProfileKeys, "profile", "profile") }
++        root["settings"]?.jsonObjectOrNull()?.let { addUnknownKeys(it, RequiredSettingsKeys, "settings", "settings") }
++        root["library"]?.jsonObjectOrNull()?.let { library ->
++            addUnknownKeys(library, RequiredLibraryKeys, "library", "unknown")
++            library["userLinks"]?.jsonArrayOrNull()?.forEachIndexed { index, element ->
++                element.jsonObjectOrNull()?.let { addUnknownKeys(it, AllowedUserLinkKeys, "library.userLinks[$index]", "library.userLinks") }
++            }
++            library["userDocuments"]?.jsonArrayOrNull()?.forEachIndexed { index, element ->
++                element.jsonObjectOrNull()?.let { document ->
++                    addUnknownKeys(document, AllowedUserDocumentKeys, "library.userDocuments[$index]", "library.userDocuments")
++                    document["documentFingerprint"]?.jsonObjectOrNull()?.let {
++                        addUnknownKeys(
++                            it,
++                            RequiredDocumentFingerprintKeys,
++                            "library.userDocuments[$index].documentFingerprint",
++                            "library.userDocuments",
++                        )
++                    }
++                    document["sourceHint"]?.jsonObjectOrNull()?.let {
++                        addUnknownKeys(
++                            it,
++                            AllowedSourceHintKeys,
++                            "library.userDocuments[$index].sourceHint",
++                            "library.userDocuments",
++                        )
++                    }
++                }
++            }
++        }
++        root["reading"]?.jsonObjectOrNull()?.let { reading ->
++            addUnknownKeys(reading, RequiredReadingKeys, "reading", "reading.progress")
++            reading["progress"]?.jsonArrayOrNull()?.forEachIndexed { index, element ->
++                element.jsonObjectOrNull()?.let { addUnknownKeys(it, RequiredReadingProgressKeys, "reading.progress[$index]", "reading.progress") }
++            }
++        }
++        root["annotations"]?.jsonObjectOrNull()?.let { annotations ->
++            addUnknownKeys(annotations, RequiredAnnotationsKeys, "annotations", "annotations")
++            annotations["export"]?.jsonObjectOrNull()?.let { addUnknownKeys(it, RequiredAnnotationExportKeys, "annotations.export", "annotations") }
++            annotations["driveSync"]?.jsonObjectOrNull()?.let { addUnknownKeys(it, RequiredAnnotationDriveSyncKeys, "annotations.driveSync", "annotations") }
++            annotations["sidecarIndex"]?.jsonArrayOrNull()?.forEachIndexed { index, element ->
++                element.jsonObjectOrNull()?.let { addUnknownKeys(it, RequiredAnnotationSidecarKeys, "annotations.sidecarIndex[$index]", "annotations") }
++            }
++        }
++        root["sync"]?.jsonObjectOrNull()?.let { sync ->
++            addUnknownKeys(sync, RequiredSyncKeys, "sync", "sync")
++            sync["profileAutosave"]?.jsonObjectOrNull()?.let {
++                addUnknownKeys(it, RequiredProfileAutosaveKeys, "sync.profileAutosave", "sync")
++            }
++        }
++        root["warnings"]?.jsonArrayOrNull()?.forEachIndexed { index, element ->
++            element.jsonObjectOrNull()?.let { addUnknownKeys(it, RequiredWarningKeys, "warnings[$index]", "unknown") }
++        }
++    }
++}
++
++private fun MutableList<UnknownFieldWarning>.addUnknownKeys(
++    source: JsonObject,
++    allowed: Set<String>,
++    path: String,
++    section: String,
++) {
++    (source.keys - allowed).forEach { key ->
++        add(UnknownFieldWarning(path = "$path.$key", section = section))
++    }
++}
++
++private fun JsonObject.validateLibraryShape() {
++    validateRequiredKeys(path = "library", required = RequiredLibraryKeys, allowed = RequiredLibraryKeys)
++    val userLinkIds = mutableSetOf<String>()
++    requireArray("userLinks", "library.userLinks").forEachIndexed { index, element ->
++        val path = "library.userLinks[$index]"
++        val link = element.requireObject(path)
++        link.validateRequiredKeys(path = path, required = RequiredUserLinkKeys, allowed = AllowedUserLinkKeys)
++        val contentId = link.requireString("contentId", path)
++        require(contentId.matches(ContentIdRegex) && contentId.startsWith("user-link-")) {
++            "$path.contentId must use the user-link prefix."
++        }
++        require(userLinkIds.add(contentId)) { "$path.contentId is duplicated." }
++        val normalizedUrl = link.requireString("normalizedUrl", path)
++        val urlValidation = UserLinkValidator.validateUrl(normalizedUrl)
++        require(urlValidation.isValid && urlValidation.normalizedUrl == normalizedUrl) {
++            "$path.normalizedUrl must be a normalized manual-link URL."
++        }
++        link.requireNonBlankString("title", path, maxLength = 200)
++            .also { title ->
++                require(title.isSafePortableTitle()) { "$path.title is not portable." }
++            }
++        link.requireString("description", path, maxLength = 1000)
++        link.requireInt("durationMinutes", path, 1..240)
++        link.requireEnumArray("topicTags", path, TopicTag.entries.mapTo(mutableSetOf(), TopicTag::name), minSize = 1)
++        link.requireEnum("availability", path, AvailabilityValues)
++        val createdAtMillis = link.requireLong("createdAtMillis", path, minimum = 0L)
++        val updatedAtMillis = link.requireLong("updatedAtMillis", path, minimum = 0L)
++        require(updatedAtMillis >= createdAtMillis) { "$path.updatedAtMillis must be >= createdAtMillis." }
++        link.requireNullableString("sourceLabel", path, maxLength = 120, required = false)
++    }
++
++    val userDocumentIds = mutableSetOf<String>()
++    requireArray("userDocuments", "library.userDocuments").forEachIndexed { index, element ->
++        val path = "library.userDocuments[$index]"
++        val document = element.requireObject(path)
++        document.validateRequiredKeys(path = path, required = RequiredUserDocumentKeys, allowed = AllowedUserDocumentKeys)
++        val contentId = document.requireString("contentId", path)
++        require(contentId.matches(ContentIdRegex) && contentId.startsWith("user-document-")) {
++            "$path.contentId must use the user-document prefix."
++        }
++        require(userDocumentIds.add(contentId)) { "$path.contentId is duplicated." }
++        document.requireNonBlankString("displayName", path, maxLength = 240)
++            .also { displayName ->
++                require(displayName.isSafePortableSourceHint()) { "$path.displayName is not portable." }
++            }
++        document.requireNullableString("mimeType", path, maxLength = 120, required = true)
++        document.requireEnum("documentFormat", path, DocumentFormatValues)
++        document.requireNonBlankString("title", path, maxLength = 200)
++            .also { title ->
++                require(title.isSafePortableTitle()) { "$path.title is not portable." }
++            }
++        document.requireString("description", path, maxLength = 1000)
++        document.requireInt("durationMinutes", path, 1..240)
++        document.requireEnumArray("topicTags", path, TopicTag.entries.mapTo(mutableSetOf(), TopicTag::name), minSize = 1)
++        document.requireEnum("availability", path, AvailabilityValues)
++        val documentImportState = document.requireEnum("documentImportState", path, DocumentImportStateValues)
++        val fingerprintStrategy = document
++            .requireObject("documentFingerprint", path)
++            .validateDocumentFingerprint("$path.documentFingerprint")
++        require(fingerprintStrategy != "UNVERIFIED_METADATA_ONLY" || documentImportState == "MISSING_FILE_NEEDS_REATTACH") {
++            "$path.documentImportState must be MISSING_FILE_NEEDS_REATTACH for UNVERIFIED_METADATA_ONLY."
++        }
++        document["sourceHint"]?.let { sourceHint ->
++            sourceHint.requireObject("$path.sourceHint").validateSourceHint("$path.sourceHint")
++        }
++        val createdAtMillis = document.requireLong("createdAtMillis", path, minimum = 0L)
++        val updatedAtMillis = document.requireLong("updatedAtMillis", path, minimum = 0L)
++        require(updatedAtMillis >= createdAtMillis) { "$path.updatedAtMillis must be >= createdAtMillis." }
++    }
++}
++
++private fun JsonObject.validateDocumentFingerprint(path: String): String {
++    validateRequiredKeys(
++        path = path,
++        required = RequiredDocumentFingerprintKeys,
++        allowed = RequiredDocumentFingerprintKeys,
++    )
++    val strategy = requireEnum("strategy", path, DocumentFingerprintStrategyValues)
++    val sha256 = requireNullableString("sha256", path, maxLength = 64, required = true)?.also { sha256 ->
++        require(sha256.matches(Sha256Regex)) { "$path.sha256 must be lowercase SHA-256 hex." }
++    }
++    val sizeBytes = requireNullableLong("sizeBytes", path, minimum = 0L, required = true)
++    requireNonBlankString("normalizedTitle", path, maxLength = 200).also { normalizedTitle ->
++        require(normalizedTitle.isNormalizedPortableTitle()) { "$path.normalizedTitle is not normalized." }
++    }
++    requireEnum("format", path, ContentFormatValues)
++    when (strategy) {
++        "SHA256_BYTES" -> {
++            require(sha256 != null) { "$path.sha256 is required for SHA256_BYTES." }
++            require(sizeBytes != null) { "$path.sizeBytes is required for SHA256_BYTES." }
++        }
++        "TEXT_SAMPLE_SHA256" -> {
++            require(sha256 != null) { "$path.sha256 is required for TEXT_SAMPLE_SHA256." }
++            require(sizeBytes == null) { "$path.sizeBytes must be null for TEXT_SAMPLE_SHA256." }
++        }
++        "UNVERIFIED_METADATA_ONLY" -> {
++            require(sha256 == null) { "$path.sha256 must be null for UNVERIFIED_METADATA_ONLY." }
++            require(sizeBytes == null) { "$path.sizeBytes must be null for UNVERIFIED_METADATA_ONLY." }
++        }
++    }
++    return strategy
++}
++
++private fun JsonObject.validateSourceHint(path: String) {
++    validateRequiredKeys(path = path, required = emptySet(), allowed = AllowedSourceHintKeys)
++    requireNullableString("lastKnownDisplayName", path, maxLength = 240, required = false)?.let { displayName ->
++        require(displayName.isSafePortableSourceHint()) { "$path.lastKnownDisplayName is not portable." }
++    }
++    requireNullableString("providerLabel", path, maxLength = 120, required = false)?.let { providerLabel ->
++        require(providerLabel.isSafePortableProviderLabel()) { "$path.providerLabel is not portable." }
++    }
++}
++
++private fun JsonObject.validateSettingsReferences(allowedContentIds: Set<String>) {
++    validateContentIdReferences("priorityContentIds", "settings.priorityContentIds", allowedContentIds)
++    validateContentIdReferences("reactivatedCompletedContentIds", "settings.reactivatedCompletedContentIds", allowedContentIds)
++}
++
++private fun JsonObject.validateContentIdReferences(key: String, path: String, allowedContentIds: Set<String>) {
++    requireArray(key, path).forEachIndexed { index, element ->
++        val contentId = element.jsonPrimitiveOrNull()?.takeUnless { primitive -> primitive.isString.not() }?.content
++            ?: throw IllegalArgumentException("$path[$index] must be a string.")
++        require(contentId.matches(ContentIdRegex)) { "$path[$index] is invalid." }
++        require(contentId in allowedContentIds) { "$path[$index] must reference imported or locally known content." }
++    }
++}
++
++private fun JsonObject.validateReadingShape(allowedContentIds: Set<String>) {
++    validateRequiredKeys(path = "reading", required = RequiredReadingKeys, allowed = RequiredReadingKeys)
++    val progressIds = mutableSetOf<String>()
++    requireArray("progress", "reading.progress").forEachIndexed { index, element ->
++        val path = "reading.progress[$index]"
++        val progress = element.requireObject(path)
++        progress.validateRequiredKeys(path = path, required = RequiredReadingProgressKeys, allowed = RequiredReadingProgressKeys)
++        val contentId = progress.requireString("contentId", path)
++        require(contentId.matches(ContentIdRegex)) { "$path.contentId is invalid." }
++        require(contentId in allowedContentIds) {
++            "$path.contentId must reference imported or locally known content."
++        }
++        require(progressIds.add(contentId)) { "$path.contentId is duplicated." }
++        val progressPercent = progress.requireInt("progressPercent", path, 0..100)
++        val lastVisibleParagraphIndex = progress.requireInt("lastVisibleParagraphIndex", path, 0..Int.MAX_VALUE)
++        val paragraphCount = progress.requireInt("paragraphCount", path, 1..Int.MAX_VALUE)
++        progress.requireLong("updatedAtMillis", path, minimum = 0L)
++        val completedAtMillis = progress.requireNullableLong("completedAtMillis", path, minimum = 0L, required = true)
++        require(lastVisibleParagraphIndex < paragraphCount) {
++            "$path.lastVisibleParagraphIndex must be < paragraphCount."
++        }
++        require((completedAtMillis != null && progressPercent == 100) || (completedAtMillis == null && progressPercent in 0..99)) {
++            "$path progress completion fields are inconsistent."
++        }
++    }
++}
++
++private fun JsonObject.validateAnnotationsShape() {
++    validateRequiredKeys(path = "annotations", required = RequiredAnnotationsKeys, allowed = RequiredAnnotationsKeys)
++    requireObject("export", "annotations.export").apply {
++        validateRequiredKeys(
++            path = "annotations.export",
++            required = RequiredAnnotationExportKeys,
++            allowed = RequiredAnnotationExportKeys,
++        )
++        requireNullableString("destinationDisplayName", "annotations.export", maxLength = 120, required = true)?.let {
++            require(it.isSafePortableDisplayName()) { "annotations.export.destinationDisplayName is not portable." }
++        }
++        requireNullableLong("lastSuccessfulAtMillis", "annotations.export", minimum = 0L, required = true)
++    }
++    requireObject("driveSync", "annotations.driveSync").apply {
++        validateRequiredKeys(
++            path = "annotations.driveSync",
++            required = RequiredAnnotationDriveSyncKeys,
++            allowed = RequiredAnnotationDriveSyncKeys,
++        )
++        requireBoolean("wasEnabledOnSourceDevice", "annotations.driveSync")
++        requireNullableString("folderDisplayName", "annotations.driveSync", maxLength = 120, required = true)?.let {
++            require(it.isSafePortableDisplayName()) { "annotations.driveSync.folderDisplayName is not portable." }
++        }
++        requireNullableLong("lastSuccessfulAtMillis", "annotations.driveSync", minimum = 0L, required = true)
++    }
++    val sidecarIds = mutableSetOf<String>()
++    requireArray("sidecarIndex", "annotations.sidecarIndex").forEachIndexed { index, element ->
++        val path = "annotations.sidecarIndex[$index]"
++        val sidecar = element.requireObject(path)
++        sidecar.validateRequiredKeys(
++            path = path,
++            required = RequiredAnnotationSidecarKeys,
++            allowed = RequiredAnnotationSidecarKeys,
++        )
++        val contentId = sidecar.requireString("contentId", path)
++        require(contentId.matches(ContentIdRegex)) { "$path.contentId is invalid." }
++        require(sidecarIds.add(contentId)) { "$path.contentId is duplicated." }
++        sidecar.requireNonBlankString("sourceTitle", path, maxLength = 240)
++        val fileName = sidecar.requireString("jsonLdFileName", path)
++        require(fileName.isSafePortableAnnotationSidecarFileName()) {
++            "$path.jsonLdFileName is invalid."
++        }
++        sidecar.requireNullableString("sha256", path, maxLength = 64, required = true)?.let { sha256 ->
++            require(sha256.matches(Sha256Regex)) { "$path.sha256 must be lowercase SHA-256 hex." }
++        }
++        sidecar.requireLong("updatedAtMillis", path, minimum = 0L)
++    }
++}
++
++private fun JsonObject.validateSyncShape() {
++    validateRequiredKeys(path = "sync", required = RequiredSyncKeys, allowed = RequiredSyncKeys)
++    requireObject("profileAutosave", "sync.profileAutosave").apply {
++        validateRequiredKeys(
++            path = "sync.profileAutosave",
++            required = RequiredProfileAutosaveKeys,
++            allowed = RequiredProfileAutosaveKeys,
++        )
++        requireEnum("provider", "sync.profileAutosave", AutosaveProviders)
++        requireNullableString("destinationDisplayName", "sync.profileAutosave", maxLength = 120, required = true)?.let {
++            require(it.isSafePortableDisplayName()) { "sync.profileAutosave.destinationDisplayName is not portable." }
++        }
++        requireNullableLong("lastSuccessfulAtMillis", "sync.profileAutosave", minimum = 0L, required = true)
++        require(requireString("activationStateOnImport", "sync.profileAutosave") == "REQUIRES_LOCAL_SELECTION") {
++            "sync.profileAutosave.activationStateOnImport is invalid."
++        }
++    }
++}
++
++private fun JsonObject.validateRequiredKeys(path: String, required: Set<String>, allowed: Set<String>) {
++    val missing = required.firstOrNull { key -> key !in this }
++    require(missing == null) { "$path is missing required field $missing." }
++    val unknown = keys - allowed
++    require(unknown.isEmpty() || allowed.isNotEmpty()) { "$path has unknown fields." }
++}
++
++private fun JsonObject.requireObject(key: String, path: String): JsonObject {
++    val element = this[key] ?: throw IllegalArgumentException("$path is missing required field $key.")
++    return element.requireObject("$path.$key")
++}
++
++private fun JsonElement.requireObject(path: String): JsonObject {
++    return jsonObjectOrNull() ?: throw IllegalArgumentException("$path must be an object.")
++}
++
++private fun JsonObject.requireArray(key: String, path: String): JsonArray {
++    val element = this[key] ?: throw IllegalArgumentException("$path is missing.")
++    return element.jsonArrayOrNull() ?: throw IllegalArgumentException("$path must be an array.")
++}
++
++private fun JsonObject.requireString(key: String, path: String, maxLength: Int? = null): String {
++    val element = this[key] ?: throw IllegalArgumentException("$path is missing required field $key.")
++    val value = element.jsonPrimitiveOrNull()?.takeUnless { primitive -> primitive.isString.not() }?.content
++        ?: throw IllegalArgumentException("$path.$key must be a string.")
++    require(maxLength == null || value.length <= maxLength) { "$path.$key is too long." }
++    return value
++}
++
++private fun JsonObject.requireNonBlankString(key: String, path: String, maxLength: Int): String {
++    val value = requireString(key, path, maxLength)
++    require(value.trim().isNotBlank()) { "$path.$key must be non-blank." }
++    return value
++}
++
++private fun JsonObject.requireNullableString(
++    key: String,
++    path: String,
++    maxLength: Int,
++    required: Boolean,
++): String? {
++    val element = this[key]
++    if (element == null) {
++        require(!required) { "$path is missing required field $key." }
++        return null
++    }
++    if (element.isJsonNull()) return null
++    val value = element.jsonPrimitiveOrNull()?.takeUnless { primitive -> primitive.isString.not() }?.content
++        ?: throw IllegalArgumentException("$path.$key must be a string or null.")
++    require(value.length <= maxLength) { "$path.$key is too long." }
++    return value
++}
++
++private fun JsonObject.requireBoolean(key: String, path: String): Boolean {
++    val element = this[key] ?: throw IllegalArgumentException("$path is missing required field $key.")
++    val primitive = element.jsonPrimitiveOrNull()?.takeUnless { primitive -> primitive.isString }
++        ?: throw IllegalArgumentException("$path.$key must be a boolean.")
++    return primitive.booleanOrNull
++        ?: throw IllegalArgumentException("$path.$key must be a boolean.")
++}
++
++private fun JsonObject.requireInt(key: String, path: String, range: IntRange): Int {
++    val element = this[key] ?: throw IllegalArgumentException("$path is missing required field $key.")
++    val primitive = element.jsonPrimitiveOrNull()?.takeUnless { primitive -> primitive.isString }
++        ?: throw IllegalArgumentException("$path.$key must be an integer.")
++    val value = primitive.intOrNull
++        ?: throw IllegalArgumentException("$path.$key must be an integer.")
++    require(value in range) { "$path.$key is outside the supported range." }
++    return value
++}
++
++private fun JsonObject.requireLong(key: String, path: String, minimum: Long): Long {
++    val element = this[key] ?: throw IllegalArgumentException("$path is missing required field $key.")
++    val primitive = element.jsonPrimitiveOrNull()?.takeUnless { primitive -> primitive.isString }
++        ?: throw IllegalArgumentException("$path.$key must be an integer.")
++    val value = primitive.longOrNull
++        ?: throw IllegalArgumentException("$path.$key must be an integer.")
++    require(value >= minimum) { "$path.$key is outside the supported range." }
++    return value
++}
++
++private fun JsonObject.requireNullableLong(key: String, path: String, minimum: Long, required: Boolean): Long? {
++    val element = this[key]
++    if (element == null) {
++        require(!required) { "$path is missing required field $key." }
++        return null
++    }
++    if (element.isJsonNull()) return null
++    val primitive = element.jsonPrimitiveOrNull()?.takeUnless { primitive -> primitive.isString }
++        ?: throw IllegalArgumentException("$path.$key must be an integer or null.")
++    val value = primitive.longOrNull
++        ?: throw IllegalArgumentException("$path.$key must be an integer or null.")
++    require(value >= minimum) { "$path.$key is outside the supported range." }
++    return value
++}
++
++private fun JsonObject.requireEnum(key: String, path: String, allowed: Set<String>): String {
++    val value = requireString(key, path)
++    require(value in allowed) { "$path.$key is invalid." }
++    return value
++}
++
++private fun JsonObject.requireEnumArray(key: String, path: String, allowed: Set<String>, minSize: Int = 0): List<String> {
++    val values = requireArray(key, "$path.$key").mapIndexed { index, element ->
++        element.jsonPrimitiveOrNull()?.takeUnless { primitive -> primitive.isString.not() }?.content
++            ?: throw IllegalArgumentException("$path.$key[$index] must be a string.")
++    }
++    require(values.size >= minSize) { "$path.$key must include at least $minSize values." }
++    values.forEach { value ->
++        require(value in allowed) { "$path.$key contains an invalid value." }
++    }
++    return values
++}
++
++private fun JsonElement.jsonObjectOrNull(): JsonObject? {
++    return runCatching { jsonObject }.getOrNull()
++}
++
++private fun JsonElement.jsonArrayOrNull(): JsonArray? {
++    return runCatching { jsonArray }.getOrNull()
++}
++
++private fun JsonElement.jsonPrimitiveOrNull() = runCatching { jsonPrimitive }.getOrNull()
++
++private fun JsonElement.isJsonNull(): Boolean {
++    return this.toString() == "null"
++}
++
++private fun JsonObject.importedLibraryContentIds(): Set<String> {
++    val library = this["library"]?.jsonObjectOrNull() ?: return emptySet()
++    val linkIds = library["userLinks"]
++        ?.jsonArrayOrNull()
++        .orEmpty()
++        .mapNotNull { element -> element.jsonObjectOrNull()?.get("contentId")?.jsonPrimitiveOrNull()?.content }
++    val documentIds = library["userDocuments"]
++        ?.jsonArrayOrNull()
++        .orEmpty()
++        .mapNotNull { element -> element.jsonObjectOrNull()?.get("contentId")?.jsonPrimitiveOrNull()?.content }
++    return (linkIds + documentIds).toSet()
++}
++
+ private fun LocalProfileIdentity.toDto(updatedAtMillis: Long): AccountLightProfileIdentityDto {
+     val safeUpdatedAtMillis = updatedAtMillis.coerceAtLeast(createdAtMillis)
+     return AccountLightProfileIdentityDto(
+@@ -298,6 +1030,26 @@ private fun LocalProfileIdentity.toDto(updatedAtMillis: Long): AccountLightProfi
+     )
+ }
+
++private fun AccountLightSettings.toPortableAppSettings(supportedPackages: Set<String>? = null): AppSettings {
++    return AppSettings(
++        hasCompletedOnboarding = hasCompletedOnboarding,
++        selectedAppPackages = selectedAppPackages
++            .filter { packageName -> supportedPackages == null || packageName in supportedPackages }
++            .toSet(),
++        preferredTopics = preferredTopics.mapTo(mutableSetOf()) { TopicTag.valueOf(it) },
++        preferredDurationBucket = DurationBucket.valueOf(preferredDurationBucket),
++        selectedPackIds = selectedPackIds.toSet(),
++        themeMode = AppThemeMode.valueOf(themeMode),
++        meditationDurationMinutes = meditationDurationMinutes,
++        contentPriority = ContentPriority.valueOf(contentPriority),
++        priorityContentIds = priorityContentIds.toSet(),
++        reactivatedCompletedContentIds = reactivatedCompletedContentIds.toSet(),
++        openAnywayUnlockMinutes = openAnywayUnlockMinutes,
++        readerFontScale = readerFontScale.takeIf { it in MIN_READER_FONT_SCALE..MAX_READER_FONT_SCALE }
++            ?: DEFAULT_READER_FONT_SCALE,
++    )
++}
++
+ private fun AppSettings.toAccountLightSettings(): AccountLightSettings {
+     return AccountLightSettings(
+         hasCompletedOnboarding = hasCompletedOnboarding,
+@@ -365,7 +1117,7 @@ private fun Collection<String>.invalidPortableContentIdsWarning(section: String)
+             code = "CONFLICT_RETAINED_LOCAL_VALUE",
+             severity = "WARNING",
+             section = section,
+-            message = "One or more stored content references were omitted because they are not portable Account Light content ids.",
++            message = "One or more stored content references were omitted because they are not portable profile content ids.",
+         )
+     } else {
+         null
+@@ -386,25 +1138,249 @@ private fun String.isSafePortableDisplayName(): Boolean {
+         }
+ }
+
++private fun String.isSafePortableSourceHint(): Boolean {
++    val value = trim()
++    return value.isNotBlank() &&
++        value.length <= 240 &&
++        !value.containsUnsafePortableValue() &&
++        value.all { char ->
++            char.isLetterOrDigit() || char.isWhitespace() || char in PortableDisplayNamePunctuation
++        }
++}
++
++private fun String.isSafePortableProviderLabel(): Boolean {
++    val value = trim()
++    val lower = value.lowercase()
++    return value.isNotBlank() &&
++        value.length <= 120 &&
++        value.isSafePortableSourceHint() &&
++        "." !in value &&
++        lower !in ProviderLabelBlocklist &&
++        !ProviderLabelBlocklist.any { blocked -> lower.contains(blocked) }
++}
++
+ private fun String.containsUnsafePortableValue(): Boolean {
+-    val value = lowercase()
++    val value = lowercase(Locale.US)
++    return value.contains("content://") ||
++        value.contains("file://") ||
++        value.contains("oauth") ||
++        value.contains("token") ||
++        UnsafePortableValueTerms.any { unsafeTerm -> value.contains(unsafeTerm) } ||
++        UnsafePortableValuePatterns.any { unsafePattern -> unsafePattern.containsMatchIn(this) } ||
++        contains("/") ||
++        contains("\\") ||
++        contains("@") ||
++        contains(":")
++}
++
++private fun String.containsUnsafeWarningMessage(): Boolean {
++    return UnsafeWarningMessagePatterns.any { unsafePattern -> unsafePattern.containsMatchIn(this) }
++}
++
++private fun String.containsUnsafePortableValueWithoutReverseDns(): Boolean {
++    val value = lowercase(Locale.US)
+     return value.contains("content://") ||
+         value.contains("file://") ||
+         value.contains("oauth") ||
+         value.contains("token") ||
++        UnsafePortableValueTerms.any { unsafeTerm -> value.contains(unsafeTerm) } ||
+         contains("/") ||
+         contains("\\") ||
+         contains("@") ||
+         contains(":")
+ }
+
++private fun String.isSafePortableFileName(): Boolean {
++    return isNotBlank() &&
++        length <= 160 &&
++        !containsUnsafePortableValue() &&
++        all { char ->
++            char.isLetterOrDigit() || char in setOf('.', '_', '-')
++        }
++}
++
++private fun String.isSafePortableAnnotationSidecarFileName(): Boolean {
++    val suffix = ".annotations.jsonld"
++    val baseName = removeSuffix(suffix)
++    return isNotBlank() &&
++        length <= 160 &&
++        endsWith(suffix) &&
++        baseName.isNotBlank() &&
++        !containsUnsafePortableValueWithoutReverseDns() &&
++        all { char ->
++            char.isLetterOrDigit() || char in setOf('.', '_', '-')
++        }
++}
++
++private fun String.isSafePortableTitle(): Boolean {
++    return isNotBlank() &&
++        length <= 240 &&
++        !containsUnsafePortableValue()
++}
++
++private fun String.isNormalizedPortableTitle(): Boolean {
++    val value = this
++    return value.isNotBlank() &&
++        value == value.trim() &&
++        value == value.lowercase(Locale.US) &&
++        value == value.replace(Regex("\\s+"), " ") &&
++        !value.endsWith(".pdf") &&
++        !value.endsWith(".epub") &&
++        !value.endsWith(".html") &&
++        !value.endsWith(".htm") &&
++        !value.endsWith(".md") &&
++        !value.endsWith(".markdown") &&
++        value.isSafePortableTitle()
++}
++
++private fun List<String>.duplicateScalarWarning(fieldName: String): AccountLightWarning? {
++    return if (size != distinct().size) {
++        AccountLightWarning(
++            code = "DUPLICATE_SCALAR_DEDUPED",
++            severity = "INFO",
++            section = "settings",
++            message = "$fieldName had duplicate values and was deduplicated.",
++        )
++    } else {
++        null
++    }
++}
++
+ private val ProfileIdRegex = Regex("^qa-local-[0-9a-fA-F-]{36}$")
++private val Sha256Regex = Regex("^[0-9a-f]{64}$")
+ private val ContentIdRegex = Regex(
+     "^(user-link|user-document)-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" +
+         "|^(editorial|meditation)-[a-z0-9][a-z0-9._-]{2,120}$",
+ )
+ private val PackageNameRegex = Regex("^[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z0-9_]+)+$")
+ private val PortableDisplayNamePunctuation = setOf(' ', '.', '_', '-', '(', ')')
++private val ProviderLabelBlocklist = setOf(
++    "com.android",
++    "com.google",
++    "providers",
++    "documents",
++    "storage",
++    "media",
++    "drive",
++    "externalstorage",
++)
++private val UnsafePortableValueTerms = setOf(
++    "android.provider",
++    "com.android.providers",
++    "com.android.providers.media.documents",
++    "com.android.externalstorage.documents",
++    "com.google.android.apps.docs",
++    "com.google.android.apps.docs.storage",
++    "providers.media.documents",
++    "providers.downloads.documents",
++    "providers.media",
++    "externalstorage.documents",
++)
++private val UnsafePortableValuePatterns = listOf(
++    Regex("\\b[a-zA-Z][a-zA-Z0-9_]*(?:\\.[a-zA-Z0-9_]+){2,}\\b"),
++)
++private val UnsafeWarningMessagePatterns = listOf(
++    Regex("\\b[A-Z][A-Za-z0-9_]*(?:Exception|Error|Throwable)\\b"),
++    Regex("\\b(?:exception|stack\\s*trace|stacktrace|traceback)\\b", RegexOption.IGNORE_CASE),
++    Regex("\\bat\\s+[^\\s]+\\.(?:kt|java)(?::|\\s+line\\s+)\\d+\\b", RegexOption.IGNORE_CASE),
++)
++private val RequiredAppKeys = setOf("profileFormat", "packageName", "appVersionName", "appVersionCode")
++private val RequiredProfileKeys = setOf("profileId", "createdAtMillis", "updatedAtMillis", "displayName")
++private val RequiredSettingsKeys = setOf(
++    "hasCompletedOnboarding",
++    "selectedAppPackages",
++    "preferredTopics",
++    "preferredDurationBucket",
++    "selectedPackIds",
++    "themeMode",
++    "meditationDurationMinutes",
++    "readerFontScale",
++    "contentPriority",
++    "priorityContentIds",
++    "reactivatedCompletedContentIds",
++    "openAnywayUnlockMinutes",
++)
++private val RequiredLibraryKeys = setOf("userLinks", "userDocuments")
++private val RequiredUserLinkKeys = setOf(
++    "contentId",
++    "normalizedUrl",
++    "title",
++    "description",
++    "durationMinutes",
++    "topicTags",
++    "availability",
++    "createdAtMillis",
++    "updatedAtMillis",
++)
++private val AllowedUserLinkKeys = RequiredUserLinkKeys + setOf("sourceLabel")
++private val RequiredUserDocumentKeys = setOf(
++    "contentId",
++    "displayName",
++    "mimeType",
++    "documentFormat",
++    "title",
++    "description",
++    "durationMinutes",
++    "topicTags",
++    "availability",
++    "documentImportState",
++    "documentFingerprint",
++    "createdAtMillis",
++    "updatedAtMillis",
++)
++private val AllowedUserDocumentKeys = RequiredUserDocumentKeys + setOf("sourceHint")
++private val RequiredDocumentFingerprintKeys = setOf(
++    "strategy",
++    "sha256",
++    "sizeBytes",
++    "normalizedTitle",
++    "format",
++)
++private val AllowedSourceHintKeys = setOf("lastKnownDisplayName", "providerLabel")
++private val RequiredReadingKeys = setOf("progress")
++private val RequiredReadingProgressKeys = setOf(
++    "contentId",
++    "progressPercent",
++    "lastVisibleParagraphIndex",
++    "paragraphCount",
++    "updatedAtMillis",
++    "completedAtMillis",
++)
++private val RequiredAnnotationsKeys = setOf("export", "driveSync", "sidecarIndex")
++private val RequiredAnnotationExportKeys = setOf("destinationDisplayName", "lastSuccessfulAtMillis")
++private val RequiredAnnotationDriveSyncKeys = setOf(
++    "wasEnabledOnSourceDevice",
++    "folderDisplayName",
++    "lastSuccessfulAtMillis",
++)
++private val RequiredAnnotationSidecarKeys = setOf(
++    "contentId",
++    "sourceTitle",
++    "jsonLdFileName",
++    "sha256",
++    "updatedAtMillis",
++)
++private val RequiredSyncKeys = setOf("profileAutosave")
++private val RequiredProfileAutosaveKeys = setOf(
++    "provider",
++    "destinationDisplayName",
++    "lastSuccessfulAtMillis",
++    "activationStateOnImport",
++)
++private val RequiredWarningKeys = setOf("code", "severity", "section", "contentId", "message")
++private val AvailabilityValues = setOf("AVAILABLE", "UNAVAILABLE", "NEEDS_FALLBACK")
++private val DocumentFormatValues = setOf("MARKDOWN", "PDF", "EPUB")
++private val DocumentImportStateValues = setOf(
++    "AVAILABLE_ON_THIS_DEVICE",
++    "MISSING_FILE_NEEDS_REATTACH",
++    "EXTERNAL_HANDOFF_ONLY",
++)
++private val DocumentFingerprintStrategyValues = setOf(
++    "SHA256_BYTES",
++    "TEXT_SAMPLE_SHA256",
++    "UNVERIFIED_METADATA_ONLY",
++)
++private val ContentFormatValues = setOf("MARKDOWN", "HTML", "PDF", "EPUB")
+ private val WarningCodes = setOf(
+     "UNKNOWN_FIELD_IGNORED",
+     "DUPLICATE_SCALAR_DEDUPED",
+@@ -430,3 +1406,15 @@ private val WarningSections = setOf(
+     "unknown",
+ )
+ private val AutosaveProviders = setOf("NONE", "ANDROID_DOCUMENT_TREE", "GOOGLE_DRIVE")
++private val RequiredTopLevelKeys = setOf(
++    "schemaVersion",
++    "exportedAtMillis",
++    "app",
++    "profile",
++    "settings",
++    "library",
++    "reading",
++    "annotations",
++    "sync",
++    "warnings",
++)
+diff --git a/app/src/main/java/com/qualityalternative/app/data/AppContainer.kt b/app/src/main/java/com/qualityalternative/app/data/AppContainer.kt
+index 4a05de8..d1e304b 100644
+--- a/app/src/main/java/com/qualityalternative/app/data/AppContainer.kt
++++ b/app/src/main/java/com/qualityalternative/app/data/AppContainer.kt
+@@ -4,6 +4,7 @@ import android.content.Context
+ import androidx.datastore.preferences.preferencesDataStore
+ import com.qualityalternative.app.BuildConfig
+ import com.qualityalternative.app.data.local.QualityAlternativeDatabase
++import com.qualityalternative.app.domain.model.ContentItem
+ import com.qualityalternative.app.domain.service.AnalyticsTracker
+ import com.qualityalternative.app.domain.service.ContentRepository
+ import com.qualityalternative.app.domain.service.DefaultRecommendationEngine
+@@ -80,6 +81,10 @@ class AppContainer(context: Context) {
+         appVersionName = BuildConfig.VERSION_NAME,
+         appVersionCode = BuildConfig.VERSION_CODE,
+     )
++    val accountLightProfileImporter: AccountLightProfileImporter = AccountLightProfileImporter(
++        settingsRepository = settingsRepository,
++        knownContentIdsProvider = { contentRepository.inventory().mapTo(mutableSetOf(), ContentItem::id) },
++    )
+     val delayGate: DelayGate = PreferencesDelayGate(
+         dataStore = context.delayGateDataStore,
+         scope = appScope,
+diff --git a/app/src/main/java/com/qualityalternative/app/data/PreferencesSettingsRepository.kt b/app/src/main/java/com/qualityalternative/app/data/PreferencesSettingsRepository.kt
+index 9bae92a..46b1dc4 100644
+--- a/app/src/main/java/com/qualityalternative/app/data/PreferencesSettingsRepository.kt
++++ b/app/src/main/java/com/qualityalternative/app/data/PreferencesSettingsRepository.kt
+@@ -104,6 +104,29 @@ class PreferencesSettingsRepository(
+         return requireNotNull(identity)
+     }
+
++    override suspend fun replacePortableSettings(settings: AppSettings, profileIdentity: LocalProfileIdentity?) {
++        dataStore.edit { preferences ->
++            if (profileIdentity != null) {
++                preferences[LocalProfileId] = profileIdentity.profileId
++                preferences[LocalProfileCreatedAtMillis] = profileIdentity.createdAtMillis.coerceAtLeast(0L)
++            }
++            preferences[HasCompletedOnboarding] = settings.hasCompletedOnboarding
++            preferences[SelectedAppPackages] = settings.selectedAppPackages
++            preferences[PreferredTopics] = settings.preferredTopics.mapTo(mutableSetOf(), TopicTag::name)
++            preferences[PreferredDurationBucket] = settings.preferredDurationBucket.name
++            preferences[SelectedPackIds] = settings.selectedPackIds
++            preferences[ThemeMode] = settings.themeMode.name
++            preferences[MeditationDurationMinutes] = settings.meditationDurationMinutes
++                .coerceIn(MIN_MEDITATION_MINUTES, MAX_MEDITATION_MINUTES)
++            preferences[ReaderFontScale] = portableReaderFontScale(settings.readerFontScale)
++            preferences[ContentPriorityPreference] = settings.contentPriority.name
++            preferences[PriorityContentIds] = settings.priorityContentIds
++            preferences[ReactivatedCompletedContentIds] = settings.reactivatedCompletedContentIds
++            preferences[OpenAnywayUnlockMinutes] = settings.openAnywayUnlockMinutes
++                .coerceIn(MIN_OPEN_ANYWAY_UNLOCK_MINUTES, MAX_OPEN_ANYWAY_UNLOCK_MINUTES)
++        }
++    }
++
+     override suspend fun saveOnboardingSelection(selection: OnboardingSelection) {
+         dataStore.edit { preferences ->
+             preferences[HasCompletedOnboarding] = true
+diff --git a/app/src/main/java/com/qualityalternative/app/domain/service/Contracts.kt b/app/src/main/java/com/qualityalternative/app/domain/service/Contracts.kt
+index c1da1bf..22e9bcd 100644
+--- a/app/src/main/java/com/qualityalternative/app/domain/service/Contracts.kt
++++ b/app/src/main/java/com/qualityalternative/app/domain/service/Contracts.kt
+@@ -104,6 +104,7 @@ interface SettingsRepository {
+     fun observeAppSettings(): Flow<AppSettings>
+     fun supportedDistractingApps(): List<DistractingApp>
+     suspend fun ensureLocalProfileIdentity(nowMillis: Long = System.currentTimeMillis()): LocalProfileIdentity
++    suspend fun replacePortableSettings(settings: AppSettings, profileIdentity: LocalProfileIdentity? = null)
+     suspend fun saveOnboardingSelection(selection: OnboardingSelection)
+     suspend fun saveSelectedAppPackages(packages: Set<String>)
+     suspend fun savePreferredDurationBucket(bucket: DurationBucket)
+diff --git a/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt b/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
+index 1bc5fcb..8fd99ce 100644
+--- a/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
++++ b/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
+@@ -6,6 +6,11 @@ import androidx.compose.runtime.setValue
+ import androidx.lifecycle.ViewModel
+ import androidx.lifecycle.ViewModelProvider
+ import androidx.lifecycle.viewModelScope
++import com.qualityalternative.app.data.AccountLightImportException
++import com.qualityalternative.app.data.AccountLightImportPlan
++import com.qualityalternative.app.data.AccountLightImportPreview
++import com.qualityalternative.app.data.AccountLightProfileExporter
++import com.qualityalternative.app.data.AccountLightProfileImporter
+ import com.qualityalternative.app.data.AppContainer
+ import com.qualityalternative.app.data.ReadingTimeEstimateSource
+ import com.qualityalternative.app.data.ReadingTimeEstimator
+@@ -136,6 +141,12 @@ data class MainUiState(
+     val annotationDriveLastSuccessfulAtMillis: Long? = null,
+     val annotationDriveLastError: String? = null,
+     val isAnnotationDriveSyncing: Boolean = false,
++    val isAccountLightExporting: Boolean = false,
++    val isAccountLightImporting: Boolean = false,
++    val accountLightImportPreview: AccountLightImportPreview? = null,
++    val accountLightImportError: String? = null,
++    val accountLightStatus: String? = null,
++    val isAccountLightReplaceConfirming: Boolean = false,
+     val isManagingLibrary: Boolean = false,
+     val selectedLibraryContentIds: Set<String> = emptySet(),
+     val latestMessage: String? = null,
+@@ -235,6 +246,12 @@ class MainViewModel(
+     private val readingAnnotationExportWriter: ReadingAnnotationExportWriter = NoOpReadingAnnotationExportWriter,
+     private val readingAnnotationDriveSyncClient: ReadingAnnotationDriveSyncClient = NoOpReadingAnnotationDriveSyncClient,
+     private val readingAnnotationDriveTokenProvider: ReadingAnnotationDriveTokenProvider = NoOpReadingAnnotationDriveTokenProvider,
++    private val accountLightProfileExporter: AccountLightProfileExporter = AccountLightProfileExporter(
++        settingsRepository = settingsRepository,
++        appVersionName = "test",
++        appVersionCode = 1,
++    ),
++    private val accountLightProfileImporter: AccountLightProfileImporter = AccountLightProfileImporter(settingsRepository),
+     private val interceptionMonitor: InterceptionMonitor,
+     private val enableDelayRefreshTicker: Boolean = true,
+     private val nowProvider: () -> Long = System::currentTimeMillis,
+@@ -252,6 +269,7 @@ class MainViewModel(
+     private var historyCompletedContentIds: Set<String> = emptySet()
+     private var readingProgressCompletedContentIds: Set<String> = emptySet()
+     private var pendingSystemInterception: PendingSystemInterception? = null
++    private var pendingAccountLightImportPlan: AccountLightImportPlan? = null
+     private var annotationDriveAccessToken: String? = null
+     private val readingAnnotationExportFormatter = ReadingAnnotationExportFormatter()
+
+@@ -2023,6 +2041,146 @@ class MainViewModel(
+         uiState = uiState.copy(latestMessage = null)
+     }
+
++    fun exportAccountLightProfile(writeJson: suspend (String) -> Unit) {
++        viewModelScope.launch {
++            uiState = uiState.copy(
++                isAccountLightExporting = true,
++                accountLightStatus = null,
++                accountLightImportError = null,
++            )
++            try {
++                val json = accountLightProfileExporter.exportSettingsOnlyProfileJson(nowMillis = nowProvider())
++                writeJson(json)
++                uiState = uiState.copy(
++                    isAccountLightExporting = false,
++                    accountLightStatus = "Portable profile exported.",
++                    latestMessage = "Portable profile exported.",
++                )
++            } catch (exception: CancellationException) {
++                uiState = uiState.copy(isAccountLightExporting = false)
++                throw exception
++            } catch (exception: Exception) {
++                uiState = uiState.copy(
++                    isAccountLightExporting = false,
++                    accountLightImportError = "Export failed.",
++                    latestMessage = "Portable profile export failed.",
++                )
++            }
++        }
++    }
++
++    fun previewAccountLightImport(rawJson: String) {
++        val plan = try {
++            accountLightProfileImporter.validateImportProfileJson(rawJson)
++        } catch (exception: AccountLightImportException) {
++            pendingAccountLightImportPlan = null
++            uiState = uiState.copy(
++                accountLightImportPreview = null,
++                accountLightImportError = exception.message ?: "Portable profile is invalid.",
++                accountLightStatus = null,
++                isAccountLightReplaceConfirming = false,
++                latestMessage = "Portable profile import failed validation.",
++            )
++            return
++        } catch (exception: Exception) {
++            pendingAccountLightImportPlan = null
++            uiState = uiState.copy(
++                accountLightImportPreview = null,
++                accountLightImportError = "Portable profile is invalid.",
++                accountLightStatus = null,
++                isAccountLightReplaceConfirming = false,
++                latestMessage = "Portable profile import failed validation.",
++            )
++            return
++        }
++        pendingAccountLightImportPlan = plan
++        uiState = uiState.copy(
++            accountLightImportPreview = plan.preview,
++            accountLightImportError = null,
++            accountLightStatus = "Profile ready to import.",
++            isAccountLightReplaceConfirming = false,
++        )
++    }
++
++    fun reportAccountLightImportReadFailure() {
++        pendingAccountLightImportPlan = null
++        uiState = uiState.copy(
++            accountLightImportPreview = null,
++            accountLightImportError = "Could not read portable profile.",
++            accountLightStatus = null,
++            isAccountLightReplaceConfirming = false,
++            latestMessage = "Portable profile import failed.",
++        )
++    }
++
++    fun applyAccountLightMergeImport() {
++        val plan = pendingAccountLightImportPlan ?: return
++        viewModelScope.launch {
++            uiState = uiState.copy(isAccountLightImporting = true)
++            val result = accountLightProfileImporter.applyMerge(plan)
++            pendingAccountLightImportPlan = null
++            uiState = uiState.copy(
++                isAccountLightImporting = false,
++                accountLightImportPreview = null,
++                accountLightImportError = null,
++                accountLightStatus = if (result.warningCount > 0) {
++                    "Profile merged. Local settings were kept."
++                } else {
++                    "Profile merged."
++                },
++                isAccountLightReplaceConfirming = false,
++                latestMessage = "Portable profile merged.",
++            )
++        }
++    }
++
++    fun requestAccountLightReplaceConfirmation() {
++        if (pendingAccountLightImportPlan != null) {
++            uiState = uiState.copy(isAccountLightReplaceConfirming = true)
++        }
++    }
++
++    fun cancelAccountLightImport() {
++        pendingAccountLightImportPlan = null
++        uiState = uiState.copy(
++            accountLightImportPreview = null,
++            accountLightImportError = null,
++            accountLightStatus = null,
++            isAccountLightReplaceConfirming = false,
++            isAccountLightImporting = false,
++        )
++    }
++
++    fun confirmAccountLightReplaceImport() {
++        val plan = pendingAccountLightImportPlan ?: return
++        viewModelScope.launch {
++            uiState = uiState.copy(isAccountLightImporting = true)
++            try {
++                accountLightProfileImporter.applyReplace(plan)
++                pendingAccountLightImportPlan = null
++                uiState = uiState.copy(
++                    isAccountLightImporting = false,
++                    accountLightImportPreview = null,
++                    accountLightImportError = null,
++                    accountLightStatus = "Imported settings replaced local portable settings.",
++                    isAccountLightReplaceConfirming = false,
++                    latestMessage = "Portable profile restored.",
++                )
++            } catch (exception: CancellationException) {
++                uiState = uiState.copy(isAccountLightImporting = false)
++                throw exception
++            } catch (exception: Exception) {
++                uiState = uiState.copy(
++                    isAccountLightImporting = false,
++                    accountLightImportError = "Import failed before any settings were changed.",
++                    accountLightStatus = null,
++                    isAccountLightReplaceConfirming = false,
++                    latestMessage = "Portable profile import failed.",
++                )
++            }
++        }
++    }
++
+     private fun applySettings(settings: AppSettings) {
+         val reactivatedCompletedContentIds = settings.reactivatedCompletedContentIds.trackedCompletedContentIds()
+         val preferences = settings.toUserPreferences(
+@@ -2860,6 +3018,8 @@ class MainViewModelFactory(
+             readingAnnotationExportWriter = appContainer.readingAnnotationExportWriter,
+             readingAnnotationDriveSyncClient = appContainer.readingAnnotationDriveSyncClient,
+             readingAnnotationDriveTokenProvider = appContainer.readingAnnotationDriveTokenProvider,
++            accountLightProfileExporter = appContainer.accountLightProfileExporter,
++            accountLightProfileImporter = appContainer.accountLightProfileImporter,
+             interceptionMonitor = appContainer.interceptionMonitor,
+         ) as T
+     }
+diff --git a/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt b/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
+index 73d266c..c004c28 100644
+--- a/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
++++ b/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
+@@ -104,6 +104,8 @@ import androidx.compose.ui.unit.dp
+ import androidx.compose.ui.unit.Density
+ import androidx.compose.ui.unit.sp
+ import androidx.core.view.WindowCompat
++import com.qualityalternative.app.data.ACCOUNT_LIGHT_PROFILE_FILE_NAME
++import com.qualityalternative.app.data.accountLightTimestampedBackupFileName
+ import com.qualityalternative.app.BuildConfig
+ import com.qualityalternative.app.data.ReadingTimeEstimateSource
+ import com.qualityalternative.app.data.UserDocumentValidator
+@@ -360,6 +362,28 @@ private fun MainRoute(
+             },
+         )
+     }
++    val accountLightExportPicker = rememberLauncherForActivityResult(
++        ActivityResultContracts.CreateDocument("application/json"),
++    ) { uri ->
++        if (uri == null) {
++            return@rememberLauncherForActivityResult
++        }
++        viewModel.exportAccountLightProfile { json ->
++            context.writeUtf8Text(uri = uri, text = json)
++        }
++    }
++    val accountLightImportPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
++        if (uri == null) {
++            return@rememberLauncherForActivityResult
++        }
++        runCatching {
++            context.readUtf8Text(uri)
++        }.onSuccess { rawJson ->
++            viewModel.previewAccountLightImport(rawJson)
++        }.onFailure {
++            viewModel.reportAccountLightImportReadFailure()
++        }
++    }
+     val onImportDocument = {
+         documentPicker.launch(USER_DOCUMENT_PICKER_MIME_TYPES)
+     }
+@@ -478,6 +502,13 @@ private fun MainRoute(
+                 onConnectAnnotationDrive = { startGoogleDriveSyncAuthorization(AnnotationDriveSyncMode.CONNECT) },
+                 onRetryAnnotationDrive = { startGoogleDriveSyncAuthorization(AnnotationDriveSyncMode.RETRY) },
+                 onDisconnectAnnotationDrive = disconnectGoogleDriveSync,
++                onExportAccountLightProfile = { accountLightExportPicker.launch(ACCOUNT_LIGHT_PROFILE_FILE_NAME) },
++                onExportAccountLightBackup = { accountLightExportPicker.launch(accountLightTimestampedBackupFileName()) },
++                onImportAccountLightProfile = { accountLightImportPicker.launch(arrayOf("application/json", "text/json", "*/*")) },
++                onMergeAccountLightProfile = viewModel::applyAccountLightMergeImport,
++                onRequestAccountLightReplace = viewModel::requestAccountLightReplaceConfirmation,
++                onConfirmAccountLightReplace = viewModel::confirmAccountLightReplaceImport,
++                onCancelAccountLightImport = viewModel::cancelAccountLightImport,
+             )
+         }
+
+@@ -3077,6 +3108,13 @@ private fun SettingsTab(
+     onConnectAnnotationDrive: () -> Unit,
+     onRetryAnnotationDrive: () -> Unit,
+     onDisconnectAnnotationDrive: () -> Unit,
++    onExportAccountLightProfile: () -> Unit,
++    onExportAccountLightBackup: () -> Unit,
++    onImportAccountLightProfile: () -> Unit,
++    onMergeAccountLightProfile: () -> Unit,
++    onRequestAccountLightReplace: () -> Unit,
++    onConfirmAccountLightReplace: () -> Unit,
++    onCancelAccountLightImport: () -> Unit,
+ ) {
+     val context = LocalContext.current
+     val colors = QualityAlternativeThemeTokens.colors
+@@ -3201,6 +3239,18 @@ private fun SettingsTab(
+                 onDisconnectAnnotationDrive = onDisconnectAnnotationDrive,
+             )
+         }
++        item {
++            AccountLightSettingsSection(
++                state = state,
++                onExport = onExportAccountLightProfile,
++                onExportBackup = onExportAccountLightBackup,
++                onImport = onImportAccountLightProfile,
++                onMerge = onMergeAccountLightProfile,
++                onRequestReplace = onRequestAccountLightReplace,
++                onConfirmReplace = onConfirmAccountLightReplace,
++                onCancel = onCancelAccountLightImport,
++            )
++        }
+         item {
+             SectionLabel("Default session length")
+             QaCard {
+@@ -3298,6 +3348,191 @@ private fun SettingsTab(
+     }
+ }
+
++@Composable
++private fun AccountLightSettingsSection(
++    state: MainUiState,
++    onExport: () -> Unit,
++    onExportBackup: () -> Unit,
++    onImport: () -> Unit,
++    onMerge: () -> Unit,
++    onRequestReplace: () -> Unit,
++    onConfirmReplace: () -> Unit,
++    onCancel: () -> Unit,
++) {
++    val colors = QualityAlternativeThemeTokens.colors
++    val preview = state.accountLightImportPreview
++    Column(modifier = Modifier.testTag("settings-account-light-section")) {
++        SectionLabel("Portable profile", right = if (preview != null) "Ready" else "Local")
++        QaCard {
++            Row(
++                modifier = Modifier.fillMaxWidth(),
++                verticalAlignment = Alignment.CenterVertically,
++                horizontalArrangement = Arrangement.spacedBy(12.dp),
++            ) {
++                SourceBadge(sourceType = ContentSourceType.USER_DOCUMENT, icon = QaIconKind.Shield)
++                Column(modifier = Modifier.weight(1f)) {
++                    Text(
++                        text = "Portable profile",
++                        style = MaterialTheme.typography.titleMedium,
++                        fontSize = 16.sp,
++                        lineHeight = 20.sp,
++                        color = colors.primaryText,
++                        fontWeight = FontWeight.SemiBold,
++                    )
++                    MonoText(
++                        text = state.accountLightStatus
++                            ?: state.accountLightImportError
++                            ?: "May include preferences, saved links, document/source titles, and reading progress.",
++                        color = if (state.accountLightImportError == null) colors.mutedText else colors.accent,
++                        maxLines = 3,
++                        overflow = TextOverflow.Ellipsis,
++                        modifier = Modifier
++                            .padding(top = 4.dp)
++                            .testTag("settings-account-light-status"),
++                    )
++                }
++            }
++            Row(
++                modifier = Modifier.padding(top = 14.dp),
++                horizontalArrangement = Arrangement.spacedBy(8.dp),
++            ) {
++                QaButton(
++                    text = if (state.isAccountLightExporting) "Exporting" else "Export",
++                    onClick = onExport,
++                    variant = QaButtonVariant.Outline,
++                    size = QaButtonSize.Small,
++                    enabled = !state.isAccountLightExporting,
++                    leadingIcon = QaIconKind.External,
++                    modifier = Modifier.weight(1f).testTag("settings-account-light-export"),
++                )
++                QaButton(
++                    text = "Import",
++                    onClick = onImport,
++                    variant = QaButtonVariant.Outline,
++                    size = QaButtonSize.Small,
++                    leadingIcon = QaIconKind.External,
++                    modifier = Modifier.weight(1f).testTag("settings-account-light-import"),
++                )
++            }
++            if (preview != null) {
++                AccountLightImportPreviewCard(
++                    state = state,
++                    onMerge = onMerge,
++                    onRequestReplace = onRequestReplace,
++                    onExportBackup = onExportBackup,
++                    onConfirmReplace = onConfirmReplace,
++                    onCancel = onCancel,
++                )
++            }
++        }
++    }
++}
++
++@Composable
++private fun AccountLightImportPreviewCard(
++    state: MainUiState,
++    onMerge: () -> Unit,
++    onRequestReplace: () -> Unit,
++    onExportBackup: () -> Unit,
++    onConfirmReplace: () -> Unit,
++    onCancel: () -> Unit,
++) {
++    val colors = QualityAlternativeThemeTokens.colors
++    val preview = state.accountLightImportPreview ?: return
++    Column(
++        modifier = Modifier
++            .padding(top = 14.dp)
++            .border(BorderStroke(1.dp, colors.lineStrong), RoundedCornerShape(12.dp))
++            .padding(12.dp)
++            .testTag("settings-account-light-import-preview"),
++        verticalArrangement = Arrangement.spacedBy(8.dp),
++    ) {
++        BodyText(
++            text = "Profile ${preview.profileId.takeLast(8)} · ${preview.importedAppCount} apps · ${preview.importedTopicCount} topics · ${preview.importedPackCount} packs",
++            color = colors.primaryText,
++            fontSize = 13.sp,
++            lineHeight = 18.sp,
++        )
++        if (preview.unsupportedAppCount > 0 || preview.warningCount > 0) {
++            MonoText(
++                text = "${preview.unsupportedAppCount} unsupported apps · ${preview.warningCount} warnings",
++                color = colors.mutedText,
++                modifier = Modifier.testTag("settings-account-light-import-warning-summary"),
++            )
++            preview.warningSummaries.take(3).forEach { summary ->
++                BodyText(
++                    text = summary,
++                    color = colors.mutedText,
++                    fontSize = 11.5.sp,
++                    lineHeight = 15.sp,
++                )
++            }
++        }
++        if (state.isAccountLightReplaceConfirming) {
++            QaCard(
++                modifier = Modifier.testTag("settings-account-light-replace-confirm"),
++                padding = 12.dp,
++                background = colors.background,
++            ) {
++                BodyText(
++                    text = "Export a backup first if needed. Replace keeps Drive authorization and annotation files connected.",
++                    color = colors.mutedText,
++                    fontSize = 12.5.sp,
++                    lineHeight = 17.sp,
++                    modifier = Modifier.padding(bottom = 10.dp),
++                )
++                QaButton(
++                    text = "Export backup",
++                    onClick = onExportBackup,
++                    variant = QaButtonVariant.Outline,
++                    size = QaButtonSize.Small,
++                    leadingIcon = QaIconKind.External,
++                    modifier = Modifier
++                        .fillMaxWidth()
++                        .padding(bottom = 8.dp)
++                        .testTag("settings-account-light-replace-backup"),
++                )
++                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
++                    QaButton(
++                        text = "Cancel",
++                        onClick = onCancel,
++                        variant = QaButtonVariant.Ghost,
++                        size = QaButtonSize.Small,
++                        modifier = Modifier.weight(1f),
++                    )
++                    QaButton(
++                        text = if (state.isAccountLightImporting) "Replacing" else "Replace",
++                        onClick = onConfirmReplace,
++                        variant = QaButtonVariant.Primary,
++                        size = QaButtonSize.Small,
++                        enabled = !state.isAccountLightImporting,
++                        modifier = Modifier.weight(1f).testTag("settings-account-light-replace-confirm-action"),
++                    )
++                }
++            }
++        } else {
++            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
++                QaButton(
++                    text = "Merge",
++                    onClick = onMerge,
++                    variant = QaButtonVariant.Primary,
++                    size = QaButtonSize.Small,
++                    enabled = !state.isAccountLightImporting,
++                    modifier = Modifier.weight(1f).testTag("settings-account-light-import-merge"),
++                )
++                QaButton(
++                    text = "Replace",
++                    onClick = onRequestReplace,
++                    variant = QaButtonVariant.Outline,
++                    size = QaButtonSize.Small,
++                    enabled = !state.isAccountLightImporting,
++                    modifier = Modifier.weight(1f).testTag("settings-account-light-import-replace"),
++                )
++            }
++        }
++    }
++}
++
+ @Composable
+ private fun AnnotationAutosaveSettingsSection(
+     state: MainUiState,
+@@ -6101,6 +6336,19 @@ private fun Context.documentImportCandidate(uri: Uri): DocumentImportCandidate {
+     ) { contentResolver.openInputStream(uri) }
+ }
+
++private fun Context.readUtf8Text(uri: Uri): String {
++    return contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use { reader ->
++        reader.readText()
++    } ?: error("Unable to read profile.")
++}
++
++private fun Context.writeUtf8Text(uri: Uri, text: String) {
++    val bytes = text.toByteArray(Charsets.UTF_8)
++    contentResolver.openOutputStream(uri)?.use { output ->
++        output.write(bytes)
++    } ?: error("Unable to write profile.")
++}
++
+ private fun persistDocumentPermission(context: Context, uri: Uri) {
+     runCatching {
+         context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+diff --git a/app/src/test/java/com/qualityalternative/app/data/AccountLightProfileExporterTest.kt b/app/src/test/java/com/qualityalternative/app/data/AccountLightProfileExporterTest.kt
+index 6b0b5ca..a6778ba 100644
+--- a/app/src/test/java/com/qualityalternative/app/data/AccountLightProfileExporterTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/data/AccountLightProfileExporterTest.kt
+@@ -61,6 +61,10 @@ class AccountLightProfileExporterTest {
+         val profile = AccountLightProfileCodec().decode(rawJson)
+
+         assertEquals(ACCOUNT_LIGHT_PROFILE_FILE_NAME, "quality-alternative-profile.json")
++        assertEquals(
++            "quality-alternative-profile-19700101-000020.json",
++            accountLightTimestampedBackupFileName(nowMillis = 20_000L),
++        )
+         assertEquals(ACCOUNT_LIGHT_SCHEMA_VERSION, profile.schemaVersion)
+         assertEquals(20_000L, profile.exportedAtMillis)
+         assertEquals(ACCOUNT_LIGHT_PROFILE_FORMAT, profile.app.profileFormat)
+diff --git a/app/src/test/java/com/qualityalternative/app/data/AccountLightProfileImporterTest.kt b/app/src/test/java/com/qualityalternative/app/data/AccountLightProfileImporterTest.kt
+new file mode 100644
+index 0000000..b8c8d09
+--- /dev/null
++++ b/app/src/test/java/com/qualityalternative/app/data/AccountLightProfileImporterTest.kt
+@@ -0,0 +1,726 @@
++package com.qualityalternative.app.data
++
++import androidx.datastore.core.DataStore
++import androidx.datastore.preferences.core.PreferenceDataStoreFactory
++import androidx.datastore.preferences.core.Preferences
++import com.qualityalternative.app.domain.model.AppThemeMode
++import com.qualityalternative.app.domain.model.ContentPriority
++import com.qualityalternative.app.domain.model.DurationBucket
++import com.qualityalternative.app.domain.model.OnboardingSelection
++import com.qualityalternative.app.domain.model.TopicTag
++import java.io.File
++import kotlinx.coroutines.flow.first
++import kotlinx.coroutines.runBlocking
++import kotlinx.serialization.json.Json
++import kotlinx.serialization.json.JsonArray
++import kotlinx.serialization.json.JsonElement
++import kotlinx.serialization.json.JsonNull
++import kotlinx.serialization.json.JsonObject
++import kotlinx.serialization.json.JsonPrimitive
++import kotlinx.serialization.json.jsonArray
++import kotlinx.serialization.json.jsonObject
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertThrows
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++class AccountLightProfileImporterTest {
++    @Test
++    fun validateImportProfileJson_rejectsMalformedMissingAndUnsupportedProfiles() {
++        val repository = PreferencesSettingsRepository(
++            dataStore = testDataStore(),
++            supportedApps = SupportedCatalog.distractingApps,
++        )
++        val importer = AccountLightProfileImporter(settingsRepository = repository)
++
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson("{not-json")
++        }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson("""{"schemaVersion":1}""")
++        }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(validProfileJson().replace("\"schemaVersion\": 1", "\"schemaVersion\": 99"))
++        }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(validProfileJson().withoutNestedField("app", "profileFormat"))
++        }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(validProfileJson().withoutNestedField("annotations", "export"))
++        }
++    }
++
++    @Test
++    fun applyMerge_validatesButKeepsLocalPortableSettings() = runBlocking {
++        val target = PreferencesSettingsRepository(
++            dataStore = testDataStore(),
++            supportedApps = SupportedCatalog.distractingApps,
++        )
++        target.saveThemeMode(AppThemeMode.LIGHT)
++        target.saveContentPriority(ContentPriority.BALANCED)
++        val importer = AccountLightProfileImporter(settingsRepository = target)
++        val plan = importer.validateImportProfileJson(validProfileJson())
++
++        val result = importer.applyMerge(plan)
++        val settings = target.observeAppSettings().first()
++
++        assertEquals(AccountLightImportMode.MERGE, result.mode)
++        assertEquals(false, result.settingsApplied)
++        assertEquals(AppThemeMode.LIGHT, settings.themeMode)
++        assertEquals(ContentPriority.BALANCED, settings.contentPriority)
++    }
++
++    @Test
++    fun applyReplace_replacesPortableSettingsAndPreservesLocalAnnotationDestinations() = runBlocking {
++        val target = PreferencesSettingsRepository(
++            dataStore = testDataStore(),
++            supportedApps = SupportedCatalog.distractingApps,
++        )
++        target.saveAnnotationExportDestination(
++            uri = "content://local/export",
++            displayName = "local-folder",
++        )
++        val importer = AccountLightProfileImporter(settingsRepository = target)
++        val plan = importer.validateImportProfileJson(validProfileJson())
++
++        val result = importer.applyReplace(plan)
++        val settings = target.observeAppSettings().first()
++        val identity = target.ensureLocalProfileIdentity(nowMillis = 99_000L)
++
++        assertEquals(AccountLightImportMode.REPLACE, result.mode)
++        assertEquals(true, result.settingsApplied)
++        assertEquals(true, settings.hasCompletedOnboarding)
++        assertEquals(AppThemeMode.DARK, settings.themeMode)
++        assertEquals(ContentPriority.MY_FILES, settings.contentPriority)
++        assertEquals(1.35, settings.readerFontScale, 0.0)
++        assertEquals(setOf("starter_pack"), settings.selectedPackIds)
++        assertEquals("content://local/export", settings.annotationExportUri)
++        assertEquals("local-folder", settings.annotationExportDisplayName)
++        assertTrue(identity.profileId.startsWith("qa-local-11111111"))
++        assertEquals(10_000L, identity.createdAtMillis)
++    }
++
++    @Test
++    fun validateImportProfileJson_warnsAndKeepsUnsupportedAppsInactiveOnReplace() = runBlocking {
++        val target = PreferencesSettingsRepository(
++            dataStore = testDataStore(),
++            supportedApps = SupportedCatalog.distractingApps,
++        )
++        val importer = AccountLightProfileImporter(settingsRepository = target)
++        val plan = importer.validateImportProfileJson(
++            validProfileJson().withSelectedAppPackages(
++                listOf("com.instagram.android", "com.future.reader", "com.future.reader"),
++            ),
++        )
++
++        assertEquals(1, plan.preview.unsupportedAppCount)
++        assertEquals(2, plan.preview.warningCount)
++        assertEquals(
++            setOf("DUPLICATE_SCALAR_DEDUPED", "UNSUPPORTED_LOCAL_APP_PACKAGE"),
++            plan.allWarnings.mapTo(mutableSetOf()) { it.code },
++        )
++
++        importer.applyReplace(plan)
++        val settings = target.observeAppSettings().first()
++
++        assertEquals(setOf("com.instagram.android"), settings.selectedAppPackages)
++    }
++
++    @Test
++    fun validateImportProfileJson_rejectsContentIdTypeMismatchesBeforeMutation() = runBlocking {
++        val target = PreferencesSettingsRepository(
++            dataStore = testDataStore(),
++            supportedApps = SupportedCatalog.distractingApps,
++        )
++        target.saveThemeMode(AppThemeMode.DARK)
++        val importer = AccountLightProfileImporter(settingsRepository = target)
++        val invalidJson = validProfileJson().withUserLinkContentId("user-document-11111111-1111-4111-8111-111111111111")
++
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(invalidJson)
++        }
++
++        assertEquals(AppThemeMode.DARK, target.observeAppSettings().first().themeMode)
++    }
++
++    @Test
++    fun validateImportProfileJson_rejectsMalformedLibraryAndReadingEntriesBeforeMutation() = runBlocking {
++        val target = PreferencesSettingsRepository(
++            dataStore = testDataStore(),
++            supportedApps = SupportedCatalog.distractingApps,
++        )
++        target.saveContentPriority(ContentPriority.MY_FILES)
++        val importer = AccountLightProfileImporter(settingsRepository = target)
++
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(validProfileJson().withMinimalMalformedUserLink())
++        }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(validProfileJson().withInvalidReadingProgress())
++        }
++
++        assertEquals(ContentPriority.MY_FILES, target.observeAppSettings().first().contentPriority)
++    }
++
++    @Test
++    fun validateImportProfileJson_rejectsUnsafeNestedPortableDataBeforeMutation() = runBlocking {
++        val target = PreferencesSettingsRepository(
++            dataStore = testDataStore(),
++            supportedApps = SupportedCatalog.distractingApps,
++        )
++        target.saveThemeMode(AppThemeMode.DARK)
++        val importer = AccountLightProfileImporter(settingsRepository = target)
++
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(validProfileJson().withUserLinks(listOf(validUserLink(normalizedUrl = "https://EXAMPLE.com/Essay"))))
++        }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(validProfileJson().withUserLinks(listOf(validUserLink(title = "content://com.android.providers.media.documents/document/1"))))
++        }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(validProfileJson().withUserLinks(listOf(validUserLink(title = "com.dropbox.android.FileProvider"))))
++        }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(validProfileJson().withUserDocuments(listOf(validUserDocument(fingerprintStrategy = "SHA256_BYTES", sha256 = null, sizeBytes = JsonPrimitive(1234L)))))
++        }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(validProfileJson().withUserDocuments(listOf(validUserDocument(sourceDisplayName = "content://provider/raw-id"))))
++        }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(validProfileJson().withUserDocuments(listOf(validUserDocument(displayName = "file:///tmp/book.epub"))))
++        }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(validProfileJson().withUserDocuments(listOf(validUserDocument(title = "/Users/me/book.epub"))))
++        }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(validProfileJson().withUserDocuments(listOf(validUserDocument(title = "mailto:user@example.com"))))
++        }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(validProfileJson().withUserDocuments(listOf(validUserDocument(title = "content:com.android.providers.media.documents"))))
++        }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(validProfileJson().withUserDocuments(listOf(validUserDocument(providerLabel = "com.google.android.apps.docs.storage"))))
++        }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(validProfileJson().withUserDocuments(listOf(validUserDocument(normalizedTitle = "Imported  Book.epub"))))
++        }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(validProfileJson().withUserDocuments(listOf(validUserDocument(normalizedTitle = " imported book "))))
++        }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(validProfileJson().withUserDocuments(listOf(validUserDocument(normalizedTitle = "imported book.html"))))
++        }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(
++                validProfileJson().withUserDocuments(
++                    listOf(
++                        validUserDocument(
++                            fingerprintStrategy = "UNVERIFIED_METADATA_ONLY",
++                            sha256 = null,
++                            sizeBytes = JsonNull,
++                            documentImportState = "AVAILABLE_ON_THIS_DEVICE",
++                        ),
++                    ),
++                ),
++            )
++        }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(validProfileJson().withReadingProgressFor(contentId = "user-link-33333333-3333-4333-8333-333333333333"))
++        }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(validProfileJson().withPriorityContentIds(listOf("editorial-not-in-this-build")))
++        }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(validProfileJson().withUserLinks(listOf(validUserLink(durationMinutes = JsonPrimitive("12")))))
++        }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(validProfileJson().withUserDocuments(listOf(validUserDocument(createdAtMillis = JsonPrimitive("10000")))))
++        }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(validProfileJson().withUserDocuments(listOf(validUserDocument(sizeBytes = JsonPrimitive("1234")))))
++        }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(validProfileJson().withReadingProgressPercent(JsonPrimitive("40")))
++        }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(validProfileJson().withSchemaVersion(JsonPrimitive("1")))
++        }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(validProfileJson().withWarningMessage("com.android.providers.media.documents was omitted"))
++        }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(validProfileJson().withWarningMessage("com.dropbox.android.FileProvider was omitted"))
++        }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(validProfileJson().withWarningMessage("java.lang.IllegalStateException at MainViewModel.kt line 42"))
++        }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(validProfileJson().withWarningMessage("IllegalStateException"))
++        }
++
++        assertEquals(AppThemeMode.DARK, target.observeAppSettings().first().themeMode)
++    }
++
++    @Test
++    fun validateImportProfileJson_acceptsPortableAnnotationSidecarFileName() = runBlocking {
++        val target = PreferencesSettingsRepository(
++            dataStore = testDataStore(),
++            supportedApps = SupportedCatalog.distractingApps,
++        )
++        val importer = AccountLightProfileImporter(settingsRepository = target)
++
++        val plan = importer.validateImportProfileJson(
++            validProfileJson().withAnnotationSidecarFileName("book.annotations.jsonld"),
++        )
++
++        assertEquals(0, plan.preview.warningCount)
++    }
++
++    @Test
++    fun validateImportProfileJson_acceptsReadingProgressForImportedLibraryContent() = runBlocking {
++        val target = PreferencesSettingsRepository(
++            dataStore = testDataStore(),
++            supportedApps = SupportedCatalog.distractingApps,
++        )
++        val importer = AccountLightProfileImporter(settingsRepository = target)
++        val contentId = "user-link-33333333-3333-4333-8333-333333333333"
++
++        val plan = importer.validateImportProfileJson(
++            validProfileJson()
++                .withUserLinks(listOf(validUserLink(contentId = contentId)))
++                .withReadingProgressFor(contentId = contentId),
++        )
++
++        assertEquals(0, plan.preview.warningCount)
++    }
++
++    @Test
++    fun validateImportProfileJson_reportsUnknownNestedFieldsAsWarnings() = runBlocking {
++        val target = PreferencesSettingsRepository(
++            dataStore = testDataStore(),
++            supportedApps = SupportedCatalog.distractingApps,
++        )
++        val importer = AccountLightProfileImporter(settingsRepository = target)
++
++        val plan = importer.validateImportProfileJson(
++            validProfileJson()
++                .withUnknownSettingsField()
++                .withUnknownSyncAutosaveField()
++                .withUnknownAnnotationExportField(),
++        )
++
++        val warningMessages = plan.allWarnings
++            .filter { it.code == "UNKNOWN_FIELD_IGNORED" }
++            .mapNotNull { it.message }
++        assertTrue(warningMessages.any { it == "An unknown settings field was ignored" })
++        assertTrue(warningMessages.any { it == "An unknown sync field was ignored" })
++        assertTrue(warningMessages.any { it == "An unknown annotations field was ignored" })
++        assertTrue(warningMessages.none { it.contains(".") })
++    }
++
++    @Test
++    fun validateImportProfileJson_sanitizesDottedUnknownFieldSections() = runBlocking {
++        val target = PreferencesSettingsRepository(
++            dataStore = testDataStore(),
++            supportedApps = SupportedCatalog.distractingApps,
++        )
++        val importer = AccountLightProfileImporter(settingsRepository = target)
++        val linkContentId = "user-link-33333333-3333-4333-8333-333333333333"
++
++        val plan = importer.validateImportProfileJson(
++            validProfileJson()
++                .withUserLinks(listOf(validUserLink(contentId = linkContentId).withUnknownField()))
++                .withUserDocuments(listOf(validUserDocument().withUnknownField()))
++                .withReadingProgressFor(contentId = linkContentId)
++                .withUnknownReadingProgressField(),
++        )
++
++        val warningMessages = plan.allWarnings
++            .filter { it.code == "UNKNOWN_FIELD_IGNORED" }
++            .mapNotNull { it.message }
++        assertTrue(warningMessages.any { it == "An unknown saved link field was ignored" })
++        assertTrue(warningMessages.any { it == "An unknown document field was ignored" })
++        assertTrue(warningMessages.any { it == "An unknown reading progress field was ignored" })
++        assertTrue(warningMessages.none { it.contains(".") })
++    }
++
++    private fun validProfileJson(): String = runBlocking {
++        val repository = PreferencesSettingsRepository(
++            dataStore = testDataStore(),
++            supportedApps = SupportedCatalog.distractingApps,
++        )
++        repository.saveOnboardingSelection(
++            OnboardingSelection(
++                selectedAppPackages = SupportedCatalog.distractingApps.take(3).mapTo(mutableSetOf()) { it.packageName },
++                preferredTopics = setOf(TopicTag.SCIENCE, TopicTag.PHILOSOPHY, TopicTag.HISTORY),
++                preferredDurationBucket = DurationBucket.DEEP,
++                selectedPackIds = setOf("starter_pack"),
++            ),
++        )
++        repository.saveThemeMode(AppThemeMode.DARK)
++        repository.saveContentPriority(ContentPriority.MY_FILES)
++        repository.saveReaderFontScale(1.35)
++        repository.replacePortableSettings(
++            settings = repository.observeAppSettings().first(),
++            profileIdentity = com.qualityalternative.app.domain.model.LocalProfileIdentity(
++                profileId = "qa-local-11111111-1111-4111-8111-111111111111",
++                createdAtMillis = 10_000L,
++            ),
++        )
++        AccountLightProfileExporter(
++            settingsRepository = repository,
++            appVersionName = "0.8.1-alpha",
++            appVersionCode = 13,
++        ).exportSettingsOnlyProfileJson(nowMillis = 20_000L)
++    }
++
++    private fun String.withSelectedAppPackages(packages: List<String>): String {
++        val root = Json.parseToJsonElement(this).jsonObject
++        val settings = root.getValue("settings").jsonObject
++        return JsonObject(
++            root + (
++                "settings" to JsonObject(
++                    settings + ("selectedAppPackages" to JsonArray(packages.map(::JsonPrimitive))),
++                )
++                ),
++        ).toString()
++    }
++
++    private fun String.withSchemaVersion(schemaVersion: JsonElement): String {
++        val root = Json.parseToJsonElement(this).jsonObject
++        return JsonObject(root + ("schemaVersion" to schemaVersion)).toString()
++    }
++
++    private fun String.withUserLinkContentId(contentId: String): String {
++        val root = Json.parseToJsonElement(this).jsonObject
++        val library = root.getValue("library").jsonObject
++        return JsonObject(
++            root + (
++                "library" to JsonObject(
++                    library + (
++                        "userLinks" to JsonArray(
++                            listOf(JsonObject(mapOf("contentId" to JsonPrimitive(contentId)))),
++                        )
++                        ),
++                )
++                ),
++        ).toString()
++    }
++
++    private fun String.withoutNestedField(section: String, field: String): String {
++        val root = Json.parseToJsonElement(this).jsonObject
++        val nested = root.getValue(section).jsonObject
++        return JsonObject(root + (section to JsonObject(nested - field))).toString()
++    }
++
++    private fun String.withUnknownSettingsField(): String {
++        val root = Json.parseToJsonElement(this).jsonObject
++        val settings = root.getValue("settings").jsonObject
++        return JsonObject(
++            root + (
++                "settings" to JsonObject(
++                    settings + ("unexpectedReaderThing" to JsonPrimitive("ignored")),
++                )
++                ),
++        ).toString()
++    }
++
++    private fun String.withUnknownSyncAutosaveField(): String {
++        val root = Json.parseToJsonElement(this).jsonObject
++        val sync = root.getValue("sync").jsonObject
++        val profileAutosave = sync.getValue("profileAutosave").jsonObject
++        return JsonObject(
++            root + (
++                "sync" to JsonObject(
++                    sync + (
++                        "profileAutosave" to JsonObject(
++                            profileAutosave + ("someFutureField" to JsonPrimitive("ignored")),
++                        )
++                        ),
++                )
++                ),
++        ).toString()
++    }
++
++    private fun String.withUnknownAnnotationExportField(): String {
++        val root = Json.parseToJsonElement(this).jsonObject
++        val annotations = root.getValue("annotations").jsonObject
++        val export = annotations.getValue("export").jsonObject
++        return JsonObject(
++            root + (
++                "annotations" to JsonObject(
++                    annotations + (
++                        "export" to JsonObject(
++                            export + ("someFutureField" to JsonPrimitive("ignored")),
++                        )
++                        ),
++                )
++                ),
++        ).toString()
++    }
++
++    private fun String.withMinimalMalformedUserLink(): String {
++        val root = Json.parseToJsonElement(this).jsonObject
++        val library = root.getValue("library").jsonObject
++        return JsonObject(
++            root + (
++                "library" to JsonObject(
++                    library + (
++                        "userLinks" to JsonArray(
++                            listOf(
++                                JsonObject(
++                                    mapOf(
++                                        "contentId" to JsonPrimitive("user-link-11111111-1111-4111-8111-111111111111"),
++                                    ),
++                                ),
++                            ),
++                        )
++                        ),
++                )
++                ),
++        ).toString()
++    }
++
++    private fun String.withUserLinks(links: List<JsonObject>): String {
++        val root = Json.parseToJsonElement(this).jsonObject
++        val library = root.getValue("library").jsonObject
++        return JsonObject(
++            root + (
++                "library" to JsonObject(
++                    library + ("userLinks" to JsonArray(links)),
++                )
++                ),
++        ).toString()
++    }
++
++    private fun String.withUserDocuments(documents: List<JsonObject>): String {
++        val root = Json.parseToJsonElement(this).jsonObject
++        val library = root.getValue("library").jsonObject
++        return JsonObject(
++            root + (
++                "library" to JsonObject(
++                    library + ("userDocuments" to JsonArray(documents)),
++                )
++                ),
++        ).toString()
++    }
++
++    private fun String.withPriorityContentIds(contentIds: List<String>): String {
++        val root = Json.parseToJsonElement(this).jsonObject
++        val settings = root.getValue("settings").jsonObject
++        return JsonObject(
++            root + (
++                "settings" to JsonObject(
++                    settings + ("priorityContentIds" to JsonArray(contentIds.map(::JsonPrimitive))),
++                )
++                ),
++        ).toString()
++    }
++
++    private fun String.withWarningMessage(message: String): String {
++        val root = Json.parseToJsonElement(this).jsonObject
++        return JsonObject(
++            root + (
++                "warnings" to JsonArray(
++                    listOf(
++                        JsonObject(
++                            mapOf(
++                                "code" to JsonPrimitive("UNKNOWN_FIELD_IGNORED"),
++                                "severity" to JsonPrimitive("WARNING"),
++                                "section" to JsonPrimitive("unknown"),
++                                "contentId" to JsonNull,
++                                "message" to JsonPrimitive(message),
++                            ),
++                        ),
++                    ),
++                )
++                ),
++        ).toString()
++    }
++
++    private fun String.withAnnotationSidecarFileName(fileName: String): String {
++        val root = Json.parseToJsonElement(this).jsonObject
++        val annotations = root.getValue("annotations").jsonObject
++        return JsonObject(
++            root + (
++                "annotations" to JsonObject(
++                    annotations + (
++                        "sidecarIndex" to JsonArray(
++                            listOf(
++                                JsonObject(
++                                    mapOf(
++                                        "contentId" to JsonPrimitive("user-document-44444444-4444-4444-8444-444444444444"),
++                                        "sourceTitle" to JsonPrimitive("Imported book"),
++                                        "jsonLdFileName" to JsonPrimitive(fileName),
++                                        "sha256" to JsonNull,
++                                        "updatedAtMillis" to JsonPrimitive(20_000L),
++                                    ),
++                                ),
++                            ),
++                        )
++                        ),
++                )
++                ),
++        ).toString()
++    }
++
++    private fun String.withInvalidReadingProgress(): String {
++        return withReadingProgress(
++            contentId = "editorial-attention-reset",
++            progressPercent = JsonPrimitive(40),
++            lastVisibleParagraphIndex = 5,
++            paragraphCount = 5,
++            completedAtMillis = JsonNull,
++        )
++    }
++
++    private fun String.withReadingProgressFor(contentId: String): String {
++        return withReadingProgress(
++            contentId = contentId,
++            progressPercent = JsonPrimitive(40),
++            lastVisibleParagraphIndex = 4,
++            paragraphCount = 12,
++            completedAtMillis = JsonNull,
++        )
++    }
++
++    private fun String.withReadingProgressPercent(progressPercent: JsonElement): String {
++        return withReadingProgress(
++            contentId = "editorial-attention-reset",
++            progressPercent = progressPercent,
++            lastVisibleParagraphIndex = 4,
++            paragraphCount = 12,
++            completedAtMillis = JsonNull,
++        )
++    }
++
++    private fun String.withUnknownReadingProgressField(): String {
++        val root = Json.parseToJsonElement(this).jsonObject
++        val reading = root.getValue("reading").jsonObject
++        val progress = reading.getValue("progress").jsonArray
++        val firstProgress = progress.first().jsonObject
++        return JsonObject(
++            root + (
++                "reading" to JsonObject(
++                    reading + (
++                        "progress" to JsonArray(
++                            listOf(
++                                JsonObject(firstProgress + ("someFutureField" to JsonPrimitive("ignored"))),
++                            ),
++                        )
++                        ),
++                )
++                ),
++        ).toString()
++    }
++
++    private fun String.withReadingProgress(
++        contentId: String,
++        progressPercent: JsonElement,
++        lastVisibleParagraphIndex: Int,
++        paragraphCount: Int,
++        completedAtMillis: JsonElement,
++    ): String {
++        val root = Json.parseToJsonElement(this).jsonObject
++        val reading = root.getValue("reading").jsonObject
++        return JsonObject(
++            root + (
++                "reading" to JsonObject(
++                    reading + (
++                        "progress" to JsonArray(
++                            listOf(
++                                JsonObject(
++                                    mapOf(
++                                        "contentId" to JsonPrimitive(contentId),
++                                        "progressPercent" to progressPercent,
++                                        "lastVisibleParagraphIndex" to JsonPrimitive(lastVisibleParagraphIndex),
++                                        "paragraphCount" to JsonPrimitive(paragraphCount),
++                                        "updatedAtMillis" to JsonPrimitive(20_000L),
++                                        "completedAtMillis" to completedAtMillis,
++                                    ),
++                                ),
++                            ),
++                        )
++                        ),
++                )
++                ),
++        ).toString()
++    }
++
++    private fun validUserLink(
++        contentId: String = "user-link-33333333-3333-4333-8333-333333333333",
++        normalizedUrl: String = "https://example.com/essay",
++        title: String = "Imported essay",
++        durationMinutes: JsonElement = JsonPrimitive(12),
++    ): JsonObject {
++        return JsonObject(
++            mapOf(
++                "contentId" to JsonPrimitive(contentId),
++                "normalizedUrl" to JsonPrimitive(normalizedUrl),
++                "title" to JsonPrimitive(title),
++                "description" to JsonPrimitive("Saved link from another device."),
++                "durationMinutes" to durationMinutes,
++                "topicTags" to JsonArray(listOf(JsonPrimitive("SCIENCE"))),
++                "availability" to JsonPrimitive("AVAILABLE"),
++                "createdAtMillis" to JsonPrimitive(10_000L),
++                "updatedAtMillis" to JsonPrimitive(20_000L),
++                "sourceLabel" to JsonNull,
++            ),
++        )
++    }
++
++    private fun JsonObject.withUnknownField(): JsonObject {
++        return JsonObject(this + ("someFutureField" to JsonPrimitive("ignored")))
++    }
++
++    private fun validUserDocument(
++        contentId: String = "user-document-44444444-4444-4444-8444-444444444444",
++        displayName: String = "book.epub",
++        title: String = "Imported book",
++        fingerprintStrategy: String = "SHA256_BYTES",
++        sha256: String? = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
++        sizeBytes: JsonElement = JsonPrimitive(1234L),
++        normalizedTitle: String = "imported book",
++        documentImportState: String = "MISSING_FILE_NEEDS_REATTACH",
++        sourceDisplayName: String? = "book.epub",
++        providerLabel: String? = null,
++        createdAtMillis: JsonElement = JsonPrimitive(10_000L),
++    ): JsonObject {
++        return JsonObject(
++            mapOf(
++                "contentId" to JsonPrimitive(contentId),
++                "displayName" to JsonPrimitive(displayName),
++                "mimeType" to JsonPrimitive("application/epub+zip"),
++                "documentFormat" to JsonPrimitive("EPUB"),
++                "title" to JsonPrimitive(title),
++                "description" to JsonPrimitive("Saved document metadata."),
++                "durationMinutes" to JsonPrimitive(45),
++                "topicTags" to JsonArray(listOf(JsonPrimitive("PHILOSOPHY"))),
++                "availability" to JsonPrimitive("UNAVAILABLE"),
++                "documentImportState" to JsonPrimitive(documentImportState),
++                "documentFingerprint" to JsonObject(
++                    mapOf(
++                        "strategy" to JsonPrimitive(fingerprintStrategy),
++                        "sha256" to (sha256?.let(::JsonPrimitive) ?: JsonNull),
++                        "sizeBytes" to sizeBytes,
++                        "normalizedTitle" to JsonPrimitive(normalizedTitle),
++                        "format" to JsonPrimitive("EPUB"),
++                    ),
++                ),
++                "createdAtMillis" to createdAtMillis,
++                "updatedAtMillis" to JsonPrimitive(20_000L),
++                "sourceHint" to JsonObject(
++                    mapOf(
++                        "lastKnownDisplayName" to (sourceDisplayName?.let(::JsonPrimitive) ?: JsonNull),
++                        "providerLabel" to (providerLabel?.let(::JsonPrimitive) ?: JsonNull),
++                    ),
++                ),
++            ),
++        )
++    }
++
++    private fun testDataStore(): DataStore<Preferences> {
++        val file = File.createTempFile("account-light-importer-test", ".preferences_pb").apply { deleteOnExit() }
++        return PreferenceDataStoreFactory.create(produceFile = { file })
++    }
++}
+diff --git a/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt b/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
+index 77ed0c6..bcaf7e8 100644
+--- a/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
+@@ -4,6 +4,7 @@ import androidx.datastore.core.DataStore
+ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+ import androidx.datastore.preferences.core.Preferences
+ import com.qualityalternative.app.analytics.InMemoryAnalyticsTracker
++import com.qualityalternative.app.data.AccountLightProfileExporter
+ import com.qualityalternative.app.data.CompositeContentRepository
+ import com.qualityalternative.app.data.InMemoryDelayGate
+ import com.qualityalternative.app.data.PreferencesDelayGate
+@@ -3042,6 +3043,106 @@ class MainViewModelTest {
+         assertEquals(InterventionOrigin.SYSTEM, viewModel.uiState.currentInterventionOrigin)
+     }
+
++    @Test
++    fun previewAccountLightImportShowsValidationErrorWithoutMutatingSettings() = runTest {
++        val settingsRepository = FakeSettingsRepository(
++            initial = completedSettings(selectedAppPackages = setOf("com.instagram.android")).copy(
++                themeMode = AppThemeMode.DARK,
++                contentPriority = ContentPriority.MY_FILES,
++            ),
++        )
++        val viewModel = createViewModel(settingsRepository = settingsRepository)
++        advanceUntilIdle()
++
++        viewModel.previewAccountLightImport("{not-json")
++
++        assertEquals("Portable profile is not valid JSON.", viewModel.uiState.accountLightImportError)
++        assertEquals(null, viewModel.uiState.accountLightImportPreview)
++        assertEquals(AppThemeMode.DARK, settingsRepository.state.value.themeMode)
++        assertEquals(ContentPriority.MY_FILES, settingsRepository.state.value.contentPriority)
++    }
++
++    @Test
++    fun accountLightMergeImportKeepsLocalPortableSettings() = runTest {
++        val importedSettingsRepository = FakeSettingsRepository(
++            initial = completedSettings(selectedAppPackages = setOf("com.instagram.android")).copy(
++                themeMode = AppThemeMode.DARK,
++                contentPriority = ContentPriority.MY_FILES,
++                readerFontScale = 1.35,
++            ),
++        )
++        val targetSettingsRepository = FakeSettingsRepository(
++            initial = completedSettings(selectedAppPackages = setOf("com.google.android.youtube")).copy(
++                themeMode = AppThemeMode.LIGHT,
++                contentPriority = ContentPriority.BALANCED,
++                readerFontScale = 1.0,
++            ),
++        )
++        val viewModel = createViewModel(settingsRepository = targetSettingsRepository)
++        val rawJson = AccountLightProfileExporter(
++            settingsRepository = importedSettingsRepository,
++            appVersionName = "0.8.1-alpha",
++            appVersionCode = 13,
++        ).exportSettingsOnlyProfileJson(nowMillis = 20_000L)
++        advanceUntilIdle()
++
++        viewModel.previewAccountLightImport(rawJson)
++        viewModel.applyAccountLightMergeImport()
++        advanceUntilIdle()
++
++        assertEquals(null, viewModel.uiState.accountLightImportError)
++        assertEquals(null, viewModel.uiState.accountLightImportPreview)
++        assertEquals("Profile merged. Local settings were kept.", viewModel.uiState.accountLightStatus)
++        assertEquals(AppThemeMode.LIGHT, targetSettingsRepository.state.value.themeMode)
++        assertEquals(ContentPriority.BALANCED, targetSettingsRepository.state.value.contentPriority)
++        assertEquals(1.0, targetSettingsRepository.state.value.readerFontScale, 0.0)
++    }
++
++    @Test
++    fun accountLightReplaceImportRequiresConfirmationAndAppliesPortableSettings() = runTest {
++        val importedSettingsRepository = FakeSettingsRepository(
++            initial = completedSettings(selectedAppPackages = setOf("com.instagram.android")).copy(
++                themeMode = AppThemeMode.DARK,
++                contentPriority = ContentPriority.MY_FILES,
++                readerFontScale = 1.35,
++                openAnywayUnlockMinutes = 60,
++            ),
++        )
++        val targetSettingsRepository = FakeSettingsRepository(
++            initial = completedSettings(selectedAppPackages = setOf("com.google.android.youtube")).copy(
++                themeMode = AppThemeMode.LIGHT,
++                contentPriority = ContentPriority.BALANCED,
++                readerFontScale = 1.0,
++                openAnywayUnlockMinutes = 15,
++            ),
++        )
++        val viewModel = createViewModel(settingsRepository = targetSettingsRepository)
++        val rawJson = AccountLightProfileExporter(
++            settingsRepository = importedSettingsRepository,
++            appVersionName = "0.8.1-alpha",
++            appVersionCode = 13,
++        ).exportSettingsOnlyProfileJson(nowMillis = 20_000L)
++        advanceUntilIdle()
++
++        viewModel.previewAccountLightImport(rawJson)
++        assertNotNull(viewModel.uiState.accountLightImportPreview)
++        assertFalse(viewModel.uiState.isAccountLightReplaceConfirming)
++
++        viewModel.requestAccountLightReplaceConfirmation()
++        assertTrue(viewModel.uiState.isAccountLightReplaceConfirming)
++
++        viewModel.confirmAccountLightReplaceImport()
++        advanceUntilIdle()
++
++        assertEquals("Imported settings replaced local portable settings.", viewModel.uiState.accountLightStatus)
++        assertEquals(null, viewModel.uiState.accountLightImportPreview)
++        assertFalse(viewModel.uiState.isAccountLightReplaceConfirming)
++        assertEquals(AppThemeMode.DARK, targetSettingsRepository.state.value.themeMode)
++        assertEquals(ContentPriority.MY_FILES, targetSettingsRepository.state.value.contentPriority)
++        assertEquals(1.35, targetSettingsRepository.state.value.readerFontScale, 0.0)
++        assertEquals(60, targetSettingsRepository.state.value.openAnywayUnlockMinutes)
++    }
++
+     private fun completedSettings(selectedAppPackages: Set<String>): AppSettings {
+         return AppSettings(
+             hasCompletedOnboarding = true,
+@@ -3141,6 +3242,26 @@ class MainViewModelTest {
+                 createdAtMillis = nowMillis,
+             )
+
++        override suspend fun replacePortableSettings(
++            settings: AppSettings,
++            profileIdentity: com.qualityalternative.app.domain.model.LocalProfileIdentity?,
++        ) {
++            state.value = state.value.copy(
++                hasCompletedOnboarding = settings.hasCompletedOnboarding,
++                selectedAppPackages = settings.selectedAppPackages,
++                preferredTopics = settings.preferredTopics,
++                preferredDurationBucket = settings.preferredDurationBucket,
++                selectedPackIds = settings.selectedPackIds,
++                themeMode = settings.themeMode,
++                meditationDurationMinutes = settings.meditationDurationMinutes,
++                readerFontScale = settings.readerFontScale,
++                contentPriority = settings.contentPriority,
++                priorityContentIds = settings.priorityContentIds,
++                reactivatedCompletedContentIds = settings.reactivatedCompletedContentIds,
++                openAnywayUnlockMinutes = settings.openAnywayUnlockMinutes,
++            )
++        }
++
+         override suspend fun saveSelectedAppPackages(packages: Set<String>) {
+             state.value = state.value.copy(selectedAppPackages = packages)
+         }
+diff --git a/docs/ACCOUNT_LIGHT_PROFILE_SCHEMA.md b/docs/ACCOUNT_LIGHT_PROFILE_SCHEMA.md
+index 2ef1746..80d3f76 100644
+--- a/docs/ACCOUNT_LIGHT_PROFILE_SCHEMA.md
++++ b/docs/ACCOUNT_LIGHT_PROFILE_SCHEMA.md
+@@ -1,10 +1,10 @@
+-# Account Light Profile Schema
++# Portable Profile Schema
+
+ Status: Sprint 16 contract, schema v1
+
+ ## Goal
+
+-Account Light gives Quality Alternative account-like portability without a Quality Alternative backend account. The user owns a local, versioned JSON profile file that can be exported, imported, and later autosaved to a user-selected destination.
++Portable Profile gives Quality Alternative account-like portability without a Quality Alternative backend account. The user owns a local, versioned JSON profile file that can be exported, imported, and later autosaved to a user-selected destination.
+
+ The product remains local-first. Google Drive can be used as a user-authorized file destination, but Drive authorization is not a Quality Alternative account and must not be copied between devices.
+
+@@ -214,7 +214,7 @@ Required fields:
+
+ ### `warnings[]`
+
+-`warnings` is required and may be empty. Warning entries are machine-readable and must not contain raw platform identifiers, URIs, Drive ids, account emails, filesystem paths, provider document ids, access tokens, OAuth values, stack traces, or raw error strings.
++`warnings` is required and may be empty. Warning entries are machine-readable and must not contain raw platform identifiers, reverse-DNS provider/class identifiers, URIs, Drive ids, account emails, filesystem paths, provider document ids, access tokens, OAuth values, stack traces, exception names, or raw error strings.
+
+ Required fields:
+
+@@ -266,7 +266,7 @@ Required fields:
+
+ - `contentId`: stable content id, non-blank string.
+ - `normalizedUrl`: `http` or `https` URL accepted by the same validator as manual link add.
+-- `title`: non-blank string, maximum 200 characters.
++- `title`: non-blank string, maximum 200 characters, display-safe; import rejects raw URIs, account-like strings, filesystem paths, provider authorities, reverse-DNS provider/class identifiers, access tokens, OAuth values, and platform identifiers.
+ - `description`: string, maximum 1000 characters.
+ - `durationMinutes`: integer in `1..240`; this is legacy/display metadata and must not be used as a whole-source recommendation filter.
+ - `topicTags`: array of `topicTags`, minimum 1.
+@@ -283,10 +283,10 @@ Optional fields:
+ Required fields:
+
+ - `contentId`: stable content id, non-blank string.
+-- `displayName`: non-blank string, maximum 240 characters.
++- `displayName`: non-blank string, maximum 240 characters, display-safe; import rejects raw URIs, account-like strings, filesystem paths, provider authorities, access tokens, OAuth values, and platform identifiers.
+ - `mimeType`: nullable string.
+ - `documentFormat`: one of `MARKDOWN`, `PDF`, `EPUB`.
+-- `title`: non-blank string, maximum 200 characters.
++- `title`: non-blank string, maximum 200 characters, display-safe under the same raw-value rejection rules as `displayName`.
+ - `description`: string, maximum 1000 characters.
+ - `durationMinutes`: integer in `1..240`; computed/display metadata only.
+ - `topicTags`: array of `topicTags`, minimum 1.
+@@ -307,7 +307,7 @@ Schema v1 must not export raw Android `content://` or `file://` URIs. A user-doc
+ }
+ ```
+
+-`sourceHint.providerLabel` is display-only and must not contain a raw URI, account email, filesystem path, or provider document id.
++`sourceHint.providerLabel` is display-only and must not contain a raw URI, account email, filesystem path, Android/Google provider authority, or provider document id.
+
+ ### `documentFingerprint`
+
+@@ -333,6 +333,8 @@ Rules:
+ - collapse internal whitespace to one ASCII space
+ - lowercase with `Locale.ROOT`
+ - remove file extension only when it exactly matches the exported `format`
++
++The stored `normalizedTitle` must already equal the algorithm output. Import rejects values with leading/trailing whitespace, doubled whitespace, uppercase characters, raw URI/account/provider identifiers, and leftover source extensions including `.pdf`, `.epub`, `.html`, `.htm`, `.md`, and `.markdown`.
+ - maximum 200 Unicode scalar values after normalization
+
+ `TEXT_SAMPLE_SHA256` algorithm:
+@@ -533,6 +535,7 @@ Importer must:
+ - Reject invalid primitive types.
+ - Reject invalid enum values.
+ - Reject invalid timestamp ranges.
++- Reject quoted string values for numeric and boolean fields before any mutation.
+ - Reject invalid reading progress bounds.
+ - Validate user links with the same URL rules as manual link add.
+ - Validate topic tags and content priority values.
+@@ -569,7 +572,7 @@ Encryption is not required for schema v1 because there is no server account or r
+
+ Implementation slices that add UI must capture screenshots for:
+
+-- Settings Account Light entry.
++- Settings Portable profile entry.
+ - Export action and export success.
+ - Export failure.
+ - Import entry point.
+@@ -586,4 +589,4 @@ Implementation slices that add UI must capture screenshots for:
+
+ - Whether to add optional encrypted ZIP export that includes document binaries.
+ - Whether to support a conflict-review screen for individual imported rows.
+-- Whether Account Light profile and annotation JSON-LD files should live in one Drive folder or sibling folders.
++- Whether Portable Profile and annotation JSON-LD files should live in one Drive folder or sibling folders.
+diff --git a/docs/SPRINT_16_ACCOUNT_LIGHT.md b/docs/SPRINT_16_ACCOUNT_LIGHT.md
+index 1c5c6f5..7de919f 100644
+--- a/docs/SPRINT_16_ACCOUNT_LIGHT.md
++++ b/docs/SPRINT_16_ACCOUNT_LIGHT.md
+@@ -1,4 +1,4 @@
+-# Sprint 16: Account Light Local Profile
++# Sprint 16: Portable Profile
+
+ Status: started
+
+@@ -21,8 +21,8 @@ Implement account-like portability without a Quality Alternative server account.
+
+ Deliverables:
+
+-- PRD Account Light requirement.
+-- Account Light profile schema document.
++- PRD Portable Profile requirement.
++- Portable Profile schema document.
+ - Sprint plan and acceptance criteria.
+
+ Review gate:
+@@ -31,7 +31,7 @@ Review gate:
+ - Required result before implementation slices: `SCORE: 10/10`, `VERDICT: PASS`.
+ - R1 GPT Pro review returned `SCORE: 7/10`, `VERDICT: FAIL`, `VISUAL REVIEW: PASS`; R2 hardens the schema with concrete field shapes, enum domains, document fingerprints, no raw URI export, explicit merge/replace semantics, and Drive/autosave reactivation rules before implementation proceeds.
+ - R2 GPT Pro review returned `SCORE: 8/10`, `VERDICT: FAIL`, `VISUAL REVIEW: PASS`; R3 adds stable content-id format/generation/collision rules, formal `warnings[]` schema, deterministic field-level merge winners for links/documents/progress/settings, and exact text fingerprint normalization.
+-- R4 GPT Pro review returned `SCORE: 9/10`, `VERDICT: FAIL`, `VISUAL REVIEW: PASS`; Account Light contract blockers were closed, but the sprint order incorrectly placed final release before the newly required adaptive reader pagination slice. R5 moves adaptive pagination before final UX/hardening/release.
++- R4 GPT Pro review returned `SCORE: 9/10`, `VERDICT: FAIL`, `VISUAL REVIEW: PASS`; Portable Profile contract blockers were closed, but the sprint order incorrectly placed final release before the newly required adaptive reader pagination slice. R5 moves adaptive pagination before final UX/hardening/release.
+
+ ### Slice 16.1: Local Profile Identity And Settings Export
+
+@@ -46,7 +46,7 @@ Deliverables:
+ Review gate:
+
+ - GPT Pro code review and Settings visual review where applicable.
+-- If Settings UI is touched, screenshot Account Light entry, export action, export success, and export failure.
++- If Settings UI is touched, screenshot Portable profile entry, export action, export success, and export failure.
+
+ ### Slice 16.2: Settings Import And Safe Restore
+
+@@ -76,7 +76,7 @@ Review gate:
+
+ - GPT Pro code, E2E, and visual review.
+
+-### Slice 16.4: Account Light Autosave Destination
++### Slice 16.4: Portable Profile Autosave Destination
+
+ Deliverables:
+
+@@ -96,13 +96,13 @@ Context:
+ - User reported that current paginated reader can leave too much empty space on a real phone.
+ - The reader should remain Kindle-like: no active vertical scrolling, no persistent Previous/Next/Done controls, tap/swipe navigation still works.
+ - Android Back should exit the active reader to the prior app screen, after closing TOC or annotation overlays. Previous-page navigation should be a reader gesture or a very small left-edge tap zone, not the system Back action.
+-- Reader font size must be adjustable in Quality Alternative settings and exported/imported through Account Light. The user must not have to change Android system font size just to tune the reader.
+-- Annotation range selection is part of this reader pass but must not be implemented during earlier Account Light slices: the current Start/End earlier/later concept is acceptable only if it becomes compact, icon-first, and works reliably.
++- Reader font size must be adjustable in Quality Alternative settings and exported/imported through Portable Profile. The user must not have to change Android system font size just to tune the reader.
++- Annotation range selection is part of this reader pass but must not be implemented during earlier Portable Profile slices: the current Start/End earlier/later concept is acceptable only if it becomes compact, icon-first, and works reliably.
+
+ Deliverables:
+
+ - Replace fixed paragraph/weight pagination with viewport-aware pagination that measures usable reader height.
+-- Add an app-level reader font-size setting backed by the Account Light `readerFontScale` field.
++- Add an app-level reader font-size setting backed by the Portable Profile `readerFontScale` field.
+ - Account for actual device dimensions and the app-level reader font-size setting when calculating pages; system font scale may be observed as an accessibility input but cannot be the only control.
+ - Keep pages full enough to avoid large avoidable blank regions while preventing clipping/overflow.
+ - Preserve TOC jumps, reading progress restoration, annotations, tap-to-next, swipe left/right, and Back-to-exit behavior.
+@@ -123,7 +123,7 @@ Review gate:
+
+ Deliverables:
+
+-- Minimal Settings UX for Account Light.
++- Minimal Settings UX for Portable Profile.
+ - E2E export/import on clean app state.
+ - Visual screenshots for Settings, export success, import success, invalid import, missing-document state, and adaptive reader pagination on representative viewport/font-size combinations.
+ - Full release validation.
+@@ -131,12 +131,12 @@ Deliverables:
+
+ Review gate:
+
+-- GPT Pro final release gate with visual review after all Account Light and adaptive reader pagination slices pass.
++- GPT Pro final release gate with visual review after all Portable Profile and adaptive reader pagination slices pass.
+ - Required result: `SCORE: 10/10`, `VERDICT: PASS`, `VISUAL REVIEW: PASS`.
+
+ ## Definition Of Done
+
+-- Account Light works without a server.
++- Portable Profile works without a server.
+ - Exported profile is JSON and human-auditable.
+ - Import validates before mutation.
+ - No credentials or authorization grants are exported.
+diff --git a/evidence/sprint16_slice16_2_portable_profile_import/MANIFEST.md b/evidence/sprint16_slice16_2_portable_profile_import/MANIFEST.md
+new file mode 100644
+index 0000000..b221c5c
+--- /dev/null
++++ b/evidence/sprint16_slice16_2_portable_profile_import/MANIFEST.md
+@@ -0,0 +1,20 @@
++# Sprint 16 Slice 16.2 Review Bundle Manifest
++
++This bundle is scoped to Portable Profile settings import and safe restore. R10 specifically addresses the R9 GPT Pro blocker for sanitized unknown-field warning messages when machine-readable sections contain dots.
++
++Included:
++
++- Sprint contract and Portable Profile schema docs.
++- Modified Portable Profile source, repository, ViewModel, Settings UI, and affected test doubles.
++- New importer unit tests and MainViewModel import/merge/replace tests.
++- Android visual/E2E test for Settings import entry, preview, replace confirmation, success, invalid JSON, and future schema rejection.
++- Emulator screenshots from the visual/E2E test.
++- Raw Gradle logs for R10 unit, compile, and connected visual runs.
++- Raw `git diff --check` log for R10.
++- Validation summary and current diff patch.
++
++Excluded:
++
++- APK artifacts and older GPT Pro outputs from prior slices.
++- Previous sprint screenshot folders unrelated to Portable Profile import.
++- Build directories and Gradle caches.
+diff --git a/evidence/sprint16_slice16_2_portable_profile_import/test_summary.md b/evidence/sprint16_slice16_2_portable_profile_import/test_summary.md
+new file mode 100644
+index 0000000..50b8ac8
+--- /dev/null
++++ b/evidence/sprint16_slice16_2_portable_profile_import/test_summary.md
+@@ -0,0 +1,54 @@
++# Sprint 16 Slice 16.2 Validation Summary
++
++Scope: Portable Profile settings import, safe merge, explicit replace, invalid profile handling, and Settings visual states.
++
++R10 fixes covered after R9 GPT Pro review (`SCORE: 9/10`, `VERDICT: FAIL`, `VISUAL REVIEW: PASS`):
++
++- Schema-complete nested validation before any replace mutation.
++- Manual saved-link URL normalization is enforced for imported `normalizedUrl` values.
++- Document fingerprint validation enforces `SHA256_BYTES`, `TEXT_SAMPLE_SHA256`, and `UNVERIFIED_METADATA_ONLY` strategy-specific rules.
++- Document `sourceHint.lastKnownDisplayName` rejects raw URI/path/account-like values.
++- Reading progress entries must reference imported library content or locally known content.
++- Document `displayName` and `title` reject raw URI/path-like values.
++- `sourceHint.providerLabel` rejects provider-id-like authorities such as Android/Google document provider ids.
++- `documentFingerprint.normalizedTitle` must be lowercase, collapsed-whitespace, extension-free, and portable.
++- `UNVERIFIED_METADATA_ONLY` documents must import as `MISSING_FILE_NEEDS_REATTACH`.
++- `priorityContentIds` and `reactivatedCompletedContentIds` must reference imported or locally known content.
++- `documentFingerprint.normalizedTitle` rejects leading/trailing whitespace, leftover `.html`/`.htm` extensions, uppercase, doubled whitespace, and raw platform identifiers.
++- `library.userDocuments[].title` now uses the same unsafe raw-value rejection as document source display names for URI/account/provider/path-like values.
++- Imported `warnings[].message` rejects Android/Google provider authorities such as `com.android.providers.media.documents`.
++- `library.userLinks[].title` now uses the same unsafe raw-value rejection as document titles and rejects raw URI/path/account/token/provider strings.
++- Imported `warnings[].message` also rejects generic reverse-DNS provider/class identifiers and raw exception/stacktrace-style text.
++- Raw Gradle logs are included in `logs/` for unit, compile, and connected visual runs.
++- Imported `warnings[].message` rejects bare exception class names such as `IllegalStateException`.
++- Valid annotation sidecar filenames ending in `.annotations.jsonld`, such as `book.annotations.jsonld`, are accepted without being mistaken for provider/class identifiers.
++- Manual JSON validation rejects quoted primitive values before mutation, including quoted `schemaVersion`, quoted link durations, quoted document timestamps, quoted fingerprint `sizeBytes`, and quoted reading progress percentages.
++- Generated unknown-field warnings use sanitized section-level messages instead of raw dotted paths, so supported schema v1 imports with unknown nested fields remain non-fatal warnings.
++- Generated unknown-field warnings also sanitize dotted warning sections such as `library.userLinks`, `library.userDocuments`, and `reading.progress` into user-facing copy without dots.
++- Replace backup launches a timestamped `quality-alternative-profile-YYYYMMDD-HHMMSS.json` backup filename.
++- Warning summaries surfaced in the import preview.
++- Destructive replace confirmation includes a real export-backup action.
++- Settings copy uses the product label `Portable profile`, not the internal `Account Light` name.
++- Privacy notice visibly states that profile files may include preferences, saved links, document/source titles, and reading progress.
++
++Commands run:
++
++- `./gradlew testDebugUnitTest --tests 'com.qualityalternative.app.data.AccountLightProfileImporterTest' --tests 'com.qualityalternative.app.data.AccountLightProfileExporterTest'`
++  - PASS after R10 dotted-section warning sanitization; raw log: `logs/r10_unit_import_export.log`.
++- `./gradlew testDebugUnitTest compileDebugAndroidTestKotlin`
++  - PASS after R10 dotted-section warning sanitization; raw log: `logs/r10_full_unit_compile.log`.
++- `git diff --check`
++  - PASS after R10 dotted-section warning sanitization; raw log: `logs/r10_git_diff_check.log`.
++- `./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.qualityalternative.app.MainActivityTest#accountLightImportSettingsShowsPreviewErrorsConfirmationAndSuccess`
++  - PASS on `qaApi36(AVD) - 16` after R10 dotted-section warning sanitization; raw log: `logs/r10_connected_import_visual.log`; screenshots refreshed from this run.
++- `git diff --check`
++  - PASS
++
++Screenshots captured from emulator:
++
++- `screenshots/01_import_entry_light.png`
++- `screenshots/02_merge_preview_with_unsupported_app_light.png`
++- `screenshots/03_replace_confirmation_light.png`
++- `screenshots/04_import_success_dark.png`
++- `screenshots/05_invalid_import_dark.png`
++- `screenshots/06_future_schema_import_dark.png`

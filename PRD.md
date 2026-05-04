@@ -380,7 +380,7 @@ The product must log enough behavior to evaluate whether substitution is working
 - Each event includes timestamp, target app, recommendation identifiers, and session context.
 - Analytics can distinguish between no recommendation available and user chose Open anyway.
 
-### FR13. Account Light Local Profile
+### FR13. Portable Profile
 
 The system must provide account-like portability without requiring a Quality Alternative server account or backend authentication.
 
@@ -391,10 +391,10 @@ The system must provide account-like portability without requiring a Quality Alt
 - User can import a compatible profile file from Settings and choose a safe restore mode.
 - Profile export includes portable settings, selected distracting apps, topic preferences, starter-pack choices, reader font-size preference, content priority settings, user links, user-document metadata, reading progress, completed/reactivated state, and annotation sync/export preferences that are safe to move across devices.
 - Profile export must not include Google access tokens, authorization grants, OAuth secrets, raw Drive file ids, raw Android `content://` or `file://` URIs, raw SAF tree URIs, account emails, raw analytics event logs, Android-only permission state, or unredacted platform-internal identifiers that would be misleading on another device.
-- User-owned document binaries are not exported in the initial Account Light profile. The profile may preserve document metadata, stable content identity, and safe document fingerprints, but import must clearly mark missing or unverified local document files as unavailable until the user reattaches and verifies them.
+- User-owned document binaries are not exported in the initial portable profile. The profile may preserve document metadata, stable content identity, and safe document fingerprints, but import must clearly mark missing or unverified local document files as unavailable until the user reattaches and verifies them.
 - The profile format is schema-versioned and must reject unsupported future versions without corrupting local state.
 - Import failures are visible and must not partially overwrite local settings or library data. Merge mode must preserve local settings unless the user explicitly chooses to apply imported settings, and replace mode must show affected scope before destructive mutation.
-- Account Light may optionally autosave the profile to a user-authorized local or Google Drive destination, but imported autosave or Drive metadata must be informational only until the current device user reselects a destination or reauthorizes Drive. The canonical product behavior must remain usable without a backend server.
+- Portable Profile may optionally autosave the profile to a user-authorized local or Google Drive destination, but imported autosave or Drive metadata must be informational only until the current device user reselects a destination or reauthorizes Drive. The canonical product behavior must remain usable without a backend server.
 
 ## Non-Functional Requirements
 
@@ -416,7 +416,7 @@ The system must provide account-like portability without requiring a Quality Alt
 
 ### NFR4. Local-First Portability And Privacy
 
-- Account Light data must be local-first and user-controlled.
+- Portable Profile data must be local-first and user-controlled.
 - Portable profile exports must be human-auditable JSON rather than opaque database backups.
 - Export/import should preserve behaviorally important state without pretending to provide server-backed identity, cross-device conflict resolution, or guaranteed document-file transfer.
 - Any cloud sync must be explicit, revocable, and scoped to user-owned files. Cloud authorization state must be re-established on each device rather than copied through profile export.

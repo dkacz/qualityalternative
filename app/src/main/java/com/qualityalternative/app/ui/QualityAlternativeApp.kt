@@ -104,6 +104,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
+import com.qualityalternative.app.data.ACCOUNT_LIGHT_PROFILE_FILE_NAME
+import com.qualityalternative.app.data.accountLightTimestampedBackupFileName
 import com.qualityalternative.app.BuildConfig
 import com.qualityalternative.app.data.ReadingTimeEstimateSource
 import com.qualityalternative.app.data.UserDocumentValidator
@@ -360,6 +362,28 @@ private fun MainRoute(
             },
         )
     }
+    val accountLightExportPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json"),
+    ) { uri ->
+        if (uri == null) {
+            return@rememberLauncherForActivityResult
+        }
+        viewModel.exportAccountLightProfile { json ->
+            context.writeUtf8Text(uri = uri, text = json)
+        }
+    }
+    val accountLightImportPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri == null) {
+            return@rememberLauncherForActivityResult
+        }
+        runCatching {
+            context.readUtf8Text(uri)
+        }.onSuccess { rawJson ->
+            viewModel.previewAccountLightImport(rawJson)
+        }.onFailure {
+            viewModel.reportAccountLightImportReadFailure()
+        }
+    }
     val onImportDocument = {
         documentPicker.launch(USER_DOCUMENT_PICKER_MIME_TYPES)
     }
@@ -478,6 +502,13 @@ private fun MainRoute(
                 onConnectAnnotationDrive = { startGoogleDriveSyncAuthorization(AnnotationDriveSyncMode.CONNECT) },
                 onRetryAnnotationDrive = { startGoogleDriveSyncAuthorization(AnnotationDriveSyncMode.RETRY) },
                 onDisconnectAnnotationDrive = disconnectGoogleDriveSync,
+                onExportAccountLightProfile = { accountLightExportPicker.launch(ACCOUNT_LIGHT_PROFILE_FILE_NAME) },
+                onExportAccountLightBackup = { accountLightExportPicker.launch(accountLightTimestampedBackupFileName()) },
+                onImportAccountLightProfile = { accountLightImportPicker.launch(arrayOf("application/json", "text/json", "*/*")) },
+                onMergeAccountLightProfile = viewModel::applyAccountLightMergeImport,
+                onRequestAccountLightReplace = viewModel::requestAccountLightReplaceConfirmation,
+                onConfirmAccountLightReplace = viewModel::confirmAccountLightReplaceImport,
+                onCancelAccountLightImport = viewModel::cancelAccountLightImport,
             )
         }
 
@@ -3077,6 +3108,13 @@ private fun SettingsTab(
     onConnectAnnotationDrive: () -> Unit,
     onRetryAnnotationDrive: () -> Unit,
     onDisconnectAnnotationDrive: () -> Unit,
+    onExportAccountLightProfile: () -> Unit,
+    onExportAccountLightBackup: () -> Unit,
+    onImportAccountLightProfile: () -> Unit,
+    onMergeAccountLightProfile: () -> Unit,
+    onRequestAccountLightReplace: () -> Unit,
+    onConfirmAccountLightReplace: () -> Unit,
+    onCancelAccountLightImport: () -> Unit,
 ) {
     val context = LocalContext.current
     val colors = QualityAlternativeThemeTokens.colors
@@ -3202,6 +3240,18 @@ private fun SettingsTab(
             )
         }
         item {
+            AccountLightSettingsSection(
+                state = state,
+                onExport = onExportAccountLightProfile,
+                onExportBackup = onExportAccountLightBackup,
+                onImport = onImportAccountLightProfile,
+                onMerge = onMergeAccountLightProfile,
+                onRequestReplace = onRequestAccountLightReplace,
+                onConfirmReplace = onConfirmAccountLightReplace,
+                onCancel = onCancelAccountLightImport,
+            )
+        }
+        item {
             SectionLabel("Default session length")
             QaCard {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -3294,6 +3344,191 @@ private fun SettingsTab(
                 textAlign = TextAlign.Center,
                 preserveCase = true,
             )
+        }
+    }
+}
+
+@Composable
+private fun AccountLightSettingsSection(
+    state: MainUiState,
+    onExport: () -> Unit,
+    onExportBackup: () -> Unit,
+    onImport: () -> Unit,
+    onMerge: () -> Unit,
+    onRequestReplace: () -> Unit,
+    onConfirmReplace: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    val colors = QualityAlternativeThemeTokens.colors
+    val preview = state.accountLightImportPreview
+    Column(modifier = Modifier.testTag("settings-account-light-section")) {
+        SectionLabel("Portable profile", right = if (preview != null) "Ready" else "Local")
+        QaCard {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                SourceBadge(sourceType = ContentSourceType.USER_DOCUMENT, icon = QaIconKind.Shield)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Portable profile",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontSize = 16.sp,
+                        lineHeight = 20.sp,
+                        color = colors.primaryText,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    MonoText(
+                        text = state.accountLightStatus
+                            ?: state.accountLightImportError
+                            ?: "May include preferences, saved links, document/source titles, and reading progress.",
+                        color = if (state.accountLightImportError == null) colors.mutedText else colors.accent,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .padding(top = 4.dp)
+                            .testTag("settings-account-light-status"),
+                    )
+                }
+            }
+            Row(
+                modifier = Modifier.padding(top = 14.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                QaButton(
+                    text = if (state.isAccountLightExporting) "Exporting" else "Export",
+                    onClick = onExport,
+                    variant = QaButtonVariant.Outline,
+                    size = QaButtonSize.Small,
+                    enabled = !state.isAccountLightExporting,
+                    leadingIcon = QaIconKind.External,
+                    modifier = Modifier.weight(1f).testTag("settings-account-light-export"),
+                )
+                QaButton(
+                    text = "Import",
+                    onClick = onImport,
+                    variant = QaButtonVariant.Outline,
+                    size = QaButtonSize.Small,
+                    leadingIcon = QaIconKind.External,
+                    modifier = Modifier.weight(1f).testTag("settings-account-light-import"),
+                )
+            }
+            if (preview != null) {
+                AccountLightImportPreviewCard(
+                    state = state,
+                    onMerge = onMerge,
+                    onRequestReplace = onRequestReplace,
+                    onExportBackup = onExportBackup,
+                    onConfirmReplace = onConfirmReplace,
+                    onCancel = onCancel,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AccountLightImportPreviewCard(
+    state: MainUiState,
+    onMerge: () -> Unit,
+    onRequestReplace: () -> Unit,
+    onExportBackup: () -> Unit,
+    onConfirmReplace: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    val colors = QualityAlternativeThemeTokens.colors
+    val preview = state.accountLightImportPreview ?: return
+    Column(
+        modifier = Modifier
+            .padding(top = 14.dp)
+            .border(BorderStroke(1.dp, colors.lineStrong), RoundedCornerShape(12.dp))
+            .padding(12.dp)
+            .testTag("settings-account-light-import-preview"),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        BodyText(
+            text = "Profile ${preview.profileId.takeLast(8)} · ${preview.importedAppCount} apps · ${preview.importedTopicCount} topics · ${preview.importedPackCount} packs",
+            color = colors.primaryText,
+            fontSize = 13.sp,
+            lineHeight = 18.sp,
+        )
+        if (preview.unsupportedAppCount > 0 || preview.warningCount > 0) {
+            MonoText(
+                text = "${preview.unsupportedAppCount} unsupported apps · ${preview.warningCount} warnings",
+                color = colors.mutedText,
+                modifier = Modifier.testTag("settings-account-light-import-warning-summary"),
+            )
+            preview.warningSummaries.take(3).forEach { summary ->
+                BodyText(
+                    text = summary,
+                    color = colors.mutedText,
+                    fontSize = 11.5.sp,
+                    lineHeight = 15.sp,
+                )
+            }
+        }
+        if (state.isAccountLightReplaceConfirming) {
+            QaCard(
+                modifier = Modifier.testTag("settings-account-light-replace-confirm"),
+                padding = 12.dp,
+                background = colors.background,
+            ) {
+                BodyText(
+                    text = "Export a backup first if needed. Replace keeps Drive authorization and annotation files connected.",
+                    color = colors.mutedText,
+                    fontSize = 12.5.sp,
+                    lineHeight = 17.sp,
+                    modifier = Modifier.padding(bottom = 10.dp),
+                )
+                QaButton(
+                    text = "Export backup",
+                    onClick = onExportBackup,
+                    variant = QaButtonVariant.Outline,
+                    size = QaButtonSize.Small,
+                    leadingIcon = QaIconKind.External,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp)
+                        .testTag("settings-account-light-replace-backup"),
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    QaButton(
+                        text = "Cancel",
+                        onClick = onCancel,
+                        variant = QaButtonVariant.Ghost,
+                        size = QaButtonSize.Small,
+                        modifier = Modifier.weight(1f),
+                    )
+                    QaButton(
+                        text = if (state.isAccountLightImporting) "Replacing" else "Replace",
+                        onClick = onConfirmReplace,
+                        variant = QaButtonVariant.Primary,
+                        size = QaButtonSize.Small,
+                        enabled = !state.isAccountLightImporting,
+                        modifier = Modifier.weight(1f).testTag("settings-account-light-replace-confirm-action"),
+                    )
+                }
+            }
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                QaButton(
+                    text = "Merge",
+                    onClick = onMerge,
+                    variant = QaButtonVariant.Primary,
+                    size = QaButtonSize.Small,
+                    enabled = !state.isAccountLightImporting,
+                    modifier = Modifier.weight(1f).testTag("settings-account-light-import-merge"),
+                )
+                QaButton(
+                    text = "Replace",
+                    onClick = onRequestReplace,
+                    variant = QaButtonVariant.Outline,
+                    size = QaButtonSize.Small,
+                    enabled = !state.isAccountLightImporting,
+                    modifier = Modifier.weight(1f).testTag("settings-account-light-import-replace"),
+                )
+            }
         }
     }
 }
@@ -6099,6 +6334,19 @@ private fun Context.documentImportCandidate(uri: Uri): DocumentImportCandidate {
         displayName = metadata.displayName,
         mimeType = metadata.mimeType,
     ) { contentResolver.openInputStream(uri) }
+}
+
+private fun Context.readUtf8Text(uri: Uri): String {
+    return contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use { reader ->
+        reader.readText()
+    } ?: error("Unable to read profile.")
+}
+
+private fun Context.writeUtf8Text(uri: Uri, text: String) {
+    val bytes = text.toByteArray(Charsets.UTF_8)
+    contentResolver.openOutputStream(uri)?.use { output ->
+        output.write(bytes)
+    } ?: error("Unable to write profile.")
 }
 
 private fun persistDocumentPermission(context: Context, uri: Uri) {

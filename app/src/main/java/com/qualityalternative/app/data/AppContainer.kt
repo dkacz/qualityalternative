@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.preferences.preferencesDataStore
 import com.qualityalternative.app.BuildConfig
 import com.qualityalternative.app.data.local.QualityAlternativeDatabase
+import com.qualityalternative.app.domain.model.ContentItem
 import com.qualityalternative.app.domain.service.AnalyticsTracker
 import com.qualityalternative.app.domain.service.ContentRepository
 import com.qualityalternative.app.domain.service.DefaultRecommendationEngine
@@ -79,6 +80,10 @@ class AppContainer(context: Context) {
         settingsRepository = settingsRepository,
         appVersionName = BuildConfig.VERSION_NAME,
         appVersionCode = BuildConfig.VERSION_CODE,
+    )
+    val accountLightProfileImporter: AccountLightProfileImporter = AccountLightProfileImporter(
+        settingsRepository = settingsRepository,
+        knownContentIdsProvider = { contentRepository.inventory().mapTo(mutableSetOf(), ContentItem::id) },
     )
     val delayGate: DelayGate = PreferencesDelayGate(
         dataStore = context.delayGateDataStore,

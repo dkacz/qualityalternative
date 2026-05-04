@@ -104,6 +104,29 @@ class PreferencesSettingsRepository(
         return requireNotNull(identity)
     }
 
+    override suspend fun replacePortableSettings(settings: AppSettings, profileIdentity: LocalProfileIdentity?) {
+        dataStore.edit { preferences ->
+            if (profileIdentity != null) {
+                preferences[LocalProfileId] = profileIdentity.profileId
+                preferences[LocalProfileCreatedAtMillis] = profileIdentity.createdAtMillis.coerceAtLeast(0L)
+            }
+            preferences[HasCompletedOnboarding] = settings.hasCompletedOnboarding
+            preferences[SelectedAppPackages] = settings.selectedAppPackages
+            preferences[PreferredTopics] = settings.preferredTopics.mapTo(mutableSetOf(), TopicTag::name)
+            preferences[PreferredDurationBucket] = settings.preferredDurationBucket.name
+            preferences[SelectedPackIds] = settings.selectedPackIds
+            preferences[ThemeMode] = settings.themeMode.name
+            preferences[MeditationDurationMinutes] = settings.meditationDurationMinutes
+                .coerceIn(MIN_MEDITATION_MINUTES, MAX_MEDITATION_MINUTES)
+            preferences[ReaderFontScale] = portableReaderFontScale(settings.readerFontScale)
+            preferences[ContentPriorityPreference] = settings.contentPriority.name
+            preferences[PriorityContentIds] = settings.priorityContentIds
+            preferences[ReactivatedCompletedContentIds] = settings.reactivatedCompletedContentIds
+            preferences[OpenAnywayUnlockMinutes] = settings.openAnywayUnlockMinutes
+                .coerceIn(MIN_OPEN_ANYWAY_UNLOCK_MINUTES, MAX_OPEN_ANYWAY_UNLOCK_MINUTES)
+        }
+    }
+
     override suspend fun saveOnboardingSelection(selection: OnboardingSelection) {
         dataStore.edit { preferences ->
             preferences[HasCompletedOnboarding] = true
