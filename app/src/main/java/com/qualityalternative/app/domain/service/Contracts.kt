@@ -10,6 +10,7 @@ import com.qualityalternative.app.domain.model.DelayWindow
 import com.qualityalternative.app.domain.model.DistractingApp
 import com.qualityalternative.app.domain.model.DurationBucket
 import com.qualityalternative.app.domain.model.EditorialPack
+import com.qualityalternative.app.domain.model.LocalProfileIdentity
 import com.qualityalternative.app.domain.model.OnboardingSelection
 import com.qualityalternative.app.domain.model.PermissionReadiness
 import com.qualityalternative.app.domain.model.RecommendationSet
@@ -102,11 +103,13 @@ interface UserDocumentRepository {
 interface SettingsRepository {
     fun observeAppSettings(): Flow<AppSettings>
     fun supportedDistractingApps(): List<DistractingApp>
+    suspend fun ensureLocalProfileIdentity(nowMillis: Long = System.currentTimeMillis()): LocalProfileIdentity
     suspend fun saveOnboardingSelection(selection: OnboardingSelection)
     suspend fun saveSelectedAppPackages(packages: Set<String>)
     suspend fun savePreferredDurationBucket(bucket: DurationBucket)
     suspend fun saveThemeMode(themeMode: AppThemeMode)
     suspend fun saveMeditationDurationMinutes(minutes: Int)
+    suspend fun saveReaderFontScale(scale: Double)
     suspend fun saveContentPriority(priority: ContentPriority)
     suspend fun savePriorityContentIds(contentIds: Set<String>)
     suspend fun saveReactivatedCompletedContentIds(contentIds: Set<String>)

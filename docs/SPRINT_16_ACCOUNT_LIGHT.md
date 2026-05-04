@@ -95,7 +95,9 @@ Context:
 
 - User reported that current paginated reader can leave too much empty space on a real phone.
 - The reader should remain Kindle-like: no active vertical scrolling, no persistent Previous/Next/Done controls, tap/swipe navigation still works.
+- Android Back should exit the active reader to the prior app screen, after closing TOC or annotation overlays. Previous-page navigation should be a reader gesture or a very small left-edge tap zone, not the system Back action.
 - Reader font size must be adjustable in Quality Alternative settings and exported/imported through Account Light. The user must not have to change Android system font size just to tune the reader.
+- Annotation range selection is part of this reader pass but must not be implemented during earlier Account Light slices: the current Start/End earlier/later concept is acceptable only if it becomes compact, icon-first, and works reliably.
 
 Deliverables:
 
@@ -103,9 +105,14 @@ Deliverables:
 - Add an app-level reader font-size setting backed by the Account Light `readerFontScale` field.
 - Account for actual device dimensions and the app-level reader font-size setting when calculating pages; system font scale may be observed as an accessibility input but cannot be the only control.
 - Keep pages full enough to avoid large avoidable blank regions while preventing clipping/overflow.
-- Preserve TOC jumps, reading progress restoration, annotations, tap-to-next, swipe left/right, and Android Back-to-previous-page behavior.
+- Preserve TOC jumps, reading progress restoration, annotations, tap-to-next, swipe left/right, and Back-to-exit behavior.
+- Previous-page navigation must remain available through reader-specific gestures and/or a very small left-edge tap zone, without preventing the user from exiting the reader through Android Back.
+- Replace verbose annotation range buttons (`Start earlier`, `Start later`, `End earlier`, `End later`) with minimalist icon controls that still expose accessible labels and stable test tags.
+- Fix annotation range adjustment so it works within a single selected sentence at token/phrase granularity; controls must not appear broken just because the initial long-press selected one sentence.
+- Solve cross-page annotation selection explicitly: start/end anchors must be source-based, the selected quote must be allowed to span paginated display pages without enabling vertical scroll, and page navigation must not corrupt the selected range.
 - Add tests for at least small/large viewport and small/default/large app-level reader-font behavior.
-- Add visual evidence for multiple viewport/font-size combinations.
+- Add tests for Back-to-exit, previous-page reader gesture/left-edge behavior, minimalist annotation controls, single-sentence range refinement, and cross-page annotation range persistence.
+- Add visual evidence for multiple viewport/font-size combinations plus the minimalist annotation overlay and a cross-page selection case.
 
 Review gate:
 

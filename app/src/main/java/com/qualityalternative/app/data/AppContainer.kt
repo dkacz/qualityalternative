@@ -2,6 +2,7 @@ package com.qualityalternative.app.data
 
 import android.content.Context
 import androidx.datastore.preferences.preferencesDataStore
+import com.qualityalternative.app.BuildConfig
 import com.qualityalternative.app.data.local.QualityAlternativeDatabase
 import com.qualityalternative.app.domain.service.AnalyticsTracker
 import com.qualityalternative.app.domain.service.ContentRepository
@@ -73,6 +74,11 @@ class AppContainer(context: Context) {
     )
     val settingsRepository: SettingsRepository = PreferencesSettingsRepository(
         dataStore = context.appSettingsDataStore,
+    )
+    val accountLightProfileExporter: AccountLightProfileExporter = AccountLightProfileExporter(
+        settingsRepository = settingsRepository,
+        appVersionName = BuildConfig.VERSION_NAME,
+        appVersionCode = BuildConfig.VERSION_CODE,
     )
     val delayGate: DelayGate = PreferencesDelayGate(
         dataStore = context.delayGateDataStore,

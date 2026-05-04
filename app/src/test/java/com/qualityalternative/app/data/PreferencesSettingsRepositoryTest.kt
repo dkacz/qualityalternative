@@ -180,6 +180,47 @@ class PreferencesSettingsRepositoryTest {
     }
 
     @Test
+    fun ensureLocalProfileIdentity_createsAndReusesPortableProfileId() = runBlocking {
+        val repository = PreferencesSettingsRepository(
+            dataStore = testDataStore(),
+            supportedApps = SupportedCatalog.distractingApps,
+        )
+
+        val created = repository.ensureLocalProfileIdentity(nowMillis = 10_000L)
+        val restored = repository.ensureLocalProfileIdentity(nowMillis = 20_000L)
+
+        assertTrue(created.profileId.matches(Regex("^qa-local-[0-9a-fA-F-]{36}$")))
+        assertEquals(10_000L, created.createdAtMillis)
+        assertEquals(created, restored)
+    }
+
+    @Test
+    fun saveReaderFontScale_persistsRoundedPortableValue() = runBlocking {
+        val repository = PreferencesSettingsRepository(
+            dataStore = testDataStore(),
+            supportedApps = SupportedCatalog.distractingApps,
+        )
+
+        repository.saveReaderFontScale(1.234)
+
+        val restored = repository.observeAppSettings().first()
+        assertEquals(1.23, restored.readerFontScale, 0.0)
+    }
+
+    @Test
+    fun saveReaderFontScale_clampsToPortableRange() = runBlocking {
+        val repository = PreferencesSettingsRepository(
+            dataStore = testDataStore(),
+            supportedApps = SupportedCatalog.distractingApps,
+        )
+
+        repository.saveReaderFontScale(4.0)
+
+        val restored = repository.observeAppSettings().first()
+        assertEquals(1.60, restored.readerFontScale, 0.0)
+    }
+
+    @Test
     fun saveAnnotationExportSettings_persistsStatusAndClearsFailureOnSuccess() = runBlocking {
         val repository = PreferencesSettingsRepository(
             dataStore = testDataStore(),

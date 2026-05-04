@@ -22,6 +22,10 @@ const val MAX_OPEN_ANYWAY_UNLOCK_MINUTES = 240
 
 val OpenAnywayUnlockMinuteOptions = listOf(15, 30, 60, 120)
 
+const val DEFAULT_READER_FONT_SCALE = 1.0
+const val MIN_READER_FONT_SCALE = 0.80
+const val MAX_READER_FONT_SCALE = 1.60
+
 enum class AppThemeMode {
     LIGHT,
     DARK,
@@ -47,6 +51,7 @@ data class AppSettings(
     val priorityContentIds: Set<String> = emptySet(),
     val reactivatedCompletedContentIds: Set<String> = emptySet(),
     val openAnywayUnlockMinutes: Int = DEFAULT_OPEN_ANYWAY_UNLOCK_MINUTES,
+    val readerFontScale: Double = DEFAULT_READER_FONT_SCALE,
     val annotationExportUri: String? = null,
     val annotationExportDisplayName: String? = null,
     val annotationExportLastSuccessfulAtMillis: Long? = null,
@@ -55,6 +60,11 @@ data class AppSettings(
     val annotationDriveFolderId: String? = null,
     val annotationDriveLastSuccessfulAtMillis: Long? = null,
     val annotationDriveLastError: String? = null,
+)
+
+data class LocalProfileIdentity(
+    val profileId: String,
+    val createdAtMillis: Long,
 )
 
 data class OnboardingSelection(

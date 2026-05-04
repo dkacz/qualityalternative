@@ -3123,6 +3123,7 @@ class MainViewModelTest {
                 priorityContentIds = state.value.priorityContentIds,
                 reactivatedCompletedContentIds = state.value.reactivatedCompletedContentIds,
                 openAnywayUnlockMinutes = state.value.openAnywayUnlockMinutes,
+                readerFontScale = state.value.readerFontScale,
                 annotationExportUri = state.value.annotationExportUri,
                 annotationExportDisplayName = state.value.annotationExportDisplayName,
                 annotationExportLastSuccessfulAtMillis = state.value.annotationExportLastSuccessfulAtMillis,
@@ -3133,6 +3134,12 @@ class MainViewModelTest {
                 annotationDriveLastError = state.value.annotationDriveLastError,
             )
         }
+
+        override suspend fun ensureLocalProfileIdentity(nowMillis: Long) =
+            com.qualityalternative.app.domain.model.LocalProfileIdentity(
+                profileId = "qa-local-00000000-0000-0000-0000-000000000000",
+                createdAtMillis = nowMillis,
+            )
 
         override suspend fun saveSelectedAppPackages(packages: Set<String>) {
             state.value = state.value.copy(selectedAppPackages = packages)
@@ -3148,6 +3155,10 @@ class MainViewModelTest {
 
         override suspend fun saveMeditationDurationMinutes(minutes: Int) {
             state.value = state.value.copy(meditationDurationMinutes = minutes)
+        }
+
+        override suspend fun saveReaderFontScale(scale: Double) {
+            state.value = state.value.copy(readerFontScale = scale)
         }
 
         override suspend fun saveContentPriority(priority: ContentPriority) {

@@ -301,7 +301,7 @@ The system must deliver a calm replacement session that feels meaningfully diffe
 - The in-app reader is paginated by default. It must not rely on vertical scrolling for active reading.
 - Reader pagination must adapt to the actual page viewport, device size, orientation where supported, and the user's in-app reader font-size setting. It should fill the page comfortably without clipping text or leaving large avoidable empty regions.
 - Reader font size is a first-class app setting, not something the user must change at Android system level. System accessibility font scale may still be respected by the platform, but the product must expose its own reader font-size control.
-- Tapping the page advances to the next page. The Android back gesture or system back action goes to the previous page before leaving the reader.
+- Tapping most of the page advances to the next page. Previous-page navigation must use reader gestures or a very small left-edge tap zone; the Android back gesture or system back action exits the active reader to the prior app screen after first dismissing any open reader overlay.
 - The active reader uses minimal reader chrome: no persistent Previous, Next, or Done buttons; content is the primary surface, with only tiny title/progress/TOC affordances outside the text.
 - EPUB readers expose table-of-contents navigation that jumps to the matching section or nearest available page without turning the reader into a discovery surface.
 - Meditation replacement duration can be adjusted by the user and plays a completion gong.
@@ -318,6 +318,8 @@ The system may let the user capture notes on actively shown reader text without 
 - User can add or edit an annotation by long-pressing actively shown text in the reader.
 - Long-press selection starts with the sentence under the press and lets the user adjust the selected range before saving.
 - Annotation creation and editing use an overlay or popup that does not expand the page, enable vertical scrolling, or change pagination.
+- Annotation range adjustment must use minimal, icon-first start/end controls instead of verbose full-width labels, and the controls must actually refine the range inside a single sentence instead of becoming inert whenever only one sentence is selected.
+- Cross-page annotation selection must be page-aware: the app must preserve source-anchored start/end positions across paginated display pages, keep the overlay from expanding the reader page, and avoid conflicts with reader next/previous navigation.
 - Notes must not be represented as margin icons in the active reading page.
 - Each annotation stores content identity, source title, fragment position, quoted fragment text, selector/range data, note text, and timestamps.
 - User can review annotations in a finite annotation library and return to the source fragment.

@@ -3,6 +3,7 @@ package com.qualityalternative.app.data
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.doublePreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.intPreferencesKey
@@ -14,16 +15,22 @@ import com.qualityalternative.app.domain.model.AppThemeMode
 import com.qualityalternative.app.domain.model.ContentPriority
 import com.qualityalternative.app.domain.model.DEFAULT_MEDITATION_MINUTES
 import com.qualityalternative.app.domain.model.DEFAULT_OPEN_ANYWAY_UNLOCK_MINUTES
+import com.qualityalternative.app.domain.model.DEFAULT_READER_FONT_SCALE
 import com.qualityalternative.app.domain.model.DistractingApp
 import com.qualityalternative.app.domain.model.DurationBucket
+import com.qualityalternative.app.domain.model.LocalProfileIdentity
 import com.qualityalternative.app.domain.model.MAX_MEDITATION_MINUTES
 import com.qualityalternative.app.domain.model.MAX_OPEN_ANYWAY_UNLOCK_MINUTES
+import com.qualityalternative.app.domain.model.MAX_READER_FONT_SCALE
 import com.qualityalternative.app.domain.model.MIN_MEDITATION_MINUTES
 import com.qualityalternative.app.domain.model.MIN_OPEN_ANYWAY_UNLOCK_MINUTES
+import com.qualityalternative.app.domain.model.MIN_READER_FONT_SCALE
 import com.qualityalternative.app.domain.model.OnboardingSelection
 import com.qualityalternative.app.domain.model.TopicTag
 import com.qualityalternative.app.domain.service.SettingsRepository
 import java.io.IOException
+import java.util.UUID
+import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
@@ -61,6 +68,9 @@ class PreferencesSettingsRepository(
                     reactivatedCompletedContentIds = preferences[ReactivatedCompletedContentIds].orEmpty(),
                     openAnywayUnlockMinutes = (preferences[OpenAnywayUnlockMinutes] ?: DEFAULT_OPEN_ANYWAY_UNLOCK_MINUTES)
                         .coerceIn(MIN_OPEN_ANYWAY_UNLOCK_MINUTES, MAX_OPEN_ANYWAY_UNLOCK_MINUTES),
+                    readerFontScale = portableReaderFontScale(
+                        preferences[ReaderFontScale] ?: DEFAULT_READER_FONT_SCALE,
+                    ),
                     annotationExportUri = preferences[AnnotationExportUri],
                     annotationExportDisplayName = preferences[AnnotationExportDisplayName],
                     annotationExportLastSuccessfulAtMillis = preferences[AnnotationExportLastSuccessfulAtMillis],
@@ -74,6 +84,25 @@ class PreferencesSettingsRepository(
     }
 
     override fun supportedDistractingApps(): List<DistractingApp> = supportedApps
+
+    override suspend fun ensureLocalProfileIdentity(nowMillis: Long): LocalProfileIdentity {
+        var identity: LocalProfileIdentity? = null
+        dataStore.edit { preferences ->
+            val profileId = preferences[LocalProfileId]
+                ?.takeIf(::isValidLocalProfileId)
+                ?: "qa-local-${UUID.randomUUID()}"
+            val createdAtMillis = preferences[LocalProfileCreatedAtMillis]
+                ?.takeIf { it >= 0L }
+                ?: nowMillis.coerceAtLeast(0L)
+            preferences[LocalProfileId] = profileId
+            preferences[LocalProfileCreatedAtMillis] = createdAtMillis
+            identity = LocalProfileIdentity(
+                profileId = profileId,
+                createdAtMillis = createdAtMillis,
+            )
+        }
+        return requireNotNull(identity)
+    }
 
     override suspend fun saveOnboardingSelection(selection: OnboardingSelection) {
         dataStore.edit { preferences ->
@@ -106,6 +135,12 @@ class PreferencesSettingsRepository(
     override suspend fun saveMeditationDurationMinutes(minutes: Int) {
         dataStore.edit { preferences ->
             preferences[MeditationDurationMinutes] = minutes.coerceIn(MIN_MEDITATION_MINUTES, MAX_MEDITATION_MINUTES)
+        }
+    }
+
+    override suspend fun saveReaderFontScale(scale: Double) {
+        dataStore.edit { preferences ->
+            preferences[ReaderFontScale] = portableReaderFontScale(scale)
         }
     }
 
@@ -221,6 +256,16 @@ class PreferencesSettingsRepository(
             }.getOrDefault(ContentPriority.BALANCED)
         }
 
+        fun portableReaderFontScale(raw: Double): Double {
+            return (raw.coerceIn(MIN_READER_FONT_SCALE, MAX_READER_FONT_SCALE) * 100.0).roundToInt() / 100.0
+        }
+
+        fun isValidLocalProfileId(raw: String): Boolean {
+            return Regex("^qa-local-[0-9a-fA-F-]{36}$").matches(raw)
+        }
+
+        val LocalProfileId = stringPreferencesKey("local_profile_id")
+        val LocalProfileCreatedAtMillis = longPreferencesKey("local_profile_created_at_millis")
         val HasCompletedOnboarding = booleanPreferencesKey("has_completed_onboarding")
         val SelectedAppPackages = stringSetPreferencesKey("selected_app_packages")
         val PreferredTopics = stringSetPreferencesKey("preferred_topics")
@@ -228,6 +273,7 @@ class PreferencesSettingsRepository(
         val SelectedPackIds = stringSetPreferencesKey("selected_pack_ids")
         val ThemeMode = stringPreferencesKey("theme_mode")
         val MeditationDurationMinutes = intPreferencesKey("meditation_duration_minutes")
+        val ReaderFontScale = doublePreferencesKey("reader_font_scale")
         val ContentPriorityPreference = stringPreferencesKey("content_priority")
         val PriorityContentIds = stringSetPreferencesKey("priority_content_ids")
         val ReactivatedCompletedContentIds = stringSetPreferencesKey("reactivated_completed_content_ids")
