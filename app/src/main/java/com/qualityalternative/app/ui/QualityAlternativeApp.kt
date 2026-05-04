@@ -151,6 +151,7 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlin.math.abs
 import kotlin.math.min
 import kotlinx.coroutines.delay
 
@@ -2008,12 +2009,29 @@ private fun ReaderScreen(
                                         movedBeyondTap = true
                                     }
                                     if (change.changedToUpIgnoreConsumed()) {
+                                        val drag = change.position - down.position
+                                        val isHorizontalPageSwipe =
+                                            abs(drag.x) > touchSlop * 3 &&
+                                                abs(drag.x) > abs(drag.y) * 1.2f
                                         val isShortTap = change.uptimeMillis - down.uptimeMillis < viewConfiguration.longPressTimeoutMillis
-                                        if (!movedBeyondTap && isShortTap && canHandlePageTap) {
-                                            if (safeCurrentPageIndex < pages.lastIndex) {
-                                                moveToPage(safeCurrentPageIndex + 1)
-                                            } else {
-                                                onDone()
+                                        if (canHandlePageTap) {
+                                            when {
+                                                isHorizontalPageSwipe && drag.x < 0f && safeCurrentPageIndex < pages.lastIndex -> {
+                                                    moveToPage(safeCurrentPageIndex + 1)
+                                                }
+                                                isHorizontalPageSwipe && drag.x < 0f -> {
+                                                    onDone()
+                                                }
+                                                isHorizontalPageSwipe && drag.x > 0f && safeCurrentPageIndex > 0 -> {
+                                                    moveToPage(safeCurrentPageIndex - 1)
+                                                }
+                                                !movedBeyondTap && isShortTap -> {
+                                                    if (safeCurrentPageIndex < pages.lastIndex) {
+                                                        moveToPage(safeCurrentPageIndex + 1)
+                                                    } else {
+                                                        onDone()
+                                                    }
+                                                }
                                             }
                                         }
                                         break

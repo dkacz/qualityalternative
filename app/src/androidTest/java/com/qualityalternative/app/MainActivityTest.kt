@@ -24,6 +24,8 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeLeft
+import androidx.compose.ui.test.swipeRight
 import androidx.compose.ui.test.swipeUp
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
@@ -671,6 +673,18 @@ class MainActivityTest {
         composeRule.onNodeWithTag("reader-list")
             .performTouchInput { swipeUp() }
         composeRule.waitForIdle()
+        composeRule.onNodeWithTag("reader-page-viewport")
+            .performTouchInput { swipeLeft() }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            visibleReaderParagraphIndices().any { index -> index > 0 }
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasNodeContaining("2/") }
+        composeRule.onNodeWithTag("reader-page-viewport")
+            .performTouchInput { swipeRight() }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            visibleReaderParagraphIndices().contains(0)
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasNodeContaining("1/") }
         advanceReaderPage()
         composeRule.waitUntil(timeoutMillis = 10_000) {
             visibleReaderParagraphIndices().any { index -> index > 0 }
