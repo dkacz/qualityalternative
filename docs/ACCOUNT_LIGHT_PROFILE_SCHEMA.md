@@ -249,7 +249,7 @@ Required fields:
 - `selectedAppPackages`: array of package-name strings. Each string must match `^[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z0-9_]+)+$`.
 - `preferredTopics`: array of `topicTags`, minimum 0 for import, minimum 3 only for onboarding completion flows.
 - `preferredDurationBucket`: `preferredDurationBucket`.
-- `selectedPackIds`: array of non-blank strings.
+- `selectedPackIds`: array of portable pack ids matching `^[a-z0-9][a-z0-9_-]{0,79}$`; values containing OAuth/token/account/email/provider/storage/file/content semantics are rejected or omitted on export.
 - `themeMode`: `themeMode`.
 - `meditationDurationMinutes`: integer in `1..60`.
 - `readerFontScale`: decimal number in `0.80..1.60`, rounded to two decimal places on export. Default is `1.00`. This is the app-level reader font-size preference and must be portable across devices; users must not need to change Android system font size to adjust the reader.

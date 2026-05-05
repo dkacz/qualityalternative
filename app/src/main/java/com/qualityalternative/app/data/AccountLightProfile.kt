@@ -133,7 +133,7 @@ data class AccountLightSettings(
         require(preferredDurationBucket in DurationBucket.entries.map(DurationBucket::name)) {
             "preferredDurationBucket is invalid."
         }
-        require(selectedPackIds.all { it.isNotBlank() }) { "selectedPackIds must be non-blank." }
+        require(selectedPackIds.all { it.isSafePortablePackId() }) { "selectedPackIds contains a non-portable pack id." }
         require(themeMode in AppThemeMode.entries.map(AppThemeMode::name)) { "themeMode is invalid." }
         require(meditationDurationMinutes in 1..60) { "meditationDurationMinutes is outside the portable range." }
         require(readerFontScale in MIN_READER_FONT_SCALE..MAX_READER_FONT_SCALE) {
@@ -512,7 +512,7 @@ class AccountLightProfileExporter(
             warnings = settings.toAccountLightWarnings(
                 contentIdMapping = contentIdMapping,
                 omittedPortableUserContentIds = omittedPortableUserContentIds,
-            ),
+            ) + portableUserDocuments.toDocumentFingerprintWarnings(),
         )
         return codec.encode(profile)
     }
@@ -1092,8 +1092,17 @@ private fun JsonObject.validateSourceHint(path: String) {
 }
 
 private fun JsonObject.validateSettingsReferences(allowedContentIds: Set<String>) {
+    validateSelectedPackIds()
     validateContentIdReferences("priorityContentIds", "settings.priorityContentIds", allowedContentIds)
     validateContentIdReferences("reactivatedCompletedContentIds", "settings.reactivatedCompletedContentIds", allowedContentIds)
+}
+
+private fun JsonObject.validateSelectedPackIds() {
+    requireArray("selectedPackIds", "settings.selectedPackIds").forEachIndexed { index, element ->
+        val packId = element.jsonPrimitiveOrNull()?.takeUnless { primitive -> primitive.isString.not() }?.content
+            ?: throw IllegalArgumentException("settings.selectedPackIds[$index] must be a string.")
+        require(packId.isSafePortablePackId()) { "settings.selectedPackIds[$index] is not portable." }
+    }
 }
 
 private fun JsonObject.validateContentIdReferences(key: String, path: String, allowedContentIds: Set<String>) {
@@ -1363,7 +1372,7 @@ private fun AccountLightSettings.toPortableAppSettings(supportedPackages: Set<St
             .toSet(),
         preferredTopics = preferredTopics.mapTo(mutableSetOf()) { TopicTag.valueOf(it) },
         preferredDurationBucket = DurationBucket.valueOf(preferredDurationBucket),
-        selectedPackIds = selectedPackIds.toSet(),
+        selectedPackIds = selectedPackIds.filter(String::isSafePortablePackId).toSet(),
         themeMode = AppThemeMode.valueOf(themeMode),
         meditationDurationMinutes = meditationDurationMinutes,
         contentPriority = ContentPriority.valueOf(contentPriority),
@@ -1384,7 +1393,7 @@ private fun AppSettings.toAccountLightSettings(
         selectedAppPackages = selectedAppPackages.sorted(),
         preferredTopics = preferredTopics.map { it.name }.sorted(),
         preferredDurationBucket = preferredDurationBucket.name,
-        selectedPackIds = selectedPackIds.sorted(),
+        selectedPackIds = selectedPackIds.filter(String::isSafePortablePackId).sorted(),
         themeMode = themeMode.name,
         meditationDurationMinutes = meditationDurationMinutes,
         readerFontScale = readerFontScale.toPortableReaderFontScale(),
@@ -1603,6 +1612,19 @@ private fun AppSettings.toAccountLightWarnings(
     }
 }
 
+private fun List<AccountLightUserDocument>.toDocumentFingerprintWarnings(): List<AccountLightWarning> {
+    return filter { document -> document.documentFingerprint.strategy == "UNVERIFIED_METADATA_ONLY" }
+        .map { document ->
+            AccountLightWarning(
+                code = "DOCUMENT_FINGERPRINT_UNVERIFIED",
+                severity = "WARNING",
+                section = "library.userDocuments",
+                contentId = document.contentId,
+                message = "Document metadata was exported without a verified fingerprint.",
+            )
+        }
+}
+
 private fun Double.toPortableReaderFontScale(): Double {
     return (coerceIn(MIN_READER_FONT_SCALE, MAX_READER_FONT_SCALE) * 100.0).roundToInt() / 100.0
 }
@@ -1726,6 +1748,23 @@ private fun String.isSafePortableProviderLabel(): Boolean {
         "." !in value &&
         lower !in ProviderLabelBlocklist &&
         !ProviderLabelBlocklist.any { blocked -> lower.contains(blocked) }
+}
+
+private fun String.isSafePortablePackId(): Boolean {
+    val value = trim()
+    val lower = value.lowercase(Locale.US)
+    return value == lower &&
+        value.matches(PortablePackIdRegex) &&
+        !lower.contains("oauth") &&
+        !lower.contains("token") &&
+        !lower.contains("content") &&
+        !lower.contains("file") &&
+        !lower.contains("provider") &&
+        !lower.contains("storage") &&
+        !lower.contains("account") &&
+        !lower.contains("email") &&
+        !ProviderLabelBlocklist.any { blocked -> lower.contains(blocked.replace(".", "")) } &&
+        !UnsafePortableValueTerms.any { unsafeTerm -> lower.contains(unsafeTerm.substringAfterLast('.')) }
 }
 
 private fun String.containsUnsafePortableValue(): Boolean {
@@ -1917,6 +1956,7 @@ private val ContentIdRegex = Regex(
         "|^(editorial|meditation)-[a-z0-9][a-z0-9._-]{2,120}$",
 )
 private val PackageNameRegex = Regex("^[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z0-9_]+)+$")
+private val PortablePackIdRegex = Regex("^[a-z0-9][a-z0-9_-]{0,79}$")
 private val PortableMimeTypeRegex = Regex("^[A-Za-z0-9!#$&^_.+-]+/[A-Za-z0-9!#$&^_.+-]+$")
 private val PortableDisplayNamePunctuation = setOf(' ', '.', '_', '-', '(', ')')
 private val ProviderLabelBlocklist = setOf(

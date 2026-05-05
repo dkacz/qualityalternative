@@ -63,6 +63,34 @@ class AccountLightProfileImporterTest {
     }
 
     @Test
+    fun validateImportProfileJson_rejectsUnsafeSelectedPackIds() {
+        val repository = PreferencesSettingsRepository(
+            dataStore = testDataStore(),
+            supportedApps = SupportedCatalog.distractingApps,
+        )
+        val importer = AccountLightProfileImporter(settingsRepository = repository)
+
+        listOf(
+            "content://provider/raw-id",
+            "oauth-token-pack",
+            "user@example.com",
+            "com.google.android.apps.docs",
+            "externalstorage-documents",
+        ).forEach { unsafePackId ->
+            assertThrows(AccountLightImportException::class.java) {
+                importer.validateImportProfileJson(validProfileJson().withSelectedPackIds(listOf(unsafePackId)))
+            }
+        }
+
+        val plan = importer.validateImportProfileJson(
+            validProfileJson().withSelectedPackIds(
+                listOf("starter_pack", "public-domain-expansion-v2", "attention_practical_agency_v1"),
+            ),
+        )
+        assertEquals(3, plan.preview.importedPackCount)
+    }
+
+    @Test
     fun applyMerge_validatesButKeepsLocalPortableSettings() = runBlocking {
         val target = PreferencesSettingsRepository(
             dataStore = testDataStore(),
@@ -703,6 +731,18 @@ class AccountLightProfileImporterTest {
             root + (
                 "settings" to JsonObject(
                     settings + ("selectedAppPackages" to JsonArray(packages.map(::JsonPrimitive))),
+                )
+                ),
+        ).toString()
+    }
+
+    private fun String.withSelectedPackIds(packIds: List<String>): String {
+        val root = Json.parseToJsonElement(this).jsonObject
+        val settings = root.getValue("settings").jsonObject
+        return JsonObject(
+            root + (
+                "settings" to JsonObject(
+                    settings + ("selectedPackIds" to JsonArray(packIds.map(::JsonPrimitive))),
                 )
                 ),
         ).toString()

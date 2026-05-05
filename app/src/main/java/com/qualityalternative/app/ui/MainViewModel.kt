@@ -2269,21 +2269,34 @@ class MainViewModel(
         val plan = pendingAccountLightImportPlan ?: return
         viewModelScope.launch {
             uiState = uiState.copy(isAccountLightImporting = true)
-            val result = accountLightProfileImporter.applyMerge(plan)
-            val profileAutosaved = autosaveAccountLightProfileIfConfigured(nowMillis = nowProvider())
-            pendingAccountLightImportPlan = null
-            uiState = uiState.copy(
-                isAccountLightImporting = false,
-                accountLightImportPreview = null,
-                accountLightImportError = null,
-                accountLightStatus = if (result.warningCount > 0) {
-                    "Profile merged. Local settings were kept."
-                } else {
-                    "Profile merged."
-                },
-                isAccountLightReplaceConfirming = false,
-                latestMessage = "Portable profile merged.".withProfileAutosaveResult(profileAutosaved),
-            )
+            try {
+                val result = accountLightProfileImporter.applyMerge(plan)
+                val profileAutosaved = autosaveAccountLightProfileIfConfigured(nowMillis = nowProvider())
+                pendingAccountLightImportPlan = null
+                uiState = uiState.copy(
+                    isAccountLightImporting = false,
+                    accountLightImportPreview = null,
+                    accountLightImportError = null,
+                    accountLightStatus = if (result.warningCount > 0) {
+                        "Profile merged. Local settings were kept."
+                    } else {
+                        "Profile merged."
+                    },
+                    isAccountLightReplaceConfirming = false,
+                    latestMessage = "Portable profile merged.".withProfileAutosaveResult(profileAutosaved),
+                )
+            } catch (exception: CancellationException) {
+                uiState = uiState.copy(isAccountLightImporting = false)
+                throw exception
+            } catch (exception: Exception) {
+                uiState = uiState.copy(
+                    isAccountLightImporting = false,
+                    accountLightImportError = "Import failed before any settings were changed.",
+                    accountLightStatus = null,
+                    isAccountLightReplaceConfirming = false,
+                    latestMessage = "Portable profile import failed.",
+                )
+            }
         }
     }
 

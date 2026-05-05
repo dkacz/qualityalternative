@@ -3540,7 +3540,7 @@ private fun AccountLightSettingsSection(
     val colors = QualityAlternativeThemeTokens.colors
     val preview = state.accountLightImportPreview
     Column(modifier = Modifier.testTag("settings-account-light-section")) {
-        SectionLabel("Portable profile", right = if (preview != null) "Ready" else "Local")
+        SectionLabel("Portable profile", right = if (preview != null) "Import ready" else "Local")
         QaCard {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -3550,7 +3550,7 @@ private fun AccountLightSettingsSection(
                 SourceBadge(sourceType = ContentSourceType.USER_DOCUMENT, icon = QaIconKind.Shield)
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Portable profile",
+                        text = "Export / import",
                         style = MaterialTheme.typography.titleMedium,
                         fontSize = 16.sp,
                         lineHeight = 20.sp,
@@ -3560,7 +3560,7 @@ private fun AccountLightSettingsSection(
                     MonoText(
                         text = state.accountLightStatus
                             ?: state.accountLightImportError
-                            ?: "May include preferences, saved links, document/source titles, and reading progress.",
+                            ?: "Preferences, saved links, document titles, reading progress, and safe sync settings.",
                         color = if (state.accountLightImportError == null) colors.mutedText else colors.accent,
                         maxLines = 3,
                         overflow = TextOverflow.Ellipsis,
@@ -3718,7 +3718,7 @@ private fun AccountLightImportPreviewCard(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         BodyText(
-            text = "Profile ${preview.profileId.takeLast(8)} · ${preview.importedLinkCount} links · ${preview.importedDocumentCount} files · ${preview.importedProgressCount} progress",
+            text = "Profile ${preview.profileId.takeLast(8)} · ${preview.importedLinkCount} links · ${preview.importedDocumentCount} documents · ${preview.importedProgressCount} progress",
             color = colors.primaryText,
             fontSize = 13.sp,
             lineHeight = 18.sp,
@@ -3731,7 +3731,7 @@ private fun AccountLightImportPreviewCard(
         }
         if (preview.unsupportedAppCount > 0 || preview.missingDocumentCount > 0 || preview.warningCount > 0) {
             MonoText(
-                text = "${preview.unsupportedAppCount} unsupported apps · ${preview.missingDocumentCount} files need reattach · ${preview.warningCount} warnings",
+                text = "${preview.unsupportedAppCount} unsupported apps · ${preview.missingDocumentCount} documents need reattach · ${preview.warningCount} warnings",
                 color = colors.mutedText,
                 modifier = Modifier.testTag("settings-account-light-import-warning-summary"),
             )
@@ -3751,7 +3751,7 @@ private fun AccountLightImportPreviewCard(
                 background = colors.background,
             ) {
                 BodyText(
-                    text = "Export a backup first if needed. Replace keeps Drive authorization and annotation files connected.",
+                    text = "Export a backup first if needed. Replace local portable data; device permissions stay local.",
                     color = colors.mutedText,
                     fontSize = 12.5.sp,
                     lineHeight = 17.sp,

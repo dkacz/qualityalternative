@@ -130,6 +130,38 @@ class AccountLightProfileExporterTest {
     }
 
     @Test
+    fun exportSettingsOnlyProfileJson_omitsUnsafeSelectedPackIds() = runBlocking {
+        val repository = PreferencesSettingsRepository(
+            dataStore = testDataStore(),
+            supportedApps = SupportedCatalog.distractingApps,
+        )
+        repository.saveOnboardingSelection(
+            OnboardingSelection(
+                selectedAppPackages = SupportedCatalog.distractingApps.take(2).mapTo(mutableSetOf()) { it.packageName },
+                preferredTopics = setOf(TopicTag.SCIENCE, TopicTag.PHILOSOPHY),
+                preferredDurationBucket = DurationBucket.FOCUS,
+                selectedPackIds = setOf(
+                    "starter_pack",
+                    "public-domain-expansion-v2",
+                    "content://provider/raw-id",
+                    "oauth-token-pack",
+                    "user@example.com",
+                    "com.google.android.apps.docs",
+                ),
+            ),
+        )
+        val exporter = AccountLightProfileExporter(
+            settingsRepository = repository,
+            appVersionName = "0.8.1-alpha",
+            appVersionCode = 13,
+        )
+
+        val profile = AccountLightProfileCodec().decode(exporter.exportSettingsOnlyProfileJson(nowMillis = 20_000L))
+
+        assertEquals(listOf("public-domain-expansion-v2", "starter_pack"), profile.settings.selectedPackIds)
+    }
+
+    @Test
     fun exportSettingsOnlyProfileJson_filtersNonPortableSettingsReferencesAndDisplayNames() = runBlocking {
         val repository = PreferencesSettingsRepository(
             dataStore = testDataStore(),
@@ -370,6 +402,13 @@ class AccountLightProfileExporterTest {
         assertEquals("Saved document metadata.", exportedDocument.description)
         assertEquals("MISSING_FILE_NEEDS_REATTACH", exportedDocument.documentImportState)
         assertEquals("UNVERIFIED_METADATA_ONLY", exportedDocument.documentFingerprint.strategy)
+        assertTrue(
+            profile.warnings.any {
+                it.code == "DOCUMENT_FINGERPRINT_UNVERIFIED" &&
+                    it.section == "library.userDocuments" &&
+                    it.contentId == exportedDocument.contentId
+            },
+        )
         assertEquals(
             setOf(exportedLink.contentId, exportedLongLabelLink.contentId),
             profile.settings.priorityContentIds.toSet(),

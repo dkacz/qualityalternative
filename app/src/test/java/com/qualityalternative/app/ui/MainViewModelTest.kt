@@ -3311,6 +3311,7 @@ class MainViewModelTest {
     }
 
     @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
     fun accountLightMergeImportKeepsLocalPortableSettings() = runTest {
         val importedSettingsRepository = FakeSettingsRepository(
             initial = completedSettings(selectedAppPackages = setOf("com.instagram.android")).copy(
@@ -3353,6 +3354,42 @@ class MainViewModelTest {
         assertEquals("Portable profile merged and autosaved.", viewModel.uiState.latestMessage)
         assertEquals("content://tree/profile-folder", profileWriter.writes.single().first)
         assertEquals(1_000L, targetSettingsRepository.state.value.profileAutosaveLastSuccessfulAtMillis)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun accountLightMergeImportFailureShowsVisibleRollbackError() = runTest {
+        val importedLink = savedUserLink(id = "local-link-before-export")
+        val importedProgress = ReadingProgress(
+            contentId = importedLink.id,
+            lastVisibleParagraphIndex = 2,
+            paragraphCount = 10,
+            progressPercent = 20,
+            updatedAtMillis = 20_000L,
+        )
+        val rawJson = AccountLightProfileExporter(
+            settingsRepository = FakeSettingsRepository(
+                initial = completedSettings(selectedAppPackages = setOf("com.instagram.android")),
+            ),
+            appVersionName = "0.8.1-alpha",
+            appVersionCode = 13,
+            userLinkRepository = FakeUserLinkRepository(initialLinks = listOf(importedLink)),
+            readingProgressRepository = FakeReadingProgressRepository(initialProgress = listOf(importedProgress)),
+        ).exportSettingsOnlyProfileJson(nowMillis = 20_000L)
+        val viewModel = createViewModel(
+            readingProgressRepository = FakeReadingProgressRepository(throwOnSaveProgress = true),
+        )
+        advanceUntilIdle()
+
+        viewModel.previewAccountLightImport(rawJson)
+        viewModel.applyAccountLightMergeImport()
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.isAccountLightImporting)
+        assertEquals("Import failed before any settings were changed.", viewModel.uiState.accountLightImportError)
+        assertEquals(null, viewModel.uiState.accountLightStatus)
+        assertEquals("Portable profile import failed.", viewModel.uiState.latestMessage)
+        assertNotNull(viewModel.uiState.accountLightImportPreview)
     }
 
     @Test
@@ -3778,6 +3815,7 @@ class MainViewModelTest {
     private class FakeReadingProgressRepository(
         initialProgress: List<ReadingProgress> = emptyList(),
         isReady: Boolean = true,
+        private val throwOnSaveProgress: Boolean = false,
     ) : ReadingProgressRepository {
         val progress = MutableStateFlow(initialProgress)
         val deletedIds = mutableSetOf<String>()
@@ -3795,6 +3833,9 @@ class MainViewModelTest {
         }
 
         override suspend fun saveProgress(progress: ReadingProgress) {
+            if (throwOnSaveProgress) {
+                error("Simulated reading progress persistence failure")
+            }
             this.progress.value = this.progress.value
                 .filterNot { it.contentId == progress.contentId }
                 .plus(progress)

@@ -1,6 +1,6 @@
 # Sprint 16: Portable Profile
 
-Status: started
+Status: final release gate in progress
 
 ## Goal
 
@@ -136,6 +136,7 @@ Review gate:
 
 - GPT Pro code and visual review before final release gate.
 - Required result before release: `SCORE: 10/10`, `VERDICT: PASS`, `VISUAL REVIEW: PASS`.
+- R3 GPT Pro review returned `SCORE: 10/10`, `VERDICT: PASS`, `VISUAL REVIEW: PASS`; Slice 16.5 is complete.
 
 ### Slice 16.6: Final UX, Hardening, Release
 
@@ -146,6 +147,10 @@ Deliverables:
 - Visual screenshots for Settings, export success, import success, invalid import, missing-document state, and adaptive reader pagination on representative viewport/font-size combinations.
 - Full release validation.
 - GitHub APK release.
+- Current hardening minimizes Portable Profile copy, adds a live export-success visual state, adds clean-state export/import restore coverage, and assembles final release-gate evidence.
+- R1 final release gate returned `SCORE: 8/10`, `VERDICT: FAIL`, `VISUAL REVIEW: PASS`; blockers were merge import phase-two failure visibility and unsafe `settings.selectedPackIds` portability.
+- R2 fixes wrap merge import apply failures into the same visible rollback/failure state as replace import and validate/filter `selectedPackIds` as safe portable pack ids before import, local settings restore, and export.
+- R2 final release gate returned `SCORE: 8/10`, `VERDICT: FAIL`, `VISUAL REVIEW: PASS`; R1 blockers were accepted as fixed, but release remained blocked by the missing `DOCUMENT_FINGERPRINT_UNVERIFIED` export warning plus incomplete/dirty review bundle hygiene. R3 adds the warning regression and ships a clean, reproducible review packet.
 
 Review gate:
 

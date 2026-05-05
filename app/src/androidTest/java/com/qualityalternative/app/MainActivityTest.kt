@@ -34,6 +34,7 @@ import androidx.test.uiautomator.UiDevice
 import com.qualityalternative.app.domain.model.AppThemeMode
 import com.qualityalternative.app.domain.model.ContentFormat
 import com.qualityalternative.app.domain.model.ContentItem
+import com.qualityalternative.app.domain.model.DEFAULT_READER_FONT_SCALE
 import com.qualityalternative.app.domain.model.DurationBucket
 import com.qualityalternative.app.domain.model.AnalyticsEventType
 import com.qualityalternative.app.domain.model.MEDITATION_TIMER_CONTENT_ID
@@ -1256,6 +1257,14 @@ class MainActivityTest {
         composeRule.onNodeWithTag("settings-account-light-import").assertIsDisplayed()
         captureSprint16PortableProfileScreenshot("01_import_entry_light")
 
+        exportAccountLightProfileJsonFromViewModel()
+        scrollToAccountLightSettings()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasNodeContaining("PORTABLE PROFILE EXPORTED") }
+        composeRule.onNodeWithTag("settings-account-light-status").assertIsDisplayed()
+        captureSprint16PortableProfileScreenshot("00_export_success_light")
+        scenario?.onActivity { activity -> activity.mainViewModel.dismissMessage() }
+        composeRule.waitForIdle()
+
         scenario?.onActivity { activity ->
             activity.mainViewModel.previewAccountLightImport(
                 accountLightProfileJson(
@@ -1273,6 +1282,11 @@ class MainActivityTest {
         composeRule.onNodeWithTag("settings-account-light-import-replace")
             .assertIsDisplayed()
             .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasTag("settings-account-light-replace-confirm")
+        }
+        composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasTestTag("settings-account-light-replace-confirm"))
         composeRule.onNodeWithTag("settings-account-light-replace-confirm").assertIsDisplayed()
         composeRule.onNodeWithTag("settings-list")
             .performScrollToNode(hasTestTag("settings-account-light-replace-backup"))
@@ -1327,6 +1341,42 @@ class MainActivityTest {
         scrollToAccountLightSettings()
         composeRule.onNodeWithTag("settings-account-light-status").assertIsDisplayed()
         captureSprint16PortableProfileScreenshot("06_future_schema_import_dark")
+    }
+
+    @Test
+    fun accountLightProfileExportsAndImportsIntoCleanAppState() {
+        launchOnboardedApp()
+        scenario?.onActivity { activity ->
+            runBlocking {
+                (activity.application as QualityAlternativeApplication)
+                    .appContainer
+                    .settingsRepository
+                    .saveReaderFontScale(1.3)
+            }
+            activity.mainViewModel.setReaderFontScale(1.3)
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) { currentReaderFontScale() == 1.3 }
+
+        val exportedJson = exportAccountLightProfileJsonFromViewModel()
+        assertTrue(exportedJson.contains("\"readerFontScale\": 1.3"))
+
+        scenario?.close()
+        scenario = null
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+        resetPersistentState()
+
+        launchOnboardedApp()
+        assertEquals(DEFAULT_READER_FONT_SCALE, currentReaderFontScale(), 0.0)
+        scenario?.onActivity { activity -> activity.mainViewModel.openSettings() }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("settings-list") }
+        scrollToAccountLightSettings()
+        scenario?.onActivity { activity -> activity.mainViewModel.previewAccountLightImport(exportedJson) }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("settings-account-light-import-preview") }
+        scenario?.onActivity { activity -> activity.mainViewModel.confirmAccountLightReplaceImport() }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            currentReaderFontScale() == 1.3 &&
+                hasNodeContaining("IMPORTED PROFILE REPLACED LOCAL PORTABLE SETTINGS AND LIBRARY")
+        }
     }
 
     @Test
@@ -1701,6 +1751,20 @@ class MainActivityTest {
             scale = activity.mainViewModel.uiState.readerFontScale
         }
         return scale
+    }
+
+    private fun exportAccountLightProfileJsonFromViewModel(): String {
+        var exportedJson = ""
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.exportAccountLightProfile { json ->
+                exportedJson = json
+            }
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            exportedJson.contains("\"schemaVersion\"")
+        }
+        assertTrue(exportedJson.contains("\"profileFormat\""))
+        return exportedJson
     }
 
     private fun readerSelectedQuoteText(paragraphIndex: Int): String {
