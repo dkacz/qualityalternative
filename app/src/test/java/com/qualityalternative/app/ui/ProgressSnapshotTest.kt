@@ -6,6 +6,7 @@ import com.qualityalternative.app.domain.model.AnalyticsEvent
 import com.qualityalternative.app.domain.model.AnalyticsEventType
 import com.qualityalternative.app.domain.model.MEDITATION_TIMER_CONTENT_ID
 import com.qualityalternative.app.domain.model.RecommendationSource
+import com.qualityalternative.app.domain.model.ReadingAnnotationSelector
 import com.qualityalternative.app.domain.model.ReplacementHistoryEntry
 import com.qualityalternative.app.domain.model.TopicTag
 import java.time.LocalDate
@@ -387,6 +388,136 @@ class ProgressSnapshotTest {
         assertTrue(layout.blocks.drop(1).dropLast(1).all { block -> block.text.text.length < longParagraph.length })
         assertTrue(pages.size >= 4)
         assertEquals(pages.lastIndex, readerPageIndexForParagraph(pages = pages, paragraphIndex = 99))
+    }
+
+    @Test
+    fun adaptiveReaderPageWeightUsesViewportAndReaderFontScale() {
+        val compactPhone = adaptiveReaderPageWeight(
+            viewportWidthDp = 360f,
+            viewportHeightDp = 420f,
+            readerFontScale = 1.0,
+        )
+        val tallPhone = adaptiveReaderPageWeight(
+            viewportWidthDp = 360f,
+            viewportHeightDp = 780f,
+            readerFontScale = 1.0,
+        )
+        val tallSmallText = adaptiveReaderPageWeight(
+            viewportWidthDp = 360f,
+            viewportHeightDp = 780f,
+            readerFontScale = 0.9,
+        )
+        val tallLargeText = adaptiveReaderPageWeight(
+            viewportWidthDp = 360f,
+            viewportHeightDp = 780f,
+            readerFontScale = 1.3,
+        )
+
+        assertTrue("Taller reader viewport should fit more content.", tallPhone > compactPhone)
+        assertTrue("Larger reader text should fit less content.", tallLargeText < tallPhone)
+        assertTrue("Smaller reader text should fit more content.", tallSmallText > tallPhone)
+        assertTrue("Smaller reader text should fit more content.", tallSmallText > tallLargeText)
+        assertTrue(
+            "Reader text width should adapt to the app-level font size.",
+            adaptiveReaderCharsPerLine(viewportWidthDp = 360f, readerFontScale = 0.9) >
+                adaptiveReaderCharsPerLine(viewportWidthDp = 360f, readerFontScale = 1.3),
+        )
+        assertTrue("Reader block chunks should stay smaller than the page budget.", adaptiveReaderBlockChunkWeight(tallLargeText) < tallLargeText)
+        assertTrue("Large reader text should keep a no-scroll viewport safety reserve.", tallLargeText <= 22)
+    }
+
+    @Test
+    fun readerLayoutMapsSourceSelectorIntoSplitDisplayBlock() {
+        val longParagraph = (1..18)
+            .joinToString(separator = " ") { index ->
+                "Sentence $index has enough calm reader prose to wrap across the adaptive page."
+            }
+        val blocks = listOf(readerMarkdownBlock(rawBlock = longParagraph, sourceBlockIndex = 0))
+        val layout = splitOversizedReaderBlocks(
+            blocks = blocks,
+            maxBlockWeight = 6,
+            charsPerLine = 34,
+        )
+        val laterChunk = layout.blocks.indexOfFirst { block -> block.sourceTextStartOffset > 0 }
+
+        assertTrue("Expected the source paragraph to split into multiple display chunks.", laterChunk > 0)
+        val selector = ReadingAnnotationSelector(
+            sourceBlockIndex = 0,
+            textStartOffset = layout.blocks[laterChunk].sourceTextStartOffset + 4,
+            textEndOffset = layout.blocks[laterChunk].sourceTextStartOffset + 24,
+        )
+
+        assertEquals(laterChunk, layout.displayBlockIndexForSelector(selector))
+    }
+
+    @Test
+    fun readerSelectionRangesRefineWithinSingleSentence() {
+        val sentence = "A long sentence can begin with one idea, continue with a second phrase, and finish with enough concrete words to refine annotation boundaries."
+
+        val ranges = readerSelectionRanges(sentence)
+
+        assertTrue("Expected phrase-level selection handles inside the sentence.", ranges.size >= 3)
+        assertEquals(0, ranges.first().start)
+        assertEquals(sentence.length, ranges.last().endExclusive)
+        assertTrue(ranges.all { range -> range.start >= 0 && range.endExclusive <= sentence.length })
+        assertTrue(ranges.zipWithNext().all { (left, right) -> left.endExclusive <= right.start })
+    }
+
+    @Test
+    fun splitReaderBlocksPreserveSourceOffsetsForCrossPageSelection() {
+        val longSentence = (1..50)
+            .joinToString(separator = " ") { index -> "sourceword$index" }
+            .plus(".")
+        val block = readerMarkdownBlock(longSentence)
+
+        val layout = splitOversizedReaderBlocks(blocks = listOf(block), maxBlockWeight = 8)
+
+        assertTrue("Expected the long source block to split across display pages.", layout.blocks.size > 1)
+        assertEquals(longSentence, layout.blocks.first().sourceFullText)
+        assertEquals(longSentence, layout.blocks.last().sourceFullText)
+        assertTrue(layout.blocks.last().sourceTextStartOffset > 0)
+    }
+
+    @Test
+    fun readerPagesKeepSplitSourceChunksContinuousAcrossAdjacentPages() {
+        val longSentence = (1..120)
+            .joinToString(separator = " ") { index -> "anchor$index" }
+            .plus(".")
+        val maxPageWeight = adaptiveReaderPageWeight(
+            viewportWidthDp = 360f,
+            viewportHeightDp = 780f,
+            readerFontScale = 1.3,
+        )
+        val charsPerLine = adaptiveReaderCharsPerLine(
+            viewportWidthDp = 360f,
+            readerFontScale = 1.3,
+        )
+        val layout = splitOversizedReaderBlocks(
+            blocks = listOf(readerMarkdownBlock(longSentence)),
+            maxBlockWeight = adaptiveReaderBlockChunkWeight(maxPageWeight),
+            charsPerLine = charsPerLine,
+        )
+        val pages = readerPagesForBlocks(
+            blocks = layout.blocks,
+            maxPageWeight = maxPageWeight,
+            charsPerLine = charsPerLine,
+        )
+
+        assertTrue("Expected the source paragraph to split across reader pages.", pages.size > 1)
+        pages.zipWithNext().forEach { (leftPage, rightPage) ->
+            val leftBlock = layout.blocks[leftPage.endInclusive]
+            val rightBlock = layout.blocks[rightPage.start]
+            if (leftBlock.sourceBlockIndex == rightBlock.sourceBlockIndex) {
+                val sourceText = leftBlock.sourceFullText ?: longSentence
+                val leftEnd = leftBlock.sourceTextStartOffset + leftBlock.text.text.length
+                val rightStart = rightBlock.sourceTextStartOffset
+                assertTrue("Adjacent page chunks must not move backward in source text.", rightStart >= leftEnd)
+                assertTrue(
+                    "Adjacent reader pages must not skip non-blank source text.",
+                    sourceText.substring(leftEnd, rightStart).isBlank(),
+                )
+            }
+        }
     }
 
     @Test

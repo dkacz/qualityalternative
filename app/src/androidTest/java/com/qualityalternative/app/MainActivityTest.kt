@@ -9,6 +9,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
@@ -38,6 +39,7 @@ import com.qualityalternative.app.domain.model.AnalyticsEventType
 import com.qualityalternative.app.domain.model.MEDITATION_TIMER_CONTENT_ID
 import com.qualityalternative.app.domain.model.OnboardingSelection
 import com.qualityalternative.app.domain.model.ReadingAnnotationDraft
+import com.qualityalternative.app.domain.model.ReadingAnnotationSelector
 import com.qualityalternative.app.domain.model.ReadingProgress
 import com.qualityalternative.app.domain.model.TopicTag
 import com.qualityalternative.app.domain.model.UserDocumentDraft
@@ -83,6 +85,8 @@ class MainActivityTest {
         "sprint16-portable-profile-${System.currentTimeMillis()}"
     private val sprint16ProfileAutosaveScreenshotDirName =
         "sprint16-profile-autosave-${System.currentTimeMillis()}"
+    private val sprint16AdaptiveReaderScreenshotDirName =
+        "sprint16-adaptive-reader-${System.currentTimeMillis()}"
 
     @Before
     fun resetAppState() {
@@ -450,6 +454,39 @@ class MainActivityTest {
     }
 
     @Test
+    fun readerFontSizeSettingUsesAppLevelPreference() {
+        launchOnboardedApp()
+
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("tab-settings") }
+        composeRule.onNodeWithTag("tab-settings", useUnmergedTree = true)
+            .performSemanticsAction(SemanticsActions.OnClick)
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("settings-list") }
+        composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasTestTag("reader-font-scale-130"))
+        composeRule.onNodeWithTag("reader-font-scale-130")
+            .assertIsDisplayed()
+            .performSemanticsAction(SemanticsActions.OnClick)
+        composeRule.waitUntil(timeoutMillis = 10_000) { currentReaderFontScale() == 1.3 }
+        captureSprint16AdaptiveReaderScreenshot("00_reader_font_setting_xl")
+
+        scenario?.close()
+        scenario = null
+        launchFixtureSystemIntervention()
+        composeRule.onNodeWithText("Read this", substring = true)
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
+        assertEquals(1.3, currentReaderFontScale(), 0.0)
+        composeRule.onNodeWithTag("reader-page-label").assertIsDisplayed()
+        captureSprint16AdaptiveReaderScreenshot("01_reader_xl_font_light")
+
+        scenario?.onActivity { activity -> activity.mainViewModel.setReaderFontScale(0.9) }
+        composeRule.waitUntil(timeoutMillis = 10_000) { currentReaderFontScale() == 0.9 }
+        composeRule.onNodeWithTag("reader-page-label").assertIsDisplayed()
+        captureSprint16AdaptiveReaderScreenshot("02_reader_small_font_light")
+    }
+
+    @Test
     fun readerFeedbackAndProgressUseFiniteReplacementCopy() {
         launchFixtureSystemIntervention()
 
@@ -702,10 +739,8 @@ class MainActivityTest {
             .performTouchInput { swipeUp() }
         composeRule.waitForIdle()
         UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).pressBack()
-        composeRule.waitUntil(timeoutMillis = 10_000) {
-            visibleReaderParagraphIndices().contains(0)
-        }
-        composeRule.waitUntil(timeoutMillis = 10_000) { hasNodeContaining("1/") }
+        waitForHome()
+        assertFalse(hasTag("reader-screen"))
     }
 
     @Test
@@ -730,7 +765,7 @@ class MainActivityTest {
             .performTouchInput { swipeUp() }
         composeRule.waitForIdle()
         assertEquals(
-            "Reader body should not respond to vertical swipe; paging is tap/back only.",
+            "Reader body should not respond to vertical swipe; paging is tap/edge/gesture only.",
             firstPageIndices,
             visibleReaderParagraphIndices(),
         )
@@ -741,10 +776,27 @@ class MainActivityTest {
         }
         assertFalse(visibleReaderParagraphIndices().contains(0))
 
-        UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).pressBack()
+        composeRule.onNodeWithTag("reader-page-viewport")
+            .performTouchInput { swipeRight() }
         composeRule.waitUntil(timeoutMillis = 10_000) {
             visibleReaderParagraphIndices() == firstPageIndices
         }
+        composeRule.onNodeWithTag("reader-page-viewport")
+            .performSemanticsAction(SemanticsActions.OnClick)
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            visibleReaderParagraphIndices().any { index -> index > (firstPageIndices.maxOrNull() ?: -1) }
+        }
+        composeRule.onNodeWithTag("reader-page-viewport")
+            .performTouchInput { click(Offset(4f, 120f)) }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            visibleReaderParagraphIndices() == firstPageIndices
+        }
+        UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).pressBack()
+        waitForHome()
+        assertFalse(hasTag("reader-screen"))
+
+        scenario?.onActivity { activity -> activity.mainViewModel.openLibraryItem(document) }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
 
         composeRule.onNodeWithTag("reader-toc-open")
             .assertIsDisplayed()
@@ -855,16 +907,19 @@ class MainActivityTest {
         composeRule.onNodeWithText("SELECTED FRAGMENT").assertDoesNotExist()
         composeRule.onNodeWithTag("reader-annotation-selected-quote-$annotationParagraph").assertIsDisplayed()
         val initialSelectedQuote = readerSelectedQuoteText(annotationParagraph)
-        composeRule.onNodeWithTag("reader-annotation-end-later")
+        composeRule.onNodeWithText("End later").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("Move end earlier")
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag("reader-annotation-end-earlier")
             .assertIsDisplayed()
             .assertIsEnabled()
             .performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) {
-            readerSelectedQuoteText(annotationParagraph).length > initialSelectedQuote.length
+            readerSelectedQuoteText(annotationParagraph).length < initialSelectedQuote.length
         }
-        val expandedSelectedQuote = readerSelectedQuoteText(annotationParagraph)
-        val expandedQuoteTail = expandedSelectedQuote.removePrefix(initialSelectedQuote).trim().take(40)
-        assertTrue("Expected End later to add text to the selected quote", expandedQuoteTail.isNotBlank())
+        val refinedSelectedQuote = readerSelectedQuoteText(annotationParagraph)
+        val refinedQuoteProbe = refinedSelectedQuote.take(40)
+        assertTrue("Expected the icon range control to keep a non-empty selected quote", refinedQuoteProbe.isNotBlank())
         val firstNote = "Worth remembering when the impulse hits."
         composeRule.onNodeWithTag("reader-annotation-note-input-$annotationParagraph")
             .assertIsDisplayed()
@@ -881,7 +936,7 @@ class MainActivityTest {
                 hasTag("reader-annotation-highlight-$annotationParagraph") &&
                 !hasTag("reader-annotation-editor-$annotationParagraph") &&
                 hasReadingAnnotationNote(contentId = contentId, paragraphIndex = annotationParagraph, noteText = firstNote) &&
-                hasReadingAnnotationQuoteContaining(contentId, annotationParagraph, expandedQuoteTail)
+                hasReadingAnnotationQuoteContaining(contentId, annotationParagraph, refinedQuoteProbe)
         }
         composeRule.onNodeWithTag("reader-annotation-highlight-$annotationParagraph").assertIsDisplayed()
         captureSprint14ReaderAnnotationScreenshot("02_reader_annotation_preview_light")
@@ -904,7 +959,7 @@ class MainActivityTest {
                 hasTag("reader-annotation-highlight-$annotationParagraph") &&
                 !hasTag("reader-annotation-editor-$annotationParagraph") &&
                 hasSingleReadingAnnotationNoteContaining(contentId, annotationParagraph, "Remember:") &&
-                hasReadingAnnotationQuoteContaining(contentId, annotationParagraph, expandedQuoteTail)
+                hasReadingAnnotationQuoteContaining(contentId, annotationParagraph, refinedQuoteProbe)
         }
         scenario?.onActivity { activity -> activity.mainViewModel.dismissMessage() }
         composeRule.waitUntil(timeoutMillis = 10_000) { !hasNode("Annotation updated.") }
@@ -915,6 +970,76 @@ class MainActivityTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("reader-annotation-highlight-$annotationParagraph").assertIsDisplayed()
         captureSprint14ReaderAnnotationScreenshot("03_reader_annotation_preview_dark")
+    }
+
+    @Test
+    fun crossPageAnnotationSelectionPersistsAcrossPagedSourceChunks() {
+        launchOnboardedApp()
+        val crossPageText = (1..120)
+            .joinToString(separator = " ") { index -> "anchor$index" }
+            .plus(".")
+        val document = addSeedMarkdownDocument(
+            title = "Cross-page Annotation Fixture",
+            displayName = "cross-page-annotation.md",
+            body = crossPageText,
+            nowMillis = 70_000L,
+        )
+
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.setReaderFontScale(1.3)
+            activity.mainViewModel.openLibraryItem(document)
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
+        val contentId = currentContentId()
+        val startOffset = crossPageText.indexOf("anchor8").coerceAtLeast(0)
+        val endOffset = crossPageText.indexOf("anchor96")
+            .takeIf { index -> index > startOffset }
+            ?.let { index -> index + "anchor96".length }
+            ?: crossPageText.length
+        val noteText = "This note spans page chunks."
+        val selector = ReadingAnnotationSelector(
+            sourceBlockIndex = 0,
+            textStartOffset = startOffset,
+            textEndOffset = endOffset,
+            prefixText = crossPageText.substring(0, startOffset).takeLast(120),
+            suffixText = crossPageText.substring(endOffset).take(120),
+        )
+
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.saveCurrentReadingAnnotation(
+                paragraphIndex = 0,
+                quotedText = crossPageText.substring(startOffset, endOffset),
+                noteText = noteText,
+                selector = selector,
+            )
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            visibleAnnotationHighlightIndices().isNotEmpty() &&
+                hasReadingAnnotationNote(contentId = contentId, paragraphIndex = 0, noteText = noteText)
+        }
+        val firstPageHighlights = visibleAnnotationHighlightIndices()
+        assertTrue(firstPageHighlights.isNotEmpty())
+        scenario?.onActivity { activity -> activity.mainViewModel.dismissMessage() }
+        composeRule.waitUntil(timeoutMillis = 10_000) { !hasNode("Annotation saved.") }
+        captureSprint16AdaptiveReaderScreenshot("03_cross_page_annotation_page_one_light")
+
+        val firstPageMax = firstPageHighlights.maxOrNull() ?: -1
+        var reachedLaterHighlightedPage = false
+        repeat(8) {
+            if (!reachedLaterHighlightedPage) {
+                reachedLaterHighlightedPage = visibleAnnotationHighlightIndices().any { index -> index > firstPageMax }
+            }
+            if (!reachedLaterHighlightedPage) {
+                advanceReaderPage()
+                composeRule.waitForIdle()
+            }
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            visibleAnnotationHighlightIndices().any { index -> index > firstPageMax }
+        }
+        val laterPageHighlights = visibleAnnotationHighlightIndices()
+        assertTrue(laterPageHighlights.any { index -> index > firstPageMax })
+        captureSprint16AdaptiveReaderScreenshot("04_cross_page_annotation_page_two_light")
     }
 
     @Test
@@ -930,8 +1055,22 @@ class MainActivityTest {
 
         val firstNote = "First note from the annotation library flow."
         val secondNote = "Second note should jump back to this paragraph."
-        saveReaderAnnotation(paragraphIndex = 0, noteText = firstNote)
-        saveReaderAnnotation(paragraphIndex = 1, noteText = secondNote)
+        seedReadingAnnotation(
+            contentId = contentId,
+            paragraphIndex = 0,
+            quotedText = "First annotation quote.",
+            noteText = firstNote,
+            sourceTitle = title,
+            nowMillis = 21_000L,
+        )
+        seedReadingAnnotation(
+            contentId = contentId,
+            paragraphIndex = 1,
+            quotedText = "Second annotation quote.",
+            noteText = secondNote,
+            sourceTitle = title,
+            nowMillis = 22_000L,
+        )
         composeRule.waitUntil(timeoutMillis = 10_000) {
             hasReadingAnnotationNote(contentId = contentId, paragraphIndex = 0, noteText = firstNote) &&
                 hasReadingAnnotationNote(contentId = contentId, paragraphIndex = 1, noteText = secondNote)
@@ -1514,6 +1653,12 @@ class MainActivityTest {
         }
     }
 
+    private fun visibleAnnotationHighlightIndices(): List<Int> {
+        return (0..120).filter { index ->
+            hasTag("reader-annotation-highlight-$index")
+        }
+    }
+
     private fun advanceReaderPage() {
         composeRule.onNodeWithTag("reader-page-viewport")
             .assertIsDisplayed()
@@ -1548,6 +1693,14 @@ class MainActivityTest {
         }
         assertTrue(title.isNotBlank())
         return title
+    }
+
+    private fun currentReaderFontScale(): Double {
+        var scale = 0.0
+        scenario?.onActivity { activity ->
+            scale = activity.mainViewModel.uiState.readerFontScale
+        }
+        return scale
     }
 
     private fun readerSelectedQuoteText(paragraphIndex: Int): String {
@@ -2070,6 +2223,33 @@ class MainActivityTest {
         (result as AddUserDocumentResult.Added).item
     }
 
+    private fun addSeedMarkdownDocument(
+        title: String,
+        displayName: String,
+        body: String,
+        nowMillis: Long,
+    ): ContentItem = runBlocking {
+        val targetContext = InstrumentationRegistry.getInstrumentation().targetContext
+        val app = (targetContext.applicationContext as QualityAlternativeApplication)
+        app.appContainer.userDocumentRepository.observeReady().first { it }
+        val fixture = File(targetContext.filesDir, "sprint16-reader-fixtures/$displayName")
+        fixture.parentFile?.mkdirs()
+        fixture.writeText(body)
+        val result = app.appContainer.userDocumentRepository.addDocument(
+            draft = UserDocumentDraft(
+                uri = Uri.fromFile(fixture).toString(),
+                displayName = displayName,
+                mimeType = "text/markdown",
+                title = title,
+                durationMinutes = 6,
+                topicTags = setOf(TopicTag.SCIENCE, TopicTag.PHILOSOPHY),
+            ),
+            nowMillis = nowMillis,
+        )
+        assertTrue("Expected $title to be saved", result is AddUserDocumentResult.Added)
+        (result as AddUserDocumentResult.Added).item
+    }
+
     private fun sprint14EpubBytes(title: String): ByteArray {
         return epubBytes(
             "META-INF/container.xml" to """
@@ -2147,7 +2327,7 @@ class MainActivityTest {
                   <p>$title starts with a long first chapter so the reader must paginate instead of placing the whole book in one scroll surface.</p>
                   <p>The first page is intentionally dense enough to make a vertical swipe tempting, but the app should keep it fixed like a page.</p>
                   <p>Tap anywhere in the page body to go forward; visible controls should stay out of the reading surface.</p>
-                  <p>When the user presses the Android back gesture, the reader should move to the previous page before leaving the reading session.</p>
+                  <p>When the user presses the Android back gesture, the reader should leave the reading session after overlays are closed.</p>
                   <p>This paragraph keeps chapter one over the page weight threshold and proves the next page is a real page, not a scrolled offset.</p>
                   <p>The page should still report stable progress and visible paragraph anchors while rendering only the current page of the EPUB.</p>
                   <p>Chapter one ends with enough text to separate it clearly from the following table-of-contents target.</p>
@@ -2282,6 +2462,16 @@ class MainActivityTest {
 
     private fun captureSprint16ProfileAutosaveScreenshot(name: String) {
         val outputDir = File("/sdcard/Download/qualityalternative/$sprint16ProfileAutosaveScreenshotDirName")
+        assertTrue("Expected screenshot output directory for $name", outputDir.mkdirs() || outputDir.exists())
+        composeRule.waitForIdle()
+        Thread.sleep(300)
+        val output = File(outputDir, "$name.png")
+        assertTrue("Expected screenshot capture for $name", UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).takeScreenshot(output))
+        assertTrue("Expected screenshot file for $name", output.exists() && output.length() > 0L)
+    }
+
+    private fun captureSprint16AdaptiveReaderScreenshot(name: String) {
+        val outputDir = File("/sdcard/Download/qualityalternative/$sprint16AdaptiveReaderScreenshotDirName")
         assertTrue("Expected screenshot output directory for $name", outputDir.mkdirs() || outputDir.exists())
         composeRule.waitForIdle()
         Thread.sleep(300)

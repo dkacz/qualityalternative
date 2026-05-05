@@ -5,7 +5,7 @@
 This sprint corrects the Sprint 14 reader/annotation model and removes the remaining ranking trap around whole-document duration.
 
 - Reading is paginated by default. There is no vertical scrolling in active reader pages.
-- Tapping anywhere on the active page advances to the next page. Android back goes to the previous page before leaving the reader.
+- Tapping most of the active page advances to the next page. Previous-page navigation uses a reader gesture or the very small left-edge tap zone; Android back exits the reader after first dismissing open reader overlays.
 - Active reading uses near-zero chrome: no persistent Previous, Next, or I'm done reading buttons. Title, progress, page number, and TOC access are small footer affordances so the text remains the screen.
 - EPUBs expose table-of-contents navigation and TOC entries jump to the closest page or section.
 - Reader annotations are created from long-press text selection, not margin icons.
@@ -69,7 +69,7 @@ Deliverables:
 - Replace the active reader's vertical list with a fixed page viewport.
 - Remove active-page vertical scrolling.
 - Page tap advances.
-- Back gesture/system back moves to previous page before exiting.
+- Previous-page navigation uses a reader gesture or the very small left-edge tap zone; Android/system back exits after closing reader overlays.
 - Persistent Previous, Next page, and I'm done reading buttons are removed from the active reader.
 - The title, page/progress metadata, and TOC affordance move into a small footer.
 - Progress reflects page/document position.
@@ -78,7 +78,7 @@ Deliverables:
 
 Review gate:
 
-- Compose tests for tap next, back previous, no scrollable active page, TOC jump, and direct reader entry.
+- Compose tests for tap next, swipe/edge previous, Android Back exit, no scrollable active page, TOC jump, and direct reader entry.
 - Emulator screenshots/light-dark visual bundle.
 - GPT Pro visual review to 10/10 before Slice 15.3.
 
@@ -93,7 +93,7 @@ Implementation status:
 - Tapping the last page finishes the reader session and opens feedback; no standalone Done button is needed.
 - Reader title, page count, progress, and TOC access are reduced to a small footer.
 - Margin annotation icon buttons are removed from active reading; long-press on a text block now opens the existing note editor without adding visible chrome.
-- Android/system back first moves to the previous reader page; it exits only from page 1.
+- Android/system back exits the reader after closing TOC/annotation overlays; previous-page movement is handled by swipe-right or the small left-edge tap zone.
 - TOC opens as a bounded overlay sheet and jumps to the page for the selected section.
 - Section headings start a new page only after body content, avoiding blank heading-only pages for consecutive headings.
 

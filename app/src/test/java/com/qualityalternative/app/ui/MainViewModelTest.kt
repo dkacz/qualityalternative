@@ -34,6 +34,7 @@ import com.qualityalternative.app.domain.model.RecommendationSignals
 import com.qualityalternative.app.domain.model.RecommendationSource
 import com.qualityalternative.app.domain.model.ReadingAnnotation
 import com.qualityalternative.app.domain.model.ReadingAnnotationDraft
+import com.qualityalternative.app.domain.model.ReadingAnnotationSelector
 import com.qualityalternative.app.domain.model.ReadingProgress
 import com.qualityalternative.app.domain.model.ReplacementHistoryEntry
 import com.qualityalternative.app.domain.model.ReturnToTargetSignal
@@ -556,6 +557,33 @@ class MainViewModelTest {
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
+    fun readerFontScaleSettingPersistsAndAutosavesPortableProfile() = runTest {
+        val settingsRepository = FakeSettingsRepository(
+            initial = completedSettings(selectedAppPackages = setOf("feed.one")).copy(
+                profileAutosaveUri = "content://tree/profile-folder",
+                profileAutosaveDisplayName = "QA profile",
+            ),
+        )
+        val profileWriter = RecordingAccountLightProfileAutosaveWriter()
+        val viewModel = createViewModel(
+            settingsRepository = settingsRepository,
+            accountLightProfileAutosaveWriter = profileWriter,
+            nowProvider = { 4_000L },
+        )
+
+        advanceUntilIdle()
+        viewModel.setReaderFontScale(1.3)
+        advanceUntilIdle()
+
+        assertEquals(1.3, viewModel.uiState.readerFontScale, 0.0)
+        assertEquals(1.3, settingsRepository.state.value.readerFontScale, 0.0)
+        assertEquals(1, profileWriter.writes.size)
+        assertTrue(profileWriter.writes.single().third.contains("\"readerFontScale\": 1.3"))
+        assertEquals(4_000L, settingsRepository.state.value.profileAutosaveLastSuccessfulAtMillis)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
     fun meditationDurationCanBeChangedBeforeStartingCurrentMeditation() = runTest {
         val recommendationEngine = FixedRecommendationEngine(
             RecommendationSet(
@@ -895,6 +923,13 @@ class MainViewModelTest {
     @OptIn(ExperimentalCoroutinesApi::class)
     fun openAnnotationTargetOpensReaderAtSavedParagraph() = runTest {
         val document = savedUserDocument(format = ContentFormat.MARKDOWN)
+        val selector = ReadingAnnotationSelector(
+            sourceBlockIndex = 0,
+            textStartOffset = 3,
+            textEndOffset = 16,
+            prefixText = "Pri",
+            suffixText = "otes",
+        )
         val annotationRepository = FakeReadingAnnotationRepository(
             initialAnnotations = listOf(
                 ReadingAnnotation(
@@ -905,6 +940,7 @@ class MainViewModelTest {
                     noteText = "Return here from the library.",
                     createdAtMillis = 1_500L,
                     updatedAtMillis = 2_500L,
+                    selector = selector,
                 ),
             ),
         )
@@ -923,6 +959,7 @@ class MainViewModelTest {
         assertEquals(document.id, viewModel.uiState.currentContent?.id)
         assertEquals("Private notes", viewModel.uiState.currentContentBody)
         assertEquals(2, viewModel.uiState.currentReaderStartParagraphIndex)
+        assertEquals(selector, viewModel.uiState.currentReaderStartSelector)
     }
 
     @Test

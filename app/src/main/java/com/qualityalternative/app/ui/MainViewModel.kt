@@ -34,9 +34,12 @@ import com.qualityalternative.app.domain.model.DelayWindow
 import com.qualityalternative.app.domain.model.DistractingApp
 import com.qualityalternative.app.domain.model.DurationBucket
 import com.qualityalternative.app.domain.model.EditorialPack
+import com.qualityalternative.app.domain.model.DEFAULT_READER_FONT_SCALE
 import com.qualityalternative.app.domain.model.MEDITATION_TIMER_CONTENT_ID
 import com.qualityalternative.app.domain.model.MAX_OPEN_ANYWAY_UNLOCK_MINUTES
+import com.qualityalternative.app.domain.model.MAX_READER_FONT_SCALE
 import com.qualityalternative.app.domain.model.MIN_OPEN_ANYWAY_UNLOCK_MINUTES
+import com.qualityalternative.app.domain.model.MIN_READER_FONT_SCALE
 import com.qualityalternative.app.domain.model.OnboardingSelection
 import com.qualityalternative.app.domain.model.PermissionReadiness
 import com.qualityalternative.app.domain.model.PermissionStatus
@@ -114,6 +117,7 @@ data class MainUiState(
     val currentContentBody: String = "",
     val currentReadingProgress: ReadingProgress? = null,
     val currentReaderStartParagraphIndex: Int? = null,
+    val currentReaderStartSelector: ReadingAnnotationSelector? = null,
     val currentSessionId: String? = null,
     val currentSessionStartedAtMillis: Long? = null,
     val activeDelayWindow: DelayWindow? = null,
@@ -130,6 +134,7 @@ data class MainUiState(
     val savedLinkConfirmation: AddLinkConfirmation? = null,
     val themeMode: AppThemeMode = AppThemeMode.LIGHT,
     val meditationDurationMinutes: Int = DEFAULT_MEDITATION_MINUTES,
+    val readerFontScale: Double = DEFAULT_READER_FONT_SCALE,
     val contentPriority: ContentPriority = ContentPriority.BALANCED,
     val priorityContentIds: Set<String> = emptySet(),
     val reactivatedCompletedContentIds: Set<String> = emptySet(),
@@ -540,6 +545,16 @@ class MainViewModel(
         }
     }
 
+    fun setReaderFontScale(scale: Double) {
+        val normalizedScale = scale.coerceIn(MIN_READER_FONT_SCALE, MAX_READER_FONT_SCALE)
+        if (uiState.readerFontScale == normalizedScale) return
+        uiState = uiState.copy(readerFontScale = normalizedScale, latestMessage = null)
+        viewModelScope.launch {
+            settingsRepository.saveReaderFontScale(normalizedScale)
+            autosaveAccountLightProfileAfterPortableMutation()
+        }
+    }
+
     fun setContentPriority(priority: ContentPriority) {
         val preferences = uiState.preferences
         uiState = uiState.copy(
@@ -932,6 +947,7 @@ class MainViewModel(
             isManagingLibrary = false,
             selectedLibraryContentIds = emptySet(),
             currentReaderStartParagraphIndex = null,
+            currentReaderStartSelector = null,
             latestMessage = null,
         )
     }
@@ -940,6 +956,7 @@ class MainViewModel(
         uiState = uiState.copy(
             screen = MainScreen.Library,
             currentReaderStartParagraphIndex = null,
+            currentReaderStartSelector = null,
             latestMessage = null,
         )
     }
@@ -1037,6 +1054,7 @@ class MainViewModel(
         uiState = uiState.copy(
             screen = MainScreen.Progress,
             currentReaderStartParagraphIndex = null,
+            currentReaderStartSelector = null,
             latestMessage = null,
         )
     }
@@ -1045,6 +1063,7 @@ class MainViewModel(
         uiState = uiState.copy(
             screen = MainScreen.Settings,
             currentReaderStartParagraphIndex = null,
+            currentReaderStartSelector = null,
             latestMessage = null,
         )
     }
@@ -1055,6 +1074,7 @@ class MainViewModel(
             isManagingLibrary = false,
             selectedLibraryContentIds = emptySet(),
             currentReaderStartParagraphIndex = null,
+            currentReaderStartSelector = null,
             latestMessage = null,
         )
     }
@@ -1078,6 +1098,7 @@ class MainViewModel(
             content = content,
             origin = "annotation-library",
             startParagraphIndex = annotation.paragraphIndex,
+            startSelector = annotation.selector.takeIf { selector -> selector.hasExplicitReaderTarget() },
         )
     }
 
@@ -1085,6 +1106,7 @@ class MainViewModel(
         content: ContentItem,
         origin: String = "library",
         startParagraphIndex: Int? = null,
+        startSelector: ReadingAnnotationSelector? = null,
     ) {
         if (content.availability == ContentAvailability.UNAVAILABLE) {
             uiState = uiState.copy(
@@ -1138,6 +1160,7 @@ class MainViewModel(
             currentContentBody = readerDocument.plainText,
             currentReadingProgress = existingProgress,
             currentReaderStartParagraphIndex = startParagraphIndex,
+            currentReaderStartSelector = startSelector,
             currentSessionId = null,
             currentSessionStartedAtMillis = startedAtMillis,
             screen = screenForReplacement(content),
@@ -2335,6 +2358,7 @@ class MainViewModel(
             preferences = preferences.takeIf { settings.hasCompletedOnboarding },
             themeMode = settings.themeMode,
             meditationDurationMinutes = settings.meditationDurationMinutes,
+            readerFontScale = settings.readerFontScale,
             contentPriority = settings.contentPriority,
             priorityContentIds = settings.priorityContentIds,
             reactivatedCompletedContentIds = reactivatedCompletedContentIds,
@@ -2729,6 +2753,7 @@ class MainViewModel(
             currentContentBody = readerDocument.plainText,
             currentReadingProgress = existingProgress,
             currentReaderStartParagraphIndex = null,
+            currentReaderStartSelector = null,
             currentSessionId = sessionId,
             currentSessionStartedAtMillis = startedAtMillis,
             screen = screenForReplacement(content),
@@ -2783,6 +2808,16 @@ class MainViewModel(
     private fun contentForAnnotation(annotation: ReadingAnnotation): ContentItem? {
         return fullReplacementInventory()
             .firstOrNull { content -> content.id == annotation.contentId }
+    }
+
+    private fun ReadingAnnotationSelector.hasExplicitReaderTarget(): Boolean {
+        return !sourceHref.isNullOrBlank() ||
+            !sourceAnchor.isNullOrBlank() ||
+            sourceBlockIndex > 0 ||
+            textStartOffset > 0 ||
+            textEndOffset > textStartOffset ||
+            prefixText.isNotBlank() ||
+            suffixText.isNotBlank()
     }
 
     private suspend fun autosaveReadingAnnotations(nowMillis: Long): AnnotationAutosaveResult {
@@ -2960,6 +2995,7 @@ class MainViewModel(
             currentSessionStartedAtMillis = null,
             currentReadingProgress = null,
             currentReaderStartParagraphIndex = null,
+            currentReaderStartSelector = null,
             lastFeedback = lastFeedback,
             latestMessage = latestMessage,
         )
