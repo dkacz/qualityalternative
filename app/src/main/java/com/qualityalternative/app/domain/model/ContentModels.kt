@@ -164,6 +164,7 @@ data class ContentItem(
     val rights: ContentRightsMetadata = ContentRightsMetadata.safeDefault(),
     val addedAtMillis: Long? = null,
     val documentFingerprintSha256: String? = null,
+    val documentFingerprintSizeBytes: Long? = null,
 )
 
 fun ContentItem.usesExternalHandoff(): Boolean = rights.usesExternalHandoff

@@ -62,4 +62,27 @@ class QualityAlternativeDatabaseMigrationTest {
             },
         )
     }
+
+    @Test
+    fun migration11To12AddsUserDocumentFingerprintSizeColumn() {
+        val statements = mutableListOf<String>()
+        val db = Proxy.newProxyInstance(
+            SupportSQLiteDatabase::class.java.classLoader,
+            arrayOf(SupportSQLiteDatabase::class.java),
+        ) { _, method, args ->
+            if (method.name == "execSQL" && args?.firstOrNull() is String) {
+                statements += args.first() as String
+            }
+            when (method.returnType) {
+                java.lang.Boolean.TYPE -> false
+                java.lang.Integer.TYPE -> 0
+                java.lang.Long.TYPE -> 0L
+                else -> null
+            }
+        } as SupportSQLiteDatabase
+
+        QualityAlternativeDatabase.MIGRATION_11_12.migrate(db)
+
+        assertTrue(statements.any { it.contains("ADD COLUMN documentFingerprintSizeBytes INTEGER") })
+    }
 }

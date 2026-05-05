@@ -790,6 +790,65 @@ class AccountLightProfileImporterTest {
     }
 
     @Test
+    fun exportedVerifiedDocumentFingerprintReconcilesCrossDeviceImport() = runBlocking {
+        val sharedFingerprint = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        val exportedContentId = "user-document-33333333-3333-4333-8333-333333333333"
+        val localContentId = "user-document-44444444-4444-4444-8444-444444444444"
+        val sourceSettings = PreferencesSettingsRepository(
+            dataStore = testDataStore(),
+            supportedApps = SupportedCatalog.distractingApps,
+        )
+        val exportedDocument = userDocumentContent(
+            id = exportedContentId,
+            fingerprintSha256 = sharedFingerprint,
+        )
+        val exportedJson = AccountLightProfileExporter(
+            settingsRepository = sourceSettings,
+            appVersionName = "0.8.1-alpha",
+            appVersionCode = 13,
+            userDocumentRepository = StaticUserDocumentRepository(listOf(exportedDocument)),
+            readingProgressRepository = StaticReadingProgressRepository(
+                listOf(
+                    ReadingProgress(
+                        contentId = exportedContentId,
+                        progressPercent = 55,
+                        lastVisibleParagraphIndex = 5,
+                        paragraphCount = 12,
+                        updatedAtMillis = 30_000L,
+                    ),
+                ),
+            ),
+        ).exportSettingsOnlyProfileJson(nowMillis = 40_000L)
+        val exportedProfile = AccountLightProfileCodec().decode(exportedJson)
+        val portableDocument = exportedProfile.library.userDocuments.single()
+        assertEquals("SHA256_BYTES", portableDocument.documentFingerprint.strategy)
+        assertEquals(sharedFingerprint, portableDocument.documentFingerprint.sha256)
+        assertEquals(1_024L, portableDocument.documentFingerprint.sizeBytes)
+
+        val targetSettings = PreferencesSettingsRepository(
+            dataStore = testDataStore(),
+            supportedApps = SupportedCatalog.distractingApps,
+        )
+        val documentRepository = RecordingUserDocumentRepository().apply {
+            documents = listOf(userDocumentContent(id = localContentId, fingerprintSha256 = sharedFingerprint))
+        }
+        val readingProgressRepository = RecordingReadingProgressRepository()
+        val importer = AccountLightProfileImporter(
+            settingsRepository = targetSettings,
+            userDocumentRepository = documentRepository,
+            readingProgressRepository = readingProgressRepository,
+        )
+
+        val plan = importer.validateImportProfileJson(exportedJson)
+        assertTrue(plan.generatedWarnings.map(AccountLightWarning::code).contains("CONFLICT_RETAINED_LOCAL_VALUE"))
+
+        importer.applyMerge(plan)
+
+        assertEquals(listOf(localContentId), documentRepository.documents.map(ContentItem::id))
+        assertEquals(listOf(localContentId), readingProgressRepository.progress.map(ReadingProgress::contentId))
+    }
+
+    @Test
     fun applyReplace_restoresLibraryWhenProgressImportFails() = runBlocking {
         val target = PreferencesSettingsRepository(
             dataStore = testDataStore(),
@@ -1333,6 +1392,7 @@ class AccountLightProfileImporterTest {
             ),
             addedAtMillis = 10_000L,
             documentFingerprintSha256 = fingerprintSha256,
+            documentFingerprintSizeBytes = 1_024L,
         )
     }
 
@@ -1380,6 +1440,31 @@ class AccountLightProfileImporterTest {
             seenContentIds = links.map(ContentItem::id)
             return emptySet()
         }
+    }
+
+    private class StaticUserDocumentRepository(
+        private val documents: List<ContentItem>,
+    ) : UserDocumentRepository {
+        override fun userDocuments(): List<ContentItem> = documents
+
+        override suspend fun addDocument(draft: UserDocumentDraft, nowMillis: Long): AddUserDocumentResult =
+            error("Not used by portable import tests.")
+
+        override suspend fun markUnavailable(contentId: String, nowMillis: Long) = Unit
+
+        override suspend fun deleteDocument(contentId: String) = Unit
+    }
+
+    private class StaticReadingProgressRepository(
+        private val progress: List<ReadingProgress>,
+    ) : ReadingProgressRepository {
+        override fun readingProgress(): List<ReadingProgress> = progress
+
+        override suspend fun saveProgress(progress: ReadingProgress) =
+            error("Not used by portable import tests.")
+
+        override suspend fun deleteProgress(contentId: String) =
+            error("Not used by portable import tests.")
     }
 
     private class RecordingUserLinkRepository : UserLinkRepository {

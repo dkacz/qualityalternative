@@ -321,7 +321,7 @@ Required fields:
 
 Rules:
 
-- If the app can read the document bytes at export time, use `SHA256_BYTES`, set `sha256`, and set `sizeBytes`.
+- If the app can read the document bytes or has a previously verified byte fingerprint for the local document, use `SHA256_BYTES`, set `sha256`, and set `sizeBytes`.
 - If byte hashing is unavailable but reader text is available, use `TEXT_SAMPLE_SHA256`, set `sha256` to a hash of the deterministic text sample described below, and set `sizeBytes` to null.
 - If neither is available, use `UNVERIFIED_METADATA_ONLY` with `sha256 = null`.
 - Imported documents with `UNVERIFIED_METADATA_ONLY` must be marked `MISSING_FILE_NEEDS_REATTACH` until the user reattaches and confirms the file.

@@ -311,6 +311,7 @@ class AccountLightProfileExporterTest {
                 sourceUrl = "https://example.com/read?src=file%253A%252F%252F%252Fsdcard%252Fbook%25ZZ",
             ),
         )
+        val documentFingerprintSha256 = "abababababababababababababababababababababababababababababababab"
         val document = ContentItem(
             id = "user-document-33333333-3333-4333-8333-333333333333",
             packId = "user-documents",
@@ -327,6 +328,8 @@ class AccountLightProfileExporterTest {
                 attribution = "book.epub",
             ),
             addedAtMillis = 6_000L,
+            documentFingerprintSha256 = documentFingerprintSha256,
+            documentFingerprintSizeBytes = 4_096L,
         )
         val longTitleDocument = document.copy(
             id = "user-document-66666666-6666-4666-8666-666666666666",
@@ -401,11 +404,12 @@ class AccountLightProfileExporterTest {
         assertTrue(exportedDocument.contentId.startsWith("user-document-"))
         assertEquals("Saved document metadata.", exportedDocument.description)
         assertEquals("MISSING_FILE_NEEDS_REATTACH", exportedDocument.documentImportState)
-        assertEquals("UNVERIFIED_METADATA_ONLY", exportedDocument.documentFingerprint.strategy)
-        assertTrue(
+        assertEquals("SHA256_BYTES", exportedDocument.documentFingerprint.strategy)
+        assertEquals(documentFingerprintSha256, exportedDocument.documentFingerprint.sha256)
+        assertEquals(4_096L, exportedDocument.documentFingerprint.sizeBytes)
+        assertFalse(
             profile.warnings.any {
                 it.code == "DOCUMENT_FINGERPRINT_UNVERIFIED" &&
-                    it.section == "library.userDocuments" &&
                     it.contentId == exportedDocument.contentId
             },
         )
@@ -449,6 +453,51 @@ class AccountLightProfileExporterTest {
         assertFalse(rawJson.contains("storage%2Femulated%2F0%2FDownload%2Fbook"))
         assertFalse(rawJson.contains("book.docx"))
         assertFalse(rawJson.contains("book%25ZZ"))
+    }
+
+    @Test
+    fun exportSettingsOnlyProfileJson_warnsWhenUserDocumentHasNoVerifiedFingerprint() = runBlocking {
+        val repository = PreferencesSettingsRepository(
+            dataStore = testDataStore(),
+            supportedApps = SupportedCatalog.distractingApps,
+        )
+        val document = ContentItem(
+            id = "user-document-33333333-3333-4333-8333-333333333333",
+            packId = "user-documents",
+            title = "Imported book",
+            description = "Saved document metadata.",
+            durationMinutes = 45,
+            format = ContentFormat.EPUB,
+            topicTags = setOf(TopicTag.PHILOSOPHY),
+            sourceLabel = "book.epub",
+            sourceType = ContentSourceType.USER_DOCUMENT,
+            availability = ContentAvailability.AVAILABLE,
+            rights = ContentRightsMetadata.userPrivateReader(
+                sourceUrl = "content://com.android.providers.media.documents/document/raw-book",
+                attribution = "book.epub",
+            ),
+            addedAtMillis = 6_000L,
+        )
+        val exporter = AccountLightProfileExporter(
+            settingsRepository = repository,
+            appVersionName = "0.8.1-alpha",
+            appVersionCode = 13,
+            userDocumentRepository = StaticUserDocumentRepository(listOf(document)),
+        )
+
+        val profile = AccountLightProfileCodec().decode(exporter.exportSettingsOnlyProfileJson(nowMillis = 20_000L))
+        val exportedDocument = profile.library.userDocuments.single()
+
+        assertEquals("UNVERIFIED_METADATA_ONLY", exportedDocument.documentFingerprint.strategy)
+        assertEquals(null, exportedDocument.documentFingerprint.sha256)
+        assertEquals(null, exportedDocument.documentFingerprint.sizeBytes)
+        assertTrue(
+            profile.warnings.any {
+                it.code == "DOCUMENT_FINGERPRINT_UNVERIFIED" &&
+                    it.section == "library.userDocuments" &&
+                    it.contentId == exportedDocument.contentId
+            },
+        )
     }
 
     @Test

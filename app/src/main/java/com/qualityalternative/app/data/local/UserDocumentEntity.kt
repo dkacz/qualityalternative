@@ -25,4 +25,5 @@ data class UserDocumentEntity(
     val createdAtMillis: Long,
     val updatedAtMillis: Long,
     val documentFingerprintSha256: String?,
+    val documentFingerprintSizeBytes: Long?,
 )

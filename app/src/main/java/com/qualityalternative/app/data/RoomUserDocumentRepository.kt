@@ -15,6 +15,7 @@ import com.qualityalternative.app.domain.model.TopicTag
 import com.qualityalternative.app.domain.model.UserDocumentDraft
 import com.qualityalternative.app.domain.service.AddUserDocumentResult
 import com.qualityalternative.app.domain.service.UserDocumentRepository
+import java.io.InputStream
 import java.security.MessageDigest
 import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
@@ -62,8 +63,16 @@ class RoomUserDocumentRepository(
         val existing = dao.findByUri(normalizedUri)
         val createdAtMillis = existing?.createdAtMillis ?: nowMillis
         val displayName = draft.displayName.trim().ifBlank { draft.title.trim() }
-        val fingerprintSha256 = existing?.documentFingerprintSha256
-            ?: (bodyLoader as? UserDocumentFingerprintProvider)?.documentFingerprintSha256(normalizedUri)
+        val loadedFingerprint = if (
+            existing?.documentFingerprintSha256 != null &&
+            existing.documentFingerprintSizeBytes != null
+        ) {
+            null
+        } else {
+            (bodyLoader as? UserDocumentFingerprintProvider)?.documentFingerprint(normalizedUri)
+        }
+        val fingerprintSha256 = existing?.documentFingerprintSha256 ?: loadedFingerprint?.sha256
+        val fingerprintSizeBytes = existing?.documentFingerprintSizeBytes ?: loadedFingerprint?.sizeBytes
         val item = ContentItem(
             id = existing?.id ?: idProvider(),
             packId = USER_DOCUMENT_PACK_ID,
@@ -97,6 +106,7 @@ class RoomUserDocumentRepository(
             },
             addedAtMillis = createdAtMillis,
             documentFingerprintSha256 = fingerprintSha256,
+            documentFingerprintSizeBytes = fingerprintSizeBytes,
         )
 
         dao.insertOrReplace(
@@ -107,6 +117,7 @@ class RoomUserDocumentRepository(
                 createdAtMillis = createdAtMillis,
                 updatedAtMillis = nowMillis,
                 documentFingerprintSha256 = fingerprintSha256,
+                documentFingerprintSizeBytes = fingerprintSizeBytes,
             ),
         )
         documents.value = upsertUserDocumentForOptimisticState(documents.value, item)
@@ -168,6 +179,7 @@ class RoomUserDocumentRepository(
                     createdAtMillis = item.addedAtMillis ?: nowMillis,
                     updatedAtMillis = nowMillis,
                     documentFingerprintSha256 = item.verifiedDocumentFingerprintSha256(),
+                    documentFingerprintSizeBytes = item.verifiedDocumentFingerprintSizeBytes(),
                 ),
             )
         }
@@ -211,8 +223,13 @@ fun interface UserDocumentBodyLoader {
 }
 
 interface UserDocumentFingerprintProvider {
-    fun documentFingerprintSha256(uri: String): String?
+    fun documentFingerprint(uri: String): UserDocumentFingerprint?
 }
+
+data class UserDocumentFingerprint(
+    val sha256: String,
+    val sizeBytes: Long,
+)
 
 interface UserDocumentReaderDocumentLoader : UserDocumentBodyLoader {
     fun loadReaderDocument(uri: String, format: ContentFormat): ReaderDocument
@@ -245,20 +262,29 @@ class AndroidUserDocumentBodyLoader(
         }
     }
 
-    override fun documentFingerprintSha256(uri: String): String? {
+    override fun documentFingerprint(uri: String): UserDocumentFingerprint? {
         return runCatching {
             contentResolver.openInputStream(Uri.parse(uri))?.use { input ->
-                val digest = MessageDigest.getInstance("SHA-256")
-                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-                while (true) {
-                    val read = input.read(buffer)
-                    if (read <= 0) break
-                    digest.update(buffer, 0, read)
-                }
-                digest.digest().joinToString("") { byte -> "%02x".format(byte) }
+                input.toUserDocumentFingerprint()
             }
         }.getOrNull()
     }
+}
+
+private fun InputStream.toUserDocumentFingerprint(): UserDocumentFingerprint {
+    val digest = MessageDigest.getInstance("SHA-256")
+    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+    var sizeBytes = 0L
+    while (true) {
+        val read = read(buffer)
+        if (read <= 0) break
+        digest.update(buffer, 0, read)
+        sizeBytes += read.toLong()
+    }
+    return UserDocumentFingerprint(
+        sha256 = digest.digest().joinToString("") { byte -> "%02x".format(byte) },
+        sizeBytes = sizeBytes,
+    )
 }
 
 class UserDocumentBodyLoadException(
@@ -295,6 +321,7 @@ private fun UserDocumentEntity.toContentItem(): ContentItem {
         },
         addedAtMillis = createdAtMillis,
         documentFingerprintSha256 = documentFingerprintSha256,
+        documentFingerprintSizeBytes = documentFingerprintSizeBytes,
     )
 }
 
@@ -305,6 +332,7 @@ private fun ContentItem.toEntity(
     createdAtMillis: Long,
     updatedAtMillis: Long,
     documentFingerprintSha256: String?,
+    documentFingerprintSizeBytes: Long?,
 ): UserDocumentEntity {
     return UserDocumentEntity(
         id = id,
@@ -320,11 +348,15 @@ private fun ContentItem.toEntity(
         createdAtMillis = createdAtMillis,
         updatedAtMillis = updatedAtMillis,
         documentFingerprintSha256 = documentFingerprintSha256,
+        documentFingerprintSizeBytes = documentFingerprintSizeBytes,
     )
 }
 
 internal fun ContentItem.verifiedDocumentFingerprintSha256(): String? =
     documentFingerprintSha256?.takeIf { fingerprint -> fingerprint.matches(VerifiedDocumentFingerprintRegex) }
+
+internal fun ContentItem.verifiedDocumentFingerprintSizeBytes(): Long? =
+    documentFingerprintSizeBytes?.takeIf { size -> size >= 0L && verifiedDocumentFingerprintSha256() != null }
 
 private fun ContentFormat.usesPrivateReader(): Boolean = this == ContentFormat.MARKDOWN || this == ContentFormat.EPUB
 

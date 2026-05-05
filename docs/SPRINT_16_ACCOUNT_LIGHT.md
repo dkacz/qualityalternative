@@ -154,6 +154,8 @@ Deliverables:
 - R3 final release gate returned `SCORE: 8/10`, `VERDICT: FAIL`, `VISUAL REVIEW: PASS`; R1/R2 blockers and package hygiene were accepted as fixed, but release remained blocked by deterministic portable user-link/document ids and missing content-id-versus-secondary-key conflict enforcement before mutation.
 - R4 aligns generated user-link and user-document ids with random UUID v4 schema requirements, removes derived fallback portable ids from export, enforces `CONTENT_ID_SECONDARY_KEY_CONFLICT` before merge mutation, and only imports reading progress for actually accepted portable content ids.
 - R4 final release gate returned `SCORE: 7/10`, `VERDICT: FAIL`, `VISUAL REVIEW: PASS`; R5 maps same-URL link imports and verified-document-fingerprint imports to existing local content ids, warns when local library values are retained, preflights links and documents together before any mutation, migrates stored user-document fingerprints in Room schema v11, and refreshes stale visual tests for UUID user content ids plus Android Back-to-exit reader behavior.
+- R5 final release gate returned `SCORE: 8/10`, `VERDICT: FAIL`, `VISUAL REVIEW: PASS`; R6 exports verified `SHA256_BYTES` document fingerprints end to end by persisting local document byte size in Room schema v12, adds a cross-device export/import reconciliation test for document progress mapping, and fixes the review bundle to include `source/app/build.gradle.kts`.
+- R6 final release gate returned `SCORE: 10/10`, `VERDICT: PASS`, `VISUAL REVIEW: PASS`; Sprint 16 is approved for Android version bump, debug APK build/signature verification, and GitHub release.
 
 Review gate:
 

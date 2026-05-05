@@ -187,7 +187,12 @@ class RoomUserDocumentRepositoryTest {
                 dao = database.userDocumentDao(),
                 scope = appScope,
                 bodyLoader = FixedFingerprintBodyLoader(
-                    fingerprints = mapOf("content://quality/local-book" to sharedFingerprint),
+                    fingerprints = mapOf(
+                        "content://quality/local-book" to UserDocumentFingerprint(
+                            sha256 = sharedFingerprint,
+                            sizeBytes = 1_024L,
+                        ),
+                    ),
                 ),
                 idProvider = { "user-document-11111111-1111-4111-8111-111111111111" },
             )
@@ -224,6 +229,7 @@ class RoomUserDocumentRepositoryTest {
             assertEquals(local.id, afterMerge.id)
             assertEquals("Local book", afterMerge.title)
             assertEquals(ContentAvailability.AVAILABLE, afterMerge.availability)
+            assertEquals(1_024L, afterMerge.documentFingerprintSizeBytes)
         } finally {
             appScope.cancel()
             delay(100)
@@ -254,8 +260,14 @@ class RoomUserDocumentRepositoryTest {
                 scope = appScope,
                 bodyLoader = FixedFingerprintBodyLoader(
                     fingerprints = mapOf(
-                        "content://quality/first" to firstFingerprint,
-                        "content://quality/second" to secondFingerprint,
+                        "content://quality/first" to UserDocumentFingerprint(
+                            sha256 = firstFingerprint,
+                            sizeBytes = 1_111L,
+                        ),
+                        "content://quality/second" to UserDocumentFingerprint(
+                            sha256 = secondFingerprint,
+                            sizeBytes = 2_222L,
+                        ),
                     ),
                 ),
                 idProvider = { ids.removeFirst() },
@@ -664,14 +676,15 @@ class RoomUserDocumentRepositoryTest {
             ),
             addedAtMillis = 2_000L,
             documentFingerprintSha256 = fingerprintSha256,
+            documentFingerprintSizeBytes = 1_024L,
         )
     }
 
     private class FixedFingerprintBodyLoader(
-        private val fingerprints: Map<String, String>,
+        private val fingerprints: Map<String, UserDocumentFingerprint>,
     ) : UserDocumentBodyLoader, UserDocumentFingerprintProvider {
         override fun loadBody(uri: String, format: ContentFormat): String = "Private body"
 
-        override fun documentFingerprintSha256(uri: String): String? = fingerprints[uri]
+        override fun documentFingerprint(uri: String): UserDocumentFingerprint? = fingerprints[uri]
     }
 }
