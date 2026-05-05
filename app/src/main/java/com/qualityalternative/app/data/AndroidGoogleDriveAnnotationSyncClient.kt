@@ -14,7 +14,9 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 
-class AndroidGoogleDriveAnnotationSyncClient : ReadingAnnotationDriveSyncClient {
+class AndroidGoogleDriveAnnotationSyncClient(
+    private val endpoints: GoogleDriveAnnotationSyncEndpoints = GoogleDriveAnnotationSyncEndpoints(),
+) : ReadingAnnotationDriveSyncClient {
     override suspend fun syncJsonLdFiles(
         request: ReadingAnnotationDriveSyncRequest,
     ): ReadingAnnotationDriveSyncResult = withContext(Dispatchers.IO) {
@@ -52,7 +54,7 @@ class AndroidGoogleDriveAnnotationSyncClient : ReadingAnnotationDriveSyncClient 
         val response = requestJson(
             method = "GET",
             url = driveApiUrl(
-                "https://www.googleapis.com/drive/v3/files",
+                endpoints.filesUrl,
                 mapOf(
                     "q" to query,
                     "spaces" to "drive",
@@ -72,7 +74,7 @@ class AndroidGoogleDriveAnnotationSyncClient : ReadingAnnotationDriveSyncClient 
         val response = requestJson(
             method = "POST",
             url = driveApiUrl(
-                "https://www.googleapis.com/drive/v3/files",
+                endpoints.filesUrl,
                 mapOf("fields" to "id,name"),
             ),
             accessToken = accessToken,
@@ -99,9 +101,9 @@ class AndroidGoogleDriveAnnotationSyncClient : ReadingAnnotationDriveSyncClient 
         }
         val method = if (existingFileId == null) "POST" else "PATCH"
         val endpoint = if (existingFileId == null) {
-            "https://www.googleapis.com/upload/drive/v3/files"
+            endpoints.uploadFilesUrl
         } else {
-            "https://www.googleapis.com/upload/drive/v3/files/$existingFileId"
+            "${endpoints.uploadFilesUrl}/$existingFileId"
         }
         requestJson(
             method = method,
@@ -127,7 +129,7 @@ class AndroidGoogleDriveAnnotationSyncClient : ReadingAnnotationDriveSyncClient 
         val response = requestJson(
             method = "GET",
             url = driveApiUrl(
-                "https://www.googleapis.com/drive/v3/files",
+                endpoints.filesUrl,
                 mapOf(
                     "q" to query,
                     "spaces" to "drive",
@@ -191,6 +193,11 @@ class AndroidGoogleDriveAnnotationSyncClient : ReadingAnnotationDriveSyncClient 
         const val MULTIPART_BOUNDARY = "quality-alternative-drive-boundary"
     }
 }
+
+data class GoogleDriveAnnotationSyncEndpoints(
+    val filesUrl: String = "https://www.googleapis.com/drive/v3/files",
+    val uploadFilesUrl: String = "https://www.googleapis.com/upload/drive/v3/files",
+)
 
 private fun JSONArray.firstObjectId(): String? {
     if (length() == 0) return null

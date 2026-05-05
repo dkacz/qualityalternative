@@ -157,6 +157,8 @@ import com.google.android.gms.auth.api.identity.AuthorizationRequest
 import com.google.android.gms.auth.api.identity.AuthorizationResult
 import com.google.android.gms.auth.api.identity.Identity
 import com.google.android.gms.auth.api.identity.RevokeAccessRequest
+import com.google.android.gms.common.api.ApiException
+import com.google.android.gms.common.api.CommonStatusCodes
 import com.google.android.gms.common.api.Scope
 import java.time.Instant
 import java.time.LocalDate
@@ -328,7 +330,10 @@ private fun MainRoute(
     onExitToTarget: () -> Unit,
 ) {
     val context = LocalContext.current
-    val driveAuthorizationClient = remember(context) { Identity.getAuthorizationClient(context) }
+    val driveAuthorizationContext = context.findActivity() ?: context
+    val driveAuthorizationClient = remember(driveAuthorizationContext) {
+        Identity.getAuthorizationClient(driveAuthorizationContext)
+    }
     var driveSyncMode by remember { mutableStateOf(AnnotationDriveSyncMode.CONNECT) }
     fun handleDriveAuthorizationResult(result: AuthorizationResult) {
         val token = result.accessToken?.takeIf(String::isNotBlank)
@@ -346,8 +351,11 @@ private fun MainRoute(
     val driveAuthorizationLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartIntentSenderForResult(),
     ) { result ->
-        if (result.resultCode != Activity.RESULT_OK || result.data == null) {
-            viewModel.reportAnnotationDriveAuthorizationFailure("Google Drive authorization was cancelled.")
+        googleDriveAuthorizationMissingResultMessage(
+            resultCode = result.resultCode,
+            hasResultIntent = result.data != null,
+        )?.let { message ->
+            viewModel.reportAnnotationDriveAuthorizationFailure(message)
             return@rememberLauncherForActivityResult
         }
         runCatching {
@@ -6853,7 +6861,32 @@ private fun profileAutosaveStatusText(state: MainUiState): String {
     }
 }
 
-private fun Throwable.googleDriveAuthMessage(): String {
+internal fun googleDriveAuthorizationMissingResultMessage(resultCode: Int, hasResultIntent: Boolean): String? {
+    if (hasResultIntent) {
+        return null
+    }
+    return if (resultCode == Activity.RESULT_CANCELED) {
+        "Google Drive authorization was cancelled."
+    } else {
+        "Google Drive authorization returned no result. Retry Google Drive connection."
+    }
+}
+
+internal fun Throwable.googleDriveAuthMessage(): String {
+    val apiException = this as? ApiException
+    if (apiException != null) {
+        return when (apiException.statusCode) {
+            CommonStatusCodes.CANCELED -> "Google Drive authorization was cancelled."
+            CommonStatusCodes.NETWORK_ERROR,
+            CommonStatusCodes.TIMEOUT -> "Google Drive authorization could not reach Google services. Check connection and retry."
+            CommonStatusCodes.SIGN_IN_REQUIRED -> "Choose a Google account to connect Google Drive."
+            CommonStatusCodes.API_NOT_CONNECTED -> "Google Play services must be available and updated to connect Google Drive."
+            CommonStatusCodes.DEVELOPER_ERROR -> "Google Drive authorization is not configured for this app build."
+            CommonStatusCodes.INTERNAL_ERROR -> "Google Drive authorization hit a Google Play services error. Retry Google Drive connection."
+            else -> apiException.message?.takeIf(String::isNotBlank)
+                ?: "Google Drive authorization failed with ${CommonStatusCodes.getStatusCodeString(apiException.statusCode)}."
+        }
+    }
     return message?.takeIf(String::isNotBlank) ?: "Google Drive authorization failed."
 }
 

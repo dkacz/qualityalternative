@@ -80,8 +80,8 @@ class MainActivityTest {
         "sprint14-annotation-export-${System.currentTimeMillis()}"
     private val sprint14ReaderPaginationScreenshotDirName =
         "sprint14-reader-pagination-${System.currentTimeMillis()}"
-    private val sprint15DriveSyncScreenshotDirName =
-        "sprint15-drive-sync-${System.currentTimeMillis()}"
+    private val sprint17DriveAuthScreenshotDirName =
+        "sprint17-drive-auth-${System.currentTimeMillis()}"
     private val sprint16PortableProfileScreenshotDirName =
         "sprint16-portable-profile-${System.currentTimeMillis()}"
     private val sprint16ProfileAutosaveScreenshotDirName =
@@ -1271,7 +1271,7 @@ class MainActivityTest {
     }
 
     @Test
-    fun annotationDriveSyncSettingsShowsConnectAndRecoverableAuthFailure() {
+    fun annotationDriveSyncSettingsShowsConnectFailureConnectedAndRetryStates() {
         launchOnboardedApp()
         scenario?.onActivity { activity -> activity.mainViewModel.openSettings() }
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("settings-list") }
@@ -1281,22 +1281,87 @@ class MainActivityTest {
         composeRule.onNodeWithTag("settings-annotation-drive-status").assertIsDisplayed()
         composeRule.onNodeWithText("Connect").assertIsDisplayed()
         composeRule.onNodeWithTag("settings-annotation-drive-disconnect").assertIsNotEnabled()
-        captureSprint15DriveSyncScreenshot("01_drive_connect_light")
+        captureSprint17DriveAuthScreenshot("01_drive_connect_light")
 
         scenario?.onActivity { activity ->
             activity.mainViewModel.beginAnnotationDriveAuthorization()
-            activity.mainViewModel.reportAnnotationDriveAuthorizationFailure("Google Drive permission was not granted.")
         }
         composeRule.waitUntil(timeoutMillis = 10_000) {
-            hasNode("GOOGLE DRIVE PERMISSION WAS NOT GRANTED")
+            hasTag("settings-annotation-drive-progress")
+        }
+        captureSprint17DriveAuthScreenshot("02_drive_connecting_light")
+
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.reportAnnotationDriveAuthorizationFailure(
+                "Google Drive authorization returned no result. Retry Google Drive connection.",
+            )
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            var hasFailure = false
+            scenario?.onActivity { activity ->
+                hasFailure = activity.mainViewModel.uiState.annotationDriveLastError ==
+                    "Google Drive authorization returned no result. Retry Google Drive connection."
+            }
+            hasFailure
         }
         composeRule.onNodeWithTag("settings-list")
             .performScrollToNode(hasTestTag("settings-annotation-drive-status"))
-        composeRule.onNodeWithText("GOOGLE DRIVE PERMISSION WAS NOT GRANTED", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("AUTHORIZATION RETURNED NO RESULT", substring = true).assertIsDisplayed()
         composeRule.onNodeWithTag("settings-annotation-drive-connect").assertIsEnabled()
         scenario?.onActivity { activity -> activity.mainViewModel.dismissMessage() }
         composeRule.waitForIdle()
-        captureSprint15DriveSyncScreenshot("02_drive_auth_failure_light")
+        captureSprint17DriveAuthScreenshot("03_drive_auth_failure_light")
+
+        scenario?.onActivity { activity ->
+            runBlocking {
+                (activity.application as QualityAlternativeApplication)
+                    .appContainer
+                    .settingsRepository
+                    .saveAnnotationDriveSyncSuccess(
+                        timestampMillis = 25_000L,
+                        folderId = "qa-drive-folder",
+                    )
+            }
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            var hasConnected = false
+            scenario?.onActivity { activity ->
+                hasConnected = activity.mainViewModel.uiState.annotationDriveSyncEnabled &&
+                    activity.mainViewModel.uiState.annotationDriveLastSuccessfulAtMillis == 25_000L &&
+                    activity.mainViewModel.uiState.annotationDriveLastError == null
+            }
+            hasConnected
+        }
+        composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasTestTag("settings-annotation-drive-status"))
+        composeRule.onNodeWithText("Google Drive connected").assertIsDisplayed()
+        composeRule.onNodeWithText("LAST SYNCED JAN 1", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithTag("settings-annotation-drive-sync-now").assertIsEnabled()
+        composeRule.onNodeWithTag("settings-annotation-drive-disconnect").assertIsEnabled()
+        captureSprint17DriveAuthScreenshot("04_drive_connected_light")
+
+        scenario?.onActivity { activity ->
+            runBlocking {
+                (activity.application as QualityAlternativeApplication)
+                    .appContainer
+                    .settingsRepository
+                    .saveAnnotationDriveSyncFailure("Google Drive sync failed. Retry from Settings.")
+            }
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            var hasFailure = false
+            scenario?.onActivity { activity ->
+                hasFailure = activity.mainViewModel.uiState.annotationDriveLastError ==
+                    "Google Drive sync failed. Retry from Settings."
+            }
+            hasFailure
+        }
+        composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasTestTag("settings-annotation-drive-status"))
+        composeRule.onNodeWithText("GOOGLE DRIVE SYNC FAILED", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithTag("settings-annotation-drive-sync-now").assertIsEnabled()
+        composeRule.onNodeWithText("Retry").assertIsDisplayed()
+        captureSprint17DriveAuthScreenshot("05_drive_retry_light")
     }
 
     @Test
@@ -2641,8 +2706,8 @@ class MainActivityTest {
         assertTrue("Expected screenshot file for $name", output.exists() && output.length() > 0L)
     }
 
-    private fun captureSprint15DriveSyncScreenshot(name: String) {
-        val outputDir = File("/sdcard/Download/qualityalternative/$sprint15DriveSyncScreenshotDirName")
+    private fun captureSprint17DriveAuthScreenshot(name: String) {
+        val outputDir = File("/sdcard/Download/qualityalternative/$sprint17DriveAuthScreenshotDirName")
         assertTrue("Expected screenshot output directory for $name", outputDir.mkdirs() || outputDir.exists())
         composeRule.waitForIdle()
         Thread.sleep(300)
