@@ -69,6 +69,9 @@ class AppContainer(context: Context) {
     val readingAnnotationExportWriter: ReadingAnnotationExportWriter = AndroidReadingAnnotationExportWriter(
         context = context,
     )
+    val accountLightProfileAutosaveWriter = AndroidAccountLightProfileAutosaveWriter(
+        context = context,
+    )
     val readingAnnotationDriveSyncClient: ReadingAnnotationDriveSyncClient = AndroidGoogleDriveAnnotationSyncClient()
     val readingAnnotationDriveTokenProvider: ReadingAnnotationDriveTokenProvider = AndroidGoogleDriveTokenProvider(
         context = context,

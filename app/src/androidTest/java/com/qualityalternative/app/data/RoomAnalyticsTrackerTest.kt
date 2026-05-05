@@ -716,6 +716,10 @@ class RoomAnalyticsTrackerTest {
                 annotationDriveFolderId = state.value.annotationDriveFolderId,
                 annotationDriveLastSuccessfulAtMillis = state.value.annotationDriveLastSuccessfulAtMillis,
                 annotationDriveLastError = state.value.annotationDriveLastError,
+                profileAutosaveUri = state.value.profileAutosaveUri,
+                profileAutosaveDisplayName = state.value.profileAutosaveDisplayName,
+                profileAutosaveLastSuccessfulAtMillis = state.value.profileAutosaveLastSuccessfulAtMillis,
+                profileAutosaveLastError = state.value.profileAutosaveLastError,
             )
         }
 
@@ -814,6 +818,35 @@ class RoomAnalyticsTrackerTest {
             state.value = state.value.copy(
                 annotationDriveLastError = errorMessage,
             )
+        }
+
+        override suspend fun saveProfileAutosaveDestination(uri: String, displayName: String) {
+            state.value = state.value.copy(
+                profileAutosaveUri = uri,
+                profileAutosaveDisplayName = displayName,
+                profileAutosaveLastSuccessfulAtMillis = null,
+                profileAutosaveLastError = null,
+            )
+        }
+
+        override suspend fun clearProfileAutosaveDestination() {
+            state.value = state.value.copy(
+                profileAutosaveUri = null,
+                profileAutosaveDisplayName = null,
+                profileAutosaveLastSuccessfulAtMillis = null,
+                profileAutosaveLastError = null,
+            )
+        }
+
+        override suspend fun saveProfileAutosaveSuccess(timestampMillis: Long) {
+            state.value = state.value.copy(
+                profileAutosaveLastSuccessfulAtMillis = timestampMillis,
+                profileAutosaveLastError = null,
+            )
+        }
+
+        override suspend fun saveProfileAutosaveFailure(errorMessage: String) {
+            state.value = state.value.copy(profileAutosaveLastError = errorMessage)
         }
     }
 

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.qualityalternative.app.data.PreferencesSettingsRepositoryTest" tests="15" skipped="0" failures="0" errors="0" timestamp="2026-05-05T05:19:01.320Z" hostname="mac-studio.home" time="0.039">
+  <properties/>
+  <testcase name="saveOnboardingSelection_persistsAndRestoresSettings" classname="com.qualityalternative.app.data.PreferencesSettingsRepositoryTest" time="0.003"/>
+  <testcase name="saveReaderFontScale_persistsRoundedPortableValue" classname="com.qualityalternative.app.data.PreferencesSettingsRepositoryTest" time="0.001"/>
+  <testcase name="saveMeditationDuration_persistsWithoutResettingOnboarding" classname="com.qualityalternative.app.data.PreferencesSettingsRepositoryTest" time="0.002"/>
+  <testcase name="saveOpenAnywayUnlockMinutes_persistsWithoutResettingOnboarding" classname="com.qualityalternative.app.data.PreferencesSettingsRepositoryTest" time="0.002"/>
+  <testcase name="saveSettingsUpdates_persistWithoutResettingOnboarding" classname="com.qualityalternative.app.data.PreferencesSettingsRepositoryTest" time="0.003"/>
+  <testcase name="ensureLocalProfileIdentity_createsAndReusesPortableProfileId" classname="com.qualityalternative.app.data.PreferencesSettingsRepositoryTest" time="0.002"/>
+  <testcase name="saveAnnotationDriveSyncSettings_persistsConnectionStatusAndFailure" classname="com.qualityalternative.app.data.PreferencesSettingsRepositoryTest" time="0.005"/>
+  <testcase name="saveProfileAutosaveSettings_persistsStatusAndClearsFailureOnSuccess" classname="com.qualityalternative.app.data.PreferencesSettingsRepositoryTest" time="0.006"/>
+  <testcase name="saveReactivatedCompletedContentIds_persistsWithoutResettingOnboarding" classname="com.qualityalternative.app.data.PreferencesSettingsRepositoryTest" time="0.002"/>
+  <testcase name="saveAnnotationExportSettings_persistsStatusAndClearsFailureOnSuccess" classname="com.qualityalternative.app.data.PreferencesSettingsRepositoryTest" time="0.003"/>
+  <testcase name="saveThemeMode_persistsWithoutResettingOnboarding" classname="com.qualityalternative.app.data.PreferencesSettingsRepositoryTest" time="0.002"/>
+  <testcase name="savePriorityContentIds_persistsWithoutResettingOnboarding" classname="com.qualityalternative.app.data.PreferencesSettingsRepositoryTest" time="0.003"/>
+  <testcase name="saveReaderFontScale_clampsToPortableRange" classname="com.qualityalternative.app.data.PreferencesSettingsRepositoryTest" time="0.001"/>
+  <testcase name="observeAppSettings_mapsLegacyInkThemeToDark" classname="com.qualityalternative.app.data.PreferencesSettingsRepositoryTest" time="0.002"/>
+  <testcase name="saveContentPriority_persistsWithoutResettingOnboarding" classname="com.qualityalternative.app.data.PreferencesSettingsRepositoryTest" time="0.002"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

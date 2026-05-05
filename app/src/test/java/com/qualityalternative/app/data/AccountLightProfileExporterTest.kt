@@ -63,6 +63,11 @@ class AccountLightProfileExporterTest {
             timestampMillis = 13_000L,
             folderId = "raw-drive-folder-id",
         )
+        repository.saveProfileAutosaveDestination(
+            uri = "content://tree/raw-profile-folder-id",
+            displayName = "QA profile",
+        )
+        repository.saveProfileAutosaveSuccess(14_000L)
 
         val exporter = AccountLightProfileExporter(
             settingsRepository = repository,
@@ -110,12 +115,15 @@ class AccountLightProfileExporterTest {
         assertEquals(true, profile.annotations.driveSync.wasEnabledOnSourceDevice)
         assertNull(profile.annotations.driveSync.folderDisplayName)
         assertEquals(13_000L, profile.annotations.driveSync.lastSuccessfulAtMillis)
-        assertEquals("NONE", profile.sync.profileAutosave.provider)
+        assertEquals("ANDROID_DOCUMENT_TREE", profile.sync.profileAutosave.provider)
+        assertEquals("QA profile", profile.sync.profileAutosave.destinationDisplayName)
+        assertEquals(14_000L, profile.sync.profileAutosave.lastSuccessfulAtMillis)
         assertEquals("REQUIRES_LOCAL_SELECTION", profile.sync.profileAutosave.activationStateOnImport)
         assertEquals(emptyList<AccountLightWarning>(), profile.warnings)
 
         assertFalse(rawJson.contains("content://"))
         assertFalse(rawJson.contains("raw-drive-folder-id"))
+        assertFalse(rawJson.contains("raw-profile-folder-id"))
         assertFalse(rawJson.contains("Drive write unavailable"))
         assertFalse(rawJson.contains("token", ignoreCase = true))
         assertFalse(rawJson.contains("oauth", ignoreCase = true))

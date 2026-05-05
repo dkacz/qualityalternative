@@ -135,6 +135,14 @@ interface SettingsRepository {
     suspend fun clearAnnotationDriveSyncConnection()
     suspend fun saveAnnotationDriveSyncSuccess(timestampMillis: Long, folderId: String)
     suspend fun saveAnnotationDriveSyncFailure(errorMessage: String)
+    suspend fun saveProfileAutosaveDestination(uri: String, displayName: String)
+    suspend fun clearProfileAutosaveDestination()
+    suspend fun saveProfileAutosaveSuccess(timestampMillis: Long)
+    suspend fun saveProfileAutosaveFailure(errorMessage: String)
+}
+
+interface AccountLightProfileAutosaveWriter {
+    suspend fun writeProfileJson(uri: String, fileName: String, json: String)
 }
 
 interface RecommendationEngine {

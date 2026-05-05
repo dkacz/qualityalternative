@@ -1,0 +1,1831 @@
+diff --git a/app/src/androidTest/AndroidManifest.xml b/app/src/androidTest/AndroidManifest.xml
+new file mode 100644
+index 0000000..4d12d01
+--- /dev/null
++++ b/app/src/androidTest/AndroidManifest.xml
+@@ -0,0 +1,12 @@
++<?xml version="1.0" encoding="utf-8"?>
++<manifest xmlns:android="http://schemas.android.com/apk/res/android">
++
++    <application>
++        <provider
++            android:name="com.qualityalternative.app.data.TestProfileDocumentsProvider"
++            android:authorities="com.qualityalternative.app.test.profiledocs"
++            android:exported="true"
++            android:grantUriPermissions="true" />
++    </application>
++
++</manifest>
+diff --git a/app/src/androidTest/java/com/qualityalternative/app/MainActivityTest.kt b/app/src/androidTest/java/com/qualityalternative/app/MainActivityTest.kt
+index d378d03..dc426cf 100644
+--- a/app/src/androidTest/java/com/qualityalternative/app/MainActivityTest.kt
++++ b/app/src/androidTest/java/com/qualityalternative/app/MainActivityTest.kt
+@@ -81,6 +81,8 @@ class MainActivityTest {
+         "sprint15-drive-sync-${System.currentTimeMillis()}"
+     private val sprint16PortableProfileScreenshotDirName =
+         "sprint16-portable-profile-${System.currentTimeMillis()}"
++    private val sprint16ProfileAutosaveScreenshotDirName =
++        "sprint16-profile-autosave-${System.currentTimeMillis()}"
+ 
+     @Before
+     fun resetAppState() {
+@@ -1188,6 +1190,63 @@ class MainActivityTest {
+         captureSprint16PortableProfileScreenshot("06_future_schema_import_dark")
+     }
+ 
++    @Test
++    fun accountLightProfileAutosaveSettingsShowsDestinationSuccessAndRecoverableFailure() {
++        launchOnboardedApp()
++        scenario?.onActivity { activity -> activity.mainViewModel.openSettings() }
++        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("settings-list") }
++
++        scrollToAccountLightSettings()
++        composeRule.onNodeWithTag("settings-account-light-autosave-status").assertIsDisplayed()
++        composeRule.onNodeWithText("No autosave folder selected").assertIsDisplayed()
++        composeRule.onNodeWithTag("settings-account-light-autosave-pick").assertIsDisplayed()
++        composeRule.onNodeWithTag("settings-account-light-autosave-save-now").assertIsNotEnabled()
++        captureSprint16ProfileAutosaveScreenshot("01_profile_autosave_empty_light")
++
++        val context = InstrumentationRegistry.getInstrumentation().targetContext
++        val autosaveDir = File(context.filesDir, "profile-autosave-e2e").apply {
++            deleteRecursively()
++            mkdirs()
++        }
++        val autosaveFile = File(autosaveDir, "quality-alternative-profile.json")
++        scenario?.onActivity { activity ->
++            activity.mainViewModel.configureAccountLightProfileAutosave(
++                uri = Uri.fromFile(autosaveDir).toString(),
++                displayName = "QA portable profile",
++                nowMillis = 21_000L,
++            )
++        }
++        composeRule.waitUntil(timeoutMillis = 10_000) {
++            autosaveFile.exists() && hasProfileAutosaveSuccess()
++        }
++        scrollToAccountLightSettings()
++        composeRule.onNodeWithText("QA portable profile").assertIsDisplayed()
++        composeRule.onNodeWithTag("settings-account-light-autosave-status").assertIsDisplayed()
++        composeRule.onNodeWithTag("settings-account-light-autosave-save-now").assertIsEnabled()
++        composeRule.onNodeWithTag("settings-account-light-autosave-clear").assertIsDisplayed()
++        assertTrue(autosaveFile.readText().contains("\"profileAutosave\""))
++        scenario?.onActivity { activity -> activity.mainViewModel.dismissMessage() }
++        composeRule.waitForIdle()
++        captureSprint16ProfileAutosaveScreenshot("02_profile_autosave_success_light")
++
++        scenario?.onActivity { activity ->
++            activity.mainViewModel.configureAccountLightProfileAutosave(
++                uri = "content://com.qualityalternative.missing/profile-autosave",
++                displayName = "Missing profile folder",
++                nowMillis = 22_000L,
++            )
++            activity.mainViewModel.selectThemeMode(AppThemeMode.DARK)
++        }
++        composeRule.waitUntil(timeoutMillis = 10_000) { hasProfileAutosaveFailure() }
++        scrollToAccountLightSettings()
++        composeRule.onNodeWithText("Missing profile folder").assertIsDisplayed()
++        composeRule.onNodeWithText("AUTOSAVE FAILED", substring = true).assertIsDisplayed()
++        composeRule.onNodeWithTag("settings-account-light-autosave-retry").assertIsDisplayed()
++        scenario?.onActivity { activity -> activity.mainViewModel.dismissMessage() }
++        composeRule.waitForIdle()
++        captureSprint16ProfileAutosaveScreenshot("03_profile_autosave_failure_dark")
++    }
++
+     @Test
+     fun meditationAlternativeOpensThreeMinuteTimer() {
+         launchMeditationFixtureSystemIntervention()
+@@ -1712,6 +1771,23 @@ class MainActivityTest {
+         return hasFailure
+     }
+ 
++    private fun hasProfileAutosaveSuccess(): Boolean {
++        var hasSuccess = false
++        scenario?.onActivity { activity ->
++            hasSuccess = activity.mainViewModel.uiState.profileAutosaveLastSuccessfulAtMillis != null &&
++                activity.mainViewModel.uiState.profileAutosaveLastError == null
++        }
++        return hasSuccess
++    }
++
++    private fun hasProfileAutosaveFailure(): Boolean {
++        var hasFailure = false
++        scenario?.onActivity { activity ->
++            hasFailure = !activity.mainViewModel.uiState.profileAutosaveLastError.isNullOrBlank()
++        }
++        return hasFailure
++    }
++
+     private fun openAddLinkFromHome() {
+         composeRule.onNodeWithTag("home-list")
+             .performScrollToNode(hasTestTag("home-add-link"))
+@@ -2204,6 +2280,16 @@ class MainActivityTest {
+         assertTrue("Expected screenshot file for $name", output.exists() && output.length() > 0L)
+     }
+ 
++    private fun captureSprint16ProfileAutosaveScreenshot(name: String) {
++        val outputDir = File("/sdcard/Download/qualityalternative/$sprint16ProfileAutosaveScreenshotDirName")
++        assertTrue("Expected screenshot output directory for $name", outputDir.mkdirs() || outputDir.exists())
++        composeRule.waitForIdle()
++        Thread.sleep(300)
++        val output = File(outputDir, "$name.png")
++        assertTrue("Expected screenshot capture for $name", UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).takeScreenshot(output))
++        assertTrue("Expected screenshot file for $name", output.exists() && output.length() > 0L)
++    }
++
+     private fun assertHomeHeroIsDisplayed() {
+         composeRule.waitUntil(timeoutMillis = 10_000) {
+             hasNode("You're set up for quieter reading today.") || hasNode("Finish setup to intercept distracting apps.")
+diff --git a/app/src/androidTest/java/com/qualityalternative/app/data/AndroidAccountLightProfileAutosaveWriterTest.kt b/app/src/androidTest/java/com/qualityalternative/app/data/AndroidAccountLightProfileAutosaveWriterTest.kt
+new file mode 100644
+index 0000000..84efb13
+--- /dev/null
++++ b/app/src/androidTest/java/com/qualityalternative/app/data/AndroidAccountLightProfileAutosaveWriterTest.kt
+@@ -0,0 +1,78 @@
++package com.qualityalternative.app.data
++
++import android.provider.DocumentsContract
++import androidx.test.ext.junit.runners.AndroidJUnit4
++import androidx.test.platform.app.InstrumentationRegistry
++import java.io.InputStreamReader
++import kotlinx.coroutines.runBlocking
++import org.junit.Assert.assertEquals
++import org.junit.Test
++import org.junit.runner.RunWith
++
++@RunWith(AndroidJUnit4::class)
++class AndroidAccountLightProfileAutosaveWriterTest {
++    @Test
++    fun writesAndRewritesProfileJsonThroughDocumentTreeUri() = runBlocking {
++        val instrumentation = InstrumentationRegistry.getInstrumentation()
++        val targetContext = instrumentation.targetContext
++        val writer = AndroidAccountLightProfileAutosaveWriter(targetContext)
++        val treeUri = DocumentsContract.buildTreeDocumentUri(
++            TestProfileDocumentsProvider.AUTHORITY,
++            TestProfileDocumentsProvider.ROOT_ID,
++        )
++
++        writer.writeProfileJson(
++            uri = treeUri.toString(),
++            fileName = ACCOUNT_LIGHT_PROFILE_FILE_NAME,
++            json = """{"schemaVersion":1}""",
++        )
++
++        assertEquals(
++            """{"schemaVersion":1}""",
++            targetContext.readProfileJson(treeUri),
++        )
++
++        writer.writeProfileJson(
++            uri = treeUri.toString(),
++            fileName = ACCOUNT_LIGHT_PROFILE_FILE_NAME,
++            json = """{"schemaVersion":2}""",
++        )
++
++        assertEquals(listOf(ACCOUNT_LIGHT_PROFILE_FILE_NAME), targetContext.profileDocumentNames(treeUri))
++        assertEquals(
++            """{"schemaVersion":2}""",
++            targetContext.readProfileJson(treeUri),
++        )
++    }
++
++    private fun android.content.Context.readProfileJson(treeUri: android.net.Uri): String {
++        val documentUri = DocumentsContract.buildDocumentUriUsingTree(
++            treeUri,
++            ACCOUNT_LIGHT_PROFILE_FILE_NAME,
++        )
++        return contentResolver.openInputStream(documentUri)?.use { stream ->
++            InputStreamReader(stream, Charsets.UTF_8).readText()
++        } ?: error("Profile document could not be opened for readback.")
++    }
++
++    private fun android.content.Context.profileDocumentNames(treeUri: android.net.Uri): List<String> {
++        val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(
++            treeUri,
++            DocumentsContract.getTreeDocumentId(treeUri),
++        )
++        return contentResolver.query(
++            childrenUri,
++            arrayOf(DocumentsContract.Document.COLUMN_DISPLAY_NAME),
++            null,
++            null,
++            null,
++        )?.use { cursor ->
++            val nameIndex = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
++            buildList {
++                while (cursor.moveToNext()) {
++                    add(cursor.getString(nameIndex))
++                }
++            }
++        }.orEmpty().sorted()
++    }
++}
+diff --git a/app/src/androidTest/java/com/qualityalternative/app/data/RoomAnalyticsTrackerTest.kt b/app/src/androidTest/java/com/qualityalternative/app/data/RoomAnalyticsTrackerTest.kt
+index a447d1d..a08d402 100644
+--- a/app/src/androidTest/java/com/qualityalternative/app/data/RoomAnalyticsTrackerTest.kt
++++ b/app/src/androidTest/java/com/qualityalternative/app/data/RoomAnalyticsTrackerTest.kt
+@@ -716,6 +716,10 @@ class RoomAnalyticsTrackerTest {
+                 annotationDriveFolderId = state.value.annotationDriveFolderId,
+                 annotationDriveLastSuccessfulAtMillis = state.value.annotationDriveLastSuccessfulAtMillis,
+                 annotationDriveLastError = state.value.annotationDriveLastError,
++                profileAutosaveUri = state.value.profileAutosaveUri,
++                profileAutosaveDisplayName = state.value.profileAutosaveDisplayName,
++                profileAutosaveLastSuccessfulAtMillis = state.value.profileAutosaveLastSuccessfulAtMillis,
++                profileAutosaveLastError = state.value.profileAutosaveLastError,
+             )
+         }
+ 
+@@ -815,6 +819,35 @@ class RoomAnalyticsTrackerTest {
+                 annotationDriveLastError = errorMessage,
+             )
+         }
++
++        override suspend fun saveProfileAutosaveDestination(uri: String, displayName: String) {
++            state.value = state.value.copy(
++                profileAutosaveUri = uri,
++                profileAutosaveDisplayName = displayName,
++                profileAutosaveLastSuccessfulAtMillis = null,
++                profileAutosaveLastError = null,
++            )
++        }
++
++        override suspend fun clearProfileAutosaveDestination() {
++            state.value = state.value.copy(
++                profileAutosaveUri = null,
++                profileAutosaveDisplayName = null,
++                profileAutosaveLastSuccessfulAtMillis = null,
++                profileAutosaveLastError = null,
++            )
++        }
++
++        override suspend fun saveProfileAutosaveSuccess(timestampMillis: Long) {
++            state.value = state.value.copy(
++                profileAutosaveLastSuccessfulAtMillis = timestampMillis,
++                profileAutosaveLastError = null,
++            )
++        }
++
++        override suspend fun saveProfileAutosaveFailure(errorMessage: String) {
++            state.value = state.value.copy(profileAutosaveLastError = errorMessage)
++        }
+     }
+ 
+     private class AndroidHistoryRepository : HistoryRepository {
+diff --git a/app/src/androidTest/java/com/qualityalternative/app/data/TestProfileDocumentsProvider.java b/app/src/androidTest/java/com/qualityalternative/app/data/TestProfileDocumentsProvider.java
+new file mode 100644
+index 0000000..1a23475
+--- /dev/null
++++ b/app/src/androidTest/java/com/qualityalternative/app/data/TestProfileDocumentsProvider.java
+@@ -0,0 +1,189 @@
++package com.qualityalternative.app.data;
++
++import android.content.ContentProvider;
++import android.content.ContentValues;
++import android.content.Context;
++import android.database.Cursor;
++import android.database.MatrixCursor;
++import android.net.Uri;
++import android.os.Bundle;
++import android.os.ParcelFileDescriptor;
++import android.provider.DocumentsContract;
++
++import java.io.File;
++import java.io.FileNotFoundException;
++import java.io.IOException;
++import java.nio.charset.StandardCharsets;
++import java.nio.file.Files;
++import java.util.Arrays;
++import java.util.Collections;
++import java.util.List;
++
++public final class TestProfileDocumentsProvider extends ContentProvider {
++    public static final String AUTHORITY = "com.qualityalternative.app.test.profiledocs";
++    public static final String ROOT_ID = "root";
++
++    private static final String[] DOCUMENT_COLUMNS = new String[] {
++        DocumentsContract.Document.COLUMN_DOCUMENT_ID,
++        DocumentsContract.Document.COLUMN_DISPLAY_NAME,
++        DocumentsContract.Document.COLUMN_MIME_TYPE,
++        DocumentsContract.Document.COLUMN_FLAGS,
++        DocumentsContract.Document.COLUMN_SIZE,
++    };
++
++    @Override
++    public boolean onCreate() {
++        return true;
++    }
++
++    @Override
++    public Cursor query(
++        Uri uri,
++        String[] projection,
++        String selection,
++        String[] selectionArgs,
++        String sortOrder
++    ) {
++        MatrixCursor cursor = new MatrixCursor(projection != null ? projection : DOCUMENT_COLUMNS);
++        List<String> segments = uri.getPathSegments();
++        if (!segments.isEmpty() && "children".equals(segments.get(segments.size() - 1))) {
++            File[] files = storageDir(attachedContext()).listFiles();
++            if (files != null) {
++                Arrays.sort(files, (left, right) -> left.getName().compareTo(right.getName()));
++                for (File file : files) {
++                    addDocumentRow(cursor, file.getName());
++                }
++            }
++        } else {
++            addDocumentRow(cursor, DocumentsContract.getDocumentId(uri));
++        }
++        return cursor;
++    }
++
++    @Override
++    public String getType(Uri uri) {
++        return ROOT_ID.equals(DocumentsContract.getDocumentId(uri))
++            ? DocumentsContract.Document.MIME_TYPE_DIR
++            : "application/json";
++    }
++
++    @Override
++    public ParcelFileDescriptor openFile(Uri uri, String mode) throws FileNotFoundException {
++        File file = documentFile(attachedContext(), DocumentsContract.getDocumentId(uri));
++        int accessMode = mode.contains("w")
++            ? ParcelFileDescriptor.MODE_CREATE | ParcelFileDescriptor.MODE_WRITE_ONLY | ParcelFileDescriptor.MODE_TRUNCATE
++            : ParcelFileDescriptor.MODE_READ_ONLY;
++        return ParcelFileDescriptor.open(file, accessMode);
++    }
++
++    @Override
++    public Bundle call(String method, String arg, Bundle extras) {
++        if (!method.endsWith("createDocument")) {
++            return super.call(method, arg, extras);
++        }
++        String displayName = extras != null ? extras.getString("displayName") : null;
++        if ((displayName == null || displayName.trim().isEmpty()) && extras != null) {
++            displayName = extras.getString(DocumentsContract.Document.COLUMN_DISPLAY_NAME);
++        }
++        if (displayName == null || displayName.trim().isEmpty()) {
++            throw new IllegalStateException("Missing displayName for test document creation.");
++        }
++        File file = documentFile(attachedContext(), displayName);
++        File parent = file.getParentFile();
++        if (parent != null) {
++            parent.mkdirs();
++        }
++        try {
++            if (!file.exists()) {
++                file.createNewFile();
++            }
++        } catch (IOException exception) {
++            throw new IllegalStateException("Could not create test document.", exception);
++        }
++
++        Bundle out = new Bundle();
++        out.putParcelable(
++            "uri",
++            DocumentsContract.buildDocumentUriUsingTree(
++                DocumentsContract.buildTreeDocumentUri(AUTHORITY, ROOT_ID),
++                displayName
++            )
++        );
++        return out;
++    }
++
++    @Override
++    public Uri insert(Uri uri, ContentValues values) {
++        return null;
++    }
++
++    @Override
++    public int delete(Uri uri, String selection, String[] selectionArgs) {
++        return 0;
++    }
++
++    @Override
++    public int update(Uri uri, ContentValues values, String selection, String[] selectionArgs) {
++        return 0;
++    }
++
++    public static void reset(Context context) {
++        deleteRecursively(storageDir(context));
++        storageDir(context).mkdirs();
++    }
++
++    public static String readDocument(Context context, String fileName) throws IOException {
++        return new String(Files.readAllBytes(documentFile(context, fileName).toPath()), StandardCharsets.UTF_8);
++    }
++
++    public static List<String> documentNames(Context context) {
++        String[] names = storageDir(context).list();
++        if (names == null) {
++            return Collections.emptyList();
++        }
++        Arrays.sort(names);
++        return Arrays.asList(names);
++    }
++
++    private void addDocumentRow(MatrixCursor cursor, String documentId) {
++        File file = documentFile(attachedContext(), documentId);
++        cursor.newRow()
++            .add(DocumentsContract.Document.COLUMN_DOCUMENT_ID, documentId)
++            .add(DocumentsContract.Document.COLUMN_DISPLAY_NAME, ROOT_ID.equals(documentId) ? "root" : documentId)
++            .add(
++                DocumentsContract.Document.COLUMN_MIME_TYPE,
++                ROOT_ID.equals(documentId) ? DocumentsContract.Document.MIME_TYPE_DIR : "application/json"
++            )
++            .add(DocumentsContract.Document.COLUMN_FLAGS, DocumentsContract.Document.FLAG_SUPPORTS_WRITE)
++            .add(DocumentsContract.Document.COLUMN_SIZE, file.exists() ? file.length() : 0L);
++    }
++
++    private Context attachedContext() {
++        Context current = getContext();
++        if (current == null) {
++            throw new IllegalStateException("Provider context is not attached.");
++        }
++        return current;
++    }
++
++    private static File storageDir(Context context) {
++        return new File(context.getCacheDir(), "test-profile-documents");
++    }
++
++    private static File documentFile(Context context, String fileName) {
++        return new File(storageDir(context), fileName);
++    }
++
++    private static void deleteRecursively(File file) {
++        if (!file.exists()) {
++            return;
++        }
++        File[] children = file.listFiles();
++        if (children != null) {
++            for (File child : children) {
++                deleteRecursively(child);
++            }
++        }
++        file.delete();
++    }
++}
+diff --git a/app/src/main/java/com/qualityalternative/app/data/AccountLightProfile.kt b/app/src/main/java/com/qualityalternative/app/data/AccountLightProfile.kt
+index b9c7896..06607d8 100644
+--- a/app/src/main/java/com/qualityalternative/app/data/AccountLightProfile.kt
++++ b/app/src/main/java/com/qualityalternative/app/data/AccountLightProfile.kt
+@@ -508,6 +508,7 @@ class AccountLightProfileExporter(
+             ),
+             reading = AccountLightReading(progress = portableProgress),
+             annotations = settings.toAccountLightAnnotations(),
++            sync = settings.toAccountLightSync(),
+             warnings = settings.toAccountLightWarnings(
+                 contentIdMapping = contentIdMapping,
+                 omittedPortableUserContentIds = omittedPortableUserContentIds,
+@@ -1549,6 +1550,19 @@ private fun AppSettings.toAccountLightAnnotations(): AccountLightAnnotations {
+     )
+ }
+ 
++private fun AppSettings.toAccountLightSync(): AccountLightSync {
++    val hasLocalProfileAutosave = !profileAutosaveUri.isNullOrBlank()
++    return AccountLightSync(
++        profileAutosave = AccountLightProfileAutosave(
++            provider = if (hasLocalProfileAutosave) "ANDROID_DOCUMENT_TREE" else "NONE",
++            destinationDisplayName = profileAutosaveDisplayName.toPortableDisplayNameOrNull(),
++            lastSuccessfulAtMillis = profileAutosaveLastSuccessfulAtMillis,
++            activationStateOnImport = "REQUIRES_LOCAL_SELECTION",
++        ),
++    )
++}
++
++
+ private fun AppSettings.toAccountLightWarnings(
+     contentIdMapping: Map<String, String> = emptyMap(),
+     omittedPortableUserContentIds: Set<String> = emptySet(),
+@@ -1576,6 +1590,16 @@ private fun AppSettings.toAccountLightWarnings(
+                 ),
+             )
+         }
++        if (!profileAutosaveDisplayName.isNullOrBlank() && profileAutosaveDisplayName.toPortableDisplayNameOrNull() == null) {
++            add(
++                AccountLightWarning(
++                    code = "CONFLICT_RETAINED_LOCAL_VALUE",
++                    severity = "WARNING",
++                    section = "sync",
++                    message = "A stored profile autosave display name was omitted because it is not portable.",
++                ),
++            )
++        }
+     }
+ }
+ 
+diff --git a/app/src/main/java/com/qualityalternative/app/data/AndroidAccountLightProfileAutosaveWriter.kt b/app/src/main/java/com/qualityalternative/app/data/AndroidAccountLightProfileAutosaveWriter.kt
+new file mode 100644
+index 0000000..8b90730
+--- /dev/null
++++ b/app/src/main/java/com/qualityalternative/app/data/AndroidAccountLightProfileAutosaveWriter.kt
+@@ -0,0 +1,85 @@
++package com.qualityalternative.app.data
++
++import android.content.Context
++import android.net.Uri
++import android.provider.DocumentsContract
++import com.qualityalternative.app.domain.service.AccountLightProfileAutosaveWriter
++import java.io.File
++import java.io.OutputStreamWriter
++
++class AndroidAccountLightProfileAutosaveWriter(
++    private val context: Context,
++) : AccountLightProfileAutosaveWriter {
++    override suspend fun writeProfileJson(uri: String, fileName: String, json: String) {
++        val parsedUri = Uri.parse(uri)
++        if (parsedUri.scheme == "file") {
++            val path = parsedUri.path?.takeIf(String::isNotBlank)
++                ?: error("Could not open portable profile autosave destination.")
++            val selected = File(path)
++            val outputFile = if (selected.isDirectory) File(selected, fileName) else selected
++            outputFile.parentFile?.mkdirs()
++            outputFile.writeText(json, Charsets.UTF_8)
++            return
++        }
++        if (DocumentsContract.isTreeUri(parsedUri)) {
++            writeProfileJsonToTree(treeUri = parsedUri, fileName = fileName, json = json)
++            return
++        }
++        context.contentResolver.openOutputStream(parsedUri, "wt")
++            ?.use { stream ->
++                OutputStreamWriter(stream, Charsets.UTF_8).use { writer ->
++                    writer.write(json)
++                }
++            }
++            ?: error("Could not write portable profile.")
++    }
++
++    private fun writeProfileJsonToTree(treeUri: Uri, fileName: String, json: String) {
++        val resolver = context.contentResolver
++        val parentDocumentId = DocumentsContract.getTreeDocumentId(treeUri)
++        val parentDocumentUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, parentDocumentId)
++        val existingDocumentUri = findChildDocumentUri(treeUri = treeUri, fileName = fileName)
++        val profileDocumentUri = existingDocumentUri ?: DocumentsContract.createDocument(
++            resolver,
++            parentDocumentUri,
++            "application/json",
++            fileName,
++        ) ?: error("Could not create portable profile file.")
++
++        resolver.openOutputStream(profileDocumentUri, "wt")
++            ?.use { stream ->
++                OutputStreamWriter(stream, Charsets.UTF_8).use { writer ->
++                    writer.write(json)
++                }
++            }
++            ?: error("Could not write portable profile file.")
++    }
++
++    private fun findChildDocumentUri(treeUri: Uri, fileName: String): Uri? {
++        val resolver = context.contentResolver
++        val parentDocumentId = DocumentsContract.getTreeDocumentId(treeUri)
++        val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentDocumentId)
++        resolver.query(
++            childrenUri,
++            arrayOf(
++                DocumentsContract.Document.COLUMN_DOCUMENT_ID,
++                DocumentsContract.Document.COLUMN_DISPLAY_NAME,
++            ),
++            null,
++            null,
++            null,
++        )?.use { cursor ->
++            val documentIdIndex = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
++            val nameIndex = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
++            while (cursor.moveToNext()) {
++                if (documentIdIndex >= 0 && nameIndex >= 0 && cursor.getString(nameIndex) == fileName) {
++                    return DocumentsContract.buildDocumentUriUsingTree(
++                        treeUri,
++                        cursor.getString(documentIdIndex),
++                    )
++                }
++            }
++        }
++        return null
++    }
++}
+diff --git a/app/src/main/java/com/qualityalternative/app/data/AppContainer.kt b/app/src/main/java/com/qualityalternative/app/data/AppContainer.kt
+index f45de75..7a445cf 100644
+--- a/app/src/main/java/com/qualityalternative/app/data/AppContainer.kt
++++ b/app/src/main/java/com/qualityalternative/app/data/AppContainer.kt
+@@ -69,6 +69,9 @@ class AppContainer(context: Context) {
+     val readingAnnotationExportWriter: ReadingAnnotationExportWriter = AndroidReadingAnnotationExportWriter(
+         context = context,
+     )
++    val accountLightProfileAutosaveWriter = AndroidAccountLightProfileAutosaveWriter(
++        context = context,
++    )
+     val readingAnnotationDriveSyncClient: ReadingAnnotationDriveSyncClient = AndroidGoogleDriveAnnotationSyncClient()
+     val readingAnnotationDriveTokenProvider: ReadingAnnotationDriveTokenProvider = AndroidGoogleDriveTokenProvider(
+         context = context,
+diff --git a/app/src/main/java/com/qualityalternative/app/data/PreferencesSettingsRepository.kt b/app/src/main/java/com/qualityalternative/app/data/PreferencesSettingsRepository.kt
+index 46b1dc4..13ee3bd 100644
+--- a/app/src/main/java/com/qualityalternative/app/data/PreferencesSettingsRepository.kt
++++ b/app/src/main/java/com/qualityalternative/app/data/PreferencesSettingsRepository.kt
+@@ -79,6 +79,10 @@ class PreferencesSettingsRepository(
+                     annotationDriveFolderId = preferences[AnnotationDriveFolderId],
+                     annotationDriveLastSuccessfulAtMillis = preferences[AnnotationDriveLastSuccessfulAtMillis],
+                     annotationDriveLastError = preferences[AnnotationDriveLastError],
++                    profileAutosaveUri = preferences[ProfileAutosaveUri],
++                    profileAutosaveDisplayName = preferences[ProfileAutosaveDisplayName],
++                    profileAutosaveLastSuccessfulAtMillis = preferences[ProfileAutosaveLastSuccessfulAtMillis],
++                    profileAutosaveLastError = preferences[ProfileAutosaveLastError],
+                 )
+             }
+     }
+@@ -259,6 +263,37 @@ class PreferencesSettingsRepository(
+         }
+     }
+ 
++    override suspend fun saveProfileAutosaveDestination(uri: String, displayName: String) {
++        dataStore.edit { preferences ->
++            preferences[ProfileAutosaveUri] = uri
++            preferences[ProfileAutosaveDisplayName] = displayName
++            preferences.remove(ProfileAutosaveLastSuccessfulAtMillis)
++            preferences.remove(ProfileAutosaveLastError)
++        }
++    }
++
++    override suspend fun clearProfileAutosaveDestination() {
++        dataStore.edit { preferences ->
++            preferences.remove(ProfileAutosaveUri)
++            preferences.remove(ProfileAutosaveDisplayName)
++            preferences.remove(ProfileAutosaveLastSuccessfulAtMillis)
++            preferences.remove(ProfileAutosaveLastError)
++        }
++    }
++
++    override suspend fun saveProfileAutosaveSuccess(timestampMillis: Long) {
++        dataStore.edit { preferences ->
++            preferences[ProfileAutosaveLastSuccessfulAtMillis] = timestampMillis
++            preferences.remove(ProfileAutosaveLastError)
++        }
++    }
++
++    override suspend fun saveProfileAutosaveFailure(errorMessage: String) {
++        dataStore.edit { preferences ->
++            preferences[ProfileAutosaveLastError] = errorMessage
++        }
++    }
++
+     suspend fun clearForTests() {
+         dataStore.edit { preferences ->
+             preferences.clear()
+@@ -309,5 +344,9 @@ class PreferencesSettingsRepository(
+         val AnnotationDriveFolderId = stringPreferencesKey("annotation_drive_folder_id")
+         val AnnotationDriveLastSuccessfulAtMillis = longPreferencesKey("annotation_drive_last_successful_at_millis")
+         val AnnotationDriveLastError = stringPreferencesKey("annotation_drive_last_error")
++        val ProfileAutosaveUri = stringPreferencesKey("profile_autosave_uri")
++        val ProfileAutosaveDisplayName = stringPreferencesKey("profile_autosave_display_name")
++        val ProfileAutosaveLastSuccessfulAtMillis = longPreferencesKey("profile_autosave_last_successful_at_millis")
++        val ProfileAutosaveLastError = stringPreferencesKey("profile_autosave_last_error")
+     }
+ }
+diff --git a/app/src/main/java/com/qualityalternative/app/domain/model/UserModels.kt b/app/src/main/java/com/qualityalternative/app/domain/model/UserModels.kt
+index af77b6a..4345994 100644
+--- a/app/src/main/java/com/qualityalternative/app/domain/model/UserModels.kt
++++ b/app/src/main/java/com/qualityalternative/app/domain/model/UserModels.kt
+@@ -60,6 +60,10 @@ data class AppSettings(
+     val annotationDriveFolderId: String? = null,
+     val annotationDriveLastSuccessfulAtMillis: Long? = null,
+     val annotationDriveLastError: String? = null,
++    val profileAutosaveUri: String? = null,
++    val profileAutosaveDisplayName: String? = null,
++    val profileAutosaveLastSuccessfulAtMillis: Long? = null,
++    val profileAutosaveLastError: String? = null,
+ )
+ 
+ data class LocalProfileIdentity(
+diff --git a/app/src/main/java/com/qualityalternative/app/domain/service/Contracts.kt b/app/src/main/java/com/qualityalternative/app/domain/service/Contracts.kt
+index f0a55ab..ef77b9c 100644
+--- a/app/src/main/java/com/qualityalternative/app/domain/service/Contracts.kt
++++ b/app/src/main/java/com/qualityalternative/app/domain/service/Contracts.kt
+@@ -135,6 +135,14 @@ interface SettingsRepository {
+     suspend fun clearAnnotationDriveSyncConnection()
+     suspend fun saveAnnotationDriveSyncSuccess(timestampMillis: Long, folderId: String)
+     suspend fun saveAnnotationDriveSyncFailure(errorMessage: String)
++    suspend fun saveProfileAutosaveDestination(uri: String, displayName: String)
++    suspend fun clearProfileAutosaveDestination()
++    suspend fun saveProfileAutosaveSuccess(timestampMillis: Long)
++    suspend fun saveProfileAutosaveFailure(errorMessage: String)
++}
++
++interface AccountLightProfileAutosaveWriter {
++    suspend fun writeProfileJson(uri: String, fileName: String, json: String)
+ }
+ 
+ interface RecommendationEngine {
+diff --git a/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt b/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
+index 0f9d8e9..ff1c359 100644
+--- a/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
++++ b/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
+@@ -12,6 +12,7 @@ import com.qualityalternative.app.data.AccountLightImportPreview
+ import com.qualityalternative.app.data.AccountLightProfileExporter
+ import com.qualityalternative.app.data.AccountLightProfileImporter
+ import com.qualityalternative.app.data.AppContainer
++import com.qualityalternative.app.data.ACCOUNT_LIGHT_PROFILE_FILE_NAME
+ import com.qualityalternative.app.data.ReadingTimeEstimateSource
+ import com.qualityalternative.app.data.ReadingTimeEstimator
+ import com.qualityalternative.app.data.SupportedCatalog
+@@ -61,6 +62,7 @@ import com.qualityalternative.app.domain.model.meditationTimerContentItem
+ import com.qualityalternative.app.domain.model.usesExternalHandoff
+ import com.qualityalternative.app.domain.model.usesMeditationTimer
+ import com.qualityalternative.app.domain.model.usesRepositoryBody
++import com.qualityalternative.app.domain.service.AccountLightProfileAutosaveWriter
+ import com.qualityalternative.app.domain.service.AddUserDocumentResult
+ import com.qualityalternative.app.domain.service.AddUserLinkResult
+ import com.qualityalternative.app.domain.service.AnalyticsTracker
+@@ -140,6 +142,11 @@ data class MainUiState(
+     val annotationDriveFolderId: String? = null,
+     val annotationDriveLastSuccessfulAtMillis: Long? = null,
+     val annotationDriveLastError: String? = null,
++    val profileAutosaveUri: String? = null,
++    val profileAutosaveDisplayName: String? = null,
++    val profileAutosaveLastSuccessfulAtMillis: Long? = null,
++    val profileAutosaveLastError: String? = null,
++    val isProfileAutosaving: Boolean = false,
+     val isAnnotationDriveSyncing: Boolean = false,
+     val isAccountLightExporting: Boolean = false,
+     val isAccountLightImporting: Boolean = false,
+@@ -261,6 +268,7 @@ class MainViewModel(
+         readingProgressRepository = readingProgressRepository,
+         knownContentIdsProvider = { contentRepository.inventory().mapTo(mutableSetOf(), ContentItem::id) },
+     ),
++    private val accountLightProfileAutosaveWriter: AccountLightProfileAutosaveWriter = NoOpAccountLightProfileAutosaveWriter,
+     private val interceptionMonitor: InterceptionMonitor,
+     private val enableDelayRefreshTicker: Boolean = true,
+     private val nowProvider: () -> Long = System::currentTimeMillis,
+@@ -489,6 +497,7 @@ class MainViewModel(
+         )
+         viewModelScope.launch {
+             settingsRepository.saveSelectedAppPackages(selectedPackages)
++            autosaveAccountLightProfileAfterPortableMutation()
+         }
+     }
+ 
+@@ -501,6 +510,7 @@ class MainViewModel(
+         )
+         viewModelScope.launch {
+             settingsRepository.savePreferredDurationBucket(durationBucket)
++            autosaveAccountLightProfileAfterPortableMutation()
+         }
+     }
+ 
+@@ -526,6 +536,7 @@ class MainViewModel(
+             if (isCurrentMeditation && activeSessionId != null) {
+                 historyRepository.updateAcceptedSessionContent(sessionId = activeSessionId, content = meditation)
+             }
++            autosaveAccountLightProfileAfterPortableMutation()
+         }
+     }
+ 
+@@ -538,6 +549,7 @@ class MainViewModel(
+         )
+         viewModelScope.launch {
+             settingsRepository.saveContentPriority(priority)
++            autosaveAccountLightProfileAfterPortableMutation()
+         }
+     }
+ 
+@@ -573,6 +585,7 @@ class MainViewModel(
+                     ),
+                 ),
+             )
++            autosaveAccountLightProfileAfterPortableMutation()
+         }
+     }
+ 
+@@ -615,6 +628,7 @@ class MainViewModel(
+                     ),
+                 ),
+             )
++            autosaveAccountLightProfileAfterPortableMutation()
+         }
+     }
+ 
+@@ -626,6 +640,7 @@ class MainViewModel(
+         )
+         viewModelScope.launch {
+             settingsRepository.saveOpenAnywayUnlockMinutes(safeMinutes)
++            autosaveAccountLightProfileAfterPortableMutation()
+         }
+     }
+ 
+@@ -663,6 +678,7 @@ class MainViewModel(
+                 uri = normalizedUri,
+                 nowMillis = nowMillis,
+             )
++            autosaveAccountLightProfileAfterPortableMutation(nowMillis = nowMillis)
+             uiState = uiState.copy(
+                 annotationExportUri = normalizedUri,
+                 annotationExportDisplayName = normalizedDisplayName,
+@@ -683,6 +699,7 @@ class MainViewModel(
+                 runCatching { releaseWritePermission(configuredUri) }
+             }
+             settingsRepository.clearAnnotationExportDestination()
++            autosaveAccountLightProfileAfterPortableMutation()
+             uiState = uiState.copy(
+                 annotationExportUri = null,
+                 annotationExportDisplayName = null,
+@@ -701,6 +718,7 @@ class MainViewModel(
+         }
+         viewModelScope.launch {
+             val exported = exportReadingAnnotationsTo(uri = uri, nowMillis = nowMillis)
++            autosaveAccountLightProfileAfterPortableMutation(nowMillis = nowMillis)
+             uiState = uiState.copy(
+                 latestMessage = if (exported) {
+                     "Annotations autosaved."
+@@ -730,6 +748,7 @@ class MainViewModel(
+         viewModelScope.launch {
+             settingsRepository.saveAnnotationDriveSyncConnection(folderId = uiState.annotationDriveFolderId)
+             val synced = syncReadingAnnotationsToDrive(accessToken = normalizedToken, nowMillis = nowMillis)
++            autosaveAccountLightProfileAfterPortableMutation(nowMillis = nowMillis)
+             uiState = uiState.copy(
+                 isAnnotationDriveSyncing = false,
+                 annotationDriveSyncEnabled = true,
+@@ -759,6 +778,7 @@ class MainViewModel(
+         uiState = uiState.copy(isAnnotationDriveSyncing = true, latestMessage = null)
+         viewModelScope.launch {
+             val synced = syncReadingAnnotationsToDrive(accessToken = normalizedToken, nowMillis = nowMillis)
++            autosaveAccountLightProfileAfterPortableMutation(nowMillis = nowMillis)
+             uiState = uiState.copy(
+                 isAnnotationDriveSyncing = false,
+                 latestMessage = if (synced) {
+@@ -779,6 +799,7 @@ class MainViewModel(
+         )
+         viewModelScope.launch {
+             settingsRepository.saveAnnotationDriveSyncFailure(message)
++            autosaveAccountLightProfileAfterPortableMutation()
+         }
+     }
+ 
+@@ -794,6 +815,7 @@ class MainViewModel(
+         )
+         viewModelScope.launch {
+             settingsRepository.clearAnnotationDriveSyncConnection()
++            autosaveAccountLightProfileAfterPortableMutation(nowMillis = nowMillis)
+             recordEventDurably(
+                 AnalyticsEvent(
+                     type = AnalyticsEventType.ANNOTATION_DRIVE_SYNC_DISCONNECTED,
+@@ -824,6 +846,7 @@ class MainViewModel(
+ 
+         viewModelScope.launch {
+             settingsRepository.saveOnboardingSelection(selection)
++            autosaveAccountLightProfileAfterPortableMutation()
+             uiState = uiState.copy(latestMessage = null)
+         }
+     }
+@@ -993,6 +1016,7 @@ class MainViewModel(
+                         ),
+                     )
+                 }
++                autosaveAccountLightProfileAfterPortableMutation(nowMillis = nowMillis)
+                 val preferences = uiState.preferences
+                 uiState = uiState.copy(
+                     priorityContentIds = updatedPriorityIds,
+@@ -1198,6 +1222,7 @@ class MainViewModel(
+                                 ),
+                             ),
+                         )
++                        autosaveAccountLightProfileAfterPortableMutation(nowMillis = nowMillis)
+                         uiState = uiState.copy(
+                             screen = MainScreen.AddLinkSuccess,
+                             addLinkForm = AddLinkFormState(),
+@@ -1350,6 +1375,7 @@ class MainViewModel(
+                         ),
+                     ),
+                 )
++                autosaveAccountLightProfileAfterPortableMutation(nowMillis = nowMillis)
+ 
+                 uiState = uiState.copy(
+                     screen = MainScreen.AddLinkSuccess,
+@@ -1829,6 +1855,7 @@ class MainViewModel(
+                     metadata = content.analyticsMetadata() + progress.analyticsMetadata(),
+                 ),
+             )
++            autosaveAccountLightProfileAfterPortableMutation(nowMillis = nowMillis)
+         }
+     }
+ 
+@@ -1867,6 +1894,7 @@ class MainViewModel(
+                 nowMillis = nowMillis,
+             )
+             val annotationAutosaveResult = autosaveReadingAnnotations(nowMillis = nowMillis)
++            autosaveAccountLightProfileAfterPortableMutation(nowMillis = nowMillis)
+             val savedMessage = if (existingAnnotationId == null) {
+                 "Annotation saved."
+             } else {
+@@ -1892,6 +1920,7 @@ class MainViewModel(
+                 nowMillis = nowMillis,
+             )
+             val annotationAutosaveResult = autosaveReadingAnnotations(nowMillis = nowMillis)
++            autosaveAccountLightProfileAfterPortableMutation(nowMillis = nowMillis)
+             uiState = uiState.copy(
+                 latestMessage = "Annotation deleted.".withAnnotationAutosaveResult(annotationAutosaveResult),
+             )
+@@ -1922,6 +1951,7 @@ class MainViewModel(
+                     metadata = sessionDurationMetadata(nowMillis) + content.analyticsMetadata() + completedProgress.analyticsMetadata(),
+                 ),
+             )
++            autosaveAccountLightProfileAfterPortableMutation(nowMillis = nowMillis)
+             uiState = uiState.copy(
+                 screen = MainScreen.Feedback,
+                 currentReadingProgress = completedProgress,
+@@ -2053,6 +2083,7 @@ class MainViewModel(
+         uiState = uiState.copy(themeMode = themeMode)
+         viewModelScope.launch {
+             settingsRepository.saveThemeMode(themeMode)
++            autosaveAccountLightProfileAfterPortableMutation()
+         }
+     }
+ 
+@@ -2088,6 +2119,85 @@ class MainViewModel(
+         }
+     }
+ 
++    fun configureAccountLightProfileAutosave(
++        uri: String,
++        displayName: String,
++        persistWritePermission: (String) -> Unit = {},
++        nowMillis: Long = nowProvider(),
++    ) {
++        val normalizedUri = uri.trim()
++        if (normalizedUri.isBlank()) {
++            uiState = uiState.copy(latestMessage = "Choose a folder for profile autosave.")
++            return
++        }
++        val normalizedDisplayName = displayName.trim().ifBlank { "Portable profile folder" }
++        viewModelScope.launch {
++            val permissionError = runCatching { persistWritePermission(normalizedUri) }.exceptionOrNull()
++            settingsRepository.saveProfileAutosaveDestination(
++                uri = normalizedUri,
++                displayName = normalizedDisplayName,
++            )
++            if (permissionError != null) {
++                val message = permissionError.profileAutosaveErrorMessage()
++                settingsRepository.saveProfileAutosaveFailure(message)
++                uiState = uiState.copy(
++                    profileAutosaveUri = normalizedUri,
++                    profileAutosaveDisplayName = normalizedDisplayName,
++                    profileAutosaveLastSuccessfulAtMillis = null,
++                    profileAutosaveLastError = message,
++                    latestMessage = "Profile autosave needs folder permission.",
++                )
++                return@launch
++            }
++            val saved = autosaveAccountLightProfileTo(uri = normalizedUri, nowMillis = nowMillis)
++            uiState = uiState.copy(
++                profileAutosaveUri = normalizedUri,
++                profileAutosaveDisplayName = normalizedDisplayName,
++                profileAutosaveLastSuccessfulAtMillis = if (saved) nowMillis else null,
++                latestMessage = if (saved) {
++                    "Profile autosave enabled."
++                } else {
++                    "Profile autosave enabled, but the first write failed."
++                },
++            )
++        }
++    }
++
++    fun clearAccountLightProfileAutosave(releaseWritePermission: (String) -> Unit = {}) {
++        val uri = uiState.profileAutosaveUri
++        viewModelScope.launch {
++            uri?.takeIf(String::isNotBlank)?.let { configuredUri ->
++                runCatching { releaseWritePermission(configuredUri) }
++            }
++            settingsRepository.clearProfileAutosaveDestination()
++            uiState = uiState.copy(
++                profileAutosaveUri = null,
++                profileAutosaveDisplayName = null,
++                profileAutosaveLastSuccessfulAtMillis = null,
++                profileAutosaveLastError = null,
++                latestMessage = "Profile autosave disabled.",
++            )
++        }
++    }
++
++    fun retryAccountLightProfileAutosave(nowMillis: Long = nowProvider()) {
++        val uri = uiState.profileAutosaveUri
++        if (uri.isNullOrBlank()) {
++            uiState = uiState.copy(latestMessage = "Choose a folder for profile autosave.")
++            return
++        }
++        viewModelScope.launch {
++            val saved = autosaveAccountLightProfileTo(uri = uri, nowMillis = nowMillis)
++            uiState = uiState.copy(
++                latestMessage = if (saved) {
++                    "Portable profile autosaved."
++                } else {
++                    "Profile autosave failed."
++                },
++            )
++        }
++    }
++
+     fun previewAccountLightImport(rawJson: String) {
+         val plan = try {
+             accountLightProfileImporter.validateImportProfileJson(rawJson)
+@@ -2137,6 +2247,7 @@ class MainViewModel(
+         viewModelScope.launch {
+             uiState = uiState.copy(isAccountLightImporting = true)
+             val result = accountLightProfileImporter.applyMerge(plan)
++            val profileAutosaved = autosaveAccountLightProfileIfConfigured(nowMillis = nowProvider())
+             pendingAccountLightImportPlan = null
+             uiState = uiState.copy(
+                 isAccountLightImporting = false,
+@@ -2148,7 +2259,7 @@ class MainViewModel(
+                     "Profile merged."
+                 },
+                 isAccountLightReplaceConfirming = false,
+-                latestMessage = "Portable profile merged.",
++                latestMessage = "Portable profile merged.".withProfileAutosaveResult(profileAutosaved),
+             )
+         }
+     }
+@@ -2176,6 +2287,7 @@ class MainViewModel(
+             uiState = uiState.copy(isAccountLightImporting = true)
+             try {
+                 accountLightProfileImporter.applyReplace(plan)
++                val profileAutosaved = autosaveAccountLightProfileIfConfigured(nowMillis = nowProvider())
+                 pendingAccountLightImportPlan = null
+                 uiState = uiState.copy(
+                     isAccountLightImporting = false,
+@@ -2183,7 +2295,7 @@ class MainViewModel(
+                     accountLightImportError = null,
+                     accountLightStatus = "Imported profile replaced local portable settings and library.",
+                     isAccountLightReplaceConfirming = false,
+-                    latestMessage = "Portable profile restored.",
++                    latestMessage = "Portable profile restored.".withProfileAutosaveResult(profileAutosaved),
+                 )
+             } catch (exception: CancellationException) {
+                 uiState = uiState.copy(isAccountLightImporting = false)
+@@ -2235,6 +2347,10 @@ class MainViewModel(
+             annotationDriveFolderId = settings.annotationDriveFolderId,
+             annotationDriveLastSuccessfulAtMillis = settings.annotationDriveLastSuccessfulAtMillis,
+             annotationDriveLastError = settings.annotationDriveLastError,
++            profileAutosaveUri = settings.profileAutosaveUri,
++            profileAutosaveDisplayName = settings.profileAutosaveDisplayName,
++            profileAutosaveLastSuccessfulAtMillis = settings.profileAutosaveLastSuccessfulAtMillis,
++            profileAutosaveLastError = settings.profileAutosaveLastError,
+             onboardingSelection = settings.toOnboardingSelection(
+                 supportedApps = supportedApps,
+                 starterPacks = starterPacks,
+@@ -2582,6 +2698,7 @@ class MainViewModel(
+             if (sessionId != null) {
+                 historyRepository.markSkipped(sessionId = sessionId, skippedAtMillis = nowMillis)
+             }
++            autosaveAccountLightProfileAfterPortableMutation(nowMillis = nowMillis)
+             clearActiveSession(
+                 latestMessage = content.handoffFailureMessage(),
+             )
+@@ -2645,6 +2762,7 @@ class MainViewModel(
+         if (sessionId != null) {
+             historyRepository.markSkipped(sessionId = sessionId, skippedAtMillis = failedAtMillis)
+         }
++        autosaveAccountLightProfileAfterPortableMutation(nowMillis = failedAtMillis)
+         clearActiveSession(
+             latestMessage = content.handoffFailureMessage(),
+         )
+@@ -2698,6 +2816,43 @@ class MainViewModel(
+         }
+     }
+ 
++    private suspend fun autosaveAccountLightProfileAfterPortableMutation(nowMillis: Long = nowProvider()) {
++        autosaveAccountLightProfileIfConfigured(nowMillis = nowMillis)
++    }
++
++    private suspend fun autosaveAccountLightProfileIfConfigured(nowMillis: Long): Boolean? {
++        val uri = uiState.profileAutosaveUri?.takeIf(String::isNotBlank) ?: return null
++        return autosaveAccountLightProfileTo(uri = uri, nowMillis = nowMillis)
++    }
++
++    private suspend fun autosaveAccountLightProfileTo(uri: String, nowMillis: Long): Boolean {
++        uiState = uiState.copy(isProfileAutosaving = true)
++        return try {
++            val json = accountLightProfileExporter.exportSettingsOnlyProfileJson(nowMillis = nowMillis)
++            accountLightProfileAutosaveWriter.writeProfileJson(
++                uri = uri,
++                fileName = ACCOUNT_LIGHT_PROFILE_FILE_NAME,
++                json = json,
++            )
++            settingsRepository.saveProfileAutosaveSuccess(timestampMillis = nowMillis)
++            uiState = uiState.copy(
++                isProfileAutosaving = false,
++                profileAutosaveLastSuccessfulAtMillis = nowMillis,
++                profileAutosaveLastError = null,
++            )
++            true
++        } catch (error: Throwable) {
++            if (error is CancellationException) throw error
++            val message = error.profileAutosaveErrorMessage()
++            settingsRepository.saveProfileAutosaveFailure(message)
++            uiState = uiState.copy(
++                isProfileAutosaving = false,
++                profileAutosaveLastError = message,
++            )
++            false
++        }
++    }
++
+     private suspend fun syncReadingAnnotationsToDriveIfConnected(nowMillis: Long): Boolean? {
+         if (!uiState.annotationDriveSyncEnabled) {
+             return null
+@@ -3039,6 +3194,7 @@ class MainViewModelFactory(
+             readingAnnotationDriveTokenProvider = appContainer.readingAnnotationDriveTokenProvider,
+             accountLightProfileExporter = appContainer.accountLightProfileExporter,
+             accountLightProfileImporter = appContainer.accountLightProfileImporter,
++            accountLightProfileAutosaveWriter = appContainer.accountLightProfileAutosaveWriter,
+             interceptionMonitor = appContainer.interceptionMonitor,
+         ) as T
+     }
+@@ -3622,6 +3778,10 @@ private object NoOpReadingAnnotationDriveTokenProvider : ReadingAnnotationDriveT
+     override suspend fun driveAccessToken(): String = error("Google Drive authorization is not available in this build.")
+ }
+ 
++private object NoOpAccountLightProfileAutosaveWriter : AccountLightProfileAutosaveWriter {
++    override suspend fun writeProfileJson(uri: String, fileName: String, json: String) = Unit
++}
++
+ private data class AnnotationAutosaveResult(
+     val fileResult: Boolean?,
+     val driveResult: Boolean?,
+@@ -3644,6 +3804,14 @@ private fun String.withAnnotationAutosaveResult(result: AnnotationAutosaveResult
+     }
+ }
+ 
++private fun String.withProfileAutosaveResult(result: Boolean?): String {
++    return when (result) {
++        true -> removeSuffix(".") + " and autosaved."
++        false -> this + " Profile autosave failed."
++        null -> this
++    }
++}
++
+ private fun Throwable.annotationExportErrorMessage(): String {
+     return "Choose the file again or retry."
+ }
+@@ -3651,3 +3819,7 @@ private fun Throwable.annotationExportErrorMessage(): String {
+ private fun Throwable.annotationDriveSyncErrorMessage(): String {
+     return "Google Drive sync failed. Retry from Settings."
+ }
++
++private fun Throwable.profileAutosaveErrorMessage(): String {
++    return "Choose the folder again or retry."
++}
+diff --git a/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt b/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
+index 9aae7df..e5b99ba 100644
+--- a/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
++++ b/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
+@@ -363,6 +363,19 @@ private fun MainRoute(
+             },
+         )
+     }
++    val profileAutosavePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
++        if (uri == null) {
++            return@rememberLauncherForActivityResult
++        }
++        val metadata = context.documentMetadata(uri)
++        viewModel.configureAccountLightProfileAutosave(
++            uri = uri.toString(),
++            displayName = metadata.displayName,
++            persistWritePermission = { uriString ->
++                persistProfileAutosavePermission(context = context, uri = Uri.parse(uriString))
++            },
++        )
++    }
+     val accountLightExportPicker = rememberLauncherForActivityResult(
+         ActivityResultContracts.CreateDocument("application/json"),
+     ) { uri ->
+@@ -397,6 +410,9 @@ private fun MainRoute(
+     val releasePersistedAnnotationExportPermission: (String) -> Unit = { uri ->
+         releaseAnnotationExportPermission(context = context, uri = Uri.parse(uri))
+     }
++    val releasePersistedProfileAutosavePermission: (String) -> Unit = { uri ->
++        releaseProfileAutosavePermission(context = context, uri = Uri.parse(uri))
++    }
+ 
+     when (state.screen) {
+         MainScreen.Onboarding -> OnboardingFlow(
+@@ -506,6 +522,11 @@ private fun MainRoute(
+                 onExportAccountLightProfile = { accountLightExportPicker.launch(ACCOUNT_LIGHT_PROFILE_FILE_NAME) },
+                 onExportAccountLightBackup = { accountLightExportPicker.launch(accountLightTimestampedBackupFileName()) },
+                 onImportAccountLightProfile = { accountLightImportPicker.launch(arrayOf("application/json", "text/json", "*/*")) },
++                onSelectAccountLightAutosave = { profileAutosavePicker.launch(null) },
++                onRetryAccountLightAutosave = { viewModel.retryAccountLightProfileAutosave() },
++                onClearAccountLightAutosave = {
++                    viewModel.clearAccountLightProfileAutosave(releaseWritePermission = releasePersistedProfileAutosavePermission)
++                },
+                 onMergeAccountLightProfile = viewModel::applyAccountLightMergeImport,
+                 onRequestAccountLightReplace = viewModel::requestAccountLightReplaceConfirmation,
+                 onConfirmAccountLightReplace = viewModel::confirmAccountLightReplaceImport,
+@@ -3112,6 +3133,9 @@ private fun SettingsTab(
+     onExportAccountLightProfile: () -> Unit,
+     onExportAccountLightBackup: () -> Unit,
+     onImportAccountLightProfile: () -> Unit,
++    onSelectAccountLightAutosave: () -> Unit,
++    onRetryAccountLightAutosave: () -> Unit,
++    onClearAccountLightAutosave: () -> Unit,
+     onMergeAccountLightProfile: () -> Unit,
+     onRequestAccountLightReplace: () -> Unit,
+     onConfirmAccountLightReplace: () -> Unit,
+@@ -3246,6 +3270,9 @@ private fun SettingsTab(
+                 onExport = onExportAccountLightProfile,
+                 onExportBackup = onExportAccountLightBackup,
+                 onImport = onImportAccountLightProfile,
++                onSelectAutosave = onSelectAccountLightAutosave,
++                onRetryAutosave = onRetryAccountLightAutosave,
++                onClearAutosave = onClearAccountLightAutosave,
+                 onMerge = onMergeAccountLightProfile,
+                 onRequestReplace = onRequestAccountLightReplace,
+                 onConfirmReplace = onConfirmAccountLightReplace,
+@@ -3355,6 +3382,9 @@ private fun AccountLightSettingsSection(
+     onExport: () -> Unit,
+     onExportBackup: () -> Unit,
+     onImport: () -> Unit,
++    onSelectAutosave: () -> Unit,
++    onRetryAutosave: () -> Unit,
++    onClearAutosave: () -> Unit,
+     onMerge: () -> Unit,
+     onRequestReplace: () -> Unit,
+     onConfirmReplace: () -> Unit,
+@@ -3415,6 +3445,16 @@ private fun AccountLightSettingsSection(
+                     modifier = Modifier.weight(1f).testTag("settings-account-light-import"),
+                 )
+             }
++            HorizontalDivider(
++                color = colors.line,
++                modifier = Modifier.padding(vertical = 12.dp),
++            )
++            AccountLightAutosaveControls(
++                state = state,
++                onSelectAutosave = onSelectAutosave,
++                onRetryAutosave = onRetryAutosave,
++                onClearAutosave = onClearAutosave,
++            )
+             if (preview != null) {
+                 AccountLightImportPreviewCard(
+                     state = state,
+@@ -3429,6 +3469,88 @@ private fun AccountLightSettingsSection(
+     }
+ }
+ 
++@Composable
++private fun AccountLightAutosaveControls(
++    state: MainUiState,
++    onSelectAutosave: () -> Unit,
++    onRetryAutosave: () -> Unit,
++    onClearAutosave: () -> Unit,
++) {
++    val configured = !state.profileAutosaveUri.isNullOrBlank()
++    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
++        Row(
++            modifier = Modifier.fillMaxWidth(),
++            verticalAlignment = Alignment.CenterVertically,
++            horizontalArrangement = Arrangement.spacedBy(10.dp),
++        ) {
++            Column(modifier = Modifier.weight(1f)) {
++                BodyText(
++                    text = state.profileAutosaveDisplayName ?: "No autosave folder selected",
++                    color = QualityAlternativeThemeTokens.colors.primaryText,
++                    fontSize = 13.sp,
++                    lineHeight = 18.sp,
++                    maxLines = 2,
++                    overflow = TextOverflow.Ellipsis,
++                )
++                MonoText(
++                    text = profileAutosaveStatusText(state),
++                    color = if (state.profileAutosaveLastError == null) {
++                        QualityAlternativeThemeTokens.colors.mutedText
++                    } else {
++                        QualityAlternativeThemeTokens.colors.accent
++                    },
++                    maxLines = 2,
++                    overflow = TextOverflow.Ellipsis,
++                    modifier = Modifier.testTag("settings-account-light-autosave-status"),
++                )
++            }
++            if (state.isProfileAutosaving) {
++                CircularProgressIndicator(
++                    modifier = Modifier.size(18.dp).testTag("settings-account-light-autosave-progress"),
++                    strokeWidth = 2.dp,
++                    color = QualityAlternativeThemeTokens.colors.accent,
++                )
++            }
++        }
++        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
++            QaButton(
++                text = if (configured) "Change folder" else "Choose folder",
++                onClick = onSelectAutosave,
++                variant = QaButtonVariant.Outline,
++                size = QaButtonSize.Small,
++                enabled = !state.isProfileAutosaving,
++                leadingIcon = QaIconKind.External,
++                modifier = Modifier.weight(1f).testTag("settings-account-light-autosave-pick"),
++            )
++            QaButton(
++                text = if (state.profileAutosaveLastError == null) "Save now" else "Retry",
++                onClick = onRetryAutosave,
++                variant = QaButtonVariant.Ghost,
++                size = QaButtonSize.Small,
++                enabled = configured && !state.isProfileAutosaving,
++                fullWidth = false,
++                modifier = Modifier.testTag(
++                    if (state.profileAutosaveLastError == null) {
++                        "settings-account-light-autosave-save-now"
++                    } else {
++                        "settings-account-light-autosave-retry"
++                    },
++                ),
++            )
++        }
++        if (configured) {
++            QaButton(
++                text = "Turn off autosave",
++                onClick = onClearAutosave,
++                variant = QaButtonVariant.Ghost,
++                size = QaButtonSize.Small,
++                enabled = !state.isProfileAutosaving,
++                modifier = Modifier.testTag("settings-account-light-autosave-clear"),
++            )
++        }
++    }
++}
++
+ @Composable
+ private fun AccountLightImportPreviewCard(
+     state: MainUiState,
+@@ -5139,12 +5261,16 @@ private fun BodyText(
+     fontSize: androidx.compose.ui.unit.TextUnit = 14.5.sp,
+     lineHeight: androidx.compose.ui.unit.TextUnit = 21.sp,
+     textAlign: TextAlign? = null,
++    maxLines: Int = Int.MAX_VALUE,
++    overflow: TextOverflow = TextOverflow.Clip,
+ ) {
+     Text(
+         text = text,
+         modifier = modifier,
+         style = MaterialTheme.typography.bodyMedium.copy(fontSize = fontSize, lineHeight = lineHeight, color = color),
+         textAlign = textAlign,
++        maxLines = maxLines,
++        overflow = overflow,
+     )
+ }
+ 
+@@ -6162,6 +6288,18 @@ private fun annotationDriveStatusText(state: MainUiState): String {
+     }
+ }
+ 
++private fun profileAutosaveStatusText(state: MainUiState): String {
++    if (state.isProfileAutosaving) {
++        return "Saving portable profile"
++    }
++    state.profileAutosaveLastError?.takeIf(String::isNotBlank)?.let { error ->
++        return "Autosave failed. ${error.removeSuffix(".")}."
++    }
++    return state.profileAutosaveLastSuccessfulAtMillis?.let { timestampMillis ->
++        "Last saved ${annotationUpdatedLabel(timestampMillis)}"
++    } ?: "Autosave is not configured"
++}
++
+ private fun Throwable.googleDriveAuthMessage(): String {
+     return message?.takeIf(String::isNotBlank) ?: "Google Drive authorization failed."
+ }
+@@ -6385,6 +6523,13 @@ private fun persistAnnotationExportPermission(context: Context, uri: Uri) {
+     )
+ }
+ 
++private fun persistProfileAutosavePermission(context: Context, uri: Uri) {
++    context.contentResolver.takePersistableUriPermission(
++        uri,
++        Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
++    )
++}
++
+ private fun releaseAnnotationExportPermission(context: Context, uri: Uri) {
+     runCatching {
+         context.contentResolver.releasePersistableUriPermission(
+@@ -6394,6 +6539,15 @@ private fun releaseAnnotationExportPermission(context: Context, uri: Uri) {
+     }
+ }
+ 
++private fun releaseProfileAutosavePermission(context: Context, uri: Uri) {
++    runCatching {
++        context.contentResolver.releasePersistableUriPermission(
++            uri,
++            Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
++        )
++    }
++}
++
+ private fun releaseDocumentPermission(context: Context, uri: Uri) {
+     runCatching {
+         context.contentResolver.releasePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+diff --git a/app/src/test/java/com/qualityalternative/app/data/AccountLightProfileExporterTest.kt b/app/src/test/java/com/qualityalternative/app/data/AccountLightProfileExporterTest.kt
+index 7403b38..840e116 100644
+--- a/app/src/test/java/com/qualityalternative/app/data/AccountLightProfileExporterTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/data/AccountLightProfileExporterTest.kt
+@@ -63,6 +63,11 @@ class AccountLightProfileExporterTest {
+             timestampMillis = 13_000L,
+             folderId = "raw-drive-folder-id",
+         )
++        repository.saveProfileAutosaveDestination(
++            uri = "content://tree/raw-profile-folder-id",
++            displayName = "QA profile",
++        )
++        repository.saveProfileAutosaveSuccess(14_000L)
+ 
+         val exporter = AccountLightProfileExporter(
+             settingsRepository = repository,
+@@ -110,12 +115,15 @@ class AccountLightProfileExporterTest {
+         assertEquals(true, profile.annotations.driveSync.wasEnabledOnSourceDevice)
+         assertNull(profile.annotations.driveSync.folderDisplayName)
+         assertEquals(13_000L, profile.annotations.driveSync.lastSuccessfulAtMillis)
+-        assertEquals("NONE", profile.sync.profileAutosave.provider)
++        assertEquals("ANDROID_DOCUMENT_TREE", profile.sync.profileAutosave.provider)
++        assertEquals("QA profile", profile.sync.profileAutosave.destinationDisplayName)
++        assertEquals(14_000L, profile.sync.profileAutosave.lastSuccessfulAtMillis)
+         assertEquals("REQUIRES_LOCAL_SELECTION", profile.sync.profileAutosave.activationStateOnImport)
+         assertEquals(emptyList<AccountLightWarning>(), profile.warnings)
+ 
+         assertFalse(rawJson.contains("content://"))
+         assertFalse(rawJson.contains("raw-drive-folder-id"))
++        assertFalse(rawJson.contains("raw-profile-folder-id"))
+         assertFalse(rawJson.contains("Drive write unavailable"))
+         assertFalse(rawJson.contains("token", ignoreCase = true))
+         assertFalse(rawJson.contains("oauth", ignoreCase = true))
+diff --git a/app/src/test/java/com/qualityalternative/app/data/PreferencesSettingsRepositoryTest.kt b/app/src/test/java/com/qualityalternative/app/data/PreferencesSettingsRepositoryTest.kt
+index 18ae720..67afe6e 100644
+--- a/app/src/test/java/com/qualityalternative/app/data/PreferencesSettingsRepositoryTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/data/PreferencesSettingsRepositoryTest.kt
+@@ -295,6 +295,45 @@ class PreferencesSettingsRepositoryTest {
+         assertEquals(null, cleared.annotationDriveLastError)
+     }
+ 
++    @Test
++    fun saveProfileAutosaveSettings_persistsStatusAndClearsFailureOnSuccess() = runBlocking {
++        val repository = PreferencesSettingsRepository(
++            dataStore = testDataStore(),
++            supportedApps = SupportedCatalog.distractingApps,
++        )
++
++        repository.saveProfileAutosaveDestination(
++            uri = "content://tree/qa-profile",
++            displayName = "QA profile",
++        )
++        repository.saveProfileAutosaveSuccess(3_000L)
++        repository.saveProfileAutosaveDestination(
++            uri = "content://tree/new-profile",
++            displayName = "New profile folder",
++        )
++        repository.saveProfileAutosaveFailure("Choose the folder again or retry.")
++
++        val failed = repository.observeAppSettings().first()
++        assertEquals("content://tree/new-profile", failed.profileAutosaveUri)
++        assertEquals("New profile folder", failed.profileAutosaveDisplayName)
++        assertEquals(null, failed.profileAutosaveLastSuccessfulAtMillis)
++        assertEquals("Choose the folder again or retry.", failed.profileAutosaveLastError)
++
++        repository.saveProfileAutosaveSuccess(4_000L)
++
++        val restored = repository.observeAppSettings().first()
++        assertEquals(4_000L, restored.profileAutosaveLastSuccessfulAtMillis)
++        assertEquals(null, restored.profileAutosaveLastError)
++
++        repository.clearProfileAutosaveDestination()
++
++        val cleared = repository.observeAppSettings().first()
++        assertEquals(null, cleared.profileAutosaveUri)
++        assertEquals(null, cleared.profileAutosaveDisplayName)
++        assertEquals(null, cleared.profileAutosaveLastSuccessfulAtMillis)
++        assertEquals(null, cleared.profileAutosaveLastError)
++    }
++
+     @Test
+     fun observeAppSettings_mapsLegacyInkThemeToDark() = runBlocking {
+         val dataStore = testDataStore()
+diff --git a/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt b/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
+index 17f651f..bb1d3ad 100644
+--- a/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
+@@ -45,6 +45,7 @@ import com.qualityalternative.app.domain.model.UserDocumentDraft
+ import com.qualityalternative.app.domain.model.UserDocumentValidationError
+ import com.qualityalternative.app.domain.model.UserPreferences
+ import com.qualityalternative.app.domain.model.meditationTimerContentItem
++import com.qualityalternative.app.domain.service.AccountLightProfileAutosaveWriter
+ import com.qualityalternative.app.domain.service.AddUserDocumentResult
+ import com.qualityalternative.app.domain.service.AddUserLinkResult
+ import com.qualityalternative.app.domain.service.ContentRepository
+@@ -260,6 +261,33 @@ class MainViewModelTest {
+         assertEquals(AppThemeMode.DARK, settingsRepository.state.value.themeMode)
+     }
+ 
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun configuredProfileAutosaveRunsAfterThemeModeChange() = runTest {
++        val settingsRepository = FakeSettingsRepository(
++            initial = completedSettings(selectedAppPackages = setOf("com.instagram.android")).copy(
++                themeMode = AppThemeMode.LIGHT,
++                profileAutosaveUri = "content://tree/profile-folder",
++                profileAutosaveDisplayName = "QA profile",
++            ),
++        )
++        val profileWriter = RecordingAccountLightProfileAutosaveWriter()
++        val viewModel = createViewModel(
++            settingsRepository = settingsRepository,
++            accountLightProfileAutosaveWriter = profileWriter,
++        )
++
++        advanceUntilIdle()
++        viewModel.selectThemeMode(AppThemeMode.DARK)
++        advanceUntilIdle()
++
++        assertEquals(AppThemeMode.DARK, settingsRepository.state.value.themeMode)
++        val write = profileWriter.writes.single()
++        assertEquals("content://tree/profile-folder", write.first)
++        assertEquals("quality-alternative-profile.json", write.second)
++        assertTrue(write.third.contains("\"themeMode\": \"DARK\""))
++    }
++
+     @Test
+     @OptIn(ExperimentalCoroutinesApi::class)
+     fun hydrationWaitsForContentRepositoryReadiness() = runTest {
+@@ -3093,6 +3121,158 @@ class MainViewModelTest {
+         assertEquals(ContentPriority.MY_FILES, settingsRepository.state.value.contentPriority)
+     }
+ 
++    @Test
++    fun configuredProfileAutosaveWritesPortableProfileAndStatus() = runTest {
++        val settingsRepository = FakeSettingsRepository(
++            initial = completedSettings(selectedAppPackages = setOf("com.instagram.android")),
++        )
++        val profileWriter = RecordingAccountLightProfileAutosaveWriter()
++        val persistedUris = mutableListOf<String>()
++        val viewModel = createViewModel(
++            settingsRepository = settingsRepository,
++            accountLightProfileAutosaveWriter = profileWriter,
++            nowProvider = { 5_000L },
++        )
++        advanceUntilIdle()
++
++        viewModel.configureAccountLightProfileAutosave(
++            uri = "content://tree/profile-folder",
++            displayName = "QA profile",
++            persistWritePermission = persistedUris::add,
++            nowMillis = 6_000L,
++        )
++        advanceUntilIdle()
++
++        assertEquals(listOf("content://tree/profile-folder"), persistedUris)
++        assertEquals("content://tree/profile-folder", settingsRepository.state.value.profileAutosaveUri)
++        assertEquals("QA profile", settingsRepository.state.value.profileAutosaveDisplayName)
++        assertEquals(6_000L, settingsRepository.state.value.profileAutosaveLastSuccessfulAtMillis)
++        assertEquals(null, settingsRepository.state.value.profileAutosaveLastError)
++        assertEquals("Profile autosave enabled.", viewModel.uiState.latestMessage)
++        val write = profileWriter.writes.single()
++        assertEquals("content://tree/profile-folder", write.first)
++        assertEquals("quality-alternative-profile.json", write.second)
++        assertTrue(write.third.contains("\"schemaVersion\""))
++        assertTrue(write.third.contains("\"provider\": \"ANDROID_DOCUMENT_TREE\""))
++        assertFalse(write.third.contains("content://tree/profile-folder"))
++    }
++
++    @Test
++    fun profileAutosaveFailureKeepsDestinationAndDoesNotBlockAppUse() = runTest {
++        val settingsRepository = FakeSettingsRepository(
++            initial = completedSettings(selectedAppPackages = setOf("com.instagram.android")),
++        )
++        val profileWriter = RecordingAccountLightProfileAutosaveWriter(
++            failure = IllegalStateException("No provider for content://tree/missing"),
++        )
++        val viewModel = createViewModel(
++            settingsRepository = settingsRepository,
++            accountLightProfileAutosaveWriter = profileWriter,
++        )
++        advanceUntilIdle()
++
++        viewModel.configureAccountLightProfileAutosave(
++            uri = "content://tree/missing",
++            displayName = "Missing folder",
++            nowMillis = 6_000L,
++        )
++        advanceUntilIdle()
++
++        assertEquals("content://tree/missing", settingsRepository.state.value.profileAutosaveUri)
++        assertEquals("Missing folder", settingsRepository.state.value.profileAutosaveDisplayName)
++        assertEquals(null, settingsRepository.state.value.profileAutosaveLastSuccessfulAtMillis)
++        assertEquals("Choose the folder again or retry.", settingsRepository.state.value.profileAutosaveLastError)
++        assertEquals("Profile autosave enabled, but the first write failed.", viewModel.uiState.latestMessage)
++        viewModel.openSettings()
++        assertEquals(MainScreen.Settings, viewModel.uiState.screen)
++    }
++
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun configuredProfileAutosaveRunsAfterPortableProfileMutations() = runTest {
++        val settingsRepository = FakeSettingsRepository(
++            initial = completedSettings(selectedAppPackages = setOf("com.instagram.android")).copy(
++                profileAutosaveUri = "content://tree/profile-folder",
++                profileAutosaveDisplayName = "QA profile",
++            ),
++        )
++        val userLinkRepository = FakeUserLinkRepository()
++        val userDocumentRepository = FakeUserDocumentRepository()
++        val readingProgressRepository = FakeReadingProgressRepository()
++        val profileWriter = RecordingAccountLightProfileAutosaveWriter()
++        val viewModel = createViewModel(
++            settingsRepository = settingsRepository,
++            userLinkRepository = userLinkRepository,
++            userDocumentRepository = userDocumentRepository,
++            readingProgressRepository = readingProgressRepository,
++            accountLightProfileAutosaveWriter = profileWriter,
++        )
++        advanceUntilIdle()
++
++        viewModel.openAddLink()
++        viewModel.updateAddLinkUrl("https://example.com/essay")
++        viewModel.updateAddLinkTitle("Saved essay")
++        viewModel.updateAddLinkDuration("9")
++        viewModel.toggleAddLinkTopic(TopicTag.SCIENCE)
++        viewModel.saveUserLink(nowMillis = 2_100L)
++        advanceUntilIdle()
++
++        assertEquals(1, profileWriter.writes.size)
++        assertTrue(profileWriter.writes.last().third.contains("Saved essay"))
++        assertEquals(2_100L, settingsRepository.state.value.profileAutosaveLastSuccessfulAtMillis)
++
++        viewModel.prepareUserDocumentImport(
++            uri = "content://quality/notes",
++            displayName = "notes.md",
++            mimeType = "text/markdown",
++        )
++        viewModel.toggleAddDocumentTopic(TopicTag.SCIENCE)
++        viewModel.saveUserDocument(nowMillis = 2_200L)
++        advanceUntilIdle()
++
++        assertEquals(2, profileWriter.writes.size)
++        assertTrue(profileWriter.writes.last().third.contains("notes"))
++
++        val document = userDocumentRepository.documents.value.single()
++        viewModel.openLibraryItem(document)
++        advanceUntilIdle()
++        viewModel.saveCurrentReadingProgress(
++            progressPercent = 35,
++            lastVisibleParagraphIndex = 2,
++            paragraphCount = 10,
++            nowMillis = 2_300L,
++        )
++        advanceUntilIdle()
++
++        assertEquals(3, profileWriter.writes.size)
++        assertTrue(profileWriter.writes.last().third.contains("\"progressPercent\""))
++
++        val link = userLinkRepository.links.value.single()
++        viewModel.togglePriorityContent(link)
++        advanceUntilIdle()
++
++        assertEquals(4, profileWriter.writes.size)
++        assertTrue(profileWriter.writes.last().third.contains("\"priorityContentIds\""))
++
++        viewModel.finishReading()
++        advanceUntilIdle()
++
++        assertEquals(5, profileWriter.writes.size)
++        assertTrue(profileWriter.writes.last().third.contains("\"completedAtMillis\""))
++
++        viewModel.openLibrary()
++        viewModel.toggleLibraryManageMode()
++        viewModel.toggleLibraryContentSelection(link)
++        viewModel.toggleLibraryContentSelection(document)
++        viewModel.deleteSelectedLibraryContent(nowMillis = 2_500L)
++        advanceUntilIdle()
++
++        assertEquals(6, profileWriter.writes.size)
++        assertFalse(profileWriter.writes.last().third.contains("Saved essay"))
++        assertFalse(profileWriter.writes.last().third.contains("notes"))
++        assertEquals(2_500L, settingsRepository.state.value.profileAutosaveLastSuccessfulAtMillis)
++    }
++
+     @Test
+     fun accountLightMergeImportKeepsLocalPortableSettings() = runTest {
+         val importedSettingsRepository = FakeSettingsRepository(
+@@ -3107,9 +3287,15 @@ class MainViewModelTest {
+                 themeMode = AppThemeMode.LIGHT,
+                 contentPriority = ContentPriority.BALANCED,
+                 readerFontScale = 1.0,
++                profileAutosaveUri = "content://tree/profile-folder",
++                profileAutosaveDisplayName = "QA profile",
+             ),
+         )
+-        val viewModel = createViewModel(settingsRepository = targetSettingsRepository)
++        val profileWriter = RecordingAccountLightProfileAutosaveWriter()
++        val viewModel = createViewModel(
++            settingsRepository = targetSettingsRepository,
++            accountLightProfileAutosaveWriter = profileWriter,
++        )
+         val rawJson = AccountLightProfileExporter(
+             settingsRepository = importedSettingsRepository,
+             appVersionName = "0.8.1-alpha",
+@@ -3127,6 +3313,9 @@ class MainViewModelTest {
+         assertEquals(AppThemeMode.LIGHT, targetSettingsRepository.state.value.themeMode)
+         assertEquals(ContentPriority.BALANCED, targetSettingsRepository.state.value.contentPriority)
+         assertEquals(1.0, targetSettingsRepository.state.value.readerFontScale, 0.0)
++        assertEquals("Portable profile merged and autosaved.", viewModel.uiState.latestMessage)
++        assertEquals("content://tree/profile-folder", profileWriter.writes.single().first)
++        assertEquals(1_000L, targetSettingsRepository.state.value.profileAutosaveLastSuccessfulAtMillis)
+     }
+ 
+     @Test
+@@ -3197,6 +3386,7 @@ class MainViewModelTest {
+         readingAnnotationExportWriter: ReadingAnnotationExportWriter = RecordingReadingAnnotationExportWriter(),
+         readingAnnotationDriveSyncClient: ReadingAnnotationDriveSyncClient = RecordingReadingAnnotationDriveSyncClient(),
+         readingAnnotationDriveTokenProvider: ReadingAnnotationDriveTokenProvider = FailingReadingAnnotationDriveTokenProvider(),
++        accountLightProfileAutosaveWriter: AccountLightProfileAutosaveWriter = RecordingAccountLightProfileAutosaveWriter(),
+         recommendationEngine: RecommendationEngine = DefaultRecommendationEngine(),
+         nowProvider: () -> Long = { 1_000L },
+     ): MainViewModel {
+@@ -3215,6 +3405,7 @@ class MainViewModelTest {
+                 readingAnnotationExportWriter = readingAnnotationExportWriter,
+                 readingAnnotationDriveSyncClient = readingAnnotationDriveSyncClient,
+                 readingAnnotationDriveTokenProvider = readingAnnotationDriveTokenProvider,
++                accountLightProfileAutosaveWriter = accountLightProfileAutosaveWriter,
+                 interceptionMonitor = FakeInterceptionMonitor(),
+                 enableDelayRefreshTicker = false,
+                 nowProvider = nowProvider,
+@@ -3264,6 +3455,10 @@ class MainViewModelTest {
+                 annotationDriveFolderId = state.value.annotationDriveFolderId,
+                 annotationDriveLastSuccessfulAtMillis = state.value.annotationDriveLastSuccessfulAtMillis,
+                 annotationDriveLastError = state.value.annotationDriveLastError,
++                profileAutosaveUri = state.value.profileAutosaveUri,
++                profileAutosaveDisplayName = state.value.profileAutosaveDisplayName,
++                profileAutosaveLastSuccessfulAtMillis = state.value.profileAutosaveLastSuccessfulAtMillis,
++                profileAutosaveLastError = state.value.profileAutosaveLastError,
+             )
+         }
+ 
+@@ -3389,6 +3584,35 @@ class MainViewModelTest {
+                 annotationDriveLastError = errorMessage,
+             )
+         }
++
++        override suspend fun saveProfileAutosaveDestination(uri: String, displayName: String) {
++            state.value = state.value.copy(
++                profileAutosaveUri = uri,
++                profileAutosaveDisplayName = displayName,
++                profileAutosaveLastSuccessfulAtMillis = null,
++                profileAutosaveLastError = null,
++            )
++        }
++
++        override suspend fun clearProfileAutosaveDestination() {
++            state.value = state.value.copy(
++                profileAutosaveUri = null,
++                profileAutosaveDisplayName = null,
++                profileAutosaveLastSuccessfulAtMillis = null,
++                profileAutosaveLastError = null,
++            )
++        }
++
++        override suspend fun saveProfileAutosaveSuccess(timestampMillis: Long) {
++            state.value = state.value.copy(
++                profileAutosaveLastSuccessfulAtMillis = timestampMillis,
++                profileAutosaveLastError = null,
++            )
++        }
++
++        override suspend fun saveProfileAutosaveFailure(errorMessage: String) {
++            state.value = state.value.copy(profileAutosaveLastError = errorMessage)
++        }
+     }
+ 
+     private class FakeHistoryRepository(
+@@ -3630,6 +3854,17 @@ class MainViewModelTest {
+         }
+     }
+ 
++    private class RecordingAccountLightProfileAutosaveWriter(
++        private val failure: Throwable? = null,
++    ) : AccountLightProfileAutosaveWriter {
++        val writes = mutableListOf<Triple<String, String, String>>()
++
++        override suspend fun writeProfileJson(uri: String, fileName: String, json: String) {
++            failure?.let { throw it }
++            writes += Triple(uri, fileName, json)
++        }
++    }
++
+     private class RecordingReadingAnnotationDriveSyncClient(
+         private val folderId: String = "drive-folder-1",
+         private val failure: Throwable? = null,
+diff --git a/docs/SPRINT_16_ACCOUNT_LIGHT.md b/docs/SPRINT_16_ACCOUNT_LIGHT.md
+index 284cc65..33d0d43 100644
+--- a/docs/SPRINT_16_ACCOUNT_LIGHT.md
++++ b/docs/SPRINT_16_ACCOUNT_LIGHT.md
+@@ -99,6 +99,8 @@ Deliverables:
+ - Local or Android document-provider export path.
+ - Optional Google Drive file sync if it can reuse the existing explicit authorization model safely.
+ - Profile autosave failures do not block app use.
++- Current implementation uses explicit Android folder/document-provider selection and writes `quality-alternative-profile.json`; imported autosave metadata stays informational until the current device user selects a destination.
++- Google Drive profile autosave is intentionally not activated in this slice because the existing authorization is annotation-specific and Portable Profile must not reuse Drive access without a separate explicit profile destination choice.
+ 
+ Review gate:
+ 

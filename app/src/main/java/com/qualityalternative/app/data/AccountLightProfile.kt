@@ -508,6 +508,7 @@ class AccountLightProfileExporter(
             ),
             reading = AccountLightReading(progress = portableProgress),
             annotations = settings.toAccountLightAnnotations(),
+            sync = settings.toAccountLightSync(),
             warnings = settings.toAccountLightWarnings(
                 contentIdMapping = contentIdMapping,
                 omittedPortableUserContentIds = omittedPortableUserContentIds,
@@ -1549,6 +1550,19 @@ private fun AppSettings.toAccountLightAnnotations(): AccountLightAnnotations {
     )
 }
 
+private fun AppSettings.toAccountLightSync(): AccountLightSync {
+    val hasLocalProfileAutosave = !profileAutosaveUri.isNullOrBlank()
+    return AccountLightSync(
+        profileAutosave = AccountLightProfileAutosave(
+            provider = if (hasLocalProfileAutosave) "ANDROID_DOCUMENT_TREE" else "NONE",
+            destinationDisplayName = profileAutosaveDisplayName.toPortableDisplayNameOrNull(),
+            lastSuccessfulAtMillis = profileAutosaveLastSuccessfulAtMillis,
+            activationStateOnImport = "REQUIRES_LOCAL_SELECTION",
+        ),
+    )
+}
+
+
 private fun AppSettings.toAccountLightWarnings(
     contentIdMapping: Map<String, String> = emptyMap(),
     omittedPortableUserContentIds: Set<String> = emptySet(),
@@ -1573,6 +1587,16 @@ private fun AppSettings.toAccountLightWarnings(
                     severity = "WARNING",
                     section = "annotations",
                     message = "A stored annotation export display name was omitted because it is not portable.",
+                ),
+            )
+        }
+        if (!profileAutosaveDisplayName.isNullOrBlank() && profileAutosaveDisplayName.toPortableDisplayNameOrNull() == null) {
+            add(
+                AccountLightWarning(
+                    code = "CONFLICT_RETAINED_LOCAL_VALUE",
+                    severity = "WARNING",
+                    section = "sync",
+                    message = "A stored profile autosave display name was omitted because it is not portable.",
                 ),
             )
         }

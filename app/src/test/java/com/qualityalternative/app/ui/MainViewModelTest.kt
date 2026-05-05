@@ -45,6 +45,7 @@ import com.qualityalternative.app.domain.model.UserDocumentDraft
 import com.qualityalternative.app.domain.model.UserDocumentValidationError
 import com.qualityalternative.app.domain.model.UserPreferences
 import com.qualityalternative.app.domain.model.meditationTimerContentItem
+import com.qualityalternative.app.domain.service.AccountLightProfileAutosaveWriter
 import com.qualityalternative.app.domain.service.AddUserDocumentResult
 import com.qualityalternative.app.domain.service.AddUserLinkResult
 import com.qualityalternative.app.domain.service.ContentRepository
@@ -258,6 +259,33 @@ class MainViewModelTest {
 
         assertEquals(AppThemeMode.DARK, viewModel.uiState.themeMode)
         assertEquals(AppThemeMode.DARK, settingsRepository.state.value.themeMode)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun configuredProfileAutosaveRunsAfterThemeModeChange() = runTest {
+        val settingsRepository = FakeSettingsRepository(
+            initial = completedSettings(selectedAppPackages = setOf("com.instagram.android")).copy(
+                themeMode = AppThemeMode.LIGHT,
+                profileAutosaveUri = "content://tree/profile-folder",
+                profileAutosaveDisplayName = "QA profile",
+            ),
+        )
+        val profileWriter = RecordingAccountLightProfileAutosaveWriter()
+        val viewModel = createViewModel(
+            settingsRepository = settingsRepository,
+            accountLightProfileAutosaveWriter = profileWriter,
+        )
+
+        advanceUntilIdle()
+        viewModel.selectThemeMode(AppThemeMode.DARK)
+        advanceUntilIdle()
+
+        assertEquals(AppThemeMode.DARK, settingsRepository.state.value.themeMode)
+        val write = profileWriter.writes.single()
+        assertEquals("content://tree/profile-folder", write.first)
+        assertEquals("quality-alternative-profile.json", write.second)
+        assertTrue(write.third.contains("\"themeMode\": \"DARK\""))
     }
 
     @Test
@@ -3094,6 +3122,158 @@ class MainViewModelTest {
     }
 
     @Test
+    fun configuredProfileAutosaveWritesPortableProfileAndStatus() = runTest {
+        val settingsRepository = FakeSettingsRepository(
+            initial = completedSettings(selectedAppPackages = setOf("com.instagram.android")),
+        )
+        val profileWriter = RecordingAccountLightProfileAutosaveWriter()
+        val persistedUris = mutableListOf<String>()
+        val viewModel = createViewModel(
+            settingsRepository = settingsRepository,
+            accountLightProfileAutosaveWriter = profileWriter,
+            nowProvider = { 5_000L },
+        )
+        advanceUntilIdle()
+
+        viewModel.configureAccountLightProfileAutosave(
+            uri = "content://tree/profile-folder",
+            displayName = "QA profile",
+            persistWritePermission = persistedUris::add,
+            nowMillis = 6_000L,
+        )
+        advanceUntilIdle()
+
+        assertEquals(listOf("content://tree/profile-folder"), persistedUris)
+        assertEquals("content://tree/profile-folder", settingsRepository.state.value.profileAutosaveUri)
+        assertEquals("QA profile", settingsRepository.state.value.profileAutosaveDisplayName)
+        assertEquals(6_000L, settingsRepository.state.value.profileAutosaveLastSuccessfulAtMillis)
+        assertEquals(null, settingsRepository.state.value.profileAutosaveLastError)
+        assertEquals("Profile autosave enabled.", viewModel.uiState.latestMessage)
+        val write = profileWriter.writes.single()
+        assertEquals("content://tree/profile-folder", write.first)
+        assertEquals("quality-alternative-profile.json", write.second)
+        assertTrue(write.third.contains("\"schemaVersion\""))
+        assertTrue(write.third.contains("\"provider\": \"ANDROID_DOCUMENT_TREE\""))
+        assertFalse(write.third.contains("content://tree/profile-folder"))
+    }
+
+    @Test
+    fun profileAutosaveFailureKeepsDestinationAndDoesNotBlockAppUse() = runTest {
+        val settingsRepository = FakeSettingsRepository(
+            initial = completedSettings(selectedAppPackages = setOf("com.instagram.android")),
+        )
+        val profileWriter = RecordingAccountLightProfileAutosaveWriter(
+            failure = IllegalStateException("No provider for content://tree/missing"),
+        )
+        val viewModel = createViewModel(
+            settingsRepository = settingsRepository,
+            accountLightProfileAutosaveWriter = profileWriter,
+        )
+        advanceUntilIdle()
+
+        viewModel.configureAccountLightProfileAutosave(
+            uri = "content://tree/missing",
+            displayName = "Missing folder",
+            nowMillis = 6_000L,
+        )
+        advanceUntilIdle()
+
+        assertEquals("content://tree/missing", settingsRepository.state.value.profileAutosaveUri)
+        assertEquals("Missing folder", settingsRepository.state.value.profileAutosaveDisplayName)
+        assertEquals(null, settingsRepository.state.value.profileAutosaveLastSuccessfulAtMillis)
+        assertEquals("Choose the folder again or retry.", settingsRepository.state.value.profileAutosaveLastError)
+        assertEquals("Profile autosave enabled, but the first write failed.", viewModel.uiState.latestMessage)
+        viewModel.openSettings()
+        assertEquals(MainScreen.Settings, viewModel.uiState.screen)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun configuredProfileAutosaveRunsAfterPortableProfileMutations() = runTest {
+        val settingsRepository = FakeSettingsRepository(
+            initial = completedSettings(selectedAppPackages = setOf("com.instagram.android")).copy(
+                profileAutosaveUri = "content://tree/profile-folder",
+                profileAutosaveDisplayName = "QA profile",
+            ),
+        )
+        val userLinkRepository = FakeUserLinkRepository()
+        val userDocumentRepository = FakeUserDocumentRepository()
+        val readingProgressRepository = FakeReadingProgressRepository()
+        val profileWriter = RecordingAccountLightProfileAutosaveWriter()
+        val viewModel = createViewModel(
+            settingsRepository = settingsRepository,
+            userLinkRepository = userLinkRepository,
+            userDocumentRepository = userDocumentRepository,
+            readingProgressRepository = readingProgressRepository,
+            accountLightProfileAutosaveWriter = profileWriter,
+        )
+        advanceUntilIdle()
+
+        viewModel.openAddLink()
+        viewModel.updateAddLinkUrl("https://example.com/essay")
+        viewModel.updateAddLinkTitle("Saved essay")
+        viewModel.updateAddLinkDuration("9")
+        viewModel.toggleAddLinkTopic(TopicTag.SCIENCE)
+        viewModel.saveUserLink(nowMillis = 2_100L)
+        advanceUntilIdle()
+
+        assertEquals(1, profileWriter.writes.size)
+        assertTrue(profileWriter.writes.last().third.contains("Saved essay"))
+        assertEquals(2_100L, settingsRepository.state.value.profileAutosaveLastSuccessfulAtMillis)
+
+        viewModel.prepareUserDocumentImport(
+            uri = "content://quality/notes",
+            displayName = "notes.md",
+            mimeType = "text/markdown",
+        )
+        viewModel.toggleAddDocumentTopic(TopicTag.SCIENCE)
+        viewModel.saveUserDocument(nowMillis = 2_200L)
+        advanceUntilIdle()
+
+        assertEquals(2, profileWriter.writes.size)
+        assertTrue(profileWriter.writes.last().third.contains("notes"))
+
+        val document = userDocumentRepository.documents.value.single()
+        viewModel.openLibraryItem(document)
+        advanceUntilIdle()
+        viewModel.saveCurrentReadingProgress(
+            progressPercent = 35,
+            lastVisibleParagraphIndex = 2,
+            paragraphCount = 10,
+            nowMillis = 2_300L,
+        )
+        advanceUntilIdle()
+
+        assertEquals(3, profileWriter.writes.size)
+        assertTrue(profileWriter.writes.last().third.contains("\"progressPercent\""))
+
+        val link = userLinkRepository.links.value.single()
+        viewModel.togglePriorityContent(link)
+        advanceUntilIdle()
+
+        assertEquals(4, profileWriter.writes.size)
+        assertTrue(profileWriter.writes.last().third.contains("\"priorityContentIds\""))
+
+        viewModel.finishReading()
+        advanceUntilIdle()
+
+        assertEquals(5, profileWriter.writes.size)
+        assertTrue(profileWriter.writes.last().third.contains("\"completedAtMillis\""))
+
+        viewModel.openLibrary()
+        viewModel.toggleLibraryManageMode()
+        viewModel.toggleLibraryContentSelection(link)
+        viewModel.toggleLibraryContentSelection(document)
+        viewModel.deleteSelectedLibraryContent(nowMillis = 2_500L)
+        advanceUntilIdle()
+
+        assertEquals(6, profileWriter.writes.size)
+        assertFalse(profileWriter.writes.last().third.contains("Saved essay"))
+        assertFalse(profileWriter.writes.last().third.contains("notes"))
+        assertEquals(2_500L, settingsRepository.state.value.profileAutosaveLastSuccessfulAtMillis)
+    }
+
+    @Test
     fun accountLightMergeImportKeepsLocalPortableSettings() = runTest {
         val importedSettingsRepository = FakeSettingsRepository(
             initial = completedSettings(selectedAppPackages = setOf("com.instagram.android")).copy(
@@ -3107,9 +3287,15 @@ class MainViewModelTest {
                 themeMode = AppThemeMode.LIGHT,
                 contentPriority = ContentPriority.BALANCED,
                 readerFontScale = 1.0,
+                profileAutosaveUri = "content://tree/profile-folder",
+                profileAutosaveDisplayName = "QA profile",
             ),
         )
-        val viewModel = createViewModel(settingsRepository = targetSettingsRepository)
+        val profileWriter = RecordingAccountLightProfileAutosaveWriter()
+        val viewModel = createViewModel(
+            settingsRepository = targetSettingsRepository,
+            accountLightProfileAutosaveWriter = profileWriter,
+        )
         val rawJson = AccountLightProfileExporter(
             settingsRepository = importedSettingsRepository,
             appVersionName = "0.8.1-alpha",
@@ -3127,6 +3313,9 @@ class MainViewModelTest {
         assertEquals(AppThemeMode.LIGHT, targetSettingsRepository.state.value.themeMode)
         assertEquals(ContentPriority.BALANCED, targetSettingsRepository.state.value.contentPriority)
         assertEquals(1.0, targetSettingsRepository.state.value.readerFontScale, 0.0)
+        assertEquals("Portable profile merged and autosaved.", viewModel.uiState.latestMessage)
+        assertEquals("content://tree/profile-folder", profileWriter.writes.single().first)
+        assertEquals(1_000L, targetSettingsRepository.state.value.profileAutosaveLastSuccessfulAtMillis)
     }
 
     @Test
@@ -3197,6 +3386,7 @@ class MainViewModelTest {
         readingAnnotationExportWriter: ReadingAnnotationExportWriter = RecordingReadingAnnotationExportWriter(),
         readingAnnotationDriveSyncClient: ReadingAnnotationDriveSyncClient = RecordingReadingAnnotationDriveSyncClient(),
         readingAnnotationDriveTokenProvider: ReadingAnnotationDriveTokenProvider = FailingReadingAnnotationDriveTokenProvider(),
+        accountLightProfileAutosaveWriter: AccountLightProfileAutosaveWriter = RecordingAccountLightProfileAutosaveWriter(),
         recommendationEngine: RecommendationEngine = DefaultRecommendationEngine(),
         nowProvider: () -> Long = { 1_000L },
     ): MainViewModel {
@@ -3215,6 +3405,7 @@ class MainViewModelTest {
                 readingAnnotationExportWriter = readingAnnotationExportWriter,
                 readingAnnotationDriveSyncClient = readingAnnotationDriveSyncClient,
                 readingAnnotationDriveTokenProvider = readingAnnotationDriveTokenProvider,
+                accountLightProfileAutosaveWriter = accountLightProfileAutosaveWriter,
                 interceptionMonitor = FakeInterceptionMonitor(),
                 enableDelayRefreshTicker = false,
                 nowProvider = nowProvider,
@@ -3264,6 +3455,10 @@ class MainViewModelTest {
                 annotationDriveFolderId = state.value.annotationDriveFolderId,
                 annotationDriveLastSuccessfulAtMillis = state.value.annotationDriveLastSuccessfulAtMillis,
                 annotationDriveLastError = state.value.annotationDriveLastError,
+                profileAutosaveUri = state.value.profileAutosaveUri,
+                profileAutosaveDisplayName = state.value.profileAutosaveDisplayName,
+                profileAutosaveLastSuccessfulAtMillis = state.value.profileAutosaveLastSuccessfulAtMillis,
+                profileAutosaveLastError = state.value.profileAutosaveLastError,
             )
         }
 
@@ -3388,6 +3583,35 @@ class MainViewModelTest {
             state.value = state.value.copy(
                 annotationDriveLastError = errorMessage,
             )
+        }
+
+        override suspend fun saveProfileAutosaveDestination(uri: String, displayName: String) {
+            state.value = state.value.copy(
+                profileAutosaveUri = uri,
+                profileAutosaveDisplayName = displayName,
+                profileAutosaveLastSuccessfulAtMillis = null,
+                profileAutosaveLastError = null,
+            )
+        }
+
+        override suspend fun clearProfileAutosaveDestination() {
+            state.value = state.value.copy(
+                profileAutosaveUri = null,
+                profileAutosaveDisplayName = null,
+                profileAutosaveLastSuccessfulAtMillis = null,
+                profileAutosaveLastError = null,
+            )
+        }
+
+        override suspend fun saveProfileAutosaveSuccess(timestampMillis: Long) {
+            state.value = state.value.copy(
+                profileAutosaveLastSuccessfulAtMillis = timestampMillis,
+                profileAutosaveLastError = null,
+            )
+        }
+
+        override suspend fun saveProfileAutosaveFailure(errorMessage: String) {
+            state.value = state.value.copy(profileAutosaveLastError = errorMessage)
         }
     }
 
@@ -3627,6 +3851,17 @@ class MainViewModelTest {
             failure?.let { throw it }
             jsonWrites += uri to files
             writes += uri to files.joinToString(separator = "\n") { file -> file.jsonLd }
+        }
+    }
+
+    private class RecordingAccountLightProfileAutosaveWriter(
+        private val failure: Throwable? = null,
+    ) : AccountLightProfileAutosaveWriter {
+        val writes = mutableListOf<Triple<String, String, String>>()
+
+        override suspend fun writeProfileJson(uri: String, fileName: String, json: String) {
+            failure?.let { throw it }
+            writes += Triple(uri, fileName, json)
         }
     }
 

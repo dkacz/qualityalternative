@@ -60,6 +60,10 @@ data class AppSettings(
     val annotationDriveFolderId: String? = null,
     val annotationDriveLastSuccessfulAtMillis: Long? = null,
     val annotationDriveLastError: String? = null,
+    val profileAutosaveUri: String? = null,
+    val profileAutosaveDisplayName: String? = null,
+    val profileAutosaveLastSuccessfulAtMillis: Long? = null,
+    val profileAutosaveLastError: String? = null,
 )
 
 data class LocalProfileIdentity(

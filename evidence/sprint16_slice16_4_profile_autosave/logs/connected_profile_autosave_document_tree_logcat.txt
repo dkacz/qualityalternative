@@ -1,0 +1,17 @@
+05-05 03:34:20.128  6156  6176 I TestRunner: started: writesAndRewritesProfileJsonThroughDocumentTreeUri(com.qualityalternative.app.data.AndroidAccountLightProfileAutosaveWriterTest)
+05-05 03:34:20.166   714  4831 V GrammaticalInflectionUtils: AttributionSource: AttributionSource { uid = 10232, packageName = null, attributionTag = null, token = android.os.Binder@42853f0, deviceId = 0, next = null } does not have READ_SYSTEM_GRAMMATICAL_GENDER permission.
+05-05 03:34:20.181   461   461 D Zygote  : Forked child process 6178
+05-05 03:34:20.223  6178  6178 I native.app.test: Late-enabling -Xcheck:jni
+05-05 03:34:20.249  6178  6178 I native.app.test: Using CollectorTypeCMC GC.
+05-05 03:34:20.256   530   557 I adbd    : jdwp connection from 6178
+05-05 03:34:20.268  6178  6178 D nativeloader: Load libframework-connectivity-tiramisu-jni.so using APEX ns com_android_tethering for caller /apex/com.android.tethering/javalib/framework-connectivity-t.jar: ok
+05-05 03:34:20.394  6178  6178 D nativeloader: Configuring clns-9 for other apk /data/app/~~miV-KzBaIO0BkMm4X94K-g==/com.qualityalternative.app.test-GZV29NPRzI3lBsPuRDLXCQ==/base.apk. target_sdk_version=36, uses_libraries=, library_path=/data/app/~~miV-KzBaIO0BkMm4X94K-g==/com.qualityalternative.app.test-GZV29NPRzI3lBsPuRDLXCQ==/lib/arm64, permitted_path=/data:/mnt/expand:/data/user/0/com.qualityalternative.app.test
+05-05 03:34:20.403  6178  6178 I native.app.test: AssetManager2(0xb40000790ecfa298) locale list changing from [] to [en-US]
+05-05 03:34:20.417  6178  6178 V GraphicsEnvironment: Currently set values for:
+05-05 03:34:20.417  6178  6178 V GraphicsEnvironment:   angle_gl_driver_selection_pkgs=[]
+05-05 03:34:20.417  6178  6178 V GraphicsEnvironment:   angle_gl_driver_selection_values=[]
+05-05 03:34:20.417  6178  6178 V GraphicsEnvironment: com.qualityalternative.app.test is not listed in per-application setting
+05-05 03:34:20.418  6178  6178 V GraphicsEnvironment: ANGLE allowlist from config: com.dreamgames.royalmatch com.dts.freefiremax com.dxx.firenow com.gramgames.mergedragons com.ludo.king com.mojang.minecraftpe com.my.defense com.nintendo.zaka com.os.airforce com.playrix.fishdomdd.gplay io.teslatech.callbreak jp.konami.prospia net.peakgames.toonblast
+05-05 03:34:20.418  6178  6178 V GraphicsEnvironment: com.qualityalternative.app.test is not listed in ANGLE allowlist or settings, returning default
+05-05 03:34:20.418  6178  6178 V GraphicsEnvironment: Neither updatable production driver nor prerelease driver is supported.
+05-05 03:34:20.505  6156  6176 I TestRunner: finished: writesAndRewritesProfileJsonThroughDocumentTreeUri(com.qualityalternative.app.data.AndroidAccountLightProfileAutosaveWriterTest)

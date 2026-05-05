@@ -363,6 +363,19 @@ private fun MainRoute(
             },
         )
     }
+    val profileAutosavePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri == null) {
+            return@rememberLauncherForActivityResult
+        }
+        val metadata = context.documentMetadata(uri)
+        viewModel.configureAccountLightProfileAutosave(
+            uri = uri.toString(),
+            displayName = metadata.displayName,
+            persistWritePermission = { uriString ->
+                persistProfileAutosavePermission(context = context, uri = Uri.parse(uriString))
+            },
+        )
+    }
     val accountLightExportPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json"),
     ) { uri ->
@@ -396,6 +409,9 @@ private fun MainRoute(
     }
     val releasePersistedAnnotationExportPermission: (String) -> Unit = { uri ->
         releaseAnnotationExportPermission(context = context, uri = Uri.parse(uri))
+    }
+    val releasePersistedProfileAutosavePermission: (String) -> Unit = { uri ->
+        releaseProfileAutosavePermission(context = context, uri = Uri.parse(uri))
     }
 
     when (state.screen) {
@@ -506,6 +522,11 @@ private fun MainRoute(
                 onExportAccountLightProfile = { accountLightExportPicker.launch(ACCOUNT_LIGHT_PROFILE_FILE_NAME) },
                 onExportAccountLightBackup = { accountLightExportPicker.launch(accountLightTimestampedBackupFileName()) },
                 onImportAccountLightProfile = { accountLightImportPicker.launch(arrayOf("application/json", "text/json", "*/*")) },
+                onSelectAccountLightAutosave = { profileAutosavePicker.launch(null) },
+                onRetryAccountLightAutosave = { viewModel.retryAccountLightProfileAutosave() },
+                onClearAccountLightAutosave = {
+                    viewModel.clearAccountLightProfileAutosave(releaseWritePermission = releasePersistedProfileAutosavePermission)
+                },
                 onMergeAccountLightProfile = viewModel::applyAccountLightMergeImport,
                 onRequestAccountLightReplace = viewModel::requestAccountLightReplaceConfirmation,
                 onConfirmAccountLightReplace = viewModel::confirmAccountLightReplaceImport,
@@ -3112,6 +3133,9 @@ private fun SettingsTab(
     onExportAccountLightProfile: () -> Unit,
     onExportAccountLightBackup: () -> Unit,
     onImportAccountLightProfile: () -> Unit,
+    onSelectAccountLightAutosave: () -> Unit,
+    onRetryAccountLightAutosave: () -> Unit,
+    onClearAccountLightAutosave: () -> Unit,
     onMergeAccountLightProfile: () -> Unit,
     onRequestAccountLightReplace: () -> Unit,
     onConfirmAccountLightReplace: () -> Unit,
@@ -3246,6 +3270,9 @@ private fun SettingsTab(
                 onExport = onExportAccountLightProfile,
                 onExportBackup = onExportAccountLightBackup,
                 onImport = onImportAccountLightProfile,
+                onSelectAutosave = onSelectAccountLightAutosave,
+                onRetryAutosave = onRetryAccountLightAutosave,
+                onClearAutosave = onClearAccountLightAutosave,
                 onMerge = onMergeAccountLightProfile,
                 onRequestReplace = onRequestAccountLightReplace,
                 onConfirmReplace = onConfirmAccountLightReplace,
@@ -3355,6 +3382,9 @@ private fun AccountLightSettingsSection(
     onExport: () -> Unit,
     onExportBackup: () -> Unit,
     onImport: () -> Unit,
+    onSelectAutosave: () -> Unit,
+    onRetryAutosave: () -> Unit,
+    onClearAutosave: () -> Unit,
     onMerge: () -> Unit,
     onRequestReplace: () -> Unit,
     onConfirmReplace: () -> Unit,
@@ -3415,6 +3445,16 @@ private fun AccountLightSettingsSection(
                     modifier = Modifier.weight(1f).testTag("settings-account-light-import"),
                 )
             }
+            HorizontalDivider(
+                color = colors.line,
+                modifier = Modifier.padding(vertical = 12.dp),
+            )
+            AccountLightAutosaveControls(
+                state = state,
+                onSelectAutosave = onSelectAutosave,
+                onRetryAutosave = onRetryAutosave,
+                onClearAutosave = onClearAutosave,
+            )
             if (preview != null) {
                 AccountLightImportPreviewCard(
                     state = state,
@@ -3425,6 +3465,88 @@ private fun AccountLightSettingsSection(
                     onCancel = onCancel,
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun AccountLightAutosaveControls(
+    state: MainUiState,
+    onSelectAutosave: () -> Unit,
+    onRetryAutosave: () -> Unit,
+    onClearAutosave: () -> Unit,
+) {
+    val configured = !state.profileAutosaveUri.isNullOrBlank()
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                BodyText(
+                    text = state.profileAutosaveDisplayName ?: "No autosave folder selected",
+                    color = QualityAlternativeThemeTokens.colors.primaryText,
+                    fontSize = 13.sp,
+                    lineHeight = 18.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                MonoText(
+                    text = profileAutosaveStatusText(state),
+                    color = if (state.profileAutosaveLastError == null) {
+                        QualityAlternativeThemeTokens.colors.mutedText
+                    } else {
+                        QualityAlternativeThemeTokens.colors.accent
+                    },
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.testTag("settings-account-light-autosave-status"),
+                )
+            }
+            if (state.isProfileAutosaving) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp).testTag("settings-account-light-autosave-progress"),
+                    strokeWidth = 2.dp,
+                    color = QualityAlternativeThemeTokens.colors.accent,
+                )
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            QaButton(
+                text = if (configured) "Change folder" else "Choose folder",
+                onClick = onSelectAutosave,
+                variant = QaButtonVariant.Outline,
+                size = QaButtonSize.Small,
+                enabled = !state.isProfileAutosaving,
+                leadingIcon = QaIconKind.External,
+                modifier = Modifier.weight(1f).testTag("settings-account-light-autosave-pick"),
+            )
+            QaButton(
+                text = if (state.profileAutosaveLastError == null) "Save now" else "Retry",
+                onClick = onRetryAutosave,
+                variant = QaButtonVariant.Ghost,
+                size = QaButtonSize.Small,
+                enabled = configured && !state.isProfileAutosaving,
+                fullWidth = false,
+                modifier = Modifier.testTag(
+                    if (state.profileAutosaveLastError == null) {
+                        "settings-account-light-autosave-save-now"
+                    } else {
+                        "settings-account-light-autosave-retry"
+                    },
+                ),
+            )
+        }
+        if (configured) {
+            QaButton(
+                text = "Turn off autosave",
+                onClick = onClearAutosave,
+                variant = QaButtonVariant.Ghost,
+                size = QaButtonSize.Small,
+                enabled = !state.isProfileAutosaving,
+                modifier = Modifier.testTag("settings-account-light-autosave-clear"),
+            )
         }
     }
 }
@@ -5139,12 +5261,16 @@ private fun BodyText(
     fontSize: androidx.compose.ui.unit.TextUnit = 14.5.sp,
     lineHeight: androidx.compose.ui.unit.TextUnit = 21.sp,
     textAlign: TextAlign? = null,
+    maxLines: Int = Int.MAX_VALUE,
+    overflow: TextOverflow = TextOverflow.Clip,
 ) {
     Text(
         text = text,
         modifier = modifier,
         style = MaterialTheme.typography.bodyMedium.copy(fontSize = fontSize, lineHeight = lineHeight, color = color),
         textAlign = textAlign,
+        maxLines = maxLines,
+        overflow = overflow,
     )
 }
 
@@ -6162,6 +6288,18 @@ private fun annotationDriveStatusText(state: MainUiState): String {
     }
 }
 
+private fun profileAutosaveStatusText(state: MainUiState): String {
+    if (state.isProfileAutosaving) {
+        return "Saving portable profile"
+    }
+    state.profileAutosaveLastError?.takeIf(String::isNotBlank)?.let { error ->
+        return "Autosave failed. ${error.removeSuffix(".")}."
+    }
+    return state.profileAutosaveLastSuccessfulAtMillis?.let { timestampMillis ->
+        "Last saved ${annotationUpdatedLabel(timestampMillis)}"
+    } ?: "Autosave is not configured"
+}
+
 private fun Throwable.googleDriveAuthMessage(): String {
     return message?.takeIf(String::isNotBlank) ?: "Google Drive authorization failed."
 }
@@ -6385,7 +6523,23 @@ private fun persistAnnotationExportPermission(context: Context, uri: Uri) {
     )
 }
 
+private fun persistProfileAutosavePermission(context: Context, uri: Uri) {
+    context.contentResolver.takePersistableUriPermission(
+        uri,
+        Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+    )
+}
+
 private fun releaseAnnotationExportPermission(context: Context, uri: Uri) {
+    runCatching {
+        context.contentResolver.releasePersistableUriPermission(
+            uri,
+            Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+        )
+    }
+}
+
+private fun releaseProfileAutosavePermission(context: Context, uri: Uri) {
     runCatching {
         context.contentResolver.releasePersistableUriPermission(
             uri,

@@ -79,6 +79,10 @@ class PreferencesSettingsRepository(
                     annotationDriveFolderId = preferences[AnnotationDriveFolderId],
                     annotationDriveLastSuccessfulAtMillis = preferences[AnnotationDriveLastSuccessfulAtMillis],
                     annotationDriveLastError = preferences[AnnotationDriveLastError],
+                    profileAutosaveUri = preferences[ProfileAutosaveUri],
+                    profileAutosaveDisplayName = preferences[ProfileAutosaveDisplayName],
+                    profileAutosaveLastSuccessfulAtMillis = preferences[ProfileAutosaveLastSuccessfulAtMillis],
+                    profileAutosaveLastError = preferences[ProfileAutosaveLastError],
                 )
             }
     }
@@ -259,6 +263,37 @@ class PreferencesSettingsRepository(
         }
     }
 
+    override suspend fun saveProfileAutosaveDestination(uri: String, displayName: String) {
+        dataStore.edit { preferences ->
+            preferences[ProfileAutosaveUri] = uri
+            preferences[ProfileAutosaveDisplayName] = displayName
+            preferences.remove(ProfileAutosaveLastSuccessfulAtMillis)
+            preferences.remove(ProfileAutosaveLastError)
+        }
+    }
+
+    override suspend fun clearProfileAutosaveDestination() {
+        dataStore.edit { preferences ->
+            preferences.remove(ProfileAutosaveUri)
+            preferences.remove(ProfileAutosaveDisplayName)
+            preferences.remove(ProfileAutosaveLastSuccessfulAtMillis)
+            preferences.remove(ProfileAutosaveLastError)
+        }
+    }
+
+    override suspend fun saveProfileAutosaveSuccess(timestampMillis: Long) {
+        dataStore.edit { preferences ->
+            preferences[ProfileAutosaveLastSuccessfulAtMillis] = timestampMillis
+            preferences.remove(ProfileAutosaveLastError)
+        }
+    }
+
+    override suspend fun saveProfileAutosaveFailure(errorMessage: String) {
+        dataStore.edit { preferences ->
+            preferences[ProfileAutosaveLastError] = errorMessage
+        }
+    }
+
     suspend fun clearForTests() {
         dataStore.edit { preferences ->
             preferences.clear()
@@ -309,5 +344,9 @@ class PreferencesSettingsRepository(
         val AnnotationDriveFolderId = stringPreferencesKey("annotation_drive_folder_id")
         val AnnotationDriveLastSuccessfulAtMillis = longPreferencesKey("annotation_drive_last_successful_at_millis")
         val AnnotationDriveLastError = stringPreferencesKey("annotation_drive_last_error")
+        val ProfileAutosaveUri = stringPreferencesKey("profile_autosave_uri")
+        val ProfileAutosaveDisplayName = stringPreferencesKey("profile_autosave_display_name")
+        val ProfileAutosaveLastSuccessfulAtMillis = longPreferencesKey("profile_autosave_last_successful_at_millis")
+        val ProfileAutosaveLastError = stringPreferencesKey("profile_autosave_last_error")
     }
 }

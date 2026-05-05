@@ -81,6 +81,8 @@ class MainActivityTest {
         "sprint15-drive-sync-${System.currentTimeMillis()}"
     private val sprint16PortableProfileScreenshotDirName =
         "sprint16-portable-profile-${System.currentTimeMillis()}"
+    private val sprint16ProfileAutosaveScreenshotDirName =
+        "sprint16-profile-autosave-${System.currentTimeMillis()}"
 
     @Before
     fun resetAppState() {
@@ -1189,6 +1191,63 @@ class MainActivityTest {
     }
 
     @Test
+    fun accountLightProfileAutosaveSettingsShowsDestinationSuccessAndRecoverableFailure() {
+        launchOnboardedApp()
+        scenario?.onActivity { activity -> activity.mainViewModel.openSettings() }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("settings-list") }
+
+        scrollToAccountLightSettings()
+        composeRule.onNodeWithTag("settings-account-light-autosave-status").assertIsDisplayed()
+        composeRule.onNodeWithText("No autosave folder selected").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings-account-light-autosave-pick").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings-account-light-autosave-save-now").assertIsNotEnabled()
+        captureSprint16ProfileAutosaveScreenshot("01_profile_autosave_empty_light")
+
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val autosaveDir = File(context.filesDir, "profile-autosave-e2e").apply {
+            deleteRecursively()
+            mkdirs()
+        }
+        val autosaveFile = File(autosaveDir, "quality-alternative-profile.json")
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.configureAccountLightProfileAutosave(
+                uri = Uri.fromFile(autosaveDir).toString(),
+                displayName = "QA portable profile",
+                nowMillis = 21_000L,
+            )
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            autosaveFile.exists() && hasProfileAutosaveSuccess()
+        }
+        scrollToAccountLightSettings()
+        composeRule.onNodeWithText("QA portable profile").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings-account-light-autosave-status").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings-account-light-autosave-save-now").assertIsEnabled()
+        composeRule.onNodeWithTag("settings-account-light-autosave-clear").assertIsDisplayed()
+        assertTrue(autosaveFile.readText().contains("\"profileAutosave\""))
+        scenario?.onActivity { activity -> activity.mainViewModel.dismissMessage() }
+        composeRule.waitForIdle()
+        captureSprint16ProfileAutosaveScreenshot("02_profile_autosave_success_light")
+
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.configureAccountLightProfileAutosave(
+                uri = "content://com.qualityalternative.missing/profile-autosave",
+                displayName = "Missing profile folder",
+                nowMillis = 22_000L,
+            )
+            activity.mainViewModel.selectThemeMode(AppThemeMode.DARK)
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasProfileAutosaveFailure() }
+        scrollToAccountLightSettings()
+        composeRule.onNodeWithText("Missing profile folder").assertIsDisplayed()
+        composeRule.onNodeWithText("AUTOSAVE FAILED", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithTag("settings-account-light-autosave-retry").assertIsDisplayed()
+        scenario?.onActivity { activity -> activity.mainViewModel.dismissMessage() }
+        composeRule.waitForIdle()
+        captureSprint16ProfileAutosaveScreenshot("03_profile_autosave_failure_dark")
+    }
+
+    @Test
     fun meditationAlternativeOpensThreeMinuteTimer() {
         launchMeditationFixtureSystemIntervention()
 
@@ -1712,6 +1771,23 @@ class MainActivityTest {
         return hasFailure
     }
 
+    private fun hasProfileAutosaveSuccess(): Boolean {
+        var hasSuccess = false
+        scenario?.onActivity { activity ->
+            hasSuccess = activity.mainViewModel.uiState.profileAutosaveLastSuccessfulAtMillis != null &&
+                activity.mainViewModel.uiState.profileAutosaveLastError == null
+        }
+        return hasSuccess
+    }
+
+    private fun hasProfileAutosaveFailure(): Boolean {
+        var hasFailure = false
+        scenario?.onActivity { activity ->
+            hasFailure = !activity.mainViewModel.uiState.profileAutosaveLastError.isNullOrBlank()
+        }
+        return hasFailure
+    }
+
     private fun openAddLinkFromHome() {
         composeRule.onNodeWithTag("home-list")
             .performScrollToNode(hasTestTag("home-add-link"))
@@ -2196,6 +2272,16 @@ class MainActivityTest {
 
     private fun captureSprint16PortableProfileScreenshot(name: String) {
         val outputDir = File("/sdcard/Download/qualityalternative/$sprint16PortableProfileScreenshotDirName")
+        assertTrue("Expected screenshot output directory for $name", outputDir.mkdirs() || outputDir.exists())
+        composeRule.waitForIdle()
+        Thread.sleep(300)
+        val output = File(outputDir, "$name.png")
+        assertTrue("Expected screenshot capture for $name", UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).takeScreenshot(output))
+        assertTrue("Expected screenshot file for $name", output.exists() && output.length() > 0L)
+    }
+
+    private fun captureSprint16ProfileAutosaveScreenshot(name: String) {
+        val outputDir = File("/sdcard/Download/qualityalternative/$sprint16ProfileAutosaveScreenshotDirName")
         assertTrue("Expected screenshot output directory for $name", outputDir.mkdirs() || outputDir.exists())
         composeRule.waitForIdle()
         Thread.sleep(300)

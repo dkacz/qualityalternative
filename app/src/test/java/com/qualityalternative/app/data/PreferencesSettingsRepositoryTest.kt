@@ -296,6 +296,45 @@ class PreferencesSettingsRepositoryTest {
     }
 
     @Test
+    fun saveProfileAutosaveSettings_persistsStatusAndClearsFailureOnSuccess() = runBlocking {
+        val repository = PreferencesSettingsRepository(
+            dataStore = testDataStore(),
+            supportedApps = SupportedCatalog.distractingApps,
+        )
+
+        repository.saveProfileAutosaveDestination(
+            uri = "content://tree/qa-profile",
+            displayName = "QA profile",
+        )
+        repository.saveProfileAutosaveSuccess(3_000L)
+        repository.saveProfileAutosaveDestination(
+            uri = "content://tree/new-profile",
+            displayName = "New profile folder",
+        )
+        repository.saveProfileAutosaveFailure("Choose the folder again or retry.")
+
+        val failed = repository.observeAppSettings().first()
+        assertEquals("content://tree/new-profile", failed.profileAutosaveUri)
+        assertEquals("New profile folder", failed.profileAutosaveDisplayName)
+        assertEquals(null, failed.profileAutosaveLastSuccessfulAtMillis)
+        assertEquals("Choose the folder again or retry.", failed.profileAutosaveLastError)
+
+        repository.saveProfileAutosaveSuccess(4_000L)
+
+        val restored = repository.observeAppSettings().first()
+        assertEquals(4_000L, restored.profileAutosaveLastSuccessfulAtMillis)
+        assertEquals(null, restored.profileAutosaveLastError)
+
+        repository.clearProfileAutosaveDestination()
+
+        val cleared = repository.observeAppSettings().first()
+        assertEquals(null, cleared.profileAutosaveUri)
+        assertEquals(null, cleared.profileAutosaveDisplayName)
+        assertEquals(null, cleared.profileAutosaveLastSuccessfulAtMillis)
+        assertEquals(null, cleared.profileAutosaveLastError)
+    }
+
+    @Test
     fun observeAppSettings_mapsLegacyInkThemeToDark() = runBlocking {
         val dataStore = testDataStore()
         val repository = PreferencesSettingsRepository(

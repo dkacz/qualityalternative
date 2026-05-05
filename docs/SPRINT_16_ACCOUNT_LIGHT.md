@@ -99,10 +99,13 @@ Deliverables:
 - Local or Android document-provider export path.
 - Optional Google Drive file sync if it can reuse the existing explicit authorization model safely.
 - Profile autosave failures do not block app use.
+- Current implementation uses explicit Android folder/document-provider selection and writes `quality-alternative-profile.json`; imported autosave metadata stays informational until the current device user selects a destination.
+- Google Drive profile autosave is intentionally not activated in this slice because the existing authorization is annotation-specific and Portable Profile must not reuse Drive access without a separate explicit profile destination choice.
 
 Review gate:
 
 - GPT Pro code, Drive/privacy, and visual review.
+- R5 GPT Pro review returned `SCORE: 10/10`, `VERDICT: PASS`, `VISUAL REVIEW: PASS`; Slice 16.4 is complete.
 
 ### Slice 16.5: Adaptive Reader Pagination
 
