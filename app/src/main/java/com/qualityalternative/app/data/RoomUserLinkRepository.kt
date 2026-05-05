@@ -222,6 +222,7 @@ class PortableContentImportConflictException(
 internal data class PortableUserContentImportPlan(
     val itemsToImport: List<ContentItem>,
     val acceptedContentIds: Set<String>,
+    val contentIdMapping: Map<String, String>,
 )
 
 internal fun portableUserContentImportPlan(
@@ -251,11 +252,13 @@ internal fun portableUserContentImportPlan(
         return PortableUserContentImportPlan(
             itemsToImport = distinctImported,
             acceptedContentIds = distinctImported.mapTo(mutableSetOf(), ContentItem::id),
+            contentIdMapping = distinctImported.associate { item -> item.id to item.id },
         )
     }
 
     val itemsToImport = mutableListOf<ContentItem>()
     val acceptedContentIds = mutableSetOf<String>()
+    val contentIdMapping = mutableMapOf<String, String>()
 
     distinctImported.forEach { item ->
         val importedSecondary = secondaryKey(item).portableSecondaryKeyOrNull()
@@ -265,21 +268,17 @@ internal fun portableUserContentImportPlan(
         if (existing == null) {
             itemsToImport += item
             acceptedContentIds += item.id
-        } else if (
-            existing.id == item.id &&
-            (importedSecondary == null || secondaryKey(existing).portableSecondaryKeyOrNull() == importedSecondary)
-        ) {
-            acceptedContentIds += existing.id
+            contentIdMapping[item.id] = item.id
         } else {
-            throw PortableContentImportConflictException(
-                "Imported contentId or secondary key conflicts with a different local record.",
-            )
+            acceptedContentIds += existing.id
+            contentIdMapping[item.id] = existing.id
         }
     }
 
     return PortableUserContentImportPlan(
         itemsToImport = itemsToImport,
         acceptedContentIds = acceptedContentIds,
+        contentIdMapping = contentIdMapping,
     )
 }
 

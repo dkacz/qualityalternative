@@ -5,8 +5,11 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import com.qualityalternative.app.domain.model.AppThemeMode
 import com.qualityalternative.app.domain.model.ContentAvailability
+import com.qualityalternative.app.domain.model.ContentFormat
 import com.qualityalternative.app.domain.model.ContentItem
 import com.qualityalternative.app.domain.model.ContentPriority
+import com.qualityalternative.app.domain.model.ContentRightsMetadata
+import com.qualityalternative.app.domain.model.ContentSourceType
 import com.qualityalternative.app.domain.model.DurationBucket
 import com.qualityalternative.app.domain.model.OnboardingSelection
 import com.qualityalternative.app.domain.model.ReadingProgress
@@ -665,6 +668,128 @@ class AccountLightProfileImporterTest {
     }
 
     @Test
+    fun applyMergeMapsSecondaryOnlyLinkProgressToLocalContentId() = runBlocking {
+        val target = PreferencesSettingsRepository(
+            dataStore = testDataStore(),
+            supportedApps = SupportedCatalog.distractingApps,
+        )
+        val localContentId = "user-link-11111111-1111-4111-8111-111111111111"
+        val importedContentId = "user-link-33333333-3333-4333-8333-333333333333"
+        val sharedUrl = "https://example.com/essay"
+        val linkRepository = RecordingUserLinkRepository().apply {
+            links = listOf(userLinkContent(id = localContentId, url = sharedUrl))
+        }
+        val readingProgressRepository = RecordingReadingProgressRepository()
+        val importer = AccountLightProfileImporter(
+            settingsRepository = target,
+            userLinkRepository = linkRepository,
+            readingProgressRepository = readingProgressRepository,
+        )
+        val plan = importer.validateImportProfileJson(
+            validProfileJson()
+                .withUserLinks(
+                    listOf(
+                        validUserLink(
+                            contentId = importedContentId,
+                            normalizedUrl = sharedUrl,
+                        ),
+                    ),
+                )
+                .withReadingProgressFor(contentId = importedContentId),
+        )
+
+        assertTrue(plan.generatedWarnings.map(AccountLightWarning::code).contains("CONFLICT_RETAINED_LOCAL_VALUE"))
+
+        importer.applyMerge(plan)
+
+        assertEquals(listOf(localContentId), linkRepository.links.map(ContentItem::id))
+        assertEquals(listOf(localContentId), readingProgressRepository.progress.map(ReadingProgress::contentId))
+    }
+
+    @Test
+    fun applyMergeMapsFingerprintOnlyDocumentProgressToLocalContentId() = runBlocking {
+        val target = PreferencesSettingsRepository(
+            dataStore = testDataStore(),
+            supportedApps = SupportedCatalog.distractingApps,
+        )
+        val localContentId = "user-document-11111111-1111-4111-8111-111111111111"
+        val importedContentId = "user-document-44444444-4444-4444-8444-444444444444"
+        val sharedFingerprint = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        val documentRepository = RecordingUserDocumentRepository().apply {
+            documents = listOf(userDocumentContent(id = localContentId, fingerprintSha256 = sharedFingerprint))
+        }
+        val readingProgressRepository = RecordingReadingProgressRepository()
+        val importer = AccountLightProfileImporter(
+            settingsRepository = target,
+            userDocumentRepository = documentRepository,
+            readingProgressRepository = readingProgressRepository,
+        )
+        val plan = importer.validateImportProfileJson(
+            validProfileJson()
+                .withUserDocuments(
+                    listOf(
+                        validUserDocument(
+                            contentId = importedContentId,
+                            sha256 = sharedFingerprint,
+                        ),
+                    ),
+                )
+                .withReadingProgressFor(contentId = importedContentId),
+        )
+
+        assertTrue(plan.generatedWarnings.map(AccountLightWarning::code).contains("CONFLICT_RETAINED_LOCAL_VALUE"))
+
+        importer.applyMerge(plan)
+
+        assertEquals(listOf(localContentId), documentRepository.documents.map(ContentItem::id))
+        assertEquals(listOf(localContentId), readingProgressRepository.progress.map(ReadingProgress::contentId))
+    }
+
+    @Test
+    fun validateImportProfileJsonPreflightsWholeLibraryBeforeAnyMutation() = runBlocking {
+        val target = PreferencesSettingsRepository(
+            dataStore = testDataStore(),
+            supportedApps = SupportedCatalog.distractingApps,
+        )
+        val linkRepository = RecordingUserLinkRepository()
+        val localDocumentById = userDocumentContent(
+            id = "user-document-11111111-1111-4111-8111-111111111111",
+            fingerprintSha256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        )
+        val localDocumentByFingerprint = userDocumentContent(
+            id = "user-document-22222222-2222-4222-8222-222222222222",
+            fingerprintSha256 = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        )
+        val documentRepository = RecordingUserDocumentRepository().apply {
+            documents = listOf(localDocumentById, localDocumentByFingerprint)
+        }
+        val importer = AccountLightProfileImporter(
+            settingsRepository = target,
+            userLinkRepository = linkRepository,
+            userDocumentRepository = documentRepository,
+        )
+
+        val error = assertThrows(AccountLightImportException::class.java) {
+            importer.validateImportProfileJson(
+                validProfileJson()
+                    .withUserLinks(listOf(validUserLink()))
+                    .withUserDocuments(
+                        listOf(
+                            validUserDocument(
+                                contentId = localDocumentById.id,
+                                sha256 = localDocumentByFingerprint.documentFingerprintSha256,
+                            ),
+                        ),
+                    ),
+            )
+        }
+
+        assertEquals(AccountLightImportErrorCode.CONTENT_ID_SECONDARY_KEY_CONFLICT, error.code)
+        assertEquals(0, linkRepository.importCallCount)
+        assertTrue(linkRepository.links.isEmpty())
+    }
+
+    @Test
     fun applyReplace_restoresLibraryWhenProgressImportFails() = runBlocking {
         val target = PreferencesSettingsRepository(
             dataStore = testDataStore(),
@@ -1166,6 +1291,51 @@ class AccountLightProfileImporterTest {
         )
     }
 
+    private fun userLinkContent(
+        id: String,
+        url: String,
+    ): ContentItem {
+        return ContentItem(
+            id = id,
+            packId = "user-links",
+            title = "Local link",
+            description = "Local link metadata.",
+            durationMinutes = 12,
+            format = ContentFormat.HTML,
+            topicTags = setOf(TopicTag.SCIENCE),
+            externalUrl = url,
+            sourceType = ContentSourceType.USER_LINK,
+            availability = ContentAvailability.NEEDS_FALLBACK,
+            rights = ContentRightsMetadata.userPrivateExternal(sourceUrl = url),
+            addedAtMillis = 10_000L,
+        )
+    }
+
+    private fun userDocumentContent(
+        id: String,
+        fingerprintSha256: String,
+    ): ContentItem {
+        val sourceReference = "portable-missing:$id"
+        return ContentItem(
+            id = id,
+            packId = "user-documents",
+            title = "Local document",
+            description = "Local document metadata.",
+            durationMinutes = 45,
+            format = ContentFormat.EPUB,
+            topicTags = setOf(TopicTag.PHILOSOPHY),
+            sourceLabel = "book.epub",
+            sourceType = ContentSourceType.USER_DOCUMENT,
+            availability = ContentAvailability.AVAILABLE,
+            rights = ContentRightsMetadata.userPrivateReader(
+                sourceUrl = sourceReference,
+                attribution = "book.epub",
+            ),
+            addedAtMillis = 10_000L,
+            documentFingerprintSha256 = fingerprintSha256,
+        )
+    }
+
     private fun testDataStore(): DataStore<Preferences> {
         val file = File.createTempFile("account-light-importer-test", ".preferences_pb").apply { deleteOnExit() }
         return PreferenceDataStoreFactory.create(produceFile = { file })
@@ -1214,6 +1384,7 @@ class AccountLightProfileImporterTest {
 
     private class RecordingUserLinkRepository : UserLinkRepository {
         var links: List<ContentItem> = emptyList()
+        var importCallCount: Int = 0
 
         override fun userLinks(): List<ContentItem> = links
 
@@ -1229,8 +1400,19 @@ class AccountLightProfileImporterTest {
             replaceExisting: Boolean,
             nowMillis: Long,
         ): Set<String> {
-            this.links = links
-            return links.mapTo(mutableSetOf(), ContentItem::id)
+            importCallCount += 1
+            val plan = portableUserContentImportPlan(
+                current = this.links,
+                imported = links,
+                replaceExisting = replaceExisting,
+                secondaryKey = ContentItem::externalUrl,
+            )
+            this.links = mergeImportedUserContent(
+                current = if (replaceExisting) emptyList() else this.links,
+                imported = plan.itemsToImport,
+                secondaryKey = ContentItem::externalUrl,
+            )
+            return plan.acceptedContentIds
         }
     }
 
@@ -1251,8 +1433,18 @@ class AccountLightProfileImporterTest {
             replaceExisting: Boolean,
             nowMillis: Long,
         ): Set<String> {
-            this.documents = documents
-            return documents.mapTo(mutableSetOf(), ContentItem::id)
+            val plan = portableUserContentImportPlan(
+                current = this.documents,
+                imported = documents,
+                replaceExisting = replaceExisting,
+                secondaryKey = ContentItem::verifiedDocumentFingerprintSha256,
+            )
+            this.documents = mergeImportedUserContent(
+                current = if (replaceExisting) emptyList() else this.documents,
+                imported = plan.itemsToImport,
+                secondaryKey = ContentItem::verifiedDocumentFingerprintSha256,
+            )
+            return plan.acceptedContentIds
         }
     }
 

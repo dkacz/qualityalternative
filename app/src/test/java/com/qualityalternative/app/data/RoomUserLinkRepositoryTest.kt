@@ -108,6 +108,59 @@ class RoomUserLinkRepositoryTest {
 
         assertEquals(listOf(newImport.id), plan.itemsToImport.map(ContentItem::id))
         assertEquals(setOf(existing.id, newImport.id), plan.acceptedContentIds)
+        assertEquals(
+            mapOf(
+                existing.id to existing.id,
+                newImport.id to newImport.id,
+            ),
+            plan.contentIdMapping,
+        )
+    }
+
+    @Test
+    fun portableImportPlanMapsSecondaryOnlyMatchToLocalContentId() {
+        val existing = userLink(
+            id = "user-link-11111111-1111-4111-8111-111111111111",
+            url = "https://example.com/existing",
+        )
+        val imported = userLink(
+            id = "user-link-33333333-3333-4333-8333-333333333333",
+            url = existing.externalUrl.orEmpty(),
+        )
+
+        val plan = portableUserContentImportPlan(
+            current = listOf(existing),
+            imported = listOf(imported),
+            replaceExisting = false,
+            secondaryKey = ContentItem::externalUrl,
+        )
+
+        assertEquals(emptyList<String>(), plan.itemsToImport.map(ContentItem::id))
+        assertEquals(setOf(existing.id), plan.acceptedContentIds)
+        assertEquals(mapOf(imported.id to existing.id), plan.contentIdMapping)
+    }
+
+    @Test
+    fun portableImportPlanRetainsLocalIdOnlyMatchWithoutReplacingLocalUrl() {
+        val existing = userLink(
+            id = "user-link-11111111-1111-4111-8111-111111111111",
+            url = "https://example.com/local",
+        )
+        val imported = userLink(
+            id = existing.id,
+            url = "https://example.com/imported",
+        )
+
+        val plan = portableUserContentImportPlan(
+            current = listOf(existing),
+            imported = listOf(imported),
+            replaceExisting = false,
+            secondaryKey = ContentItem::externalUrl,
+        )
+
+        assertEquals(emptyList<String>(), plan.itemsToImport.map(ContentItem::id))
+        assertEquals(setOf(existing.id), plan.acceptedContentIds)
+        assertEquals(mapOf(imported.id to existing.id), plan.contentIdMapping)
     }
 
     private fun userLink(

@@ -19,22 +19,24 @@ class QualityAlternativeDatabaseMigrationInstrumentedTest {
     )
 
     @Test
-    fun migration8To10ValidatesRoomSchemaAndCreatesAnnotationColumnsOnce() {
-        val databaseName = "qa-migration-8-10.db"
+    fun migration8To11ValidatesRoomSchemaAndCreatesAnnotationColumnsOnce() {
+        val databaseName = "qa-migration-8-11.db"
         deleteDatabase(databaseName)
         helper.createDatabase(databaseName, 8).close()
 
         val migrated = helper.runMigrationsAndValidate(
             databaseName,
-            10,
+            11,
             true,
             QualityAlternativeDatabase.MIGRATION_8_9,
             QualityAlternativeDatabase.MIGRATION_9_10,
+            QualityAlternativeDatabase.MIGRATION_10_11,
         )
         try {
             val columns = readingAnnotationColumns(migrated)
             assertEquals(1, columns.count { column -> column == "sourceTitle" })
             assertTrue(columns.containsAll(version10AnnotationColumns))
+            assertTrue(userDocumentColumns(migrated).contains("documentFingerprintSha256"))
 
             migrated.execSQL(
                 """
@@ -84,8 +86,8 @@ class QualityAlternativeDatabaseMigrationInstrumentedTest {
     }
 
     @Test
-    fun migration9To10ValidatesRoomSchemaAndPreservesLegacyAnnotationRows() {
-        val databaseName = "qa-migration-9-10.db"
+    fun migration9To11ValidatesRoomSchemaAndPreservesLegacyAnnotationRows() {
+        val databaseName = "qa-migration-9-11.db"
         deleteDatabase(databaseName)
         val legacy = helper.createDatabase(databaseName, 9)
         legacy.execSQL(
@@ -113,12 +115,14 @@ class QualityAlternativeDatabaseMigrationInstrumentedTest {
 
         val migrated = helper.runMigrationsAndValidate(
             databaseName,
-            10,
+            11,
             true,
             QualityAlternativeDatabase.MIGRATION_9_10,
+            QualityAlternativeDatabase.MIGRATION_10_11,
         )
         try {
             assertTrue(readingAnnotationColumns(migrated).containsAll(version10AnnotationColumns))
+            assertTrue(userDocumentColumns(migrated).contains("documentFingerprintSha256"))
             migrated.query(
                 """
                 SELECT
@@ -152,6 +156,16 @@ class QualityAlternativeDatabaseMigrationInstrumentedTest {
 
     private fun readingAnnotationColumns(db: SupportSQLiteDatabase): List<String> {
         return db.query("PRAGMA table_info(reading_annotations)").use { cursor ->
+            buildList {
+                while (cursor.moveToNext()) {
+                    add(cursor.getString(cursor.getColumnIndexOrThrow("name")))
+                }
+            }
+        }
+    }
+
+    private fun userDocumentColumns(db: SupportSQLiteDatabase): List<String> {
+        return db.query("PRAGMA table_info(user_documents)").use { cursor ->
             buildList {
                 while (cursor.moveToNext()) {
                     add(cursor.getString(cursor.getColumnIndexOrThrow("name")))

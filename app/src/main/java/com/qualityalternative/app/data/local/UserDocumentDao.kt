@@ -14,6 +14,9 @@ interface UserDocumentDao {
     @Query("SELECT * FROM user_documents WHERE uri = :uri LIMIT 1")
     suspend fun findByUri(uri: String): UserDocumentEntity?
 
+    @Query("SELECT * FROM user_documents WHERE documentFingerprintSha256 = :sha256 LIMIT 1")
+    suspend fun findByDocumentFingerprintSha256(sha256: String): UserDocumentEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOrReplace(document: UserDocumentEntity)
 

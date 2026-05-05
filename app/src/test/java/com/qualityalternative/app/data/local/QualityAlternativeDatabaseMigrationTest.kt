@@ -33,4 +33,33 @@ class QualityAlternativeDatabaseMigrationTest {
         assertTrue(statements.any { it.contains("prefixText TEXT NOT NULL DEFAULT ''") })
         assertTrue(statements.any { it.contains("suffixText TEXT NOT NULL DEFAULT ''") })
     }
+
+    @Test
+    fun migration10To11AddsUserDocumentFingerprintColumnAndIndex() {
+        val statements = mutableListOf<String>()
+        val db = Proxy.newProxyInstance(
+            SupportSQLiteDatabase::class.java.classLoader,
+            arrayOf(SupportSQLiteDatabase::class.java),
+        ) { _, method, args ->
+            if (method.name == "execSQL" && args?.firstOrNull() is String) {
+                statements += args.first() as String
+            }
+            when (method.returnType) {
+                java.lang.Boolean.TYPE -> false
+                java.lang.Integer.TYPE -> 0
+                java.lang.Long.TYPE -> 0L
+                else -> null
+            }
+        } as SupportSQLiteDatabase
+
+        QualityAlternativeDatabase.MIGRATION_10_11.migrate(db)
+
+        assertTrue(statements.any { it.contains("ADD COLUMN documentFingerprintSha256 TEXT") })
+        assertTrue(
+            statements.any {
+                it.contains("index_user_documents_documentFingerprintSha256") &&
+                    it.contains("documentFingerprintSha256")
+            },
+        )
+    }
 }

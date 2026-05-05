@@ -15,6 +15,7 @@ import com.qualityalternative.app.domain.model.TopicTag
 import com.qualityalternative.app.domain.model.UserDocumentDraft
 import com.qualityalternative.app.domain.service.AddUserDocumentResult
 import com.qualityalternative.app.domain.service.UserDocumentRepository
+import java.security.MessageDigest
 import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -61,6 +62,8 @@ class RoomUserDocumentRepository(
         val existing = dao.findByUri(normalizedUri)
         val createdAtMillis = existing?.createdAtMillis ?: nowMillis
         val displayName = draft.displayName.trim().ifBlank { draft.title.trim() }
+        val fingerprintSha256 = existing?.documentFingerprintSha256
+            ?: (bodyLoader as? UserDocumentFingerprintProvider)?.documentFingerprintSha256(normalizedUri)
         val item = ContentItem(
             id = existing?.id ?: idProvider(),
             packId = USER_DOCUMENT_PACK_ID,
@@ -93,6 +96,7 @@ class RoomUserDocumentRepository(
                 )
             },
             addedAtMillis = createdAtMillis,
+            documentFingerprintSha256 = fingerprintSha256,
         )
 
         dao.insertOrReplace(
@@ -102,6 +106,7 @@ class RoomUserDocumentRepository(
                 mimeType = draft.mimeType,
                 createdAtMillis = createdAtMillis,
                 updatedAtMillis = nowMillis,
+                documentFingerprintSha256 = fingerprintSha256,
             ),
         )
         documents.value = upsertUserDocumentForOptimisticState(documents.value, item)
@@ -141,7 +146,7 @@ class RoomUserDocumentRepository(
             current = existingDocuments,
             imported = documents,
             replaceExisting = replaceExisting,
-            secondaryKey = { item -> item.rights.sourceUrl?.takeUnless { source -> source.startsWith("portable-missing:") } },
+            secondaryKey = ContentItem::verifiedDocumentFingerprintSha256,
         )
         if (replaceExisting) {
             val retainedIds = documents.mapTo(mutableSetOf(), ContentItem::id)
@@ -162,13 +167,14 @@ class RoomUserDocumentRepository(
                     mimeType = null,
                     createdAtMillis = item.addedAtMillis ?: nowMillis,
                     updatedAtMillis = nowMillis,
+                    documentFingerprintSha256 = item.verifiedDocumentFingerprintSha256(),
                 ),
             )
         }
         this.documents.value = mergeImportedUserContent(
             current = if (replaceExisting) emptyList() else existingDocuments,
             imported = documentsToImport,
-            secondaryKey = { item -> item.rights.sourceUrl?.takeUnless { source -> source.startsWith("portable-missing:") } },
+            secondaryKey = ContentItem::verifiedDocumentFingerprintSha256,
         )
         return importPlan.acceptedContentIds
     }
@@ -204,13 +210,17 @@ fun interface UserDocumentBodyLoader {
     fun loadBody(uri: String, format: ContentFormat): String
 }
 
+interface UserDocumentFingerprintProvider {
+    fun documentFingerprintSha256(uri: String): String?
+}
+
 interface UserDocumentReaderDocumentLoader : UserDocumentBodyLoader {
     fun loadReaderDocument(uri: String, format: ContentFormat): ReaderDocument
 }
 
 class AndroidUserDocumentBodyLoader(
     context: Context,
-) : UserDocumentReaderDocumentLoader {
+) : UserDocumentReaderDocumentLoader, UserDocumentFingerprintProvider {
     private val contentResolver: ContentResolver = context.contentResolver
 
     override fun loadBody(uri: String, format: ContentFormat): String {
@@ -233,6 +243,21 @@ class AndroidUserDocumentBodyLoader(
         }.getOrElse { error ->
             throw UserDocumentBodyLoadException(uri = uri, cause = error)
         }
+    }
+
+    override fun documentFingerprintSha256(uri: String): String? {
+        return runCatching {
+            contentResolver.openInputStream(Uri.parse(uri))?.use { input ->
+                val digest = MessageDigest.getInstance("SHA-256")
+                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                while (true) {
+                    val read = input.read(buffer)
+                    if (read <= 0) break
+                    digest.update(buffer, 0, read)
+                }
+                digest.digest().joinToString("") { byte -> "%02x".format(byte) }
+            }
+        }.getOrNull()
     }
 }
 
@@ -269,6 +294,7 @@ private fun UserDocumentEntity.toContentItem(): ContentItem {
             )
         },
         addedAtMillis = createdAtMillis,
+        documentFingerprintSha256 = documentFingerprintSha256,
     )
 }
 
@@ -278,6 +304,7 @@ private fun ContentItem.toEntity(
     mimeType: String?,
     createdAtMillis: Long,
     updatedAtMillis: Long,
+    documentFingerprintSha256: String?,
 ): UserDocumentEntity {
     return UserDocumentEntity(
         id = id,
@@ -292,8 +319,12 @@ private fun ContentItem.toEntity(
         availability = availability.name,
         createdAtMillis = createdAtMillis,
         updatedAtMillis = updatedAtMillis,
+        documentFingerprintSha256 = documentFingerprintSha256,
     )
 }
+
+internal fun ContentItem.verifiedDocumentFingerprintSha256(): String? =
+    documentFingerprintSha256?.takeIf { fingerprint -> fingerprint.matches(VerifiedDocumentFingerprintRegex) }
 
 private fun ContentFormat.usesPrivateReader(): Boolean = this == ContentFormat.MARKDOWN || this == ContentFormat.EPUB
 
@@ -332,3 +363,5 @@ internal fun upsertUserDocumentForOptimisticState(
 }
 
 private fun randomUserDocumentId(): String = "user-document-${UUID.randomUUID()}"
+
+private val VerifiedDocumentFingerprintRegex = Regex("^[0-9a-f]{64}$")

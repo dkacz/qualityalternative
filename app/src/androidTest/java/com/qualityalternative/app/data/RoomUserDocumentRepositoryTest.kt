@@ -25,6 +25,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
@@ -164,6 +165,151 @@ class RoomUserDocumentRepositoryTest {
             assertEquals("Local book", afterMerge.title)
             assertEquals(ContentAvailability.AVAILABLE, afterMerge.availability)
             assertEquals("content://quality/local-book", afterMerge.rights.sourceUrl)
+        } finally {
+            appScope.cancel()
+            delay(100)
+            database.close()
+        }
+    }
+
+    @Test
+    fun importPortableDocuments_mergeMapsVerifiedFingerprintCollisionToLocalDocument() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val database = Room.inMemoryDatabaseBuilder(
+            context,
+            QualityAlternativeDatabase::class.java,
+        ).allowMainThreadQueries().build()
+        val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val sharedFingerprint = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
+        try {
+            val repository = RoomUserDocumentRepository(
+                dao = database.userDocumentDao(),
+                scope = appScope,
+                bodyLoader = FixedFingerprintBodyLoader(
+                    fingerprints = mapOf("content://quality/local-book" to sharedFingerprint),
+                ),
+                idProvider = { "user-document-11111111-1111-4111-8111-111111111111" },
+            )
+            repository.observeReady().first { it }
+            repository.addDocument(
+                draft = UserDocumentDraft(
+                    uri = "content://quality/local-book",
+                    displayName = "local-book.epub",
+                    mimeType = "application/epub+zip",
+                    title = "Local book",
+                    durationMinutes = 25,
+                    topicTags = setOf(TopicTag.PHILOSOPHY),
+                ),
+                nowMillis = 1_000L,
+            )
+            val local = withTimeout(10_000L) {
+                repository.observeUserDocuments().first { it.size == 1 }.single()
+            }
+            val importedMissingCollision = missingImportedDocument(
+                id = "user-document-33333333-3333-4333-8333-333333333333",
+                fingerprintSha256 = sharedFingerprint,
+            )
+
+            val acceptedIds = repository.importPortableDocuments(
+                documents = listOf(importedMissingCollision),
+                replaceExisting = false,
+                nowMillis = 3_000L,
+            )
+
+            val afterMerge = withTimeout(10_000L) {
+                repository.observeUserDocuments().first { it.size == 1 }.single()
+            }
+            assertEquals(setOf(local.id), acceptedIds)
+            assertEquals(local.id, afterMerge.id)
+            assertEquals("Local book", afterMerge.title)
+            assertEquals(ContentAvailability.AVAILABLE, afterMerge.availability)
+        } finally {
+            appScope.cancel()
+            delay(100)
+            database.close()
+        }
+    }
+
+    @Test
+    fun importPortableDocuments_throwsBeforeMutationWhenIdAndFingerprintMatchDifferentRows() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val database = Room.inMemoryDatabaseBuilder(
+            context,
+            QualityAlternativeDatabase::class.java,
+        ).allowMainThreadQueries().build()
+        val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val firstFingerprint = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        val secondFingerprint = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        val ids = ArrayDeque(
+            listOf(
+                "user-document-11111111-1111-4111-8111-111111111111",
+                "user-document-22222222-2222-4222-8222-222222222222",
+            ),
+        )
+
+        try {
+            val repository = RoomUserDocumentRepository(
+                dao = database.userDocumentDao(),
+                scope = appScope,
+                bodyLoader = FixedFingerprintBodyLoader(
+                    fingerprints = mapOf(
+                        "content://quality/first" to firstFingerprint,
+                        "content://quality/second" to secondFingerprint,
+                    ),
+                ),
+                idProvider = { ids.removeFirst() },
+            )
+            repository.observeReady().first { it }
+            repository.addDocument(
+                draft = UserDocumentDraft(
+                    uri = "content://quality/first",
+                    displayName = "first.epub",
+                    mimeType = "application/epub+zip",
+                    title = "First local book",
+                    durationMinutes = 25,
+                    topicTags = setOf(TopicTag.PHILOSOPHY),
+                ),
+                nowMillis = 1_000L,
+            )
+            repository.addDocument(
+                draft = UserDocumentDraft(
+                    uri = "content://quality/second",
+                    displayName = "second.epub",
+                    mimeType = "application/epub+zip",
+                    title = "Second local book",
+                    durationMinutes = 25,
+                    topicTags = setOf(TopicTag.HISTORY),
+                ),
+                nowMillis = 2_000L,
+            )
+            val beforeMerge = withTimeout(10_000L) {
+                repository.observeUserDocuments().first { it.size == 2 }
+            }
+
+            assertThrows(PortableContentImportConflictException::class.java) {
+                runBlocking {
+                    repository.importPortableDocuments(
+                        documents = listOf(
+                            missingImportedDocument(
+                                id = "user-document-11111111-1111-4111-8111-111111111111",
+                                fingerprintSha256 = secondFingerprint,
+                            ),
+                        ),
+                        replaceExisting = false,
+                        nowMillis = 3_000L,
+                    )
+                }
+            }
+
+            val afterMerge = withTimeout(10_000L) {
+                repository.observeUserDocuments().first { it.size == 2 }
+            }
+            assertEquals(beforeMerge.map(ContentItem::id).sorted(), afterMerge.map(ContentItem::id).sorted())
+            assertEquals(
+                beforeMerge.map(ContentItem::title).sorted(),
+                afterMerge.map(ContentItem::title).sorted(),
+            )
         } finally {
             appScope.cancel()
             delay(100)
@@ -493,5 +639,39 @@ class RoomUserDocumentRepositoryTest {
         } finally {
             context.deleteDatabase(databaseName)
         }
+    }
+
+    private fun missingImportedDocument(
+        id: String,
+        fingerprintSha256: String,
+    ): ContentItem {
+        return ContentItem(
+            id = id,
+            packId = "user-documents",
+            title = "Imported missing book",
+            description = "Reattach to continue reading.",
+            durationMinutes = 25,
+            format = ContentFormat.EPUB,
+            topicTags = setOf(TopicTag.PHILOSOPHY),
+            bodyAssetPath = null,
+            externalUrl = null,
+            sourceLabel = "book.epub (missing)",
+            sourceType = ContentSourceType.USER_DOCUMENT,
+            availability = ContentAvailability.UNAVAILABLE,
+            rights = ContentRightsMetadata.userPrivateReader(
+                sourceUrl = "portable-missing:$id",
+                attribution = "book.epub",
+            ),
+            addedAtMillis = 2_000L,
+            documentFingerprintSha256 = fingerprintSha256,
+        )
+    }
+
+    private class FixedFingerprintBodyLoader(
+        private val fingerprints: Map<String, String>,
+    ) : UserDocumentBodyLoader, UserDocumentFingerprintProvider {
+        override fun loadBody(uri: String, format: ContentFormat): String = "Private body"
+
+        override fun documentFingerprintSha256(uri: String): String? = fingerprints[uri]
     }
 }

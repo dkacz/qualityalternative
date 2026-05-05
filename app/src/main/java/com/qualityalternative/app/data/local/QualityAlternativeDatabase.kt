@@ -16,7 +16,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ReadingProgressEntity::class,
         ReadingAnnotationEntity::class,
     ],
-    version = 10,
+    version = 11,
     exportSchema = true,
 )
 abstract class QualityAlternativeDatabase : RoomDatabase() {
@@ -52,6 +52,7 @@ abstract class QualityAlternativeDatabase : RoomDatabase() {
                     MIGRATION_7_8,
                     MIGRATION_8_9,
                     MIGRATION_9_10,
+                    MIGRATION_10_11,
                 )
                 .build()
         }
@@ -204,7 +205,7 @@ abstract class QualityAlternativeDatabase : RoomDatabase() {
 
         val MIGRATION_5_6 = object : Migration(5, 6) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                createUserDocumentsTable(db)
+                createUserDocumentsTableV6(db)
             }
         }
 
@@ -259,6 +260,15 @@ abstract class QualityAlternativeDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE user_documents ADD COLUMN documentFingerprintSha256 TEXT")
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_user_documents_documentFingerprintSha256 ON user_documents(documentFingerprintSha256)",
+                )
+            }
+        }
+
         private fun createUserLinksTable(db: SupportSQLiteDatabase) {
             db.execSQL(
                 """
@@ -281,7 +291,7 @@ abstract class QualityAlternativeDatabase : RoomDatabase() {
             )
         }
 
-        private fun createUserDocumentsTable(db: SupportSQLiteDatabase) {
+        private fun createUserDocumentsTableV6(db: SupportSQLiteDatabase) {
             db.execSQL(
                 """
                 CREATE TABLE IF NOT EXISTS user_documents (

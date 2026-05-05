@@ -575,6 +575,16 @@ private data class AccountLightImportSnapshot(
     val settings: AppSettings,
 )
 
+private data class AccountLightPortableLibraryImportPreflight(
+    val importedLinks: List<ContentItem>,
+    val importedDocuments: List<ContentItem>,
+    val linkPlan: PortableUserContentImportPlan,
+    val documentPlan: PortableUserContentImportPlan,
+) {
+    val contentIdMapping: Map<String, String>
+        get() = linkPlan.contentIdMapping + documentPlan.contentIdMapping
+}
+
 class AccountLightProfileImporter(
     private val settingsRepository: SettingsRepository,
     private val userLinkRepository: UserLinkRepository? = null,
@@ -642,10 +652,12 @@ class AccountLightProfileImporter(
             document.documentImportState == "MISSING_FILE_NEEDS_REATTACH" ||
                 document.documentFingerprint.strategy == "UNVERIFIED_METADATA_ONLY"
         }
+        val retainedLocalWarnings = retainedLocalLibraryWarnings(profile)
         val generatedWarnings = unknownFieldWarnings(root) +
             unsupportedAppWarnings(unsupportedAppCount) +
             missingDocumentWarnings(missingDocumentCount) +
-            duplicateScalarWarnings(profile.settings)
+            duplicateScalarWarnings(profile.settings) +
+            retainedLocalWarnings
         val allWarnings = profile.warnings + generatedWarnings
         return AccountLightImportPlan(
             profile = profile,
@@ -760,24 +772,33 @@ class AccountLightProfileImporter(
         plan: AccountLightImportPlan,
         replaceExisting: Boolean,
     ) {
-        val importedLinks = plan.profile.library.userLinks.map(AccountLightUserLink::toContentItem)
-        val importedDocuments = plan.profile.library.userDocuments.map(AccountLightUserDocument::toMissingContentItem)
+        val preflight = preflightPortableLibraryImport(
+            profile = plan.profile,
+            replaceExisting = replaceExisting,
+        )
         val acceptedLinkContentIds = importPortableLinksOrThrow(
-            links = importedLinks,
+            links = preflight.importedLinks,
             replaceExisting = replaceExisting,
             nowMillis = plan.profile.exportedAtMillis,
         )
         val acceptedDocumentContentIds = importPortableDocumentsOrThrow(
-            documents = importedDocuments,
+            documents = preflight.importedDocuments,
             replaceExisting = replaceExisting,
             nowMillis = plan.profile.exportedAtMillis,
         )
         val progressRepository = readingProgressRepository ?: return
         val localKnownIds = knownContentIdsProvider()
-        val importedContentIds = acceptedLinkContentIds + acceptedDocumentContentIds
+        val acceptedContentIds = acceptedLinkContentIds + acceptedDocumentContentIds
+        val contentIdMapping = preflight.contentIdMapping
         val activeProgress = plan.profile.reading.progress
-            .filter { progress -> progress.contentId in localKnownIds || progress.contentId in importedContentIds }
-            .map(AccountLightReadingProgress::toReadingProgress)
+            .mapNotNull { progress ->
+                val targetContentId = contentIdMapping[progress.contentId] ?: progress.contentId
+                if (targetContentId in localKnownIds || targetContentId in acceptedContentIds) {
+                    progress.toReadingProgress(contentId = targetContentId)
+                } else {
+                    null
+                }
+            }
         if (replaceExisting) {
             progressRepository.replaceReadingProgress(activeProgress)
         } else {
@@ -786,6 +807,46 @@ class AccountLightProfileImporter(
                 .filter { progress -> progress.contentId !in currentProgressIds }
                 .forEach { progress -> progressRepository.saveProgress(progress) }
         }
+    }
+
+    private fun preflightPortableLibraryImport(
+        profile: AccountLightProfileFile,
+        replaceExisting: Boolean,
+    ): AccountLightPortableLibraryImportPreflight {
+        val importedLinks = profile.library.userLinks.map(AccountLightUserLink::toContentItem)
+        val importedDocuments = profile.library.userDocuments.map(AccountLightUserDocument::toMissingContentItem)
+        return try {
+            AccountLightPortableLibraryImportPreflight(
+                importedLinks = importedLinks,
+                importedDocuments = importedDocuments,
+                linkPlan = portableUserContentImportPlan(
+                    current = userLinkRepository?.userLinks().orEmpty(),
+                    imported = importedLinks,
+                    replaceExisting = replaceExisting,
+                    secondaryKey = ContentItem::externalUrl,
+                ),
+                documentPlan = portableUserContentImportPlan(
+                    current = userDocumentRepository?.userDocuments().orEmpty(),
+                    imported = importedDocuments,
+                    replaceExisting = replaceExisting,
+                    secondaryKey = ContentItem::verifiedDocumentFingerprintSha256,
+                ),
+            )
+        } catch (exception: PortableContentImportConflictException) {
+            throw AccountLightImportException(
+                code = AccountLightImportErrorCode.CONTENT_ID_SECONDARY_KEY_CONFLICT,
+                message = "Portable profile content ids conflict with local saved content.",
+                cause = exception,
+            )
+        }
+    }
+
+    private fun retainedLocalLibraryWarnings(profile: AccountLightProfileFile): List<AccountLightWarning> {
+        val preflight = preflightPortableLibraryImport(profile = profile, replaceExisting = false)
+        return listOfNotNull(
+            preflight.linkPlan.retainedLocalWarning(section = "library.userLinks"),
+            preflight.documentPlan.retainedLocalWarning(section = "library.userDocuments"),
+        )
     }
 
     private suspend fun importPortableLinksOrThrow(
@@ -1572,10 +1633,11 @@ private fun AccountLightUserDocument.toMissingContentItem(): ContentItem {
             ContentRightsMetadata.userPrivateReader(sourceUrl = sourceReference, attribution = display)
         },
         addedAtMillis = createdAtMillis,
+        documentFingerprintSha256 = documentFingerprint.verifiedSha256OrNull(),
     )
 }
 
-private fun AccountLightReadingProgress.toReadingProgress(): ReadingProgress {
+private fun AccountLightReadingProgress.toReadingProgress(contentId: String = this.contentId): ReadingProgress {
     return ReadingProgress(
         contentId = contentId,
         progressPercent = progressPercent,
@@ -1584,6 +1646,12 @@ private fun AccountLightReadingProgress.toReadingProgress(): ReadingProgress {
         updatedAtMillis = updatedAtMillis,
         completedAtMillis = completedAtMillis,
     )
+}
+
+private fun AccountLightDocumentFingerprint.verifiedSha256OrNull(): String? {
+    return sha256?.takeIf { fingerprint ->
+        strategy != "UNVERIFIED_METADATA_ONLY" && fingerprint.matches(Sha256Regex)
+    }
 }
 
 private fun AppSettings.toAccountLightAnnotations(): AccountLightAnnotations {
@@ -1699,6 +1767,19 @@ private fun Collection<String>.invalidPortableContentIdsWarning(
             severity = "WARNING",
             section = section,
             message = "One or more stored content references were omitted because they are not portable profile content ids.",
+        )
+    } else {
+        null
+    }
+}
+
+private fun PortableUserContentImportPlan.retainedLocalWarning(section: String): AccountLightWarning? {
+    return if (contentIdMapping.any { (importedId, localId) -> importedId != localId }) {
+        AccountLightWarning(
+            code = "CONFLICT_RETAINED_LOCAL_VALUE",
+            severity = "WARNING",
+            section = section,
+            message = "Imported library metadata matched existing local content, so local values were retained.",
         )
     } else {
         null

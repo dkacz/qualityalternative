@@ -18,6 +18,7 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeRight
 import androidx.compose.ui.test.swipeUp
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
@@ -518,7 +519,7 @@ class VisualQaScreenshotTest {
     @Test
     fun captureSprint12LibraryManageScreens() {
         launchOnboardedApp()
-        seedSprint12LibraryManageContent()
+        val savedLinkId = seedSprint12LibraryManageContent()
 
         openTab("tab-library", "library-list")
         composeRule.onNodeWithTag("library-manage-toggle")
@@ -540,7 +541,7 @@ class VisualQaScreenshotTest {
             .assertIsDisplayed()
             .performClick()
 
-        val selectTag = "library-select-user-link:9fc84fe76d22668b6556dad16b5e5f6dc6667b571c585ff3766449738cf56cb8"
+        val selectTag = "library-select-$savedLinkId"
         composeRule.onNodeWithTag("library-list")
             .performScrollToNode(hasTestTag(selectTag))
         composeRule.onNodeWithTag(selectTag)
@@ -1217,7 +1218,7 @@ class VisualQaScreenshotTest {
         composeRule.waitUntil(timeoutMillis = 10_000) { hasNodeContaining("2/") }
         captureSprint15Slice152("03_tap_advances_page_light")
 
-        UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).pressBack()
+        composeRule.onNodeWithTag("reader-page-viewport").performTouchInput { swipeRight() }
         composeRule.waitUntil(timeoutMillis = 10_000) { hasNodeContaining("1/") && hasNode("Chapter One") }
         composeRule.onNodeWithTag("reader-toc-open").performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-toc-sheet") }
@@ -1650,7 +1651,7 @@ class VisualQaScreenshotTest {
         "creativity_play_v1",
     )
 
-    private fun seedSprint12LibraryManageContent() = runBlocking {
+    private fun seedSprint12LibraryManageContent(): String = runBlocking {
         val app = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication)
         app.appContainer.userLinkRepository.observeReady().first { it }
         val result = app.appContainer.userLinkRepository.addLink(
@@ -1672,6 +1673,7 @@ class VisualQaScreenshotTest {
                 selectedPackIds = setOf("attention-classics-v1"),
             ),
         )
+        (result as AddUserLinkResult.Added).item.id
     }
 
     private fun seedSupportedAppSelection() = runBlocking {

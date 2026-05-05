@@ -362,7 +362,14 @@ class MainActivityTest {
         composeRule.waitUntil(timeoutMillis = 10_000) { hasNode("Ready when you are") }
         composeRule.onNodeWithTag("add-link-done").performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("library-list") }
-        val deletedLinkId = "user-link:918123c9245605b90800494db814f2b6282ee47d915b479427b52aa7fe1b9805"
+        var deletedLinkId = ""
+        scenario?.onActivity { activity ->
+            val app = activity.application as QualityAlternativeApplication
+            deletedLinkId = app.appContainer.userLinkRepository.userLinks()
+                .first { item -> item.externalUrl == "https://example.com/delete-me" }
+                .id
+        }
+        assertTrue(deletedLinkId.isNotBlank())
         seedReadingAnnotation(
             contentId = deletedLinkId,
             paragraphIndex = 1,
@@ -1179,7 +1186,7 @@ class MainActivityTest {
             .performScrollToNode(hasTestTag("settings-annotation-export-status"))
         composeRule.onNodeWithText("qa-annotations-e2e.jsonld").assertIsDisplayed()
         composeRule.onNodeWithTag("settings-annotation-export-status").assertIsDisplayed()
-        composeRule.onNodeWithText("Save now").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings-annotation-export-save-now").assertIsDisplayed()
         scenario?.onActivity { activity -> activity.mainViewModel.dismissMessage() }
         composeRule.waitForIdle()
         captureSprint14AnnotationExportScreenshot("01_annotation_export_success_light")

@@ -8,6 +8,7 @@ import androidx.room.PrimaryKey
     tableName = "user_documents",
     indices = [
         Index(value = ["uri"], unique = true),
+        Index(value = ["documentFingerprintSha256"]),
     ],
 )
 data class UserDocumentEntity(
@@ -23,4 +24,5 @@ data class UserDocumentEntity(
     val availability: String,
     val createdAtMillis: Long,
     val updatedAtMillis: Long,
+    val documentFingerprintSha256: String?,
 )
