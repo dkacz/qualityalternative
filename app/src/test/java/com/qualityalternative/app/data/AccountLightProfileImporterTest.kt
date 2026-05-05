@@ -612,6 +612,59 @@ class AccountLightProfileImporterTest {
     }
 
     @Test
+    fun applyMergeStopsBeforeProgressWhenPortableContentIdsConflict() = runBlocking {
+        val target = PreferencesSettingsRepository(
+            dataStore = testDataStore(),
+            supportedApps = SupportedCatalog.distractingApps,
+        )
+        val readingProgressRepository = RecordingReadingProgressRepository()
+        val linkContentId = "user-link-33333333-3333-4333-8333-333333333333"
+        val importer = AccountLightProfileImporter(
+            settingsRepository = target,
+            userLinkRepository = ConflictingUserLinkRepository(),
+            readingProgressRepository = readingProgressRepository,
+        )
+        val plan = importer.validateImportProfileJson(
+            validProfileJson()
+                .withUserLinks(listOf(validUserLink(contentId = linkContentId)))
+                .withReadingProgressFor(contentId = linkContentId),
+        )
+
+        val error = assertThrows(AccountLightImportException::class.java) {
+            runBlocking { importer.applyMerge(plan) }
+        }
+
+        assertEquals(AccountLightImportErrorCode.CONTENT_ID_SECONDARY_KEY_CONFLICT, error.code)
+        assertTrue(readingProgressRepository.progress.isEmpty())
+    }
+
+    @Test
+    fun applyMergeStoresProgressOnlyForAcceptedImportedContentIds() = runBlocking {
+        val target = PreferencesSettingsRepository(
+            dataStore = testDataStore(),
+            supportedApps = SupportedCatalog.distractingApps,
+        )
+        val linkRepository = RejectingImportedUserLinkRepository()
+        val readingProgressRepository = RecordingReadingProgressRepository()
+        val linkContentId = "user-link-33333333-3333-4333-8333-333333333333"
+        val importer = AccountLightProfileImporter(
+            settingsRepository = target,
+            userLinkRepository = linkRepository,
+            readingProgressRepository = readingProgressRepository,
+        )
+        val plan = importer.validateImportProfileJson(
+            validProfileJson()
+                .withUserLinks(listOf(validUserLink(contentId = linkContentId)))
+                .withReadingProgressFor(contentId = linkContentId),
+        )
+
+        importer.applyMerge(plan)
+
+        assertEquals(listOf(linkContentId), linkRepository.seenContentIds)
+        assertTrue(readingProgressRepository.progress.isEmpty())
+    }
+
+    @Test
     fun applyReplace_restoresLibraryWhenProgressImportFails() = runBlocking {
         val target = PreferencesSettingsRepository(
             dataStore = testDataStore(),
@@ -1118,6 +1171,47 @@ class AccountLightProfileImporterTest {
         return PreferenceDataStoreFactory.create(produceFile = { file })
     }
 
+    private class ConflictingUserLinkRepository : UserLinkRepository {
+        override fun userLinks(): List<ContentItem> = emptyList()
+
+        override suspend fun addLink(draft: UserLinkDraft, nowMillis: Long): AddUserLinkResult =
+            error("Not used by portable import tests.")
+
+        override suspend fun markUnavailable(contentId: String, nowMillis: Long) = Unit
+
+        override suspend fun deleteLink(contentId: String) = Unit
+
+        override suspend fun importPortableLinks(
+            links: List<ContentItem>,
+            replaceExisting: Boolean,
+            nowMillis: Long,
+        ): Set<String> {
+            throw PortableContentImportConflictException("Simulated contentId secondary key conflict.")
+        }
+    }
+
+    private class RejectingImportedUserLinkRepository : UserLinkRepository {
+        var seenContentIds: List<String> = emptyList()
+
+        override fun userLinks(): List<ContentItem> = emptyList()
+
+        override suspend fun addLink(draft: UserLinkDraft, nowMillis: Long): AddUserLinkResult =
+            error("Not used by portable import tests.")
+
+        override suspend fun markUnavailable(contentId: String, nowMillis: Long) = Unit
+
+        override suspend fun deleteLink(contentId: String) = Unit
+
+        override suspend fun importPortableLinks(
+            links: List<ContentItem>,
+            replaceExisting: Boolean,
+            nowMillis: Long,
+        ): Set<String> {
+            seenContentIds = links.map(ContentItem::id)
+            return emptySet()
+        }
+    }
+
     private class RecordingUserLinkRepository : UserLinkRepository {
         var links: List<ContentItem> = emptyList()
 
@@ -1134,8 +1228,9 @@ class AccountLightProfileImporterTest {
             links: List<ContentItem>,
             replaceExisting: Boolean,
             nowMillis: Long,
-        ) {
+        ): Set<String> {
             this.links = links
+            return links.mapTo(mutableSetOf(), ContentItem::id)
         }
     }
 
@@ -1155,8 +1250,9 @@ class AccountLightProfileImporterTest {
             documents: List<ContentItem>,
             replaceExisting: Boolean,
             nowMillis: Long,
-        ) {
+        ): Set<String> {
             this.documents = documents
+            return documents.mapTo(mutableSetOf(), ContentItem::id)
         }
     }
 

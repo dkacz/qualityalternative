@@ -212,7 +212,7 @@ class AccountLightProfileExporterTest {
             supportedApps = SupportedCatalog.distractingApps,
         )
         val link = ContentItem(
-            id = "user-link:legacy-local-id",
+            id = "user-link-11111111-1111-4111-8111-111111111111",
             packId = "user-links",
             title = "Saved essay",
             description = "A saved link from content://com.android.providers.media.documents/document/raw-link.",
@@ -312,7 +312,7 @@ class AccountLightProfileExporterTest {
             ),
         )
         val document = ContentItem(
-            id = "user-document:legacy-local-id",
+            id = "user-document-33333333-3333-4333-8333-333333333333",
             packId = "user-documents",
             title = "Imported book",
             description = "A private EPUB from user@example.com with oauth token text.",

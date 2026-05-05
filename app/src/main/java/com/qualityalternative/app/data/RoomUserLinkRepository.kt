@@ -11,7 +11,7 @@ import com.qualityalternative.app.domain.model.TopicTag
 import com.qualityalternative.app.domain.model.UserLinkDraft
 import com.qualityalternative.app.domain.service.AddUserLinkResult
 import com.qualityalternative.app.domain.service.UserLinkRepository
-import java.security.MessageDigest
+import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,7 +22,7 @@ import kotlinx.coroutines.launch
 class RoomUserLinkRepository(
     private val dao: UserLinkDao,
     private val scope: CoroutineScope,
-    private val idProvider: (String) -> String = ::stableUserLinkId,
+    private val idProvider: () -> String = ::randomUserLinkId,
 ) : UserLinkRepository {
     private val links = MutableStateFlow(emptyList<ContentItem>())
     private val ready = MutableStateFlow(false)
@@ -55,7 +55,7 @@ class RoomUserLinkRepository(
         val existing = dao.findByNormalizedUrl(normalizedUrl)
         val createdAtMillis = existing?.createdAtMillis ?: nowMillis
         val item = ContentItem(
-            id = existing?.id ?: idProvider(normalizedUrl),
+            id = existing?.id ?: idProvider(),
             packId = USER_LINK_PACK_ID,
             title = draft.title.trim(),
             description = draft.description.trim().ifBlank { normalizedUrl },
@@ -103,8 +103,14 @@ class RoomUserLinkRepository(
         links: List<ContentItem>,
         replaceExisting: Boolean,
         nowMillis: Long,
-    ) {
+    ): Set<String> {
         val existingLinks = this.links.value
+        val importPlan = portableUserContentImportPlan(
+            current = existingLinks,
+            imported = links,
+            replaceExisting = replaceExisting,
+            secondaryKey = ContentItem::externalUrl,
+        )
         if (replaceExisting) {
             val retainedIds = links.mapTo(mutableSetOf(), ContentItem::id)
             if (retainedIds.isEmpty()) {
@@ -113,18 +119,7 @@ class RoomUserLinkRepository(
                 dao.deleteAllExcept(retainedIds)
             }
         }
-        val linksToImport = if (replaceExisting) {
-            links
-        } else {
-            val existingIds = existingLinks.mapTo(mutableSetOf(), ContentItem::id)
-            val existingUrls = existingLinks.mapNotNullTo(mutableSetOf()) { item ->
-                item.externalUrl?.takeIf(String::isNotBlank)
-            }
-            links.filter { item ->
-                item.id !in existingIds &&
-                    item.externalUrl?.takeIf(String::isNotBlank) !in existingUrls
-            }
-        }
+        val linksToImport = importPlan.itemsToImport
         linksToImport.forEach { item ->
             dao.insertOrReplace(
                 item.toEntity(
@@ -138,6 +133,7 @@ class RoomUserLinkRepository(
             imported = linksToImport,
             secondaryKey = ContentItem::externalUrl,
         )
+        return importPlan.acceptedContentIds
     }
 
     override fun isReady(): Boolean = ready.value
@@ -217,12 +213,104 @@ internal fun upsertUserLinkForOptimisticState(
     }
 }
 
-private fun stableUserLinkId(normalizedUrl: String): String {
-    val digest = MessageDigest.getInstance("SHA-256")
-        .digest(normalizedUrl.toByteArray(Charsets.UTF_8))
-        .joinToString("") { byte -> "%02x".format(byte) }
-    return "user-link-${digest.toUuidLikeSuffix()}"
+private fun randomUserLinkId(): String = "user-link-${UUID.randomUUID()}"
+
+class PortableContentImportConflictException(
+    message: String,
+) : IllegalStateException(message)
+
+internal data class PortableUserContentImportPlan(
+    val itemsToImport: List<ContentItem>,
+    val acceptedContentIds: Set<String>,
+)
+
+internal fun portableUserContentImportPlan(
+    current: List<ContentItem>,
+    imported: List<ContentItem>,
+    replaceExisting: Boolean,
+    secondaryKey: (ContentItem) -> String?,
+): PortableUserContentImportPlan {
+    val distinctImported = imported.distinctPortableUserContentOrThrow(secondaryKey = secondaryKey)
+    val currentById = current.associateBy(ContentItem::id)
+    val currentBySecondary = current
+        .mapNotNull { item -> secondaryKey(item).portableSecondaryKeyOrNull()?.let { key -> key to item } }
+        .toMap()
+
+    distinctImported.forEach { item ->
+        val importedSecondary = secondaryKey(item).portableSecondaryKeyOrNull()
+        val existingById = currentById[item.id]
+        val existingBySecondary = importedSecondary?.let(currentBySecondary::get)
+        if (existingById != null && existingBySecondary != null && existingById.id != existingBySecondary.id) {
+            throw PortableContentImportConflictException(
+                "Imported contentId and secondary key match two different local records.",
+            )
+        }
+    }
+
+    if (replaceExisting) {
+        return PortableUserContentImportPlan(
+            itemsToImport = distinctImported,
+            acceptedContentIds = distinctImported.mapTo(mutableSetOf(), ContentItem::id),
+        )
+    }
+
+    val itemsToImport = mutableListOf<ContentItem>()
+    val acceptedContentIds = mutableSetOf<String>()
+
+    distinctImported.forEach { item ->
+        val importedSecondary = secondaryKey(item).portableSecondaryKeyOrNull()
+        val existingById = currentById[item.id]
+        val existingBySecondary = importedSecondary?.let(currentBySecondary::get)
+        val existing = existingById ?: existingBySecondary
+        if (existing == null) {
+            itemsToImport += item
+            acceptedContentIds += item.id
+        } else if (
+            existing.id == item.id &&
+            (importedSecondary == null || secondaryKey(existing).portableSecondaryKeyOrNull() == importedSecondary)
+        ) {
+            acceptedContentIds += existing.id
+        } else {
+            throw PortableContentImportConflictException(
+                "Imported contentId or secondary key conflicts with a different local record.",
+            )
+        }
+    }
+
+    return PortableUserContentImportPlan(
+        itemsToImport = itemsToImport,
+        acceptedContentIds = acceptedContentIds,
+    )
 }
+
+private fun List<ContentItem>.distinctPortableUserContentOrThrow(
+    secondaryKey: (ContentItem) -> String?,
+): List<ContentItem> {
+    val seenById = mutableMapOf<String, ContentItem>()
+    val seenBySecondary = mutableMapOf<String, ContentItem>()
+    val result = mutableListOf<ContentItem>()
+    forEach { item ->
+        val existingById = seenById[item.id]
+        val secondary = secondaryKey(item).portableSecondaryKeyOrNull()
+        val existingBySecondary = secondary?.let(seenBySecondary::get)
+        if (existingById != null && secondaryKey(existingById).portableSecondaryKeyOrNull() != secondary) {
+            throw PortableContentImportConflictException("Imported profile contains duplicate contentId conflict.")
+        }
+        if (existingBySecondary != null && existingBySecondary.id != item.id) {
+            throw PortableContentImportConflictException("Imported profile contains duplicate secondary key conflict.")
+        }
+        if (existingById == null && existingBySecondary == null) {
+            result += item
+        }
+        seenById[item.id] = item
+        if (secondary != null) {
+            seenBySecondary[secondary] = item
+        }
+    }
+    return result
+}
+
+private fun String?.portableSecondaryKeyOrNull(): String? = this?.takeIf(String::isNotBlank)
 
 internal fun mergeImportedUserContent(
     current: List<ContentItem>,
@@ -242,15 +330,4 @@ internal fun mergeImportedUserContent(
             listOf(item) + merged
         }
     }
-}
-
-internal fun String.toUuidLikeSuffix(): String {
-    val padded = padEnd(32, '0')
-    return listOf(
-        padded.substring(0, 8),
-        padded.substring(8, 12),
-        padded.substring(12, 16),
-        padded.substring(16, 20),
-        padded.substring(20, 32),
-    ).joinToString("-")
 }

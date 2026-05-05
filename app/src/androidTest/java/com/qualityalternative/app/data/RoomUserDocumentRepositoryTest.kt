@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
@@ -45,7 +46,7 @@ class RoomUserDocumentRepositoryTest {
                 dao = database.userDocumentDao(),
                 scope = appScope,
                 bodyLoader = UserDocumentBodyLoader { _, _ -> "Private **Markdown** body." },
-                idProvider = { _ -> "user-document:test" },
+                idProvider = { "user-document:test" },
             )
             repository.observeReady().first { it }
 
@@ -82,7 +83,7 @@ class RoomUserDocumentRepositoryTest {
                 dao = database.userDocumentDao(),
                 scope = reloadedScope,
                 bodyLoader = UserDocumentBodyLoader { _, _ -> "Reloaded body" },
-                idProvider = { _ -> "user-document:unused" },
+                idProvider = { "user-document:unused" },
             )
             try {
                 val reloaded = withTimeout(10_000L) {
@@ -113,7 +114,7 @@ class RoomUserDocumentRepositoryTest {
                 dao = database.userDocumentDao(),
                 scope = appScope,
                 bodyLoader = UserDocumentBodyLoader { _, _ -> "Private body" },
-                idProvider = { _ -> "user-document-44444444-4444-4444-8444-444444444444" },
+                idProvider = { "user-document-44444444-4444-4444-8444-444444444444" },
             )
             repository.observeReady().first { it }
             repository.addDocument(
@@ -184,7 +185,7 @@ class RoomUserDocumentRepositoryTest {
                 dao = database.userDocumentDao(),
                 scope = appScope,
                 bodyLoader = UserDocumentBodyLoader { _, _ -> error("PDF should not be loaded into reader") },
-                idProvider = { _ -> "user-document:pdf" },
+                idProvider = { "user-document:pdf" },
             )
             repository.observeReady().first { it }
 
@@ -229,7 +230,7 @@ class RoomUserDocumentRepositoryTest {
                 dao = database.userDocumentDao(),
                 scope = appScope,
                 bodyLoader = UserDocumentBodyLoader { _, _ -> "Private body" },
-                idProvider = { _ -> "user-document:test" },
+                idProvider = { "user-document:test" },
             )
             repository.observeReady().first { it }
             repository.addDocument(
@@ -257,7 +258,7 @@ class RoomUserDocumentRepositoryTest {
                 dao = database.userDocumentDao(),
                 scope = reloadedScope,
                 bodyLoader = UserDocumentBodyLoader { _, _ -> "Reloaded body" },
-                idProvider = { _ -> "user-document:unused" },
+                idProvider = { "user-document:unused" },
             )
             try {
                 assertEquals(
@@ -291,7 +292,7 @@ class RoomUserDocumentRepositoryTest {
                     assertEquals(ContentFormat.EPUB, format)
                     "Extracted EPUB text."
                 },
-                idProvider = { _ -> "user-document:epub" },
+                idProvider = { "user-document:epub" },
             )
             repository.observeReady().first { it }
 
@@ -321,6 +322,51 @@ class RoomUserDocumentRepositoryTest {
             delay(100)
             database.close()
         }
+    }
+
+    @Test
+    fun addDocument_defaultIdsAreRandomUuidV4PerIndependentRecord() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val idRegex = Regex("^user-document-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
+
+        suspend fun createSavedId(): String {
+            val database = Room.inMemoryDatabaseBuilder(
+                context,
+                QualityAlternativeDatabase::class.java,
+            ).allowMainThreadQueries().build()
+            val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+            return try {
+                val repository = RoomUserDocumentRepository(
+                    dao = database.userDocumentDao(),
+                    scope = appScope,
+                    bodyLoader = UserDocumentBodyLoader { _, _ -> "Private body" },
+                )
+                repository.observeReady().first { it }
+                val result = repository.addDocument(
+                    draft = UserDocumentDraft(
+                        uri = "content://quality/same-notes",
+                        displayName = "same-notes.md",
+                        mimeType = "text/markdown",
+                        title = "Same notes",
+                        durationMinutes = 8,
+                        topicTags = setOf(TopicTag.PSYCHOLOGY),
+                    ),
+                    nowMillis = 1_000L,
+                ) as AddUserDocumentResult.Added
+                result.item.id
+            } finally {
+                appScope.cancel()
+                delay(100)
+                database.close()
+            }
+        }
+
+        val firstId = createSavedId()
+        val secondId = createSavedId()
+
+        assertTrue(firstId.matches(idRegex))
+        assertTrue(secondId.matches(idRegex))
+        assertNotEquals(firstId, secondId)
     }
 
     @Test

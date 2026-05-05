@@ -73,7 +73,7 @@ interface UserLinkRepository {
         links: List<ContentItem>,
         replaceExisting: Boolean,
         nowMillis: Long = System.currentTimeMillis(),
-    ) = Unit
+    ): Set<String> = links.mapTo(mutableSetOf(), ContentItem::id)
 
     fun isReady(): Boolean = true
 
@@ -101,7 +101,7 @@ interface UserDocumentRepository {
         documents: List<ContentItem>,
         replaceExisting: Boolean,
         nowMillis: Long = System.currentTimeMillis(),
-    ) = Unit
+    ): Set<String> = documents.mapTo(mutableSetOf(), ContentItem::id)
 
     fun contentBody(item: ContentItem): String = item.description
 

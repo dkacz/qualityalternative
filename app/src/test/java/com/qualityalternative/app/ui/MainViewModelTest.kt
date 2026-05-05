@@ -1581,7 +1581,7 @@ class MainViewModelTest {
         assertEquals("Saved essay", userLinkRepository.links.value.single().title)
         assertEquals("Saved essay", viewModel.uiState.userLinks.single().title)
         val event = analyticsTracker.allEvents().first { it.type == AnalyticsEventType.USER_LINK_ADDED }
-        assertEquals("user-link:1", event.contentId)
+        assertEquals(userLinkRepository.links.value.single().id, event.contentId)
         assertEquals("USER_LINK", event.metadata["sourceType"])
         assertEquals("USER_PRIVATE", event.metadata["rightsClass"])
         assertEquals("EXTERNAL_HANDOFF", event.metadata["renderMode"])
@@ -1624,7 +1624,7 @@ class MainViewModelTest {
         assertEquals("notes", userDocumentRepository.documents.value.single().title)
         assertEquals("notes", viewModel.uiState.userDocuments.single().title)
         val event = analyticsTracker.allEvents().first { it.type == AnalyticsEventType.USER_DOCUMENT_ADDED }
-        assertEquals("user-document:1", event.contentId)
+        assertEquals(userDocumentRepository.documents.value.single().id, event.contentId)
         assertEquals("USER_DOCUMENT", event.metadata["sourceType"])
         assertEquals("USER_PRIVATE", event.metadata["rightsClass"])
         assertEquals("USER_PRIVATE_READER", event.metadata["renderMode"])
@@ -3359,7 +3359,7 @@ class MainViewModelTest {
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
     fun accountLightMergeImportFailureShowsVisibleRollbackError() = runTest {
-        val importedLink = savedUserLink(id = "local-link-before-export")
+        val importedLink = savedUserLink(id = "user-link-99999999-9999-4999-8999-999999999999")
         val importedProgress = ReadingProgress(
             contentId = importedLink.id,
             lastVisibleParagraphIndex = 2,
@@ -4219,7 +4219,7 @@ class MainViewModelTest {
                 return AddUserLinkResult.Rejected(setOf(UserLinkValidationError.UNSUPPORTED_SCHEME))
             }
             val item = ContentItem(
-                id = "user-link:${++nextId}",
+                id = "user-link-00000000-0000-4000-8000-${(++nextId).toString().padStart(12, '0')}",
                 packId = "user-links",
                 title = draft.title.trim(),
                 description = draft.url.trim(),
@@ -4278,7 +4278,7 @@ class MainViewModelTest {
             }
             addedDrafts += draft
             val item = ContentItem(
-                id = "user-document:${++nextId}",
+                id = "user-document-00000000-0000-4000-8000-${(++nextId).toString().padStart(12, '0')}",
                 packId = "user-documents",
                 title = draft.title.trim(),
                 description = draft.displayName,

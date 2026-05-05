@@ -479,7 +479,7 @@ class AccountLightProfileExporter(
                 portableUserDocuments.map(AccountLightUserDocument::contentId)
             ).toSet()
         val omittedPortableUserContentIds = (userLinks + userDocuments)
-            .mapTo(mutableSetOf()) { item -> item.portableContentId() } - portableContentIds
+            .mapNotNullTo(mutableSetOf()) { item -> item.portableContentId() } - portableContentIds
         val contentIdMapping = portableUserLinkPairs
             .associate { (localId, portable) -> localId to portable.contentId } +
             portableUserDocumentPairs.associate { (localId, portable) -> localId to portable.contentId }
@@ -527,6 +527,7 @@ enum class AccountLightImportErrorCode {
     MALFORMED_JSON,
     MISSING_TOP_LEVEL_SECTION,
     UNSUPPORTED_SCHEMA_VERSION,
+    CONTENT_ID_SECONDARY_KEY_CONFLICT,
     INVALID_PROFILE,
 }
 
@@ -761,20 +762,19 @@ class AccountLightProfileImporter(
     ) {
         val importedLinks = plan.profile.library.userLinks.map(AccountLightUserLink::toContentItem)
         val importedDocuments = plan.profile.library.userDocuments.map(AccountLightUserDocument::toMissingContentItem)
-        userLinkRepository?.importPortableLinks(
+        val acceptedLinkContentIds = importPortableLinksOrThrow(
             links = importedLinks,
             replaceExisting = replaceExisting,
             nowMillis = plan.profile.exportedAtMillis,
         )
-        userDocumentRepository?.importPortableDocuments(
+        val acceptedDocumentContentIds = importPortableDocumentsOrThrow(
             documents = importedDocuments,
             replaceExisting = replaceExisting,
             nowMillis = plan.profile.exportedAtMillis,
         )
         val progressRepository = readingProgressRepository ?: return
         val localKnownIds = knownContentIdsProvider()
-        val importedContentIds = importedLinks.mapTo(mutableSetOf(), ContentItem::id) +
-            importedDocuments.map(ContentItem::id)
+        val importedContentIds = acceptedLinkContentIds + acceptedDocumentContentIds
         val activeProgress = plan.profile.reading.progress
             .filter { progress -> progress.contentId in localKnownIds || progress.contentId in importedContentIds }
             .map(AccountLightReadingProgress::toReadingProgress)
@@ -785,6 +785,46 @@ class AccountLightProfileImporter(
             activeProgress
                 .filter { progress -> progress.contentId !in currentProgressIds }
                 .forEach { progress -> progressRepository.saveProgress(progress) }
+        }
+    }
+
+    private suspend fun importPortableLinksOrThrow(
+        links: List<ContentItem>,
+        replaceExisting: Boolean,
+        nowMillis: Long,
+    ): Set<String> {
+        return try {
+            userLinkRepository?.importPortableLinks(
+                links = links,
+                replaceExisting = replaceExisting,
+                nowMillis = nowMillis,
+            ).orEmpty()
+        } catch (exception: PortableContentImportConflictException) {
+            throw AccountLightImportException(
+                code = AccountLightImportErrorCode.CONTENT_ID_SECONDARY_KEY_CONFLICT,
+                message = "Portable profile content ids conflict with local saved links.",
+                cause = exception,
+            )
+        }
+    }
+
+    private suspend fun importPortableDocumentsOrThrow(
+        documents: List<ContentItem>,
+        replaceExisting: Boolean,
+        nowMillis: Long,
+    ): Set<String> {
+        return try {
+            userDocumentRepository?.importPortableDocuments(
+                documents = documents,
+                replaceExisting = replaceExisting,
+                nowMillis = nowMillis,
+            ).orEmpty()
+        } catch (exception: PortableContentImportConflictException) {
+            throw AccountLightImportException(
+                code = AccountLightImportErrorCode.CONTENT_ID_SECONDARY_KEY_CONFLICT,
+                message = "Portable profile content ids conflict with local documents.",
+                cause = exception,
+            )
         }
     }
 
@@ -1412,13 +1452,14 @@ private fun AppSettings.toAccountLightSettings(
 
 private fun ContentItem.toAccountLightUserLink(exportedAtMillis: Long): AccountLightUserLink? {
     if (sourceType != ContentSourceType.USER_LINK) return null
+    val contentId = portableContentId() ?: return null
     val url = externalUrl?.takeIf(String::isNotBlank) ?: rights.sourceUrl?.takeIf(String::isNotBlank) ?: return null
     val normalizedUrl = UserLinkValidator.validateUrl(url).normalizedUrl ?: return null
     if (!normalizedUrl.isSafePortableUserLinkUrl()) return null
     val portableTitle = title.trim().takeIf { it.isSafePortableTitle() } ?: return null
     val createdAtMillis = addedAtMillis?.coerceAtLeast(0L) ?: exportedAtMillis
     return AccountLightUserLink(
-        contentId = portableContentId(),
+        contentId = contentId,
         normalizedUrl = normalizedUrl,
         title = portableTitle,
         description = description.toPortableDescriptionOrFallback("Saved link metadata."),
@@ -1433,6 +1474,7 @@ private fun ContentItem.toAccountLightUserLink(exportedAtMillis: Long): AccountL
 
 private fun ContentItem.toAccountLightUserDocument(exportedAtMillis: Long): AccountLightUserDocument? {
     if (sourceType != ContentSourceType.USER_DOCUMENT) return null
+    val contentId = portableContentId() ?: return null
     val portableFormat = format.takeIf { it.name in DocumentFormatValues } ?: return null
     val portableTitle = title.trim().takeIf { it.isSafePortableTitle() } ?: return null
     val createdAtMillis = addedAtMillis?.coerceAtLeast(0L) ?: exportedAtMillis
@@ -1440,7 +1482,7 @@ private fun ContentItem.toAccountLightUserDocument(exportedAtMillis: Long): Acco
         ?: portableTitle.toPortableSourceHintOrNull()
         ?: "Imported document"
     return AccountLightUserDocument(
-        contentId = portableContentId(),
+        contentId = contentId,
         displayName = displayName,
         mimeType = null,
         documentFormat = portableFormat.name,
@@ -1663,25 +1705,7 @@ private fun Collection<String>.invalidPortableContentIdsWarning(
     }
 }
 
-private fun ContentItem.portableContentId(): String {
-    if (id.matches(ContentIdRegex)) {
-        return id
-    }
-    val prefix = when (sourceType) {
-        ContentSourceType.USER_LINK -> "user-link"
-        ContentSourceType.USER_DOCUMENT -> "user-document"
-        else -> return id
-    }
-    val seed = when (sourceType) {
-        ContentSourceType.USER_LINK -> externalUrl ?: rights.sourceUrl ?: id
-        ContentSourceType.USER_DOCUMENT -> sourceLabel ?: title
-        else -> id
-    }
-    val digest = java.security.MessageDigest.getInstance("SHA-256")
-        .digest(seed.toByteArray(Charsets.UTF_8))
-        .joinToString("") { byte -> "%02x".format(byte) }
-    return "$prefix-${digest.toUuidLikeSuffix()}"
-}
+private fun ContentItem.portableContentId(): String? = id.takeIf { it.matches(ContentIdRegex) }
 
 private fun String.normalizedPortableTitle(): String {
     return lowercase(Locale.US)
@@ -1952,7 +1976,7 @@ private fun List<String>.duplicateScalarWarning(fieldName: String): AccountLight
 private val ProfileIdRegex = Regex("^qa-local-[0-9a-fA-F-]{36}$")
 private val Sha256Regex = Regex("^[0-9a-f]{64}$")
 private val ContentIdRegex = Regex(
-    "^(user-link|user-document)-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" +
+    "^(user-link|user-document)-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" +
         "|^(editorial|meditation)-[a-z0-9][a-z0-9._-]{2,120}$",
 )
 private val PackageNameRegex = Regex("^[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z0-9_]+)+$")

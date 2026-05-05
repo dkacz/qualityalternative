@@ -53,7 +53,7 @@ user-document-6f3f8f4d-5d33-4a2a-a4ef-222222222222
 Validation regex:
 
 ```text
-^(user-link|user-document)-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$|^(editorial|meditation)-[a-z0-9][a-z0-9._-]{2,120}$
+^(user-link|user-document)-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$|^(editorial|meditation)-[a-z0-9][a-z0-9._-]{2,120}$
 ```
 
 Generation policy:

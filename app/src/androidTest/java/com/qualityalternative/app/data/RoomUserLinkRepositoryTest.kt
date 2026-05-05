@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -41,7 +42,7 @@ class RoomUserLinkRepositoryTest {
             val repository = RoomUserLinkRepository(
                 dao = database.userLinkDao(),
                 scope = appScope,
-                idProvider = { _ -> "user-link:test" },
+                idProvider = { "user-link:test" },
             )
             repository.observeReady().first { it }
 
@@ -74,7 +75,7 @@ class RoomUserLinkRepositoryTest {
             val reloadedRepository = RoomUserLinkRepository(
                 dao = database.userLinkDao(),
                 scope = reloadedScope,
-                idProvider = { _ -> "user-link:unused" },
+                idProvider = { "user-link:unused" },
             )
             try {
                 val reloaded = withTimeout(10_000L) {
@@ -104,7 +105,7 @@ class RoomUserLinkRepositoryTest {
             val repository = RoomUserLinkRepository(
                 dao = database.userLinkDao(),
                 scope = appScope,
-                idProvider = { _ -> "user-link:test" },
+                idProvider = { "user-link:test" },
             )
             repository.observeReady().first { it }
 
@@ -148,7 +149,7 @@ class RoomUserLinkRepositoryTest {
             val repository = RoomUserLinkRepository(
                 dao = database.userLinkDao(),
                 scope = appScope,
-                idProvider = { _ -> "user-link:test" },
+                idProvider = { "user-link:test" },
             )
             repository.observeReady().first { it }
             repository.addLink(
@@ -174,7 +175,7 @@ class RoomUserLinkRepositoryTest {
             val reloadedRepository = RoomUserLinkRepository(
                 dao = database.userLinkDao(),
                 scope = reloadedScope,
-                idProvider = { _ -> "user-link:unused" },
+                idProvider = { "user-link:unused" },
             )
             try {
                 assertEquals(
@@ -204,7 +205,7 @@ class RoomUserLinkRepositoryTest {
             val repository = RoomUserLinkRepository(
                 dao = database.userLinkDao(),
                 scope = appScope,
-                idProvider = { _ -> "user-link:test" },
+                idProvider = { "user-link:test" },
             )
             repository.observeReady().first { it }
             repository.addLink(
@@ -230,7 +231,7 @@ class RoomUserLinkRepositoryTest {
             val reloadedRepository = RoomUserLinkRepository(
                 dao = database.userLinkDao(),
                 scope = reloadedScope,
-                idProvider = { _ -> "user-link:unused" },
+                idProvider = { "user-link:unused" },
             )
             try {
                 val reloaded = withTimeout(10_000L) {
@@ -263,7 +264,7 @@ class RoomUserLinkRepositoryTest {
             val repository = RoomUserLinkRepository(
                 dao = database.userLinkDao(),
                 scope = appScope,
-                idProvider = { _ -> "user-link:${++nextId}" },
+                idProvider = { "user-link:${++nextId}" },
             )
             repository.observeReady().first { it }
 
@@ -304,6 +305,48 @@ class RoomUserLinkRepositoryTest {
             delay(100)
             database.close()
         }
+    }
+
+    @Test
+    fun addLink_defaultIdsAreRandomUuidV4PerIndependentRecord() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val idRegex = Regex("^user-link-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
+
+        suspend fun createSavedId(): String {
+            val database = Room.inMemoryDatabaseBuilder(
+                context,
+                QualityAlternativeDatabase::class.java,
+            ).allowMainThreadQueries().build()
+            val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+            return try {
+                val repository = RoomUserLinkRepository(
+                    dao = database.userLinkDao(),
+                    scope = appScope,
+                )
+                repository.observeReady().first { it }
+                val result = repository.addLink(
+                    draft = UserLinkDraft(
+                        url = "https://example.com/same-essay",
+                        title = "Same essay",
+                        durationMinutes = 8,
+                        topicTags = setOf(TopicTag.PSYCHOLOGY),
+                    ),
+                    nowMillis = 1_000L,
+                ) as AddUserLinkResult.Added
+                result.item.id
+            } finally {
+                appScope.cancel()
+                delay(100)
+                database.close()
+            }
+        }
+
+        val firstId = createSavedId()
+        val secondId = createSavedId()
+
+        assertTrue(firstId.matches(idRegex))
+        assertTrue(secondId.matches(idRegex))
+        assertNotEquals(firstId, secondId)
     }
 
     @Test

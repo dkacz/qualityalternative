@@ -151,6 +151,8 @@ Deliverables:
 - R1 final release gate returned `SCORE: 8/10`, `VERDICT: FAIL`, `VISUAL REVIEW: PASS`; blockers were merge import phase-two failure visibility and unsafe `settings.selectedPackIds` portability.
 - R2 fixes wrap merge import apply failures into the same visible rollback/failure state as replace import and validate/filter `selectedPackIds` as safe portable pack ids before import, local settings restore, and export.
 - R2 final release gate returned `SCORE: 8/10`, `VERDICT: FAIL`, `VISUAL REVIEW: PASS`; R1 blockers were accepted as fixed, but release remained blocked by the missing `DOCUMENT_FINGERPRINT_UNVERIFIED` export warning plus incomplete/dirty review bundle hygiene. R3 adds the warning regression and ships a clean, reproducible review packet.
+- R3 final release gate returned `SCORE: 8/10`, `VERDICT: FAIL`, `VISUAL REVIEW: PASS`; R1/R2 blockers and package hygiene were accepted as fixed, but release remained blocked by deterministic portable user-link/document ids and missing content-id-versus-secondary-key conflict enforcement before mutation.
+- R4 aligns generated user-link and user-document ids with random UUID v4 schema requirements, removes derived fallback portable ids from export, enforces `CONTENT_ID_SECONDARY_KEY_CONFLICT` before merge mutation, and only imports reading progress for actually accepted portable content ids.
 
 Review gate:
 

@@ -15,7 +15,7 @@ import com.qualityalternative.app.domain.model.TopicTag
 import com.qualityalternative.app.domain.model.UserDocumentDraft
 import com.qualityalternative.app.domain.service.AddUserDocumentResult
 import com.qualityalternative.app.domain.service.UserDocumentRepository
-import java.security.MessageDigest
+import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,7 +27,7 @@ class RoomUserDocumentRepository(
     private val dao: UserDocumentDao,
     private val scope: CoroutineScope,
     private val bodyLoader: UserDocumentBodyLoader,
-    private val idProvider: (String) -> String = ::stableUserDocumentId,
+    private val idProvider: () -> String = ::randomUserDocumentId,
 ) : UserDocumentRepository {
     private val documents = MutableStateFlow(emptyList<ContentItem>())
     private val ready = MutableStateFlow(false)
@@ -62,7 +62,7 @@ class RoomUserDocumentRepository(
         val createdAtMillis = existing?.createdAtMillis ?: nowMillis
         val displayName = draft.displayName.trim().ifBlank { draft.title.trim() }
         val item = ContentItem(
-            id = existing?.id ?: idProvider(normalizedUri),
+            id = existing?.id ?: idProvider(),
             packId = USER_DOCUMENT_PACK_ID,
             title = draft.title.trim(),
             description = draft.description.trim().ifBlank {
@@ -135,8 +135,14 @@ class RoomUserDocumentRepository(
         documents: List<ContentItem>,
         replaceExisting: Boolean,
         nowMillis: Long,
-    ) {
+    ): Set<String> {
         val existingDocuments = this.documents.value
+        val importPlan = portableUserContentImportPlan(
+            current = existingDocuments,
+            imported = documents,
+            replaceExisting = replaceExisting,
+            secondaryKey = { item -> item.rights.sourceUrl?.takeUnless { source -> source.startsWith("portable-missing:") } },
+        )
         if (replaceExisting) {
             val retainedIds = documents.mapTo(mutableSetOf(), ContentItem::id)
             if (retainedIds.isEmpty()) {
@@ -145,18 +151,7 @@ class RoomUserDocumentRepository(
                 dao.deleteAllExcept(retainedIds)
             }
         }
-        val documentsToImport = if (replaceExisting) {
-            documents
-        } else {
-            val existingIds = existingDocuments.mapTo(mutableSetOf(), ContentItem::id)
-            val existingSourceReferences = existingDocuments.mapNotNullTo(mutableSetOf()) { item ->
-                item.rights.sourceUrl?.takeIf(String::isNotBlank)
-            }
-            documents.filter { item ->
-                item.id !in existingIds &&
-                    item.rights.sourceUrl?.takeIf(String::isNotBlank) !in existingSourceReferences
-            }
-        }
+        val documentsToImport = importPlan.itemsToImport
         documentsToImport.forEach { item ->
             dao.insertOrReplace(
                 item.toEntity(
@@ -173,8 +168,9 @@ class RoomUserDocumentRepository(
         this.documents.value = mergeImportedUserContent(
             current = if (replaceExisting) emptyList() else existingDocuments,
             imported = documentsToImport,
-            secondaryKey = { item -> item.rights.sourceUrl },
+            secondaryKey = { item -> item.rights.sourceUrl?.takeUnless { source -> source.startsWith("portable-missing:") } },
         )
+        return importPlan.acceptedContentIds
     }
 
     override fun contentBody(item: ContentItem): String {
@@ -335,9 +331,4 @@ internal fun upsertUserDocumentForOptimisticState(
     }
 }
 
-private fun stableUserDocumentId(uri: String): String {
-    val digest = MessageDigest.getInstance("SHA-256")
-        .digest(uri.toByteArray(Charsets.UTF_8))
-        .joinToString("") { byte -> "%02x".format(byte) }
-    return "user-document-${digest.toUuidLikeSuffix()}"
-}
+private fun randomUserDocumentId(): String = "user-document-${UUID.randomUUID()}"
