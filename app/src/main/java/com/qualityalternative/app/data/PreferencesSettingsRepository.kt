@@ -14,15 +14,18 @@ import com.qualityalternative.app.domain.model.AppSettings
 import com.qualityalternative.app.domain.model.AppThemeMode
 import com.qualityalternative.app.domain.model.ContentPriority
 import com.qualityalternative.app.domain.model.DEFAULT_MEDITATION_MINUTES
+import com.qualityalternative.app.domain.model.DEFAULT_INTERFACE_TEXT_SCALE
 import com.qualityalternative.app.domain.model.DEFAULT_OPEN_ANYWAY_UNLOCK_MINUTES
 import com.qualityalternative.app.domain.model.DEFAULT_READER_FONT_SCALE
 import com.qualityalternative.app.domain.model.DistractingApp
 import com.qualityalternative.app.domain.model.DurationBucket
 import com.qualityalternative.app.domain.model.LocalProfileIdentity
 import com.qualityalternative.app.domain.model.MAX_MEDITATION_MINUTES
+import com.qualityalternative.app.domain.model.MAX_INTERFACE_TEXT_SCALE
 import com.qualityalternative.app.domain.model.MAX_OPEN_ANYWAY_UNLOCK_MINUTES
 import com.qualityalternative.app.domain.model.MAX_READER_FONT_SCALE
 import com.qualityalternative.app.domain.model.MIN_MEDITATION_MINUTES
+import com.qualityalternative.app.domain.model.MIN_INTERFACE_TEXT_SCALE
 import com.qualityalternative.app.domain.model.MIN_OPEN_ANYWAY_UNLOCK_MINUTES
 import com.qualityalternative.app.domain.model.MIN_READER_FONT_SCALE
 import com.qualityalternative.app.domain.model.OnboardingSelection
@@ -70,6 +73,9 @@ class PreferencesSettingsRepository(
                         .coerceIn(MIN_OPEN_ANYWAY_UNLOCK_MINUTES, MAX_OPEN_ANYWAY_UNLOCK_MINUTES),
                     readerFontScale = portableReaderFontScale(
                         preferences[ReaderFontScale] ?: DEFAULT_READER_FONT_SCALE,
+                    ),
+                    interfaceTextScale = portableInterfaceTextScale(
+                        preferences[InterfaceTextScale] ?: DEFAULT_INTERFACE_TEXT_SCALE,
                     ),
                     annotationExportUri = preferences[AnnotationExportUri],
                     annotationExportDisplayName = preferences[AnnotationExportDisplayName],
@@ -123,6 +129,7 @@ class PreferencesSettingsRepository(
             preferences[MeditationDurationMinutes] = settings.meditationDurationMinutes
                 .coerceIn(MIN_MEDITATION_MINUTES, MAX_MEDITATION_MINUTES)
             preferences[ReaderFontScale] = portableReaderFontScale(settings.readerFontScale)
+            preferences[InterfaceTextScale] = portableInterfaceTextScale(settings.interfaceTextScale)
             preferences[ContentPriorityPreference] = settings.contentPriority.name
             preferences[PriorityContentIds] = settings.priorityContentIds
             preferences[ReactivatedCompletedContentIds] = settings.reactivatedCompletedContentIds
@@ -168,6 +175,12 @@ class PreferencesSettingsRepository(
     override suspend fun saveReaderFontScale(scale: Double) {
         dataStore.edit { preferences ->
             preferences[ReaderFontScale] = portableReaderFontScale(scale)
+        }
+    }
+
+    override suspend fun saveInterfaceTextScale(scale: Double) {
+        dataStore.edit { preferences ->
+            preferences[InterfaceTextScale] = portableInterfaceTextScale(scale)
         }
     }
 
@@ -318,6 +331,10 @@ class PreferencesSettingsRepository(
             return (raw.coerceIn(MIN_READER_FONT_SCALE, MAX_READER_FONT_SCALE) * 100.0).roundToInt() / 100.0
         }
 
+        fun portableInterfaceTextScale(raw: Double): Double {
+            return (raw.coerceIn(MIN_INTERFACE_TEXT_SCALE, MAX_INTERFACE_TEXT_SCALE) * 100.0).roundToInt() / 100.0
+        }
+
         fun isValidLocalProfileId(raw: String): Boolean {
             return Regex("^qa-local-[0-9a-fA-F-]{36}$").matches(raw)
         }
@@ -332,6 +349,7 @@ class PreferencesSettingsRepository(
         val ThemeMode = stringPreferencesKey("theme_mode")
         val MeditationDurationMinutes = intPreferencesKey("meditation_duration_minutes")
         val ReaderFontScale = doublePreferencesKey("reader_font_scale")
+        val InterfaceTextScale = doublePreferencesKey("interface_text_scale")
         val ContentPriorityPreference = stringPreferencesKey("content_priority")
         val PriorityContentIds = stringSetPreferencesKey("priority_content_ids")
         val ReactivatedCompletedContentIds = stringSetPreferencesKey("reactivated_completed_content_ids")

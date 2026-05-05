@@ -123,6 +123,7 @@ interface SettingsRepository {
     suspend fun saveThemeMode(themeMode: AppThemeMode)
     suspend fun saveMeditationDurationMinutes(minutes: Int)
     suspend fun saveReaderFontScale(scale: Double)
+    suspend fun saveInterfaceTextScale(scale: Double) {}
     suspend fun saveContentPriority(priority: ContentPriority)
     suspend fun savePriorityContentIds(contentIds: Set<String>)
     suspend fun saveReactivatedCompletedContentIds(contentIds: Set<String>)

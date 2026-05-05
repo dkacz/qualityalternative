@@ -28,6 +28,7 @@ import com.qualityalternative.app.domain.model.ContentFormat
 import com.qualityalternative.app.domain.model.ContentItem
 import com.qualityalternative.app.domain.model.ContentPriority
 import com.qualityalternative.app.domain.model.ContentSourceType
+import com.qualityalternative.app.domain.model.DEFAULT_INTERFACE_TEXT_SCALE
 import com.qualityalternative.app.domain.model.DEFAULT_MEDITATION_MINUTES
 import com.qualityalternative.app.domain.model.DEFAULT_OPEN_ANYWAY_UNLOCK_MINUTES
 import com.qualityalternative.app.domain.model.DelayWindow
@@ -36,8 +37,10 @@ import com.qualityalternative.app.domain.model.DurationBucket
 import com.qualityalternative.app.domain.model.EditorialPack
 import com.qualityalternative.app.domain.model.DEFAULT_READER_FONT_SCALE
 import com.qualityalternative.app.domain.model.MEDITATION_TIMER_CONTENT_ID
+import com.qualityalternative.app.domain.model.MAX_INTERFACE_TEXT_SCALE
 import com.qualityalternative.app.domain.model.MAX_OPEN_ANYWAY_UNLOCK_MINUTES
 import com.qualityalternative.app.domain.model.MAX_READER_FONT_SCALE
+import com.qualityalternative.app.domain.model.MIN_INTERFACE_TEXT_SCALE
 import com.qualityalternative.app.domain.model.MIN_OPEN_ANYWAY_UNLOCK_MINUTES
 import com.qualityalternative.app.domain.model.MIN_READER_FONT_SCALE
 import com.qualityalternative.app.domain.model.OnboardingSelection
@@ -135,6 +138,7 @@ data class MainUiState(
     val themeMode: AppThemeMode = AppThemeMode.LIGHT,
     val meditationDurationMinutes: Int = DEFAULT_MEDITATION_MINUTES,
     val readerFontScale: Double = DEFAULT_READER_FONT_SCALE,
+    val interfaceTextScale: Double = DEFAULT_INTERFACE_TEXT_SCALE,
     val contentPriority: ContentPriority = ContentPriority.BALANCED,
     val priorityContentIds: Set<String> = emptySet(),
     val reactivatedCompletedContentIds: Set<String> = emptySet(),
@@ -551,6 +555,16 @@ class MainViewModel(
         uiState = uiState.copy(readerFontScale = normalizedScale, latestMessage = null)
         viewModelScope.launch {
             settingsRepository.saveReaderFontScale(normalizedScale)
+            autosaveAccountLightProfileAfterPortableMutation()
+        }
+    }
+
+    fun setInterfaceTextScale(scale: Double) {
+        val normalizedScale = scale.coerceIn(MIN_INTERFACE_TEXT_SCALE, MAX_INTERFACE_TEXT_SCALE)
+        if (uiState.interfaceTextScale == normalizedScale) return
+        uiState = uiState.copy(interfaceTextScale = normalizedScale, latestMessage = null)
+        viewModelScope.launch {
+            settingsRepository.saveInterfaceTextScale(normalizedScale)
             autosaveAccountLightProfileAfterPortableMutation()
         }
     }
@@ -2372,6 +2386,7 @@ class MainViewModel(
             themeMode = settings.themeMode,
             meditationDurationMinutes = settings.meditationDurationMinutes,
             readerFontScale = settings.readerFontScale,
+            interfaceTextScale = settings.interfaceTextScale,
             contentPriority = settings.contentPriority,
             priorityContentIds = settings.priorityContentIds,
             reactivatedCompletedContentIds = reactivatedCompletedContentIds,

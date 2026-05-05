@@ -65,6 +65,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -123,9 +124,12 @@ import com.qualityalternative.app.domain.model.DelayWindow
 import com.qualityalternative.app.domain.model.DistractingApp
 import com.qualityalternative.app.domain.model.DurationBucket
 import com.qualityalternative.app.domain.model.EditorialPack
+import com.qualityalternative.app.domain.model.DEFAULT_INTERFACE_TEXT_SCALE
 import com.qualityalternative.app.domain.model.DEFAULT_READER_FONT_SCALE
 import com.qualityalternative.app.domain.model.MEDITATION_TIMER_CONTENT_ID
+import com.qualityalternative.app.domain.model.MAX_INTERFACE_TEXT_SCALE
 import com.qualityalternative.app.domain.model.MAX_READER_FONT_SCALE
+import com.qualityalternative.app.domain.model.MIN_INTERFACE_TEXT_SCALE
 import com.qualityalternative.app.domain.model.MIN_READER_FONT_SCALE
 import com.qualityalternative.app.domain.model.OnboardingSelection
 import com.qualityalternative.app.domain.model.OpenAnywayUnlockMinuteOptions
@@ -164,6 +168,8 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 
+private val LocalAppInterfaceTextScale = compositionLocalOf { DEFAULT_INTERFACE_TEXT_SCALE }
+
 @Composable
 fun QualityAlternativeApp(
     viewModel: MainViewModel,
@@ -174,55 +180,91 @@ fun QualityAlternativeApp(
     ApplySystemBarsForTheme(themeMode = uiState.themeMode)
 
     QualityAlternativeAppTheme(themeMode = uiState.themeMode) {
-        DebugVisualParityDensityScale {
-            val snackbarHostState = remember { SnackbarHostState() }
+        AppInterfaceTextScaleProvider(interfaceTextScale = uiState.interfaceTextScale) {
+            DebugVisualParityDensityScale {
+                val snackbarHostState = remember { SnackbarHostState() }
 
-            LaunchedEffect(uiState.latestMessage) {
-                val message = uiState.latestMessage
-                if (message == null) {
-                    snackbarHostState.currentSnackbarData?.dismiss()
-                    return@LaunchedEffect
+                LaunchedEffect(uiState.latestMessage) {
+                    val message = uiState.latestMessage
+                    if (message == null) {
+                        snackbarHostState.currentSnackbarData?.dismiss()
+                        return@LaunchedEffect
+                    }
+                    snackbarHostState.showSnackbar(message)
+                    viewModel.dismissMessage()
                 }
-                snackbarHostState.showSnackbar(message)
-                viewModel.dismissMessage()
-            }
 
-            Scaffold(
-                modifier = Modifier.fillMaxSize(),
-                snackbarHost = {
-                    SnackbarHost(
-                        hostState = snackbarHostState,
-                        modifier = Modifier.padding(bottom = uiState.screen.snackbarBottomPadding()),
-                    )
-                },
-                containerColor = QualityAlternativeThemeTokens.colors.background,
-            ) { paddingValues ->
-                Surface(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues),
-                    color = QualityAlternativeThemeTokens.colors.background,
-                ) {
-                    when {
-                        uiState.isLoadingSettings -> LoadingScreen()
-                        !uiState.hasCompletedOnboarding -> OnboardingFlow(
-                            selection = uiState.onboardingSelection,
-                            supportedApps = uiState.allSupportedApps,
-                            onToggleApp = viewModel::toggleOnboardingApp,
-                            onToggleTopic = viewModel::toggleOnboardingTopic,
-                            onSelectDuration = viewModel::setOnboardingDuration,
-                            onComplete = viewModel::completeOnboarding,
+                Scaffold(
+                    modifier = Modifier.fillMaxSize(),
+                    snackbarHost = {
+                        SnackbarHost(
+                            hostState = snackbarHostState,
+                            modifier = Modifier.padding(bottom = uiState.screen.snackbarBottomPadding()),
                         )
+                    },
+                    containerColor = QualityAlternativeThemeTokens.colors.background,
+                ) { paddingValues ->
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(paddingValues),
+                        color = QualityAlternativeThemeTokens.colors.background,
+                    ) {
+                        when {
+                            uiState.isLoadingSettings -> LoadingScreen()
+                            !uiState.hasCompletedOnboarding -> OnboardingFlow(
+                                selection = uiState.onboardingSelection,
+                                supportedApps = uiState.allSupportedApps,
+                                onToggleApp = viewModel::toggleOnboardingApp,
+                                onToggleTopic = viewModel::toggleOnboardingTopic,
+                                onSelectDuration = viewModel::setOnboardingDuration,
+                                onComplete = viewModel::completeOnboarding,
+                            )
 
-                        else -> MainRoute(
-                            state = uiState,
-                            viewModel = viewModel,
-                            onExitToTarget = onExitToTarget,
-                        )
+                            else -> MainRoute(
+                                state = uiState,
+                                viewModel = viewModel,
+                                onExitToTarget = onExitToTarget,
+                            )
+                        }
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun AppInterfaceTextScaleProvider(
+    interfaceTextScale: Double,
+    content: @Composable () -> Unit,
+) {
+    val baseDensity = LocalDensity.current
+    val safeScale = interfaceTextScale.coerceIn(MIN_INTERFACE_TEXT_SCALE, MAX_INTERFACE_TEXT_SCALE).toFloat()
+    CompositionLocalProvider(
+        LocalAppInterfaceTextScale provides safeScale.toDouble(),
+        LocalDensity provides Density(
+            density = baseDensity.density,
+            fontScale = baseDensity.fontScale * safeScale,
+        ),
+    ) {
+        content()
+    }
+}
+
+@Composable
+private fun ReaderTextDensity(content: @Composable () -> Unit) {
+    val density = LocalDensity.current
+    val interfaceTextScale = LocalAppInterfaceTextScale.current
+        .coerceIn(MIN_INTERFACE_TEXT_SCALE, MAX_INTERFACE_TEXT_SCALE)
+        .toFloat()
+    CompositionLocalProvider(
+        LocalDensity provides Density(
+            density = density.density,
+            fontScale = density.fontScale / interfaceTextScale,
+        ),
+    ) {
+        content()
     }
 }
 
@@ -514,6 +556,7 @@ private fun MainRoute(
                 onSelectDuration = viewModel::setPreferredDuration,
                 onSelectMeditationDuration = viewModel::setMeditationDurationMinutes,
                 onSelectReaderFontScale = viewModel::setReaderFontScale,
+                onSelectInterfaceTextScale = viewModel::setInterfaceTextScale,
                 onSelectContentPriority = viewModel::setContentPriority,
                 onSelectOpenAnywayUnlock = viewModel::setOpenAnywayUnlockMinutes,
                 onSelectTheme = viewModel::selectThemeMode,
@@ -709,6 +752,7 @@ private enum class TabGlyph { Home, Library, Progress, Settings }
 
 private enum class QaIconKind {
     Plus,
+    Minus,
     Check,
     ArrowRight,
     ArrowLeft,
@@ -730,19 +774,6 @@ private enum class QaIconKind {
     Note,
     Dot,
 }
-
-private data class ReaderFontScaleOption(
-    val label: String,
-    val scale: Double,
-    val scaleLabel: String,
-)
-
-private val ReaderFontScaleOptions = listOf(
-    ReaderFontScaleOption(label = "Small", scale = 0.9, scaleLabel = "90"),
-    ReaderFontScaleOption(label = "Default", scale = DEFAULT_READER_FONT_SCALE, scaleLabel = "100"),
-    ReaderFontScaleOption(label = "Large", scale = 1.15, scaleLabel = "115"),
-    ReaderFontScaleOption(label = "XL", scale = 1.3, scaleLabel = "130"),
-)
 
 private fun MainScreen.snackbarBottomPadding() = when (this) {
     MainScreen.Home,
@@ -2715,13 +2746,15 @@ private fun ReaderMarkdownBlockText(
         else -> Modifier.padding(bottom = if (block.kind == ReaderMarkdownBlockKind.HEADING) 10.dp else 16.dp)
     }
 
-    Text(
-        text = displayText,
-        style = style,
-        color = textColor,
-        modifier = blockModifier.then(modifier),
-        onTextLayout = onTextLayout,
-    )
+    ReaderTextDensity {
+        Text(
+            text = displayText,
+            style = style,
+            color = textColor,
+            modifier = blockModifier.then(modifier),
+            onTextLayout = onTextLayout,
+        )
+    }
 }
 
 @Composable
@@ -3248,6 +3281,7 @@ private fun SettingsTab(
     onSelectDuration: (DurationBucket) -> Unit,
     onSelectMeditationDuration: (Int) -> Unit,
     onSelectReaderFontScale: (Double) -> Unit,
+    onSelectInterfaceTextScale: (Double) -> Unit,
     onSelectContentPriority: (ContentPriority) -> Unit,
     onSelectOpenAnywayUnlock: (Int) -> Unit,
     onSelectTheme: (AppThemeMode) -> Unit,
@@ -3382,21 +3416,37 @@ private fun SettingsTab(
             }
         }
         item {
-            SectionLabel("Reader text")
+            SectionLabel("Text size")
             QaCard {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    ReaderFontScaleOptions.forEach { option ->
-                        QaChip(
-                            text = option.label,
-                            selected = state.readerFontScale == option.scale,
-                            onClick = { onSelectReaderFontScale(option.scale) },
-                            modifier = Modifier.testTag("reader-font-scale-${option.scaleLabel}"),
-                            centered = true,
-                            minHeight = 34.dp,
-                            horizontalPadding = 12.dp,
-                            verticalPadding = 7.dp,
-                        )
-                    }
+                TextScaleStepper(
+                    title = "Reading text",
+                    value = state.readerFontScale,
+                    min = MIN_READER_FONT_SCALE,
+                    max = MAX_READER_FONT_SCALE,
+                    onChange = onSelectReaderFontScale,
+                    containerTag = "reader-font-scale-control",
+                    decreaseTag = "reader-font-scale-decrease",
+                    increaseTag = "reader-font-scale-increase",
+                    valueTag = "reader-font-scale-value",
+                ) {
+                    ReaderTextPreview(readerFontScale = state.readerFontScale)
+                }
+                HorizontalDivider(
+                    color = colors.line,
+                    modifier = Modifier.padding(vertical = 14.dp),
+                )
+                TextScaleStepper(
+                    title = "Interface text",
+                    value = state.interfaceTextScale,
+                    min = MIN_INTERFACE_TEXT_SCALE,
+                    max = MAX_INTERFACE_TEXT_SCALE,
+                    onChange = onSelectInterfaceTextScale,
+                    containerTag = "interface-text-scale-control",
+                    decreaseTag = "interface-text-scale-decrease",
+                    increaseTag = "interface-text-scale-increase",
+                    valueTag = "interface-text-scale-value",
+                ) {
+                    InterfaceTextPreview()
                 }
             }
         }
@@ -3807,6 +3857,142 @@ private fun AccountLightImportPreviewCard(
             }
         }
     }
+}
+
+private const val TEXT_SCALE_STEP = 0.05
+
+@Composable
+private fun TextScaleStepper(
+    title: String,
+    value: Double,
+    min: Double,
+    max: Double,
+    onChange: (Double) -> Unit,
+    containerTag: String,
+    decreaseTag: String,
+    increaseTag: String,
+    valueTag: String,
+    preview: @Composable () -> Unit,
+) {
+    val colors = QualityAlternativeThemeTokens.colors
+    val safeValue = value.coerceIn(min, max).toPortableTextScale()
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(containerTag),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                BodyText(text = title, fontSize = 15.sp, lineHeight = 20.sp)
+                MonoText(
+                    text = safeValue.toPercentLabel(),
+                    color = colors.mutedText,
+                    modifier = Modifier
+                        .padding(top = 4.dp)
+                        .testTag(valueTag),
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextScaleIconButton(
+                    icon = QaIconKind.Minus,
+                    label = "Decrease $title",
+                    enabled = safeValue > min,
+                    onClick = { onChange((safeValue - TEXT_SCALE_STEP).coerceIn(min, max).toPortableTextScale()) },
+                    modifier = Modifier.testTag(decreaseTag),
+                )
+                TextScaleIconButton(
+                    icon = QaIconKind.Plus,
+                    label = "Increase $title",
+                    enabled = safeValue < max,
+                    onClick = { onChange((safeValue + TEXT_SCALE_STEP).coerceIn(min, max).toPortableTextScale()) },
+                    modifier = Modifier.testTag(increaseTag),
+                )
+            }
+        }
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp),
+            shape = RoundedCornerShape(10.dp),
+            color = colors.background,
+            border = BorderStroke(1.dp, colors.line),
+        ) {
+            Box(modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp)) {
+                preview()
+            }
+        }
+    }
+}
+
+@Composable
+private fun TextScaleIconButton(
+    icon: QaIconKind,
+    label: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = QualityAlternativeThemeTokens.colors
+    val contentColor = if (enabled) colors.primaryText else colors.faintText
+    Surface(
+        modifier = modifier
+            .size(36.dp)
+            .alpha(if (enabled) 1f else 0.42f)
+            .semantics { contentDescription = label },
+        onClick = onClick,
+        enabled = enabled,
+        shape = RoundedCornerShape(10.dp),
+        color = colors.elevatedSurface,
+        contentColor = contentColor,
+        border = BorderStroke(1.dp, colors.lineStrong),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            QaIcon(kind = icon, color = contentColor, size = 16.dp)
+        }
+    }
+}
+
+@Composable
+private fun ReaderTextPreview(readerFontScale: Double) {
+    val colors = QualityAlternativeThemeTokens.colors
+    val scale = readerFontScale.coerceIn(MIN_READER_FONT_SCALE, MAX_READER_FONT_SCALE).toFloat()
+    ReaderTextDensity {
+        Text(
+            text = "Reader preview text",
+            style = MaterialTheme.typography.bodyLarge.copy(
+                fontFamily = QualityDisplayFontFamily,
+                fontSize = (17f * scale).sp,
+                lineHeight = (24f * scale).sp,
+            ),
+            color = colors.primaryText,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.testTag("reader-font-scale-preview"),
+        )
+    }
+}
+
+@Composable
+private fun InterfaceTextPreview() {
+    BodyText(
+        text = "Interface preview text",
+        color = QualityAlternativeThemeTokens.colors.mutedText,
+        modifier = Modifier.testTag("interface-text-scale-preview"),
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
+}
+
+private fun Double.toPortableTextScale(): Double {
+    return (this * 100.0).roundToInt() / 100.0
+}
+
+private fun Double.toPercentLabel(): String {
+    return "${(this * 100.0).roundToInt()}%"
 }
 
 @Composable
@@ -4944,6 +5130,8 @@ private fun QaIcon(
                 line(12f, 5f, 12f, 19f)
                 line(5f, 12f, 19f, 12f)
             }
+
+            QaIconKind.Minus -> line(5f, 12f, 19f, 12f)
 
             QaIconKind.Check -> path {
                 moveTo(x(5f), y(12f))

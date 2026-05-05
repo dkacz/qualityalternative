@@ -25,6 +25,9 @@ val OpenAnywayUnlockMinuteOptions = listOf(15, 30, 60, 120)
 const val DEFAULT_READER_FONT_SCALE = 1.0
 const val MIN_READER_FONT_SCALE = 0.80
 const val MAX_READER_FONT_SCALE = 1.60
+const val DEFAULT_INTERFACE_TEXT_SCALE = 1.0
+const val MIN_INTERFACE_TEXT_SCALE = 0.90
+const val MAX_INTERFACE_TEXT_SCALE = 1.30
 
 enum class AppThemeMode {
     LIGHT,
@@ -52,6 +55,7 @@ data class AppSettings(
     val reactivatedCompletedContentIds: Set<String> = emptySet(),
     val openAnywayUnlockMinutes: Int = DEFAULT_OPEN_ANYWAY_UNLOCK_MINUTES,
     val readerFontScale: Double = DEFAULT_READER_FONT_SCALE,
+    val interfaceTextScale: Double = DEFAULT_INTERFACE_TEXT_SCALE,
     val annotationExportUri: String? = null,
     val annotationExportDisplayName: String? = null,
     val annotationExportLastSuccessfulAtMillis: Long? = null,

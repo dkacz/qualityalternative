@@ -218,6 +218,42 @@ class PreferencesSettingsRepositoryTest {
 
         val restored = repository.observeAppSettings().first()
         assertEquals(1.60, restored.readerFontScale, 0.0)
+
+        repository.saveReaderFontScale(0.1)
+
+        val restoredMinimum = repository.observeAppSettings().first()
+        assertEquals(0.80, restoredMinimum.readerFontScale, 0.0)
+    }
+
+    @Test
+    fun saveInterfaceTextScale_persistsRoundedPortableValue() = runBlocking {
+        val repository = PreferencesSettingsRepository(
+            dataStore = testDataStore(),
+            supportedApps = SupportedCatalog.distractingApps,
+        )
+
+        repository.saveInterfaceTextScale(1.164)
+
+        val restored = repository.observeAppSettings().first()
+        assertEquals(1.16, restored.interfaceTextScale, 0.0)
+    }
+
+    @Test
+    fun saveInterfaceTextScale_clampsToPortableRange() = runBlocking {
+        val repository = PreferencesSettingsRepository(
+            dataStore = testDataStore(),
+            supportedApps = SupportedCatalog.distractingApps,
+        )
+
+        repository.saveInterfaceTextScale(2.0)
+
+        val restored = repository.observeAppSettings().first()
+        assertEquals(1.30, restored.interfaceTextScale, 0.0)
+
+        repository.saveInterfaceTextScale(0.1)
+
+        val restoredMinimum = repository.observeAppSettings().first()
+        assertEquals(0.90, restoredMinimum.interfaceTextScale, 0.0)
     }
 
     @Test

@@ -136,6 +136,7 @@ class AccountLightProfileImporterTest {
         assertEquals(AppThemeMode.DARK, settings.themeMode)
         assertEquals(ContentPriority.MY_FILES, settings.contentPriority)
         assertEquals(1.35, settings.readerFontScale, 0.0)
+        assertEquals(1.12, settings.interfaceTextScale, 0.0)
         assertEquals(setOf("starter_pack"), settings.selectedPackIds)
         assertEquals("content://local/export", settings.annotationExportUri)
         assertEquals("local-folder", settings.annotationExportDisplayName)
@@ -947,6 +948,7 @@ class AccountLightProfileImporterTest {
         repository.saveThemeMode(AppThemeMode.DARK)
         repository.saveContentPriority(ContentPriority.MY_FILES)
         repository.saveReaderFontScale(1.35)
+        repository.saveInterfaceTextScale(1.12)
         repository.replacePortableSettings(
             settings = repository.observeAppSettings().first(),
             profileIdentity = com.qualityalternative.app.domain.model.LocalProfileIdentity(

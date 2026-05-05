@@ -584,6 +584,77 @@ class MainViewModelTest {
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
+    fun readerFontScaleSettingClampsToPortableRange() = runTest {
+        val settingsRepository = FakeSettingsRepository(
+            initial = completedSettings(selectedAppPackages = setOf("feed.one")),
+        )
+        val viewModel = createViewModel(settingsRepository = settingsRepository)
+
+        advanceUntilIdle()
+        viewModel.setReaderFontScale(4.0)
+        advanceUntilIdle()
+
+        assertEquals(1.6, viewModel.uiState.readerFontScale, 0.0)
+        assertEquals(1.6, settingsRepository.state.value.readerFontScale, 0.0)
+
+        viewModel.setReaderFontScale(0.1)
+        advanceUntilIdle()
+
+        assertEquals(0.8, viewModel.uiState.readerFontScale, 0.0)
+        assertEquals(0.8, settingsRepository.state.value.readerFontScale, 0.0)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun interfaceTextScaleSettingPersistsAndAutosavesPortableProfile() = runTest {
+        val settingsRepository = FakeSettingsRepository(
+            initial = completedSettings(selectedAppPackages = setOf("feed.one")).copy(
+                profileAutosaveUri = "content://tree/profile-folder",
+                profileAutosaveDisplayName = "QA profile",
+            ),
+        )
+        val profileWriter = RecordingAccountLightProfileAutosaveWriter()
+        val viewModel = createViewModel(
+            settingsRepository = settingsRepository,
+            accountLightProfileAutosaveWriter = profileWriter,
+            nowProvider = { 4_500L },
+        )
+
+        advanceUntilIdle()
+        viewModel.setInterfaceTextScale(1.2)
+        advanceUntilIdle()
+
+        assertEquals(1.2, viewModel.uiState.interfaceTextScale, 0.0)
+        assertEquals(1.2, settingsRepository.state.value.interfaceTextScale, 0.0)
+        assertEquals(1, profileWriter.writes.size)
+        assertTrue(profileWriter.writes.single().third.contains("\"interfaceTextScale\": 1.2"))
+        assertEquals(4_500L, settingsRepository.state.value.profileAutosaveLastSuccessfulAtMillis)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun interfaceTextScaleSettingClampsToPortableRange() = runTest {
+        val settingsRepository = FakeSettingsRepository(
+            initial = completedSettings(selectedAppPackages = setOf("feed.one")),
+        )
+        val viewModel = createViewModel(settingsRepository = settingsRepository)
+
+        advanceUntilIdle()
+        viewModel.setInterfaceTextScale(2.0)
+        advanceUntilIdle()
+
+        assertEquals(1.3, viewModel.uiState.interfaceTextScale, 0.0)
+        assertEquals(1.3, settingsRepository.state.value.interfaceTextScale, 0.0)
+
+        viewModel.setInterfaceTextScale(0.1)
+        advanceUntilIdle()
+
+        assertEquals(0.9, viewModel.uiState.interfaceTextScale, 0.0)
+        assertEquals(0.9, settingsRepository.state.value.interfaceTextScale, 0.0)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
     fun meditationDurationCanBeChangedBeforeStartingCurrentMeditation() = runTest {
         val recommendationEngine = FixedRecommendationEngine(
             RecommendationSet(
@@ -3521,6 +3592,7 @@ class MainViewModelTest {
                 reactivatedCompletedContentIds = state.value.reactivatedCompletedContentIds,
                 openAnywayUnlockMinutes = state.value.openAnywayUnlockMinutes,
                 readerFontScale = state.value.readerFontScale,
+                interfaceTextScale = state.value.interfaceTextScale,
                 annotationExportUri = state.value.annotationExportUri,
                 annotationExportDisplayName = state.value.annotationExportDisplayName,
                 annotationExportLastSuccessfulAtMillis = state.value.annotationExportLastSuccessfulAtMillis,
@@ -3555,6 +3627,7 @@ class MainViewModelTest {
                 themeMode = settings.themeMode,
                 meditationDurationMinutes = settings.meditationDurationMinutes,
                 readerFontScale = settings.readerFontScale,
+                interfaceTextScale = settings.interfaceTextScale,
                 contentPriority = settings.contentPriority,
                 priorityContentIds = settings.priorityContentIds,
                 reactivatedCompletedContentIds = settings.reactivatedCompletedContentIds,
@@ -3580,6 +3653,10 @@ class MainViewModelTest {
 
         override suspend fun saveReaderFontScale(scale: Double) {
             state.value = state.value.copy(readerFontScale = scale)
+        }
+
+        override suspend fun saveInterfaceTextScale(scale: Double) {
+            state.value = state.value.copy(interfaceTextScale = scale)
         }
 
         override suspend fun saveContentPriority(priority: ContentPriority) {

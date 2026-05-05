@@ -88,6 +88,8 @@ class MainActivityTest {
         "sprint16-profile-autosave-${System.currentTimeMillis()}"
     private val sprint16AdaptiveReaderScreenshotDirName =
         "sprint16-adaptive-reader-${System.currentTimeMillis()}"
+    private val sprint17TypographyScreenshotDirName =
+        "sprint17-typography-settings-${System.currentTimeMillis()}"
 
     @Before
     fun resetAppState() {
@@ -470,12 +472,54 @@ class MainActivityTest {
             .performSemanticsAction(SemanticsActions.OnClick)
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("settings-list") }
         composeRule.onNodeWithTag("settings-list")
-            .performScrollToNode(hasTestTag("reader-font-scale-130"))
-        composeRule.onNodeWithTag("reader-font-scale-130")
+            .performScrollToNode(hasTestTag("reader-font-scale-increase"))
+        composeRule.onNodeWithTag("reader-font-scale-value")
+            .assertTextContains("100%")
+        composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasTestTag("reader-font-scale-preview"))
+        composeRule.onNodeWithTag("reader-font-scale-preview")
             .assertIsDisplayed()
-            .performSemanticsAction(SemanticsActions.OnClick)
+        composeRule.onNodeWithTag("settings-list")
+            .performTouchInput { swipeUp(startY = 620f, endY = 520f, durationMillis = 180) }
+        composeRule.waitForIdle()
+        captureSprint17TypographyScreenshot("00_reader_font_setting_default")
+        composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasTestTag("reader-font-scale-increase"))
+        repeat(6) {
+            composeRule.onNodeWithTag("reader-font-scale-increase")
+                .assertIsDisplayed()
+                .performSemanticsAction(SemanticsActions.OnClick)
+            composeRule.waitForIdle()
+        }
+        composeRule.onNodeWithTag("reader-font-scale-value")
+            .assertTextContains("130%")
+        composeRule.onNodeWithTag("reader-font-scale-preview")
+            .assertIsDisplayed()
         composeRule.waitUntil(timeoutMillis = 10_000) { currentReaderFontScale() == 1.3 }
-        captureSprint16AdaptiveReaderScreenshot("00_reader_font_setting_xl")
+        composeRule.onNodeWithTag("settings-list")
+            .performTouchInput { swipeUp(startY = 620f, endY = 520f, durationMillis = 180) }
+        composeRule.waitForIdle()
+        captureSprint17TypographyScreenshot("01_reader_font_setting_xl")
+        composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasTestTag("interface-text-scale-control"))
+        repeat(4) {
+            composeRule.onNodeWithTag("interface-text-scale-increase")
+                .performScrollTo()
+                .assertIsDisplayed()
+                .performSemanticsAction(SemanticsActions.OnClick)
+            composeRule.waitForIdle()
+        }
+        composeRule.onNodeWithTag("interface-text-scale-value")
+            .assertTextContains("120%")
+        composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasTestTag("interface-text-scale-preview"))
+        composeRule.onNodeWithTag("interface-text-scale-preview")
+            .assertIsDisplayed()
+        composeRule.waitUntil(timeoutMillis = 10_000) { currentInterfaceTextScale() == 1.2 }
+        composeRule.onNodeWithTag("settings-list")
+            .performTouchInput { swipeUp(startY = 620f, endY = 520f, durationMillis = 180) }
+        composeRule.waitForIdle()
+        captureSprint17TypographyScreenshot("04_interface_text_setting_large")
 
         scenario?.close()
         scenario = null
@@ -486,12 +530,12 @@ class MainActivityTest {
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
         assertEquals(1.3, currentReaderFontScale(), 0.0)
         composeRule.onNodeWithTag("reader-page-label").assertIsDisplayed()
-        captureSprint16AdaptiveReaderScreenshot("01_reader_xl_font_light")
+        captureSprint17TypographyScreenshot("02_reader_xl_font_light")
 
         scenario?.onActivity { activity -> activity.mainViewModel.setReaderFontScale(0.9) }
         composeRule.waitUntil(timeoutMillis = 10_000) { currentReaderFontScale() == 0.9 }
         composeRule.onNodeWithTag("reader-page-label").assertIsDisplayed()
-        captureSprint16AdaptiveReaderScreenshot("02_reader_small_font_light")
+        captureSprint17TypographyScreenshot("03_reader_small_font_light")
     }
 
     @Test
@@ -1760,6 +1804,14 @@ class MainActivityTest {
         return scale
     }
 
+    private fun currentInterfaceTextScale(): Double {
+        var scale = 0.0
+        scenario?.onActivity { activity ->
+            scale = activity.mainViewModel.uiState.interfaceTextScale
+        }
+        return scale
+    }
+
     private fun exportAccountLightProfileJsonFromViewModel(): String {
         var exportedJson = ""
         scenario?.onActivity { activity ->
@@ -2543,6 +2595,16 @@ class MainActivityTest {
 
     private fun captureSprint16AdaptiveReaderScreenshot(name: String) {
         val outputDir = File("/sdcard/Download/qualityalternative/$sprint16AdaptiveReaderScreenshotDirName")
+        assertTrue("Expected screenshot output directory for $name", outputDir.mkdirs() || outputDir.exists())
+        composeRule.waitForIdle()
+        Thread.sleep(300)
+        val output = File(outputDir, "$name.png")
+        assertTrue("Expected screenshot capture for $name", UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).takeScreenshot(output))
+        assertTrue("Expected screenshot file for $name", output.exists() && output.length() > 0L)
+    }
+
+    private fun captureSprint17TypographyScreenshot(name: String) {
+        val outputDir = File("/sdcard/Download/qualityalternative/$sprint17TypographyScreenshotDirName")
         assertTrue("Expected screenshot output directory for $name", outputDir.mkdirs() || outputDir.exists())
         composeRule.waitForIdle()
         Thread.sleep(300)

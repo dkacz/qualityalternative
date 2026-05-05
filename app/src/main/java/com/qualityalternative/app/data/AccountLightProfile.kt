@@ -8,12 +8,15 @@ import com.qualityalternative.app.domain.model.ContentItem
 import com.qualityalternative.app.domain.model.ContentPriority
 import com.qualityalternative.app.domain.model.ContentRightsMetadata
 import com.qualityalternative.app.domain.model.ContentSourceType
+import com.qualityalternative.app.domain.model.DEFAULT_INTERFACE_TEXT_SCALE
 import com.qualityalternative.app.domain.model.DEFAULT_READER_FONT_SCALE
 import com.qualityalternative.app.domain.model.DistractingApp
 import com.qualityalternative.app.domain.model.DurationBucket
 import com.qualityalternative.app.domain.model.LocalProfileIdentity
+import com.qualityalternative.app.domain.model.MAX_INTERFACE_TEXT_SCALE
 import com.qualityalternative.app.domain.model.MAX_OPEN_ANYWAY_UNLOCK_MINUTES
 import com.qualityalternative.app.domain.model.MAX_READER_FONT_SCALE
+import com.qualityalternative.app.domain.model.MIN_INTERFACE_TEXT_SCALE
 import com.qualityalternative.app.domain.model.MIN_OPEN_ANYWAY_UNLOCK_MINUTES
 import com.qualityalternative.app.domain.model.MIN_READER_FONT_SCALE
 import com.qualityalternative.app.domain.model.ReadingProgress
@@ -118,6 +121,7 @@ data class AccountLightSettings(
     val themeMode: String,
     val meditationDurationMinutes: Int,
     val readerFontScale: Double,
+    val interfaceTextScale: Double = DEFAULT_INTERFACE_TEXT_SCALE,
     val contentPriority: String,
     val priorityContentIds: List<String>,
     val reactivatedCompletedContentIds: List<String>,
@@ -138,6 +142,9 @@ data class AccountLightSettings(
         require(meditationDurationMinutes in 1..60) { "meditationDurationMinutes is outside the portable range." }
         require(readerFontScale in MIN_READER_FONT_SCALE..MAX_READER_FONT_SCALE) {
             "readerFontScale is outside the portable range."
+        }
+        require(interfaceTextScale in MIN_INTERFACE_TEXT_SCALE..MAX_INTERFACE_TEXT_SCALE) {
+            "interfaceTextScale is outside the portable range."
         }
         require(contentPriority in ContentPriority.entries.map(ContentPriority::name)) { "contentPriority is invalid." }
         require(priorityContentIds.all { it.matches(ContentIdRegex) }) {
@@ -915,7 +922,7 @@ class AccountLightProfileImporter(
         root.requireObject("settings", "settings").validateRequiredKeys(
             path = "settings",
             required = RequiredSettingsKeys,
-            allowed = RequiredSettingsKeys,
+            allowed = AllowedSettingsKeys,
         )
         root.requireObject("library", "library").validateLibraryShape()
         val allowedContentIds = root.importedLibraryContentIds() + knownContentIdsProvider()
@@ -999,7 +1006,7 @@ private fun findUnknownFieldWarnings(root: JsonObject): List<UnknownFieldWarning
         addUnknownKeys(root, RequiredTopLevelKeys, "profile", "unknown")
         root["app"]?.jsonObjectOrNull()?.let { addUnknownKeys(it, RequiredAppKeys, "app", "app") }
         root["profile"]?.jsonObjectOrNull()?.let { addUnknownKeys(it, RequiredProfileKeys, "profile", "profile") }
-        root["settings"]?.jsonObjectOrNull()?.let { addUnknownKeys(it, RequiredSettingsKeys, "settings", "settings") }
+        root["settings"]?.jsonObjectOrNull()?.let { addUnknownKeys(it, AllowedSettingsKeys, "settings", "settings") }
         root["library"]?.jsonObjectOrNull()?.let { library ->
             addUnknownKeys(library, RequiredLibraryKeys, "library", "unknown")
             library["userLinks"]?.jsonArrayOrNull()?.forEachIndexed { index, element ->
@@ -1482,6 +1489,8 @@ private fun AccountLightSettings.toPortableAppSettings(supportedPackages: Set<St
         openAnywayUnlockMinutes = openAnywayUnlockMinutes,
         readerFontScale = readerFontScale.takeIf { it in MIN_READER_FONT_SCALE..MAX_READER_FONT_SCALE }
             ?: DEFAULT_READER_FONT_SCALE,
+        interfaceTextScale = interfaceTextScale.takeIf { it in MIN_INTERFACE_TEXT_SCALE..MAX_INTERFACE_TEXT_SCALE }
+            ?: DEFAULT_INTERFACE_TEXT_SCALE,
     )
 }
 
@@ -1498,6 +1507,7 @@ private fun AppSettings.toAccountLightSettings(
         themeMode = themeMode.name,
         meditationDurationMinutes = meditationDurationMinutes,
         readerFontScale = readerFontScale.toPortableReaderFontScale(),
+        interfaceTextScale = interfaceTextScale.toPortableInterfaceTextScale(),
         contentPriority = contentPriority.name,
         priorityContentIds = priorityContentIds.toPortableContentIds(
             contentIdMapping = contentIdMapping,
@@ -1751,6 +1761,10 @@ private fun List<AccountLightUserDocument>.toDocumentFingerprintWarnings(): List
 
 private fun Double.toPortableReaderFontScale(): Double {
     return (coerceIn(MIN_READER_FONT_SCALE, MAX_READER_FONT_SCALE) * 100.0).roundToInt() / 100.0
+}
+
+private fun Double.toPortableInterfaceTextScale(): Double {
+    return (coerceIn(MIN_INTERFACE_TEXT_SCALE, MAX_INTERFACE_TEXT_SCALE) * 100.0).roundToInt() / 100.0
 }
 
 private fun Collection<String>.toPortableContentIds(
@@ -2132,6 +2146,7 @@ private val RequiredSettingsKeys = setOf(
     "reactivatedCompletedContentIds",
     "openAnywayUnlockMinutes",
 )
+private val AllowedSettingsKeys = RequiredSettingsKeys + setOf("interfaceTextScale")
 private val RequiredLibraryKeys = setOf("userLinks", "userDocuments")
 private val RequiredUserLinkKeys = setOf(
     "contentId",
