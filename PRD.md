@@ -301,6 +301,8 @@ The system must deliver a calm replacement session that feels meaningfully diffe
 - The in-app reader is paginated by default. It must not rely on vertical scrolling for active reading.
 - Reader pagination must adapt to the actual page viewport, device size, orientation where supported, and the user's in-app reader font-size setting. It should fill the page comfortably without clipping text or leaving large avoidable empty regions.
 - Reader font size is a first-class app setting, not something the user must change at Android system level. System accessibility font scale may still be respected by the platform, but the product must expose its own reader font-size control.
+- Reader text size must be adjustable with compact numeric controls, immediate plus/minus changes, and a live preview of the effective reader text size. It must not be presented as a large modal with only coarse named choices.
+- The app may expose a separate interface text or interface size control when reader tuning alone is not sufficient. Reader text size and interface size must be stored distinctly so changing active reading typography does not unexpectedly resize all Settings controls.
 - Tapping most of the page advances to the next page. Previous-page navigation must use reader gestures or a very small left-edge tap zone; the Android back gesture or system back action exits the active reader to the prior app screen after first dismissing any open reader overlay.
 - The active reader uses minimal reader chrome: no persistent Previous, Next, or Done buttons; content is the primary surface, with only tiny title/progress/TOC affordances outside the text.
 - EPUB readers expose table-of-contents navigation that jumps to the matching section or nearest available page without turning the reader into a discovery surface.
@@ -317,16 +319,19 @@ The system may let the user capture notes on actively shown reader text without 
 
 - User can add or edit an annotation by long-pressing actively shown text in the reader.
 - Long-press selection starts with the sentence under the press and lets the user adjust the selected range before saving.
-- Annotation creation and editing use an overlay or popup that does not expand the page, enable vertical scrolling, or change pagination.
+- Annotation creation and editing use an overlay or popup that does not expand the page, enable vertical scrolling, or change pagination. The note surface may grow up to the available viewport when the selected quote is long, and once it reaches that limit the quote/note region must scroll internally rather than forcing the reader page to scroll.
 - Annotation range adjustment must use minimal, icon-first start/end controls instead of verbose full-width labels, and the controls must actually refine the range inside a single sentence instead of becoming inert whenever only one sentence is selected.
-- Cross-page annotation selection must be page-aware: the app must preserve source-anchored start/end positions across paginated display pages, keep the overlay from expanding the reader page, and avoid conflicts with reader next/previous navigation.
+- Cross-page annotation selection must be page-aware: the app must preserve source-anchored start/end positions across paginated display pages, keep the overlay from expanding the reader page, and avoid conflicts with reader next/previous navigation. Start/end adjustment must not be hard-limited by the currently visible page when the underlying source text continues before or after it.
 - Notes must not be represented as margin icons in the active reading page.
 - Each annotation stores content identity, source title, fragment position, quoted fragment text, selector/range data, note text, and timestamps.
 - User can review annotations in a finite annotation library and return to the source fragment.
 - User can authorize Google Drive sync for annotations from settings.
+- On a supported Android device with Google Play services and a valid signed-in Google account, Google Drive authorization must complete and leave annotation sync in a connected state. Better failure copy alone is not an acceptable substitute for a working Drive connection.
 - Drive sync writes one annotation file per annotated source material, with the source title included in the filename.
 - The canonical export format is W3C Web Annotation JSON-LD. EPUB annotations should include an EPUB locator when available, such as an EPUB CFI or stable source-section locator.
 - Annotation export failures are visible and do not lose local annotations.
+- Annotation autosave must have a working local default destination so saving annotations does not require the user to choose a folder before first use. User-selected local folders and Google Drive sync are optional replacements or supplements to that default.
+- Google Drive authorization failures must distinguish user cancellation from technical or configuration failure where Android APIs allow it, present a retry path, and never erase the local annotation library.
 
 ### FR9. Delay Behavior
 
@@ -395,6 +400,8 @@ The system must provide account-like portability without requiring a Quality Alt
 - The profile format is schema-versioned and must reject unsupported future versions without corrupting local state.
 - Import failures are visible and must not partially overwrite local settings or library data. Merge mode must preserve local settings unless the user explicitly chooses to apply imported settings, and replace mode must show affected scope before destructive mutation.
 - Portable Profile may optionally autosave the profile to a user-authorized local or Google Drive destination, but imported autosave or Drive metadata must be informational only until the current device user reselects a destination or reauthorizes Drive. The canonical product behavior must remain usable without a backend server.
+- Portable Profile autosave must also have a working local default destination. Choosing a folder changes where portable backups are written; it is not a prerequisite for the first successful local profile backup.
+- Settings copy must make the distinction between annotation autosave/sync and Portable Profile backup clear: annotations export notes tied to reader text, while Portable Profile backs up app configuration, library metadata, and reading state.
 
 ## Non-Functional Requirements
 
