@@ -26,4 +26,10 @@ interface UserLinkDao {
 
     @Query("DELETE FROM user_links WHERE id = :id")
     suspend fun deleteById(id: String)
+
+    @Query("DELETE FROM user_links")
+    suspend fun deleteAll()
+
+    @Query("DELETE FROM user_links WHERE id NOT IN (:ids)")
+    suspend fun deleteAllExcept(ids: Set<String>)
 }

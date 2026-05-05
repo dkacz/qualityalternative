@@ -834,6 +834,37 @@ class MainViewModelTest {
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
+    fun missingPortableDocumentDoesNotOpenFromLibrary() = runTest {
+        val document = savedUserDocument(format = ContentFormat.MARKDOWN).copy(
+            availability = ContentAvailability.UNAVAILABLE,
+            sourceLabel = "book.epub (missing)",
+            rights = ContentRightsMetadata.userPrivateReader(
+                sourceUrl = "portable-missing:user-document-44444444-4444-4444-8444-444444444444",
+                attribution = "book.epub",
+            ),
+        )
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val viewModel = createViewModel(
+            contentRepository = FakeContentRepository(extraItems = listOf(document)),
+            analyticsTracker = analyticsTracker,
+        )
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+        viewModel.openLibraryItem(document)
+        advanceUntilIdle()
+
+        assertEquals(MainScreen.Home, viewModel.uiState.screen)
+        assertEquals("Reattach this file before reading can continue.", viewModel.uiState.latestMessage)
+        assertEquals(null, viewModel.uiState.currentContent)
+        assertTrue(analyticsTracker.allEvents().filter { event ->
+            event.contentId == document.id
+        }.isEmpty())
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
     fun openAnnotationTargetOpensReaderAtSavedParagraph() = runTest {
         val document = savedUserDocument(format = ContentFormat.MARKDOWN)
         val annotationRepository = FakeReadingAnnotationRepository(
@@ -3134,7 +3165,7 @@ class MainViewModelTest {
         viewModel.confirmAccountLightReplaceImport()
         advanceUntilIdle()
 
-        assertEquals("Imported settings replaced local portable settings.", viewModel.uiState.accountLightStatus)
+        assertEquals("Imported profile replaced local portable settings and library.", viewModel.uiState.accountLightStatus)
         assertEquals(null, viewModel.uiState.accountLightImportPreview)
         assertFalse(viewModel.uiState.isAccountLightReplaceConfirming)
         assertEquals(AppThemeMode.DARK, targetSettingsRepository.state.value.themeMode)

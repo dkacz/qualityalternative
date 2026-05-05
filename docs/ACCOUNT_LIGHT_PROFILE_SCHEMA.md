@@ -265,9 +265,9 @@ Arrays are de-duplicated while preserving first-seen order on export. Import tre
 Required fields:
 
 - `contentId`: stable content id, non-blank string.
-- `normalizedUrl`: `http` or `https` URL accepted by the same validator as manual link add.
+- `normalizedUrl`: `http` or `https` URL accepted by the same validator as manual link add, with additional portable-safety checks. Import rejects URL userinfo, fragments, Google Drive/Docs hosts, encoded or decoded raw `content://`/`file://` payloads, OAuth/token/signature query data, account-like strings, opaque provider/file ids, and provider-like reverse-DNS identifiers embedded in the path or query.
 - `title`: non-blank string, maximum 200 characters, display-safe; import rejects raw URIs, account-like strings, filesystem paths, provider authorities, reverse-DNS provider/class identifiers, access tokens, OAuth values, and platform identifiers.
-- `description`: string, maximum 1000 characters.
+- `description`: string, maximum 1000 characters, display-safe under the same raw-value rejection rules as `title`.
 - `durationMinutes`: integer in `1..240`; this is legacy/display metadata and must not be used as a whole-source recommendation filter.
 - `topicTags`: array of `topicTags`, minimum 1.
 - `availability`: `availability`.
@@ -284,10 +284,10 @@ Required fields:
 
 - `contentId`: stable content id, non-blank string.
 - `displayName`: non-blank string, maximum 240 characters, display-safe; import rejects raw URIs, account-like strings, filesystem paths, provider authorities, access tokens, OAuth values, and platform identifiers.
-- `mimeType`: nullable string.
+- `mimeType`: nullable string; when present, must be a compact MIME token such as `application/pdf`, `application/epub+zip`, `text/html`, or `text/markdown` and must not contain raw URIs, account-like strings, tokens, Drive/provider wording, or provider-like identifiers.
 - `documentFormat`: one of `MARKDOWN`, `PDF`, `EPUB`.
 - `title`: non-blank string, maximum 200 characters, display-safe under the same raw-value rejection rules as `displayName`.
-- `description`: string, maximum 1000 characters.
+- `description`: string, maximum 1000 characters, display-safe under the same raw-value rejection rules as `title`.
 - `durationMinutes`: integer in `1..240`; computed/display metadata only.
 - `topicTags`: array of `topicTags`, minimum 1.
 - `availability`: must be exported as `AVAILABLE`, `UNAVAILABLE`, or `NEEDS_FALLBACK`.

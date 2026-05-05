@@ -99,6 +99,47 @@ class RoomUserLinkRepository(
         links.value = links.value.filterNot { item -> item.id == contentId }
     }
 
+    override suspend fun importPortableLinks(
+        links: List<ContentItem>,
+        replaceExisting: Boolean,
+        nowMillis: Long,
+    ) {
+        val existingLinks = this.links.value
+        if (replaceExisting) {
+            val retainedIds = links.mapTo(mutableSetOf(), ContentItem::id)
+            if (retainedIds.isEmpty()) {
+                dao.deleteAll()
+            } else {
+                dao.deleteAllExcept(retainedIds)
+            }
+        }
+        val linksToImport = if (replaceExisting) {
+            links
+        } else {
+            val existingIds = existingLinks.mapTo(mutableSetOf(), ContentItem::id)
+            val existingUrls = existingLinks.mapNotNullTo(mutableSetOf()) { item ->
+                item.externalUrl?.takeIf(String::isNotBlank)
+            }
+            links.filter { item ->
+                item.id !in existingIds &&
+                    item.externalUrl?.takeIf(String::isNotBlank) !in existingUrls
+            }
+        }
+        linksToImport.forEach { item ->
+            dao.insertOrReplace(
+                item.toEntity(
+                    createdAtMillis = item.addedAtMillis ?: nowMillis,
+                    updatedAtMillis = nowMillis,
+                ),
+            )
+        }
+        this.links.value = mergeImportedUserContent(
+            current = if (replaceExisting) emptyList() else existingLinks,
+            imported = linksToImport,
+            secondaryKey = ContentItem::externalUrl,
+        )
+    }
+
     override fun isReady(): Boolean = ready.value
 
     override fun observeReady(): Flow<Boolean> = ready.asStateFlow()
@@ -180,5 +221,36 @@ private fun stableUserLinkId(normalizedUrl: String): String {
     val digest = MessageDigest.getInstance("SHA-256")
         .digest(normalizedUrl.toByteArray(Charsets.UTF_8))
         .joinToString("") { byte -> "%02x".format(byte) }
-    return "user-link:$digest"
+    return "user-link-${digest.toUuidLikeSuffix()}"
+}
+
+internal fun mergeImportedUserContent(
+    current: List<ContentItem>,
+    imported: List<ContentItem>,
+    secondaryKey: (ContentItem) -> String?,
+): List<ContentItem> {
+    return imported.fold(current) { merged, item ->
+        val existingIndex = merged.indexOfFirst { candidate ->
+            candidate.id == item.id ||
+                secondaryKey(candidate)?.takeIf(String::isNotBlank) == secondaryKey(item)?.takeIf(String::isNotBlank)
+        }
+        if (existingIndex >= 0) {
+            merged.mapIndexed { index, candidate ->
+                if (index == existingIndex) item else candidate
+            }
+        } else {
+            listOf(item) + merged
+        }
+    }
+}
+
+internal fun String.toUuidLikeSuffix(): String {
+    val padded = padEnd(32, '0')
+    return listOf(
+        padded.substring(0, 8),
+        padded.substring(8, 12),
+        padded.substring(12, 16),
+        padded.substring(16, 20),
+        padded.substring(20, 32),
+    ).joinToString("-")
 }

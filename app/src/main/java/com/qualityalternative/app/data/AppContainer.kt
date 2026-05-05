@@ -80,9 +80,15 @@ class AppContainer(context: Context) {
         settingsRepository = settingsRepository,
         appVersionName = BuildConfig.VERSION_NAME,
         appVersionCode = BuildConfig.VERSION_CODE,
+        userLinkRepository = userLinkRepository,
+        userDocumentRepository = userDocumentRepository,
+        readingProgressRepository = readingProgressRepository,
     )
     val accountLightProfileImporter: AccountLightProfileImporter = AccountLightProfileImporter(
         settingsRepository = settingsRepository,
+        userLinkRepository = userLinkRepository,
+        userDocumentRepository = userDocumentRepository,
+        readingProgressRepository = readingProgressRepository,
         knownContentIdsProvider = { contentRepository.inventory().mapTo(mutableSetOf(), ContentItem::id) },
     )
     val delayGate: DelayGate = PreferencesDelayGate(

@@ -4,10 +4,22 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import com.qualityalternative.app.domain.model.AppThemeMode
+import com.qualityalternative.app.domain.model.ContentAvailability
+import com.qualityalternative.app.domain.model.ContentItem
 import com.qualityalternative.app.domain.model.ContentPriority
 import com.qualityalternative.app.domain.model.DurationBucket
 import com.qualityalternative.app.domain.model.OnboardingSelection
+import com.qualityalternative.app.domain.model.ReadingProgress
 import com.qualityalternative.app.domain.model.TopicTag
+import com.qualityalternative.app.domain.model.UserDocumentDraft
+import com.qualityalternative.app.domain.model.UserLinkDraft
+import com.qualityalternative.app.domain.service.AddUserDocumentResult
+import com.qualityalternative.app.domain.service.AddUserLinkResult
+import com.qualityalternative.app.domain.service.ReadingProgressRepository
+import com.qualityalternative.app.domain.service.UserDocumentRepository
+import com.qualityalternative.app.domain.service.UserLinkRepository
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import java.io.File
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -175,13 +187,218 @@ class AccountLightProfileImporterTest {
             importer.validateImportProfileJson(validProfileJson().withUserLinks(listOf(validUserLink(normalizedUrl = "https://EXAMPLE.com/Essay"))))
         }
         assertThrows(AccountLightImportException::class.java) {
+            importer.validateImportProfileJson(
+                validProfileJson().withUserLinks(
+                    listOf(
+                        validUserLink(
+                            normalizedUrl = "https://drive.google.com/file/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/view",
+                        ),
+                    ),
+                ),
+            )
+        }
+        assertThrows(AccountLightImportException::class.java) {
+            importer.validateImportProfileJson(
+                validProfileJson().withUserLinks(
+                    listOf(
+                        validUserLink(
+                            normalizedUrl = "https://user@example.com@example.org/read?oauth_token=abc123",
+                        ),
+                    ),
+                ),
+            )
+        }
+        assertThrows(AccountLightImportException::class.java) {
+            importer.validateImportProfileJson(
+                validProfileJson().withUserLinks(
+                    listOf(
+                        validUserLink(
+                            normalizedUrl = "https://example.com/read?src=file%3A%2F%2F%2Fsdcard%2Fbook.epub",
+                        ),
+                    ),
+                ),
+            )
+        }
+        assertThrows(AccountLightImportException::class.java) {
+            importer.validateImportProfileJson(
+                validProfileJson().withUserLinks(
+                    listOf(
+                        validUserLink(
+                            normalizedUrl = "https://example.com/read?src=file%253A%252F%252F%252Fsdcard%252Fbook.epub",
+                        ),
+                    ),
+                ),
+            )
+        }
+        assertThrows(AccountLightImportException::class.java) {
+            importer.validateImportProfileJson(
+                validProfileJson().withUserLinks(
+                    listOf(
+                        validUserLink(
+                            normalizedUrl = "https://example.com/read?src=file%25252525253A%25252525252F%25252525252F%25252525252Fsdcard%25252525252Fbook.epub",
+                        ),
+                    ),
+                ),
+            )
+        }
+        assertThrows(AccountLightImportException::class.java) {
+            importer.validateImportProfileJson(
+                validProfileJson().withUserLinks(
+                    listOf(
+                        validUserLink(
+                            normalizedUrl = "https://example.com/read?src=content%253A%252F%252Fprovider%252Fraw-id",
+                        ),
+                    ),
+                ),
+            )
+        }
+        assertThrows(AccountLightImportException::class.java) {
+            importer.validateImportProfileJson(
+                validProfileJson().withUserLinks(
+                    listOf(
+                        validUserLink(
+                            normalizedUrl = "https://example.com/read?acct=user%2540example.com",
+                        ),
+                    ),
+                ),
+            )
+        }
+        assertThrows(AccountLightImportException::class.java) {
+            importer.validateImportProfileJson(
+                validProfileJson().withUserLinks(
+                    listOf(
+                        validUserLink(
+                            normalizedUrl = "https://example.com/read?doc=primary%3ADownload%2Fbook.epub",
+                        ),
+                    ),
+                ),
+            )
+        }
+        assertThrows(AccountLightImportException::class.java) {
+            importer.validateImportProfileJson(
+                validProfileJson().withUserLinks(
+                    listOf(
+                        validUserLink(
+                            normalizedUrl = "https://example.com/read?doc=storage%2Femulated%2F0%2FDownload%2Fbook.epub",
+                        ),
+                    ),
+                ),
+            )
+        }
+        assertThrows(AccountLightImportException::class.java) {
+            importer.validateImportProfileJson(
+                validProfileJson().withUserLinks(
+                    listOf(
+                        validUserLink(
+                            normalizedUrl = "https://example.com/read?doc=storage%2Femulated%2F0%2FDownload%2Fbook",
+                        ),
+                    ),
+                ),
+            )
+        }
+        assertThrows(AccountLightImportException::class.java) {
+            importer.validateImportProfileJson(
+                validProfileJson().withUserLinks(
+                    listOf(
+                        validUserLink(
+                            normalizedUrl = "https://example.com/read?doc=storage%2Femulated%2F0%2FDownload%2Fbook.docx",
+                        ),
+                    ),
+                ),
+            )
+        }
+        assertThrows(AccountLightImportException::class.java) {
+            importer.validateImportProfileJson(
+                validProfileJson().withUserLinks(
+                    listOf(
+                        validUserLink(
+                            normalizedUrl = "https://example.com/read?doc=storage%252Femulated%252F0%252FDownload%252Fbook%25ZZ",
+                        ),
+                    ),
+                ),
+            )
+        }
+        assertThrows(AccountLightImportException::class.java) {
+            importer.validateImportProfileJson(
+                validProfileJson().withUserLinks(
+                    listOf(
+                        validUserLink(
+                            normalizedUrl = "https://example.com/read?src=file%253A%252F%252F%252Fsdcard%252Fbook%25ZZ",
+                        ),
+                    ),
+                ),
+            )
+        }
+        assertThrows(AccountLightImportException::class.java) {
+            importer.validateImportProfileJson(
+                validProfileJson().withUserLinks(
+                    listOf(
+                        validUserLink(
+                            normalizedUrl = "https://example.com/read?image=image%3A3952",
+                        ),
+                    ),
+                ),
+            )
+        }
+        assertThrows(AccountLightImportException::class.java) {
+            importer.validateImportProfileJson(
+                validProfileJson().withUserLinks(
+                    listOf(
+                        validUserLink(
+                            normalizedUrl = "https://example.com/read?doc=msf%3A29",
+                        ),
+                    ),
+                ),
+            )
+        }
+        assertThrows(AccountLightImportException::class.java) {
+            importer.validateImportProfileJson(
+                validProfileJson().withUserLinks(
+                    listOf(
+                        validUserLink(
+                            normalizedUrl = "https://example.com/com.dropbox.android.FileProvider/document/raw",
+                        ),
+                    ),
+                ),
+            )
+        }
+        assertThrows(AccountLightImportException::class.java) {
             importer.validateImportProfileJson(validProfileJson().withUserLinks(listOf(validUserLink(title = "content://com.android.providers.media.documents/document/1"))))
         }
         assertThrows(AccountLightImportException::class.java) {
             importer.validateImportProfileJson(validProfileJson().withUserLinks(listOf(validUserLink(title = "com.dropbox.android.FileProvider"))))
         }
         assertThrows(AccountLightImportException::class.java) {
+            importer.validateImportProfileJson(validProfileJson().withUserLinks(listOf(validUserLink(title = "L".repeat(201)))))
+        }
+        assertThrows(AccountLightImportException::class.java) {
+            importer.validateImportProfileJson(validProfileJson().withUserLinks(listOf(validUserLink(sourceLabel = "s".repeat(121)))))
+        }
+        assertThrows(AccountLightImportException::class.java) {
+            importer.validateImportProfileJson(validProfileJson().withUserLinks(listOf(validUserLink(description = "Stored from content://provider/raw-id"))))
+        }
+        assertThrows(AccountLightImportException::class.java) {
+            importer.validateImportProfileJson(validProfileJson().withUserLinks(listOf(validUserLink(description = "User email user@example.com was present"))))
+        }
+        assertThrows(AccountLightImportException::class.java) {
+            importer.validateImportProfileJson(
+                validProfileJson().withUserLinks(
+                    listOf(
+                        validUserLink(
+                            description = "Drive file id 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms",
+                        ),
+                    ),
+                ),
+            )
+        }
+        assertThrows(AccountLightImportException::class.java) {
             importer.validateImportProfileJson(validProfileJson().withUserDocuments(listOf(validUserDocument(fingerprintStrategy = "SHA256_BYTES", sha256 = null, sizeBytes = JsonPrimitive(1234L)))))
+        }
+        assertThrows(AccountLightImportException::class.java) {
+            importer.validateImportProfileJson(validProfileJson().withUserDocuments(listOf(validUserDocument(mimeType = "text/plain; src=content://provider/raw-id"))))
+        }
+        assertThrows(AccountLightImportException::class.java) {
+            importer.validateImportProfileJson(validProfileJson().withUserDocuments(listOf(validUserDocument(mimeType = "application/vnd.com.dropbox.android.FileProvider"))))
         }
         assertThrows(AccountLightImportException::class.java) {
             importer.validateImportProfileJson(validProfileJson().withUserDocuments(listOf(validUserDocument(sourceDisplayName = "content://provider/raw-id"))))
@@ -197,6 +414,26 @@ class AccountLightProfileImporterTest {
         }
         assertThrows(AccountLightImportException::class.java) {
             importer.validateImportProfileJson(validProfileJson().withUserDocuments(listOf(validUserDocument(title = "content:com.android.providers.media.documents"))))
+        }
+        assertThrows(AccountLightImportException::class.java) {
+            importer.validateImportProfileJson(validProfileJson().withUserDocuments(listOf(validUserDocument(title = "D".repeat(201)))))
+        }
+        assertThrows(AccountLightImportException::class.java) {
+            importer.validateImportProfileJson(validProfileJson().withUserDocuments(listOf(validUserDocument(description = "OAuth token copied from device"))))
+        }
+        assertThrows(AccountLightImportException::class.java) {
+            importer.validateImportProfileJson(validProfileJson().withUserDocuments(listOf(validUserDocument(description = "Drive file id com.google.android.apps.docs.storage"))))
+        }
+        assertThrows(AccountLightImportException::class.java) {
+            importer.validateImportProfileJson(
+                validProfileJson().withUserDocuments(
+                    listOf(
+                        validUserDocument(
+                            description = "Opaque source id 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms",
+                        ),
+                    ),
+                ),
+            )
         }
         assertThrows(AccountLightImportException::class.java) {
             importer.validateImportProfileJson(validProfileJson().withUserDocuments(listOf(validUserDocument(providerLabel = "com.google.android.apps.docs.storage"))))
@@ -292,6 +529,91 @@ class AccountLightProfileImporterTest {
         )
 
         assertEquals(0, plan.preview.warningCount)
+    }
+
+    @Test
+    fun applyMerge_importsLibraryMarksDocumentsMissingAndKeepsMissingDocumentProgressDormant() = runBlocking {
+        val target = PreferencesSettingsRepository(
+            dataStore = testDataStore(),
+            supportedApps = SupportedCatalog.distractingApps,
+        )
+        val linkRepository = RecordingUserLinkRepository()
+        val documentRepository = RecordingUserDocumentRepository()
+        val readingProgressRepository = RecordingReadingProgressRepository()
+        val linkContentId = "user-link-33333333-3333-4333-8333-333333333333"
+        val documentContentId = "user-document-44444444-4444-4444-8444-444444444444"
+        val importer = AccountLightProfileImporter(
+            settingsRepository = target,
+            userLinkRepository = linkRepository,
+            userDocumentRepository = documentRepository,
+            readingProgressRepository = readingProgressRepository,
+        )
+        val plan = importer.validateImportProfileJson(
+            validProfileJson()
+                .withUserLinks(listOf(validUserLink(contentId = linkContentId)))
+                .withUserDocuments(listOf(validUserDocument(contentId = documentContentId)))
+                .withReadingProgressEntries(
+                    listOf(
+                        readingProgressJson(contentId = linkContentId),
+                        readingProgressJson(contentId = documentContentId, progressPercent = 64),
+                    ),
+                ),
+        )
+
+        assertEquals(1, plan.preview.importedLinkCount)
+        assertEquals(1, plan.preview.importedDocumentCount)
+        assertEquals(2, plan.preview.importedProgressCount)
+        assertEquals(1, plan.preview.missingDocumentCount)
+
+        importer.applyMerge(plan)
+
+        assertEquals(linkContentId, linkRepository.links.single().id)
+        val importedDocument = documentRepository.documents.single()
+        assertEquals(documentContentId, importedDocument.id)
+        assertEquals(ContentAvailability.UNAVAILABLE, importedDocument.availability)
+        assertTrue(importedDocument.sourceLabel.orEmpty().contains("(missing)"))
+        assertEquals(
+            setOf(linkContentId, documentContentId),
+            readingProgressRepository.progress.mapTo(mutableSetOf(), ReadingProgress::contentId),
+        )
+        assertEquals(
+            64,
+            readingProgressRepository.progress.single { progress -> progress.contentId == documentContentId }
+                .progressPercent,
+        )
+    }
+
+    @Test
+    fun applyReplace_restoresLibraryWhenProgressImportFails() = runBlocking {
+        val target = PreferencesSettingsRepository(
+            dataStore = testDataStore(),
+            supportedApps = SupportedCatalog.distractingApps,
+        )
+        val linkRepository = RecordingUserLinkRepository()
+        val documentRepository = RecordingUserDocumentRepository()
+        val readingProgressRepository = FailingOnceReadingProgressRepository()
+        val importer = AccountLightProfileImporter(
+            settingsRepository = target,
+            userLinkRepository = linkRepository,
+            userDocumentRepository = documentRepository,
+            readingProgressRepository = readingProgressRepository,
+        )
+        val linkContentId = "user-link-33333333-3333-4333-8333-333333333333"
+        val documentContentId = "user-document-44444444-4444-4444-8444-444444444444"
+        val plan = importer.validateImportProfileJson(
+            validProfileJson()
+                .withUserLinks(listOf(validUserLink(contentId = linkContentId)))
+                .withUserDocuments(listOf(validUserDocument(contentId = documentContentId)))
+                .withReadingProgressFor(contentId = documentContentId),
+        )
+
+        assertThrows(IllegalStateException::class.java) {
+            runBlocking { importer.applyReplace(plan) }
+        }
+
+        assertTrue(linkRepository.links.isEmpty())
+        assertTrue(documentRepository.documents.isEmpty())
+        assertTrue(readingProgressRepository.progress.isEmpty())
     }
 
     @Test
@@ -584,6 +906,34 @@ class AccountLightProfileImporterTest {
         )
     }
 
+    private fun String.withReadingProgressEntries(progressEntries: List<JsonObject>): String {
+        val root = Json.parseToJsonElement(this).jsonObject
+        val reading = root.getValue("reading").jsonObject
+        return JsonObject(
+            root + (
+                "reading" to JsonObject(
+                    reading + ("progress" to JsonArray(progressEntries)),
+                )
+                ),
+        ).toString()
+    }
+
+    private fun readingProgressJson(
+        contentId: String,
+        progressPercent: Int = 40,
+    ): JsonObject {
+        return JsonObject(
+            mapOf(
+                "contentId" to JsonPrimitive(contentId),
+                "progressPercent" to JsonPrimitive(progressPercent),
+                "lastVisibleParagraphIndex" to JsonPrimitive(4),
+                "paragraphCount" to JsonPrimitive(12),
+                "updatedAtMillis" to JsonPrimitive(20_000L),
+                "completedAtMillis" to JsonNull,
+            ),
+        )
+    }
+
     private fun String.withReadingProgressPercent(progressPercent: JsonElement): String {
         return withReadingProgress(
             contentId = "editorial-attention-reset",
@@ -651,20 +1001,22 @@ class AccountLightProfileImporterTest {
         contentId: String = "user-link-33333333-3333-4333-8333-333333333333",
         normalizedUrl: String = "https://example.com/essay",
         title: String = "Imported essay",
+        description: String = "Saved link from another device.",
         durationMinutes: JsonElement = JsonPrimitive(12),
+        sourceLabel: String? = null,
     ): JsonObject {
         return JsonObject(
             mapOf(
                 "contentId" to JsonPrimitive(contentId),
                 "normalizedUrl" to JsonPrimitive(normalizedUrl),
                 "title" to JsonPrimitive(title),
-                "description" to JsonPrimitive("Saved link from another device."),
+                "description" to JsonPrimitive(description),
                 "durationMinutes" to durationMinutes,
                 "topicTags" to JsonArray(listOf(JsonPrimitive("SCIENCE"))),
                 "availability" to JsonPrimitive("AVAILABLE"),
                 "createdAtMillis" to JsonPrimitive(10_000L),
                 "updatedAtMillis" to JsonPrimitive(20_000L),
-                "sourceLabel" to JsonNull,
+                "sourceLabel" to (sourceLabel?.let(::JsonPrimitive) ?: JsonNull),
             ),
         )
     }
@@ -677,6 +1029,7 @@ class AccountLightProfileImporterTest {
         contentId: String = "user-document-44444444-4444-4444-8444-444444444444",
         displayName: String = "book.epub",
         title: String = "Imported book",
+        description: String = "Saved document metadata.",
         fingerprintStrategy: String = "SHA256_BYTES",
         sha256: String? = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         sizeBytes: JsonElement = JsonPrimitive(1234L),
@@ -685,15 +1038,16 @@ class AccountLightProfileImporterTest {
         sourceDisplayName: String? = "book.epub",
         providerLabel: String? = null,
         createdAtMillis: JsonElement = JsonPrimitive(10_000L),
+        mimeType: String = "application/epub+zip",
     ): JsonObject {
         return JsonObject(
             mapOf(
                 "contentId" to JsonPrimitive(contentId),
                 "displayName" to JsonPrimitive(displayName),
-                "mimeType" to JsonPrimitive("application/epub+zip"),
+                "mimeType" to JsonPrimitive(mimeType),
                 "documentFormat" to JsonPrimitive("EPUB"),
                 "title" to JsonPrimitive(title),
-                "description" to JsonPrimitive("Saved document metadata."),
+                "description" to JsonPrimitive(description),
                 "durationMinutes" to JsonPrimitive(45),
                 "topicTags" to JsonArray(listOf(JsonPrimitive("PHILOSOPHY"))),
                 "availability" to JsonPrimitive("UNAVAILABLE"),
@@ -722,5 +1076,92 @@ class AccountLightProfileImporterTest {
     private fun testDataStore(): DataStore<Preferences> {
         val file = File.createTempFile("account-light-importer-test", ".preferences_pb").apply { deleteOnExit() }
         return PreferenceDataStoreFactory.create(produceFile = { file })
+    }
+
+    private class RecordingUserLinkRepository : UserLinkRepository {
+        var links: List<ContentItem> = emptyList()
+
+        override fun userLinks(): List<ContentItem> = links
+
+        override suspend fun addLink(draft: UserLinkDraft, nowMillis: Long): AddUserLinkResult =
+            error("Not used by portable import tests.")
+
+        override suspend fun markUnavailable(contentId: String, nowMillis: Long) = Unit
+
+        override suspend fun deleteLink(contentId: String) = Unit
+
+        override suspend fun importPortableLinks(
+            links: List<ContentItem>,
+            replaceExisting: Boolean,
+            nowMillis: Long,
+        ) {
+            this.links = links
+        }
+    }
+
+    private class RecordingUserDocumentRepository : UserDocumentRepository {
+        var documents: List<ContentItem> = emptyList()
+
+        override fun userDocuments(): List<ContentItem> = documents
+
+        override suspend fun addDocument(draft: UserDocumentDraft, nowMillis: Long): AddUserDocumentResult =
+            error("Not used by portable import tests.")
+
+        override suspend fun markUnavailable(contentId: String, nowMillis: Long) = Unit
+
+        override suspend fun deleteDocument(contentId: String) = Unit
+
+        override suspend fun importPortableDocuments(
+            documents: List<ContentItem>,
+            replaceExisting: Boolean,
+            nowMillis: Long,
+        ) {
+            this.documents = documents
+        }
+    }
+
+    private class RecordingReadingProgressRepository : ReadingProgressRepository {
+        var progress: List<ReadingProgress> = emptyList()
+
+        override fun readingProgress(): List<ReadingProgress> = progress
+
+        override fun observeReadingProgress(): Flow<List<ReadingProgress>> = flowOf(progress)
+
+        override suspend fun saveProgress(progress: ReadingProgress) {
+            this.progress = this.progress.filterNot { item -> item.contentId == progress.contentId } + progress
+        }
+
+        override suspend fun deleteProgress(contentId: String) {
+            progress = progress.filterNot { item -> item.contentId == contentId }
+        }
+
+        override suspend fun replaceReadingProgress(progress: List<ReadingProgress>) {
+            this.progress = progress
+        }
+    }
+
+    private class FailingOnceReadingProgressRepository : ReadingProgressRepository {
+        var progress: List<ReadingProgress> = emptyList()
+        private var shouldFailReplace = true
+
+        override fun readingProgress(): List<ReadingProgress> = progress
+
+        override fun observeReadingProgress(): Flow<List<ReadingProgress>> = flowOf(progress)
+
+        override suspend fun saveProgress(progress: ReadingProgress) {
+            this.progress = this.progress.filterNot { item -> item.contentId == progress.contentId } + progress
+        }
+
+        override suspend fun deleteProgress(contentId: String) {
+            progress = progress.filterNot { item -> item.contentId == contentId }
+        }
+
+        override suspend fun replaceReadingProgress(progress: List<ReadingProgress>) {
+            if (shouldFailReplace) {
+                shouldFailReplace = false
+                throw IllegalStateException("Simulated progress write failure")
+            }
+            this.progress = progress
+        }
     }
 }

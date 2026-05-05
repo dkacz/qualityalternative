@@ -7,7 +7,9 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.qualityalternative.app.data.local.QualityAlternativeDatabase
 import com.qualityalternative.app.domain.model.ContentAvailability
 import com.qualityalternative.app.domain.model.ContentFormat
+import com.qualityalternative.app.domain.model.ContentItem
 import com.qualityalternative.app.domain.model.ContentRenderMode
+import com.qualityalternative.app.domain.model.ContentRightsMetadata
 import com.qualityalternative.app.domain.model.ContentRightsClass
 import com.qualityalternative.app.domain.model.ContentSourceType
 import com.qualityalternative.app.domain.model.TopicTag
@@ -90,6 +92,77 @@ class RoomUserDocumentRepositoryTest {
             } finally {
                 reloadedScope.cancel()
             }
+        } finally {
+            appScope.cancel()
+            delay(100)
+            database.close()
+        }
+    }
+
+    @Test
+    fun importPortableDocuments_mergeSkipsExistingAvailableDocumentCollision() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val database = Room.inMemoryDatabaseBuilder(
+            context,
+            QualityAlternativeDatabase::class.java,
+        ).allowMainThreadQueries().build()
+        val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+        try {
+            val repository = RoomUserDocumentRepository(
+                dao = database.userDocumentDao(),
+                scope = appScope,
+                bodyLoader = UserDocumentBodyLoader { _, _ -> "Private body" },
+                idProvider = { _ -> "user-document-44444444-4444-4444-8444-444444444444" },
+            )
+            repository.observeReady().first { it }
+            repository.addDocument(
+                draft = UserDocumentDraft(
+                    uri = "content://quality/local-book",
+                    displayName = "local-book.epub",
+                    mimeType = "application/epub+zip",
+                    title = "Local book",
+                    durationMinutes = 25,
+                    topicTags = setOf(TopicTag.PHILOSOPHY),
+                ),
+                nowMillis = 1_000L,
+            )
+            val local = withTimeout(10_000L) {
+                repository.observeUserDocuments().first { it.size == 1 }.single()
+            }
+            val importedMissingCollision = ContentItem(
+                id = local.id,
+                packId = "user-documents",
+                title = "Imported missing book",
+                description = "Reattach to continue reading.",
+                durationMinutes = 25,
+                format = ContentFormat.EPUB,
+                topicTags = setOf(TopicTag.PHILOSOPHY),
+                bodyAssetPath = null,
+                externalUrl = null,
+                sourceLabel = "book.epub (missing)",
+                sourceType = ContentSourceType.USER_DOCUMENT,
+                availability = ContentAvailability.UNAVAILABLE,
+                rights = ContentRightsMetadata.userPrivateReader(
+                    sourceUrl = "portable-missing:${local.id}",
+                    attribution = "book.epub",
+                ),
+                addedAtMillis = 2_000L,
+            )
+
+            repository.importPortableDocuments(
+                documents = listOf(importedMissingCollision),
+                replaceExisting = false,
+                nowMillis = 3_000L,
+            )
+
+            val afterMerge = withTimeout(10_000L) {
+                repository.observeUserDocuments().first { it.size == 1 }.single()
+            }
+            assertEquals(local.id, afterMerge.id)
+            assertEquals("Local book", afterMerge.title)
+            assertEquals(ContentAvailability.AVAILABLE, afterMerge.availability)
+            assertEquals("content://quality/local-book", afterMerge.rights.sourceUrl)
         } finally {
             appScope.cancel()
             delay(100)

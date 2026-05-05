@@ -62,6 +62,7 @@ Review gate:
 
 - GPT Pro code, E2E, and visual review.
 - Screenshot import entry, merge preview, replace confirmation, invalid import, unsupported future schema, and import success.
+- R10 GPT Pro review returned `SCORE: 10/10`, `VERDICT: PASS`, `VISUAL REVIEW: PASS`; Slice 16.2 is complete.
 
 ### Slice 16.3: Portable Library And Reading State
 
@@ -75,6 +76,20 @@ Deliverables:
 Review gate:
 
 - GPT Pro code, E2E, and visual review.
+- Current implementation exports and imports saved links, user-document metadata, active reading progress, and completed/reactivated state; imported documents are marked missing until the source file is reattached.
+- R1 GPT Pro review returned `SCORE: 6/10`, `VERDICT: FAIL`, `VISUAL REVIEW: FAIL`; R2 removes the active open action from missing imported documents, retains their progress as dormant state, prevents merge from replacing local available library records with synthetic missing records, and adds rollback for mid-apply import failures.
+- R2 GPT Pro review returned `SCORE: 9/10`, `VERDICT: FAIL`, `VISUAL REVIEW: PASS`; R3 applies unsafe-value filtering to portable link/document descriptions and proves raw URI/email/OAuth/token/provider text cannot be exported or imported through descriptions.
+- R3 GPT Pro review returned `SCORE: 8/10`, `VERDICT: FAIL`, `VISUAL REVIEW: PASS`; R4 additionally rejects opaque provider/file IDs in portable descriptions, rejects unsafe portable link URLs, omits unsafe saved links from export, and proves available local documents are not overwritten by imported missing-document placeholders.
+- R4 GPT Pro review returned `SCORE: 8/10`, `VERDICT: FAIL`, `VISUAL REVIEW: PASS`; R5 rejects encoded raw URI/provider payloads inside otherwise valid URLs, validates imported `mimeType` as portable data, and prevents settings references from pointing at unsafe library records omitted during export.
+- R5 GPT Pro review returned `SCORE: 9/10`, `VERDICT: FAIL`, `VISUAL REVIEW: PASS`; R6 aligns portable user-link and user-document title export with the schema/import limit of 200 characters, while preserving the separate 240-character annotation sidecar source-title limit.
+- R6 GPT Pro review returned `SCORE: 9/10`, `VERDICT: FAIL`, `VISUAL REVIEW: PASS`; R7 aligns saved-link `sourceLabel` export and DTO validation with the schema/import limit of 120 characters while preserving broader 240-character document source hints.
+- R7 GPT Pro review returned `SCORE: 9/10`, `VERDICT: FAIL`, `VISUAL REVIEW: PASS`; R8 recursively decodes saved-link URL path/query/fragment surfaces before privacy scanning so nested encoded raw URI/account payloads cannot be exported or imported.
+- R8 GPT Pro review returned `SCORE: 9/10`, `VERDICT: FAIL`, `VISUAL REVIEW: PASS`; R9 treats URL decode-depth cap exhaustion as non-portable and adds six-deep encoded raw-URI regression coverage.
+- R9 GPT Pro review returned `SCORE: 9/10`, `VERDICT: FAIL`, `VISUAL REVIEW: PASS`; R10 rejects short Android SAF/provider document IDs and storage/download file payloads embedded inside saved-link `https://` URL surfaces.
+- R10 GPT Pro review returned `SCORE: 9/10`, `VERDICT: FAIL`, `VISUAL REVIEW: PASS`; R11 rejects no-slash short provider-internal ids such as `image:3952`, `audio:1234`, and `msf:29` embedded inside saved-link `https://` URL surfaces.
+- R11 GPT Pro review returned `SCORE: 9/10`, `VERDICT: FAIL`, `VISUAL REVIEW: PASS`; R12 rejects decoded `storage/` and `sdcard/` local-path payloads in saved-link URL surfaces regardless of file extension.
+- R13 GPT Pro review returned `SCORE: 8/10`, `VERDICT: FAIL`, `VISUAL REVIEW: PASS`; R14 treats malformed nested URL-decoding failures as non-portable and adds malformed nested local-path/raw-URI regression coverage.
+- R14 GPT Pro review returned `SCORE: 10/10`, `VERDICT: PASS`, `VISUAL REVIEW: PASS`; Slice 16.3 is complete.
 
 ### Slice 16.4: Portable Profile Autosave Destination
 

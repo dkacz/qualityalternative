@@ -2,7 +2,12 @@ package com.qualityalternative.app.data
 
 import com.qualityalternative.app.domain.model.AppSettings
 import com.qualityalternative.app.domain.model.AppThemeMode
+import com.qualityalternative.app.domain.model.ContentAvailability
+import com.qualityalternative.app.domain.model.ContentFormat
+import com.qualityalternative.app.domain.model.ContentItem
 import com.qualityalternative.app.domain.model.ContentPriority
+import com.qualityalternative.app.domain.model.ContentRightsMetadata
+import com.qualityalternative.app.domain.model.ContentSourceType
 import com.qualityalternative.app.domain.model.DEFAULT_READER_FONT_SCALE
 import com.qualityalternative.app.domain.model.DistractingApp
 import com.qualityalternative.app.domain.model.DurationBucket
@@ -11,13 +16,19 @@ import com.qualityalternative.app.domain.model.MAX_OPEN_ANYWAY_UNLOCK_MINUTES
 import com.qualityalternative.app.domain.model.MAX_READER_FONT_SCALE
 import com.qualityalternative.app.domain.model.MIN_OPEN_ANYWAY_UNLOCK_MINUTES
 import com.qualityalternative.app.domain.model.MIN_READER_FONT_SCALE
+import com.qualityalternative.app.domain.model.ReadingProgress
 import com.qualityalternative.app.domain.model.TopicTag
+import com.qualityalternative.app.domain.service.ReadingProgressRepository
 import com.qualityalternative.app.domain.service.SettingsRepository
+import com.qualityalternative.app.domain.service.UserDocumentRepository
+import com.qualityalternative.app.domain.service.UserLinkRepository
 import java.text.SimpleDateFormat
+import java.net.URI
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 import kotlin.math.roundToInt
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
@@ -150,10 +161,38 @@ data class AccountLightLibrary(
 @Serializable
 data class AccountLightUserLink(
     val contentId: String,
+    val normalizedUrl: String,
+    val title: String,
+    val description: String,
+    val durationMinutes: Int,
+    val topicTags: List<String>,
+    val availability: String,
+    val createdAtMillis: Long,
+    val updatedAtMillis: Long,
+    val sourceLabel: String? = null,
 ) {
     init {
         require(contentId.matches(ContentIdRegex) && contentId.startsWith("user-link-")) {
             "userLinks contentId must use the user-link prefix."
+        }
+        val urlValidation = UserLinkValidator.validateUrl(normalizedUrl)
+        require(urlValidation.isValid && urlValidation.normalizedUrl == normalizedUrl) {
+            "userLinks normalizedUrl must be a normalized manual-link URL."
+        }
+        require(normalizedUrl.isSafePortableUserLinkUrl()) {
+            "userLinks normalizedUrl is not portable."
+        }
+        require(title.isSafePortableTitle()) { "userLinks title is not portable." }
+        require(description.isSafePortableDescription()) { "userLinks description is not portable." }
+        require(durationMinutes in 1..240) { "userLinks durationMinutes is outside the portable range." }
+        require(topicTags.isNotEmpty() && topicTags.all { it in TopicTag.entries.map(TopicTag::name) }) {
+            "userLinks topicTags is invalid."
+        }
+        require(availability in AvailabilityValues) { "userLinks availability is invalid." }
+        require(createdAtMillis >= 0L) { "userLinks createdAtMillis must be non-negative." }
+        require(updatedAtMillis >= createdAtMillis) { "userLinks updatedAtMillis must be >= createdAtMillis." }
+        require(sourceLabel == null || sourceLabel.isSafePortableLinkSourceLabel()) {
+            "userLinks sourceLabel is not portable."
         }
     }
 }
@@ -161,10 +200,90 @@ data class AccountLightUserLink(
 @Serializable
 data class AccountLightUserDocument(
     val contentId: String,
+    val displayName: String,
+    val mimeType: String?,
+    val documentFormat: String,
+    val title: String,
+    val description: String,
+    val durationMinutes: Int,
+    val topicTags: List<String>,
+    val availability: String,
+    val documentImportState: String,
+    val documentFingerprint: AccountLightDocumentFingerprint,
+    val createdAtMillis: Long,
+    val updatedAtMillis: Long,
+    val sourceHint: AccountLightSourceHint? = null,
 ) {
     init {
         require(contentId.matches(ContentIdRegex) && contentId.startsWith("user-document-")) {
             "userDocuments contentId must use the user-document prefix."
+        }
+        require(displayName.isSafePortableSourceHint()) { "userDocuments displayName is not portable." }
+        require(mimeType == null || mimeType.isSafePortableMimeType()) {
+            "userDocuments mimeType is not portable."
+        }
+        require(documentFormat in DocumentFormatValues) { "userDocuments documentFormat is invalid." }
+        require(title.isSafePortableTitle()) { "userDocuments title is not portable." }
+        require(description.isSafePortableDescription()) { "userDocuments description is not portable." }
+        require(durationMinutes in 1..240) { "userDocuments durationMinutes is outside the portable range." }
+        require(topicTags.isNotEmpty() && topicTags.all { it in TopicTag.entries.map(TopicTag::name) }) {
+            "userDocuments topicTags is invalid."
+        }
+        require(availability in AvailabilityValues) { "userDocuments availability is invalid." }
+        require(documentImportState in DocumentImportStateValues) { "userDocuments documentImportState is invalid." }
+        require(
+            documentFingerprint.strategy != "UNVERIFIED_METADATA_ONLY" ||
+                documentImportState == "MISSING_FILE_NEEDS_REATTACH",
+        ) {
+            "userDocuments documentImportState must be missing for unverified fingerprints."
+        }
+        require(createdAtMillis >= 0L) { "userDocuments createdAtMillis must be non-negative." }
+        require(updatedAtMillis >= createdAtMillis) { "userDocuments updatedAtMillis must be >= createdAtMillis." }
+    }
+}
+
+@Serializable
+data class AccountLightDocumentFingerprint(
+    val strategy: String,
+    val sha256: String?,
+    val sizeBytes: Long?,
+    val normalizedTitle: String,
+    val format: String,
+) {
+    init {
+        require(strategy in DocumentFingerprintStrategyValues) { "documentFingerprint strategy is invalid." }
+        require(sha256 == null || sha256.matches(Sha256Regex)) { "documentFingerprint sha256 is invalid." }
+        require(sizeBytes == null || sizeBytes >= 0L) { "documentFingerprint sizeBytes must be non-negative." }
+        require(normalizedTitle.isNormalizedPortableTitle()) { "documentFingerprint normalizedTitle is invalid." }
+        require(format in ContentFormatValues) { "documentFingerprint format is invalid." }
+        when (strategy) {
+            "SHA256_BYTES" -> {
+                require(sha256 != null) { "documentFingerprint sha256 is required." }
+                require(sizeBytes != null) { "documentFingerprint sizeBytes is required." }
+            }
+            "TEXT_SAMPLE_SHA256" -> {
+                require(sha256 != null) { "documentFingerprint sha256 is required." }
+                require(sizeBytes == null) { "documentFingerprint sizeBytes must be null." }
+            }
+            "UNVERIFIED_METADATA_ONLY" -> {
+                require(sha256 == null) { "documentFingerprint sha256 must be null." }
+                require(sizeBytes == null) { "documentFingerprint sizeBytes must be null." }
+            }
+        }
+    }
+}
+
+@Serializable
+data class AccountLightSourceHint(
+    val lastKnownDisplayName: String? = null,
+    val providerLabel: String? = null,
+) {
+    init {
+        require(lastKnownDisplayName == null || lastKnownDisplayName.isSafePortableSourceHint()) {
+            "sourceHint lastKnownDisplayName is not portable."
+        }
+        require(providerLabel == null || providerLabel.isSafePortableProviderLabel()) {
+            "sourceHint providerLabel is not portable."
         }
     }
 }
@@ -177,9 +296,26 @@ data class AccountLightReading(
 @Serializable
 data class AccountLightReadingProgress(
     val contentId: String,
+    val progressPercent: Int,
+    val lastVisibleParagraphIndex: Int,
+    val paragraphCount: Int,
+    val updatedAtMillis: Long,
+    val completedAtMillis: Long? = null,
 ) {
     init {
         require(contentId.matches(ContentIdRegex)) { "reading progress contentId is invalid." }
+        require(progressPercent in 0..100) { "reading progress progressPercent is invalid." }
+        require(paragraphCount >= 1) { "reading progress paragraphCount is invalid." }
+        require(lastVisibleParagraphIndex in 0 until paragraphCount) {
+            "reading progress lastVisibleParagraphIndex is invalid."
+        }
+        require(updatedAtMillis >= 0L) { "reading progress updatedAtMillis must be non-negative." }
+        require(completedAtMillis == null || completedAtMillis >= 0L) {
+            "reading progress completedAtMillis must be non-negative."
+        }
+        require((completedAtMillis != null && progressPercent == 100) || (completedAtMillis == null && progressPercent in 0..99)) {
+            "reading progress completion fields are inconsistent."
+        }
     }
 }
 
@@ -231,7 +367,7 @@ data class AccountLightAnnotationSidecar(
 ) {
     init {
         require(contentId.matches(ContentIdRegex)) { "annotation sidecar contentId is invalid." }
-        require(sourceTitle.isSafePortableTitle()) {
+        require(sourceTitle.isSafePortableAnnotationSourceTitle()) {
             "annotation sidecar sourceTitle is not portable."
         }
         require(jsonLdFileName.isSafePortableAnnotationSidecarFileName()) {
@@ -319,12 +455,41 @@ class AccountLightProfileExporter(
     private val settingsRepository: SettingsRepository,
     private val appVersionName: String,
     private val appVersionCode: Int,
+    private val userLinkRepository: UserLinkRepository? = null,
+    private val userDocumentRepository: UserDocumentRepository? = null,
+    private val readingProgressRepository: ReadingProgressRepository? = null,
     private val codec: AccountLightProfileCodec = AccountLightProfileCodec(),
 ) {
     suspend fun exportSettingsOnlyProfileJson(nowMillis: Long = System.currentTimeMillis()): String {
         val exportedAtMillis = nowMillis.coerceAtLeast(0L)
         val identity = settingsRepository.ensureLocalProfileIdentity(nowMillis = exportedAtMillis)
         val settings = settingsRepository.observeAppSettings().first()
+        val userLinks = userLinkRepository?.userLinks().orEmpty()
+        val userDocuments = userDocumentRepository?.userDocuments().orEmpty()
+        val portableUserLinkPairs = userLinks.mapNotNull { item ->
+            item.toAccountLightUserLink(exportedAtMillis)?.let { portable -> item.id to portable }
+        }
+        val portableUserDocumentPairs = userDocuments.mapNotNull { item ->
+            item.toAccountLightUserDocument(exportedAtMillis)?.let { portable -> item.id to portable }
+        }
+        val portableUserLinks = portableUserLinkPairs.map { (_, portable) -> portable }
+        val portableUserDocuments = portableUserDocumentPairs.map { (_, portable) -> portable }
+        val portableContentIds = (
+            portableUserLinks.map(AccountLightUserLink::contentId) +
+                portableUserDocuments.map(AccountLightUserDocument::contentId)
+            ).toSet()
+        val omittedPortableUserContentIds = (userLinks + userDocuments)
+            .mapTo(mutableSetOf()) { item -> item.portableContentId() } - portableContentIds
+        val contentIdMapping = portableUserLinkPairs
+            .associate { (localId, portable) -> localId to portable.contentId } +
+            portableUserDocumentPairs.associate { (localId, portable) -> localId to portable.contentId }
+        val portableProgress = readingProgressRepository?.readingProgress().orEmpty()
+            .mapNotNull { progress ->
+                progress.toAccountLightReadingProgress(
+                    contentIdMapping = contentIdMapping,
+                    portableLibraryContentIds = portableContentIds,
+                )
+            }
         val profile = AccountLightProfileFile(
             schemaVersion = ACCOUNT_LIGHT_SCHEMA_VERSION,
             exportedAtMillis = exportedAtMillis,
@@ -333,9 +498,20 @@ class AccountLightProfileExporter(
                 appVersionCode = appVersionCode,
             ),
             profile = identity.toDto(updatedAtMillis = exportedAtMillis),
-            settings = settings.toAccountLightSettings(),
+            settings = settings.toAccountLightSettings(
+                contentIdMapping = contentIdMapping,
+                omittedPortableUserContentIds = omittedPortableUserContentIds,
+            ),
+            library = AccountLightLibrary(
+                userLinks = portableUserLinks,
+                userDocuments = portableUserDocuments,
+            ),
+            reading = AccountLightReading(progress = portableProgress),
             annotations = settings.toAccountLightAnnotations(),
-            warnings = settings.toAccountLightWarnings(),
+            warnings = settings.toAccountLightWarnings(
+                contentIdMapping = contentIdMapping,
+                omittedPortableUserContentIds = omittedPortableUserContentIds,
+            ),
         )
         return codec.encode(profile)
     }
@@ -367,6 +543,10 @@ data class AccountLightImportPreview(
     val unsupportedAppCount: Int,
     val importedTopicCount: Int,
     val importedPackCount: Int,
+    val importedLinkCount: Int,
+    val importedDocumentCount: Int,
+    val importedProgressCount: Int,
+    val missingDocumentCount: Int,
     val warningCount: Int,
     val warningSummaries: List<String> = emptyList(),
 )
@@ -386,8 +566,18 @@ data class AccountLightImportApplyResult(
     val warningCount: Int,
 )
 
+private data class AccountLightImportSnapshot(
+    val links: List<ContentItem>?,
+    val documents: List<ContentItem>?,
+    val progress: List<ReadingProgress>?,
+    val settings: AppSettings,
+)
+
 class AccountLightProfileImporter(
     private val settingsRepository: SettingsRepository,
+    private val userLinkRepository: UserLinkRepository? = null,
+    private val userDocumentRepository: UserDocumentRepository? = null,
+    private val readingProgressRepository: ReadingProgressRepository? = null,
     private val supportedApps: List<DistractingApp> = settingsRepository.supportedDistractingApps(),
     private val knownContentIdsProvider: () -> Set<String> = { emptySet() },
     private val codec: AccountLightProfileCodec = AccountLightProfileCodec(),
@@ -446,8 +636,13 @@ class AccountLightProfileImporter(
         val unsupportedAppCount = profile.settings.selectedAppPackages.distinct().count { packageName ->
             packageName !in supportedPackages
         }
+        val missingDocumentCount = profile.library.userDocuments.count { document ->
+            document.documentImportState == "MISSING_FILE_NEEDS_REATTACH" ||
+                document.documentFingerprint.strategy == "UNVERIFIED_METADATA_ONLY"
+        }
         val generatedWarnings = unknownFieldWarnings(root) +
             unsupportedAppWarnings(unsupportedAppCount) +
+            missingDocumentWarnings(missingDocumentCount) +
             duplicateScalarWarnings(profile.settings)
         val allWarnings = profile.warnings + generatedWarnings
         return AccountLightImportPlan(
@@ -461,6 +656,10 @@ class AccountLightProfileImporter(
                 unsupportedAppCount = unsupportedAppCount,
                 importedTopicCount = profile.settings.preferredTopics.size,
                 importedPackCount = profile.settings.selectedPackIds.size,
+                importedLinkCount = profile.library.userLinks.size,
+                importedDocumentCount = profile.library.userDocuments.size,
+                importedProgressCount = profile.reading.progress.size,
+                missingDocumentCount = missingDocumentCount,
                 warningCount = allWarnings.size,
                 warningSummaries = allWarnings.map { warning ->
                     warning.message ?: warning.code
@@ -470,27 +669,122 @@ class AccountLightProfileImporter(
     }
 
     suspend fun applyMerge(plan: AccountLightImportPlan): AccountLightImportApplyResult {
-        return AccountLightImportApplyResult(
-            mode = AccountLightImportMode.MERGE,
-            settingsApplied = false,
-            warningCount = plan.allWarnings.size + 1,
-        )
+        return applyImportWithRollback(plan) {
+            applyPortableLibraryAndProgress(plan = plan, replaceExisting = false)
+            val importedReactivatedIds = plan.profile.settings.reactivatedCompletedContentIds.toSet()
+            if (importedReactivatedIds.isNotEmpty()) {
+                val currentSettings = settingsRepository.observeAppSettings().first()
+                settingsRepository.saveReactivatedCompletedContentIds(
+                    currentSettings.reactivatedCompletedContentIds + importedReactivatedIds,
+                )
+            }
+            AccountLightImportApplyResult(
+                mode = AccountLightImportMode.MERGE,
+                settingsApplied = false,
+                warningCount = plan.allWarnings.size + 1,
+            )
+        }
     }
 
     suspend fun applyReplace(plan: AccountLightImportPlan): AccountLightImportApplyResult {
-        val supportedPackages = supportedApps.mapTo(mutableSetOf(), DistractingApp::packageName)
+        return applyImportWithRollback(plan) {
+            applyPortableLibraryAndProgress(plan = plan, replaceExisting = true)
+            val supportedPackages = supportedApps.mapTo(mutableSetOf(), DistractingApp::packageName)
+            settingsRepository.replacePortableSettings(
+                settings = plan.profile.settings.toPortableAppSettings(supportedPackages = supportedPackages),
+                profileIdentity = LocalProfileIdentity(
+                    profileId = plan.profile.profile.profileId,
+                    createdAtMillis = plan.profile.profile.createdAtMillis,
+                ),
+            )
+            AccountLightImportApplyResult(
+                mode = AccountLightImportMode.REPLACE,
+                settingsApplied = true,
+                warningCount = plan.allWarnings.size,
+            )
+        }
+    }
+
+    private suspend fun applyImportWithRollback(
+        plan: AccountLightImportPlan,
+        block: suspend () -> AccountLightImportApplyResult,
+    ): AccountLightImportApplyResult {
+        val snapshot = captureImportSnapshot()
+        return try {
+            block()
+        } catch (error: Throwable) {
+            if (error is CancellationException) throw error
+            val restoreFailure = runCatching {
+                restoreImportSnapshot(snapshot = snapshot, nowMillis = plan.profile.exportedAtMillis)
+            }.exceptionOrNull()
+            if (restoreFailure != null) {
+                error.addSuppressed(restoreFailure)
+            }
+            throw error
+        }
+    }
+
+    private suspend fun captureImportSnapshot(): AccountLightImportSnapshot {
+        return AccountLightImportSnapshot(
+            links = userLinkRepository?.userLinks(),
+            documents = userDocumentRepository?.userDocuments(),
+            progress = readingProgressRepository?.readingProgress(),
+            settings = settingsRepository.observeAppSettings().first(),
+        )
+    }
+
+    private suspend fun restoreImportSnapshot(
+        snapshot: AccountLightImportSnapshot,
+        nowMillis: Long,
+    ) {
+        userLinkRepository?.importPortableLinks(
+            links = snapshot.links.orEmpty(),
+            replaceExisting = true,
+            nowMillis = nowMillis,
+        )
+        userDocumentRepository?.importPortableDocuments(
+            documents = snapshot.documents.orEmpty(),
+            replaceExisting = true,
+            nowMillis = nowMillis,
+        )
+        readingProgressRepository?.replaceReadingProgress(snapshot.progress.orEmpty())
         settingsRepository.replacePortableSettings(
-            settings = plan.profile.settings.toPortableAppSettings(supportedPackages = supportedPackages),
-            profileIdentity = LocalProfileIdentity(
-                profileId = plan.profile.profile.profileId,
-                createdAtMillis = plan.profile.profile.createdAtMillis,
-            ),
+            settings = snapshot.settings,
+            profileIdentity = null,
         )
-        return AccountLightImportApplyResult(
-            mode = AccountLightImportMode.REPLACE,
-            settingsApplied = true,
-            warningCount = plan.allWarnings.size,
+    }
+
+    private suspend fun applyPortableLibraryAndProgress(
+        plan: AccountLightImportPlan,
+        replaceExisting: Boolean,
+    ) {
+        val importedLinks = plan.profile.library.userLinks.map(AccountLightUserLink::toContentItem)
+        val importedDocuments = plan.profile.library.userDocuments.map(AccountLightUserDocument::toMissingContentItem)
+        userLinkRepository?.importPortableLinks(
+            links = importedLinks,
+            replaceExisting = replaceExisting,
+            nowMillis = plan.profile.exportedAtMillis,
         )
+        userDocumentRepository?.importPortableDocuments(
+            documents = importedDocuments,
+            replaceExisting = replaceExisting,
+            nowMillis = plan.profile.exportedAtMillis,
+        )
+        val progressRepository = readingProgressRepository ?: return
+        val localKnownIds = knownContentIdsProvider()
+        val importedContentIds = importedLinks.mapTo(mutableSetOf(), ContentItem::id) +
+            importedDocuments.map(ContentItem::id)
+        val activeProgress = plan.profile.reading.progress
+            .filter { progress -> progress.contentId in localKnownIds || progress.contentId in importedContentIds }
+            .map(AccountLightReadingProgress::toReadingProgress)
+        if (replaceExisting) {
+            progressRepository.replaceReadingProgress(activeProgress)
+        } else {
+            val currentProgressIds = progressRepository.readingProgress().mapTo(mutableSetOf(), ReadingProgress::contentId)
+            activeProgress
+                .filter { progress -> progress.contentId !in currentProgressIds }
+                .forEach { progress -> progressRepository.saveProgress(progress) }
+        }
     }
 
     private fun parseRootObject(rawJson: String): JsonObject {
@@ -558,6 +852,17 @@ class AccountLightProfileImporter(
                 severity = "WARNING",
                 section = "settings",
                 message = "An imported app package is not supported by this build and will stay inactive.",
+            )
+        }
+    }
+
+    private fun missingDocumentWarnings(missingDocumentCount: Int): List<AccountLightWarning> {
+        return List(missingDocumentCount) {
+            AccountLightWarning(
+                code = "DOCUMENT_FILE_MISSING_ON_IMPORT",
+                severity = "WARNING",
+                section = "library.userDocuments",
+                message = "An imported document needs the original file reattached before reading can continue.",
             )
         }
     }
@@ -674,11 +979,17 @@ private fun JsonObject.validateLibraryShape() {
         require(urlValidation.isValid && urlValidation.normalizedUrl == normalizedUrl) {
             "$path.normalizedUrl must be a normalized manual-link URL."
         }
+        require(normalizedUrl.isSafePortableUserLinkUrl()) {
+            "$path.normalizedUrl is not portable."
+        }
         link.requireNonBlankString("title", path, maxLength = 200)
             .also { title ->
                 require(title.isSafePortableTitle()) { "$path.title is not portable." }
             }
         link.requireString("description", path, maxLength = 1000)
+            .also { description ->
+                require(description.isSafePortableDescription()) { "$path.description is not portable." }
+            }
         link.requireInt("durationMinutes", path, 1..240)
         link.requireEnumArray("topicTags", path, TopicTag.entries.mapTo(mutableSetOf(), TopicTag::name), minSize = 1)
         link.requireEnum("availability", path, AvailabilityValues)
@@ -686,6 +997,9 @@ private fun JsonObject.validateLibraryShape() {
         val updatedAtMillis = link.requireLong("updatedAtMillis", path, minimum = 0L)
         require(updatedAtMillis >= createdAtMillis) { "$path.updatedAtMillis must be >= createdAtMillis." }
         link.requireNullableString("sourceLabel", path, maxLength = 120, required = false)
+            ?.also { sourceLabel ->
+                require(sourceLabel.isSafePortableLinkSourceLabel()) { "$path.sourceLabel is not portable." }
+            }
     }
 
     val userDocumentIds = mutableSetOf<String>()
@@ -703,12 +1017,18 @@ private fun JsonObject.validateLibraryShape() {
                 require(displayName.isSafePortableSourceHint()) { "$path.displayName is not portable." }
             }
         document.requireNullableString("mimeType", path, maxLength = 120, required = true)
+            ?.also { mimeType ->
+                require(mimeType.isSafePortableMimeType()) { "$path.mimeType is not portable." }
+            }
         document.requireEnum("documentFormat", path, DocumentFormatValues)
         document.requireNonBlankString("title", path, maxLength = 200)
             .also { title ->
                 require(title.isSafePortableTitle()) { "$path.title is not portable." }
             }
         document.requireString("description", path, maxLength = 1000)
+            .also { description ->
+                require(description.isSafePortableDescription()) { "$path.description is not portable." }
+            }
         document.requireInt("durationMinutes", path, 1..240)
         document.requireEnumArray("topicTags", path, TopicTag.entries.mapTo(mutableSetOf(), TopicTag::name), minSize = 1)
         document.requireEnum("availability", path, AvailabilityValues)
@@ -848,7 +1168,11 @@ private fun JsonObject.validateAnnotationsShape() {
         val contentId = sidecar.requireString("contentId", path)
         require(contentId.matches(ContentIdRegex)) { "$path.contentId is invalid." }
         require(sidecarIds.add(contentId)) { "$path.contentId is duplicated." }
-        sidecar.requireNonBlankString("sourceTitle", path, maxLength = 240)
+        sidecar.requireNonBlankString("sourceTitle", path, maxLength = 240).also { sourceTitle ->
+            require(sourceTitle.isSafePortableAnnotationSourceTitle()) {
+                "$path.sourceTitle is not portable."
+            }
+        }
         val fileName = sidecar.requireString("jsonLdFileName", path)
         require(fileName.isSafePortableAnnotationSidecarFileName()) {
             "$path.jsonLdFileName is invalid."
@@ -1050,7 +1374,10 @@ private fun AccountLightSettings.toPortableAppSettings(supportedPackages: Set<St
     )
 }
 
-private fun AppSettings.toAccountLightSettings(): AccountLightSettings {
+private fun AppSettings.toAccountLightSettings(
+    contentIdMapping: Map<String, String> = emptyMap(),
+    omittedPortableUserContentIds: Set<String> = emptySet(),
+): AccountLightSettings {
     return AccountLightSettings(
         hasCompletedOnboarding = hasCompletedOnboarding,
         selectedAppPackages = selectedAppPackages.sorted(),
@@ -1061,9 +1388,149 @@ private fun AppSettings.toAccountLightSettings(): AccountLightSettings {
         meditationDurationMinutes = meditationDurationMinutes,
         readerFontScale = readerFontScale.toPortableReaderFontScale(),
         contentPriority = contentPriority.name,
-        priorityContentIds = priorityContentIds.toPortableContentIds(),
-        reactivatedCompletedContentIds = reactivatedCompletedContentIds.toPortableContentIds(),
+        priorityContentIds = priorityContentIds.toPortableContentIds(
+            contentIdMapping = contentIdMapping,
+            omittedPortableUserContentIds = omittedPortableUserContentIds,
+        ),
+        reactivatedCompletedContentIds = reactivatedCompletedContentIds.toPortableContentIds(
+            contentIdMapping = contentIdMapping,
+            omittedPortableUserContentIds = omittedPortableUserContentIds,
+        ),
         openAnywayUnlockMinutes = openAnywayUnlockMinutes,
+    )
+}
+
+private fun ContentItem.toAccountLightUserLink(exportedAtMillis: Long): AccountLightUserLink? {
+    if (sourceType != ContentSourceType.USER_LINK) return null
+    val url = externalUrl?.takeIf(String::isNotBlank) ?: rights.sourceUrl?.takeIf(String::isNotBlank) ?: return null
+    val normalizedUrl = UserLinkValidator.validateUrl(url).normalizedUrl ?: return null
+    if (!normalizedUrl.isSafePortableUserLinkUrl()) return null
+    val portableTitle = title.trim().takeIf { it.isSafePortableTitle() } ?: return null
+    val createdAtMillis = addedAtMillis?.coerceAtLeast(0L) ?: exportedAtMillis
+    return AccountLightUserLink(
+        contentId = portableContentId(),
+        normalizedUrl = normalizedUrl,
+        title = portableTitle,
+        description = description.toPortableDescriptionOrFallback("Saved link metadata."),
+        durationMinutes = durationMinutes.coerceIn(1, 240),
+        topicTags = topicTags.map { it.name }.sorted().ifEmpty { listOf(TopicTag.OTHER.name) },
+        availability = availability.name,
+        createdAtMillis = createdAtMillis,
+        updatedAtMillis = exportedAtMillis.coerceAtLeast(createdAtMillis),
+        sourceLabel = sourceLabel.toPortableLinkSourceLabelOrNull(),
+    )
+}
+
+private fun ContentItem.toAccountLightUserDocument(exportedAtMillis: Long): AccountLightUserDocument? {
+    if (sourceType != ContentSourceType.USER_DOCUMENT) return null
+    val portableFormat = format.takeIf { it.name in DocumentFormatValues } ?: return null
+    val portableTitle = title.trim().takeIf { it.isSafePortableTitle() } ?: return null
+    val createdAtMillis = addedAtMillis?.coerceAtLeast(0L) ?: exportedAtMillis
+    val displayName = sourceLabel.toPortableSourceHintOrNull()
+        ?: portableTitle.toPortableSourceHintOrNull()
+        ?: "Imported document"
+    return AccountLightUserDocument(
+        contentId = portableContentId(),
+        displayName = displayName,
+        mimeType = null,
+        documentFormat = portableFormat.name,
+        title = portableTitle,
+        description = description.toPortableDescriptionOrFallback("Saved document metadata."),
+        durationMinutes = durationMinutes.coerceIn(1, 240),
+        topicTags = topicTags.map { it.name }.sorted().ifEmpty { listOf(TopicTag.OTHER.name) },
+        availability = availability.name,
+        documentImportState = "MISSING_FILE_NEEDS_REATTACH",
+        documentFingerprint = AccountLightDocumentFingerprint(
+            strategy = "UNVERIFIED_METADATA_ONLY",
+            sha256 = null,
+            sizeBytes = null,
+            normalizedTitle = title.normalizedPortableTitle(),
+            format = portableFormat.name,
+        ),
+        createdAtMillis = createdAtMillis,
+        updatedAtMillis = exportedAtMillis.coerceAtLeast(createdAtMillis),
+        sourceHint = AccountLightSourceHint(lastKnownDisplayName = displayName, providerLabel = null),
+    )
+}
+
+private fun ReadingProgress.toAccountLightReadingProgress(
+    contentIdMapping: Map<String, String>,
+    portableLibraryContentIds: Set<String>,
+): AccountLightReadingProgress? {
+    val portableId = contentIdMapping[contentId] ?: contentId
+    if (!portableId.matches(ContentIdRegex)) {
+        return null
+    }
+    if (portableId.startsWith("user-") && portableId !in portableLibraryContentIds) {
+        return null
+    }
+    val safeParagraphCount = paragraphCount.coerceAtLeast(1)
+    val safeLastVisible = lastVisibleParagraphIndex.coerceIn(0, safeParagraphCount - 1)
+    val safePercent = progressPercent.coerceIn(0, 100)
+    val portablePercent = if (completedAtMillis == null) safePercent.coerceAtMost(99) else 100
+    return AccountLightReadingProgress(
+        contentId = portableId,
+        progressPercent = portablePercent,
+        lastVisibleParagraphIndex = safeLastVisible,
+        paragraphCount = safeParagraphCount,
+        updatedAtMillis = updatedAtMillis.coerceAtLeast(0L),
+        completedAtMillis = completedAtMillis?.coerceAtLeast(0L),
+    )
+}
+
+private fun AccountLightUserLink.toContentItem(): ContentItem {
+    return ContentItem(
+        id = contentId,
+        packId = "user-links",
+        title = title,
+        description = description.ifBlank { normalizedUrl },
+        durationMinutes = durationMinutes,
+        format = ContentFormat.HTML,
+        topicTags = topicTags.mapTo(mutableSetOf()) { TopicTag.valueOf(it) },
+        bodyAssetPath = null,
+        externalUrl = normalizedUrl,
+        sourceLabel = sourceLabel,
+        sourceType = ContentSourceType.USER_LINK,
+        availability = ContentAvailability.valueOf(availability),
+        rights = ContentRightsMetadata.userPrivateExternal(sourceUrl = normalizedUrl, attribution = sourceLabel),
+        addedAtMillis = createdAtMillis,
+    )
+}
+
+private fun AccountLightUserDocument.toMissingContentItem(): ContentItem {
+    val display = displayName.removeSuffix(" (missing)").ifBlank { title }
+    val sourceReference = "portable-missing:$contentId"
+    val format = ContentFormat.valueOf(documentFormat)
+    return ContentItem(
+        id = contentId,
+        packId = "user-documents",
+        title = title,
+        description = description.ifBlank { "Reattach $display to continue reading." },
+        durationMinutes = durationMinutes,
+        format = format,
+        topicTags = topicTags.mapTo(mutableSetOf()) { TopicTag.valueOf(it) },
+        bodyAssetPath = null,
+        externalUrl = null,
+        sourceLabel = "$display (missing)",
+        sourceType = ContentSourceType.USER_DOCUMENT,
+        availability = ContentAvailability.UNAVAILABLE,
+        rights = if (format == ContentFormat.PDF) {
+            ContentRightsMetadata.userPrivateExternal(sourceUrl = sourceReference, attribution = display)
+        } else {
+            ContentRightsMetadata.userPrivateReader(sourceUrl = sourceReference, attribution = display)
+        },
+        addedAtMillis = createdAtMillis,
+    )
+}
+
+private fun AccountLightReadingProgress.toReadingProgress(): ReadingProgress {
+    return ReadingProgress(
+        contentId = contentId,
+        progressPercent = progressPercent,
+        lastVisibleParagraphIndex = lastVisibleParagraphIndex,
+        paragraphCount = paragraphCount,
+        updatedAtMillis = updatedAtMillis,
+        completedAtMillis = completedAtMillis,
     )
 }
 
@@ -1082,11 +1549,22 @@ private fun AppSettings.toAccountLightAnnotations(): AccountLightAnnotations {
     )
 }
 
-private fun AppSettings.toAccountLightWarnings(): List<AccountLightWarning> {
+private fun AppSettings.toAccountLightWarnings(
+    contentIdMapping: Map<String, String> = emptyMap(),
+    omittedPortableUserContentIds: Set<String> = emptySet(),
+): List<AccountLightWarning> {
     return buildList {
-        priorityContentIds.invalidPortableContentIdsWarning(section = "settings")?.let(::add)
+        priorityContentIds.invalidPortableContentIdsWarning(
+            section = "settings",
+            contentIdMapping = contentIdMapping,
+            omittedPortableUserContentIds = omittedPortableUserContentIds,
+        )?.let(::add)
         reactivatedCompletedContentIds
-            .invalidPortableContentIdsWarning(section = "settings")
+            .invalidPortableContentIdsWarning(
+                section = "settings",
+                contentIdMapping = contentIdMapping,
+                omittedPortableUserContentIds = omittedPortableUserContentIds,
+            )
             ?.let(::add)
         if (!annotationExportDisplayName.isNullOrBlank() && annotationExportDisplayName.toPortableDisplayNameOrNull() == null) {
             add(
@@ -1105,14 +1583,29 @@ private fun Double.toPortableReaderFontScale(): Double {
     return (coerceIn(MIN_READER_FONT_SCALE, MAX_READER_FONT_SCALE) * 100.0).roundToInt() / 100.0
 }
 
-private fun Collection<String>.toPortableContentIds(): List<String> {
-    return filter { it.matches(ContentIdRegex) }
+private fun Collection<String>.toPortableContentIds(
+    contentIdMapping: Map<String, String> = emptyMap(),
+    omittedPortableUserContentIds: Set<String> = emptySet(),
+): List<String> {
+    return mapNotNull { contentId ->
+        contentIdMapping[contentId]
+            ?: contentId.takeIf { it.matches(ContentIdRegex) && it !in omittedPortableUserContentIds }
+    }
         .distinct()
         .sorted()
 }
 
-private fun Collection<String>.invalidPortableContentIdsWarning(section: String): AccountLightWarning? {
-    return if (any { !it.matches(ContentIdRegex) }) {
+private fun Collection<String>.invalidPortableContentIdsWarning(
+    section: String,
+    contentIdMapping: Map<String, String> = emptyMap(),
+    omittedPortableUserContentIds: Set<String> = emptySet(),
+): AccountLightWarning? {
+    return if (
+        any { contentId ->
+            contentIdMapping[contentId]?.matches(ContentIdRegex) != true &&
+                (contentId in omittedPortableUserContentIds || !contentId.matches(ContentIdRegex))
+        }
+    ) {
         AccountLightWarning(
             code = "CONFLICT_RETAINED_LOCAL_VALUE",
             severity = "WARNING",
@@ -1124,9 +1617,54 @@ private fun Collection<String>.invalidPortableContentIdsWarning(section: String)
     }
 }
 
+private fun ContentItem.portableContentId(): String {
+    if (id.matches(ContentIdRegex)) {
+        return id
+    }
+    val prefix = when (sourceType) {
+        ContentSourceType.USER_LINK -> "user-link"
+        ContentSourceType.USER_DOCUMENT -> "user-document"
+        else -> return id
+    }
+    val seed = when (sourceType) {
+        ContentSourceType.USER_LINK -> externalUrl ?: rights.sourceUrl ?: id
+        ContentSourceType.USER_DOCUMENT -> sourceLabel ?: title
+        else -> id
+    }
+    val digest = java.security.MessageDigest.getInstance("SHA-256")
+        .digest(seed.toByteArray(Charsets.UTF_8))
+        .joinToString("") { byte -> "%02x".format(byte) }
+    return "$prefix-${digest.toUuidLikeSuffix()}"
+}
+
+private fun String.normalizedPortableTitle(): String {
+    return lowercase(Locale.US)
+        .replace(Regex("\\.(md|markdown|epub|pdf|html?)$"), "")
+        .replace(Regex("[^a-z0-9]+"), " ")
+        .trim()
+        .replace(Regex("\\s+"), " ")
+        .ifBlank { "untitled" }
+        .take(200)
+}
+
 private fun String?.toPortableDisplayNameOrNull(): String? {
     val value = this?.trim()?.takeIf(String::isNotBlank) ?: return null
     return value.takeIf { it.length <= 120 && it.isSafePortableDisplayName() }
+}
+
+private fun String?.toPortableSourceHintOrNull(): String? {
+    val value = this?.trim()?.takeIf(String::isNotBlank) ?: return null
+    return value.takeIf { it.isSafePortableSourceHint() }
+}
+
+private fun String?.toPortableLinkSourceLabelOrNull(): String? {
+    val value = this?.trim()?.takeIf(String::isNotBlank) ?: return null
+    return value.takeIf { it.isSafePortableLinkSourceLabel() }
+}
+
+private fun String.toPortableDescriptionOrFallback(fallback: String): String {
+    val value = trim().take(1000)
+    return value.takeIf { it.isSafePortableDescription() } ?: fallback
 }
 
 private fun String.isSafePortableDisplayName(): Boolean {
@@ -1148,6 +1686,13 @@ private fun String.isSafePortableSourceHint(): Boolean {
         }
 }
 
+private fun String.isSafePortableLinkSourceLabel(): Boolean {
+    val value = trim()
+    return value.isNotBlank() &&
+        value.length <= 120 &&
+        value.isSafePortableSourceHint()
+}
+
 private fun String.isSafePortableProviderLabel(): Boolean {
     val value = trim()
     val lower = value.lowercase()
@@ -1165,6 +1710,9 @@ private fun String.containsUnsafePortableValue(): Boolean {
         value.contains("file://") ||
         value.contains("oauth") ||
         value.contains("token") ||
+        value.contains("google drive") ||
+        value.contains("drive file") ||
+        value.contains("drive id") ||
         UnsafePortableValueTerms.any { unsafeTerm -> value.contains(unsafeTerm) } ||
         UnsafePortableValuePatterns.any { unsafePattern -> unsafePattern.containsMatchIn(this) } ||
         contains("/") ||
@@ -1183,7 +1731,11 @@ private fun String.containsUnsafePortableValueWithoutReverseDns(): Boolean {
         value.contains("file://") ||
         value.contains("oauth") ||
         value.contains("token") ||
+        value.contains("google drive") ||
+        value.contains("drive file") ||
+        value.contains("drive id") ||
         UnsafePortableValueTerms.any { unsafeTerm -> value.contains(unsafeTerm) } ||
+        UnsafeOpaqueIdPattern.containsMatchIn(this) ||
         contains("/") ||
         contains("\\") ||
         contains("@") ||
@@ -1214,8 +1766,96 @@ private fun String.isSafePortableAnnotationSidecarFileName(): Boolean {
 
 private fun String.isSafePortableTitle(): Boolean {
     return isNotBlank() &&
+        length <= 200 &&
+        !containsUnsafePortableValue()
+}
+
+private fun String.isSafePortableAnnotationSourceTitle(): Boolean {
+    return isNotBlank() &&
         length <= 240 &&
         !containsUnsafePortableValue()
+}
+
+private fun String.isSafePortableDescription(): Boolean {
+    val value = trim()
+    return value.length <= 1000 &&
+        !value.containsUnsafePortableValue()
+}
+
+private fun String.isSafePortableMimeType(): Boolean {
+    val value = trim()
+    val lower = value.lowercase(Locale.US)
+    return value.length <= 120 &&
+        PortableMimeTypeRegex.matches(value) &&
+        !lower.contains("oauth") &&
+        !lower.contains("token") &&
+        !lower.contains("content") &&
+        !lower.contains("file") &&
+        !lower.contains("provider") &&
+        !lower.contains("drive") &&
+        !lower.contains("storage") &&
+        !lower.contains("@") &&
+        !lower.contains(":") &&
+        !lower.contains("\\") &&
+        !UnsafePortableValueTerms.any { unsafeTerm -> lower.contains(unsafeTerm) } &&
+        !UnsafePortableValuePatterns.any { unsafePattern -> unsafePattern.containsMatchIn(value) }
+}
+
+private fun String.isSafePortableUserLinkUrl(): Boolean {
+    val parsed = runCatching { URI(this) }.getOrNull() ?: return false
+    val host = parsed.host?.lowercase(Locale.US) ?: return false
+    val rawQuery = parsed.rawQuery.orEmpty()
+    val rawFragment = parsed.rawFragment.orEmpty()
+    val rawPath = parsed.rawPath.orEmpty()
+    val encodedSurface = listOf(rawPath, rawQuery, rawFragment).joinToString(" ")
+    val urlSurfaces = encodedSurface.urlDecodedSurfacesOrNull() ?: return false
+    return parsed.rawUserInfo.isNullOrBlank() &&
+        rawFragment.isBlank() &&
+        !host.isSensitivePortableLinkHost() &&
+        urlSurfaces.none { surface -> surface.containsUnsafePortableUrlValue() }
+}
+
+private fun String.isSensitivePortableLinkHost(): Boolean {
+    return this == "drive.google.com" ||
+        this.endsWith(".drive.google.com") ||
+        this == "docs.google.com" ||
+        this.endsWith(".docs.google.com")
+}
+
+private fun String.containsUnsafePortableUrlValue(): Boolean {
+    val value = lowercase(Locale.US)
+    return value.contains("content:") ||
+        value.contains("file:") ||
+        value.contains("oauth") ||
+        value.contains("token") ||
+        value.contains("access_key") ||
+        value.contains("apikey") ||
+        value.contains("api_key") ||
+        value.contains("signature") ||
+        value.contains("signed") ||
+        value.contains("drive.google") ||
+        value.contains("docs.google") ||
+        PortableUrlProviderDocumentIdPatterns.any { unsafePattern -> unsafePattern.containsMatchIn(value) } ||
+        value.contains("@") ||
+        value.contains("\\") ||
+        UnsafePortableValueTerms.any { unsafeTerm -> value.contains(unsafeTerm) } ||
+        UnsafePortableValuePatterns.any { unsafePattern -> unsafePattern.containsMatchIn(this) }
+}
+
+private fun String.urlDecodedSurfacesOrNull(maxDepth: Int = 5): List<String>? {
+    val surfaces = mutableListOf(this)
+    var current = this
+    repeat(maxDepth) {
+        val decoded = runCatching { java.net.URLDecoder.decode(current, Charsets.UTF_8.name()) }
+            .getOrNull() ?: return null
+        if (decoded == current) return surfaces
+        surfaces += decoded
+        current = decoded
+    }
+    val decodedAfterCap = runCatching { java.net.URLDecoder.decode(current, Charsets.UTF_8.name()) }
+        .getOrNull() ?: return null
+    val wouldDecodeFurther = decodedAfterCap != current
+    return if (wouldDecodeFurther) null else surfaces
 }
 
 private fun String.isNormalizedPortableTitle(): Boolean {
@@ -1253,6 +1893,7 @@ private val ContentIdRegex = Regex(
         "|^(editorial|meditation)-[a-z0-9][a-z0-9._-]{2,120}$",
 )
 private val PackageNameRegex = Regex("^[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z0-9_]+)+$")
+private val PortableMimeTypeRegex = Regex("^[A-Za-z0-9!#$&^_.+-]+/[A-Za-z0-9!#$&^_.+-]+$")
 private val PortableDisplayNamePunctuation = setOf(' ', '.', '_', '-', '(', ')')
 private val ProviderLabelBlocklist = setOf(
     "com.android",
@@ -1278,6 +1919,14 @@ private val UnsafePortableValueTerms = setOf(
 )
 private val UnsafePortableValuePatterns = listOf(
     Regex("\\b[a-zA-Z][a-zA-Z0-9_]*(?:\\.[a-zA-Z0-9_]+){2,}\\b"),
+    Regex("\\b[A-Za-z0-9_-]{24,}\\b"),
+)
+private val UnsafeOpaqueIdPattern = Regex("\\b[A-Za-z0-9_-]{24,}\\b")
+private val PortableUrlProviderDocumentIdPatterns = listOf(
+    Regex("\\b(?:primary|home|raw|external|externalstorage|downloads?|documents?|media|images?|videos?|audio):[^\\s&=?#]+/[^\\s&=?#]+"),
+    Regex("\\b(?:image|video|audio|media|msf|raw|primary|home|external|externalstorage|downloads?|documents?):[A-Za-z0-9._-]{1,120}\\b"),
+    Regex("\\b(?:sdcard|storage)/[^\\s&=?#]+"),
+    Regex("\\b(?:download|downloads|documents)/[^\\s&=?#]+\\.(?:pdf|epub|md|markdown|html|htm|txt)"),
 )
 private val UnsafeWarningMessagePatterns = listOf(
     Regex("\\b[A-Z][A-Za-z0-9_]*(?:Exception|Error|Throwable)\\b"),

@@ -250,8 +250,17 @@ class MainViewModel(
         settingsRepository = settingsRepository,
         appVersionName = "test",
         appVersionCode = 1,
+        userLinkRepository = userLinkRepository,
+        userDocumentRepository = userDocumentRepository,
+        readingProgressRepository = readingProgressRepository,
     ),
-    private val accountLightProfileImporter: AccountLightProfileImporter = AccountLightProfileImporter(settingsRepository),
+    private val accountLightProfileImporter: AccountLightProfileImporter = AccountLightProfileImporter(
+        settingsRepository = settingsRepository,
+        userLinkRepository = userLinkRepository,
+        userDocumentRepository = userDocumentRepository,
+        readingProgressRepository = readingProgressRepository,
+        knownContentIdsProvider = { contentRepository.inventory().mapTo(mutableSetOf(), ContentItem::id) },
+    ),
     private val interceptionMonitor: InterceptionMonitor,
     private val enableDelayRefreshTicker: Boolean = true,
     private val nowProvider: () -> Long = System::currentTimeMillis,
@@ -1053,6 +1062,16 @@ class MainViewModel(
         origin: String = "library",
         startParagraphIndex: Int? = null,
     ) {
+        if (content.availability == ContentAvailability.UNAVAILABLE) {
+            uiState = uiState.copy(
+                latestMessage = if (content.sourceType == ContentSourceType.USER_DOCUMENT) {
+                    "Reattach this file before reading can continue."
+                } else {
+                    "This saved item is unavailable."
+                },
+            )
+            return
+        }
         val startedAtMillis = nowProvider()
         val readerDocument = if (content.usesRepositoryBody()) {
             try {
@@ -2162,7 +2181,7 @@ class MainViewModel(
                     isAccountLightImporting = false,
                     accountLightImportPreview = null,
                     accountLightImportError = null,
-                    accountLightStatus = "Imported settings replaced local portable settings.",
+                    accountLightStatus = "Imported profile replaced local portable settings and library.",
                     isAccountLightReplaceConfirming = false,
                     latestMessage = "Portable profile restored.",
                 )

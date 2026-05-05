@@ -1133,6 +1133,8 @@ class MainActivityTest {
             .assertIsDisplayed()
             .performClick()
         composeRule.onNodeWithTag("settings-account-light-replace-confirm").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasTestTag("settings-account-light-replace-backup"))
         composeRule.onNodeWithTag("settings-account-light-replace-backup").assertIsDisplayed()
         composeRule.onNodeWithTag("settings-list")
             .performScrollToNode(hasTestTag("settings-account-light-replace-confirm-action"))
@@ -1142,11 +1144,28 @@ class MainActivityTest {
             .assertIsDisplayed()
             .performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) {
-            hasNodeContaining("IMPORTED SETTINGS REPLACED LOCAL PORTABLE SETTINGS")
+            hasNodeContaining("IMPORTED PROFILE REPLACED LOCAL PORTABLE SETTINGS AND LIBRARY")
         }
         scrollToAccountLightSettings()
         composeRule.onNodeWithTag("settings-account-light-status").assertIsDisplayed()
         captureSprint16PortableProfileScreenshot("04_import_success_dark")
+
+        scenario?.onActivity { activity -> activity.mainViewModel.openLibrary() }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("library-list") }
+        composeRule.onNodeWithTag("library-list")
+            .performScrollToNode(hasTestTag("library-item-user-document-44444444-4444-4444-8444-444444444444"))
+        composeRule.onNodeWithTag("library-item-user-document-44444444-4444-4444-8444-444444444444")
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("book.epub (missing)", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithTag("library-unavailable-user-document-44444444-4444-4444-8444-444444444444")
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag("library-open-user-document-44444444-4444-4444-8444-444444444444")
+            .assertDoesNotExist()
+        captureSprint16PortableProfileScreenshot("07_missing_document_library_dark")
+
+        scenario?.onActivity { activity -> activity.mainViewModel.openSettings() }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("settings-list") }
+        scrollToAccountLightSettings()
 
         scenario?.onActivity { activity ->
             activity.mainViewModel.previewAccountLightImport("{not-json")
@@ -1336,11 +1355,67 @@ class MainActivityTest {
                 "openAnywayUnlockMinutes": 60
               },
               "library": {
-                "userLinks": [],
-                "userDocuments": []
+                "userLinks": [
+                  {
+                    "contentId": "user-link-33333333-3333-4333-8333-333333333333",
+                    "normalizedUrl": "https://example.com/essay",
+                    "title": "Imported essay",
+                    "description": "Saved link from another device.",
+                    "durationMinutes": 12,
+                    "topicTags": ["SCIENCE"],
+                    "availability": "AVAILABLE",
+                    "createdAtMillis": 10000,
+                    "updatedAtMillis": 20000,
+                    "sourceLabel": null
+                  }
+                ],
+                "userDocuments": [
+                  {
+                    "contentId": "user-document-44444444-4444-4444-8444-444444444444",
+                    "displayName": "book.epub",
+                    "mimeType": "application/epub+zip",
+                    "documentFormat": "EPUB",
+                    "title": "Imported book",
+                    "description": "Saved document metadata.",
+                    "durationMinutes": 45,
+                    "topicTags": ["PHILOSOPHY"],
+                    "availability": "UNAVAILABLE",
+                    "documentImportState": "MISSING_FILE_NEEDS_REATTACH",
+                    "documentFingerprint": {
+                      "strategy": "UNVERIFIED_METADATA_ONLY",
+                      "sha256": null,
+                      "sizeBytes": null,
+                      "normalizedTitle": "imported book",
+                      "format": "EPUB"
+                    },
+                    "createdAtMillis": 10000,
+                    "updatedAtMillis": 20000,
+                    "sourceHint": {
+                      "lastKnownDisplayName": "book.epub",
+                      "providerLabel": null
+                    }
+                  }
+                ]
               },
               "reading": {
-                "progress": []
+                "progress": [
+                  {
+                    "contentId": "user-link-33333333-3333-4333-8333-333333333333",
+                    "progressPercent": 40,
+                    "lastVisibleParagraphIndex": 4,
+                    "paragraphCount": 12,
+                    "updatedAtMillis": 20000,
+                    "completedAtMillis": null
+                  },
+                  {
+                    "contentId": "user-document-44444444-4444-4444-8444-444444444444",
+                    "progressPercent": 64,
+                    "lastVisibleParagraphIndex": 6,
+                    "paragraphCount": 20,
+                    "updatedAtMillis": 20000,
+                    "completedAtMillis": null
+                  }
+                ]
               },
               "annotations": {
                 "export": {

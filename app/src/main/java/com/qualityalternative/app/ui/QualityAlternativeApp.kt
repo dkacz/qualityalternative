@@ -112,6 +112,7 @@ import com.qualityalternative.app.data.UserDocumentValidator
 import com.qualityalternative.app.domain.model.AnalyticsEvent
 import com.qualityalternative.app.domain.model.AnalyticsEventType
 import com.qualityalternative.app.domain.model.AppThemeMode
+import com.qualityalternative.app.domain.model.ContentAvailability
 import com.qualityalternative.app.domain.model.ContentFormat
 import com.qualityalternative.app.domain.model.ContentItem
 import com.qualityalternative.app.domain.model.ContentPriority
@@ -3448,14 +3449,20 @@ private fun AccountLightImportPreviewCard(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         BodyText(
-            text = "Profile ${preview.profileId.takeLast(8)} · ${preview.importedAppCount} apps · ${preview.importedTopicCount} topics · ${preview.importedPackCount} packs",
+            text = "Profile ${preview.profileId.takeLast(8)} · ${preview.importedLinkCount} links · ${preview.importedDocumentCount} files · ${preview.importedProgressCount} progress",
             color = colors.primaryText,
             fontSize = 13.sp,
             lineHeight = 18.sp,
         )
-        if (preview.unsupportedAppCount > 0 || preview.warningCount > 0) {
+        if (preview.importedAppCount > 0 || preview.importedTopicCount > 0 || preview.importedPackCount > 0) {
             MonoText(
-                text = "${preview.unsupportedAppCount} unsupported apps · ${preview.warningCount} warnings",
+                text = "${preview.importedAppCount} apps · ${preview.importedTopicCount} topics · ${preview.importedPackCount} packs",
+                color = colors.mutedText,
+            )
+        }
+        if (preview.unsupportedAppCount > 0 || preview.missingDocumentCount > 0 || preview.warningCount > 0) {
+            MonoText(
+                text = "${preview.unsupportedAppCount} unsupported apps · ${preview.missingDocumentCount} files need reattach · ${preview.warningCount} warnings",
                 color = colors.mutedText,
                 modifier = Modifier.testTag("settings-account-light-import-warning-summary"),
             )
@@ -4053,6 +4060,7 @@ private fun LibraryItemCard(
     onToggleSelection: () -> Unit,
 ) {
     val canDelete = item.isUserContent()
+    val canOpen = item.availability != ContentAvailability.UNAVAILABLE
     QaCard(
         padding = 16.dp,
         modifier = Modifier.testTag("library-item-${item.id}"),
@@ -4164,16 +4172,23 @@ private fun LibraryItemCard(
                 horizontalPadding = 8.dp,
                 verticalPadding = 7.dp,
             )
-            QaChip(
-                text = if (progress != null) "Continue" else "Open",
-                selected = false,
-                onClick = onOpen,
-                modifier = Modifier.testTag("library-open-${item.id}"),
-                centered = true,
-                minHeight = 34.dp,
-                horizontalPadding = 8.dp,
-                verticalPadding = 7.dp,
-            )
+            if (canOpen) {
+                QaChip(
+                    text = if (progress != null) "Continue" else "Open",
+                    selected = false,
+                    onClick = onOpen,
+                    modifier = Modifier.testTag("library-open-${item.id}"),
+                    centered = true,
+                    minHeight = 34.dp,
+                    horizontalPadding = 8.dp,
+                    verticalPadding = 7.dp,
+                )
+            } else {
+                ReadOnlyPill(
+                    text = "File missing",
+                    modifier = Modifier.testTag("library-unavailable-${item.id}"),
+                )
+            }
         }
     }
 }
@@ -6070,7 +6085,15 @@ private fun ContentItem.sourceLabel(): String {
             host?.let { "Your link · $it" } ?: "Your link"
         }
 
-        isUserDocument() -> sourceLabel?.let { "Your file · $it" } ?: "Your file"
+        isUserDocument() -> {
+            val label = sourceLabel?.removeSuffix(" (missing)")?.ifBlank { null }
+            when {
+                availability == com.qualityalternative.app.domain.model.ContentAvailability.UNAVAILABLE ->
+                    label?.let { "Your file · $it (missing)" } ?: "Your file · missing"
+                label != null -> "Your file · $label"
+                else -> "Your file"
+            }
+        }
         usesMeditationTimer() -> sourceLabel ?: "Quality Alternative"
         else -> sourceLabel?.ifBlank { null }
             ?: packId.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.US) else it.toString() }

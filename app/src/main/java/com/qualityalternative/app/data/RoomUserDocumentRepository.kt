@@ -131,6 +131,52 @@ class RoomUserDocumentRepository(
         documents.value = documents.value.filterNot { item -> item.id == contentId }
     }
 
+    override suspend fun importPortableDocuments(
+        documents: List<ContentItem>,
+        replaceExisting: Boolean,
+        nowMillis: Long,
+    ) {
+        val existingDocuments = this.documents.value
+        if (replaceExisting) {
+            val retainedIds = documents.mapTo(mutableSetOf(), ContentItem::id)
+            if (retainedIds.isEmpty()) {
+                dao.deleteAll()
+            } else {
+                dao.deleteAllExcept(retainedIds)
+            }
+        }
+        val documentsToImport = if (replaceExisting) {
+            documents
+        } else {
+            val existingIds = existingDocuments.mapTo(mutableSetOf(), ContentItem::id)
+            val existingSourceReferences = existingDocuments.mapNotNullTo(mutableSetOf()) { item ->
+                item.rights.sourceUrl?.takeIf(String::isNotBlank)
+            }
+            documents.filter { item ->
+                item.id !in existingIds &&
+                    item.rights.sourceUrl?.takeIf(String::isNotBlank) !in existingSourceReferences
+            }
+        }
+        documentsToImport.forEach { item ->
+            dao.insertOrReplace(
+                item.toEntity(
+                    uri = requireNotNull(item.rights.sourceUrl) {
+                        "Imported document content must provide a synthetic source reference."
+                    },
+                    displayName = item.sourceLabel.orEmpty().removeSuffix(" (missing)").ifBlank { item.title },
+                    mimeType = null,
+                    createdAtMillis = item.addedAtMillis ?: nowMillis,
+                    updatedAtMillis = nowMillis,
+                ),
+            )
+        }
+        this.documents.value = mergeImportedUserContent(
+            current = if (replaceExisting) emptyList() else existingDocuments,
+            imported = documentsToImport,
+            secondaryKey = { item -> item.rights.sourceUrl },
+        )
+    }
+
     override fun contentBody(item: ContentItem): String {
         return if (item.sourceType == ContentSourceType.USER_DOCUMENT && item.format.usesPrivateReader()) {
             bodyLoader.loadBody(uri = item.rights.sourceUrl.orEmpty(), format = item.format)
@@ -293,5 +339,5 @@ private fun stableUserDocumentId(uri: String): String {
     val digest = MessageDigest.getInstance("SHA-256")
         .digest(uri.toByteArray(Charsets.UTF_8))
         .joinToString("") { byte -> "%02x".format(byte) }
-    return "user-document:$digest"
+    return "user-document-${digest.toUuidLikeSuffix()}"
 }

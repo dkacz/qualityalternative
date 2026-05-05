@@ -69,6 +69,12 @@ interface UserLinkRepository {
 
     suspend fun deleteLink(contentId: String)
 
+    suspend fun importPortableLinks(
+        links: List<ContentItem>,
+        replaceExisting: Boolean,
+        nowMillis: Long = System.currentTimeMillis(),
+    ) = Unit
+
     fun isReady(): Boolean = true
 
     fun observeReady(): Flow<Boolean> = flowOf(isReady())
@@ -90,6 +96,12 @@ interface UserDocumentRepository {
     )
 
     suspend fun deleteDocument(contentId: String)
+
+    suspend fun importPortableDocuments(
+        documents: List<ContentItem>,
+        replaceExisting: Boolean,
+        nowMillis: Long = System.currentTimeMillis(),
+    ) = Unit
 
     fun contentBody(item: ContentItem): String = item.description
 
@@ -275,6 +287,11 @@ interface ReadingProgressRepository {
 
     suspend fun deleteProgressForContentIds(contentIds: Set<String>) {
         contentIds.forEach { contentId -> deleteProgress(contentId) }
+    }
+
+    suspend fun replaceReadingProgress(progress: List<ReadingProgress>) {
+        deleteProgressForContentIds(readingProgress().mapTo(mutableSetOf(), ReadingProgress::contentId))
+        progress.forEach { item -> saveProgress(item) }
     }
 
     fun isReady(): Boolean = true

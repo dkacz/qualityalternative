@@ -1,0 +1,2554 @@
+diff --git a/app/src/androidTest/java/com/qualityalternative/app/MainActivityTest.kt b/app/src/androidTest/java/com/qualityalternative/app/MainActivityTest.kt
+index f6b600b..d378d03 100644
+--- a/app/src/androidTest/java/com/qualityalternative/app/MainActivityTest.kt
++++ b/app/src/androidTest/java/com/qualityalternative/app/MainActivityTest.kt
+@@ -1133,6 +1133,8 @@ class MainActivityTest {
+             .assertIsDisplayed()
+             .performClick()
+         composeRule.onNodeWithTag("settings-account-light-replace-confirm").assertIsDisplayed()
++        composeRule.onNodeWithTag("settings-list")
++            .performScrollToNode(hasTestTag("settings-account-light-replace-backup"))
+         composeRule.onNodeWithTag("settings-account-light-replace-backup").assertIsDisplayed()
+         composeRule.onNodeWithTag("settings-list")
+             .performScrollToNode(hasTestTag("settings-account-light-replace-confirm-action"))
+@@ -1142,12 +1144,29 @@ class MainActivityTest {
+             .assertIsDisplayed()
+             .performClick()
+         composeRule.waitUntil(timeoutMillis = 10_000) {
+-            hasNodeContaining("IMPORTED SETTINGS REPLACED LOCAL PORTABLE SETTINGS")
++            hasNodeContaining("IMPORTED PROFILE REPLACED LOCAL PORTABLE SETTINGS AND LIBRARY")
+         }
+         scrollToAccountLightSettings()
+         composeRule.onNodeWithTag("settings-account-light-status").assertIsDisplayed()
+         captureSprint16PortableProfileScreenshot("04_import_success_dark")
+ 
++        scenario?.onActivity { activity -> activity.mainViewModel.openLibrary() }
++        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("library-list") }
++        composeRule.onNodeWithTag("library-list")
++            .performScrollToNode(hasTestTag("library-item-user-document-44444444-4444-4444-8444-444444444444"))
++        composeRule.onNodeWithTag("library-item-user-document-44444444-4444-4444-8444-444444444444")
++            .assertIsDisplayed()
++        composeRule.onNodeWithText("book.epub (missing)", substring = true).assertIsDisplayed()
++        composeRule.onNodeWithTag("library-unavailable-user-document-44444444-4444-4444-8444-444444444444")
++            .assertIsDisplayed()
++        composeRule.onNodeWithTag("library-open-user-document-44444444-4444-4444-8444-444444444444")
++            .assertDoesNotExist()
++        captureSprint16PortableProfileScreenshot("07_missing_document_library_dark")
++
++        scenario?.onActivity { activity -> activity.mainViewModel.openSettings() }
++        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("settings-list") }
++        scrollToAccountLightSettings()
++
+         scenario?.onActivity { activity ->
+             activity.mainViewModel.previewAccountLightImport("{not-json")
+         }
+@@ -1336,11 +1355,67 @@ class MainActivityTest {
+                 "openAnywayUnlockMinutes": 60
+               },
+               "library": {
+-                "userLinks": [],
+-                "userDocuments": []
++                "userLinks": [
++                  {
++                    "contentId": "user-link-33333333-3333-4333-8333-333333333333",
++                    "normalizedUrl": "https://example.com/essay",
++                    "title": "Imported essay",
++                    "description": "Saved link from another device.",
++                    "durationMinutes": 12,
++                    "topicTags": ["SCIENCE"],
++                    "availability": "AVAILABLE",
++                    "createdAtMillis": 10000,
++                    "updatedAtMillis": 20000,
++                    "sourceLabel": null
++                  }
++                ],
++                "userDocuments": [
++                  {
++                    "contentId": "user-document-44444444-4444-4444-8444-444444444444",
++                    "displayName": "book.epub",
++                    "mimeType": "application/epub+zip",
++                    "documentFormat": "EPUB",
++                    "title": "Imported book",
++                    "description": "Saved document metadata.",
++                    "durationMinutes": 45,
++                    "topicTags": ["PHILOSOPHY"],
++                    "availability": "UNAVAILABLE",
++                    "documentImportState": "MISSING_FILE_NEEDS_REATTACH",
++                    "documentFingerprint": {
++                      "strategy": "UNVERIFIED_METADATA_ONLY",
++                      "sha256": null,
++                      "sizeBytes": null,
++                      "normalizedTitle": "imported book",
++                      "format": "EPUB"
++                    },
++                    "createdAtMillis": 10000,
++                    "updatedAtMillis": 20000,
++                    "sourceHint": {
++                      "lastKnownDisplayName": "book.epub",
++                      "providerLabel": null
++                    }
++                  }
++                ]
+               },
+               "reading": {
+-                "progress": []
++                "progress": [
++                  {
++                    "contentId": "user-link-33333333-3333-4333-8333-333333333333",
++                    "progressPercent": 40,
++                    "lastVisibleParagraphIndex": 4,
++                    "paragraphCount": 12,
++                    "updatedAtMillis": 20000,
++                    "completedAtMillis": null
++                  },
++                  {
++                    "contentId": "user-document-44444444-4444-4444-8444-444444444444",
++                    "progressPercent": 64,
++                    "lastVisibleParagraphIndex": 6,
++                    "paragraphCount": 20,
++                    "updatedAtMillis": 20000,
++                    "completedAtMillis": null
++                  }
++                ]
+               },
+               "annotations": {
+                 "export": {
+diff --git a/app/src/androidTest/java/com/qualityalternative/app/data/RoomUserDocumentRepositoryTest.kt b/app/src/androidTest/java/com/qualityalternative/app/data/RoomUserDocumentRepositoryTest.kt
+index 4d825eb..b51b1a9 100644
+--- a/app/src/androidTest/java/com/qualityalternative/app/data/RoomUserDocumentRepositoryTest.kt
++++ b/app/src/androidTest/java/com/qualityalternative/app/data/RoomUserDocumentRepositoryTest.kt
+@@ -7,7 +7,9 @@ import androidx.test.platform.app.InstrumentationRegistry
+ import com.qualityalternative.app.data.local.QualityAlternativeDatabase
+ import com.qualityalternative.app.domain.model.ContentAvailability
+ import com.qualityalternative.app.domain.model.ContentFormat
++import com.qualityalternative.app.domain.model.ContentItem
+ import com.qualityalternative.app.domain.model.ContentRenderMode
++import com.qualityalternative.app.domain.model.ContentRightsMetadata
+ import com.qualityalternative.app.domain.model.ContentRightsClass
+ import com.qualityalternative.app.domain.model.ContentSourceType
+ import com.qualityalternative.app.domain.model.TopicTag
+@@ -97,6 +99,77 @@ class RoomUserDocumentRepositoryTest {
+         }
+     }
+ 
++    @Test
++    fun importPortableDocuments_mergeSkipsExistingAvailableDocumentCollision() = runBlocking {
++        val context = InstrumentationRegistry.getInstrumentation().targetContext
++        val database = Room.inMemoryDatabaseBuilder(
++            context,
++            QualityAlternativeDatabase::class.java,
++        ).allowMainThreadQueries().build()
++        val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
++
++        try {
++            val repository = RoomUserDocumentRepository(
++                dao = database.userDocumentDao(),
++                scope = appScope,
++                bodyLoader = UserDocumentBodyLoader { _, _ -> "Private body" },
++                idProvider = { _ -> "user-document-44444444-4444-4444-8444-444444444444" },
++            )
++            repository.observeReady().first { it }
++            repository.addDocument(
++                draft = UserDocumentDraft(
++                    uri = "content://quality/local-book",
++                    displayName = "local-book.epub",
++                    mimeType = "application/epub+zip",
++                    title = "Local book",
++                    durationMinutes = 25,
++                    topicTags = setOf(TopicTag.PHILOSOPHY),
++                ),
++                nowMillis = 1_000L,
++            )
++            val local = withTimeout(10_000L) {
++                repository.observeUserDocuments().first { it.size == 1 }.single()
++            }
++            val importedMissingCollision = ContentItem(
++                id = local.id,
++                packId = "user-documents",
++                title = "Imported missing book",
++                description = "Reattach to continue reading.",
++                durationMinutes = 25,
++                format = ContentFormat.EPUB,
++                topicTags = setOf(TopicTag.PHILOSOPHY),
++                bodyAssetPath = null,
++                externalUrl = null,
++                sourceLabel = "book.epub (missing)",
++                sourceType = ContentSourceType.USER_DOCUMENT,
++                availability = ContentAvailability.UNAVAILABLE,
++                rights = ContentRightsMetadata.userPrivateReader(
++                    sourceUrl = "portable-missing:${local.id}",
++                    attribution = "book.epub",
++                ),
++                addedAtMillis = 2_000L,
++            )
++
++            repository.importPortableDocuments(
++                documents = listOf(importedMissingCollision),
++                replaceExisting = false,
++                nowMillis = 3_000L,
++            )
++
++            val afterMerge = withTimeout(10_000L) {
++                repository.observeUserDocuments().first { it.size == 1 }.single()
++            }
++            assertEquals(local.id, afterMerge.id)
++            assertEquals("Local book", afterMerge.title)
++            assertEquals(ContentAvailability.AVAILABLE, afterMerge.availability)
++            assertEquals("content://quality/local-book", afterMerge.rights.sourceUrl)
++        } finally {
++            appScope.cancel()
++            delay(100)
++            database.close()
++        }
++    }
++
+     @Test
+     fun addPdfDocument_roundTripsAsExternalPrivateHandoffContent() = runBlocking {
+         val context = InstrumentationRegistry.getInstrumentation().targetContext
+diff --git a/app/src/main/java/com/qualityalternative/app/data/AccountLightProfile.kt b/app/src/main/java/com/qualityalternative/app/data/AccountLightProfile.kt
+index 30ef2fc..b9c7896 100644
+--- a/app/src/main/java/com/qualityalternative/app/data/AccountLightProfile.kt
++++ b/app/src/main/java/com/qualityalternative/app/data/AccountLightProfile.kt
+@@ -2,7 +2,12 @@ package com.qualityalternative.app.data
+ 
+ import com.qualityalternative.app.domain.model.AppSettings
+ import com.qualityalternative.app.domain.model.AppThemeMode
++import com.qualityalternative.app.domain.model.ContentAvailability
++import com.qualityalternative.app.domain.model.ContentFormat
++import com.qualityalternative.app.domain.model.ContentItem
+ import com.qualityalternative.app.domain.model.ContentPriority
++import com.qualityalternative.app.domain.model.ContentRightsMetadata
++import com.qualityalternative.app.domain.model.ContentSourceType
+ import com.qualityalternative.app.domain.model.DEFAULT_READER_FONT_SCALE
+ import com.qualityalternative.app.domain.model.DistractingApp
+ import com.qualityalternative.app.domain.model.DurationBucket
+@@ -11,13 +16,19 @@ import com.qualityalternative.app.domain.model.MAX_OPEN_ANYWAY_UNLOCK_MINUTES
+ import com.qualityalternative.app.domain.model.MAX_READER_FONT_SCALE
+ import com.qualityalternative.app.domain.model.MIN_OPEN_ANYWAY_UNLOCK_MINUTES
+ import com.qualityalternative.app.domain.model.MIN_READER_FONT_SCALE
++import com.qualityalternative.app.domain.model.ReadingProgress
+ import com.qualityalternative.app.domain.model.TopicTag
++import com.qualityalternative.app.domain.service.ReadingProgressRepository
+ import com.qualityalternative.app.domain.service.SettingsRepository
++import com.qualityalternative.app.domain.service.UserDocumentRepository
++import com.qualityalternative.app.domain.service.UserLinkRepository
+ import java.text.SimpleDateFormat
++import java.net.URI
+ import java.util.Date
+ import java.util.Locale
+ import java.util.TimeZone
+ import kotlin.math.roundToInt
++import kotlinx.coroutines.CancellationException
+ import kotlinx.coroutines.flow.first
+ import kotlinx.serialization.Serializable
+ import kotlinx.serialization.SerializationException
+@@ -150,22 +161,130 @@ data class AccountLightLibrary(
+ @Serializable
+ data class AccountLightUserLink(
+     val contentId: String,
++    val normalizedUrl: String,
++    val title: String,
++    val description: String,
++    val durationMinutes: Int,
++    val topicTags: List<String>,
++    val availability: String,
++    val createdAtMillis: Long,
++    val updatedAtMillis: Long,
++    val sourceLabel: String? = null,
+ ) {
+     init {
+         require(contentId.matches(ContentIdRegex) && contentId.startsWith("user-link-")) {
+             "userLinks contentId must use the user-link prefix."
+         }
++        val urlValidation = UserLinkValidator.validateUrl(normalizedUrl)
++        require(urlValidation.isValid && urlValidation.normalizedUrl == normalizedUrl) {
++            "userLinks normalizedUrl must be a normalized manual-link URL."
++        }
++        require(normalizedUrl.isSafePortableUserLinkUrl()) {
++            "userLinks normalizedUrl is not portable."
++        }
++        require(title.isSafePortableTitle()) { "userLinks title is not portable." }
++        require(description.isSafePortableDescription()) { "userLinks description is not portable." }
++        require(durationMinutes in 1..240) { "userLinks durationMinutes is outside the portable range." }
++        require(topicTags.isNotEmpty() && topicTags.all { it in TopicTag.entries.map(TopicTag::name) }) {
++            "userLinks topicTags is invalid."
++        }
++        require(availability in AvailabilityValues) { "userLinks availability is invalid." }
++        require(createdAtMillis >= 0L) { "userLinks createdAtMillis must be non-negative." }
++        require(updatedAtMillis >= createdAtMillis) { "userLinks updatedAtMillis must be >= createdAtMillis." }
++        require(sourceLabel == null || sourceLabel.isSafePortableLinkSourceLabel()) {
++            "userLinks sourceLabel is not portable."
++        }
+     }
+ }
+ 
+ @Serializable
+ data class AccountLightUserDocument(
+     val contentId: String,
++    val displayName: String,
++    val mimeType: String?,
++    val documentFormat: String,
++    val title: String,
++    val description: String,
++    val durationMinutes: Int,
++    val topicTags: List<String>,
++    val availability: String,
++    val documentImportState: String,
++    val documentFingerprint: AccountLightDocumentFingerprint,
++    val createdAtMillis: Long,
++    val updatedAtMillis: Long,
++    val sourceHint: AccountLightSourceHint? = null,
+ ) {
+     init {
+         require(contentId.matches(ContentIdRegex) && contentId.startsWith("user-document-")) {
+             "userDocuments contentId must use the user-document prefix."
+         }
++        require(displayName.isSafePortableSourceHint()) { "userDocuments displayName is not portable." }
++        require(mimeType == null || mimeType.isSafePortableMimeType()) {
++            "userDocuments mimeType is not portable."
++        }
++        require(documentFormat in DocumentFormatValues) { "userDocuments documentFormat is invalid." }
++        require(title.isSafePortableTitle()) { "userDocuments title is not portable." }
++        require(description.isSafePortableDescription()) { "userDocuments description is not portable." }
++        require(durationMinutes in 1..240) { "userDocuments durationMinutes is outside the portable range." }
++        require(topicTags.isNotEmpty() && topicTags.all { it in TopicTag.entries.map(TopicTag::name) }) {
++            "userDocuments topicTags is invalid."
++        }
++        require(availability in AvailabilityValues) { "userDocuments availability is invalid." }
++        require(documentImportState in DocumentImportStateValues) { "userDocuments documentImportState is invalid." }
++        require(
++            documentFingerprint.strategy != "UNVERIFIED_METADATA_ONLY" ||
++                documentImportState == "MISSING_FILE_NEEDS_REATTACH",
++        ) {
++            "userDocuments documentImportState must be missing for unverified fingerprints."
++        }
++        require(createdAtMillis >= 0L) { "userDocuments createdAtMillis must be non-negative." }
++        require(updatedAtMillis >= createdAtMillis) { "userDocuments updatedAtMillis must be >= createdAtMillis." }
++    }
++}
++
++@Serializable
++data class AccountLightDocumentFingerprint(
++    val strategy: String,
++    val sha256: String?,
++    val sizeBytes: Long?,
++    val normalizedTitle: String,
++    val format: String,
++) {
++    init {
++        require(strategy in DocumentFingerprintStrategyValues) { "documentFingerprint strategy is invalid." }
++        require(sha256 == null || sha256.matches(Sha256Regex)) { "documentFingerprint sha256 is invalid." }
++        require(sizeBytes == null || sizeBytes >= 0L) { "documentFingerprint sizeBytes must be non-negative." }
++        require(normalizedTitle.isNormalizedPortableTitle()) { "documentFingerprint normalizedTitle is invalid." }
++        require(format in ContentFormatValues) { "documentFingerprint format is invalid." }
++        when (strategy) {
++            "SHA256_BYTES" -> {
++                require(sha256 != null) { "documentFingerprint sha256 is required." }
++                require(sizeBytes != null) { "documentFingerprint sizeBytes is required." }
++            }
++            "TEXT_SAMPLE_SHA256" -> {
++                require(sha256 != null) { "documentFingerprint sha256 is required." }
++                require(sizeBytes == null) { "documentFingerprint sizeBytes must be null." }
++            }
++            "UNVERIFIED_METADATA_ONLY" -> {
++                require(sha256 == null) { "documentFingerprint sha256 must be null." }
++                require(sizeBytes == null) { "documentFingerprint sizeBytes must be null." }
++            }
++        }
++    }
++}
++
++@Serializable
++data class AccountLightSourceHint(
++    val lastKnownDisplayName: String? = null,
++    val providerLabel: String? = null,
++) {
++    init {
++        require(lastKnownDisplayName == null || lastKnownDisplayName.isSafePortableSourceHint()) {
++            "sourceHint lastKnownDisplayName is not portable."
++        }
++        require(providerLabel == null || providerLabel.isSafePortableProviderLabel()) {
++            "sourceHint providerLabel is not portable."
++        }
+     }
+ }
+ 
+@@ -177,9 +296,26 @@ data class AccountLightReading(
+ @Serializable
+ data class AccountLightReadingProgress(
+     val contentId: String,
++    val progressPercent: Int,
++    val lastVisibleParagraphIndex: Int,
++    val paragraphCount: Int,
++    val updatedAtMillis: Long,
++    val completedAtMillis: Long? = null,
+ ) {
+     init {
+         require(contentId.matches(ContentIdRegex)) { "reading progress contentId is invalid." }
++        require(progressPercent in 0..100) { "reading progress progressPercent is invalid." }
++        require(paragraphCount >= 1) { "reading progress paragraphCount is invalid." }
++        require(lastVisibleParagraphIndex in 0 until paragraphCount) {
++            "reading progress lastVisibleParagraphIndex is invalid."
++        }
++        require(updatedAtMillis >= 0L) { "reading progress updatedAtMillis must be non-negative." }
++        require(completedAtMillis == null || completedAtMillis >= 0L) {
++            "reading progress completedAtMillis must be non-negative."
++        }
++        require((completedAtMillis != null && progressPercent == 100) || (completedAtMillis == null && progressPercent in 0..99)) {
++            "reading progress completion fields are inconsistent."
++        }
+     }
+ }
+ 
+@@ -231,7 +367,7 @@ data class AccountLightAnnotationSidecar(
+ ) {
+     init {
+         require(contentId.matches(ContentIdRegex)) { "annotation sidecar contentId is invalid." }
+-        require(sourceTitle.isSafePortableTitle()) {
++        require(sourceTitle.isSafePortableAnnotationSourceTitle()) {
+             "annotation sidecar sourceTitle is not portable."
+         }
+         require(jsonLdFileName.isSafePortableAnnotationSidecarFileName()) {
+@@ -319,12 +455,41 @@ class AccountLightProfileExporter(
+     private val settingsRepository: SettingsRepository,
+     private val appVersionName: String,
+     private val appVersionCode: Int,
++    private val userLinkRepository: UserLinkRepository? = null,
++    private val userDocumentRepository: UserDocumentRepository? = null,
++    private val readingProgressRepository: ReadingProgressRepository? = null,
+     private val codec: AccountLightProfileCodec = AccountLightProfileCodec(),
+ ) {
+     suspend fun exportSettingsOnlyProfileJson(nowMillis: Long = System.currentTimeMillis()): String {
+         val exportedAtMillis = nowMillis.coerceAtLeast(0L)
+         val identity = settingsRepository.ensureLocalProfileIdentity(nowMillis = exportedAtMillis)
+         val settings = settingsRepository.observeAppSettings().first()
++        val userLinks = userLinkRepository?.userLinks().orEmpty()
++        val userDocuments = userDocumentRepository?.userDocuments().orEmpty()
++        val portableUserLinkPairs = userLinks.mapNotNull { item ->
++            item.toAccountLightUserLink(exportedAtMillis)?.let { portable -> item.id to portable }
++        }
++        val portableUserDocumentPairs = userDocuments.mapNotNull { item ->
++            item.toAccountLightUserDocument(exportedAtMillis)?.let { portable -> item.id to portable }
++        }
++        val portableUserLinks = portableUserLinkPairs.map { (_, portable) -> portable }
++        val portableUserDocuments = portableUserDocumentPairs.map { (_, portable) -> portable }
++        val portableContentIds = (
++            portableUserLinks.map(AccountLightUserLink::contentId) +
++                portableUserDocuments.map(AccountLightUserDocument::contentId)
++            ).toSet()
++        val omittedPortableUserContentIds = (userLinks + userDocuments)
++            .mapTo(mutableSetOf()) { item -> item.portableContentId() } - portableContentIds
++        val contentIdMapping = portableUserLinkPairs
++            .associate { (localId, portable) -> localId to portable.contentId } +
++            portableUserDocumentPairs.associate { (localId, portable) -> localId to portable.contentId }
++        val portableProgress = readingProgressRepository?.readingProgress().orEmpty()
++            .mapNotNull { progress ->
++                progress.toAccountLightReadingProgress(
++                    contentIdMapping = contentIdMapping,
++                    portableLibraryContentIds = portableContentIds,
++                )
++            }
+         val profile = AccountLightProfileFile(
+             schemaVersion = ACCOUNT_LIGHT_SCHEMA_VERSION,
+             exportedAtMillis = exportedAtMillis,
+@@ -333,9 +498,20 @@ class AccountLightProfileExporter(
+                 appVersionCode = appVersionCode,
+             ),
+             profile = identity.toDto(updatedAtMillis = exportedAtMillis),
+-            settings = settings.toAccountLightSettings(),
++            settings = settings.toAccountLightSettings(
++                contentIdMapping = contentIdMapping,
++                omittedPortableUserContentIds = omittedPortableUserContentIds,
++            ),
++            library = AccountLightLibrary(
++                userLinks = portableUserLinks,
++                userDocuments = portableUserDocuments,
++            ),
++            reading = AccountLightReading(progress = portableProgress),
+             annotations = settings.toAccountLightAnnotations(),
+-            warnings = settings.toAccountLightWarnings(),
++            warnings = settings.toAccountLightWarnings(
++                contentIdMapping = contentIdMapping,
++                omittedPortableUserContentIds = omittedPortableUserContentIds,
++            ),
+         )
+         return codec.encode(profile)
+     }
+@@ -367,6 +543,10 @@ data class AccountLightImportPreview(
+     val unsupportedAppCount: Int,
+     val importedTopicCount: Int,
+     val importedPackCount: Int,
++    val importedLinkCount: Int,
++    val importedDocumentCount: Int,
++    val importedProgressCount: Int,
++    val missingDocumentCount: Int,
+     val warningCount: Int,
+     val warningSummaries: List<String> = emptyList(),
+ )
+@@ -386,8 +566,18 @@ data class AccountLightImportApplyResult(
+     val warningCount: Int,
+ )
+ 
++private data class AccountLightImportSnapshot(
++    val links: List<ContentItem>?,
++    val documents: List<ContentItem>?,
++    val progress: List<ReadingProgress>?,
++    val settings: AppSettings,
++)
++
+ class AccountLightProfileImporter(
+     private val settingsRepository: SettingsRepository,
++    private val userLinkRepository: UserLinkRepository? = null,
++    private val userDocumentRepository: UserDocumentRepository? = null,
++    private val readingProgressRepository: ReadingProgressRepository? = null,
+     private val supportedApps: List<DistractingApp> = settingsRepository.supportedDistractingApps(),
+     private val knownContentIdsProvider: () -> Set<String> = { emptySet() },
+     private val codec: AccountLightProfileCodec = AccountLightProfileCodec(),
+@@ -446,8 +636,13 @@ class AccountLightProfileImporter(
+         val unsupportedAppCount = profile.settings.selectedAppPackages.distinct().count { packageName ->
+             packageName !in supportedPackages
+         }
++        val missingDocumentCount = profile.library.userDocuments.count { document ->
++            document.documentImportState == "MISSING_FILE_NEEDS_REATTACH" ||
++                document.documentFingerprint.strategy == "UNVERIFIED_METADATA_ONLY"
++        }
+         val generatedWarnings = unknownFieldWarnings(root) +
+             unsupportedAppWarnings(unsupportedAppCount) +
++            missingDocumentWarnings(missingDocumentCount) +
+             duplicateScalarWarnings(profile.settings)
+         val allWarnings = profile.warnings + generatedWarnings
+         return AccountLightImportPlan(
+@@ -461,6 +656,10 @@ class AccountLightProfileImporter(
+                 unsupportedAppCount = unsupportedAppCount,
+                 importedTopicCount = profile.settings.preferredTopics.size,
+                 importedPackCount = profile.settings.selectedPackIds.size,
++                importedLinkCount = profile.library.userLinks.size,
++                importedDocumentCount = profile.library.userDocuments.size,
++                importedProgressCount = profile.reading.progress.size,
++                missingDocumentCount = missingDocumentCount,
+                 warningCount = allWarnings.size,
+                 warningSummaries = allWarnings.map { warning ->
+                     warning.message ?: warning.code
+@@ -470,27 +669,122 @@ class AccountLightProfileImporter(
+     }
+ 
+     suspend fun applyMerge(plan: AccountLightImportPlan): AccountLightImportApplyResult {
+-        return AccountLightImportApplyResult(
+-            mode = AccountLightImportMode.MERGE,
+-            settingsApplied = false,
+-            warningCount = plan.allWarnings.size + 1,
+-        )
++        return applyImportWithRollback(plan) {
++            applyPortableLibraryAndProgress(plan = plan, replaceExisting = false)
++            val importedReactivatedIds = plan.profile.settings.reactivatedCompletedContentIds.toSet()
++            if (importedReactivatedIds.isNotEmpty()) {
++                val currentSettings = settingsRepository.observeAppSettings().first()
++                settingsRepository.saveReactivatedCompletedContentIds(
++                    currentSettings.reactivatedCompletedContentIds + importedReactivatedIds,
++                )
++            }
++            AccountLightImportApplyResult(
++                mode = AccountLightImportMode.MERGE,
++                settingsApplied = false,
++                warningCount = plan.allWarnings.size + 1,
++            )
++        }
+     }
+ 
+     suspend fun applyReplace(plan: AccountLightImportPlan): AccountLightImportApplyResult {
+-        val supportedPackages = supportedApps.mapTo(mutableSetOf(), DistractingApp::packageName)
++        return applyImportWithRollback(plan) {
++            applyPortableLibraryAndProgress(plan = plan, replaceExisting = true)
++            val supportedPackages = supportedApps.mapTo(mutableSetOf(), DistractingApp::packageName)
++            settingsRepository.replacePortableSettings(
++                settings = plan.profile.settings.toPortableAppSettings(supportedPackages = supportedPackages),
++                profileIdentity = LocalProfileIdentity(
++                    profileId = plan.profile.profile.profileId,
++                    createdAtMillis = plan.profile.profile.createdAtMillis,
++                ),
++            )
++            AccountLightImportApplyResult(
++                mode = AccountLightImportMode.REPLACE,
++                settingsApplied = true,
++                warningCount = plan.allWarnings.size,
++            )
++        }
++    }
++
++    private suspend fun applyImportWithRollback(
++        plan: AccountLightImportPlan,
++        block: suspend () -> AccountLightImportApplyResult,
++    ): AccountLightImportApplyResult {
++        val snapshot = captureImportSnapshot()
++        return try {
++            block()
++        } catch (error: Throwable) {
++            if (error is CancellationException) throw error
++            val restoreFailure = runCatching {
++                restoreImportSnapshot(snapshot = snapshot, nowMillis = plan.profile.exportedAtMillis)
++            }.exceptionOrNull()
++            if (restoreFailure != null) {
++                error.addSuppressed(restoreFailure)
++            }
++            throw error
++        }
++    }
++
++    private suspend fun captureImportSnapshot(): AccountLightImportSnapshot {
++        return AccountLightImportSnapshot(
++            links = userLinkRepository?.userLinks(),
++            documents = userDocumentRepository?.userDocuments(),
++            progress = readingProgressRepository?.readingProgress(),
++            settings = settingsRepository.observeAppSettings().first(),
++        )
++    }
++
++    private suspend fun restoreImportSnapshot(
++        snapshot: AccountLightImportSnapshot,
++        nowMillis: Long,
++    ) {
++        userLinkRepository?.importPortableLinks(
++            links = snapshot.links.orEmpty(),
++            replaceExisting = true,
++            nowMillis = nowMillis,
++        )
++        userDocumentRepository?.importPortableDocuments(
++            documents = snapshot.documents.orEmpty(),
++            replaceExisting = true,
++            nowMillis = nowMillis,
++        )
++        readingProgressRepository?.replaceReadingProgress(snapshot.progress.orEmpty())
+         settingsRepository.replacePortableSettings(
+-            settings = plan.profile.settings.toPortableAppSettings(supportedPackages = supportedPackages),
+-            profileIdentity = LocalProfileIdentity(
+-                profileId = plan.profile.profile.profileId,
+-                createdAtMillis = plan.profile.profile.createdAtMillis,
+-            ),
++            settings = snapshot.settings,
++            profileIdentity = null,
+         )
+-        return AccountLightImportApplyResult(
+-            mode = AccountLightImportMode.REPLACE,
+-            settingsApplied = true,
+-            warningCount = plan.allWarnings.size,
++    }
++
++    private suspend fun applyPortableLibraryAndProgress(
++        plan: AccountLightImportPlan,
++        replaceExisting: Boolean,
++    ) {
++        val importedLinks = plan.profile.library.userLinks.map(AccountLightUserLink::toContentItem)
++        val importedDocuments = plan.profile.library.userDocuments.map(AccountLightUserDocument::toMissingContentItem)
++        userLinkRepository?.importPortableLinks(
++            links = importedLinks,
++            replaceExisting = replaceExisting,
++            nowMillis = plan.profile.exportedAtMillis,
+         )
++        userDocumentRepository?.importPortableDocuments(
++            documents = importedDocuments,
++            replaceExisting = replaceExisting,
++            nowMillis = plan.profile.exportedAtMillis,
++        )
++        val progressRepository = readingProgressRepository ?: return
++        val localKnownIds = knownContentIdsProvider()
++        val importedContentIds = importedLinks.mapTo(mutableSetOf(), ContentItem::id) +
++            importedDocuments.map(ContentItem::id)
++        val activeProgress = plan.profile.reading.progress
++            .filter { progress -> progress.contentId in localKnownIds || progress.contentId in importedContentIds }
++            .map(AccountLightReadingProgress::toReadingProgress)
++        if (replaceExisting) {
++            progressRepository.replaceReadingProgress(activeProgress)
++        } else {
++            val currentProgressIds = progressRepository.readingProgress().mapTo(mutableSetOf(), ReadingProgress::contentId)
++            activeProgress
++                .filter { progress -> progress.contentId !in currentProgressIds }
++                .forEach { progress -> progressRepository.saveProgress(progress) }
++        }
+     }
+ 
+     private fun parseRootObject(rawJson: String): JsonObject {
+@@ -562,6 +856,17 @@ class AccountLightProfileImporter(
+         }
+     }
+ 
++    private fun missingDocumentWarnings(missingDocumentCount: Int): List<AccountLightWarning> {
++        return List(missingDocumentCount) {
++            AccountLightWarning(
++                code = "DOCUMENT_FILE_MISSING_ON_IMPORT",
++                severity = "WARNING",
++                section = "library.userDocuments",
++                message = "An imported document needs the original file reattached before reading can continue.",
++            )
++        }
++    }
++
+     private fun duplicateScalarWarnings(settings: AccountLightSettings): List<AccountLightWarning> {
+         return listOfNotNull(
+             settings.selectedAppPackages.duplicateScalarWarning("selectedAppPackages"),
+@@ -674,11 +979,17 @@ private fun JsonObject.validateLibraryShape() {
+         require(urlValidation.isValid && urlValidation.normalizedUrl == normalizedUrl) {
+             "$path.normalizedUrl must be a normalized manual-link URL."
+         }
++        require(normalizedUrl.isSafePortableUserLinkUrl()) {
++            "$path.normalizedUrl is not portable."
++        }
+         link.requireNonBlankString("title", path, maxLength = 200)
+             .also { title ->
+                 require(title.isSafePortableTitle()) { "$path.title is not portable." }
+             }
+         link.requireString("description", path, maxLength = 1000)
++            .also { description ->
++                require(description.isSafePortableDescription()) { "$path.description is not portable." }
++            }
+         link.requireInt("durationMinutes", path, 1..240)
+         link.requireEnumArray("topicTags", path, TopicTag.entries.mapTo(mutableSetOf(), TopicTag::name), minSize = 1)
+         link.requireEnum("availability", path, AvailabilityValues)
+@@ -686,6 +997,9 @@ private fun JsonObject.validateLibraryShape() {
+         val updatedAtMillis = link.requireLong("updatedAtMillis", path, minimum = 0L)
+         require(updatedAtMillis >= createdAtMillis) { "$path.updatedAtMillis must be >= createdAtMillis." }
+         link.requireNullableString("sourceLabel", path, maxLength = 120, required = false)
++            ?.also { sourceLabel ->
++                require(sourceLabel.isSafePortableLinkSourceLabel()) { "$path.sourceLabel is not portable." }
++            }
+     }
+ 
+     val userDocumentIds = mutableSetOf<String>()
+@@ -703,12 +1017,18 @@ private fun JsonObject.validateLibraryShape() {
+                 require(displayName.isSafePortableSourceHint()) { "$path.displayName is not portable." }
+             }
+         document.requireNullableString("mimeType", path, maxLength = 120, required = true)
++            ?.also { mimeType ->
++                require(mimeType.isSafePortableMimeType()) { "$path.mimeType is not portable." }
++            }
+         document.requireEnum("documentFormat", path, DocumentFormatValues)
+         document.requireNonBlankString("title", path, maxLength = 200)
+             .also { title ->
+                 require(title.isSafePortableTitle()) { "$path.title is not portable." }
+             }
+         document.requireString("description", path, maxLength = 1000)
++            .also { description ->
++                require(description.isSafePortableDescription()) { "$path.description is not portable." }
++            }
+         document.requireInt("durationMinutes", path, 1..240)
+         document.requireEnumArray("topicTags", path, TopicTag.entries.mapTo(mutableSetOf(), TopicTag::name), minSize = 1)
+         document.requireEnum("availability", path, AvailabilityValues)
+@@ -848,7 +1168,11 @@ private fun JsonObject.validateAnnotationsShape() {
+         val contentId = sidecar.requireString("contentId", path)
+         require(contentId.matches(ContentIdRegex)) { "$path.contentId is invalid." }
+         require(sidecarIds.add(contentId)) { "$path.contentId is duplicated." }
+-        sidecar.requireNonBlankString("sourceTitle", path, maxLength = 240)
++        sidecar.requireNonBlankString("sourceTitle", path, maxLength = 240).also { sourceTitle ->
++            require(sourceTitle.isSafePortableAnnotationSourceTitle()) {
++                "$path.sourceTitle is not portable."
++            }
++        }
+         val fileName = sidecar.requireString("jsonLdFileName", path)
+         require(fileName.isSafePortableAnnotationSidecarFileName()) {
+             "$path.jsonLdFileName is invalid."
+@@ -1050,7 +1374,10 @@ private fun AccountLightSettings.toPortableAppSettings(supportedPackages: Set<St
+     )
+ }
+ 
+-private fun AppSettings.toAccountLightSettings(): AccountLightSettings {
++private fun AppSettings.toAccountLightSettings(
++    contentIdMapping: Map<String, String> = emptyMap(),
++    omittedPortableUserContentIds: Set<String> = emptySet(),
++): AccountLightSettings {
+     return AccountLightSettings(
+         hasCompletedOnboarding = hasCompletedOnboarding,
+         selectedAppPackages = selectedAppPackages.sorted(),
+@@ -1061,12 +1388,152 @@ private fun AppSettings.toAccountLightSettings(): AccountLightSettings {
+         meditationDurationMinutes = meditationDurationMinutes,
+         readerFontScale = readerFontScale.toPortableReaderFontScale(),
+         contentPriority = contentPriority.name,
+-        priorityContentIds = priorityContentIds.toPortableContentIds(),
+-        reactivatedCompletedContentIds = reactivatedCompletedContentIds.toPortableContentIds(),
++        priorityContentIds = priorityContentIds.toPortableContentIds(
++            contentIdMapping = contentIdMapping,
++            omittedPortableUserContentIds = omittedPortableUserContentIds,
++        ),
++        reactivatedCompletedContentIds = reactivatedCompletedContentIds.toPortableContentIds(
++            contentIdMapping = contentIdMapping,
++            omittedPortableUserContentIds = omittedPortableUserContentIds,
++        ),
+         openAnywayUnlockMinutes = openAnywayUnlockMinutes,
+     )
+ }
+ 
++private fun ContentItem.toAccountLightUserLink(exportedAtMillis: Long): AccountLightUserLink? {
++    if (sourceType != ContentSourceType.USER_LINK) return null
++    val url = externalUrl?.takeIf(String::isNotBlank) ?: rights.sourceUrl?.takeIf(String::isNotBlank) ?: return null
++    val normalizedUrl = UserLinkValidator.validateUrl(url).normalizedUrl ?: return null
++    if (!normalizedUrl.isSafePortableUserLinkUrl()) return null
++    val portableTitle = title.trim().takeIf { it.isSafePortableTitle() } ?: return null
++    val createdAtMillis = addedAtMillis?.coerceAtLeast(0L) ?: exportedAtMillis
++    return AccountLightUserLink(
++        contentId = portableContentId(),
++        normalizedUrl = normalizedUrl,
++        title = portableTitle,
++        description = description.toPortableDescriptionOrFallback("Saved link metadata."),
++        durationMinutes = durationMinutes.coerceIn(1, 240),
++        topicTags = topicTags.map { it.name }.sorted().ifEmpty { listOf(TopicTag.OTHER.name) },
++        availability = availability.name,
++        createdAtMillis = createdAtMillis,
++        updatedAtMillis = exportedAtMillis.coerceAtLeast(createdAtMillis),
++        sourceLabel = sourceLabel.toPortableLinkSourceLabelOrNull(),
++    )
++}
++
++private fun ContentItem.toAccountLightUserDocument(exportedAtMillis: Long): AccountLightUserDocument? {
++    if (sourceType != ContentSourceType.USER_DOCUMENT) return null
++    val portableFormat = format.takeIf { it.name in DocumentFormatValues } ?: return null
++    val portableTitle = title.trim().takeIf { it.isSafePortableTitle() } ?: return null
++    val createdAtMillis = addedAtMillis?.coerceAtLeast(0L) ?: exportedAtMillis
++    val displayName = sourceLabel.toPortableSourceHintOrNull()
++        ?: portableTitle.toPortableSourceHintOrNull()
++        ?: "Imported document"
++    return AccountLightUserDocument(
++        contentId = portableContentId(),
++        displayName = displayName,
++        mimeType = null,
++        documentFormat = portableFormat.name,
++        title = portableTitle,
++        description = description.toPortableDescriptionOrFallback("Saved document metadata."),
++        durationMinutes = durationMinutes.coerceIn(1, 240),
++        topicTags = topicTags.map { it.name }.sorted().ifEmpty { listOf(TopicTag.OTHER.name) },
++        availability = availability.name,
++        documentImportState = "MISSING_FILE_NEEDS_REATTACH",
++        documentFingerprint = AccountLightDocumentFingerprint(
++            strategy = "UNVERIFIED_METADATA_ONLY",
++            sha256 = null,
++            sizeBytes = null,
++            normalizedTitle = title.normalizedPortableTitle(),
++            format = portableFormat.name,
++        ),
++        createdAtMillis = createdAtMillis,
++        updatedAtMillis = exportedAtMillis.coerceAtLeast(createdAtMillis),
++        sourceHint = AccountLightSourceHint(lastKnownDisplayName = displayName, providerLabel = null),
++    )
++}
++
++private fun ReadingProgress.toAccountLightReadingProgress(
++    contentIdMapping: Map<String, String>,
++    portableLibraryContentIds: Set<String>,
++): AccountLightReadingProgress? {
++    val portableId = contentIdMapping[contentId] ?: contentId
++    if (!portableId.matches(ContentIdRegex)) {
++        return null
++    }
++    if (portableId.startsWith("user-") && portableId !in portableLibraryContentIds) {
++        return null
++    }
++    val safeParagraphCount = paragraphCount.coerceAtLeast(1)
++    val safeLastVisible = lastVisibleParagraphIndex.coerceIn(0, safeParagraphCount - 1)
++    val safePercent = progressPercent.coerceIn(0, 100)
++    val portablePercent = if (completedAtMillis == null) safePercent.coerceAtMost(99) else 100
++    return AccountLightReadingProgress(
++        contentId = portableId,
++        progressPercent = portablePercent,
++        lastVisibleParagraphIndex = safeLastVisible,
++        paragraphCount = safeParagraphCount,
++        updatedAtMillis = updatedAtMillis.coerceAtLeast(0L),
++        completedAtMillis = completedAtMillis?.coerceAtLeast(0L),
++    )
++}
++
++private fun AccountLightUserLink.toContentItem(): ContentItem {
++    return ContentItem(
++        id = contentId,
++        packId = "user-links",
++        title = title,
++        description = description.ifBlank { normalizedUrl },
++        durationMinutes = durationMinutes,
++        format = ContentFormat.HTML,
++        topicTags = topicTags.mapTo(mutableSetOf()) { TopicTag.valueOf(it) },
++        bodyAssetPath = null,
++        externalUrl = normalizedUrl,
++        sourceLabel = sourceLabel,
++        sourceType = ContentSourceType.USER_LINK,
++        availability = ContentAvailability.valueOf(availability),
++        rights = ContentRightsMetadata.userPrivateExternal(sourceUrl = normalizedUrl, attribution = sourceLabel),
++        addedAtMillis = createdAtMillis,
++    )
++}
++
++private fun AccountLightUserDocument.toMissingContentItem(): ContentItem {
++    val display = displayName.removeSuffix(" (missing)").ifBlank { title }
++    val sourceReference = "portable-missing:$contentId"
++    val format = ContentFormat.valueOf(documentFormat)
++    return ContentItem(
++        id = contentId,
++        packId = "user-documents",
++        title = title,
++        description = description.ifBlank { "Reattach $display to continue reading." },
++        durationMinutes = durationMinutes,
++        format = format,
++        topicTags = topicTags.mapTo(mutableSetOf()) { TopicTag.valueOf(it) },
++        bodyAssetPath = null,
++        externalUrl = null,
++        sourceLabel = "$display (missing)",
++        sourceType = ContentSourceType.USER_DOCUMENT,
++        availability = ContentAvailability.UNAVAILABLE,
++        rights = if (format == ContentFormat.PDF) {
++            ContentRightsMetadata.userPrivateExternal(sourceUrl = sourceReference, attribution = display)
++        } else {
++            ContentRightsMetadata.userPrivateReader(sourceUrl = sourceReference, attribution = display)
++        },
++        addedAtMillis = createdAtMillis,
++    )
++}
++
++private fun AccountLightReadingProgress.toReadingProgress(): ReadingProgress {
++    return ReadingProgress(
++        contentId = contentId,
++        progressPercent = progressPercent,
++        lastVisibleParagraphIndex = lastVisibleParagraphIndex,
++        paragraphCount = paragraphCount,
++        updatedAtMillis = updatedAtMillis,
++        completedAtMillis = completedAtMillis,
++    )
++}
++
+ private fun AppSettings.toAccountLightAnnotations(): AccountLightAnnotations {
+     return AccountLightAnnotations(
+         export = AccountLightAnnotationExport(
+@@ -1082,11 +1549,22 @@ private fun AppSettings.toAccountLightAnnotations(): AccountLightAnnotations {
+     )
+ }
+ 
+-private fun AppSettings.toAccountLightWarnings(): List<AccountLightWarning> {
++private fun AppSettings.toAccountLightWarnings(
++    contentIdMapping: Map<String, String> = emptyMap(),
++    omittedPortableUserContentIds: Set<String> = emptySet(),
++): List<AccountLightWarning> {
+     return buildList {
+-        priorityContentIds.invalidPortableContentIdsWarning(section = "settings")?.let(::add)
++        priorityContentIds.invalidPortableContentIdsWarning(
++            section = "settings",
++            contentIdMapping = contentIdMapping,
++            omittedPortableUserContentIds = omittedPortableUserContentIds,
++        )?.let(::add)
+         reactivatedCompletedContentIds
+-            .invalidPortableContentIdsWarning(section = "settings")
++            .invalidPortableContentIdsWarning(
++                section = "settings",
++                contentIdMapping = contentIdMapping,
++                omittedPortableUserContentIds = omittedPortableUserContentIds,
++            )
+             ?.let(::add)
+         if (!annotationExportDisplayName.isNullOrBlank() && annotationExportDisplayName.toPortableDisplayNameOrNull() == null) {
+             add(
+@@ -1105,14 +1583,29 @@ private fun Double.toPortableReaderFontScale(): Double {
+     return (coerceIn(MIN_READER_FONT_SCALE, MAX_READER_FONT_SCALE) * 100.0).roundToInt() / 100.0
+ }
+ 
+-private fun Collection<String>.toPortableContentIds(): List<String> {
+-    return filter { it.matches(ContentIdRegex) }
++private fun Collection<String>.toPortableContentIds(
++    contentIdMapping: Map<String, String> = emptyMap(),
++    omittedPortableUserContentIds: Set<String> = emptySet(),
++): List<String> {
++    return mapNotNull { contentId ->
++        contentIdMapping[contentId]
++            ?: contentId.takeIf { it.matches(ContentIdRegex) && it !in omittedPortableUserContentIds }
++    }
+         .distinct()
+         .sorted()
+ }
+ 
+-private fun Collection<String>.invalidPortableContentIdsWarning(section: String): AccountLightWarning? {
+-    return if (any { !it.matches(ContentIdRegex) }) {
++private fun Collection<String>.invalidPortableContentIdsWarning(
++    section: String,
++    contentIdMapping: Map<String, String> = emptyMap(),
++    omittedPortableUserContentIds: Set<String> = emptySet(),
++): AccountLightWarning? {
++    return if (
++        any { contentId ->
++            contentIdMapping[contentId]?.matches(ContentIdRegex) != true &&
++                (contentId in omittedPortableUserContentIds || !contentId.matches(ContentIdRegex))
++        }
++    ) {
+         AccountLightWarning(
+             code = "CONFLICT_RETAINED_LOCAL_VALUE",
+             severity = "WARNING",
+@@ -1124,11 +1617,56 @@ private fun Collection<String>.invalidPortableContentIdsWarning(section: String)
+     }
+ }
+ 
++private fun ContentItem.portableContentId(): String {
++    if (id.matches(ContentIdRegex)) {
++        return id
++    }
++    val prefix = when (sourceType) {
++        ContentSourceType.USER_LINK -> "user-link"
++        ContentSourceType.USER_DOCUMENT -> "user-document"
++        else -> return id
++    }
++    val seed = when (sourceType) {
++        ContentSourceType.USER_LINK -> externalUrl ?: rights.sourceUrl ?: id
++        ContentSourceType.USER_DOCUMENT -> sourceLabel ?: title
++        else -> id
++    }
++    val digest = java.security.MessageDigest.getInstance("SHA-256")
++        .digest(seed.toByteArray(Charsets.UTF_8))
++        .joinToString("") { byte -> "%02x".format(byte) }
++    return "$prefix-${digest.toUuidLikeSuffix()}"
++}
++
++private fun String.normalizedPortableTitle(): String {
++    return lowercase(Locale.US)
++        .replace(Regex("\\.(md|markdown|epub|pdf|html?)$"), "")
++        .replace(Regex("[^a-z0-9]+"), " ")
++        .trim()
++        .replace(Regex("\\s+"), " ")
++        .ifBlank { "untitled" }
++        .take(200)
++}
++
+ private fun String?.toPortableDisplayNameOrNull(): String? {
+     val value = this?.trim()?.takeIf(String::isNotBlank) ?: return null
+     return value.takeIf { it.length <= 120 && it.isSafePortableDisplayName() }
+ }
+ 
++private fun String?.toPortableSourceHintOrNull(): String? {
++    val value = this?.trim()?.takeIf(String::isNotBlank) ?: return null
++    return value.takeIf { it.isSafePortableSourceHint() }
++}
++
++private fun String?.toPortableLinkSourceLabelOrNull(): String? {
++    val value = this?.trim()?.takeIf(String::isNotBlank) ?: return null
++    return value.takeIf { it.isSafePortableLinkSourceLabel() }
++}
++
++private fun String.toPortableDescriptionOrFallback(fallback: String): String {
++    val value = trim().take(1000)
++    return value.takeIf { it.isSafePortableDescription() } ?: fallback
++}
++
+ private fun String.isSafePortableDisplayName(): Boolean {
+     return isNotBlank() &&
+         length <= 120 &&
+@@ -1148,6 +1686,13 @@ private fun String.isSafePortableSourceHint(): Boolean {
+         }
+ }
+ 
++private fun String.isSafePortableLinkSourceLabel(): Boolean {
++    val value = trim()
++    return value.isNotBlank() &&
++        value.length <= 120 &&
++        value.isSafePortableSourceHint()
++}
++
+ private fun String.isSafePortableProviderLabel(): Boolean {
+     val value = trim()
+     val lower = value.lowercase()
+@@ -1165,6 +1710,9 @@ private fun String.containsUnsafePortableValue(): Boolean {
+         value.contains("file://") ||
+         value.contains("oauth") ||
+         value.contains("token") ||
++        value.contains("google drive") ||
++        value.contains("drive file") ||
++        value.contains("drive id") ||
+         UnsafePortableValueTerms.any { unsafeTerm -> value.contains(unsafeTerm) } ||
+         UnsafePortableValuePatterns.any { unsafePattern -> unsafePattern.containsMatchIn(this) } ||
+         contains("/") ||
+@@ -1183,7 +1731,11 @@ private fun String.containsUnsafePortableValueWithoutReverseDns(): Boolean {
+         value.contains("file://") ||
+         value.contains("oauth") ||
+         value.contains("token") ||
++        value.contains("google drive") ||
++        value.contains("drive file") ||
++        value.contains("drive id") ||
+         UnsafePortableValueTerms.any { unsafeTerm -> value.contains(unsafeTerm) } ||
++        UnsafeOpaqueIdPattern.containsMatchIn(this) ||
+         contains("/") ||
+         contains("\\") ||
+         contains("@") ||
+@@ -1213,11 +1765,99 @@ private fun String.isSafePortableAnnotationSidecarFileName(): Boolean {
+ }
+ 
+ private fun String.isSafePortableTitle(): Boolean {
++    return isNotBlank() &&
++        length <= 200 &&
++        !containsUnsafePortableValue()
++}
++
++private fun String.isSafePortableAnnotationSourceTitle(): Boolean {
+     return isNotBlank() &&
+         length <= 240 &&
+         !containsUnsafePortableValue()
+ }
+ 
++private fun String.isSafePortableDescription(): Boolean {
++    val value = trim()
++    return value.length <= 1000 &&
++        !value.containsUnsafePortableValue()
++}
++
++private fun String.isSafePortableMimeType(): Boolean {
++    val value = trim()
++    val lower = value.lowercase(Locale.US)
++    return value.length <= 120 &&
++        PortableMimeTypeRegex.matches(value) &&
++        !lower.contains("oauth") &&
++        !lower.contains("token") &&
++        !lower.contains("content") &&
++        !lower.contains("file") &&
++        !lower.contains("provider") &&
++        !lower.contains("drive") &&
++        !lower.contains("storage") &&
++        !lower.contains("@") &&
++        !lower.contains(":") &&
++        !lower.contains("\\") &&
++        !UnsafePortableValueTerms.any { unsafeTerm -> lower.contains(unsafeTerm) } &&
++        !UnsafePortableValuePatterns.any { unsafePattern -> unsafePattern.containsMatchIn(value) }
++}
++
++private fun String.isSafePortableUserLinkUrl(): Boolean {
++    val parsed = runCatching { URI(this) }.getOrNull() ?: return false
++    val host = parsed.host?.lowercase(Locale.US) ?: return false
++    val rawQuery = parsed.rawQuery.orEmpty()
++    val rawFragment = parsed.rawFragment.orEmpty()
++    val rawPath = parsed.rawPath.orEmpty()
++    val encodedSurface = listOf(rawPath, rawQuery, rawFragment).joinToString(" ")
++    val urlSurfaces = encodedSurface.urlDecodedSurfacesOrNull() ?: return false
++    return parsed.rawUserInfo.isNullOrBlank() &&
++        rawFragment.isBlank() &&
++        !host.isSensitivePortableLinkHost() &&
++        urlSurfaces.none { surface -> surface.containsUnsafePortableUrlValue() }
++}
++
++private fun String.isSensitivePortableLinkHost(): Boolean {
++    return this == "drive.google.com" ||
++        this.endsWith(".drive.google.com") ||
++        this == "docs.google.com" ||
++        this.endsWith(".docs.google.com")
++}
++
++private fun String.containsUnsafePortableUrlValue(): Boolean {
++    val value = lowercase(Locale.US)
++    return value.contains("content:") ||
++        value.contains("file:") ||
++        value.contains("oauth") ||
++        value.contains("token") ||
++        value.contains("access_key") ||
++        value.contains("apikey") ||
++        value.contains("api_key") ||
++        value.contains("signature") ||
++        value.contains("signed") ||
++        value.contains("drive.google") ||
++        value.contains("docs.google") ||
++        PortableUrlProviderDocumentIdPatterns.any { unsafePattern -> unsafePattern.containsMatchIn(value) } ||
++        value.contains("@") ||
++        value.contains("\\") ||
++        UnsafePortableValueTerms.any { unsafeTerm -> value.contains(unsafeTerm) } ||
++        UnsafePortableValuePatterns.any { unsafePattern -> unsafePattern.containsMatchIn(this) }
++}
++
++private fun String.urlDecodedSurfacesOrNull(maxDepth: Int = 5): List<String>? {
++    val surfaces = mutableListOf(this)
++    var current = this
++    repeat(maxDepth) {
++        val decoded = runCatching { java.net.URLDecoder.decode(current, Charsets.UTF_8.name()) }
++            .getOrNull() ?: return null
++        if (decoded == current) return surfaces
++        surfaces += decoded
++        current = decoded
++    }
++    val decodedAfterCap = runCatching { java.net.URLDecoder.decode(current, Charsets.UTF_8.name()) }
++        .getOrNull() ?: return null
++    val wouldDecodeFurther = decodedAfterCap != current
++    return if (wouldDecodeFurther) null else surfaces
++}
++
+ private fun String.isNormalizedPortableTitle(): Boolean {
+     val value = this
+     return value.isNotBlank() &&
+@@ -1253,6 +1893,7 @@ private val ContentIdRegex = Regex(
+         "|^(editorial|meditation)-[a-z0-9][a-z0-9._-]{2,120}$",
+ )
+ private val PackageNameRegex = Regex("^[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z0-9_]+)+$")
++private val PortableMimeTypeRegex = Regex("^[A-Za-z0-9!#$&^_.+-]+/[A-Za-z0-9!#$&^_.+-]+$")
+ private val PortableDisplayNamePunctuation = setOf(' ', '.', '_', '-', '(', ')')
+ private val ProviderLabelBlocklist = setOf(
+     "com.android",
+@@ -1278,6 +1919,14 @@ private val UnsafePortableValueTerms = setOf(
+ )
+ private val UnsafePortableValuePatterns = listOf(
+     Regex("\\b[a-zA-Z][a-zA-Z0-9_]*(?:\\.[a-zA-Z0-9_]+){2,}\\b"),
++    Regex("\\b[A-Za-z0-9_-]{24,}\\b"),
++)
++private val UnsafeOpaqueIdPattern = Regex("\\b[A-Za-z0-9_-]{24,}\\b")
++private val PortableUrlProviderDocumentIdPatterns = listOf(
++    Regex("\\b(?:primary|home|raw|external|externalstorage|downloads?|documents?|media|images?|videos?|audio):[^\\s&=?#]+/[^\\s&=?#]+"),
++    Regex("\\b(?:image|video|audio|media|msf|raw|primary|home|external|externalstorage|downloads?|documents?):[A-Za-z0-9._-]{1,120}\\b"),
++    Regex("\\b(?:sdcard|storage)/[^\\s&=?#]+"),
++    Regex("\\b(?:download|downloads|documents)/[^\\s&=?#]+\\.(?:pdf|epub|md|markdown|html|htm|txt)"),
+ )
+ private val UnsafeWarningMessagePatterns = listOf(
+     Regex("\\b[A-Z][A-Za-z0-9_]*(?:Exception|Error|Throwable)\\b"),
+diff --git a/app/src/main/java/com/qualityalternative/app/data/AppContainer.kt b/app/src/main/java/com/qualityalternative/app/data/AppContainer.kt
+index d1e304b..f45de75 100644
+--- a/app/src/main/java/com/qualityalternative/app/data/AppContainer.kt
++++ b/app/src/main/java/com/qualityalternative/app/data/AppContainer.kt
+@@ -80,9 +80,15 @@ class AppContainer(context: Context) {
+         settingsRepository = settingsRepository,
+         appVersionName = BuildConfig.VERSION_NAME,
+         appVersionCode = BuildConfig.VERSION_CODE,
++        userLinkRepository = userLinkRepository,
++        userDocumentRepository = userDocumentRepository,
++        readingProgressRepository = readingProgressRepository,
+     )
+     val accountLightProfileImporter: AccountLightProfileImporter = AccountLightProfileImporter(
+         settingsRepository = settingsRepository,
++        userLinkRepository = userLinkRepository,
++        userDocumentRepository = userDocumentRepository,
++        readingProgressRepository = readingProgressRepository,
+         knownContentIdsProvider = { contentRepository.inventory().mapTo(mutableSetOf(), ContentItem::id) },
+     )
+     val delayGate: DelayGate = PreferencesDelayGate(
+diff --git a/app/src/main/java/com/qualityalternative/app/data/RoomUserDocumentRepository.kt b/app/src/main/java/com/qualityalternative/app/data/RoomUserDocumentRepository.kt
+index 6cb9a0e..6e347ca 100644
+--- a/app/src/main/java/com/qualityalternative/app/data/RoomUserDocumentRepository.kt
++++ b/app/src/main/java/com/qualityalternative/app/data/RoomUserDocumentRepository.kt
+@@ -131,6 +131,52 @@ class RoomUserDocumentRepository(
+         documents.value = documents.value.filterNot { item -> item.id == contentId }
+     }
+ 
++    override suspend fun importPortableDocuments(
++        documents: List<ContentItem>,
++        replaceExisting: Boolean,
++        nowMillis: Long,
++    ) {
++        val existingDocuments = this.documents.value
++        if (replaceExisting) {
++            val retainedIds = documents.mapTo(mutableSetOf(), ContentItem::id)
++            if (retainedIds.isEmpty()) {
++                dao.deleteAll()
++            } else {
++                dao.deleteAllExcept(retainedIds)
++            }
++        }
++        val documentsToImport = if (replaceExisting) {
++            documents
++        } else {
++            val existingIds = existingDocuments.mapTo(mutableSetOf(), ContentItem::id)
++            val existingSourceReferences = existingDocuments.mapNotNullTo(mutableSetOf()) { item ->
++                item.rights.sourceUrl?.takeIf(String::isNotBlank)
++            }
++            documents.filter { item ->
++                item.id !in existingIds &&
++                    item.rights.sourceUrl?.takeIf(String::isNotBlank) !in existingSourceReferences
++            }
++        }
++        documentsToImport.forEach { item ->
++            dao.insertOrReplace(
++                item.toEntity(
++                    uri = requireNotNull(item.rights.sourceUrl) {
++                        "Imported document content must provide a synthetic source reference."
++                    },
++                    displayName = item.sourceLabel.orEmpty().removeSuffix(" (missing)").ifBlank { item.title },
++                    mimeType = null,
++                    createdAtMillis = item.addedAtMillis ?: nowMillis,
++                    updatedAtMillis = nowMillis,
++                ),
++            )
++        }
++        this.documents.value = mergeImportedUserContent(
++            current = if (replaceExisting) emptyList() else existingDocuments,
++            imported = documentsToImport,
++            secondaryKey = { item -> item.rights.sourceUrl },
++        )
++    }
++
+     override fun contentBody(item: ContentItem): String {
+         return if (item.sourceType == ContentSourceType.USER_DOCUMENT && item.format.usesPrivateReader()) {
+             bodyLoader.loadBody(uri = item.rights.sourceUrl.orEmpty(), format = item.format)
+@@ -293,5 +339,5 @@ private fun stableUserDocumentId(uri: String): String {
+     val digest = MessageDigest.getInstance("SHA-256")
+         .digest(uri.toByteArray(Charsets.UTF_8))
+         .joinToString("") { byte -> "%02x".format(byte) }
+-    return "user-document:$digest"
++    return "user-document-${digest.toUuidLikeSuffix()}"
+ }
+diff --git a/app/src/main/java/com/qualityalternative/app/data/RoomUserLinkRepository.kt b/app/src/main/java/com/qualityalternative/app/data/RoomUserLinkRepository.kt
+index d28591d..2bf19b9 100644
+--- a/app/src/main/java/com/qualityalternative/app/data/RoomUserLinkRepository.kt
++++ b/app/src/main/java/com/qualityalternative/app/data/RoomUserLinkRepository.kt
+@@ -99,6 +99,47 @@ class RoomUserLinkRepository(
+         links.value = links.value.filterNot { item -> item.id == contentId }
+     }
+ 
++    override suspend fun importPortableLinks(
++        links: List<ContentItem>,
++        replaceExisting: Boolean,
++        nowMillis: Long,
++    ) {
++        val existingLinks = this.links.value
++        if (replaceExisting) {
++            val retainedIds = links.mapTo(mutableSetOf(), ContentItem::id)
++            if (retainedIds.isEmpty()) {
++                dao.deleteAll()
++            } else {
++                dao.deleteAllExcept(retainedIds)
++            }
++        }
++        val linksToImport = if (replaceExisting) {
++            links
++        } else {
++            val existingIds = existingLinks.mapTo(mutableSetOf(), ContentItem::id)
++            val existingUrls = existingLinks.mapNotNullTo(mutableSetOf()) { item ->
++                item.externalUrl?.takeIf(String::isNotBlank)
++            }
++            links.filter { item ->
++                item.id !in existingIds &&
++                    item.externalUrl?.takeIf(String::isNotBlank) !in existingUrls
++            }
++        }
++        linksToImport.forEach { item ->
++            dao.insertOrReplace(
++                item.toEntity(
++                    createdAtMillis = item.addedAtMillis ?: nowMillis,
++                    updatedAtMillis = nowMillis,
++                ),
++            )
++        }
++        this.links.value = mergeImportedUserContent(
++            current = if (replaceExisting) emptyList() else existingLinks,
++            imported = linksToImport,
++            secondaryKey = ContentItem::externalUrl,
++        )
++    }
++
+     override fun isReady(): Boolean = ready.value
+ 
+     override fun observeReady(): Flow<Boolean> = ready.asStateFlow()
+@@ -180,5 +221,36 @@ private fun stableUserLinkId(normalizedUrl: String): String {
+     val digest = MessageDigest.getInstance("SHA-256")
+         .digest(normalizedUrl.toByteArray(Charsets.UTF_8))
+         .joinToString("") { byte -> "%02x".format(byte) }
+-    return "user-link:$digest"
++    return "user-link-${digest.toUuidLikeSuffix()}"
++}
++
++internal fun mergeImportedUserContent(
++    current: List<ContentItem>,
++    imported: List<ContentItem>,
++    secondaryKey: (ContentItem) -> String?,
++): List<ContentItem> {
++    return imported.fold(current) { merged, item ->
++        val existingIndex = merged.indexOfFirst { candidate ->
++            candidate.id == item.id ||
++                secondaryKey(candidate)?.takeIf(String::isNotBlank) == secondaryKey(item)?.takeIf(String::isNotBlank)
++        }
++        if (existingIndex >= 0) {
++            merged.mapIndexed { index, candidate ->
++                if (index == existingIndex) item else candidate
++            }
++        } else {
++            listOf(item) + merged
++        }
++    }
++}
++
++internal fun String.toUuidLikeSuffix(): String {
++    val padded = padEnd(32, '0')
++    return listOf(
++        padded.substring(0, 8),
++        padded.substring(8, 12),
++        padded.substring(12, 16),
++        padded.substring(16, 20),
++        padded.substring(20, 32),
++    ).joinToString("-")
+ }
+diff --git a/app/src/main/java/com/qualityalternative/app/data/local/UserDocumentDao.kt b/app/src/main/java/com/qualityalternative/app/data/local/UserDocumentDao.kt
+index 90a0c01..a3c7584 100644
+--- a/app/src/main/java/com/qualityalternative/app/data/local/UserDocumentDao.kt
++++ b/app/src/main/java/com/qualityalternative/app/data/local/UserDocumentDao.kt
+@@ -26,4 +26,10 @@ interface UserDocumentDao {
+ 
+     @Query("DELETE FROM user_documents WHERE id = :id")
+     suspend fun deleteById(id: String)
++
++    @Query("DELETE FROM user_documents")
++    suspend fun deleteAll()
++
++    @Query("DELETE FROM user_documents WHERE id NOT IN (:ids)")
++    suspend fun deleteAllExcept(ids: Set<String>)
+ }
+diff --git a/app/src/main/java/com/qualityalternative/app/data/local/UserLinkDao.kt b/app/src/main/java/com/qualityalternative/app/data/local/UserLinkDao.kt
+index 201ffd0..2df33de 100644
+--- a/app/src/main/java/com/qualityalternative/app/data/local/UserLinkDao.kt
++++ b/app/src/main/java/com/qualityalternative/app/data/local/UserLinkDao.kt
+@@ -26,4 +26,10 @@ interface UserLinkDao {
+ 
+     @Query("DELETE FROM user_links WHERE id = :id")
+     suspend fun deleteById(id: String)
++
++    @Query("DELETE FROM user_links")
++    suspend fun deleteAll()
++
++    @Query("DELETE FROM user_links WHERE id NOT IN (:ids)")
++    suspend fun deleteAllExcept(ids: Set<String>)
+ }
+diff --git a/app/src/main/java/com/qualityalternative/app/domain/service/Contracts.kt b/app/src/main/java/com/qualityalternative/app/domain/service/Contracts.kt
+index 22e9bcd..f0a55ab 100644
+--- a/app/src/main/java/com/qualityalternative/app/domain/service/Contracts.kt
++++ b/app/src/main/java/com/qualityalternative/app/domain/service/Contracts.kt
+@@ -69,6 +69,12 @@ interface UserLinkRepository {
+ 
+     suspend fun deleteLink(contentId: String)
+ 
++    suspend fun importPortableLinks(
++        links: List<ContentItem>,
++        replaceExisting: Boolean,
++        nowMillis: Long = System.currentTimeMillis(),
++    ) = Unit
++
+     fun isReady(): Boolean = true
+ 
+     fun observeReady(): Flow<Boolean> = flowOf(isReady())
+@@ -91,6 +97,12 @@ interface UserDocumentRepository {
+ 
+     suspend fun deleteDocument(contentId: String)
+ 
++    suspend fun importPortableDocuments(
++        documents: List<ContentItem>,
++        replaceExisting: Boolean,
++        nowMillis: Long = System.currentTimeMillis(),
++    ) = Unit
++
+     fun contentBody(item: ContentItem): String = item.description
+ 
+     fun readerDocument(item: ContentItem): ReaderDocument = ReaderDocument.fromPlainText(contentBody(item))
+@@ -277,6 +289,11 @@ interface ReadingProgressRepository {
+         contentIds.forEach { contentId -> deleteProgress(contentId) }
+     }
+ 
++    suspend fun replaceReadingProgress(progress: List<ReadingProgress>) {
++        deleteProgressForContentIds(readingProgress().mapTo(mutableSetOf(), ReadingProgress::contentId))
++        progress.forEach { item -> saveProgress(item) }
++    }
++
+     fun isReady(): Boolean = true
+ 
+     fun observeReady(): Flow<Boolean> = flowOf(isReady())
+diff --git a/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt b/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
+index 8fd99ce..0f9d8e9 100644
+--- a/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
++++ b/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
+@@ -250,8 +250,17 @@ class MainViewModel(
+         settingsRepository = settingsRepository,
+         appVersionName = "test",
+         appVersionCode = 1,
++        userLinkRepository = userLinkRepository,
++        userDocumentRepository = userDocumentRepository,
++        readingProgressRepository = readingProgressRepository,
++    ),
++    private val accountLightProfileImporter: AccountLightProfileImporter = AccountLightProfileImporter(
++        settingsRepository = settingsRepository,
++        userLinkRepository = userLinkRepository,
++        userDocumentRepository = userDocumentRepository,
++        readingProgressRepository = readingProgressRepository,
++        knownContentIdsProvider = { contentRepository.inventory().mapTo(mutableSetOf(), ContentItem::id) },
+     ),
+-    private val accountLightProfileImporter: AccountLightProfileImporter = AccountLightProfileImporter(settingsRepository),
+     private val interceptionMonitor: InterceptionMonitor,
+     private val enableDelayRefreshTicker: Boolean = true,
+     private val nowProvider: () -> Long = System::currentTimeMillis,
+@@ -1053,6 +1062,16 @@ class MainViewModel(
+         origin: String = "library",
+         startParagraphIndex: Int? = null,
+     ) {
++        if (content.availability == ContentAvailability.UNAVAILABLE) {
++            uiState = uiState.copy(
++                latestMessage = if (content.sourceType == ContentSourceType.USER_DOCUMENT) {
++                    "Reattach this file before reading can continue."
++                } else {
++                    "This saved item is unavailable."
++                },
++            )
++            return
++        }
+         val startedAtMillis = nowProvider()
+         val readerDocument = if (content.usesRepositoryBody()) {
+             try {
+@@ -2162,7 +2181,7 @@ class MainViewModel(
+                     isAccountLightImporting = false,
+                     accountLightImportPreview = null,
+                     accountLightImportError = null,
+-                    accountLightStatus = "Imported settings replaced local portable settings.",
++                    accountLightStatus = "Imported profile replaced local portable settings and library.",
+                     isAccountLightReplaceConfirming = false,
+                     latestMessage = "Portable profile restored.",
+                 )
+diff --git a/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt b/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
+index c004c28..9aae7df 100644
+--- a/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
++++ b/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
+@@ -112,6 +112,7 @@ import com.qualityalternative.app.data.UserDocumentValidator
+ import com.qualityalternative.app.domain.model.AnalyticsEvent
+ import com.qualityalternative.app.domain.model.AnalyticsEventType
+ import com.qualityalternative.app.domain.model.AppThemeMode
++import com.qualityalternative.app.domain.model.ContentAvailability
+ import com.qualityalternative.app.domain.model.ContentFormat
+ import com.qualityalternative.app.domain.model.ContentItem
+ import com.qualityalternative.app.domain.model.ContentPriority
+@@ -3448,14 +3449,20 @@ private fun AccountLightImportPreviewCard(
+         verticalArrangement = Arrangement.spacedBy(8.dp),
+     ) {
+         BodyText(
+-            text = "Profile ${preview.profileId.takeLast(8)} · ${preview.importedAppCount} apps · ${preview.importedTopicCount} topics · ${preview.importedPackCount} packs",
++            text = "Profile ${preview.profileId.takeLast(8)} · ${preview.importedLinkCount} links · ${preview.importedDocumentCount} files · ${preview.importedProgressCount} progress",
+             color = colors.primaryText,
+             fontSize = 13.sp,
+             lineHeight = 18.sp,
+         )
+-        if (preview.unsupportedAppCount > 0 || preview.warningCount > 0) {
++        if (preview.importedAppCount > 0 || preview.importedTopicCount > 0 || preview.importedPackCount > 0) {
+             MonoText(
+-                text = "${preview.unsupportedAppCount} unsupported apps · ${preview.warningCount} warnings",
++                text = "${preview.importedAppCount} apps · ${preview.importedTopicCount} topics · ${preview.importedPackCount} packs",
++                color = colors.mutedText,
++            )
++        }
++        if (preview.unsupportedAppCount > 0 || preview.missingDocumentCount > 0 || preview.warningCount > 0) {
++            MonoText(
++                text = "${preview.unsupportedAppCount} unsupported apps · ${preview.missingDocumentCount} files need reattach · ${preview.warningCount} warnings",
+                 color = colors.mutedText,
+                 modifier = Modifier.testTag("settings-account-light-import-warning-summary"),
+             )
+@@ -4053,6 +4060,7 @@ private fun LibraryItemCard(
+     onToggleSelection: () -> Unit,
+ ) {
+     val canDelete = item.isUserContent()
++    val canOpen = item.availability != ContentAvailability.UNAVAILABLE
+     QaCard(
+         padding = 16.dp,
+         modifier = Modifier.testTag("library-item-${item.id}"),
+@@ -4164,16 +4172,23 @@ private fun LibraryItemCard(
+                 horizontalPadding = 8.dp,
+                 verticalPadding = 7.dp,
+             )
+-            QaChip(
+-                text = if (progress != null) "Continue" else "Open",
+-                selected = false,
+-                onClick = onOpen,
+-                modifier = Modifier.testTag("library-open-${item.id}"),
+-                centered = true,
+-                minHeight = 34.dp,
+-                horizontalPadding = 8.dp,
+-                verticalPadding = 7.dp,
+-            )
++            if (canOpen) {
++                QaChip(
++                    text = if (progress != null) "Continue" else "Open",
++                    selected = false,
++                    onClick = onOpen,
++                    modifier = Modifier.testTag("library-open-${item.id}"),
++                    centered = true,
++                    minHeight = 34.dp,
++                    horizontalPadding = 8.dp,
++                    verticalPadding = 7.dp,
++                )
++            } else {
++                ReadOnlyPill(
++                    text = "File missing",
++                    modifier = Modifier.testTag("library-unavailable-${item.id}"),
++                )
++            }
+         }
+     }
+ }
+@@ -6070,7 +6085,15 @@ private fun ContentItem.sourceLabel(): String {
+             host?.let { "Your link · $it" } ?: "Your link"
+         }
+ 
+-        isUserDocument() -> sourceLabel?.let { "Your file · $it" } ?: "Your file"
++        isUserDocument() -> {
++            val label = sourceLabel?.removeSuffix(" (missing)")?.ifBlank { null }
++            when {
++                availability == com.qualityalternative.app.domain.model.ContentAvailability.UNAVAILABLE ->
++                    label?.let { "Your file · $it (missing)" } ?: "Your file · missing"
++                label != null -> "Your file · $label"
++                else -> "Your file"
++            }
++        }
+         usesMeditationTimer() -> sourceLabel ?: "Quality Alternative"
+         else -> sourceLabel?.ifBlank { null }
+             ?: packId.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.US) else it.toString() }
+diff --git a/app/src/test/java/com/qualityalternative/app/data/AccountLightProfileExporterTest.kt b/app/src/test/java/com/qualityalternative/app/data/AccountLightProfileExporterTest.kt
+index a6778ba..7403b38 100644
+--- a/app/src/test/java/com/qualityalternative/app/data/AccountLightProfileExporterTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/data/AccountLightProfileExporterTest.kt
+@@ -4,10 +4,23 @@ import androidx.datastore.core.DataStore
+ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+ import androidx.datastore.preferences.core.Preferences
+ import com.qualityalternative.app.domain.model.AppThemeMode
++import com.qualityalternative.app.domain.model.ContentAvailability
++import com.qualityalternative.app.domain.model.ContentFormat
++import com.qualityalternative.app.domain.model.ContentItem
+ import com.qualityalternative.app.domain.model.ContentPriority
++import com.qualityalternative.app.domain.model.ContentRightsMetadata
++import com.qualityalternative.app.domain.model.ContentSourceType
+ import com.qualityalternative.app.domain.model.DurationBucket
+ import com.qualityalternative.app.domain.model.OnboardingSelection
++import com.qualityalternative.app.domain.model.ReadingProgress
+ import com.qualityalternative.app.domain.model.TopicTag
++import com.qualityalternative.app.domain.model.UserDocumentDraft
++import com.qualityalternative.app.domain.model.UserLinkDraft
++import com.qualityalternative.app.domain.service.AddUserDocumentResult
++import com.qualityalternative.app.domain.service.AddUserLinkResult
++import com.qualityalternative.app.domain.service.ReadingProgressRepository
++import com.qualityalternative.app.domain.service.UserDocumentRepository
++import com.qualityalternative.app.domain.service.UserLinkRepository
+ import java.io.File
+ import kotlinx.coroutines.runBlocking
+ import org.junit.Assert.assertEquals
+@@ -152,6 +165,245 @@ class AccountLightProfileExporterTest {
+         assertFalse(rawJson.contains("raw-provider-id"))
+     }
+ 
++    @Test
++    fun exportSettingsOnlyProfileJson_includesPortableLibraryAndReadingStateWithoutRawUris() = runBlocking {
++        val repository = PreferencesSettingsRepository(
++            dataStore = testDataStore(),
++            supportedApps = SupportedCatalog.distractingApps,
++        )
++        val link = ContentItem(
++            id = "user-link:legacy-local-id",
++            packId = "user-links",
++            title = "Saved essay",
++            description = "A saved link from content://com.android.providers.media.documents/document/raw-link.",
++            durationMinutes = 11,
++            format = ContentFormat.HTML,
++            topicTags = setOf(TopicTag.SCIENCE),
++            externalUrl = "https://example.com/essay",
++            sourceLabel = "example.com",
++            sourceType = ContentSourceType.USER_LINK,
++            availability = ContentAvailability.AVAILABLE,
++            rights = ContentRightsMetadata.userPrivateExternal(sourceUrl = "https://example.com/essay"),
++            addedAtMillis = 5_000L,
++        )
++        val unsafeLink = link.copy(
++            id = "user-link-22222222-2222-4222-8222-222222222222",
++            title = "Unsafe drive link",
++            externalUrl = "https://drive.google.com/file/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/view",
++            rights = ContentRightsMetadata.userPrivateExternal(
++                sourceUrl = "https://drive.google.com/file/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/view",
++            ),
++        )
++        val longTitleLink = link.copy(
++            id = "user-link-55555555-5555-4555-8555-555555555555",
++            title = "L".repeat(201),
++            externalUrl = "https://example.com/long-title",
++            rights = ContentRightsMetadata.userPrivateExternal(sourceUrl = "https://example.com/long-title"),
++        )
++        val longSourceLabelLink = link.copy(
++            id = "user-link-77777777-7777-4777-8777-777777777777",
++            title = "Long label link",
++            externalUrl = "https://example.com/long-source-label",
++            sourceLabel = "s".repeat(121),
++            rights = ContentRightsMetadata.userPrivateExternal(sourceUrl = "https://example.com/long-source-label"),
++        )
++        val doubleEncodedUnsafeLink = link.copy(
++            id = "user-link-88888888-8888-4888-8888-888888888888",
++            title = "Nested encoded link",
++            externalUrl = "https://example.com/read?src=file%253A%252F%252F%252Fsdcard%252Fbook.epub",
++            rights = ContentRightsMetadata.userPrivateExternal(
++                sourceUrl = "https://example.com/read?src=file%253A%252F%252F%252Fsdcard%252Fbook.epub",
++            ),
++        )
++        val deepEncodedUnsafeLink = link.copy(
++            id = "user-link-99999999-9999-4999-8999-999999999999",
++            title = "Deep encoded link",
++            externalUrl = "https://example.com/read?src=file%25252525253A%25252525252F%25252525252F%25252525252Fsdcard%25252525252Fbook.epub",
++            rights = ContentRightsMetadata.userPrivateExternal(
++                sourceUrl = "https://example.com/read?src=file%25252525253A%25252525252F%25252525252F%25252525252Fsdcard%25252525252Fbook.epub",
++            ),
++        )
++        val providerDocumentIdLink = link.copy(
++            id = "user-link-aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
++            title = "Provider id link",
++            externalUrl = "https://example.com/read?doc=primary%3ADownload%2Fbook.epub",
++            rights = ContentRightsMetadata.userPrivateExternal(
++                sourceUrl = "https://example.com/read?doc=primary%3ADownload%2Fbook.epub",
++            ),
++        )
++        val shortProviderIdLink = link.copy(
++            id = "user-link-bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
++            title = "Short provider id link",
++            externalUrl = "https://example.com/read?image=image%3A3952",
++            rights = ContentRightsMetadata.userPrivateExternal(
++                sourceUrl = "https://example.com/read?image=image%3A3952",
++            ),
++        )
++        val storagePathNoExtensionLink = link.copy(
++            id = "user-link-cccccccc-cccc-4ccc-8ccc-cccccccccccc",
++            title = "Storage path link",
++            externalUrl = "https://example.com/read?doc=storage%2Femulated%2F0%2FDownload%2Fbook",
++            rights = ContentRightsMetadata.userPrivateExternal(
++                sourceUrl = "https://example.com/read?doc=storage%2Femulated%2F0%2FDownload%2Fbook",
++            ),
++        )
++        val storagePathUnsupportedExtensionLink = link.copy(
++            id = "user-link-dddddddd-dddd-4ddd-8ddd-dddddddddddd",
++            title = "Storage docx path link",
++            externalUrl = "https://example.com/read?doc=storage%2Femulated%2F0%2FDownload%2Fbook.docx",
++            rights = ContentRightsMetadata.userPrivateExternal(
++                sourceUrl = "https://example.com/read?doc=storage%2Femulated%2F0%2FDownload%2Fbook.docx",
++            ),
++        )
++        val malformedNestedStorageLink = link.copy(
++            id = "user-link-eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
++            title = "Malformed nested storage link",
++            externalUrl = "https://example.com/read?doc=storage%252Femulated%252F0%252FDownload%252Fbook%25ZZ",
++            rights = ContentRightsMetadata.userPrivateExternal(
++                sourceUrl = "https://example.com/read?doc=storage%252Femulated%252F0%252FDownload%252Fbook%25ZZ",
++            ),
++        )
++        val malformedNestedRawUriLink = link.copy(
++            id = "user-link-ffffffff-ffff-4fff-8fff-ffffffffffff",
++            title = "Malformed nested raw uri link",
++            externalUrl = "https://example.com/read?src=file%253A%252F%252F%252Fsdcard%252Fbook%25ZZ",
++            rights = ContentRightsMetadata.userPrivateExternal(
++                sourceUrl = "https://example.com/read?src=file%253A%252F%252F%252Fsdcard%252Fbook%25ZZ",
++            ),
++        )
++        val document = ContentItem(
++            id = "user-document:legacy-local-id",
++            packId = "user-documents",
++            title = "Imported book",
++            description = "A private EPUB from user@example.com with oauth token text.",
++            durationMinutes = 45,
++            format = ContentFormat.EPUB,
++            topicTags = setOf(TopicTag.PHILOSOPHY),
++            sourceLabel = "book.epub",
++            sourceType = ContentSourceType.USER_DOCUMENT,
++            availability = ContentAvailability.AVAILABLE,
++            rights = ContentRightsMetadata.userPrivateReader(
++                sourceUrl = "content://com.android.providers.media.documents/document/raw-book",
++                attribution = "book.epub",
++            ),
++            addedAtMillis = 6_000L,
++        )
++        val longTitleDocument = document.copy(
++            id = "user-document-66666666-6666-4666-8666-666666666666",
++            title = "D".repeat(201),
++            sourceLabel = "long-title.epub",
++        )
++        repository.savePriorityContentIds(
++            setOf(
++                link.id,
++                unsafeLink.id,
++                longTitleLink.id,
++                longSourceLabelLink.id,
++                doubleEncodedUnsafeLink.id,
++                deepEncodedUnsafeLink.id,
++                providerDocumentIdLink.id,
++                shortProviderIdLink.id,
++                storagePathNoExtensionLink.id,
++                storagePathUnsupportedExtensionLink.id,
++                malformedNestedStorageLink.id,
++                malformedNestedRawUriLink.id,
++                longTitleDocument.id,
++            ),
++        )
++        val exporter = AccountLightProfileExporter(
++            settingsRepository = repository,
++            appVersionName = "0.8.1-alpha",
++            appVersionCode = 13,
++            userLinkRepository = StaticUserLinkRepository(
++                listOf(
++                    link,
++                    unsafeLink,
++                    longTitleLink,
++                    longSourceLabelLink,
++                    doubleEncodedUnsafeLink,
++                    deepEncodedUnsafeLink,
++                    providerDocumentIdLink,
++                    shortProviderIdLink,
++                    storagePathNoExtensionLink,
++                    storagePathUnsupportedExtensionLink,
++                    malformedNestedStorageLink,
++                    malformedNestedRawUriLink,
++                ),
++            ),
++            userDocumentRepository = StaticUserDocumentRepository(listOf(document, longTitleDocument)),
++            readingProgressRepository = StaticReadingProgressRepository(
++                listOf(
++                    ReadingProgress(
++                        contentId = link.id,
++                        progressPercent = 42,
++                        lastVisibleParagraphIndex = 4,
++                        paragraphCount = 12,
++                        updatedAtMillis = 9_000L,
++                    ),
++                ),
++            ),
++        )
++
++        val rawJson = exporter.exportSettingsOnlyProfileJson(nowMillis = 20_000L)
++        val profile = AccountLightProfileCodec().decode(rawJson)
++
++        assertEquals(2, profile.library.userLinks.size)
++        val exportedLink = profile.library.userLinks.single { it.normalizedUrl == "https://example.com/essay" }
++        val exportedLongLabelLink = profile.library.userLinks.single {
++            it.normalizedUrl == "https://example.com/long-source-label"
++        }
++        val exportedDocument = profile.library.userDocuments.single()
++        assertTrue(exportedLink.contentId.startsWith("user-link-"))
++        assertFalse(exportedLink.contentId.contains(":"))
++        assertEquals("https://example.com/essay", exportedLink.normalizedUrl)
++        assertEquals("Saved link metadata.", exportedLink.description)
++        assertNull(exportedLongLabelLink.sourceLabel)
++        assertTrue(exportedDocument.contentId.startsWith("user-document-"))
++        assertEquals("Saved document metadata.", exportedDocument.description)
++        assertEquals("MISSING_FILE_NEEDS_REATTACH", exportedDocument.documentImportState)
++        assertEquals("UNVERIFIED_METADATA_ONLY", exportedDocument.documentFingerprint.strategy)
++        assertEquals(
++            setOf(exportedLink.contentId, exportedLongLabelLink.contentId),
++            profile.settings.priorityContentIds.toSet(),
++        )
++        assertTrue(
++            profile.warnings.any {
++                it.code == "CONFLICT_RETAINED_LOCAL_VALUE" && it.section == "settings"
++            },
++        )
++        assertEquals(exportedLink.contentId, profile.reading.progress.single().contentId)
++        assertFalse(rawJson.contains("content://"))
++        assertFalse(rawJson.contains("raw-book"))
++        assertFalse(rawJson.contains("raw-link"))
++        assertFalse(rawJson.contains("user@example.com"))
++        assertFalse(rawJson.contains("oauth"))
++        assertFalse(rawJson.contains("token"))
++        assertFalse(rawJson.contains("1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms"))
++        assertFalse(rawJson.contains("drive.google.com"))
++        assertFalse(rawJson.contains("legacy-local-id"))
++        assertFalse(rawJson.contains("22222222-2222-4222-8222-222222222222"))
++        assertFalse(rawJson.contains("55555555-5555-4555-8555-555555555555"))
++        assertFalse(rawJson.contains("66666666-6666-4666-8666-666666666666"))
++        assertFalse(rawJson.contains("88888888-8888-4888-8888-888888888888"))
++        assertFalse(rawJson.contains("99999999-9999-4999-8999-999999999999"))
++        assertFalse(rawJson.contains("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"))
++        assertFalse(rawJson.contains("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"))
++        assertFalse(rawJson.contains("cccccccc-cccc-4ccc-8ccc-cccccccccccc"))
++        assertFalse(rawJson.contains("dddddddd-dddd-4ddd-8ddd-dddddddddddd"))
++        assertFalse(rawJson.contains("eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"))
++        assertFalse(rawJson.contains("ffffffff-ffff-4fff-8fff-ffffffffffff"))
++        assertFalse(rawJson.contains("L".repeat(201)))
++        assertFalse(rawJson.contains("D".repeat(201)))
++        assertFalse(rawJson.contains("s".repeat(121)))
++        assertFalse(rawJson.contains("file%253A%252F%252F%252Fsdcard%252Fbook.epub"))
++        assertFalse(rawJson.contains("file%25252525253A%25252525252F%25252525252F%25252525252Fsdcard"))
++        assertFalse(rawJson.contains("primary%3ADownload%2Fbook.epub"))
++        assertFalse(rawJson.contains("image%3A3952"))
++        assertFalse(rawJson.contains("storage%2Femulated%2F0%2FDownload%2Fbook"))
++        assertFalse(rawJson.contains("book.docx"))
++        assertFalse(rawJson.contains("book%25ZZ"))
++    }
++
+     @Test
+     fun warningAndAutosaveDtosEnforceApprovedSchemaDomains() {
+         AccountLightWarning(
+@@ -315,4 +567,40 @@ class AccountLightProfileExporterTest {
+         val file = File.createTempFile("account-light-profile-test", ".preferences_pb").apply { deleteOnExit() }
+         return PreferenceDataStoreFactory.create(produceFile = { file })
+     }
++
++    private class StaticUserLinkRepository(
++        private val links: List<ContentItem>,
++    ) : UserLinkRepository {
++        override fun userLinks(): List<ContentItem> = links
++
++        override suspend fun addLink(draft: UserLinkDraft, nowMillis: Long): AddUserLinkResult =
++            error("Not used by exporter tests.")
++
++        override suspend fun markUnavailable(contentId: String, nowMillis: Long) = Unit
++
++        override suspend fun deleteLink(contentId: String) = Unit
++    }
++
++    private class StaticUserDocumentRepository(
++        private val documents: List<ContentItem>,
++    ) : UserDocumentRepository {
++        override fun userDocuments(): List<ContentItem> = documents
++
++        override suspend fun addDocument(draft: UserDocumentDraft, nowMillis: Long): AddUserDocumentResult =
++            error("Not used by exporter tests.")
++
++        override suspend fun markUnavailable(contentId: String, nowMillis: Long) = Unit
++
++        override suspend fun deleteDocument(contentId: String) = Unit
++    }
++
++    private class StaticReadingProgressRepository(
++        private val progress: List<ReadingProgress>,
++    ) : ReadingProgressRepository {
++        override fun readingProgress(): List<ReadingProgress> = progress
++
++        override suspend fun saveProgress(progress: ReadingProgress) = Unit
++
++        override suspend fun deleteProgress(contentId: String) = Unit
++    }
+ }
+diff --git a/app/src/test/java/com/qualityalternative/app/data/AccountLightProfileImporterTest.kt b/app/src/test/java/com/qualityalternative/app/data/AccountLightProfileImporterTest.kt
+index b8c8d09..4e53960 100644
+--- a/app/src/test/java/com/qualityalternative/app/data/AccountLightProfileImporterTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/data/AccountLightProfileImporterTest.kt
+@@ -4,10 +4,22 @@ import androidx.datastore.core.DataStore
+ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+ import androidx.datastore.preferences.core.Preferences
+ import com.qualityalternative.app.domain.model.AppThemeMode
++import com.qualityalternative.app.domain.model.ContentAvailability
++import com.qualityalternative.app.domain.model.ContentItem
+ import com.qualityalternative.app.domain.model.ContentPriority
+ import com.qualityalternative.app.domain.model.DurationBucket
+ import com.qualityalternative.app.domain.model.OnboardingSelection
++import com.qualityalternative.app.domain.model.ReadingProgress
+ import com.qualityalternative.app.domain.model.TopicTag
++import com.qualityalternative.app.domain.model.UserDocumentDraft
++import com.qualityalternative.app.domain.model.UserLinkDraft
++import com.qualityalternative.app.domain.service.AddUserDocumentResult
++import com.qualityalternative.app.domain.service.AddUserLinkResult
++import com.qualityalternative.app.domain.service.ReadingProgressRepository
++import com.qualityalternative.app.domain.service.UserDocumentRepository
++import com.qualityalternative.app.domain.service.UserLinkRepository
++import kotlinx.coroutines.flow.Flow
++import kotlinx.coroutines.flow.flowOf
+ import java.io.File
+ import kotlinx.coroutines.flow.first
+ import kotlinx.coroutines.runBlocking
+@@ -174,15 +186,220 @@ class AccountLightProfileImporterTest {
+         assertThrows(AccountLightImportException::class.java) {
+             importer.validateImportProfileJson(validProfileJson().withUserLinks(listOf(validUserLink(normalizedUrl = "https://EXAMPLE.com/Essay"))))
+         }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(
++                validProfileJson().withUserLinks(
++                    listOf(
++                        validUserLink(
++                            normalizedUrl = "https://drive.google.com/file/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/view",
++                        ),
++                    ),
++                ),
++            )
++        }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(
++                validProfileJson().withUserLinks(
++                    listOf(
++                        validUserLink(
++                            normalizedUrl = "https://user@example.com@example.org/read?oauth_token=abc123",
++                        ),
++                    ),
++                ),
++            )
++        }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(
++                validProfileJson().withUserLinks(
++                    listOf(
++                        validUserLink(
++                            normalizedUrl = "https://example.com/read?src=file%3A%2F%2F%2Fsdcard%2Fbook.epub",
++                        ),
++                    ),
++                ),
++            )
++        }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(
++                validProfileJson().withUserLinks(
++                    listOf(
++                        validUserLink(
++                            normalizedUrl = "https://example.com/read?src=file%253A%252F%252F%252Fsdcard%252Fbook.epub",
++                        ),
++                    ),
++                ),
++            )
++        }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(
++                validProfileJson().withUserLinks(
++                    listOf(
++                        validUserLink(
++                            normalizedUrl = "https://example.com/read?src=file%25252525253A%25252525252F%25252525252F%25252525252Fsdcard%25252525252Fbook.epub",
++                        ),
++                    ),
++                ),
++            )
++        }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(
++                validProfileJson().withUserLinks(
++                    listOf(
++                        validUserLink(
++                            normalizedUrl = "https://example.com/read?src=content%253A%252F%252Fprovider%252Fraw-id",
++                        ),
++                    ),
++                ),
++            )
++        }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(
++                validProfileJson().withUserLinks(
++                    listOf(
++                        validUserLink(
++                            normalizedUrl = "https://example.com/read?acct=user%2540example.com",
++                        ),
++                    ),
++                ),
++            )
++        }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(
++                validProfileJson().withUserLinks(
++                    listOf(
++                        validUserLink(
++                            normalizedUrl = "https://example.com/read?doc=primary%3ADownload%2Fbook.epub",
++                        ),
++                    ),
++                ),
++            )
++        }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(
++                validProfileJson().withUserLinks(
++                    listOf(
++                        validUserLink(
++                            normalizedUrl = "https://example.com/read?doc=storage%2Femulated%2F0%2FDownload%2Fbook.epub",
++                        ),
++                    ),
++                ),
++            )
++        }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(
++                validProfileJson().withUserLinks(
++                    listOf(
++                        validUserLink(
++                            normalizedUrl = "https://example.com/read?doc=storage%2Femulated%2F0%2FDownload%2Fbook",
++                        ),
++                    ),
++                ),
++            )
++        }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(
++                validProfileJson().withUserLinks(
++                    listOf(
++                        validUserLink(
++                            normalizedUrl = "https://example.com/read?doc=storage%2Femulated%2F0%2FDownload%2Fbook.docx",
++                        ),
++                    ),
++                ),
++            )
++        }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(
++                validProfileJson().withUserLinks(
++                    listOf(
++                        validUserLink(
++                            normalizedUrl = "https://example.com/read?doc=storage%252Femulated%252F0%252FDownload%252Fbook%25ZZ",
++                        ),
++                    ),
++                ),
++            )
++        }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(
++                validProfileJson().withUserLinks(
++                    listOf(
++                        validUserLink(
++                            normalizedUrl = "https://example.com/read?src=file%253A%252F%252F%252Fsdcard%252Fbook%25ZZ",
++                        ),
++                    ),
++                ),
++            )
++        }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(
++                validProfileJson().withUserLinks(
++                    listOf(
++                        validUserLink(
++                            normalizedUrl = "https://example.com/read?image=image%3A3952",
++                        ),
++                    ),
++                ),
++            )
++        }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(
++                validProfileJson().withUserLinks(
++                    listOf(
++                        validUserLink(
++                            normalizedUrl = "https://example.com/read?doc=msf%3A29",
++                        ),
++                    ),
++                ),
++            )
++        }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(
++                validProfileJson().withUserLinks(
++                    listOf(
++                        validUserLink(
++                            normalizedUrl = "https://example.com/com.dropbox.android.FileProvider/document/raw",
++                        ),
++                    ),
++                ),
++            )
++        }
+         assertThrows(AccountLightImportException::class.java) {
+             importer.validateImportProfileJson(validProfileJson().withUserLinks(listOf(validUserLink(title = "content://com.android.providers.media.documents/document/1"))))
+         }
+         assertThrows(AccountLightImportException::class.java) {
+             importer.validateImportProfileJson(validProfileJson().withUserLinks(listOf(validUserLink(title = "com.dropbox.android.FileProvider"))))
+         }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(validProfileJson().withUserLinks(listOf(validUserLink(title = "L".repeat(201)))))
++        }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(validProfileJson().withUserLinks(listOf(validUserLink(sourceLabel = "s".repeat(121)))))
++        }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(validProfileJson().withUserLinks(listOf(validUserLink(description = "Stored from content://provider/raw-id"))))
++        }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(validProfileJson().withUserLinks(listOf(validUserLink(description = "User email user@example.com was present"))))
++        }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(
++                validProfileJson().withUserLinks(
++                    listOf(
++                        validUserLink(
++                            description = "Drive file id 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms",
++                        ),
++                    ),
++                ),
++            )
++        }
+         assertThrows(AccountLightImportException::class.java) {
+             importer.validateImportProfileJson(validProfileJson().withUserDocuments(listOf(validUserDocument(fingerprintStrategy = "SHA256_BYTES", sha256 = null, sizeBytes = JsonPrimitive(1234L)))))
+         }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(validProfileJson().withUserDocuments(listOf(validUserDocument(mimeType = "text/plain; src=content://provider/raw-id"))))
++        }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(validProfileJson().withUserDocuments(listOf(validUserDocument(mimeType = "application/vnd.com.dropbox.android.FileProvider"))))
++        }
+         assertThrows(AccountLightImportException::class.java) {
+             importer.validateImportProfileJson(validProfileJson().withUserDocuments(listOf(validUserDocument(sourceDisplayName = "content://provider/raw-id"))))
+         }
+@@ -198,6 +415,26 @@ class AccountLightProfileImporterTest {
+         assertThrows(AccountLightImportException::class.java) {
+             importer.validateImportProfileJson(validProfileJson().withUserDocuments(listOf(validUserDocument(title = "content:com.android.providers.media.documents"))))
+         }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(validProfileJson().withUserDocuments(listOf(validUserDocument(title = "D".repeat(201)))))
++        }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(validProfileJson().withUserDocuments(listOf(validUserDocument(description = "OAuth token copied from device"))))
++        }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(validProfileJson().withUserDocuments(listOf(validUserDocument(description = "Drive file id com.google.android.apps.docs.storage"))))
++        }
++        assertThrows(AccountLightImportException::class.java) {
++            importer.validateImportProfileJson(
++                validProfileJson().withUserDocuments(
++                    listOf(
++                        validUserDocument(
++                            description = "Opaque source id 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms",
++                        ),
++                    ),
++                ),
++            )
++        }
+         assertThrows(AccountLightImportException::class.java) {
+             importer.validateImportProfileJson(validProfileJson().withUserDocuments(listOf(validUserDocument(providerLabel = "com.google.android.apps.docs.storage"))))
+         }
+@@ -294,6 +531,91 @@ class AccountLightProfileImporterTest {
+         assertEquals(0, plan.preview.warningCount)
+     }
+ 
++    @Test
++    fun applyMerge_importsLibraryMarksDocumentsMissingAndKeepsMissingDocumentProgressDormant() = runBlocking {
++        val target = PreferencesSettingsRepository(
++            dataStore = testDataStore(),
++            supportedApps = SupportedCatalog.distractingApps,
++        )
++        val linkRepository = RecordingUserLinkRepository()
++        val documentRepository = RecordingUserDocumentRepository()
++        val readingProgressRepository = RecordingReadingProgressRepository()
++        val linkContentId = "user-link-33333333-3333-4333-8333-333333333333"
++        val documentContentId = "user-document-44444444-4444-4444-8444-444444444444"
++        val importer = AccountLightProfileImporter(
++            settingsRepository = target,
++            userLinkRepository = linkRepository,
++            userDocumentRepository = documentRepository,
++            readingProgressRepository = readingProgressRepository,
++        )
++        val plan = importer.validateImportProfileJson(
++            validProfileJson()
++                .withUserLinks(listOf(validUserLink(contentId = linkContentId)))
++                .withUserDocuments(listOf(validUserDocument(contentId = documentContentId)))
++                .withReadingProgressEntries(
++                    listOf(
++                        readingProgressJson(contentId = linkContentId),
++                        readingProgressJson(contentId = documentContentId, progressPercent = 64),
++                    ),
++                ),
++        )
++
++        assertEquals(1, plan.preview.importedLinkCount)
++        assertEquals(1, plan.preview.importedDocumentCount)
++        assertEquals(2, plan.preview.importedProgressCount)
++        assertEquals(1, plan.preview.missingDocumentCount)
++
++        importer.applyMerge(plan)
++
++        assertEquals(linkContentId, linkRepository.links.single().id)
++        val importedDocument = documentRepository.documents.single()
++        assertEquals(documentContentId, importedDocument.id)
++        assertEquals(ContentAvailability.UNAVAILABLE, importedDocument.availability)
++        assertTrue(importedDocument.sourceLabel.orEmpty().contains("(missing)"))
++        assertEquals(
++            setOf(linkContentId, documentContentId),
++            readingProgressRepository.progress.mapTo(mutableSetOf(), ReadingProgress::contentId),
++        )
++        assertEquals(
++            64,
++            readingProgressRepository.progress.single { progress -> progress.contentId == documentContentId }
++                .progressPercent,
++        )
++    }
++
++    @Test
++    fun applyReplace_restoresLibraryWhenProgressImportFails() = runBlocking {
++        val target = PreferencesSettingsRepository(
++            dataStore = testDataStore(),
++            supportedApps = SupportedCatalog.distractingApps,
++        )
++        val linkRepository = RecordingUserLinkRepository()
++        val documentRepository = RecordingUserDocumentRepository()
++        val readingProgressRepository = FailingOnceReadingProgressRepository()
++        val importer = AccountLightProfileImporter(
++            settingsRepository = target,
++            userLinkRepository = linkRepository,
++            userDocumentRepository = documentRepository,
++            readingProgressRepository = readingProgressRepository,
++        )
++        val linkContentId = "user-link-33333333-3333-4333-8333-333333333333"
++        val documentContentId = "user-document-44444444-4444-4444-8444-444444444444"
++        val plan = importer.validateImportProfileJson(
++            validProfileJson()
++                .withUserLinks(listOf(validUserLink(contentId = linkContentId)))
++                .withUserDocuments(listOf(validUserDocument(contentId = documentContentId)))
++                .withReadingProgressFor(contentId = documentContentId),
++        )
++
++        assertThrows(IllegalStateException::class.java) {
++            runBlocking { importer.applyReplace(plan) }
++        }
++
++        assertTrue(linkRepository.links.isEmpty())
++        assertTrue(documentRepository.documents.isEmpty())
++        assertTrue(readingProgressRepository.progress.isEmpty())
++    }
++
+     @Test
+     fun validateImportProfileJson_reportsUnknownNestedFieldsAsWarnings() = runBlocking {
+         val target = PreferencesSettingsRepository(
+@@ -584,6 +906,34 @@ class AccountLightProfileImporterTest {
+         )
+     }
+ 
++    private fun String.withReadingProgressEntries(progressEntries: List<JsonObject>): String {
++        val root = Json.parseToJsonElement(this).jsonObject
++        val reading = root.getValue("reading").jsonObject
++        return JsonObject(
++            root + (
++                "reading" to JsonObject(
++                    reading + ("progress" to JsonArray(progressEntries)),
++                )
++                ),
++        ).toString()
++    }
++
++    private fun readingProgressJson(
++        contentId: String,
++        progressPercent: Int = 40,
++    ): JsonObject {
++        return JsonObject(
++            mapOf(
++                "contentId" to JsonPrimitive(contentId),
++                "progressPercent" to JsonPrimitive(progressPercent),
++                "lastVisibleParagraphIndex" to JsonPrimitive(4),
++                "paragraphCount" to JsonPrimitive(12),
++                "updatedAtMillis" to JsonPrimitive(20_000L),
++                "completedAtMillis" to JsonNull,
++            ),
++        )
++    }
++
+     private fun String.withReadingProgressPercent(progressPercent: JsonElement): String {
+         return withReadingProgress(
+             contentId = "editorial-attention-reset",
+@@ -651,20 +1001,22 @@ class AccountLightProfileImporterTest {
+         contentId: String = "user-link-33333333-3333-4333-8333-333333333333",
+         normalizedUrl: String = "https://example.com/essay",
+         title: String = "Imported essay",
++        description: String = "Saved link from another device.",
+         durationMinutes: JsonElement = JsonPrimitive(12),
++        sourceLabel: String? = null,
+     ): JsonObject {
+         return JsonObject(
+             mapOf(
+                 "contentId" to JsonPrimitive(contentId),
+                 "normalizedUrl" to JsonPrimitive(normalizedUrl),
+                 "title" to JsonPrimitive(title),
+-                "description" to JsonPrimitive("Saved link from another device."),
++                "description" to JsonPrimitive(description),
+                 "durationMinutes" to durationMinutes,
+                 "topicTags" to JsonArray(listOf(JsonPrimitive("SCIENCE"))),
+                 "availability" to JsonPrimitive("AVAILABLE"),
+                 "createdAtMillis" to JsonPrimitive(10_000L),
+                 "updatedAtMillis" to JsonPrimitive(20_000L),
+-                "sourceLabel" to JsonNull,
++                "sourceLabel" to (sourceLabel?.let(::JsonPrimitive) ?: JsonNull),
+             ),
+         )
+     }
+@@ -677,6 +1029,7 @@ class AccountLightProfileImporterTest {
+         contentId: String = "user-document-44444444-4444-4444-8444-444444444444",
+         displayName: String = "book.epub",
+         title: String = "Imported book",
++        description: String = "Saved document metadata.",
+         fingerprintStrategy: String = "SHA256_BYTES",
+         sha256: String? = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+         sizeBytes: JsonElement = JsonPrimitive(1234L),
+@@ -685,15 +1038,16 @@ class AccountLightProfileImporterTest {
+         sourceDisplayName: String? = "book.epub",
+         providerLabel: String? = null,
+         createdAtMillis: JsonElement = JsonPrimitive(10_000L),
++        mimeType: String = "application/epub+zip",
+     ): JsonObject {
+         return JsonObject(
+             mapOf(
+                 "contentId" to JsonPrimitive(contentId),
+                 "displayName" to JsonPrimitive(displayName),
+-                "mimeType" to JsonPrimitive("application/epub+zip"),
++                "mimeType" to JsonPrimitive(mimeType),
+                 "documentFormat" to JsonPrimitive("EPUB"),
+                 "title" to JsonPrimitive(title),
+-                "description" to JsonPrimitive("Saved document metadata."),
++                "description" to JsonPrimitive(description),
+                 "durationMinutes" to JsonPrimitive(45),
+                 "topicTags" to JsonArray(listOf(JsonPrimitive("PHILOSOPHY"))),
+                 "availability" to JsonPrimitive("UNAVAILABLE"),
+@@ -723,4 +1077,91 @@ class AccountLightProfileImporterTest {
+         val file = File.createTempFile("account-light-importer-test", ".preferences_pb").apply { deleteOnExit() }
+         return PreferenceDataStoreFactory.create(produceFile = { file })
+     }
++
++    private class RecordingUserLinkRepository : UserLinkRepository {
++        var links: List<ContentItem> = emptyList()
++
++        override fun userLinks(): List<ContentItem> = links
++
++        override suspend fun addLink(draft: UserLinkDraft, nowMillis: Long): AddUserLinkResult =
++            error("Not used by portable import tests.")
++
++        override suspend fun markUnavailable(contentId: String, nowMillis: Long) = Unit
++
++        override suspend fun deleteLink(contentId: String) = Unit
++
++        override suspend fun importPortableLinks(
++            links: List<ContentItem>,
++            replaceExisting: Boolean,
++            nowMillis: Long,
++        ) {
++            this.links = links
++        }
++    }
++
++    private class RecordingUserDocumentRepository : UserDocumentRepository {
++        var documents: List<ContentItem> = emptyList()
++
++        override fun userDocuments(): List<ContentItem> = documents
++
++        override suspend fun addDocument(draft: UserDocumentDraft, nowMillis: Long): AddUserDocumentResult =
++            error("Not used by portable import tests.")
++
++        override suspend fun markUnavailable(contentId: String, nowMillis: Long) = Unit
++
++        override suspend fun deleteDocument(contentId: String) = Unit
++
++        override suspend fun importPortableDocuments(
++            documents: List<ContentItem>,
++            replaceExisting: Boolean,
++            nowMillis: Long,
++        ) {
++            this.documents = documents
++        }
++    }
++
++    private class RecordingReadingProgressRepository : ReadingProgressRepository {
++        var progress: List<ReadingProgress> = emptyList()
++
++        override fun readingProgress(): List<ReadingProgress> = progress
++
++        override fun observeReadingProgress(): Flow<List<ReadingProgress>> = flowOf(progress)
++
++        override suspend fun saveProgress(progress: ReadingProgress) {
++            this.progress = this.progress.filterNot { item -> item.contentId == progress.contentId } + progress
++        }
++
++        override suspend fun deleteProgress(contentId: String) {
++            progress = progress.filterNot { item -> item.contentId == contentId }
++        }
++
++        override suspend fun replaceReadingProgress(progress: List<ReadingProgress>) {
++            this.progress = progress
++        }
++    }
++
++    private class FailingOnceReadingProgressRepository : ReadingProgressRepository {
++        var progress: List<ReadingProgress> = emptyList()
++        private var shouldFailReplace = true
++
++        override fun readingProgress(): List<ReadingProgress> = progress
++
++        override fun observeReadingProgress(): Flow<List<ReadingProgress>> = flowOf(progress)
++
++        override suspend fun saveProgress(progress: ReadingProgress) {
++            this.progress = this.progress.filterNot { item -> item.contentId == progress.contentId } + progress
++        }
++
++        override suspend fun deleteProgress(contentId: String) {
++            progress = progress.filterNot { item -> item.contentId == contentId }
++        }
++
++        override suspend fun replaceReadingProgress(progress: List<ReadingProgress>) {
++            if (shouldFailReplace) {
++                shouldFailReplace = false
++                throw IllegalStateException("Simulated progress write failure")
++            }
++            this.progress = progress
++        }
++    }
+ }
+diff --git a/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt b/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
+index bcaf7e8..17f651f 100644
+--- a/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
+@@ -832,6 +832,37 @@ class MainViewModelTest {
+         assertEquals(null, completedEvent.sessionId)
+     }
+ 
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun missingPortableDocumentDoesNotOpenFromLibrary() = runTest {
++        val document = savedUserDocument(format = ContentFormat.MARKDOWN).copy(
++            availability = ContentAvailability.UNAVAILABLE,
++            sourceLabel = "book.epub (missing)",
++            rights = ContentRightsMetadata.userPrivateReader(
++                sourceUrl = "portable-missing:user-document-44444444-4444-4444-8444-444444444444",
++                attribution = "book.epub",
++            ),
++        )
++        val analyticsTracker = InMemoryAnalyticsTracker()
++        val viewModel = createViewModel(
++            contentRepository = FakeContentRepository(extraItems = listOf(document)),
++            analyticsTracker = analyticsTracker,
++        )
++
++        advanceUntilIdle()
++        viewModel.completeOnboarding()
++        advanceUntilIdle()
++        viewModel.openLibraryItem(document)
++        advanceUntilIdle()
++
++        assertEquals(MainScreen.Home, viewModel.uiState.screen)
++        assertEquals("Reattach this file before reading can continue.", viewModel.uiState.latestMessage)
++        assertEquals(null, viewModel.uiState.currentContent)
++        assertTrue(analyticsTracker.allEvents().filter { event ->
++            event.contentId == document.id
++        }.isEmpty())
++    }
++
+     @Test
+     @OptIn(ExperimentalCoroutinesApi::class)
+     fun openAnnotationTargetOpensReaderAtSavedParagraph() = runTest {
+@@ -3134,7 +3165,7 @@ class MainViewModelTest {
+         viewModel.confirmAccountLightReplaceImport()
+         advanceUntilIdle()
+ 
+-        assertEquals("Imported settings replaced local portable settings.", viewModel.uiState.accountLightStatus)
++        assertEquals("Imported profile replaced local portable settings and library.", viewModel.uiState.accountLightStatus)
+         assertEquals(null, viewModel.uiState.accountLightImportPreview)
+         assertFalse(viewModel.uiState.isAccountLightReplaceConfirming)
+         assertEquals(AppThemeMode.DARK, targetSettingsRepository.state.value.themeMode)
+diff --git a/docs/ACCOUNT_LIGHT_PROFILE_SCHEMA.md b/docs/ACCOUNT_LIGHT_PROFILE_SCHEMA.md
+index 80d3f76..346ae4c 100644
+--- a/docs/ACCOUNT_LIGHT_PROFILE_SCHEMA.md
++++ b/docs/ACCOUNT_LIGHT_PROFILE_SCHEMA.md
+@@ -265,9 +265,9 @@ Arrays are de-duplicated while preserving first-seen order on export. Import tre
+ Required fields:
+ 
+ - `contentId`: stable content id, non-blank string.
+-- `normalizedUrl`: `http` or `https` URL accepted by the same validator as manual link add.
++- `normalizedUrl`: `http` or `https` URL accepted by the same validator as manual link add, with additional portable-safety checks. Import rejects URL userinfo, fragments, Google Drive/Docs hosts, encoded or decoded raw `content://`/`file://` payloads, OAuth/token/signature query data, account-like strings, opaque provider/file ids, and provider-like reverse-DNS identifiers embedded in the path or query.
+ - `title`: non-blank string, maximum 200 characters, display-safe; import rejects raw URIs, account-like strings, filesystem paths, provider authorities, reverse-DNS provider/class identifiers, access tokens, OAuth values, and platform identifiers.
+-- `description`: string, maximum 1000 characters.
++- `description`: string, maximum 1000 characters, display-safe under the same raw-value rejection rules as `title`.
+ - `durationMinutes`: integer in `1..240`; this is legacy/display metadata and must not be used as a whole-source recommendation filter.
+ - `topicTags`: array of `topicTags`, minimum 1.
+ - `availability`: `availability`.
+@@ -284,10 +284,10 @@ Required fields:
+ 
+ - `contentId`: stable content id, non-blank string.
+ - `displayName`: non-blank string, maximum 240 characters, display-safe; import rejects raw URIs, account-like strings, filesystem paths, provider authorities, access tokens, OAuth values, and platform identifiers.
+-- `mimeType`: nullable string.
++- `mimeType`: nullable string; when present, must be a compact MIME token such as `application/pdf`, `application/epub+zip`, `text/html`, or `text/markdown` and must not contain raw URIs, account-like strings, tokens, Drive/provider wording, or provider-like identifiers.
+ - `documentFormat`: one of `MARKDOWN`, `PDF`, `EPUB`.
+ - `title`: non-blank string, maximum 200 characters, display-safe under the same raw-value rejection rules as `displayName`.
+-- `description`: string, maximum 1000 characters.
++- `description`: string, maximum 1000 characters, display-safe under the same raw-value rejection rules as `title`.
+ - `durationMinutes`: integer in `1..240`; computed/display metadata only.
+ - `topicTags`: array of `topicTags`, minimum 1.
+ - `availability`: must be exported as `AVAILABLE`, `UNAVAILABLE`, or `NEEDS_FALLBACK`.
+diff --git a/docs/SPRINT_16_ACCOUNT_LIGHT.md b/docs/SPRINT_16_ACCOUNT_LIGHT.md
+index 7de919f..284cc65 100644
+--- a/docs/SPRINT_16_ACCOUNT_LIGHT.md
++++ b/docs/SPRINT_16_ACCOUNT_LIGHT.md
+@@ -62,6 +62,7 @@ Review gate:
+ 
+ - GPT Pro code, E2E, and visual review.
+ - Screenshot import entry, merge preview, replace confirmation, invalid import, unsupported future schema, and import success.
++- R10 GPT Pro review returned `SCORE: 10/10`, `VERDICT: PASS`, `VISUAL REVIEW: PASS`; Slice 16.2 is complete.
+ 
+ ### Slice 16.3: Portable Library And Reading State
+ 
+@@ -75,6 +76,20 @@ Deliverables:
+ Review gate:
+ 
+ - GPT Pro code, E2E, and visual review.
++- Current implementation exports and imports saved links, user-document metadata, active reading progress, and completed/reactivated state; imported documents are marked missing until the source file is reattached.
++- R1 GPT Pro review returned `SCORE: 6/10`, `VERDICT: FAIL`, `VISUAL REVIEW: FAIL`; R2 removes the active open action from missing imported documents, retains their progress as dormant state, prevents merge from replacing local available library records with synthetic missing records, and adds rollback for mid-apply import failures.
++- R2 GPT Pro review returned `SCORE: 9/10`, `VERDICT: FAIL`, `VISUAL REVIEW: PASS`; R3 applies unsafe-value filtering to portable link/document descriptions and proves raw URI/email/OAuth/token/provider text cannot be exported or imported through descriptions.
++- R3 GPT Pro review returned `SCORE: 8/10`, `VERDICT: FAIL`, `VISUAL REVIEW: PASS`; R4 additionally rejects opaque provider/file IDs in portable descriptions, rejects unsafe portable link URLs, omits unsafe saved links from export, and proves available local documents are not overwritten by imported missing-document placeholders.
++- R4 GPT Pro review returned `SCORE: 8/10`, `VERDICT: FAIL`, `VISUAL REVIEW: PASS`; R5 rejects encoded raw URI/provider payloads inside otherwise valid URLs, validates imported `mimeType` as portable data, and prevents settings references from pointing at unsafe library records omitted during export.
++- R5 GPT Pro review returned `SCORE: 9/10`, `VERDICT: FAIL`, `VISUAL REVIEW: PASS`; R6 aligns portable user-link and user-document title export with the schema/import limit of 200 characters, while preserving the separate 240-character annotation sidecar source-title limit.
++- R6 GPT Pro review returned `SCORE: 9/10`, `VERDICT: FAIL`, `VISUAL REVIEW: PASS`; R7 aligns saved-link `sourceLabel` export and DTO validation with the schema/import limit of 120 characters while preserving broader 240-character document source hints.
++- R7 GPT Pro review returned `SCORE: 9/10`, `VERDICT: FAIL`, `VISUAL REVIEW: PASS`; R8 recursively decodes saved-link URL path/query/fragment surfaces before privacy scanning so nested encoded raw URI/account payloads cannot be exported or imported.
++- R8 GPT Pro review returned `SCORE: 9/10`, `VERDICT: FAIL`, `VISUAL REVIEW: PASS`; R9 treats URL decode-depth cap exhaustion as non-portable and adds six-deep encoded raw-URI regression coverage.
++- R9 GPT Pro review returned `SCORE: 9/10`, `VERDICT: FAIL`, `VISUAL REVIEW: PASS`; R10 rejects short Android SAF/provider document IDs and storage/download file payloads embedded inside saved-link `https://` URL surfaces.
++- R10 GPT Pro review returned `SCORE: 9/10`, `VERDICT: FAIL`, `VISUAL REVIEW: PASS`; R11 rejects no-slash short provider-internal ids such as `image:3952`, `audio:1234`, and `msf:29` embedded inside saved-link `https://` URL surfaces.
++- R11 GPT Pro review returned `SCORE: 9/10`, `VERDICT: FAIL`, `VISUAL REVIEW: PASS`; R12 rejects decoded `storage/` and `sdcard/` local-path payloads in saved-link URL surfaces regardless of file extension.
++- R13 GPT Pro review returned `SCORE: 8/10`, `VERDICT: FAIL`, `VISUAL REVIEW: PASS`; R14 treats malformed nested URL-decoding failures as non-portable and adds malformed nested local-path/raw-URI regression coverage.
++- R14 GPT Pro review returned `SCORE: 10/10`, `VERDICT: PASS`, `VISUAL REVIEW: PASS`; Slice 16.3 is complete.
+ 
+ ### Slice 16.4: Portable Profile Autosave Destination
+ 
