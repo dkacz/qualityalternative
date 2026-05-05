@@ -1,6 +1,7 @@
 package com.qualityalternative.app.data
 
 import android.content.Context
+import android.net.Uri
 import androidx.datastore.preferences.preferencesDataStore
 import com.qualityalternative.app.BuildConfig
 import com.qualityalternative.app.data.local.QualityAlternativeDatabase
@@ -21,6 +22,7 @@ import com.qualityalternative.app.domain.service.SettingsRepository
 import com.qualityalternative.app.domain.service.UserDocumentRepository
 import com.qualityalternative.app.domain.service.UserLinkRepository
 import com.qualityalternative.app.interception.InterceptionRuntimeGate
+import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -34,6 +36,10 @@ class AppContainer(context: Context) {
     private val appJob = SupervisorJob()
     private val appScope = CoroutineScope(appJob + Dispatchers.IO)
     private val database = QualityAlternativeDatabase.build(context)
+    private val annotationSyncDirectory = File(context.filesDir, "annotation-sync").apply { mkdirs() }
+    private val profileBackupDirectory = File(context.filesDir, "profile-backup").apply { mkdirs() }
+    val defaultAnnotationExportUri: String = Uri.fromFile(annotationSyncDirectory).toString()
+    val defaultProfileAutosaveUri: String = Uri.fromFile(profileBackupDirectory).toString()
 
     val analyticsTracker: AnalyticsTracker = RoomAnalyticsTracker(
         dao = database.analyticsEventDao(),

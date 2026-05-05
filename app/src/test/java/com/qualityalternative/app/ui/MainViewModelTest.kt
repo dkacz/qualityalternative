@@ -1335,7 +1335,7 @@ class MainViewModelTest {
         assertEquals("content://drive/qa-annotations.jsonld", settingsRepository.state.value.annotationExportUri)
         assertEquals(null, settingsRepository.state.value.annotationExportLastSuccessfulAtMillis)
         assertEquals("Choose the file again or retry.", settingsRepository.state.value.annotationExportLastError)
-        assertEquals("Annotation autosave needs file permission.", viewModel.uiState.latestMessage)
+        assertEquals("Annotation sync needs folder permission.", viewModel.uiState.latestMessage)
     }
 
     @Test
@@ -1361,6 +1361,157 @@ class MainViewModelTest {
         assertEquals(null, settingsRepository.state.value.annotationExportLastSuccessfulAtMillis)
         assertEquals(null, settingsRepository.state.value.annotationExportLastError)
         assertEquals("Annotation autosave disabled.", viewModel.uiState.latestMessage)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun localDefaultsEnableAnnotationSyncAndProfileBackupWithoutFolderSelection() = runTest {
+        val settingsRepository = FakeSettingsRepository(
+            initial = completedSettings(selectedAppPackages = setOf("feed.one")),
+        )
+        val exportWriter = RecordingReadingAnnotationExportWriter()
+        val profileWriter = RecordingAccountLightProfileAutosaveWriter()
+        val annotationDefaultUri = "file:///local/qualityalternative/annotation-sync"
+        val profileDefaultUri = "file:///local/qualityalternative/profile-backup"
+        val viewModel = createViewModel(
+            settingsRepository = settingsRepository,
+            readingAnnotationExportWriter = exportWriter,
+            accountLightProfileAutosaveWriter = profileWriter,
+            defaultAnnotationExportUri = annotationDefaultUri,
+            defaultProfileAutosaveUri = profileDefaultUri,
+        )
+
+        advanceUntilIdle()
+
+        assertEquals(annotationDefaultUri, viewModel.uiState.annotationExportUri)
+        assertEquals("App storage - Annotation sync", viewModel.uiState.annotationExportDisplayName)
+        assertTrue(viewModel.uiState.annotationExportUsesLocalDefault)
+        assertEquals(profileDefaultUri, viewModel.uiState.profileAutosaveUri)
+        assertEquals("App storage - Profile backup", viewModel.uiState.profileAutosaveDisplayName)
+        assertTrue(viewModel.uiState.profileAutosaveUsesLocalDefault)
+        assertEquals(null, settingsRepository.state.value.annotationExportUri)
+        assertEquals(null, settingsRepository.state.value.profileAutosaveUri)
+
+        viewModel.retryReadingAnnotationExport(nowMillis = 3_000L)
+        advanceUntilIdle()
+
+        assertEquals(annotationDefaultUri, exportWriter.jsonWrites.single().first)
+        assertEquals(3_000L, settingsRepository.state.value.annotationExportLastSuccessfulAtMillis)
+
+        viewModel.retryAccountLightProfileAutosave(nowMillis = 4_000L)
+        advanceUntilIdle()
+
+        assertEquals(profileDefaultUri, profileWriter.writes.last().first)
+        assertEquals("quality-alternative-profile.json", profileWriter.writes.last().second)
+        assertEquals(4_000L, settingsRepository.state.value.profileAutosaveLastSuccessfulAtMillis)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun changedDestinationsRemainExplicitAndCanReturnToLocalDefaults() = runTest {
+        val settingsRepository = FakeSettingsRepository(
+            initial = completedSettings(selectedAppPackages = setOf("feed.one")),
+        )
+        val releasedUris = mutableListOf<String>()
+        val annotationDefaultUri = "file:///local/qualityalternative/annotation-sync"
+        val profileDefaultUri = "file:///local/qualityalternative/profile-backup"
+        val viewModel = createViewModel(
+            settingsRepository = settingsRepository,
+            defaultAnnotationExportUri = annotationDefaultUri,
+            defaultProfileAutosaveUri = profileDefaultUri,
+        )
+        advanceUntilIdle()
+
+        viewModel.configureReadingAnnotationExport(
+            uri = "content://tree/custom-annotations",
+            displayName = "Custom annotations",
+            nowMillis = 2_000L,
+        )
+        advanceUntilIdle()
+        viewModel.configureAccountLightProfileAutosave(
+            uri = "content://tree/custom-profile",
+            displayName = "Custom profile backup",
+            nowMillis = 3_000L,
+        )
+        advanceUntilIdle()
+
+        assertEquals("content://tree/custom-annotations", settingsRepository.state.value.annotationExportUri)
+        assertEquals("Custom annotations", viewModel.uiState.annotationExportDisplayName)
+        assertFalse(viewModel.uiState.annotationExportUsesLocalDefault)
+        assertEquals("content://tree/custom-profile", settingsRepository.state.value.profileAutosaveUri)
+        assertEquals("Custom profile backup", viewModel.uiState.profileAutosaveDisplayName)
+        assertFalse(viewModel.uiState.profileAutosaveUsesLocalDefault)
+
+        viewModel.clearReadingAnnotationExport(releaseWritePermission = releasedUris::add)
+        advanceUntilIdle()
+        viewModel.clearAccountLightProfileAutosave(releaseWritePermission = releasedUris::add)
+        advanceUntilIdle()
+
+        assertEquals(listOf("content://tree/custom-annotations", "content://tree/custom-profile"), releasedUris)
+        assertEquals(null, settingsRepository.state.value.annotationExportUri)
+        assertEquals(null, settingsRepository.state.value.profileAutosaveUri)
+        assertEquals(annotationDefaultUri, viewModel.uiState.annotationExportUri)
+        assertEquals(profileDefaultUri, viewModel.uiState.profileAutosaveUri)
+        assertTrue(viewModel.uiState.annotationExportUsesLocalDefault)
+        assertTrue(viewModel.uiState.profileAutosaveUsesLocalDefault)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun localAnnotationDefaultFailureStaysVisibleAndKeepsDefaultDestination() = runTest {
+        val settingsRepository = FakeSettingsRepository(
+            initial = completedSettings(selectedAppPackages = setOf("feed.one")),
+        )
+        val annotationDefaultUri = "file:///local/qualityalternative/annotation-sync"
+        val viewModel = createViewModel(
+            settingsRepository = settingsRepository,
+            readingAnnotationExportWriter = RecordingReadingAnnotationExportWriter(
+                failure = IllegalStateException("Could not write local annotations"),
+            ),
+            defaultAnnotationExportUri = annotationDefaultUri,
+        )
+
+        advanceUntilIdle()
+        viewModel.retryReadingAnnotationExport(nowMillis = 3_000L)
+        advanceUntilIdle()
+
+        assertEquals(annotationDefaultUri, viewModel.uiState.annotationExportUri)
+        assertTrue(viewModel.uiState.annotationExportUsesLocalDefault)
+        assertEquals(
+            "Retry or change annotation sync destination.",
+            settingsRepository.state.value.annotationExportLastError,
+        )
+        assertEquals("Retry or change annotation sync destination.", viewModel.uiState.annotationExportLastError)
+        assertEquals("Annotation sync failed.", viewModel.uiState.latestMessage)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun localProfileDefaultFailureStaysVisibleAndKeepsDefaultDestination() = runTest {
+        val settingsRepository = FakeSettingsRepository(
+            initial = completedSettings(selectedAppPackages = setOf("feed.one")),
+        )
+        val profileDefaultUri = "file:///local/qualityalternative/profile-backup"
+        val viewModel = createViewModel(
+            settingsRepository = settingsRepository,
+            accountLightProfileAutosaveWriter = RecordingAccountLightProfileAutosaveWriter(
+                failure = IllegalStateException("Could not write local profile backup"),
+            ),
+            defaultProfileAutosaveUri = profileDefaultUri,
+        )
+
+        advanceUntilIdle()
+        viewModel.retryAccountLightProfileAutosave(nowMillis = 4_000L)
+        advanceUntilIdle()
+
+        assertEquals(profileDefaultUri, viewModel.uiState.profileAutosaveUri)
+        assertTrue(viewModel.uiState.profileAutosaveUsesLocalDefault)
+        assertEquals(
+            "Retry or change profile backup destination.",
+            settingsRepository.state.value.profileAutosaveLastError,
+        )
+        assertEquals("Retry or change profile backup destination.", viewModel.uiState.profileAutosaveLastError)
+        assertEquals("Profile backup failed.", viewModel.uiState.latestMessage)
     }
 
     @Test
@@ -3256,7 +3407,7 @@ class MainViewModelTest {
         assertEquals("QA profile", settingsRepository.state.value.profileAutosaveDisplayName)
         assertEquals(6_000L, settingsRepository.state.value.profileAutosaveLastSuccessfulAtMillis)
         assertEquals(null, settingsRepository.state.value.profileAutosaveLastError)
-        assertEquals("Profile autosave enabled.", viewModel.uiState.latestMessage)
+        assertEquals("Profile backup destination changed.", viewModel.uiState.latestMessage)
         val write = profileWriter.writes.single()
         assertEquals("content://tree/profile-folder", write.first)
         assertEquals("quality-alternative-profile.json", write.second)
@@ -3290,7 +3441,7 @@ class MainViewModelTest {
         assertEquals("Missing folder", settingsRepository.state.value.profileAutosaveDisplayName)
         assertEquals(null, settingsRepository.state.value.profileAutosaveLastSuccessfulAtMillis)
         assertEquals("Choose the folder again or retry.", settingsRepository.state.value.profileAutosaveLastError)
-        assertEquals("Profile autosave enabled, but the first write failed.", viewModel.uiState.latestMessage)
+        assertEquals("Profile backup destination changed, but the first write failed.", viewModel.uiState.latestMessage)
         viewModel.openSettings()
         assertEquals(MainScreen.Settings, viewModel.uiState.screen)
     }
@@ -3532,6 +3683,10 @@ class MainViewModelTest {
         readingAnnotationDriveSyncClient: ReadingAnnotationDriveSyncClient = RecordingReadingAnnotationDriveSyncClient(),
         readingAnnotationDriveTokenProvider: ReadingAnnotationDriveTokenProvider = FailingReadingAnnotationDriveTokenProvider(),
         accountLightProfileAutosaveWriter: AccountLightProfileAutosaveWriter = RecordingAccountLightProfileAutosaveWriter(),
+        defaultAnnotationExportUri: String? = null,
+        defaultAnnotationExportDisplayName: String = "App storage - Annotation sync",
+        defaultProfileAutosaveUri: String? = null,
+        defaultProfileAutosaveDisplayName: String = "App storage - Profile backup",
         recommendationEngine: RecommendationEngine = DefaultRecommendationEngine(),
         nowProvider: () -> Long = { 1_000L },
     ): MainViewModel {
@@ -3551,6 +3706,10 @@ class MainViewModelTest {
                 readingAnnotationDriveSyncClient = readingAnnotationDriveSyncClient,
                 readingAnnotationDriveTokenProvider = readingAnnotationDriveTokenProvider,
                 accountLightProfileAutosaveWriter = accountLightProfileAutosaveWriter,
+                defaultAnnotationExportUri = defaultAnnotationExportUri,
+                defaultAnnotationExportDisplayName = defaultAnnotationExportDisplayName,
+                defaultProfileAutosaveUri = defaultProfileAutosaveUri,
+                defaultProfileAutosaveDisplayName = defaultProfileAutosaveDisplayName,
                 interceptionMonitor = FakeInterceptionMonitor(),
                 enableDelayRefreshTicker = false,
                 nowProvider = nowProvider,

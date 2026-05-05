@@ -145,6 +145,7 @@ data class MainUiState(
     val openAnywayUnlockMinutes: Int = DEFAULT_OPEN_ANYWAY_UNLOCK_MINUTES,
     val annotationExportUri: String? = null,
     val annotationExportDisplayName: String? = null,
+    val annotationExportUsesLocalDefault: Boolean = false,
     val annotationExportLastSuccessfulAtMillis: Long? = null,
     val annotationExportLastError: String? = null,
     val annotationDriveSyncEnabled: Boolean = false,
@@ -153,6 +154,7 @@ data class MainUiState(
     val annotationDriveLastError: String? = null,
     val profileAutosaveUri: String? = null,
     val profileAutosaveDisplayName: String? = null,
+    val profileAutosaveUsesLocalDefault: Boolean = false,
     val profileAutosaveLastSuccessfulAtMillis: Long? = null,
     val profileAutosaveLastError: String? = null,
     val isProfileAutosaving: Boolean = false,
@@ -278,6 +280,10 @@ class MainViewModel(
         knownContentIdsProvider = { contentRepository.inventory().mapTo(mutableSetOf(), ContentItem::id) },
     ),
     private val accountLightProfileAutosaveWriter: AccountLightProfileAutosaveWriter = NoOpAccountLightProfileAutosaveWriter,
+    private val defaultAnnotationExportUri: String? = null,
+    private val defaultAnnotationExportDisplayName: String = LOCAL_ANNOTATION_EXPORT_DISPLAY_NAME,
+    private val defaultProfileAutosaveUri: String? = null,
+    private val defaultProfileAutosaveDisplayName: String = LOCAL_PROFILE_BACKUP_DISPLAY_NAME,
     private val interceptionMonitor: InterceptionMonitor,
     private val enableDelayRefreshTicker: Boolean = true,
     private val nowProvider: () -> Long = System::currentTimeMillis,
@@ -681,10 +687,10 @@ class MainViewModel(
     ) {
         val normalizedUri = uri.trim()
         if (normalizedUri.isBlank()) {
-            uiState = uiState.copy(latestMessage = "Choose a file for annotation autosave.")
+            uiState = uiState.copy(latestMessage = "Choose a destination for annotation sync.")
             return
         }
-        val normalizedDisplayName = displayName.trim().ifBlank { "quality-alternative-annotations.jsonld" }
+        val normalizedDisplayName = displayName.trim().ifBlank { "Annotation sync folder" }
         viewModelScope.launch {
             val permissionError = runCatching { persistWritePermission(normalizedUri) }.exceptionOrNull()
             settingsRepository.saveAnnotationExportDestination(
@@ -697,9 +703,10 @@ class MainViewModel(
                 uiState = uiState.copy(
                     annotationExportUri = normalizedUri,
                     annotationExportDisplayName = normalizedDisplayName,
+                    annotationExportUsesLocalDefault = false,
                     annotationExportLastSuccessfulAtMillis = null,
                     annotationExportLastError = message,
-                    latestMessage = "Annotation autosave needs file permission.",
+                    latestMessage = "Annotation sync needs folder permission.",
                 )
                 return@launch
             }
@@ -711,11 +718,12 @@ class MainViewModel(
             uiState = uiState.copy(
                 annotationExportUri = normalizedUri,
                 annotationExportDisplayName = normalizedDisplayName,
+                annotationExportUsesLocalDefault = false,
                 annotationExportLastSuccessfulAtMillis = if (exported) nowMillis else null,
                 latestMessage = if (exported) {
-                    "Annotation autosave enabled."
+                    "Annotation sync destination changed."
                 } else {
-                    "Annotation autosave enabled, but the first write failed."
+                    "Annotation sync destination changed, but the first write failed."
                 },
             )
         }
@@ -723,18 +731,28 @@ class MainViewModel(
 
     fun clearReadingAnnotationExport(releaseWritePermission: (String) -> Unit = {}) {
         val uri = uiState.annotationExportUri
+        val wasUsingLocalDefault = uiState.annotationExportUsesLocalDefault
         viewModelScope.launch {
-            uri?.takeIf(String::isNotBlank)?.let { configuredUri ->
-                runCatching { releaseWritePermission(configuredUri) }
+            if (!wasUsingLocalDefault) {
+                uri?.takeIf(String::isNotBlank)?.let { configuredUri ->
+                    runCatching { releaseWritePermission(configuredUri) }
+                }
             }
             settingsRepository.clearAnnotationExportDestination()
             autosaveAccountLightProfileAfterPortableMutation()
+            val defaultUri = normalizedDefaultAnnotationExportUri()
+            val hasDefault = defaultUri != null
             uiState = uiState.copy(
-                annotationExportUri = null,
-                annotationExportDisplayName = null,
+                annotationExportUri = defaultUri,
+                annotationExportDisplayName = defaultAnnotationExportDisplayName.takeIf { hasDefault },
+                annotationExportUsesLocalDefault = hasDefault,
                 annotationExportLastSuccessfulAtMillis = null,
                 annotationExportLastError = null,
-                latestMessage = "Annotation autosave disabled.",
+                latestMessage = if (hasDefault) {
+                    "Annotation sync returned to app storage."
+                } else {
+                    "Annotation autosave disabled."
+                },
             )
         }
     }
@@ -742,7 +760,7 @@ class MainViewModel(
     fun retryReadingAnnotationExport(nowMillis: Long = nowProvider()) {
         val uri = uiState.annotationExportUri
         if (uri.isNullOrBlank()) {
-            uiState = uiState.copy(latestMessage = "Choose a file for annotation autosave.")
+            uiState = uiState.copy(latestMessage = "Choose a folder for annotation sync.")
             return
         }
         viewModelScope.launch {
@@ -750,9 +768,9 @@ class MainViewModel(
             autosaveAccountLightProfileAfterPortableMutation(nowMillis = nowMillis)
             uiState = uiState.copy(
                 latestMessage = if (exported) {
-                    "Annotations autosaved."
+                    "Annotations synced locally."
                 } else {
-                    "Annotation autosave failed."
+                    "Annotation sync failed."
                 },
             )
         }
@@ -2164,10 +2182,10 @@ class MainViewModel(
     ) {
         val normalizedUri = uri.trim()
         if (normalizedUri.isBlank()) {
-            uiState = uiState.copy(latestMessage = "Choose a folder for profile autosave.")
+            uiState = uiState.copy(latestMessage = "Choose a destination for profile backup.")
             return
         }
-        val normalizedDisplayName = displayName.trim().ifBlank { "Portable profile folder" }
+        val normalizedDisplayName = displayName.trim().ifBlank { "Profile backup folder" }
         viewModelScope.launch {
             val permissionError = runCatching { persistWritePermission(normalizedUri) }.exceptionOrNull()
             settingsRepository.saveProfileAutosaveDestination(
@@ -2180,9 +2198,10 @@ class MainViewModel(
                 uiState = uiState.copy(
                     profileAutosaveUri = normalizedUri,
                     profileAutosaveDisplayName = normalizedDisplayName,
+                    profileAutosaveUsesLocalDefault = false,
                     profileAutosaveLastSuccessfulAtMillis = null,
                     profileAutosaveLastError = message,
-                    latestMessage = "Profile autosave needs folder permission.",
+                    latestMessage = "Profile backup needs folder permission.",
                 )
                 return@launch
             }
@@ -2190,11 +2209,12 @@ class MainViewModel(
             uiState = uiState.copy(
                 profileAutosaveUri = normalizedUri,
                 profileAutosaveDisplayName = normalizedDisplayName,
+                profileAutosaveUsesLocalDefault = false,
                 profileAutosaveLastSuccessfulAtMillis = if (saved) nowMillis else null,
                 latestMessage = if (saved) {
-                    "Profile autosave enabled."
+                    "Profile backup destination changed."
                 } else {
-                    "Profile autosave enabled, but the first write failed."
+                    "Profile backup destination changed, but the first write failed."
                 },
             )
         }
@@ -2202,17 +2222,27 @@ class MainViewModel(
 
     fun clearAccountLightProfileAutosave(releaseWritePermission: (String) -> Unit = {}) {
         val uri = uiState.profileAutosaveUri
+        val wasUsingLocalDefault = uiState.profileAutosaveUsesLocalDefault
         viewModelScope.launch {
-            uri?.takeIf(String::isNotBlank)?.let { configuredUri ->
-                runCatching { releaseWritePermission(configuredUri) }
+            if (!wasUsingLocalDefault) {
+                uri?.takeIf(String::isNotBlank)?.let { configuredUri ->
+                    runCatching { releaseWritePermission(configuredUri) }
+                }
             }
             settingsRepository.clearProfileAutosaveDestination()
+            val defaultUri = normalizedDefaultProfileAutosaveUri()
+            val hasDefault = defaultUri != null
             uiState = uiState.copy(
-                profileAutosaveUri = null,
-                profileAutosaveDisplayName = null,
+                profileAutosaveUri = defaultUri,
+                profileAutosaveDisplayName = defaultProfileAutosaveDisplayName.takeIf { hasDefault },
+                profileAutosaveUsesLocalDefault = hasDefault,
                 profileAutosaveLastSuccessfulAtMillis = null,
                 profileAutosaveLastError = null,
-                latestMessage = "Profile autosave disabled.",
+                latestMessage = if (hasDefault) {
+                    "Profile backup returned to app storage."
+                } else {
+                    "Profile autosave disabled."
+                },
             )
         }
     }
@@ -2220,16 +2250,16 @@ class MainViewModel(
     fun retryAccountLightProfileAutosave(nowMillis: Long = nowProvider()) {
         val uri = uiState.profileAutosaveUri
         if (uri.isNullOrBlank()) {
-            uiState = uiState.copy(latestMessage = "Choose a folder for profile autosave.")
+            uiState = uiState.copy(latestMessage = "Choose a destination for profile backup.")
             return
         }
         viewModelScope.launch {
             val saved = autosaveAccountLightProfileTo(uri = uri, nowMillis = nowMillis)
             uiState = uiState.copy(
                 latestMessage = if (saved) {
-                    "Portable profile autosaved."
+                    "Profile backup saved."
                 } else {
-                    "Profile autosave failed."
+                    "Profile backup failed."
                 },
             )
         }
@@ -2362,6 +2392,14 @@ class MainViewModel(
         }
     }
 
+    private fun normalizedDefaultAnnotationExportUri(): String? {
+        return defaultAnnotationExportUri?.trim()?.takeIf(String::isNotBlank)
+    }
+
+    private fun normalizedDefaultProfileAutosaveUri(): String? {
+        return defaultProfileAutosaveUri?.trim()?.takeIf(String::isNotBlank)
+    }
+
     private fun applySettings(settings: AppSettings) {
         val reactivatedCompletedContentIds = settings.reactivatedCompletedContentIds.trackedCompletedContentIds()
         val preferences = settings.toUserPreferences(
@@ -2377,6 +2415,20 @@ class MainViewModel(
             null
         }
         val activeDelayWindow = selectedTargetApp?.takeIf { delayReady }?.let { delayGate.activeDelay(it) }
+        val configuredAnnotationExportUri = settings.annotationExportUri?.takeIf(String::isNotBlank)
+        val effectiveAnnotationExportUri = configuredAnnotationExportUri ?: normalizedDefaultAnnotationExportUri()
+        val annotationExportUsesLocalDefault =
+            configuredAnnotationExportUri == null && effectiveAnnotationExportUri != null
+        val effectiveAnnotationExportDisplayName = settings.annotationExportDisplayName
+            ?.takeIf(String::isNotBlank)
+            ?: defaultAnnotationExportDisplayName.takeIf { annotationExportUsesLocalDefault }
+        val configuredProfileAutosaveUri = settings.profileAutosaveUri?.takeIf(String::isNotBlank)
+        val effectiveProfileAutosaveUri = configuredProfileAutosaveUri ?: normalizedDefaultProfileAutosaveUri()
+        val profileAutosaveUsesLocalDefault =
+            configuredProfileAutosaveUri == null && effectiveProfileAutosaveUri != null
+        val effectiveProfileAutosaveDisplayName = settings.profileAutosaveDisplayName
+            ?.takeIf(String::isNotBlank)
+            ?: defaultProfileAutosaveDisplayName.takeIf { profileAutosaveUsesLocalDefault }
 
         uiState = uiState.copy(
             hasCompletedOnboarding = settings.hasCompletedOnboarding,
@@ -2391,16 +2443,18 @@ class MainViewModel(
             priorityContentIds = settings.priorityContentIds,
             reactivatedCompletedContentIds = reactivatedCompletedContentIds,
             openAnywayUnlockMinutes = settings.openAnywayUnlockMinutes,
-            annotationExportUri = settings.annotationExportUri,
-            annotationExportDisplayName = settings.annotationExportDisplayName,
+            annotationExportUri = effectiveAnnotationExportUri,
+            annotationExportDisplayName = effectiveAnnotationExportDisplayName,
+            annotationExportUsesLocalDefault = annotationExportUsesLocalDefault,
             annotationExportLastSuccessfulAtMillis = settings.annotationExportLastSuccessfulAtMillis,
             annotationExportLastError = settings.annotationExportLastError,
             annotationDriveSyncEnabled = settings.annotationDriveSyncEnabled,
             annotationDriveFolderId = settings.annotationDriveFolderId,
             annotationDriveLastSuccessfulAtMillis = settings.annotationDriveLastSuccessfulAtMillis,
             annotationDriveLastError = settings.annotationDriveLastError,
-            profileAutosaveUri = settings.profileAutosaveUri,
-            profileAutosaveDisplayName = settings.profileAutosaveDisplayName,
+            profileAutosaveUri = effectiveProfileAutosaveUri,
+            profileAutosaveDisplayName = effectiveProfileAutosaveDisplayName,
+            profileAutosaveUsesLocalDefault = profileAutosaveUsesLocalDefault,
             profileAutosaveLastSuccessfulAtMillis = settings.profileAutosaveLastSuccessfulAtMillis,
             profileAutosaveLastError = settings.profileAutosaveLastError,
             onboardingSelection = settings.toOnboardingSelection(
@@ -2874,7 +2928,12 @@ class MainViewModel(
             true
         } catch (error: Throwable) {
             if (error is CancellationException) throw error
-            settingsRepository.saveAnnotationExportFailure(error.annotationExportErrorMessage())
+            val message = if (uiState.annotationExportUsesLocalDefault && uri == normalizedDefaultAnnotationExportUri()) {
+                "Retry or change annotation sync destination."
+            } else {
+                error.annotationExportErrorMessage()
+            }
+            settingsRepository.saveAnnotationExportFailure(message)
             false
         }
     }
@@ -2906,7 +2965,11 @@ class MainViewModel(
             true
         } catch (error: Throwable) {
             if (error is CancellationException) throw error
-            val message = error.profileAutosaveErrorMessage()
+            val message = if (uiState.profileAutosaveUsesLocalDefault && uri == normalizedDefaultProfileAutosaveUri()) {
+                "Retry or change profile backup destination."
+            } else {
+                error.profileAutosaveErrorMessage()
+            }
             settingsRepository.saveProfileAutosaveFailure(message)
             uiState = uiState.copy(
                 isProfileAutosaving = false,
@@ -3259,10 +3322,15 @@ class MainViewModelFactory(
             accountLightProfileExporter = appContainer.accountLightProfileExporter,
             accountLightProfileImporter = appContainer.accountLightProfileImporter,
             accountLightProfileAutosaveWriter = appContainer.accountLightProfileAutosaveWriter,
+            defaultAnnotationExportUri = appContainer.defaultAnnotationExportUri,
+            defaultProfileAutosaveUri = appContainer.defaultProfileAutosaveUri,
             interceptionMonitor = appContainer.interceptionMonitor,
         ) as T
     }
 }
+
+private const val LOCAL_ANNOTATION_EXPORT_DISPLAY_NAME = "App storage - Annotation sync"
+private const val LOCAL_PROFILE_BACKUP_DISPLAY_NAME = "App storage - Profile backup"
 
 private fun defaultOnboardingSelection(
     supportedApps: List<DistractingApp>,

@@ -90,6 +90,8 @@ class MainActivityTest {
         "sprint16-adaptive-reader-${System.currentTimeMillis()}"
     private val sprint17TypographyScreenshotDirName =
         "sprint17-typography-settings-${System.currentTimeMillis()}"
+    private val sprint17DefaultsScreenshotDirName =
+        "sprint17-default-settings-${System.currentTimeMillis()}"
 
     @Before
     fun resetAppState() {
@@ -1431,6 +1433,81 @@ class MainActivityTest {
     }
 
     @Test
+    fun settingsShowsLocalDefaultsAndChangedDestinationsForAnnotationSyncAndProfileBackup() {
+        launchOnboardedApp()
+        scenario?.onActivity { activity -> activity.mainViewModel.openSettings() }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("settings-list") }
+
+        composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasTestTag("settings-annotation-export-section"))
+        composeRule.onNodeWithText("App storage - Annotation sync").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings-annotation-export-save-now").assertIsEnabled()
+        composeRule.onNodeWithTag("settings-annotation-export-clear").assertDoesNotExist()
+        captureSprint17DefaultsScreenshot("00_annotation_default_light")
+
+        scrollToAccountLightSettings()
+        composeRule.onNodeWithText("App storage - Profile backup").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings-account-light-autosave-save-now").assertIsEnabled()
+        composeRule.onNodeWithTag("settings-account-light-autosave-clear").assertDoesNotExist()
+        captureSprint17DefaultsScreenshot("01_profile_default_light")
+
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val annotationDir = File(context.filesDir, "annotation-sync-custom-e2e").apply {
+            deleteRecursively()
+            mkdirs()
+        }
+        val profileDir = File(context.filesDir, "profile-backup-custom-e2e").apply {
+            deleteRecursively()
+            mkdirs()
+        }
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.configureReadingAnnotationExport(
+                uri = Uri.fromFile(annotationDir).toString(),
+                displayName = "QA annotation folder",
+                nowMillis = 23_000L,
+            )
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            var hasAnnotationDestination = false
+            scenario?.onActivity { activity ->
+                hasAnnotationDestination =
+                    activity.mainViewModel.uiState.annotationExportDisplayName == "QA annotation folder" &&
+                        activity.mainViewModel.uiState.annotationExportLastSuccessfulAtMillis == 23_000L
+            }
+            hasAnnotationDestination
+        }
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.configureAccountLightProfileAutosave(
+                uri = Uri.fromFile(profileDir).toString(),
+                displayName = "QA profile backup",
+                nowMillis = 24_000L,
+            )
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            var hasProfileDestination = false
+            scenario?.onActivity { activity ->
+                hasProfileDestination =
+                    activity.mainViewModel.uiState.profileAutosaveDisplayName == "QA profile backup" &&
+                        activity.mainViewModel.uiState.profileAutosaveLastSuccessfulAtMillis == 24_000L
+            }
+            hasProfileDestination
+        }
+        scenario?.onActivity { activity -> activity.mainViewModel.dismissMessage() }
+        composeRule.waitUntil(timeoutMillis = 10_000) { !hasNodeContaining("destination changed") }
+
+        composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasTestTag("settings-annotation-export-section"))
+        composeRule.onNodeWithText("QA annotation folder").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings-annotation-export-clear").assertIsDisplayed()
+        captureSprint17DefaultsScreenshot("02_annotation_changed_destination_light")
+
+        scrollToAccountLightSettings()
+        composeRule.onNodeWithText("QA profile backup").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings-account-light-autosave-clear").assertIsDisplayed()
+        captureSprint17DefaultsScreenshot("03_profile_changed_destination_light")
+    }
+
+    @Test
     fun accountLightProfileAutosaveSettingsShowsDestinationSuccessAndRecoverableFailure() {
         launchOnboardedApp()
         scenario?.onActivity { activity -> activity.mainViewModel.openSettings() }
@@ -1438,10 +1515,11 @@ class MainActivityTest {
 
         scrollToAccountLightSettings()
         composeRule.onNodeWithTag("settings-account-light-autosave-status").assertIsDisplayed()
-        composeRule.onNodeWithText("No autosave folder selected").assertIsDisplayed()
+        composeRule.onNodeWithText("App storage - Profile backup").assertIsDisplayed()
         composeRule.onNodeWithTag("settings-account-light-autosave-pick").assertIsDisplayed()
-        composeRule.onNodeWithTag("settings-account-light-autosave-save-now").assertIsNotEnabled()
-        captureSprint16ProfileAutosaveScreenshot("01_profile_autosave_empty_light")
+        composeRule.onNodeWithTag("settings-account-light-autosave-save-now").assertIsEnabled()
+        composeRule.onNodeWithTag("settings-account-light-autosave-clear").assertDoesNotExist()
+        captureSprint16ProfileAutosaveScreenshot("01_profile_autosave_default_light")
 
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val autosaveDir = File(context.filesDir, "profile-autosave-e2e").apply {
@@ -1480,7 +1558,7 @@ class MainActivityTest {
         composeRule.waitUntil(timeoutMillis = 10_000) { hasProfileAutosaveFailure() }
         scrollToAccountLightSettings()
         composeRule.onNodeWithText("Missing profile folder").assertIsDisplayed()
-        composeRule.onNodeWithText("AUTOSAVE FAILED", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("BACKUP FAILED", substring = true).assertIsDisplayed()
         composeRule.onNodeWithTag("settings-account-light-autosave-retry").assertIsDisplayed()
         scenario?.onActivity { activity -> activity.mainViewModel.dismissMessage() }
         composeRule.waitForIdle()
@@ -2605,6 +2683,16 @@ class MainActivityTest {
 
     private fun captureSprint17TypographyScreenshot(name: String) {
         val outputDir = File("/sdcard/Download/qualityalternative/$sprint17TypographyScreenshotDirName")
+        assertTrue("Expected screenshot output directory for $name", outputDir.mkdirs() || outputDir.exists())
+        composeRule.waitForIdle()
+        Thread.sleep(300)
+        val output = File(outputDir, "$name.png")
+        assertTrue("Expected screenshot capture for $name", UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).takeScreenshot(output))
+        assertTrue("Expected screenshot file for $name", output.exists() && output.length() > 0L)
+    }
+
+    private fun captureSprint17DefaultsScreenshot(name: String) {
+        val outputDir = File("/sdcard/Download/qualityalternative/$sprint17DefaultsScreenshotDirName")
         assertTrue("Expected screenshot output directory for $name", outputDir.mkdirs() || outputDir.exists())
         composeRule.waitForIdle()
         Thread.sleep(300)

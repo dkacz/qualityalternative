@@ -3674,6 +3674,7 @@ private fun AccountLightAutosaveControls(
     onClearAutosave: () -> Unit,
 ) {
     val configured = !state.profileAutosaveUri.isNullOrBlank()
+    val usesLocalDefault = state.profileAutosaveUsesLocalDefault
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -3682,7 +3683,7 @@ private fun AccountLightAutosaveControls(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 BodyText(
-                    text = state.profileAutosaveDisplayName ?: "No autosave folder selected",
+                    text = state.profileAutosaveDisplayName ?: "No profile backup destination selected",
                     color = QualityAlternativeThemeTokens.colors.primaryText,
                     fontSize = 13.sp,
                     lineHeight = 18.sp,
@@ -3711,7 +3712,7 @@ private fun AccountLightAutosaveControls(
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             QaButton(
-                text = if (configured) "Change folder" else "Choose folder",
+                text = if (configured) "Change destination" else "Choose destination",
                 onClick = onSelectAutosave,
                 variant = QaButtonVariant.Outline,
                 size = QaButtonSize.Small,
@@ -3735,9 +3736,9 @@ private fun AccountLightAutosaveControls(
                 ),
             )
         }
-        if (configured) {
+        if (configured && !usesLocalDefault) {
             QaButton(
-                text = "Turn off autosave",
+                text = "Use app storage",
                 onClick = onClearAutosave,
                 variant = QaButtonVariant.Ghost,
                 size = QaButtonSize.Small,
@@ -4007,6 +4008,7 @@ private fun AnnotationAutosaveSettingsSection(
 ) {
     val colors = QualityAlternativeThemeTokens.colors
     val configured = !state.annotationExportUri.isNullOrBlank()
+    val usesLocalDefault = state.annotationExportUsesLocalDefault
     val exportActionLabel = if (state.annotationExportLastError == null) "Save now" else "Retry"
     val driveConfigured = state.annotationDriveSyncEnabled
     val driveActionLabel = when {
@@ -4016,7 +4018,15 @@ private fun AnnotationAutosaveSettingsSection(
         else -> "Retry"
     }
     Column(modifier = Modifier.testTag("settings-annotation-export-section")) {
-        SectionLabel("Annotation autosave", right = if (configured) "On" else "Off")
+        SectionLabel(
+            "Annotation sync",
+            right = when {
+                driveConfigured -> "Drive"
+                usesLocalDefault -> "Local"
+                configured -> "Folder"
+                else -> "Off"
+            },
+        )
         QaCard {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -4026,7 +4036,7 @@ private fun AnnotationAutosaveSettingsSection(
                 SourceBadge(sourceType = ContentSourceType.USER_DOCUMENT, icon = QaIconKind.Note)
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = state.annotationExportDisplayName ?: "No export folder selected",
+                        text = state.annotationExportDisplayName ?: "No annotation sync destination selected",
                         style = MaterialTheme.typography.titleMedium,
                         fontSize = 16.sp,
                         lineHeight = 20.sp,
@@ -4051,7 +4061,7 @@ private fun AnnotationAutosaveSettingsSection(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 QaButton(
-                    text = if (configured) "Change folder" else "Choose folder",
+                    text = if (configured) "Change destination" else "Choose destination",
                     onClick = onSelectAnnotationExport,
                     variant = QaButtonVariant.Outline,
                     size = QaButtonSize.Small,
@@ -4074,9 +4084,9 @@ private fun AnnotationAutosaveSettingsSection(
                     ),
                 )
             }
-            if (configured) {
+            if (configured && !usesLocalDefault) {
                 QaButton(
-                    text = "Turn off autosave",
+                    text = "Use app storage",
                     onClick = onClearAnnotationExport,
                     variant = QaButtonVariant.Ghost,
                     size = QaButtonSize.Small,
@@ -6792,11 +6802,19 @@ private fun annotationUpdatedLabel(timestampMillis: Long): String {
 
 private fun annotationExportStatusText(state: MainUiState): String {
     state.annotationExportLastError?.takeIf(String::isNotBlank)?.let { error ->
-        return "Autosave failed. ${error.removeSuffix(".")}."
+        return "Sync failed. ${error.removeSuffix(".")}."
     }
     return state.annotationExportLastSuccessfulAtMillis?.let { timestampMillis ->
-        "Last saved ${annotationUpdatedLabel(timestampMillis)}"
-    } ?: "Autosave is not configured"
+        if (state.annotationExportUsesLocalDefault) {
+            "Local files saved ${annotationUpdatedLabel(timestampMillis)}"
+        } else {
+            "Last saved ${annotationUpdatedLabel(timestampMillis)}"
+        }
+    } ?: when {
+        state.annotationExportUsesLocalDefault -> "Stores annotation files in app storage"
+        !state.annotationExportUri.isNullOrBlank() -> "Ready to save annotation files"
+        else -> "No annotation sync destination selected"
+    }
 }
 
 private fun annotationDriveStatusText(state: MainUiState): String {
@@ -6817,14 +6835,22 @@ private fun annotationDriveStatusText(state: MainUiState): String {
 
 private fun profileAutosaveStatusText(state: MainUiState): String {
     if (state.isProfileAutosaving) {
-        return "Saving portable profile"
+        return "Saving profile backup"
     }
     state.profileAutosaveLastError?.takeIf(String::isNotBlank)?.let { error ->
-        return "Autosave failed. ${error.removeSuffix(".")}."
+        return "Backup failed. ${error.removeSuffix(".")}."
     }
     return state.profileAutosaveLastSuccessfulAtMillis?.let { timestampMillis ->
-        "Last saved ${annotationUpdatedLabel(timestampMillis)}"
-    } ?: "Autosave is not configured"
+        if (state.profileAutosaveUsesLocalDefault) {
+            "Local backup saved ${annotationUpdatedLabel(timestampMillis)}"
+        } else {
+            "Last saved ${annotationUpdatedLabel(timestampMillis)}"
+        }
+    } ?: when {
+        state.profileAutosaveUsesLocalDefault -> "Stores the profile backup in app storage"
+        !state.profileAutosaveUri.isNullOrBlank() -> "Ready to save profile backups"
+        else -> "No profile backup destination selected"
+    }
 }
 
 private fun Throwable.googleDriveAuthMessage(): String {
