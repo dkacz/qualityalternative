@@ -51,4 +51,16 @@ class GoogleDriveAuthorizationUiTest {
             ApiException(Status(CommonStatusCodes.NETWORK_ERROR)).googleDriveAuthMessage(),
         )
     }
+
+    @Test
+    fun googleDriveDocumentTreeProviderIsRecognizedAsDriveConnectionFallback() {
+        assertEquals(
+            true,
+            annotationExportUsesGoogleDriveProvider(
+                "content://com.google.android.apps.docs.storage/tree/acc%3Duser%40example.com%3Bdoc%3Dfolder",
+            ),
+        )
+        assertEquals(false, annotationExportUsesGoogleDriveProvider("content://com.android.externalstorage.documents/tree/home"))
+        assertEquals(false, annotationExportUsesGoogleDriveProvider(null))
+    }
 }

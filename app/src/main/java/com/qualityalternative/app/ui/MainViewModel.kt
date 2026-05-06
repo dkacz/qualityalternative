@@ -729,6 +729,64 @@ class MainViewModel(
         }
     }
 
+    fun connectAnnotationDriveFolderProvider(
+        uri: String,
+        displayName: String,
+        persistWritePermission: (String) -> Unit = {},
+        nowMillis: Long = nowProvider(),
+    ) {
+        val normalizedUri = uri.trim()
+        if (normalizedUri.isBlank()) {
+            reportAnnotationDriveAuthorizationFailure("Google Drive folder was not selected.")
+            return
+        }
+        val normalizedDisplayName = displayName.trim().ifBlank { "Google Drive annotation folder" }
+        viewModelScope.launch {
+            val permissionError = runCatching { persistWritePermission(normalizedUri) }.exceptionOrNull()
+            settingsRepository.saveAnnotationExportDestination(
+                uri = normalizedUri,
+                displayName = normalizedDisplayName,
+            )
+            if (permissionError != null) {
+                val message = permissionError.annotationExportErrorMessage()
+                settingsRepository.saveAnnotationExportFailure(message)
+                uiState = uiState.copy(
+                    annotationExportUri = normalizedUri,
+                    annotationExportDisplayName = normalizedDisplayName,
+                    annotationExportUsesLocalDefault = false,
+                    annotationExportLastSuccessfulAtMillis = null,
+                    annotationExportLastError = message,
+                    annotationDriveLastError = message,
+                    isAnnotationDriveSyncing = false,
+                    latestMessage = "Google Drive folder needs permission.",
+                )
+                return@launch
+            }
+            settingsRepository.clearAnnotationDriveSyncConnection()
+            val exported = exportReadingAnnotationsTo(
+                uri = normalizedUri,
+                nowMillis = nowMillis,
+            )
+            autosaveAccountLightProfileAfterPortableMutation(nowMillis = nowMillis)
+            uiState = uiState.copy(
+                annotationExportUri = normalizedUri,
+                annotationExportDisplayName = normalizedDisplayName,
+                annotationExportUsesLocalDefault = false,
+                annotationExportLastSuccessfulAtMillis = if (exported) nowMillis else null,
+                annotationDriveLastError = null,
+                annotationDriveSyncEnabled = false,
+                annotationDriveFolderId = null,
+                annotationDriveLastSuccessfulAtMillis = null,
+                isAnnotationDriveSyncing = false,
+                latestMessage = if (exported) {
+                    "Google Drive folder connected."
+                } else {
+                    "Google Drive folder connected, but the first write failed."
+                },
+            )
+        }
+    }
+
     fun clearReadingAnnotationExport(releaseWritePermission: (String) -> Unit = {}) {
         val uri = uiState.annotationExportUri
         val wasUsingLocalDefault = uiState.annotationExportUsesLocalDefault

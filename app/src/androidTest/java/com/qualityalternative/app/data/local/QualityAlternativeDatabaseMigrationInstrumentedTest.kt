@@ -215,6 +215,73 @@ class QualityAlternativeDatabaseMigrationInstrumentedTest {
         }
     }
 
+    @Test
+    fun migration13To14ValidatesRoomSchemaAndBackfillsAnnotationEndSourceBlock() {
+        val databaseName = "qa-migration-13-14.db"
+        deleteDatabase(databaseName)
+        val legacy = helper.createDatabase(databaseName, 13)
+        legacy.execSQL(
+            """
+            INSERT INTO reading_annotations (
+                id,
+                contentId,
+                paragraphIndex,
+                quotedText,
+                noteText,
+                createdAtMillis,
+                updatedAtMillis,
+                sourceTitle,
+                sourceBlockIndex,
+                textStartOffset,
+                textEndOffset,
+                prefixText,
+                suffixText
+            ) VALUES (
+                'legacy-range',
+                'content-1',
+                3,
+                'Selected quote',
+                'Stored note',
+                1000,
+                1200,
+                'Private EPUB',
+                7,
+                12,
+                42,
+                'Before',
+                'After'
+            )
+            """.trimIndent(),
+        )
+        legacy.close()
+
+        val migrated = helper.runMigrationsAndValidate(
+            databaseName,
+            14,
+            true,
+            QualityAlternativeDatabase.MIGRATION_13_14,
+        )
+        try {
+            assertTrue(readingAnnotationColumns(migrated).contains("endSourceBlockIndex"))
+            migrated.query(
+                """
+                SELECT sourceBlockIndex, endSourceBlockIndex, textStartOffset, textEndOffset
+                FROM reading_annotations
+                WHERE id = 'legacy-range'
+                """.trimIndent(),
+            ).use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals(7, cursor.getInt(0))
+                assertEquals(7, cursor.getInt(1))
+                assertEquals(12, cursor.getInt(2))
+                assertEquals(42, cursor.getInt(3))
+            }
+        } finally {
+            migrated.close()
+            deleteDatabase(databaseName)
+        }
+    }
+
     private fun readingProgressColumns(db: SupportSQLiteDatabase): List<String> {
         return db.query("PRAGMA table_info(reading_progress)").use { cursor ->
             buildList {

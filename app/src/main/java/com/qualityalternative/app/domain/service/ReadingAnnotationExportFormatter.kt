@@ -161,6 +161,7 @@ class ReadingAnnotationExportFormatter {
                 "contentId" to jsonString(contentId),
                 "paragraphIndex" to paragraphIndex.toString(),
                 "sourceBlockIndex" to selector.sourceBlockIndex.toString(),
+                "endSourceBlockIndex" to selector.endSourceBlockIndex.toString(),
                 "sourceTitle" to jsonString(sourceTitle),
                 "sourceLabel" to sourceLabel.jsonNullableString(),
                 "sourceType" to sourceType?.name.jsonNullableString(),

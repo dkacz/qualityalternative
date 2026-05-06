@@ -221,6 +221,7 @@ private fun ReadingAnnotation.toEntity(): ReadingAnnotationEntity {
         sourceHref = selector.sourceHref,
         sourceAnchor = selector.sourceAnchor,
         sourceBlockIndex = selector.sourceBlockIndex,
+        endSourceBlockIndex = selector.endSourceBlockIndex,
         textStartOffset = selector.textStartOffset,
         textEndOffset = selector.textEndOffset,
         prefixText = selector.prefixText,
@@ -245,6 +246,7 @@ private fun ReadingAnnotationEntity.toModel(): ReadingAnnotation {
             sourceHref = sourceHref,
             sourceAnchor = sourceAnchor,
             sourceBlockIndex = sourceBlockIndex,
+            endSourceBlockIndex = endSourceBlockIndex,
             textStartOffset = textStartOffset,
             textEndOffset = textEndOffset,
             prefixText = prefixText,
@@ -255,15 +257,26 @@ private fun ReadingAnnotationEntity.toModel(): ReadingAnnotation {
 
 private fun ReadingAnnotationSelector.normalized(quoteLength: Int): ReadingAnnotationSelector {
     val safeStart = textStartOffset.coerceAtLeast(0)
-    val safeEnd = textEndOffset
-        .takeIf { it > safeStart }
-        ?: (safeStart + quoteLength.coerceAtLeast(0))
+    val safeSourceBlockIndex = sourceBlockIndex.coerceAtLeast(0)
+    val safeEndSourceBlockIndex = endSourceBlockIndex.coerceAtLeast(safeSourceBlockIndex)
+    val safeEnd = if (safeEndSourceBlockIndex > safeSourceBlockIndex) {
+        textEndOffset.takeIf { it > 0 } ?: quoteLength.coerceAtLeast(0)
+    } else {
+        textEndOffset
+            .takeIf { it > safeStart }
+            ?: (safeStart + quoteLength.coerceAtLeast(0))
+    }
     return copy(
         sourceHref = sourceHref?.trim()?.takeIf(String::isNotBlank),
         sourceAnchor = sourceAnchor?.trim()?.takeIf(String::isNotBlank),
-        sourceBlockIndex = sourceBlockIndex.coerceAtLeast(0),
+        sourceBlockIndex = safeSourceBlockIndex,
+        endSourceBlockIndex = safeEndSourceBlockIndex,
         textStartOffset = safeStart,
-        textEndOffset = safeEnd.coerceAtLeast(safeStart),
+        textEndOffset = if (safeEndSourceBlockIndex > safeSourceBlockIndex) {
+            safeEnd.coerceAtLeast(0)
+        } else {
+            safeEnd.coerceAtLeast(safeStart)
+        },
         prefixText = prefixText.trim().takeLast(120),
         suffixText = suffixText.trim().take(120),
     )
@@ -273,6 +286,7 @@ private fun ReadingAnnotationSelector.hasExplicitTarget(): Boolean {
     return !sourceHref.isNullOrBlank() ||
         !sourceAnchor.isNullOrBlank() ||
         sourceBlockIndex > 0 ||
+        endSourceBlockIndex > sourceBlockIndex ||
         textStartOffset > 0 ||
         textEndOffset > 0 ||
         prefixText.isNotBlank() ||

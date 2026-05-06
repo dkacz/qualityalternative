@@ -1168,6 +1168,45 @@ class ProgressSnapshotTest {
     }
 
     @Test
+    fun readerAnnotationSelectionStartCanMoveIntoPreviousSourceBlock() {
+        val sourceBlocks = listOf(
+            readerMarkdownBlock(
+                rawBlock = "alpha1 alpha2 alpha3 alpha4. alpha5 alpha6 alpha7 alpha8.",
+                sourceBlockIndex = 0,
+            ),
+            readerMarkdownBlock(
+                rawBlock = "middle1 middle2 middle3 middle4. middle5 middle6 middle7 middle8.",
+                sourceBlockIndex = 1,
+            ),
+            readerMarkdownBlock(
+                rawBlock = "omega1 omega2 omega3 omega4. omega5 omega6 omega7 omega8.",
+                sourceBlockIndex = 2,
+            ),
+        )
+        val layout = splitOversizedReaderBlocks(blocks = sourceBlocks, maxBlockWeight = 40)
+        val laterBlock = layout.blocks.last()
+        var selection = initialReaderAnnotationSelection(
+            paragraphIndex = 2,
+            block = laterBlock,
+            charOffset = laterBlock.text.text.indexOf("omega5").coerceAtLeast(0),
+            annotation = null,
+            selectionBlocks = layout.blocks,
+        )
+
+        repeat(20) {
+            if (selection.selector.sourceBlockIndex > 0 && selection.canExpandStart) {
+                selection = selection.expandStart()
+            }
+        }
+
+        assertEquals(0, selection.selector.sourceBlockIndex)
+        assertEquals(2, selection.selector.endSourceBlockIndex)
+        assertTrue("Expected the quote to include text before the original page block.", selection.quotedText.contains("alpha"))
+        assertTrue("Expected the quote to preserve the original later-page anchor.", selection.quotedText.contains("omega5"))
+        assertTrue("Expected a multi-block selector to keep an end offset in the ending block.", selection.selector.textEndOffset > 0)
+    }
+
+    @Test
     fun dayLabelsUseSingularAndPluralCopy() {
         assertEquals("1 day", dayCountLabel(count = 1, singular = "day"))
         assertEquals("2 days", dayCountLabel(count = 2, singular = "day"))

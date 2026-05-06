@@ -1116,6 +1116,56 @@ class MainViewModelTest {
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
+    fun googleDriveFolderProviderFallbackConnectsAnnotationExportWithoutOAuth() = runTest {
+        val document = savedUserDocument(format = ContentFormat.MARKDOWN)
+        val driveFolderUri = "content://com.google.android.apps.docs.storage/document/tree%3Aqa-annotations"
+        val settingsRepository = FakeSettingsRepository(
+            initial = completedSettings(selectedAppPackages = setOf("feed.one")).copy(
+                annotationDriveLastError = "Google Drive authorization was cancelled.",
+            ),
+        )
+        val annotationRepository = FakeReadingAnnotationRepository()
+        val exportWriter = RecordingReadingAnnotationExportWriter()
+        val persistedUris = mutableListOf<String>()
+        val viewModel = createViewModel(
+            settingsRepository = settingsRepository,
+            contentRepository = FakeContentRepository(extraItems = listOf(document)),
+            readingAnnotationRepository = annotationRepository,
+            readingAnnotationExportWriter = exportWriter,
+            nowProvider = { 2_000L },
+        )
+
+        advanceUntilIdle()
+        viewModel.connectAnnotationDriveFolderProvider(
+            uri = driveFolderUri,
+            displayName = "QA annotations",
+            persistWritePermission = persistedUris::add,
+            nowMillis = 2_500L,
+        )
+        advanceUntilIdle()
+        viewModel.openLibraryItem(document)
+        advanceUntilIdle()
+        viewModel.saveCurrentReadingAnnotation(
+            paragraphIndex = 1,
+            quotedText = "Private notes",
+            noteText = "Drive folder provider fallback writes this note.",
+            nowMillis = 3_000L,
+        )
+        advanceUntilIdle()
+
+        assertEquals(listOf(driveFolderUri), persistedUris)
+        assertEquals(driveFolderUri, settingsRepository.state.value.annotationExportUri)
+        assertEquals("QA annotations", settingsRepository.state.value.annotationExportDisplayName)
+        assertEquals(false, settingsRepository.state.value.annotationDriveSyncEnabled)
+        assertEquals(null, settingsRepository.state.value.annotationDriveLastError)
+        assertEquals(3_000L, settingsRepository.state.value.annotationExportLastSuccessfulAtMillis)
+        assertEquals("Annotation saved and autosaved.", viewModel.uiState.latestMessage)
+        assertEquals(driveFolderUri, exportWriter.writes.last().first)
+        assertTrue(exportWriter.writes.last().second.contains("Drive folder provider fallback writes this note."))
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
     fun googleDriveAnnotationSyncConnectsAndAutosavesPerSourceJsonLd() = runTest {
         val document = savedUserDocument(format = ContentFormat.MARKDOWN)
         val settingsRepository = FakeSettingsRepository(

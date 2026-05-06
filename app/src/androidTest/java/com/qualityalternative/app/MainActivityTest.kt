@@ -1671,6 +1671,54 @@ class MainActivityTest {
     }
 
     @Test
+    fun readerAnnotationStartCanMoveBackIntoPreviousSourceBlocks() {
+        launchOnboardedApp()
+        val paragraphs = (0..11).map { index ->
+            "sourceblock$index carries one compact sentence for cross page start selection."
+        }
+        val document = addSeedMarkdownDocument(
+            title = "Start Range Regression",
+            displayName = "start-range-regression.md",
+            body = paragraphs.joinToString(separator = "\n\n"),
+            nowMillis = 71_000L,
+        )
+
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.setReaderFontScale(1.8)
+            activity.mainViewModel.openLibraryItem(document)
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
+        repeat(6) {
+            if (!hasTag("reader-annotation-block-9")) {
+                advanceReaderPage()
+                composeRule.waitForIdle()
+            }
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-annotation-block-9") }
+        composeRule.onNodeWithTag("reader-annotation-block-9")
+            .assertIsDisplayed()
+            .performTouchInput { longClick(position = Offset(24f, 24f)) }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-annotation-editor-9") }
+
+        repeat(32) {
+            if (hasTag("reader-annotation-start-earlier")) {
+                composeRule.onNodeWithTag("reader-annotation-start-earlier")
+                    .assertIsDisplayed()
+                    .performClick()
+                composeRule.waitForIdle()
+            }
+        }
+        composeRule.waitForIdle()
+
+        val expandedQuote = readerSelectedQuoteText(9)
+        assertTrue(
+            "Expected start range control to move into earlier source blocks. quote=$expandedQuote",
+            expandedQuote.contains("sourceblock0") && expandedQuote.contains("sourceblock9"),
+        )
+        composeRule.onNodeWithTag("reader-annotation-start-earlier").assertIsNotEnabled()
+    }
+
+    @Test
     fun readerAnnotationControlsExpandAndReopenAcrossPages() {
         launchOnboardedApp()
         val crossPageText = (1..120)

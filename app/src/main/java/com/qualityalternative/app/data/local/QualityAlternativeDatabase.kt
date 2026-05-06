@@ -16,7 +16,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ReadingProgressEntity::class,
         ReadingAnnotationEntity::class,
     ],
-    version = 13,
+    version = 14,
     exportSchema = true,
 )
 abstract class QualityAlternativeDatabase : RoomDatabase() {
@@ -55,6 +55,7 @@ abstract class QualityAlternativeDatabase : RoomDatabase() {
                     MIGRATION_10_11,
                     MIGRATION_11_12,
                     MIGRATION_12_13,
+                    MIGRATION_13_14,
                 )
                 .build()
         }
@@ -282,6 +283,15 @@ abstract class QualityAlternativeDatabase : RoomDatabase() {
                 db.execSQL(
                     "ALTER TABLE reading_progress ADD COLUMN lastVisibleTextOffset INTEGER NOT NULL DEFAULT 0",
                 )
+            }
+        }
+
+        val MIGRATION_13_14 = object : Migration(13, 14) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE reading_annotations ADD COLUMN endSourceBlockIndex INTEGER NOT NULL DEFAULT 0",
+                )
+                db.execSQL("UPDATE reading_annotations SET endSourceBlockIndex = sourceBlockIndex")
             }
         }
 

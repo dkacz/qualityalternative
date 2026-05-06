@@ -355,9 +355,31 @@ private fun MainRoute(
             viewModel.connectAnnotationDriveSync(token)
         }
     }
+    val annotationDriveFolderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri == null) {
+            viewModel.reportAnnotationDriveAuthorizationFailure("Google Drive folder was not selected.")
+            return@rememberLauncherForActivityResult
+        }
+        val metadata = context.documentMetadata(uri)
+        viewModel.connectAnnotationDriveFolderProvider(
+            uri = uri.toString(),
+            displayName = metadata.displayName,
+            persistWritePermission = { uriString ->
+                persistAnnotationExportPermission(context = context, uri = Uri.parse(uriString))
+            },
+        )
+    }
+    fun startGoogleDriveFolderProvider() {
+        viewModel.beginAnnotationDriveAuthorization()
+        annotationDriveFolderPicker.launch(null)
+    }
     val driveAuthorizationLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartIntentSenderForResult(),
     ) { result ->
+        if (result.resultCode == Activity.RESULT_CANCELED && result.data == null) {
+            startGoogleDriveFolderProvider()
+            return@rememberLauncherForActivityResult
+        }
         googleDriveAuthorizationMissingResultMessage(
             resultCode = result.resultCode,
             hasResultIntent = result.data != null,
@@ -368,7 +390,11 @@ private fun MainRoute(
         runCatching {
             driveAuthorizationClient.getAuthorizationResultFromIntent(result.data!!)
         }.onSuccess(::handleDriveAuthorizationResult).onFailure { error ->
-            viewModel.reportAnnotationDriveAuthorizationFailure(error.googleDriveAuthMessage())
+            if (error.googleDriveAuthMessage() == "Google Drive authorization was cancelled.") {
+                startGoogleDriveFolderProvider()
+            } else {
+                viewModel.reportAnnotationDriveAuthorizationFailure(error.googleDriveAuthMessage())
+            }
         }
     }
     val startGoogleDriveSyncAuthorization: (AnnotationDriveSyncMode) -> Unit = { mode ->
@@ -395,7 +421,11 @@ private fun MainRoute(
                 }
             }
             .addOnFailureListener { error ->
-                viewModel.reportAnnotationDriveAuthorizationFailure(error.googleDriveAuthMessage())
+                if (error.googleDriveAuthMessage() == "Google Drive authorization was cancelled.") {
+                    startGoogleDriveFolderProvider()
+                } else {
+                    viewModel.reportAnnotationDriveAuthorizationFailure(error.googleDriveAuthMessage())
+                }
             }
     }
     val disconnectGoogleDriveSync = {
@@ -2352,6 +2382,7 @@ private fun ReaderScreen(
                                         block = block,
                                         charOffset = charOffset,
                                         annotation = annotation,
+                                        selectionBlocks = blocks,
                                     )
                                     annotationNoteDraft = annotation?.noteText.orEmpty()
                                 },
@@ -4211,7 +4242,8 @@ private fun AnnotationAutosaveSettingsSection(
     val configured = !state.annotationExportUri.isNullOrBlank()
     val usesLocalDefault = state.annotationExportUsesLocalDefault
     val exportActionLabel = if (state.annotationExportLastError == null) "Save now" else "Retry"
-    val driveConfigured = state.annotationDriveSyncEnabled
+    val driveProviderConfigured = annotationExportUsesGoogleDriveProvider(state.annotationExportUri)
+    val driveConfigured = state.annotationDriveSyncEnabled || driveProviderConfigured
     val driveActionLabel = when {
         state.isAnnotationDriveSyncing -> "Syncing"
         !driveConfigured -> "Connect"
@@ -4306,7 +4338,11 @@ private fun AnnotationAutosaveSettingsSection(
                 SourceBadge(sourceType = ContentSourceType.USER_LINK, icon = QaIconKind.External)
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = if (driveConfigured) "Google Drive connected" else "Google Drive not connected",
+                        text = when {
+                            state.annotationDriveSyncEnabled -> "Google Drive connected"
+                            driveProviderConfigured -> "Google Drive folder connected"
+                            else -> "Google Drive not connected"
+                        },
                         style = MaterialTheme.typography.titleMedium,
                         fontSize = 16.sp,
                         lineHeight = 20.sp,
@@ -4339,7 +4375,11 @@ private fun AnnotationAutosaveSettingsSection(
             ) {
                 QaButton(
                     text = driveActionLabel,
-                    onClick = if (driveConfigured) onRetryAnnotationDrive else onConnectAnnotationDrive,
+                    onClick = when {
+                        state.annotationDriveSyncEnabled -> onRetryAnnotationDrive
+                        driveProviderConfigured -> onRetryAnnotationExport
+                        else -> onConnectAnnotationDrive
+                    },
                     variant = QaButtonVariant.Outline,
                     size = QaButtonSize.Small,
                     enabled = !state.isAnnotationDriveSyncing,
@@ -4354,7 +4394,11 @@ private fun AnnotationAutosaveSettingsSection(
                 )
                 QaButton(
                     text = "Disconnect",
-                    onClick = onDisconnectAnnotationDrive,
+                    onClick = if (driveProviderConfigured && !state.annotationDriveSyncEnabled) {
+                        onClearAnnotationExport
+                    } else {
+                        onDisconnectAnnotationDrive
+                    },
                     variant = QaButtonVariant.Ghost,
                     size = QaButtonSize.Small,
                     enabled = driveConfigured && !state.isAnnotationDriveSyncing,
@@ -6026,16 +6070,11 @@ internal data class ReaderBlockLayout(
     }
 
     fun displayBlockIndexForSelector(selector: ReadingAnnotationSelector): Int {
-        if (selector.textEndOffset <= selector.textStartOffset) {
+        if (selector.endSourceBlockIndex <= selector.sourceBlockIndex && selector.textEndOffset <= selector.textStartOffset) {
             return displayBlockIndexFor(selector.sourceBlockIndex)
         }
-        return blocks.indexOfFirst { block ->
-            selector.sourceBlockIndex == block.sourceBlockIndex &&
-                (selector.sourceHref.isNullOrBlank() || selector.sourceHref == block.sourceHref) &&
-                (selector.sourceAnchor.isNullOrBlank() || selector.sourceAnchor == block.sourceAnchor) &&
-                selector.textStartOffset < block.sourceTextEndOffset() &&
-                selector.textEndOffset > block.sourceTextStartOffset
-        }.takeIf { index -> index >= 0 }
+        return blocks.indexOfFirst { block -> selector.overlapsReaderBlock(block) }
+            .takeIf { index -> index >= 0 }
             ?: displayBlockIndexFor(selector.sourceBlockIndex)
     }
 
@@ -6079,6 +6118,11 @@ private data class ReaderAnnotatedChunk(
 internal data class ReaderSentenceRange(
     val start: Int,
     val endExclusive: Int,
+    val sourceBlockIndex: Int = 0,
+    val sourceHref: String? = null,
+    val sourceAnchor: String? = null,
+    val sourceTextStartOffset: Int = start,
+    val sourceTextEndOffset: Int = endExclusive,
 )
 
 internal enum class ReaderAnnotationSelectionFocus {
@@ -6107,14 +6151,17 @@ internal data class ReaderAnnotationSelection(
 
     val selector: ReadingAnnotationSelector
         get() {
-            val start = sentenceRanges[startSentenceIndex].start
-            val end = sentenceRanges[endSentenceIndex].endExclusive
+            val startRange = sentenceRanges[startSentenceIndex]
+            val endRange = sentenceRanges[endSentenceIndex]
+            val start = startRange.start
+            val end = endRange.endExclusive
             return ReadingAnnotationSelector(
-                sourceHref = sourceHref,
-                sourceAnchor = sourceAnchor,
-                sourceBlockIndex = sourceBlockIndex,
-                textStartOffset = sourceTextStartOffset + start,
-                textEndOffset = sourceTextStartOffset + end,
+                sourceHref = startRange.sourceHref ?: sourceHref,
+                sourceAnchor = startRange.sourceAnchor ?: sourceAnchor,
+                sourceBlockIndex = startRange.sourceBlockIndex,
+                endSourceBlockIndex = endRange.sourceBlockIndex,
+                textStartOffset = startRange.sourceTextStartOffset,
+                textEndOffset = endRange.sourceTextEndOffset,
                 prefixText = sourceText.substring(0, start).takeLast(120).trim(),
                 suffixText = sourceText.substring(end).take(120).trim(),
             )
@@ -6149,10 +6196,11 @@ internal data class ReaderAnnotationSelection(
     }
 
     fun focusChangedFrom(previous: ReaderAnnotationSelection?): ReaderAnnotationSelectionFocus {
-        if (previous == null || previous.selector.sourceBlockIndex != selector.sourceBlockIndex) {
+        if (previous == null) {
             return ReaderAnnotationSelectionFocus.END
         }
         return when {
+            selector.sourceBlockIndex != previous.selector.sourceBlockIndex -> ReaderAnnotationSelectionFocus.START
             selector.textStartOffset != previous.selector.textStartOffset -> ReaderAnnotationSelectionFocus.START
             else -> ReaderAnnotationSelectionFocus.END
         }
@@ -6166,12 +6214,16 @@ internal fun readerPageIndexForAnnotationSelectionFocus(
     pages: List<ReaderPage>,
 ): Int {
     val selector = selection.selector
+    val focusSourceBlockIndex = when (focus) {
+        ReaderAnnotationSelectionFocus.START -> selector.sourceBlockIndex
+        ReaderAnnotationSelectionFocus.END -> selector.endSourceBlockIndex
+    }
     val focusOffset = when (focus) {
         ReaderAnnotationSelectionFocus.START -> selector.textStartOffset
         ReaderAnnotationSelectionFocus.END -> selector.textEndOffset
     }
     val focusDisplayBlockIndex = layout.displayBlockIndexForSourcePosition(
-        sourceBlockIndex = selector.sourceBlockIndex,
+        sourceBlockIndex = focusSourceBlockIndex,
         textOffset = focusOffset,
     )
     return readerPageIndexForParagraph(
@@ -6215,69 +6267,75 @@ internal fun initialReaderAnnotationSelection(
     block: ReaderMarkdownBlock,
     charOffset: Int,
     annotation: ReadingAnnotation?,
+    selectionBlocks: List<ReaderMarkdownBlock> = listOf(block),
 ): ReaderAnnotationSelection {
-    val blockText = block.annotationSourceText()
-    val hasFullSourceText = block.sourceFullText?.let { sourceText ->
-        sourceText.length >= block.sourceTextEndOffset()
-    } == true
-    val selectionSourceTextStartOffset = if (hasFullSourceText) {
-        0
-    } else {
-        block.sourceTextStartOffset
+    val sourceBlocks = readerAnnotationSourceBlocks(selectionBlocks.ifEmpty { listOf(block) })
+        .ifEmpty { readerAnnotationSourceBlocks(listOf(block)) }
+    val sourceText = sourceBlocks.joinToString(separator = READER_ANNOTATION_SOURCE_BLOCK_SEPARATOR) { sourceBlock ->
+        sourceBlock.text
     }
-    val visibleTargetOffset = (block.sourceTextStartOffset + charOffset - selectionSourceTextStartOffset)
-        .coerceIn(0, blockText.length.coerceAtLeast(1) - 1)
-    val sentenceRanges = readerSentenceRanges(blockText).ifEmpty {
-        listOf(ReaderSentenceRange(start = 0, endExclusive = blockText.length))
-    }
-    val selectionRanges = readerSelectionRanges(blockText).ifEmpty {
-        listOf(ReaderSentenceRange(start = 0, endExclusive = blockText.length))
+    val currentSourceBlock = sourceBlocks.firstOrNull { sourceBlock -> sourceBlock.matches(block) }
+        ?: sourceBlocks.first()
+    val visibleTargetOffset = (
+        currentSourceBlock.combinedStart +
+            block.sourceTextStartOffset +
+            charOffset
+        )
+        .coerceIn(0, sourceText.length.coerceAtLeast(1) - 1)
+    val selectionRanges = sourceBlocks.flatMap { sourceBlock ->
+        readerSelectionRanges(sourceBlock.text).map { range ->
+            ReaderSentenceRange(
+                start = sourceBlock.combinedStart + range.start,
+                endExclusive = sourceBlock.combinedStart + range.endExclusive,
+                sourceBlockIndex = sourceBlock.sourceBlockIndex,
+                sourceHref = sourceBlock.sourceHref,
+                sourceAnchor = sourceBlock.sourceAnchor,
+                sourceTextStartOffset = range.start,
+                sourceTextEndOffset = range.endExclusive,
+            )
+        }
+    }.ifEmpty {
+        listOf(ReaderSentenceRange(start = 0, endExclusive = sourceText.length))
     }
     val existingQuote = annotation
         ?.quotedText
         ?.trim()
         ?.takeIf(String::isNotBlank)
-    val selectorStart = annotation
-        ?.selector
-        ?.takeIf { selector -> selector.matchesReaderSource(block) && selector.textEndOffset > selector.textStartOffset }
-        ?.textStartOffset
-        ?.minus(selectionSourceTextStartOffset)
-        ?.coerceIn(0, blockText.length)
-    val selectorEndExclusive = annotation
-        ?.selector
-        ?.takeIf { selector -> selector.matchesReaderSource(block) && selector.textEndOffset > selector.textStartOffset }
-        ?.textEndOffset
-        ?.minus(selectionSourceTextStartOffset)
-        ?.coerceIn(selectorStart ?: 0, blockText.length)
+    val selector = annotation?.selector?.takeIf { selector ->
+        selector.hasUsableReaderRange() &&
+            sourceBlocks.any { sourceBlock -> sourceBlock.sourceBlockIndex == selector.sourceBlockIndex } &&
+            sourceBlocks.any { sourceBlock -> sourceBlock.sourceBlockIndex == selector.endSourceBlockIndex }
+    }
+    val selectorStart = selector?.let { currentSelector ->
+        sourceBlocks.firstOrNull { sourceBlock -> sourceBlock.sourceBlockIndex == currentSelector.sourceBlockIndex }
+            ?.let { sourceBlock -> sourceBlock.combinedStart + currentSelector.textStartOffset }
+            ?.coerceIn(0, sourceText.length)
+    }
+    val selectorEndExclusive = selector?.let { currentSelector ->
+        sourceBlocks.firstOrNull { sourceBlock -> sourceBlock.sourceBlockIndex == currentSelector.endSourceBlockIndex }
+            ?.let { sourceBlock -> sourceBlock.combinedStart + currentSelector.textEndOffset }
+            ?.coerceIn(selectorStart ?: 0, sourceText.length)
+    }
     val annotationStart = selectorStart ?: existingQuote
-        ?.let { quote -> blockText.indexOf(quote).takeIf { index -> index >= 0 } }
+        ?.let { quote -> sourceText.indexOf(quote).takeIf { index -> index >= 0 } }
     val annotationEndExclusive = selectorEndExclusive ?: annotationStart
-        ?.let { start -> (start + existingQuote.orEmpty().length).coerceIn(0, blockText.length) }
-    val targetOffset = (annotationStart ?: visibleTargetOffset).coerceIn(0, blockText.length.coerceAtLeast(1) - 1)
-    val sentenceIndex = sentenceRanges
+        ?.let { start -> (start + existingQuote.orEmpty().length).coerceIn(0, sourceText.length) }
+    val targetOffset = (annotationStart ?: visibleTargetOffset).coerceIn(0, sourceText.length.coerceAtLeast(1) - 1)
+    val sentenceIndex = selectionRanges
         .indexOfFirst { range -> targetOffset in range.start until range.endExclusive }
         .takeIf { index -> index >= 0 }
-        ?: sentenceRanges.indices.minByOrNull { index ->
-            val range = sentenceRanges[index]
+        ?: selectionRanges.indices.minByOrNull { index ->
+            val range = selectionRanges[index]
             minOf(kotlin.math.abs(targetOffset - range.start), kotlin.math.abs(targetOffset - range.endExclusive))
         }
-        ?: 0
-    val targetSentence = sentenceRanges[sentenceIndex]
-    val targetSelectionIndex = selectionRanges
-        .indexOfFirst { range -> targetOffset in range.start until range.endExclusive }
-        .takeIf { index -> index >= 0 }
-        ?: 0
-    val firstSelectionIndexInSentence = selectionRanges
-        .indexOfFirst { range -> range.start >= targetSentence.start && range.endExclusive <= targetSentence.endExclusive }
-        .takeIf { index -> index >= 0 }
         ?: 0
     val startSelectionIndex = if (annotationStart != null && annotationEndExclusive != null) {
         selectionRanges
             .indexOfFirst { range -> range.start < annotationEndExclusive && range.endExclusive > annotationStart }
             .takeIf { index -> index >= 0 }
-            ?: targetSelectionIndex
+            ?: sentenceIndex
     } else {
-        firstSelectionIndexInSentence
+        sentenceIndex
     }
     val endSelectionIndex = if (annotationStart != null && annotationEndExclusive != null) {
         selectionRanges
@@ -6285,23 +6343,58 @@ internal fun initialReaderAnnotationSelection(
             .takeIf { index -> index >= startSelectionIndex }
             ?: startSelectionIndex
     } else {
-        selectionRanges
-            .indexOfLast { range -> range.start >= targetSentence.start && range.endExclusive <= targetSentence.endExclusive }
-            .takeIf { index -> index >= startSelectionIndex }
-            ?: startSelectionIndex
+        startSelectionIndex
     }
     return ReaderAnnotationSelection(
         paragraphIndex = paragraphIndex,
-        sourceText = blockText,
+        sourceText = sourceText,
         sourceHref = block.sourceHref,
         sourceAnchor = block.sourceAnchor,
         sourceBlockIndex = block.sourceBlockIndex,
-        sourceTextStartOffset = selectionSourceTextStartOffset,
+        sourceTextStartOffset = 0,
         sentenceRanges = selectionRanges,
         startSentenceIndex = startSelectionIndex,
         endSentenceIndex = endSelectionIndex,
         existingAnnotationId = annotation?.id,
     )
+}
+
+private const val READER_ANNOTATION_SOURCE_BLOCK_SEPARATOR = "\n\n"
+
+private data class ReaderAnnotationSourceBlock(
+    val sourceBlockIndex: Int,
+    val sourceHref: String?,
+    val sourceAnchor: String?,
+    val text: String,
+    val combinedStart: Int,
+) {
+    fun matches(block: ReaderMarkdownBlock): Boolean {
+        return sourceBlockIndex == block.sourceBlockIndex &&
+            sourceHref == block.sourceHref &&
+            sourceAnchor == block.sourceAnchor
+    }
+}
+
+private fun readerAnnotationSourceBlocks(blocks: List<ReaderMarkdownBlock>): List<ReaderAnnotationSourceBlock> {
+    val uniqueBlocks = linkedMapOf<String, ReaderMarkdownBlock>()
+    blocks.forEach { block ->
+        val key = listOf(block.sourceBlockIndex.toString(), block.sourceHref.orEmpty(), block.sourceAnchor.orEmpty())
+            .joinToString(separator = "\u0000")
+        uniqueBlocks.putIfAbsent(key, block)
+    }
+    var combinedStart = 0
+    return uniqueBlocks.values.map { block ->
+        val sourceText = block.annotationSourceText()
+        val sourceBlock = ReaderAnnotationSourceBlock(
+            sourceBlockIndex = block.sourceBlockIndex,
+            sourceHref = block.sourceHref,
+            sourceAnchor = block.sourceAnchor,
+            text = sourceText,
+            combinedStart = combinedStart,
+        )
+        combinedStart += sourceText.length + READER_ANNOTATION_SOURCE_BLOCK_SEPARATOR.length
+        sourceBlock
+    }
 }
 
 internal fun readerSentenceRanges(text: String): List<ReaderSentenceRange> {
@@ -6547,18 +6640,45 @@ private fun ReadingAnnotationSelector.matchesReaderSource(block: ReaderMarkdownB
 }
 
 private fun ReadingAnnotationSelector.overlapsReaderBlock(block: ReaderMarkdownBlock): Boolean {
-    if (!matchesReaderSource(block) || textEndOffset <= textStartOffset) {
+    val startBlock = sourceBlockIndex
+    val endBlock = endSourceBlockIndex.coerceAtLeast(startBlock)
+    if (startBlock == endBlock && textEndOffset <= textStartOffset) {
         return false
     }
-    return textStartOffset < block.sourceTextEndOffset() && textEndOffset > block.sourceTextStartOffset
+    if (endBlock > startBlock && textEndOffset <= 0) {
+        return false
+    }
+    if (block.sourceBlockIndex !in startBlock..endBlock) {
+        return false
+    }
+    if (startBlock == endBlock) {
+        return matchesReaderSource(block) &&
+            textStartOffset < block.sourceTextEndOffset() &&
+            textEndOffset > block.sourceTextStartOffset
+    }
+    return when (block.sourceBlockIndex) {
+        startBlock -> textStartOffset < block.sourceTextEndOffset()
+        endBlock -> textEndOffset > block.sourceTextStartOffset
+        else -> true
+    }
 }
 
 private fun ReadingAnnotationSelector.readerBlockHighlightRange(block: ReaderMarkdownBlock): IntRange? {
     if (!overlapsReaderBlock(block)) {
         return null
     }
-    val start = (textStartOffset - block.sourceTextStartOffset).coerceIn(0, block.text.text.length)
-    val endExclusive = (textEndOffset - block.sourceTextStartOffset).coerceIn(start, block.text.text.length)
+    val startBlock = sourceBlockIndex
+    val endBlock = endSourceBlockIndex.coerceAtLeast(startBlock)
+    val start = if (block.sourceBlockIndex == startBlock) {
+        (textStartOffset - block.sourceTextStartOffset).coerceIn(0, block.text.text.length)
+    } else {
+        0
+    }
+    val endExclusive = if (block.sourceBlockIndex == endBlock) {
+        (textEndOffset - block.sourceTextStartOffset).coerceIn(start, block.text.text.length)
+    } else {
+        block.text.text.length
+    }
     if (start >= endExclusive) {
         return null
     }
@@ -6566,7 +6686,11 @@ private fun ReadingAnnotationSelector.readerBlockHighlightRange(block: ReaderMar
 }
 
 private fun ReadingAnnotationSelector.hasUsableReaderRange(): Boolean {
-    return textEndOffset > textStartOffset
+    return if (endSourceBlockIndex > sourceBlockIndex) {
+        textEndOffset > 0
+    } else {
+        textEndOffset > textStartOffset
+    }
 }
 
 internal fun readingAnnotationForBlock(
@@ -7425,6 +7549,11 @@ private fun annotationDriveStatusText(state: MainUiState): String {
     if (state.isAnnotationDriveSyncing) {
         return "Syncing annotations"
     }
+    if (annotationExportUsesGoogleDriveProvider(state.annotationExportUri)) {
+        return state.annotationExportLastSuccessfulAtMillis?.let { timestampMillis ->
+            "Drive folder saved ${annotationUpdatedLabel(timestampMillis)}"
+        } ?: "Uses the Android Google Drive folder picker"
+    }
     state.annotationDriveLastError?.takeIf(String::isNotBlank)?.let { error ->
         return error.removeSuffix(".")
     }
@@ -7435,6 +7564,15 @@ private fun annotationDriveStatusText(state: MainUiState): String {
     } else {
         "Uses Google Drive file access only"
     }
+}
+
+internal fun annotationExportUsesGoogleDriveProvider(uri: String?): Boolean {
+    return uri
+        ?.takeIf(String::isNotBlank)
+        ?.let { rawUri ->
+            runCatching { Uri.parse(rawUri).authority.orEmpty() }.getOrDefault(rawUri)
+        }
+        ?.contains("com.google.android.apps.docs", ignoreCase = true) == true
 }
 
 private fun profileAutosaveStatusText(state: MainUiState): String {

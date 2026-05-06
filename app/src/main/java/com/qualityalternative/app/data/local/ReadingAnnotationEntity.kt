@@ -27,6 +27,7 @@ data class ReadingAnnotationEntity(
     val sourceHref: String?,
     val sourceAnchor: String?,
     val sourceBlockIndex: Int,
+    val endSourceBlockIndex: Int,
     val textStartOffset: Int,
     val textEndOffset: Int,
     val prefixText: String,

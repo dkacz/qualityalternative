@@ -32,6 +32,7 @@ data class ReadingAnnotationSelector(
     val sourceHref: String? = null,
     val sourceAnchor: String? = null,
     val sourceBlockIndex: Int = 0,
+    val endSourceBlockIndex: Int = sourceBlockIndex,
     val textStartOffset: Int = 0,
     val textEndOffset: Int = 0,
     val prefixText: String = "",
