@@ -34,11 +34,13 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -105,6 +107,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import com.qualityalternative.app.data.ACCOUNT_LIGHT_PROFILE_FILE_NAME
@@ -741,6 +744,7 @@ private fun TabBar(
     onSettings: () -> Unit,
 ) {
     val colors = QualityAlternativeThemeTokens.colors
+    val density = LocalDensity.current
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -2419,6 +2423,7 @@ private fun BoxScope.ReaderTableOfContentsSheet(
     onDismiss: () -> Unit,
 ) {
     val colors = QualityAlternativeThemeTokens.colors
+    val density = LocalDensity.current
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -2635,6 +2640,7 @@ private fun BoxScope.ReaderAnnotationEditorOverlay(
     onSave: () -> Unit,
 ) {
     val colors = QualityAlternativeThemeTokens.colors
+    val density = LocalDensity.current
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -2645,92 +2651,154 @@ private fun BoxScope.ReaderAnnotationEditorOverlay(
     BoxWithConstraints(
         modifier = Modifier
             .align(Alignment.BottomCenter)
-            .fillMaxSize()
-            .padding(horizontal = 12.dp, vertical = 12.dp),
+            .fillMaxSize(),
     ) {
-        val sheetMaxHeight = maxHeight * 0.94f
-        val quoteMaxHeight = (sheetMaxHeight - 184.dp).coerceAtLeast(96.dp)
+        val horizontalPadding = 12.dp
+        val verticalPadding = 12.dp
+        val reportedImeBottomPadding = with(density) { WindowInsets.ime.getBottom(density).toDp() }
+        val isKeyboardVisible = reportedImeBottomPadding > 0.dp
+        val rootAlreadyAvoidsIme = isKeyboardVisible && maxHeight < 620.dp
+        val effectiveImeBottomPadding = if (rootAlreadyAvoidsIme) 0.dp else reportedImeBottomPadding
+        val rawUsableHeight = (maxHeight - effectiveImeBottomPadding - (verticalPadding * 2))
+            .coerceAtLeast(260.dp)
+        val sheetMaxHeight = if (isKeyboardVisible) {
+            rawUsableHeight.coerceAtMost(360.dp)
+        } else {
+            maxHeight * 0.94f
+        }
+        val isKeyboardConstrained = isKeyboardVisible || sheetMaxHeight < 620.dp
+        val sheetContentPadding = if (isKeyboardConstrained) 10.dp else 12.dp
+        val sheetGap = if (isKeyboardConstrained) 6.dp else 8.dp
+        val fixedRowBudget = (sheetContentPadding * 2) +
+            if (isKeyboardConstrained) 136.dp else 178.dp
+        val scrollableBudget = (sheetMaxHeight - fixedRowBudget)
+            .coerceAtLeast(if (isKeyboardConstrained) 112.dp else 200.dp)
+        val noteMaxHeight = if (isKeyboardConstrained) {
+            (scrollableBudget * 0.56f).coerceIn(64.dp, 112.dp)
+        } else {
+            (sheetMaxHeight * 0.25f).coerceAtLeast(104.dp)
+        }
+        val quoteMaxHeight = if (isKeyboardConstrained) {
+            (scrollableBudget - noteMaxHeight).coerceIn(48.dp, 132.dp)
+        } else {
+            (sheetMaxHeight * 0.56f).coerceAtLeast(96.dp)
+        }
         val quoteScrollState = rememberScrollState()
-        Surface(
+        Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .heightIn(max = sheetMaxHeight)
-                .testTag("reader-annotation-editor-${selection.paragraphIndex}"),
-            shape = RoundedCornerShape(18.dp),
-            color = colors.elevatedSurface,
-            border = BorderStroke(1.dp, colors.lineStrong),
+                .padding(
+                    start = horizontalPadding,
+                    end = horizontalPadding,
+                    top = verticalPadding,
+                    bottom = verticalPadding + effectiveImeBottomPadding,
+                ),
         ) {
-            Column(
+            Surface(
                 modifier = Modifier
-                    .heightIn(max = sheetMaxHeight)
-                    .padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .then(
+                        if (isKeyboardVisible) {
+                            Modifier.height(sheetMaxHeight)
+                        } else {
+                            Modifier.heightIn(max = sheetMaxHeight)
+                        },
+                    )
+                    .testTag("reader-annotation-editor-${selection.paragraphIndex}"),
+                shape = RoundedCornerShape(18.dp),
+                color = colors.elevatedSurface,
+                border = BorderStroke(1.dp, colors.lineStrong),
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    DisplayText("Note", fontSize = 19.sp, lineHeight = 23.sp, modifier = Modifier.weight(1f))
-                    ReaderAnnotationRangeControls(
-                        selection = selection,
-                        onSelectionChanged = onSelectionChanged,
-                    )
-                    QaIconButton(icon = QaIconKind.Close, onClick = onCancel)
-                }
-                Box(
+                Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = quoteMaxHeight)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(colors.background.copy(alpha = 0.56f))
-                        .verticalScroll(quoteScrollState)
-                        .padding(horizontal = 10.dp, vertical = 8.dp)
-                        .testTag("reader-annotation-selected-quote-scroll-${selection.paragraphIndex}"),
+                        .heightIn(max = sheetMaxHeight)
+                        .padding(sheetContentPadding),
+                    verticalArrangement = Arrangement.spacedBy(sheetGap),
                 ) {
-                    Text(
-                        text = selection.quotedText,
-                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp, lineHeight = 18.sp),
-                        color = colors.primaryText,
-                        modifier = Modifier.testTag("reader-annotation-selected-quote-${selection.paragraphIndex}"),
-                    )
-                }
-                QaMultilineTextField(
-                    value = noteDraft,
-                    onValueChange = onNoteDraftChanged,
-                    placeholder = "Write a note",
-                    modifier = Modifier.testTag("reader-annotation-note-input-${selection.paragraphIndex}"),
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (onDelete != null) {
-                        QaButton(
-                            text = "Delete note",
-                            onClick = onDelete,
-                            variant = QaButtonVariant.Ghost,
-                            size = QaButtonSize.Small,
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = if (isKeyboardConstrained) 34.dp else 44.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        DisplayText(
+                            "Note",
+                            fontSize = 19.sp,
+                            lineHeight = 23.sp,
                             modifier = Modifier
                                 .weight(1f)
-                                .testTag("reader-annotation-delete-${selection.paragraphIndex}"),
+                                .testTag("reader-annotation-title-${selection.paragraphIndex}"),
+                        )
+                        ReaderAnnotationRangeControls(
+                            selection = selection,
+                            onSelectionChanged = onSelectionChanged,
+                        )
+                        QaIconButton(
+                            icon = QaIconKind.Close,
+                            onClick = onCancel,
+                            modifier = Modifier.testTag("reader-annotation-close-${selection.paragraphIndex}"),
                         )
                     }
-                    QaButton(
-                        text = "Cancel",
-                        onClick = onCancel,
-                        variant = QaButtonVariant.Ghost,
-                        size = QaButtonSize.Small,
-                        modifier = Modifier.weight(1f),
-                    )
-                    QaButton(
-                        text = if (hasExistingAnnotation) "Update" else "Save",
-                        onClick = onSave,
-                        variant = QaButtonVariant.Primary,
-                        size = QaButtonSize.Small,
-                        enabled = noteDraft.isNotBlank(),
+                    Box(
                         modifier = Modifier
-                            .weight(1f)
-                            .testTag("reader-annotation-save-${selection.paragraphIndex}"),
+                            .fillMaxWidth()
+                            .heightIn(max = quoteMaxHeight)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(colors.background.copy(alpha = 0.56f))
+                            .verticalScroll(quoteScrollState)
+                            .padding(horizontal = 10.dp, vertical = 8.dp)
+                            .testTag("reader-annotation-selected-quote-scroll-${selection.paragraphIndex}"),
+                    ) {
+                        Text(
+                            text = selection.quotedText,
+                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp, lineHeight = 18.sp),
+                            color = colors.primaryText,
+                            modifier = Modifier.testTag("reader-annotation-selected-quote-${selection.paragraphIndex}"),
+                        )
+                    }
+                    QaMultilineTextField(
+                        value = noteDraft,
+                        onValueChange = onNoteDraftChanged,
+                        placeholder = "Write a note",
+                        maxHeight = noteMaxHeight,
+                        modifier = Modifier.testTag("reader-annotation-note-input-${selection.paragraphIndex}"),
                     )
+                    Row(
+                        modifier = Modifier.heightIn(min = if (isKeyboardConstrained) 46.dp else 52.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        if (onDelete != null) {
+                            QaButton(
+                                text = "Delete note",
+                                onClick = onDelete,
+                                variant = QaButtonVariant.Ghost,
+                                size = QaButtonSize.Small,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("reader-annotation-delete-${selection.paragraphIndex}"),
+                            )
+                        }
+                        QaButton(
+                            text = "Cancel",
+                            onClick = onCancel,
+                            variant = QaButtonVariant.Ghost,
+                            size = QaButtonSize.Small,
+                            modifier = Modifier.weight(1f),
+                        )
+                        QaButton(
+                            text = if (hasExistingAnnotation) "Update" else "Save",
+                            onClick = onSave,
+                            variant = QaButtonVariant.Primary,
+                            size = QaButtonSize.Small,
+                            enabled = noteDraft.isNotBlank(),
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("reader-annotation-save-${selection.paragraphIndex}"),
+                        )
+                    }
                 }
             }
         }
@@ -2747,7 +2815,7 @@ private fun ReaderAnnotationRangeControls(
         modifier = Modifier
             .semantics { contentDescription = "Annotation range controls" }
             .testTag("reader-annotation-range-controls"),
-        horizontalArrangement = Arrangement.spacedBy(3.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         ReaderRangeIconButton(
@@ -2766,7 +2834,7 @@ private fun ReaderAnnotationRangeControls(
         )
         Box(
             modifier = Modifier
-                .height(14.dp)
+                .height(12.dp)
                 .width(1.dp)
                 .background(colors.line),
         )
@@ -2799,7 +2867,7 @@ private fun ReaderRangeIconButton(
     val contentColor = if (enabled) colors.primaryText else colors.faintText
     Box(
         modifier = modifier
-            .size(44.dp)
+            .size(36.dp)
             .alpha(if (enabled) 1f else 0.42f)
             .semantics { contentDescription = label }
             .clickable(enabled = enabled, onClick = onClick),
@@ -5478,9 +5546,9 @@ private fun QaIcon(
 }
 
 @Composable
-private fun QaIconButton(icon: QaIconKind, onClick: () -> Unit) {
+private fun QaIconButton(icon: QaIconKind, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Surface(
-        modifier = Modifier.size(34.dp),
+        modifier = modifier.size(34.dp),
         onClick = onClick,
         shape = RoundedCornerShape(10.dp),
         color = Color.Transparent,
@@ -5586,8 +5654,20 @@ private fun QaMultilineTextField(
     placeholder: String,
     modifier: Modifier = Modifier,
     isError: Boolean = false,
+    maxHeight: Dp? = null,
 ) {
     val colors = QualityAlternativeThemeTokens.colors
+    val defaultMinHeight = 92.dp
+    val horizontalPadding = 13.dp
+    val verticalPadding = 12.dp
+    val fieldMinHeight = maxHeight
+        ?.let { height -> minOf(defaultMinHeight, height) }
+        ?: defaultMinHeight
+    val innerMinHeight = (fieldMinHeight - (verticalPadding * 2))
+        .coerceAtLeast(48.dp)
+    val fieldHeightModifier = maxHeight
+        ?.let { height -> Modifier.heightIn(min = fieldMinHeight, max = height) }
+        ?: Modifier.heightIn(min = defaultMinHeight)
     BasicTextField(
         value = value,
         onValueChange = onValueChange,
@@ -5599,19 +5679,19 @@ private fun QaMultilineTextField(
         ),
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = 92.dp)
+            .then(fieldHeightModifier)
             .clip(RoundedCornerShape(10.dp))
             .background(colors.background)
             .border(
                 BorderStroke(1.dp, if (isError) colors.accent else colors.lineStrong),
                 RoundedCornerShape(10.dp),
             )
-            .padding(horizontal = 13.dp, vertical = 12.dp),
+            .padding(horizontal = horizontalPadding, vertical = verticalPadding),
         decorationBox = { innerTextField ->
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 68.dp),
+                    .heightIn(min = innerMinHeight),
                 contentAlignment = Alignment.TopStart,
             ) {
                 if (value.isBlank()) {

@@ -96,6 +96,8 @@ class MainActivityTest {
         "sprint17-adaptive-pagination-${System.currentTimeMillis()}"
     private val sprint17CrossPageAnnotationScreenshotDirName =
         "sprint17-cross-page-annotation-${System.currentTimeMillis()}"
+    private val sprint17AnnotationSurfaceScreenshotDirName =
+        "sprint17-annotation-surface-${System.currentTimeMillis()}"
 
     @Before
     fun resetAppState() {
@@ -1543,6 +1545,7 @@ class MainActivityTest {
         val firstNote = "Worth remembering when the impulse hits."
         composeRule.onNodeWithTag("reader-annotation-note-input-$annotationParagraph")
             .assertIsDisplayed()
+            .performClick()
             .performTextInput(firstNote)
         UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).pressBack()
         composeRule.waitForIdle()
@@ -1551,6 +1554,7 @@ class MainActivityTest {
 
         composeRule.onNodeWithTag("reader-annotation-save-$annotationParagraph")
             .assertIsDisplayed()
+            .assertIsEnabled()
             .performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) {
                 hasTag("reader-annotation-highlight-$annotationParagraph") &&
@@ -1569,11 +1573,13 @@ class MainActivityTest {
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-annotation-editor-$annotationParagraph") }
         val updatedNoteSuffix = "Remember: "
         composeRule.onNodeWithTag("reader-annotation-note-input-$annotationParagraph")
+            .performClick()
             .performTextInput(updatedNoteSuffix)
         UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).pressBack()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("reader-annotation-save-$annotationParagraph")
             .assertIsDisplayed()
+            .assertIsEnabled()
             .performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) {
                 hasTag("reader-annotation-highlight-$annotationParagraph") &&
@@ -1777,11 +1783,13 @@ class MainActivityTest {
         val noteText = "Cross-page range from compact controls."
         composeRule.onNodeWithTag("reader-annotation-note-input-0")
             .assertIsDisplayed()
+            .performClick()
             .performTextInput(noteText)
         UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).pressBack()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("reader-annotation-save-0")
             .assertIsDisplayed()
+            .assertIsEnabled()
             .performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) {
                 !hasTag("reader-annotation-editor-0") &&
@@ -1801,6 +1809,84 @@ class MainActivityTest {
         assertTrue("Expected reopened quote to keep the source-anchored start.", reopenedQuote.contains("anchor1"))
         assertTrue("Expected reopened quote to keep the later-page end.", reopenedQuote.contains(expectedSavedEndAnchor))
         captureSprint17CrossPageAnnotationScreenshot("05_reopened_cross_page_quote_light")
+    }
+
+    @Test
+    fun readerAnnotationEditorContainsLongQuoteAndLongNoteWithinViewport() {
+        launchOnboardedApp()
+        val longQuoteText = (1..240)
+            .chunked(8)
+            .joinToString(separator = " ") { chunk ->
+                chunk.joinToString(separator = " ") { index -> "surface$index" }.plus(".")
+            }
+        val document = addSeedMarkdownDocument(
+            title = "Annotation Surface Sizing",
+            displayName = "annotation-surface-sizing.md",
+            body = longQuoteText,
+            nowMillis = 73_000L,
+        )
+
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.setReaderFontScale(1.3)
+            activity.mainViewModel.openLibraryItem(document)
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasTag("reader-screen") && readerPageFitPages(readerPageFitSummary()) > 1
+        }
+        composeRule.onNodeWithTag("reader-annotation-block-0")
+            .assertIsDisplayed()
+            .performTouchInput { longClick(position = Offset(24f, 24f)) }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-annotation-editor-0") }
+
+        repeat(80) {
+            if (hasTag("reader-annotation-end-later")) {
+                composeRule.onNodeWithTag("reader-annotation-end-later")
+                    .assertIsDisplayed()
+                    .performClick()
+                composeRule.waitForIdle()
+            }
+        }
+        composeRule.waitForIdle()
+        val longQuote = readerSelectedQuoteText(0)
+        assertTrue("Expected a long selected quote for surface sizing.", longQuote.contains("surface96"))
+        assertAnnotationEditorInsideReaderScreen("long quote")
+        assertAnnotationActionsVisibleInsideEditor("long quote")
+        val longQuoteEditorHeight = nodeHeight("reader-annotation-editor-0")
+        val longQuoteNoteHeight = nodeHeight("reader-annotation-note-input-0")
+        assertTrue(
+            "Expected long quote state to leave a usable note editor. " +
+                "noteHeight=$longQuoteNoteHeight editorHeight=$longQuoteEditorHeight",
+            longQuoteNoteHeight >= 92f && longQuoteNoteHeight < longQuoteEditorHeight * 0.38f,
+        )
+        captureSprint17AnnotationSurfaceScreenshot("01_long_quote_surface_light")
+
+        val longNote = (1..28).joinToString(separator = "\n") { index ->
+            "Long note line $index keeps the annotation editor bounded and scrollable."
+        }
+        composeRule.onNodeWithTag("reader-annotation-note-input-0")
+            .assertIsDisplayed()
+            .performClick()
+            .performTextInput(longNote)
+        composeRule.waitForIdle()
+        captureSprint17AnnotationSurfaceScreenshot("02_long_note_surface_light")
+        assertAnnotationEditorInsideReaderScreen("long note")
+        assertAnnotationActionsVisibleInsideEditor("long note")
+        val longNoteEditorHeight = nodeHeight("reader-annotation-editor-0")
+        val longNoteHeight = nodeHeight("reader-annotation-note-input-0")
+        assertTrue(
+            "Expected long note input to scroll internally instead of pushing controls away. " +
+                "noteHeight=$longNoteHeight editorHeight=$longNoteEditorHeight",
+            longNoteHeight < longNoteEditorHeight * 0.38f,
+        )
+        UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).pressBack()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("reader-annotation-save-0")
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            !hasTag("reader-annotation-editor-0") &&
+                hasReadingAnnotationNote(currentContentId(), 0, longNote)
+        }
     }
 
     @Test
@@ -2799,6 +2885,56 @@ class MainActivityTest {
         return bounds.right - bounds.left
     }
 
+    private fun nodeBounds(tag: String) = composeRule.onNodeWithTag(tag)
+        .fetchSemanticsNode()
+        .boundsInRoot
+
+    private fun assertAnnotationEditorInsideReaderScreen(context: String) {
+        val editorBounds = nodeBounds("reader-annotation-editor-0")
+        val screenBounds = nodeBounds("reader-screen")
+        assertTrue(
+            "Expected annotation editor to stay within reader screen for $context. " +
+                "editor=$editorBounds screen=$screenBounds",
+            editorBounds.top >= screenBounds.top &&
+                editorBounds.bottom <= screenBounds.bottom &&
+                editorBounds.left >= screenBounds.left &&
+                editorBounds.right <= screenBounds.right,
+        )
+    }
+
+    private fun assertAnnotationActionsVisibleInsideEditor(context: String) {
+        val editorBounds = nodeBounds("reader-annotation-editor-0")
+        val titleBounds = nodeBounds("reader-annotation-title-0")
+        val rangeBounds = nodeBounds("reader-annotation-range-controls")
+        val closeBounds = nodeBounds("reader-annotation-close-0")
+        val cancelBounds = nodeBounds("reader-annotation-save-0")
+        val noteBounds = nodeBounds("reader-annotation-note-input-0")
+        composeRule.onNodeWithTag("reader-annotation-title-0").assertIsDisplayed()
+        composeRule.onNodeWithTag("reader-annotation-range-controls").assertIsDisplayed()
+        composeRule.onNodeWithTag("reader-annotation-close-0").assertIsDisplayed()
+        assertTrue(
+            "Expected note input to remain above save action for $context. note=$noteBounds save=$cancelBounds",
+            noteBounds.bottom <= cancelBounds.top,
+        )
+        listOf(
+            "title" to titleBounds,
+            "rangeControls" to rangeBounds,
+            "close" to closeBounds,
+        ).forEach { (label, bounds) ->
+            assertTrue(
+                "Expected $label to remain inside annotation editor for $context. editor=$editorBounds $label=$bounds",
+                bounds.top >= editorBounds.top &&
+                    bounds.bottom <= editorBounds.bottom &&
+                    bounds.left >= editorBounds.left &&
+                    bounds.right <= editorBounds.right,
+            )
+        }
+        assertTrue(
+            "Expected save action to remain inside annotation editor for $context. editor=$editorBounds save=$cancelBounds",
+            cancelBounds.bottom <= editorBounds.bottom && cancelBounds.top >= editorBounds.top,
+        )
+    }
+
     private fun currentReaderStartParagraphIndex(): Int {
         var paragraphIndex = -1
         scenario?.onActivity { activity ->
@@ -3044,11 +3180,13 @@ class MainActivityTest {
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-annotation-editor-$paragraphIndex") }
         composeRule.onNodeWithTag("reader-annotation-note-input-$paragraphIndex")
             .assertIsDisplayed()
+            .performClick()
             .performTextInput(noteText)
         UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).pressBack()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("reader-annotation-save-$paragraphIndex")
             .assertIsDisplayed()
+            .assertIsEnabled()
             .performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) {
             hasTag("reader-annotation-highlight-$paragraphIndex") && hasReadingAnnotationNote(currentContentId(), paragraphIndex, noteText)
@@ -3601,6 +3739,16 @@ class MainActivityTest {
 
     private fun captureSprint17CrossPageAnnotationScreenshot(name: String) {
         val outputDir = File("/sdcard/Download/qualityalternative/$sprint17CrossPageAnnotationScreenshotDirName")
+        assertTrue("Expected screenshot output directory for $name", outputDir.mkdirs() || outputDir.exists())
+        composeRule.waitForIdle()
+        Thread.sleep(300)
+        val output = File(outputDir, "$name.png")
+        assertTrue("Expected screenshot capture for $name", UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).takeScreenshot(output))
+        assertTrue("Expected screenshot file for $name", output.exists() && output.length() > 0L)
+    }
+
+    private fun captureSprint17AnnotationSurfaceScreenshot(name: String) {
+        val outputDir = File("/sdcard/Download/qualityalternative/$sprint17AnnotationSurfaceScreenshotDirName")
         assertTrue("Expected screenshot output directory for $name", outputDir.mkdirs() || outputDir.exists())
         composeRule.waitForIdle()
         Thread.sleep(300)

@@ -1,0 +1,600 @@
+diff --git a/app/src/androidTest/java/com/qualityalternative/app/MainActivityTest.kt b/app/src/androidTest/java/com/qualityalternative/app/MainActivityTest.kt
+index 23a55c1..b7515b3 100644
+--- a/app/src/androidTest/java/com/qualityalternative/app/MainActivityTest.kt
++++ b/app/src/androidTest/java/com/qualityalternative/app/MainActivityTest.kt
+@@ -96,6 +96,8 @@ class MainActivityTest {
+         "sprint17-adaptive-pagination-${System.currentTimeMillis()}"
+     private val sprint17CrossPageAnnotationScreenshotDirName =
+         "sprint17-cross-page-annotation-${System.currentTimeMillis()}"
++    private val sprint17AnnotationSurfaceScreenshotDirName =
++        "sprint17-annotation-surface-${System.currentTimeMillis()}"
+ 
+     @Before
+     fun resetAppState() {
+@@ -1543,6 +1545,7 @@ class MainActivityTest {
+         val firstNote = "Worth remembering when the impulse hits."
+         composeRule.onNodeWithTag("reader-annotation-note-input-$annotationParagraph")
+             .assertIsDisplayed()
++            .performClick()
+             .performTextInput(firstNote)
+         UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).pressBack()
+         composeRule.waitForIdle()
+@@ -1551,6 +1554,7 @@ class MainActivityTest {
+ 
+         composeRule.onNodeWithTag("reader-annotation-save-$annotationParagraph")
+             .assertIsDisplayed()
++            .assertIsEnabled()
+             .performClick()
+         composeRule.waitUntil(timeoutMillis = 10_000) {
+                 hasTag("reader-annotation-highlight-$annotationParagraph") &&
+@@ -1569,11 +1573,13 @@ class MainActivityTest {
+         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-annotation-editor-$annotationParagraph") }
+         val updatedNoteSuffix = "Remember: "
+         composeRule.onNodeWithTag("reader-annotation-note-input-$annotationParagraph")
++            .performClick()
+             .performTextInput(updatedNoteSuffix)
+         UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).pressBack()
+         composeRule.waitForIdle()
+         composeRule.onNodeWithTag("reader-annotation-save-$annotationParagraph")
+             .assertIsDisplayed()
++            .assertIsEnabled()
+             .performClick()
+         composeRule.waitUntil(timeoutMillis = 10_000) {
+                 hasTag("reader-annotation-highlight-$annotationParagraph") &&
+@@ -1777,11 +1783,13 @@ class MainActivityTest {
+         val noteText = "Cross-page range from compact controls."
+         composeRule.onNodeWithTag("reader-annotation-note-input-0")
+             .assertIsDisplayed()
++            .performClick()
+             .performTextInput(noteText)
+         UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).pressBack()
+         composeRule.waitForIdle()
+         composeRule.onNodeWithTag("reader-annotation-save-0")
+             .assertIsDisplayed()
++            .assertIsEnabled()
+             .performClick()
+         composeRule.waitUntil(timeoutMillis = 10_000) {
+                 !hasTag("reader-annotation-editor-0") &&
+@@ -1803,6 +1811,84 @@ class MainActivityTest {
+         captureSprint17CrossPageAnnotationScreenshot("05_reopened_cross_page_quote_light")
+     }
+ 
++    @Test
++    fun readerAnnotationEditorContainsLongQuoteAndLongNoteWithinViewport() {
++        launchOnboardedApp()
++        val longQuoteText = (1..240)
++            .chunked(8)
++            .joinToString(separator = " ") { chunk ->
++                chunk.joinToString(separator = " ") { index -> "surface$index" }.plus(".")
++            }
++        val document = addSeedMarkdownDocument(
++            title = "Annotation Surface Sizing",
++            displayName = "annotation-surface-sizing.md",
++            body = longQuoteText,
++            nowMillis = 73_000L,
++        )
++
++        scenario?.onActivity { activity ->
++            activity.mainViewModel.setReaderFontScale(1.3)
++            activity.mainViewModel.openLibraryItem(document)
++        }
++        composeRule.waitUntil(timeoutMillis = 10_000) {
++            hasTag("reader-screen") && readerPageFitPages(readerPageFitSummary()) > 1
++        }
++        composeRule.onNodeWithTag("reader-annotation-block-0")
++            .assertIsDisplayed()
++            .performTouchInput { longClick(position = Offset(24f, 24f)) }
++        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-annotation-editor-0") }
++
++        repeat(80) {
++            if (hasTag("reader-annotation-end-later")) {
++                composeRule.onNodeWithTag("reader-annotation-end-later")
++                    .assertIsDisplayed()
++                    .performClick()
++                composeRule.waitForIdle()
++            }
++        }
++        composeRule.waitForIdle()
++        val longQuote = readerSelectedQuoteText(0)
++        assertTrue("Expected a long selected quote for surface sizing.", longQuote.contains("surface96"))
++        assertAnnotationEditorInsideReaderScreen("long quote")
++        assertAnnotationActionsVisibleInsideEditor("long quote")
++        val longQuoteEditorHeight = nodeHeight("reader-annotation-editor-0")
++        val longQuoteNoteHeight = nodeHeight("reader-annotation-note-input-0")
++        assertTrue(
++            "Expected long quote state to leave a usable note editor. " +
++                "noteHeight=$longQuoteNoteHeight editorHeight=$longQuoteEditorHeight",
++            longQuoteNoteHeight >= 92f && longQuoteNoteHeight < longQuoteEditorHeight * 0.38f,
++        )
++        captureSprint17AnnotationSurfaceScreenshot("01_long_quote_surface_light")
++
++        val longNote = (1..28).joinToString(separator = "\n") { index ->
++            "Long note line $index keeps the annotation editor bounded and scrollable."
++        }
++        composeRule.onNodeWithTag("reader-annotation-note-input-0")
++            .assertIsDisplayed()
++            .performClick()
++            .performTextInput(longNote)
++        composeRule.waitForIdle()
++        captureSprint17AnnotationSurfaceScreenshot("02_long_note_surface_light")
++        assertAnnotationEditorInsideReaderScreen("long note")
++        assertAnnotationActionsVisibleInsideEditor("long note")
++        val longNoteEditorHeight = nodeHeight("reader-annotation-editor-0")
++        val longNoteHeight = nodeHeight("reader-annotation-note-input-0")
++        assertTrue(
++            "Expected long note input to scroll internally instead of pushing controls away. " +
++                "noteHeight=$longNoteHeight editorHeight=$longNoteEditorHeight",
++            longNoteHeight < longNoteEditorHeight * 0.38f,
++        )
++        UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).pressBack()
++        composeRule.waitForIdle()
++        composeRule.onNodeWithTag("reader-annotation-save-0")
++            .assertIsDisplayed()
++            .performClick()
++        composeRule.waitUntil(timeoutMillis = 10_000) {
++            !hasTag("reader-annotation-editor-0") &&
++                hasReadingAnnotationNote(currentContentId(), 0, longNote)
++        }
++    }
++
+     @Test
+     fun annotationLibraryListsSavedNotesAndOpensSourceFragment() {
+         launchFixtureSystemIntervention()
+@@ -2799,6 +2885,56 @@ class MainActivityTest {
+         return bounds.right - bounds.left
+     }
+ 
++    private fun nodeBounds(tag: String) = composeRule.onNodeWithTag(tag)
++        .fetchSemanticsNode()
++        .boundsInRoot
++
++    private fun assertAnnotationEditorInsideReaderScreen(context: String) {
++        val editorBounds = nodeBounds("reader-annotation-editor-0")
++        val screenBounds = nodeBounds("reader-screen")
++        assertTrue(
++            "Expected annotation editor to stay within reader screen for $context. " +
++                "editor=$editorBounds screen=$screenBounds",
++            editorBounds.top >= screenBounds.top &&
++                editorBounds.bottom <= screenBounds.bottom &&
++                editorBounds.left >= screenBounds.left &&
++                editorBounds.right <= screenBounds.right,
++        )
++    }
++
++    private fun assertAnnotationActionsVisibleInsideEditor(context: String) {
++        val editorBounds = nodeBounds("reader-annotation-editor-0")
++        val titleBounds = nodeBounds("reader-annotation-title-0")
++        val rangeBounds = nodeBounds("reader-annotation-range-controls")
++        val closeBounds = nodeBounds("reader-annotation-close-0")
++        val cancelBounds = nodeBounds("reader-annotation-save-0")
++        val noteBounds = nodeBounds("reader-annotation-note-input-0")
++        composeRule.onNodeWithTag("reader-annotation-title-0").assertIsDisplayed()
++        composeRule.onNodeWithTag("reader-annotation-range-controls").assertIsDisplayed()
++        composeRule.onNodeWithTag("reader-annotation-close-0").assertIsDisplayed()
++        assertTrue(
++            "Expected note input to remain above save action for $context. note=$noteBounds save=$cancelBounds",
++            noteBounds.bottom <= cancelBounds.top,
++        )
++        listOf(
++            "title" to titleBounds,
++            "rangeControls" to rangeBounds,
++            "close" to closeBounds,
++        ).forEach { (label, bounds) ->
++            assertTrue(
++                "Expected $label to remain inside annotation editor for $context. editor=$editorBounds $label=$bounds",
++                bounds.top >= editorBounds.top &&
++                    bounds.bottom <= editorBounds.bottom &&
++                    bounds.left >= editorBounds.left &&
++                    bounds.right <= editorBounds.right,
++            )
++        }
++        assertTrue(
++            "Expected save action to remain inside annotation editor for $context. editor=$editorBounds save=$cancelBounds",
++            cancelBounds.bottom <= editorBounds.bottom && cancelBounds.top >= editorBounds.top,
++        )
++    }
++
+     private fun currentReaderStartParagraphIndex(): Int {
+         var paragraphIndex = -1
+         scenario?.onActivity { activity ->
+@@ -3044,11 +3180,13 @@ class MainActivityTest {
+         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-annotation-editor-$paragraphIndex") }
+         composeRule.onNodeWithTag("reader-annotation-note-input-$paragraphIndex")
+             .assertIsDisplayed()
++            .performClick()
+             .performTextInput(noteText)
+         UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).pressBack()
+         composeRule.waitForIdle()
+         composeRule.onNodeWithTag("reader-annotation-save-$paragraphIndex")
+             .assertIsDisplayed()
++            .assertIsEnabled()
+             .performClick()
+         composeRule.waitUntil(timeoutMillis = 10_000) {
+             hasTag("reader-annotation-highlight-$paragraphIndex") && hasReadingAnnotationNote(currentContentId(), paragraphIndex, noteText)
+@@ -3609,6 +3747,16 @@ class MainActivityTest {
+         assertTrue("Expected screenshot file for $name", output.exists() && output.length() > 0L)
+     }
+ 
++    private fun captureSprint17AnnotationSurfaceScreenshot(name: String) {
++        val outputDir = File("/sdcard/Download/qualityalternative/$sprint17AnnotationSurfaceScreenshotDirName")
++        assertTrue("Expected screenshot output directory for $name", outputDir.mkdirs() || outputDir.exists())
++        composeRule.waitForIdle()
++        Thread.sleep(300)
++        val output = File(outputDir, "$name.png")
++        assertTrue("Expected screenshot capture for $name", UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).takeScreenshot(output))
++        assertTrue("Expected screenshot file for $name", output.exists() && output.length() > 0L)
++    }
++
+     private fun recordSprint17AdaptivePaginationSummary(name: String, summary: String) {
+         val outputDir = File("/sdcard/Download/qualityalternative/$sprint17AdaptivePaginationScreenshotDirName")
+         assertTrue("Expected summary output directory for $name", outputDir.mkdirs() || outputDir.exists())
+diff --git a/app/src/main/AndroidManifest.xml b/app/src/main/AndroidManifest.xml
+index 29519b2..dec1860 100644
+--- a/app/src/main/AndroidManifest.xml
++++ b/app/src/main/AndroidManifest.xml
+@@ -16,7 +16,8 @@
+             android:name=".MainActivity"
+             android:exported="true"
+             android:launchMode="singleTop"
+-            android:label="@string/app_name">
++            android:label="@string/app_name"
++            android:windowSoftInputMode="adjustResize">
+             <intent-filter>
+                 <action android:name="android.intent.action.MAIN" />
+ 
+diff --git a/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt b/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
+index 74dd45b..e7cdf42 100644
+--- a/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
++++ b/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
+@@ -34,11 +34,13 @@ import androidx.compose.foundation.layout.FlowRow
+ import androidx.compose.foundation.layout.PaddingValues
+ import androidx.compose.foundation.layout.Row
+ import androidx.compose.foundation.layout.Spacer
++import androidx.compose.foundation.layout.WindowInsets
+ import androidx.compose.foundation.layout.fillMaxHeight
+ import androidx.compose.foundation.layout.fillMaxSize
+ import androidx.compose.foundation.layout.fillMaxWidth
+ import androidx.compose.foundation.layout.height
+ import androidx.compose.foundation.layout.heightIn
++import androidx.compose.foundation.layout.ime
+ import androidx.compose.foundation.layout.padding
+ import androidx.compose.foundation.layout.size
+ import androidx.compose.foundation.layout.width
+@@ -105,6 +107,7 @@ import androidx.compose.ui.text.style.TextAlign
+ import androidx.compose.ui.text.style.TextOverflow
+ import androidx.compose.ui.unit.dp
+ import androidx.compose.ui.unit.Density
++import androidx.compose.ui.unit.Dp
+ import androidx.compose.ui.unit.sp
+ import androidx.core.view.WindowCompat
+ import com.qualityalternative.app.data.ACCOUNT_LIGHT_PROFILE_FILE_NAME
+@@ -741,6 +744,7 @@ private fun TabBar(
+     onSettings: () -> Unit,
+ ) {
+     val colors = QualityAlternativeThemeTokens.colors
++    val density = LocalDensity.current
+     Column(
+         modifier = Modifier
+             .fillMaxWidth()
+@@ -2419,6 +2423,7 @@ private fun BoxScope.ReaderTableOfContentsSheet(
+     onDismiss: () -> Unit,
+ ) {
+     val colors = QualityAlternativeThemeTokens.colors
++    val density = LocalDensity.current
+     Box(
+         modifier = Modifier
+             .fillMaxSize()
+@@ -2635,6 +2640,7 @@ private fun BoxScope.ReaderAnnotationEditorOverlay(
+     onSave: () -> Unit,
+ ) {
+     val colors = QualityAlternativeThemeTokens.colors
++    val density = LocalDensity.current
+     Box(
+         modifier = Modifier
+             .fillMaxSize()
+@@ -2645,92 +2651,154 @@ private fun BoxScope.ReaderAnnotationEditorOverlay(
+     BoxWithConstraints(
+         modifier = Modifier
+             .align(Alignment.BottomCenter)
+-            .fillMaxSize()
+-            .padding(horizontal = 12.dp, vertical = 12.dp),
++            .fillMaxSize(),
+     ) {
+-        val sheetMaxHeight = maxHeight * 0.94f
+-        val quoteMaxHeight = (sheetMaxHeight - 184.dp).coerceAtLeast(96.dp)
++        val horizontalPadding = 12.dp
++        val verticalPadding = 12.dp
++        val reportedImeBottomPadding = with(density) { WindowInsets.ime.getBottom(density).toDp() }
++        val isKeyboardVisible = reportedImeBottomPadding > 0.dp
++        val rootAlreadyAvoidsIme = isKeyboardVisible && maxHeight < 620.dp
++        val effectiveImeBottomPadding = if (rootAlreadyAvoidsIme) 0.dp else reportedImeBottomPadding
++        val rawUsableHeight = (maxHeight - effectiveImeBottomPadding - (verticalPadding * 2))
++            .coerceAtLeast(260.dp)
++        val sheetMaxHeight = if (isKeyboardVisible) {
++            rawUsableHeight.coerceAtMost(360.dp)
++        } else {
++            maxHeight * 0.94f
++        }
++        val isKeyboardConstrained = isKeyboardVisible || sheetMaxHeight < 620.dp
++        val sheetContentPadding = if (isKeyboardConstrained) 10.dp else 12.dp
++        val sheetGap = if (isKeyboardConstrained) 6.dp else 8.dp
++        val fixedRowBudget = (sheetContentPadding * 2) +
++            if (isKeyboardConstrained) 136.dp else 178.dp
++        val scrollableBudget = (sheetMaxHeight - fixedRowBudget)
++            .coerceAtLeast(if (isKeyboardConstrained) 112.dp else 200.dp)
++        val noteMaxHeight = if (isKeyboardConstrained) {
++            (scrollableBudget * 0.56f).coerceIn(64.dp, 112.dp)
++        } else {
++            (sheetMaxHeight * 0.25f).coerceAtLeast(104.dp)
++        }
++        val quoteMaxHeight = if (isKeyboardConstrained) {
++            (scrollableBudget - noteMaxHeight).coerceIn(48.dp, 132.dp)
++        } else {
++            (sheetMaxHeight * 0.56f).coerceAtLeast(96.dp)
++        }
+         val quoteScrollState = rememberScrollState()
+-        Surface(
++        Box(
+             modifier = Modifier
+                 .align(Alignment.BottomCenter)
+                 .fillMaxWidth()
+-                .heightIn(max = sheetMaxHeight)
+-                .testTag("reader-annotation-editor-${selection.paragraphIndex}"),
+-            shape = RoundedCornerShape(18.dp),
+-            color = colors.elevatedSurface,
+-            border = BorderStroke(1.dp, colors.lineStrong),
++                .padding(
++                    start = horizontalPadding,
++                    end = horizontalPadding,
++                    top = verticalPadding,
++                    bottom = verticalPadding + effectiveImeBottomPadding,
++                ),
+         ) {
+-            Column(
++            Surface(
+                 modifier = Modifier
+-                    .heightIn(max = sheetMaxHeight)
+-                    .padding(12.dp),
+-                verticalArrangement = Arrangement.spacedBy(8.dp),
+-            ) {
+-                Row(
+-                    modifier = Modifier.fillMaxWidth(),
+-                    verticalAlignment = Alignment.CenterVertically,
+-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+-                ) {
+-                    DisplayText("Note", fontSize = 19.sp, lineHeight = 23.sp, modifier = Modifier.weight(1f))
+-                    ReaderAnnotationRangeControls(
+-                        selection = selection,
+-                        onSelectionChanged = onSelectionChanged,
++                    .align(Alignment.BottomCenter)
++                    .fillMaxWidth()
++                    .then(
++                        if (isKeyboardVisible) {
++                            Modifier.height(sheetMaxHeight)
++                        } else {
++                            Modifier.heightIn(max = sheetMaxHeight)
++                        },
+                     )
+-                    QaIconButton(icon = QaIconKind.Close, onClick = onCancel)
+-                }
+-                Box(
++                    .testTag("reader-annotation-editor-${selection.paragraphIndex}"),
++                shape = RoundedCornerShape(18.dp),
++                color = colors.elevatedSurface,
++                border = BorderStroke(1.dp, colors.lineStrong),
++            ) {
++                Column(
+                     modifier = Modifier
+-                        .fillMaxWidth()
+-                        .heightIn(max = quoteMaxHeight)
+-                        .clip(RoundedCornerShape(10.dp))
+-                        .background(colors.background.copy(alpha = 0.56f))
+-                        .verticalScroll(quoteScrollState)
+-                        .padding(horizontal = 10.dp, vertical = 8.dp)
+-                        .testTag("reader-annotation-selected-quote-scroll-${selection.paragraphIndex}"),
++                        .heightIn(max = sheetMaxHeight)
++                        .padding(sheetContentPadding),
++                    verticalArrangement = Arrangement.spacedBy(sheetGap),
+                 ) {
+-                    Text(
+-                        text = selection.quotedText,
+-                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp, lineHeight = 18.sp),
+-                        color = colors.primaryText,
+-                        modifier = Modifier.testTag("reader-annotation-selected-quote-${selection.paragraphIndex}"),
++                    Row(
++                        modifier = Modifier
++                            .fillMaxWidth()
++                            .heightIn(min = if (isKeyboardConstrained) 34.dp else 44.dp),
++                        verticalAlignment = Alignment.CenterVertically,
++                        horizontalArrangement = Arrangement.spacedBy(8.dp),
++                    ) {
++                        DisplayText(
++                            "Note",
++                            fontSize = 19.sp,
++                            lineHeight = 23.sp,
++                            modifier = Modifier
++                                .weight(1f)
++                                .testTag("reader-annotation-title-${selection.paragraphIndex}"),
++                        )
++                        ReaderAnnotationRangeControls(
++                            selection = selection,
++                            onSelectionChanged = onSelectionChanged,
++                        )
++                        QaIconButton(
++                            icon = QaIconKind.Close,
++                            onClick = onCancel,
++                            modifier = Modifier.testTag("reader-annotation-close-${selection.paragraphIndex}"),
++                        )
++                    }
++                    Box(
++                        modifier = Modifier
++                            .fillMaxWidth()
++                            .heightIn(max = quoteMaxHeight)
++                            .clip(RoundedCornerShape(10.dp))
++                            .background(colors.background.copy(alpha = 0.56f))
++                            .verticalScroll(quoteScrollState)
++                            .padding(horizontal = 10.dp, vertical = 8.dp)
++                            .testTag("reader-annotation-selected-quote-scroll-${selection.paragraphIndex}"),
++                    ) {
++                        Text(
++                            text = selection.quotedText,
++                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp, lineHeight = 18.sp),
++                            color = colors.primaryText,
++                            modifier = Modifier.testTag("reader-annotation-selected-quote-${selection.paragraphIndex}"),
++                        )
++                    }
++                    QaMultilineTextField(
++                        value = noteDraft,
++                        onValueChange = onNoteDraftChanged,
++                        placeholder = "Write a note",
++                        maxHeight = noteMaxHeight,
++                        modifier = Modifier.testTag("reader-annotation-note-input-${selection.paragraphIndex}"),
+                     )
+-                }
+-                QaMultilineTextField(
+-                    value = noteDraft,
+-                    onValueChange = onNoteDraftChanged,
+-                    placeholder = "Write a note",
+-                    modifier = Modifier.testTag("reader-annotation-note-input-${selection.paragraphIndex}"),
+-                )
+-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+-                    if (onDelete != null) {
++                    Row(
++                        modifier = Modifier.heightIn(min = if (isKeyboardConstrained) 46.dp else 52.dp),
++                        horizontalArrangement = Arrangement.spacedBy(8.dp),
++                    ) {
++                        if (onDelete != null) {
++                            QaButton(
++                                text = "Delete note",
++                                onClick = onDelete,
++                                variant = QaButtonVariant.Ghost,
++                                size = QaButtonSize.Small,
++                                modifier = Modifier
++                                    .weight(1f)
++                                    .testTag("reader-annotation-delete-${selection.paragraphIndex}"),
++                            )
++                        }
+                         QaButton(
+-                            text = "Delete note",
+-                            onClick = onDelete,
++                            text = "Cancel",
++                            onClick = onCancel,
+                             variant = QaButtonVariant.Ghost,
+                             size = QaButtonSize.Small,
++                            modifier = Modifier.weight(1f),
++                        )
++                        QaButton(
++                            text = if (hasExistingAnnotation) "Update" else "Save",
++                            onClick = onSave,
++                            variant = QaButtonVariant.Primary,
++                            size = QaButtonSize.Small,
++                            enabled = noteDraft.isNotBlank(),
+                             modifier = Modifier
+                                 .weight(1f)
+-                                .testTag("reader-annotation-delete-${selection.paragraphIndex}"),
++                                .testTag("reader-annotation-save-${selection.paragraphIndex}"),
+                         )
+                     }
+-                    QaButton(
+-                        text = "Cancel",
+-                        onClick = onCancel,
+-                        variant = QaButtonVariant.Ghost,
+-                        size = QaButtonSize.Small,
+-                        modifier = Modifier.weight(1f),
+-                    )
+-                    QaButton(
+-                        text = if (hasExistingAnnotation) "Update" else "Save",
+-                        onClick = onSave,
+-                        variant = QaButtonVariant.Primary,
+-                        size = QaButtonSize.Small,
+-                        enabled = noteDraft.isNotBlank(),
+-                        modifier = Modifier
+-                            .weight(1f)
+-                            .testTag("reader-annotation-save-${selection.paragraphIndex}"),
+-                    )
+                 }
+             }
+         }
+@@ -2747,7 +2815,7 @@ private fun ReaderAnnotationRangeControls(
+         modifier = Modifier
+             .semantics { contentDescription = "Annotation range controls" }
+             .testTag("reader-annotation-range-controls"),
+-        horizontalArrangement = Arrangement.spacedBy(3.dp),
++        horizontalArrangement = Arrangement.spacedBy(2.dp),
+         verticalAlignment = Alignment.CenterVertically,
+     ) {
+         ReaderRangeIconButton(
+@@ -2766,7 +2834,7 @@ private fun ReaderAnnotationRangeControls(
+         )
+         Box(
+             modifier = Modifier
+-                .height(14.dp)
++                .height(12.dp)
+                 .width(1.dp)
+                 .background(colors.line),
+         )
+@@ -2799,7 +2867,7 @@ private fun ReaderRangeIconButton(
+     val contentColor = if (enabled) colors.primaryText else colors.faintText
+     Box(
+         modifier = modifier
+-            .size(44.dp)
++            .size(36.dp)
+             .alpha(if (enabled) 1f else 0.42f)
+             .semantics { contentDescription = label }
+             .clickable(enabled = enabled, onClick = onClick),
+@@ -5478,9 +5546,9 @@ private fun QaIcon(
+ }
+ 
+ @Composable
+-private fun QaIconButton(icon: QaIconKind, onClick: () -> Unit) {
++private fun QaIconButton(icon: QaIconKind, onClick: () -> Unit, modifier: Modifier = Modifier) {
+     Surface(
+-        modifier = Modifier.size(34.dp),
++        modifier = modifier.size(34.dp),
+         onClick = onClick,
+         shape = RoundedCornerShape(10.dp),
+         color = Color.Transparent,
+@@ -5586,8 +5654,20 @@ private fun QaMultilineTextField(
+     placeholder: String,
+     modifier: Modifier = Modifier,
+     isError: Boolean = false,
++    maxHeight: Dp? = null,
+ ) {
+     val colors = QualityAlternativeThemeTokens.colors
++    val defaultMinHeight = 92.dp
++    val horizontalPadding = 13.dp
++    val verticalPadding = 12.dp
++    val fieldMinHeight = maxHeight
++        ?.let { height -> minOf(defaultMinHeight, height) }
++        ?: defaultMinHeight
++    val innerMinHeight = (fieldMinHeight - (verticalPadding * 2))
++        .coerceAtLeast(48.dp)
++    val fieldHeightModifier = maxHeight
++        ?.let { height -> Modifier.heightIn(min = fieldMinHeight, max = height) }
++        ?: Modifier.heightIn(min = defaultMinHeight)
+     BasicTextField(
+         value = value,
+         onValueChange = onValueChange,
+@@ -5599,19 +5679,19 @@ private fun QaMultilineTextField(
+         ),
+         modifier = modifier
+             .fillMaxWidth()
+-            .heightIn(min = 92.dp)
++            .then(fieldHeightModifier)
+             .clip(RoundedCornerShape(10.dp))
+             .background(colors.background)
+             .border(
+                 BorderStroke(1.dp, if (isError) colors.accent else colors.lineStrong),
+                 RoundedCornerShape(10.dp),
+             )
+-            .padding(horizontal = 13.dp, vertical = 12.dp),
++            .padding(horizontal = horizontalPadding, vertical = verticalPadding),
+         decorationBox = { innerTextField ->
+             Box(
+                 modifier = Modifier
+                     .fillMaxWidth()
+-                    .heightIn(min = 68.dp),
++                    .heightIn(min = innerMinHeight),
+                 contentAlignment = Alignment.TopStart,
+             ) {
+                 if (value.isBlank()) {
