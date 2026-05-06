@@ -94,6 +94,8 @@ class MainActivityTest {
         "sprint17-default-settings-${System.currentTimeMillis()}"
     private val sprint17AdaptivePaginationScreenshotDirName =
         "sprint17-adaptive-pagination-${System.currentTimeMillis()}"
+    private val sprint17CrossPageAnnotationScreenshotDirName =
+        "sprint17-cross-page-annotation-${System.currentTimeMillis()}"
 
     @Before
     fun resetAppState() {
@@ -1593,9 +1595,11 @@ class MainActivityTest {
     @Test
     fun crossPageAnnotationSelectionPersistsAcrossPagedSourceChunks() {
         launchOnboardedApp()
-        val crossPageText = (1..120)
-            .joinToString(separator = " ") { index -> "anchor$index" }
-            .plus(".")
+        val crossPageText = (1..240)
+            .chunked(8)
+            .joinToString(separator = " ") { chunk ->
+                chunk.joinToString(separator = " ") { index -> "anchor$index" }.plus(".")
+            }
         val document = addSeedMarkdownDocument(
             title = "Cross-page Annotation Fixture",
             displayName = "cross-page-annotation.md",
@@ -1658,6 +1662,145 @@ class MainActivityTest {
         val laterPageHighlights = visibleAnnotationHighlightIndices()
         assertTrue(laterPageHighlights.any { index -> index > firstPageMax })
         captureSprint16AdaptiveReaderScreenshot("04_cross_page_annotation_page_two_light")
+    }
+
+    @Test
+    fun readerAnnotationControlsExpandAndReopenAcrossPages() {
+        launchOnboardedApp()
+        val crossPageText = (1..120)
+            .chunked(8)
+            .joinToString(separator = " ") { chunk ->
+                chunk.joinToString(separator = " ") { index -> "anchor$index" }.plus(".")
+            }
+        val document = addSeedMarkdownDocument(
+            title = "Cross-page Range Controls",
+            displayName = "cross-page-range-controls.md",
+            body = crossPageText,
+            nowMillis = 72_000L,
+        )
+
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.setReaderFontScale(1.3)
+            activity.mainViewModel.openLibraryItem(document)
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") && readerPageFitPages(readerPageFitSummary()) > 1 }
+        val contentId = currentContentId()
+        val firstPageEnd = currentReaderPageEndParagraphIndex()
+        composeRule.onNodeWithTag("reader-annotation-block-0")
+            .assertIsDisplayed()
+            .performTouchInput { longClick(position = Offset(24f, 24f)) }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-annotation-editor-0") }
+        composeRule.onNodeWithTag("reader-annotation-range-controls").assertIsDisplayed()
+        composeRule.onNodeWithText("Start").assertDoesNotExist()
+        composeRule.onNodeWithText("End").assertDoesNotExist()
+        val initialQuote = readerSelectedQuoteText(0)
+        val initialEditorHeight = nodeHeight("reader-annotation-editor-0")
+        captureSprint17CrossPageAnnotationScreenshot("01_compact_controls_first_page_light")
+
+        repeat(80) {
+            if (hasTag("reader-annotation-end-later")) {
+                composeRule.onNodeWithTag("reader-annotation-end-later")
+                    .assertIsDisplayed()
+                    .performClick()
+                composeRule.waitForIdle()
+            }
+        }
+        composeRule.waitForIdle()
+        captureSprint17CrossPageAnnotationScreenshot("02_after_end_later_clicks_light")
+        val expandedQuote = readerSelectedQuoteText(0)
+        val expectedSavedEndAnchor = Regex("""anchor\d+""")
+            .findAll(expandedQuote)
+            .lastOrNull()
+            ?.value
+            ?: "anchor96"
+        val expandedPageEnd = currentReaderPageEndParagraphIndex()
+        val expandedEditorHeight = nodeHeight("reader-annotation-editor-0")
+        val readerScreenHeight = nodeHeight("reader-screen")
+        val rangeControlsHeight = nodeHeight("reader-annotation-range-controls")
+        assertTrue(
+            "Expected range controls to expand beyond the first page. " +
+                "initialQuoteLength=${initialQuote.length} expandedQuoteLength=${expandedQuote.length} " +
+                "firstPageEnd=$firstPageEnd expandedPageEnd=$expandedPageEnd",
+            expandedQuote.length > initialQuote.length && expandedPageEnd > firstPageEnd,
+        )
+        assertTrue(
+            "Expected the annotation editor to grow with a long selected quote. " +
+                "initialEditorHeight=$initialEditorHeight expandedEditorHeight=$expandedEditorHeight",
+            expandedEditorHeight > initialEditorHeight,
+        )
+        assertTrue(
+            "Expected the long-quote editor to use most of the reader screen before quote scrolling. " +
+                "expandedEditorHeight=$expandedEditorHeight readerScreenHeight=$readerScreenHeight",
+            expandedEditorHeight > readerScreenHeight * 0.65f,
+        )
+        assertTrue(
+            "Expected range arrows to stay compact inside the header instead of consuming a separate row. " +
+                "rangeControlsHeight=$rangeControlsHeight expandedEditorHeight=$expandedEditorHeight",
+            rangeControlsHeight < expandedEditorHeight * 0.18f,
+        )
+        assertTrue(
+            "Expected the selected quote to reach at least the original R1 evidence anchor. " +
+                "expectedSavedEndAnchor=$expectedSavedEndAnchor",
+            expectedSavedEndAnchor.removePrefix("anchor").toInt() >= 96,
+        )
+        listOf(
+            "reader-annotation-start-earlier",
+            "reader-annotation-start-later",
+            "reader-annotation-end-earlier",
+            "reader-annotation-end-later",
+        ).forEach { tag ->
+            val hitTargetWidth = nodeWidth(tag)
+            val hitTargetHeight = nodeHeight(tag)
+            assertTrue(
+                "Expected compact visual arrows to keep an accessible touch target. " +
+                    "tag=$tag width=$hitTargetWidth height=$hitTargetHeight",
+                hitTargetWidth >= 44f && hitTargetHeight >= 44f,
+            )
+        }
+        composeRule.onNodeWithTag("reader-annotation-start-earlier").assertIsDisplayed()
+        composeRule.onNodeWithTag("reader-annotation-end-later").assertIsDisplayed()
+        captureSprint17CrossPageAnnotationScreenshot("03_compact_controls_later_page_light")
+        composeRule.onNodeWithTag("reader-annotation-selected-quote-scroll-0")
+            .performTouchInput {
+                swipeUp(
+                    startY = bottom - 12f,
+                    endY = top + 12f,
+                )
+            }
+        composeRule.waitForIdle()
+        captureSprint17CrossPageAnnotationScreenshot("04_long_quote_scroll_region_light")
+        assertTrue(
+            "Expected internal quote scrolling to preserve the same selected range.",
+            readerSelectedQuoteText(0).contains(expectedSavedEndAnchor),
+        )
+
+        val noteText = "Cross-page range from compact controls."
+        composeRule.onNodeWithTag("reader-annotation-note-input-0")
+            .assertIsDisplayed()
+            .performTextInput(noteText)
+        UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).pressBack()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("reader-annotation-save-0")
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+                !hasTag("reader-annotation-editor-0") &&
+                    hasReadingAnnotationNote(contentId = contentId, paragraphIndex = 0, noteText = noteText) &&
+                    hasReadingAnnotationQuoteContaining(contentId, 0, expectedSavedEndAnchor)
+        }
+        scenario?.onActivity { activity -> activity.mainViewModel.dismissMessage() }
+        composeRule.waitUntil(timeoutMillis = 10_000) { !hasNode("Annotation saved.") }
+
+        val laterHighlight = visibleAnnotationHighlightIndices().maxOrNull() ?: -1
+        assertTrue("Expected a later-page highlight after saving the cross-page range.", laterHighlight > 0)
+        composeRule.onNodeWithTag("reader-annotation-block-$laterHighlight")
+            .assertIsDisplayed()
+            .performTouchInput { longClick(position = Offset(24f, 24f)) }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-annotation-editor-$laterHighlight") }
+        val reopenedQuote = readerSelectedQuoteText(laterHighlight)
+        assertTrue("Expected reopened quote to keep the source-anchored start.", reopenedQuote.contains("anchor1"))
+        assertTrue("Expected reopened quote to keep the later-page end.", reopenedQuote.contains(expectedSavedEndAnchor))
+        captureSprint17CrossPageAnnotationScreenshot("05_reopened_cross_page_quote_light")
     }
 
     @Test
@@ -2642,6 +2785,20 @@ class MainActivityTest {
             .joinToString(separator = "\n") { text -> text.text }
     }
 
+    private fun nodeHeight(tag: String): Float {
+        val bounds = composeRule.onNodeWithTag(tag)
+            .fetchSemanticsNode()
+            .boundsInRoot
+        return bounds.bottom - bounds.top
+    }
+
+    private fun nodeWidth(tag: String): Float {
+        val bounds = composeRule.onNodeWithTag(tag)
+            .fetchSemanticsNode()
+            .boundsInRoot
+        return bounds.right - bounds.left
+    }
+
     private fun currentReaderStartParagraphIndex(): Int {
         var paragraphIndex = -1
         scenario?.onActivity { activity ->
@@ -3434,6 +3591,16 @@ class MainActivityTest {
 
     private fun captureSprint17AdaptivePaginationScreenshot(name: String) {
         val outputDir = File("/sdcard/Download/qualityalternative/$sprint17AdaptivePaginationScreenshotDirName")
+        assertTrue("Expected screenshot output directory for $name", outputDir.mkdirs() || outputDir.exists())
+        composeRule.waitForIdle()
+        Thread.sleep(300)
+        val output = File(outputDir, "$name.png")
+        assertTrue("Expected screenshot capture for $name", UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).takeScreenshot(output))
+        assertTrue("Expected screenshot file for $name", output.exists() && output.length() > 0L)
+    }
+
+    private fun captureSprint17CrossPageAnnotationScreenshot(name: String) {
+        val outputDir = File("/sdcard/Download/qualityalternative/$sprint17CrossPageAnnotationScreenshotDirName")
         assertTrue("Expected screenshot output directory for $name", outputDir.mkdirs() || outputDir.exists())
         composeRule.waitForIdle()
         Thread.sleep(300)

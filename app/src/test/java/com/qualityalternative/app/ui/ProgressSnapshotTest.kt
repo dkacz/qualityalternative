@@ -1003,8 +1003,10 @@ class ProgressSnapshotTest {
     @Test
     fun readerPagesKeepSplitSourceChunksContinuousAcrossAdjacentPages() {
         val longSentence = (1..120)
-            .joinToString(separator = " ") { index -> "anchor$index" }
-            .plus(".")
+            .chunked(8)
+            .joinToString(separator = " ") { chunk ->
+                chunk.joinToString(separator = " ") { index -> "anchor$index" }.plus(".")
+            }
         val maxPageWeight = adaptiveReaderPageWeight(
             viewportWidthDp = 360f,
             viewportHeightDp = 780f,
@@ -1040,6 +1042,129 @@ class ProgressSnapshotTest {
                 )
             }
         }
+    }
+
+    @Test
+    fun readerAnnotationSelectionEndCanMoveBeyondCurrentPage() {
+        val longSentence = (1..120)
+            .chunked(8)
+            .joinToString(separator = " ") { chunk ->
+                chunk.joinToString(separator = " ") { index -> "anchor$index" }.plus(".")
+            }
+        val maxPageWeight = 8
+        val charsPerLine = 34
+        val layout = splitOversizedReaderBlocks(
+            blocks = listOf(readerMarkdownBlock(rawBlock = longSentence, sourceBlockIndex = 0)),
+            maxBlockWeight = 6,
+            charsPerLine = charsPerLine,
+        )
+        val pages = readerPagesForBlocks(
+            blocks = layout.blocks,
+            maxPageWeight = maxPageWeight,
+            charsPerLine = charsPerLine,
+        )
+        assertTrue("Expected split source to create multiple reader pages.", pages.size > 1)
+        val firstDisplayBlock = layout.blocks[pages.first().start].copy(sourceFullText = longSentence)
+        val startOffset = firstDisplayBlock.text.text.indexOf("anchor8").coerceAtLeast(0)
+        var selection = initialReaderAnnotationSelection(
+            paragraphIndex = pages.first().start,
+            block = firstDisplayBlock,
+            charOffset = startOffset,
+            annotation = null,
+        )
+        val initialEndPage = readerPageIndexForAnnotationSelectionFocus(
+            selection = selection,
+            focus = ReaderAnnotationSelectionFocus.END,
+            layout = layout,
+            pages = pages,
+        )
+
+        repeat(40) {
+            if (!selection.quotedText.contains("anchor96") && selection.canExpandEnd) {
+                selection = selection.expandEnd()
+            }
+        }
+
+        assertTrue("Expected end expansion to reach a later source chunk.", selection.quotedText.contains("anchor96"))
+        assertTrue(
+            "Selection end should move beyond the original display page.",
+            selection.selector.textEndOffset > layout.blocks[pages[initialEndPage].endInclusive].sourceTextEndOffset(),
+        )
+        assertTrue(
+            "Selection focus should resolve to a later reader page.",
+            readerPageIndexForAnnotationSelectionFocus(
+                selection = selection,
+                focus = ReaderAnnotationSelectionFocus.END,
+                layout = layout,
+                pages = pages,
+            ) > initialEndPage,
+        )
+        val expandedEndOffset = selection.selector.textEndOffset
+        val shrunkSelection = selection.shrinkEnd()
+        assertTrue("End contraction should refine the cross-page range.", shrunkSelection.selector.textEndOffset < expandedEndOffset)
+    }
+
+    @Test
+    fun readerAnnotationSelectionStartCanMoveBeforeCurrentPage() {
+        val longSentence = (1..120)
+            .chunked(8)
+            .joinToString(separator = " ") { chunk ->
+                chunk.joinToString(separator = " ") { index -> "anchor$index" }.plus(".")
+            }
+        val maxPageWeight = 8
+        val charsPerLine = 34
+        val layout = splitOversizedReaderBlocks(
+            blocks = listOf(readerMarkdownBlock(rawBlock = longSentence, sourceBlockIndex = 0)),
+            maxBlockWeight = 6,
+            charsPerLine = charsPerLine,
+        )
+        val sourceSentenceCount = readerSentenceRanges(longSentence).size
+        val pages = readerPagesForBlocks(
+            blocks = layout.blocks,
+            maxPageWeight = maxPageWeight,
+            charsPerLine = charsPerLine,
+        )
+        val laterDisplayBlockIndex = layout.blocks.indexOfFirst { block -> block.text.text.contains("anchor96") }
+        assertTrue("Expected anchor96 to live in a later split display chunk.", laterDisplayBlockIndex > 0)
+        val laterDisplayBlock = layout.blocks[laterDisplayBlockIndex].copy(sourceFullText = longSentence)
+        val laterCharOffset = laterDisplayBlock.text.text.indexOf("anchor96").coerceAtLeast(0)
+        var selection = initialReaderAnnotationSelection(
+            paragraphIndex = laterDisplayBlockIndex,
+            block = laterDisplayBlock,
+            charOffset = laterCharOffset,
+            annotation = null,
+        )
+        val initialStartPage = readerPageIndexForAnnotationSelectionFocus(
+            selection = selection,
+            focus = ReaderAnnotationSelectionFocus.START,
+            layout = layout,
+            pages = pages,
+        )
+        assertTrue(
+            "Expected initial selection to start after the first page. " +
+                "initialStartPage=$initialStartPage laterDisplayBlockIndex=$laterDisplayBlockIndex " +
+                "sourceStart=${laterDisplayBlock.sourceTextStartOffset} selectorStart=${selection.selector.textStartOffset} " +
+                "sourceSentenceCount=$sourceSentenceCount quote=${selection.quotedText.take(80)}",
+            initialStartPage > 0,
+        )
+
+        val earlyTargetOffset = longSentence.indexOf("anchor8").coerceAtLeast(0)
+        repeat(40) {
+            if (selection.selector.textStartOffset > earlyTargetOffset && selection.canExpandStart) {
+                selection = selection.expandStart()
+            }
+        }
+
+        assertTrue("Expected start expansion to reach an earlier source chunk.", selection.selector.textStartOffset <= earlyTargetOffset)
+        assertTrue(
+            "Selection start should resolve to an earlier reader page.",
+            readerPageIndexForAnnotationSelectionFocus(
+                selection = selection,
+                focus = ReaderAnnotationSelectionFocus.START,
+                layout = layout,
+                pages = pages,
+            ) < initialStartPage,
+        )
     }
 
     @Test
