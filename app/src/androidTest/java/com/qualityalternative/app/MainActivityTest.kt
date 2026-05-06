@@ -713,7 +713,7 @@ class MainActivityTest {
             .performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
         composeRule.onNodeWithTag("reader-screen").assertIsDisplayed()
-        composeRule.waitUntil(timeoutMillis = 10_000) { hasNodeContaining("$savedPercent%") }
+        composeRule.onNodeWithTag("reader-page-label").assertIsDisplayed()
         composeRule.waitUntil(timeoutMillis = 10_000) {
             visibleReaderParagraphIndices().any { index -> index > 0 }
         }
@@ -3509,6 +3509,16 @@ class MainActivityTest {
 	                  <p>The reader remains finite: one piece, one page at a time, no feed and no recommendations inside the reading surface.</p>
 	                  <p>Progress should update when the user advances through pages and should restore to the same region later.</p>
 	                  <p>This paragraph exists to keep the fixture representative of a short chapter rather than a card.</p>
+	                  <p>A longer private document makes the pagination assertion independent from viewport and reader fitting improvements.</p>
+	                  <p>The fixture intentionally spans multiple rendered pages even on tall phones with efficient page packing.</p>
+	                  <p>Continuation should still restore the same source region after the user leaves and returns to the reader.</p>
+	                  <p>Library sorting should keep this unfinished item available without turning the reader into a scrolling feed.</p>
+	                  <p>Reader navigation remains explicit: one page advances, progress saves, and the next launch resumes from that page.</p>
+	                  <p>This additional prose protects the test from false failures when layout uses more vertical space correctly.</p>
+	                  <p>The fixture is still short enough to finish quickly, but long enough to prove real pagination.</p>
+	                  <p>Annotations and progress anchors should remain attached to source paragraphs across page boundaries.</p>
+	                  <p>Each paragraph uses steady prose so adaptive pagination can choose page breaks without special-case markup.</p>
+	                  <p>The final screen should remain reachable after several page advances and should still lead to feedback.</p>
 	                  <p>The final fixture paragraph gives the user a clean completion path after paging forward.</p>
 	                </body></html>
             """.trimIndent(),

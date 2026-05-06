@@ -1,0 +1,23 @@
+SCORE: 10/10
+
+VERDICT: PASS
+
+VISUAL REVIEW: PASS
+
+BLOCKERS: None
+
+R19 SCORE-GAP RECHECK: PASS. The two R19 non-blocking score gaps are closed. r20_unit_validation.log begins with the exact unit command, including all --tests filters, and reports BUILD SUCCESSFUL. r20_instrumentation_validation.log begins with the exact instrumentation command, including the targeted MainActivityTest#readerPaginationFitRespondsToViewportAndReaderTextSize, repository test class, and migration test filter, and reports BUILD SUCCESSFUL after 3 tests on qaApi36(AVD) - 16. The ZIP contains retained prior review context R3-R19 only; the unnecessary original and R2 prior-output directories are absent.
+
+R18 BLOCKER RECHECK: PASS. The 5-/6-/7-/9-line CODE blocker remains closed by source, unit, instrumentation, page-fit summaries, and screenshots. The source uses discrete short multi-line CODE cost buckets rather than one flat 3-11-line factor. ProgressSnapshotTest.adaptiveReaderPaginationPacksShortMultiLineCodeWithoutUnderfill() asserts the 2-11-line table, including 5→6, 6→5, 7→4, and 9→3 first-page blocks. Instrumentation asserts those exact counts through assertTallDefaultRepeatedCodeFit(...), verifies footer safety and actual next-block rejection, and records screenshots 09-12 with summaries blocks-6-pages-4, blocks-5-pages-5, blocks-4-pages-6, and blocks-3-pages-8.
+
+R17 BLOCKER RECHECK: PASS. The three-line CODE blocker remains closed. Unit coverage asserts exactly 10 three-line CODE blocks on the first tall default page. Instrumentation asserts the same, performs rendered footer and next-block checks, and screenshot 08 plus page-fit-summaries.txt show blocks-10-pages-3.
+
+R16 BLOCKER RECHECK: PASS. The two-line CODE underfill blocker remains closed. Unit coverage asserts exactly 15 two-line CODE blocks on the first tall default page. Instrumentation asserts the same, checks rendered bounds and actual next-block rejection, and screenshot 07 plus page-fit-summaries.txt show blocks-15-pages-2.
+
+R15 BLOCKER RECHECK: PASS. The mixed CODE+BODY blocker remains closed. Unit evidence preserves the [17,17,1] split and asserts page 1 ends after the two CODE chunks while page 2 starts at the BODY tail. Screenshot 17 and the summary blocks-2-pages-2 are consistent with that behavior, and the instrumentation helper advances to verify the actual next block rather than relying on prose-only evidence.
+
+R14/R13/R12/R11/R10/R9/R8/R7/R6/R5/R4/R3 BLOCKER RECHECK: PASS. R14 adjacent and large-tail cases remain closed: unit evidence asserts [17,2,17] for adjacent 19+17 CODE and [15,15,10] for large oversized CODE, while screenshots 14-16 and summaries match the expected first-page and tail behavior. R13’s [17,17,2] split-tail case remains closed by unit assertions and screenshot 13. R12’s many-short-line CODE whole-block path remains closed by CODE-specific rendered-line splitting. R11’s eight-line CODE case remains covered by screenshots 05 and 06 with default blocks-4-pages-3 and large-text blocks-1-pages-10. R10’s stale initial-page issue remains closed by measured viewport use, readerPageBoundarySignature(...), signature-keyed page initialization, and no-manual-navigation reconciliation. R9/R8 one-line CODE default and large-text cases remain covered by screenshots 03 and 04, summaries blocks-26-pages-2 and blocks-22-pages-2, and rendered next-block checks. R7/R6 prose and BODY/LIST/QUOTE fit remain covered by adaptive rendered body padding cost, max rendered block cap, and visual evidence for default prose, large prose, mixed CODE+BODY, and small-phone prose. R5’s current-page-end marker and rendered boundary helper remain present. R4/R3 progress and annotation closures remain intact: progress persists source block plus lastVisibleTextOffset, restore maps through source position, annotation resolution prefers source selector overlap before legacy paragraph-index fallback, schema 13 contains lastVisibleTextOffset, migration 12→13 defaults it to 0, and Portable Profile export/import accepts the offset without unknown-field warnings.
+
+BUNDLE GAPS: None
+
+PACKAGE HYGIENE: PASS. The manifest-listed source, tests, schema, validation, logs, diff, screenshots, and prior review outputs are present. The current evidence folder is scoped to R20 artifacts, contains one current screenshot directory with 18 screenshots and matching page-fit-summaries.txt, and does not retain stale R19 logs, screenshots, prompts, manifests, ZIP clutter, or the unnecessary original/R2 prior-output directories.
