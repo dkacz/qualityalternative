@@ -166,6 +166,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.abs
+import kotlin.math.floor
 import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
@@ -183,7 +184,7 @@ fun QualityAlternativeApp(
 
     QualityAlternativeAppTheme(themeMode = uiState.themeMode) {
         AppInterfaceTextScaleProvider(interfaceTextScale = uiState.interfaceTextScale) {
-            DebugVisualParityDensityScale {
+            DebugVisualParityDensityScale(enabled = uiState.screen != MainScreen.Reader) {
                 val snackbarHostState = remember { SnackbarHostState() }
 
                 LaunchedEffect(uiState.latestMessage) {
@@ -298,8 +299,11 @@ private enum class AnnotationDriveSyncMode {
 }
 
 @Composable
-private fun DebugVisualParityDensityScale(content: @Composable () -> Unit) {
-    if (!BuildConfig.DEBUG) {
+private fun DebugVisualParityDensityScale(
+    enabled: Boolean = true,
+    content: @Composable () -> Unit,
+) {
+    if (!BuildConfig.DEBUG || !enabled) {
         content()
         return
     }
@@ -640,10 +644,11 @@ private fun MainRoute(
 
         MainScreen.Reader -> ReaderScreen(
             state = state,
-            onProgressChanged = { progressPercent, lastVisibleParagraphIndex, paragraphCount ->
+            onProgressChanged = { progressPercent, lastVisibleParagraphIndex, lastVisibleTextOffset, paragraphCount ->
                 viewModel.saveCurrentReadingProgress(
                     progressPercent = progressPercent,
                     lastVisibleParagraphIndex = lastVisibleParagraphIndex,
+                    lastVisibleTextOffset = lastVisibleTextOffset,
                     paragraphCount = paragraphCount,
                 )
             },
@@ -1978,7 +1983,7 @@ private fun RecommendationReasonPill(text: String) {
 @Composable
 private fun ReaderScreen(
     state: MainUiState,
-    onProgressChanged: (Int, Int, Int) -> Unit,
+    onProgressChanged: (Int, Int, Int, Int) -> Unit,
     onSaveAnnotation: (
         paragraphIndex: Int,
         quotedText: String,
@@ -2015,22 +2020,19 @@ private fun ReaderScreen(
     var measuredReaderHeightDp by remember(content.id) { mutableStateOf(0f) }
     val readerViewportWidthDp = measuredReaderWidthDp.takeIf { it > 0f } ?: configuration.screenWidthDp.toFloat()
     val readerViewportHeightDp = measuredReaderHeightDp.takeIf { it > 0f } ?: configuration.screenHeightDp.toFloat()
-    val maxPageWeight = remember(readerViewportWidthDp, readerViewportHeightDp, readerFontScale) {
-        adaptiveReaderPageWeight(
+    val readerPageFit = remember(readerViewportWidthDp, readerViewportHeightDp, readerFontScale) {
+        adaptiveReaderPageFit(
             viewportWidthDp = readerViewportWidthDp,
             viewportHeightDp = readerViewportHeightDp,
             readerFontScale = readerFontScale,
         )
     }
-    val charsPerLine = remember(readerViewportWidthDp, readerFontScale) {
-        adaptiveReaderCharsPerLine(
-            viewportWidthDp = readerViewportWidthDp,
-            readerFontScale = readerFontScale,
-        )
-    }
-    val maxBlockWeight = remember(maxPageWeight) {
-        adaptiveReaderBlockChunkWeight(maxPageWeight)
-    }
+    val maxPageWeight = readerPageFit.maxPageWeight
+    val charsPerLine = readerPageFit.charsPerLine
+    val maxBlockWeight = readerPageFit.maxBlockWeight
+    val blockGapLineCost = readerPageFit.blockGapLineCost
+    val maxBlocksPerPage = readerPageFit.maxBlocksPerPage
+    val effectiveReaderFontScale = readerPageFit.readerFontScale
     val readerBlockLayout = remember(rawBlocks, maxBlockWeight, charsPerLine) {
         splitOversizedReaderBlocks(
             blocks = rawBlocks,
@@ -2049,12 +2051,18 @@ private fun ReaderScreen(
     }
     val readerStartParagraphIndex = state.currentReaderStartParagraphIndex
     val readerStartSelector = state.currentReaderStartSelector
-    val pages = remember(content.id, blocks, maxPageWeight, charsPerLine) {
+    val pages = remember(content.id, blocks, maxPageWeight, charsPerLine, blockGapLineCost, maxBlocksPerPage, effectiveReaderFontScale) {
         readerPagesForBlocks(
             blocks = blocks,
             maxPageWeight = maxPageWeight,
             charsPerLine = charsPerLine,
+            blockGapLineCost = blockGapLineCost,
+            maxBlocksPerPage = maxBlocksPerPage,
+            readerFontScale = effectiveReaderFontScale,
         )
+    }
+    val pageBoundarySignature = remember(pages) {
+        readerPageBoundarySignature(pages)
     }
     val restoredProgress = remember(content.id) {
         state.currentReadingProgress?.takeIf { it.contentId == content.id && it.isUnfinished() }
@@ -2062,18 +2070,41 @@ private fun ReaderScreen(
     val selectorStartParagraphIndex = remember(readerStartSelector, readerBlockLayout) {
         readerStartSelector?.let(readerBlockLayout::displayBlockIndexForSelector)
     }
-    val initialParagraphIndex = (selectorStartParagraphIndex ?: readerStartParagraphIndex ?: restoredProgress?.lastVisibleParagraphIndex ?: 0)
+    val restoredProgressParagraphIndex = remember(
+        restoredProgress?.lastVisibleParagraphIndex,
+        restoredProgress?.lastVisibleTextOffset,
+        readerBlockLayout,
+    ) {
+        restoredProgress?.let { progress ->
+            readerBlockLayout.displayBlockIndexForSourcePosition(
+                sourceBlockIndex = progress.lastVisibleParagraphIndex,
+                textOffset = progress.lastVisibleTextOffset,
+            )
+        }
+    }
+    val initialParagraphIndex = (selectorStartParagraphIndex ?: readerStartParagraphIndex ?: restoredProgressParagraphIndex ?: 0)
         .coerceIn(0, (blocks.size - 1).coerceAtLeast(0))
     val initialPageIndex = remember(
         content.id,
         selectorStartParagraphIndex,
         readerStartParagraphIndex,
-        restoredProgress?.lastVisibleParagraphIndex,
-        pages.size,
+        restoredProgressParagraphIndex,
+        pageBoundarySignature,
     ) {
         readerPageIndexForParagraph(pages = pages, paragraphIndex = initialParagraphIndex)
     }
-    var currentPageIndex by remember(content.id, initialPageIndex, pages.size) { mutableStateOf(initialPageIndex) }
+    var hasManualReaderNavigation by remember(
+        content.id,
+        selectorStartParagraphIndex,
+        readerStartParagraphIndex,
+        restoredProgressParagraphIndex,
+    ) { mutableStateOf(false) }
+    var currentPageIndex by remember(
+        content.id,
+        selectorStartParagraphIndex,
+        readerStartParagraphIndex,
+        restoredProgressParagraphIndex,
+    ) { mutableStateOf(initialPageIndex) }
     val listState = rememberLazyListState()
     var annotationSelection by remember(content.id) { mutableStateOf<ReaderAnnotationSelection?>(null) }
     var annotationNoteDraft by remember(content.id) { mutableStateOf("") }
@@ -2092,6 +2123,11 @@ private fun ReaderScreen(
             currentPageIndex = safeCurrentPageIndex
         }
     }
+    LaunchedEffect(content.id, initialPageIndex, pageBoundarySignature) {
+        if (!hasManualReaderNavigation && currentPageIndex != initialPageIndex) {
+            currentPageIndex = initialPageIndex
+        }
+    }
     val currentPage = pages.getOrElse(safeCurrentPageIndex) { ReaderPage(0, (blocks.size - 1).coerceAtLeast(0)) }
     val displayedProgress = readerProgressPercentForPageIndex(
         pageIndex = safeCurrentPageIndex,
@@ -2106,18 +2142,23 @@ private fun ReaderScreen(
     fun moveToPage(targetPageIndex: Int) {
         val nextPageIndex = targetPageIndex.coerceIn(0, pages.lastIndex)
         val nextPage = pages[nextPageIndex]
+        if (nextPageIndex != safeCurrentPageIndex) {
+            hasManualReaderNavigation = true
+        }
         currentPageIndex = nextPageIndex
         annotationSelection = null
         annotationNoteDraft = ""
         isTocOpen = false
         if (nextPageIndex > safeCurrentPageIndex) {
+            val sourcePosition = readerBlockLayout.sourcePositionForDisplayBlock(nextPage.endInclusive)
             onProgressChanged(
                 readerProgressPercentForPageIndex(
                     pageIndex = nextPageIndex,
                     pageCount = pages.size,
                 ),
-                nextPage.endInclusive,
-                blocks.size,
+                sourcePosition.sourceBlockIndex,
+                sourcePosition.textOffset,
+                rawBlocks.size,
             )
         }
     }
@@ -2145,6 +2186,30 @@ private fun ReaderScreen(
                             contentDescription = "reader-first-visible-paragraph-$firstVisibleParagraphIndex"
                         }
                         .testTag("reader-first-visible-paragraph-$firstVisibleParagraphIndex"),
+                )
+                Spacer(
+                    modifier = Modifier
+                        .size(1.dp)
+                        .alpha(0f)
+                        .semantics {
+                            contentDescription = "reader-current-page-end-paragraph-${currentPage.endInclusive}"
+                        }
+                        .testTag("reader-current-page-end-paragraph-${currentPage.endInclusive}"),
+                )
+                Spacer(
+                    modifier = Modifier
+                        .size(1.dp)
+                        .alpha(0f)
+                        .semantics {
+                            contentDescription = "reader-page-fit-${readerPageFit.viewportWidthDp.roundToInt()}x" +
+                                "${readerPageFit.viewportHeightDp.roundToInt()}-" +
+                                "font-${(readerPageFit.readerFontScale * 100).roundToInt()}-" +
+                                "weight-${readerPageFit.maxPageWeight}-chars-${readerPageFit.charsPerLine}-" +
+                                "gap-${(readerPageFit.blockGapLineCost * 100).roundToInt()}-" +
+                                "cap-${readerPageFit.maxBlocksPerPage}-" +
+                                "blocks-${currentPage.endInclusive - currentPage.start + 1}-pages-${pages.size}"
+                        }
+                        .testTag("reader-page-fit-summary"),
                 )
             }
             Box(
@@ -2231,14 +2296,21 @@ private fun ReaderScreen(
                         state = listState,
                         userScrollEnabled = false,
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(start = 28.dp, top = 18.dp, end = 28.dp, bottom = 24.dp),
+                        contentPadding = PaddingValues(
+                            start = READER_CONTENT_SIDE_PADDING_DP.dp,
+                            top = READER_CONTENT_TOP_PADDING_DP.dp,
+                            end = READER_CONTENT_SIDE_PADDING_DP.dp,
+                            bottom = READER_CONTENT_BOTTOM_PADDING_DP.dp,
+                        ),
                     ) {
                         items(pageParagraphIndices.toList(), key = { paragraphIndex -> "reader-paragraph-$paragraphIndex" }) { paragraphIndex ->
                             val block = blocks[paragraphIndex]
-                            val annotation = annotationsByParagraph[paragraphIndex]
-                                ?: annotationsForContent.firstOrNull { candidate ->
-                                    candidate.selector.overlapsReaderBlock(block)
-                                }
+                            val annotation = readingAnnotationForBlock(
+                                paragraphIndex = paragraphIndex,
+                                block = block,
+                                annotationsByParagraph = annotationsByParagraph,
+                                annotationsForContent = annotationsForContent,
+                            )
                             val activeSelection = annotationSelection?.takeIf { selection ->
                                 selection.selector.overlapsReaderBlock(block)
                             }
@@ -2492,7 +2564,7 @@ private fun ReaderAnnotatedBlock(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(bottom = 6.dp)
+            .padding(bottom = READER_BLOCK_OUTER_BOTTOM_PADDING_DP.dp)
             .pointerInput(paragraphIndex, annotation?.id) {
                 detectTapGestures(
                     onLongPress = { offset ->
@@ -2517,14 +2589,20 @@ private fun ReaderAnnotatedBlock(
             }
             .testTag("reader-annotation-block-$paragraphIndex"),
     ) {
-        ReaderMarkdownBlockText(
-            block = block,
-            highlightedText = highlightedText,
-            highlightRange = highlightRange,
-            readerFontScale = readerFontScale,
-            modifier = if (hasHighlight) Modifier.testTag("reader-annotation-highlight-$paragraphIndex") else Modifier,
-            onTextLayout = { layout -> textLayoutResult = layout },
-        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("reader-annotation-rendered-block-$paragraphIndex"),
+        ) {
+            ReaderMarkdownBlockText(
+                block = block,
+                highlightedText = highlightedText,
+                highlightRange = highlightRange,
+                readerFontScale = readerFontScale,
+                modifier = if (hasHighlight) Modifier.testTag("reader-annotation-highlight-$paragraphIndex") else Modifier,
+                onTextLayout = { layout -> textLayoutResult = layout },
+            )
+        }
     }
 }
 
@@ -2748,10 +2826,15 @@ private fun ReaderMarkdownBlockText(
             .clip(RoundedCornerShape(14.dp))
             .background(colors.elevatedSurface)
             .border(BorderStroke(1.dp, colors.line), RoundedCornerShape(14.dp))
-            .padding(14.dp)
-            .padding(bottom = 4.dp)
+            .padding(horizontal = 12.dp, vertical = 3.dp)
 
-        else -> Modifier.padding(bottom = if (block.kind == ReaderMarkdownBlockKind.HEADING) 10.dp else 16.dp)
+        else -> Modifier.padding(
+            bottom = if (block.kind == ReaderMarkdownBlockKind.HEADING) {
+                READER_HEADING_TEXT_BOTTOM_PADDING_DP.dp
+            } else {
+                READER_BODY_TEXT_BOTTOM_PADDING_DP.dp
+            },
+        )
     }
 
     ReaderTextDensity {
@@ -5833,7 +5916,43 @@ internal data class ReaderBlockLayout(
         }.takeIf { index -> index >= 0 }
             ?: displayBlockIndexFor(selector.sourceBlockIndex)
     }
+
+    fun sourceBlockIndexForDisplayBlock(displayBlockIndex: Int): Int {
+        return blocks
+            .getOrNull(displayBlockIndex.coerceIn(0, blocks.lastIndex.coerceAtLeast(0)))
+            ?.sourceBlockIndex
+            ?: 0
+    }
+
+    fun sourcePositionForDisplayBlock(displayBlockIndex: Int): ReaderSourcePosition {
+        val block = blocks.getOrNull(displayBlockIndex.coerceIn(0, blocks.lastIndex.coerceAtLeast(0)))
+            ?: return ReaderSourcePosition(sourceBlockIndex = 0, textOffset = 0)
+        return ReaderSourcePosition(
+            sourceBlockIndex = block.sourceBlockIndex,
+            textOffset = block.sourceTextEndOffset(),
+        )
+    }
+
+    fun displayBlockIndexForSourcePosition(sourceBlockIndex: Int, textOffset: Int): Int {
+        val safeOffset = textOffset.coerceAtLeast(0)
+        return blocks.indexOfFirst { block ->
+            block.sourceBlockIndex == sourceBlockIndex &&
+                safeOffset > block.sourceTextStartOffset &&
+                safeOffset <= block.sourceTextEndOffset()
+        }.takeIf { index -> index >= 0 }
+            ?: displayBlockIndexFor(sourceBlockIndex)
+    }
 }
+
+internal data class ReaderSourcePosition(
+    val sourceBlockIndex: Int,
+    val textOffset: Int,
+)
+
+private data class ReaderAnnotatedChunk(
+    val text: AnnotatedString,
+    val sourceStartOffset: Int,
+)
 
 internal data class ReaderSentenceRange(
     val start: Int,
@@ -6081,25 +6200,41 @@ internal fun readerPagesForBlocks(
     blocks: List<ReaderMarkdownBlock>,
     maxPageWeight: Int = READER_DEFAULT_PAGE_WEIGHT,
     charsPerLine: Int = READER_BODY_CHARS_PER_LINE,
+    blockGapLineCost: Double = READER_DEFAULT_BLOCK_GAP_LINE_COST,
+    maxBlocksPerPage: Int = Int.MAX_VALUE,
+    readerFontScale: Double = DEFAULT_READER_FONT_SCALE,
 ): List<ReaderPage> {
     if (blocks.isEmpty()) {
         return listOf(ReaderPage(start = 0, endInclusive = 0))
     }
-    val safeMaxWeight = maxPageWeight.coerceAtLeast(1)
+    val safeMaxWeight = maxPageWeight.coerceAtLeast(1).toDouble()
+    val safeBlockGapLineCost = blockGapLineCost.coerceIn(0.0, 1.5)
+    val safeMaxBlocksPerPage = maxBlocksPerPage.coerceAtLeast(1)
     val pages = mutableListOf<ReaderPage>()
     var pageStart = 0
-    var pageWeight = 0
+    var pageWeight = 0.0
+    var pageCappedBlockCount = 0
     var pageHasBodyBlock = false
     blocks.forEachIndexed { index, block ->
-        val blockWeight = block.readerPageWeight(charsPerLine = charsPerLine)
+        val blockWeight = block.readerPageCost(
+            charsPerLine = charsPerLine,
+            blockGapLineCost = safeBlockGapLineCost,
+            readerFontScale = readerFontScale,
+        )
+        val appliesRenderedBlockCap = block.kind != ReaderMarkdownBlockKind.CODE
         val startsReaderSection = block.kind == ReaderMarkdownBlockKind.HEADING && pageHasBodyBlock
-        if (index > pageStart && (startsReaderSection || pageWeight + blockWeight > safeMaxWeight)) {
+        val exceedsRenderedBlockCap = appliesRenderedBlockCap && pageCappedBlockCount >= safeMaxBlocksPerPage
+        if (index > pageStart && (startsReaderSection || exceedsRenderedBlockCap || pageWeight + blockWeight > safeMaxWeight)) {
             pages += ReaderPage(start = pageStart, endInclusive = index - 1)
             pageStart = index
-            pageWeight = 0
+            pageWeight = 0.0
+            pageCappedBlockCount = 0
             pageHasBodyBlock = false
         }
         pageWeight += blockWeight
+        if (appliesRenderedBlockCap) {
+            pageCappedBlockCount += 1
+        }
         if (block.kind != ReaderMarkdownBlockKind.HEADING) {
             pageHasBodyBlock = true
         }
@@ -6114,21 +6249,97 @@ internal fun adaptiveReaderPageWeight(
     readerFontScale: Double,
 ): Int {
     val safeFontScale = readerFontScale.coerceIn(MIN_READER_FONT_SCALE, MAX_READER_FONT_SCALE).toFloat()
-    val usableWidthDp = (viewportWidthDp - READER_HORIZONTAL_PADDING_DP).coerceAtLeast(220f)
     val usableHeightDp = (viewportHeightDp - READER_VERTICAL_PADDING_DP).coerceAtLeast(180f)
-    val lineHeightDp = 27f * safeFontScale
-    val visibleLineCapacity = (usableHeightDp / lineHeightDp).roundToInt().coerceAtLeast(6)
+    val lineHeightDp = READER_BODY_LINE_HEIGHT_DP * safeFontScale
+    val visibleLineCapacity = (usableHeightDp / lineHeightDp).coerceAtLeast(6f)
+    val baseReserve = if (viewportHeightDp < READER_COMPACT_VIEWPORT_HEIGHT_DP) {
+        READER_COMPACT_PAGE_SAFETY_RESERVE_LINES
+    } else {
+        READER_PAGE_SAFETY_RESERVE_LINES
+    }
     val fixedViewportReserveLines = (
-        READER_PAGE_CHROME_RESERVE_LINES +
-            ((safeFontScale - 1f).coerceAtLeast(0f) * READER_LARGE_FONT_RESERVE_LINES)
-        ).coerceAtMost(visibleLineCapacity - 6f)
-    val safeLineCapacity = (visibleLineCapacity - fixedViewportReserveLines).coerceAtLeast(6f)
-    val widthFactor = (usableWidthDp / READER_REFERENCE_TEXT_WIDTH_DP).coerceIn(0.72f, 1.35f)
-    val fillMultiplier = READER_PAGE_FILL_MULTIPLIER +
-        ((1f - safeFontScale).coerceAtLeast(0f) * READER_SMALL_FONT_FILL_BONUS)
-    return (safeLineCapacity * widthFactor * fillMultiplier)
-        .roundToInt()
+        baseReserve +
+            ((safeFontScale - 1f).coerceAtLeast(0f) * READER_LARGE_FONT_SAFETY_LINES)
+        ).coerceAtMost(visibleLineCapacity * READER_MAX_RESERVE_SHARE)
+    val fillAllowanceLines = when {
+        viewportHeightDp < READER_COMPACT_VIEWPORT_HEIGHT_DP -> 0f
+        safeFontScale <= 1.05f -> READER_DEFAULT_TEXT_FILL_ALLOWANCE_LINES
+        else -> 0f
+    }
+    val safeLineCapacity = (visibleLineCapacity - fixedViewportReserveLines + fillAllowanceLines).coerceAtLeast(6f)
+    return floor(safeLineCapacity)
+        .toInt()
         .coerceIn(READER_MIN_PAGE_WEIGHT, READER_MAX_PAGE_WEIGHT)
+}
+
+internal data class AdaptiveReaderPageFit(
+    val viewportWidthDp: Float,
+    val viewportHeightDp: Float,
+    val readerFontScale: Double,
+    val maxPageWeight: Int,
+    val charsPerLine: Int,
+    val maxBlockWeight: Int,
+    val blockGapLineCost: Double,
+    val maxBlocksPerPage: Int,
+)
+
+internal fun adaptiveReaderPageFit(
+    viewportWidthDp: Float,
+    viewportHeightDp: Float,
+    readerFontScale: Double,
+): AdaptiveReaderPageFit {
+    val maxPageWeight = adaptiveReaderPageWeight(
+        viewportWidthDp = viewportWidthDp,
+        viewportHeightDp = viewportHeightDp,
+        readerFontScale = readerFontScale,
+    )
+    val charsPerLine = adaptiveReaderCharsPerLine(
+        viewportWidthDp = viewportWidthDp,
+        readerFontScale = readerFontScale,
+    )
+    return AdaptiveReaderPageFit(
+        viewportWidthDp = viewportWidthDp,
+        viewportHeightDp = viewportHeightDp,
+        readerFontScale = readerFontScale.coerceIn(MIN_READER_FONT_SCALE, MAX_READER_FONT_SCALE),
+        maxPageWeight = maxPageWeight,
+        charsPerLine = charsPerLine,
+        maxBlockWeight = adaptiveReaderBlockChunkWeight(maxPageWeight),
+        blockGapLineCost = adaptiveReaderBlockGapLineCost(
+            viewportHeightDp = viewportHeightDp,
+            readerFontScale = readerFontScale,
+        ),
+        maxBlocksPerPage = adaptiveReaderMaxBlocksPerPage(
+            viewportHeightDp = viewportHeightDp,
+            readerFontScale = readerFontScale,
+        ),
+    )
+}
+
+internal fun adaptiveReaderMaxBlocksPerPage(
+    viewportHeightDp: Float,
+    readerFontScale: Double,
+): Int {
+    val safeFontScale = readerFontScale.coerceIn(MIN_READER_FONT_SCALE, MAX_READER_FONT_SCALE).toFloat()
+    val usableHeightDp = (viewportHeightDp - READER_VERTICAL_PADDING_DP).coerceAtLeast(180f)
+    val shortestRenderedBodyBlockDp =
+        (READER_BODY_LINE_HEIGHT_DP * safeFontScale) +
+            READER_BODY_TEXT_BOTTOM_PADDING_DP +
+            READER_BLOCK_OUTER_BOTTOM_PADDING_DP
+    return floor(usableHeightDp / shortestRenderedBodyBlockDp)
+        .toInt()
+        .coerceAtLeast(1)
+}
+
+internal fun adaptiveReaderBlockGapLineCost(
+    viewportHeightDp: Float,
+    readerFontScale: Double,
+): Double {
+    val safeFontScale = readerFontScale.coerceIn(MIN_READER_FONT_SCALE, MAX_READER_FONT_SCALE)
+    return when {
+        viewportHeightDp < READER_COMPACT_VIEWPORT_HEIGHT_DP -> READER_COMPACT_BLOCK_GAP_LINE_COST
+        safeFontScale >= READER_LARGE_TEXT_GAP_THRESHOLD -> READER_LARGE_TEXT_BLOCK_GAP_LINE_COST
+        else -> READER_TALL_BLOCK_GAP_LINE_COST
+    }
 }
 
 internal fun adaptiveReaderCharsPerLine(
@@ -6152,7 +6363,7 @@ private fun ReaderMarkdownBlock.annotationSourceText(): String {
     return sourceFullText ?: text.text
 }
 
-private fun ReaderMarkdownBlock.sourceTextEndOffset(): Int {
+internal fun ReaderMarkdownBlock.sourceTextEndOffset(): Int {
     return sourceTextStartOffset + text.text.length
 }
 
@@ -6181,6 +6392,26 @@ private fun ReadingAnnotationSelector.readerBlockHighlightRange(block: ReaderMar
     return start until endExclusive
 }
 
+private fun ReadingAnnotationSelector.hasUsableReaderRange(): Boolean {
+    return textEndOffset > textStartOffset
+}
+
+internal fun readingAnnotationForBlock(
+    paragraphIndex: Int,
+    block: ReaderMarkdownBlock,
+    annotationsByParagraph: Map<Int, ReadingAnnotation>,
+    annotationsForContent: List<ReadingAnnotation>,
+): ReadingAnnotation? {
+    annotationsForContent.firstOrNull { annotation ->
+        annotation.selector.overlapsReaderBlock(block)
+    }?.let { annotation -> return annotation }
+
+    val legacyParagraphAnnotation = annotationsByParagraph[paragraphIndex] ?: return null
+    return legacyParagraphAnnotation.takeIf { annotation ->
+        !annotation.selector.hasUsableReaderRange() || annotation.selector.overlapsReaderBlock(block)
+    }
+}
+
 internal fun readerPageIndexForParagraph(pages: List<ReaderPage>, paragraphIndex: Int): Int {
     if (pages.isEmpty()) {
         return 0
@@ -6189,6 +6420,10 @@ internal fun readerPageIndexForParagraph(pages: List<ReaderPage>, paragraphIndex
     return pages.indexOfFirst { page -> safeParagraphIndex in page.start..page.endInclusive }
         .takeIf { index -> index >= 0 }
         ?: pages.lastIndex
+}
+
+internal fun readerPageBoundarySignature(pages: List<ReaderPage>): String {
+    return pages.joinToString(separator = "|") { page -> "${page.start}-${page.endInclusive}" }
 }
 
 internal fun readerProgressPercentForParagraphIndex(paragraphIndex: Int, paragraphCount: Int): Int {
@@ -6225,12 +6460,99 @@ private fun ReaderMarkdownBlock.readerPageWeight(charsPerLine: Int = READER_BODY
     }
 }
 
+private fun ReaderMarkdownBlock.readerPageCost(
+    charsPerLine: Int = READER_BODY_CHARS_PER_LINE,
+    blockGapLineCost: Double = READER_DEFAULT_BLOCK_GAP_LINE_COST,
+    readerFontScale: Double = DEFAULT_READER_FONT_SCALE,
+): Double {
+    val safeFontScale = readerFontScale.coerceIn(MIN_READER_FONT_SCALE, MAX_READER_FONT_SCALE).toFloat()
+    val effectiveCharsPerLine = readerCharsPerLineForKind(kind = kind, bodyCharsPerLine = charsPerLine)
+    val lineWeight = text.text
+        .lines()
+        .sumOf { line ->
+            val visibleChars = line.length.coerceAtLeast(1)
+            ((visibleChars + effectiveCharsPerLine - 1) / effectiveCharsPerLine).coerceAtLeast(1)
+        }
+        .toDouble()
+    return when (kind) {
+        ReaderMarkdownBlockKind.HEADING -> lineWeight + 2.0
+        ReaderMarkdownBlockKind.CODE -> {
+            val bodyLineHeightDp = READER_BODY_LINE_HEIGHT_DP * safeFontScale
+            val codeLineHeightDp = READER_CODE_LINE_HEIGHT_DP * safeFontScale
+            val codeLineCostFactor = when {
+                lineWeight <= 1.0 -> READER_CODE_ONE_LINE_VISUAL_LINE_COST_FACTOR
+                safeFontScale >= READER_LARGE_TEXT_GAP_THRESHOLD.toFloat() -> {
+                    READER_CODE_LARGE_TEXT_MULTI_LINE_VISUAL_LINE_COST_FACTOR
+                }
+                lineWeight <= 2.0 -> READER_CODE_TWO_LINE_VISUAL_LINE_COST_FACTOR
+                lineWeight >= READER_CODE_LONG_MULTI_LINE_COST_THRESHOLD -> READER_CODE_LONG_MULTI_LINE_VISUAL_LINE_COST_FACTOR
+                else -> readerShortMultiLineCodeVisualLineCostFactor(lineWeight)
+            }
+            val codeFixedPaddingDp = if (safeFontScale <= 1.05f) {
+                READER_CODE_DEFAULT_TEXT_FIXED_VERTICAL_PADDING_DP
+            } else {
+                READER_CODE_LARGE_TEXT_FIXED_VERTICAL_PADDING_DP
+            }
+            ((lineWeight * codeLineHeightDp * codeLineCostFactor) + codeFixedPaddingDp + READER_BLOCK_OUTER_BOTTOM_PADDING_DP) / bodyLineHeightDp
+        }
+
+        ReaderMarkdownBlockKind.LIST,
+        ReaderMarkdownBlockKind.QUOTE,
+        ReaderMarkdownBlockKind.BODY,
+        -> {
+            val bodyLineHeightDp = READER_BODY_LINE_HEIGHT_DP * safeFontScale
+            val fixedBodyPaddingCost =
+                (READER_BODY_TEXT_BOTTOM_PADDING_DP + READER_BLOCK_OUTER_BOTTOM_PADDING_DP) / bodyLineHeightDp
+            lineWeight + maxOf(blockGapLineCost, fixedBodyPaddingCost.toDouble())
+        }
+    }
+}
+
+private fun readerShortMultiLineCodeVisualLineCostFactor(lineWeight: Double): Float {
+    return when {
+        lineWeight <= 4.0 -> READER_CODE_THREE_TO_FOUR_LINE_VISUAL_LINE_COST_FACTOR
+        lineWeight <= 6.0 -> READER_CODE_FIVE_TO_SIX_LINE_VISUAL_LINE_COST_FACTOR
+        lineWeight <= 7.0 -> READER_CODE_SEVEN_LINE_VISUAL_LINE_COST_FACTOR
+        lineWeight <= 8.0 -> READER_CODE_EIGHT_LINE_VISUAL_LINE_COST_FACTOR
+        lineWeight <= 9.0 -> READER_CODE_NINE_LINE_VISUAL_LINE_COST_FACTOR
+        else -> READER_CODE_TEN_TO_ELEVEN_LINE_VISUAL_LINE_COST_FACTOR
+    }
+}
+
 private fun ReaderMarkdownBlock.splitForReaderPage(
     maxBlockWeight: Int,
     charsPerLine: Int = READER_BODY_CHARS_PER_LINE,
 ): List<ReaderMarkdownBlock> {
     val safeMaxWeight = maxBlockWeight.coerceAtLeast(6)
-    if (kind == ReaderMarkdownBlockKind.HEADING || readerPageWeight(charsPerLine = charsPerLine) <= safeMaxWeight) {
+    val blockWeight = readerPageWeight(charsPerLine = charsPerLine)
+    val wholeBlockWeightAllowance = if (kind == ReaderMarkdownBlockKind.CODE) {
+        (safeMaxWeight * READER_CODE_WHOLE_BLOCK_SPLIT_ALLOWANCE_FACTOR).roundToInt()
+    } else {
+        safeMaxWeight
+    }
+    if (kind == ReaderMarkdownBlockKind.CODE) {
+        val maxRenderedLineWeight = wholeBlockWeightAllowance - READER_CODE_SPLIT_SAFETY_LINES
+        val shouldSplitCodeBlock = blockWeight > wholeBlockWeightAllowance ||
+            hasUnsafeShortLineCodeTail(
+                maxRenderedLineWeight = maxRenderedLineWeight,
+                charsPerLine = charsPerLine,
+            )
+        if (shouldSplitCodeBlock) {
+            val fullSourceText = sourceFullText ?: text.text
+            return text.splitCodeAnnotatedByRenderedWeight(
+                maxRenderedLineWeight = maxRenderedLineWeight,
+                charsPerLine = charsPerLine,
+            ).map { chunk ->
+                copy(
+                    text = chunk.text,
+                    sourceTextStartOffset = sourceTextStartOffset + chunk.sourceStartOffset,
+                    sourceFullText = fullSourceText,
+                )
+            }
+        }
+        return listOf(this)
+    }
+    if (kind == ReaderMarkdownBlockKind.HEADING || blockWeight <= wholeBlockWeightAllowance) {
         return listOf(this)
     }
     val targetChars = readerApproxCharsForWeight(
@@ -6254,6 +6576,29 @@ private fun ReaderMarkdownBlock.splitForReaderPage(
     }
 }
 
+private fun ReaderMarkdownBlock.hasUnsafeShortLineCodeTail(
+    maxRenderedLineWeight: Int,
+    charsPerLine: Int,
+): Boolean {
+    if (kind != ReaderMarkdownBlockKind.CODE) {
+        return false
+    }
+    val effectiveCharsPerLine = readerCharsPerLineForKind(
+        kind = ReaderMarkdownBlockKind.CODE,
+        bodyCharsPerLine = charsPerLine,
+    )
+    var sourceLineCount = 0
+    var renderedLineWeight = 0
+    text.text.forEachLineRange { lineStart, lineEnd ->
+        sourceLineCount += 1
+        val visibleChars = (lineEnd - lineStart).coerceAtLeast(1)
+        renderedLineWeight += ((visibleChars + effectiveCharsPerLine - 1) / effectiveCharsPerLine)
+            .coerceAtLeast(1)
+    }
+    return sourceLineCount > maxRenderedLineWeight &&
+        renderedLineWeight <= sourceLineCount + READER_CODE_SHORT_LINE_WRAP_ALLOWANCE
+}
+
 private fun readerApproxCharsForWeight(
     kind: ReaderMarkdownBlockKind,
     weight: Int,
@@ -6269,12 +6614,90 @@ private fun readerCharsPerLineForKind(
 ): Int {
     return when (kind) {
         ReaderMarkdownBlockKind.HEADING -> (bodyCharsPerLine * 0.62f).roundToInt()
-        ReaderMarkdownBlockKind.CODE -> (bodyCharsPerLine * 0.82f).roundToInt()
+        ReaderMarkdownBlockKind.CODE -> (bodyCharsPerLine * 0.60f).roundToInt()
         ReaderMarkdownBlockKind.LIST -> (bodyCharsPerLine * 0.90f).roundToInt()
         ReaderMarkdownBlockKind.QUOTE,
         ReaderMarkdownBlockKind.BODY,
         -> bodyCharsPerLine
     }.coerceIn(READER_MIN_CHARS_PER_LINE, READER_MAX_CHARS_PER_LINE)
+}
+
+private fun AnnotatedString.splitCodeAnnotatedByRenderedWeight(
+    maxRenderedLineWeight: Int,
+    charsPerLine: Int,
+): List<ReaderAnnotatedChunk> {
+    val raw = text
+    if (raw.isBlank()) {
+        return listOf(ReaderAnnotatedChunk(text = this, sourceStartOffset = 0))
+    }
+    val effectiveCharsPerLine = readerCharsPerLineForKind(
+        kind = ReaderMarkdownBlockKind.CODE,
+        bodyCharsPerLine = charsPerLine,
+    )
+    val targetLineWeight = maxRenderedLineWeight.coerceAtLeast(1)
+    val chunks = mutableListOf<ReaderAnnotatedChunk>()
+    var chunkStart = -1
+    var chunkEnd = 0
+    var chunkWeight = 0
+
+    fun appendChunk(start: Int, end: Int) {
+        if (end > start) {
+            chunks += ReaderAnnotatedChunk(
+                text = subAnnotatedString(start = start, end = end),
+                sourceStartOffset = start,
+            )
+        }
+    }
+
+    fun flushChunk() {
+        if (chunkStart >= 0) {
+            appendChunk(start = chunkStart, end = chunkEnd)
+            chunkStart = -1
+            chunkEnd = 0
+            chunkWeight = 0
+        }
+    }
+
+    raw.forEachLineRange { lineStart, lineEnd ->
+        val visibleChars = (lineEnd - lineStart).coerceAtLeast(1)
+        val lineWeight = ((visibleChars + effectiveCharsPerLine - 1) / effectiveCharsPerLine).coerceAtLeast(1)
+        if (lineWeight > targetLineWeight) {
+            flushChunk()
+            val targetChars = effectiveCharsPerLine * targetLineWeight
+            var segmentStart = lineStart
+            while (segmentStart < lineEnd) {
+                val segmentEnd = (segmentStart + targetChars).coerceAtMost(lineEnd)
+                appendChunk(start = segmentStart, end = segmentEnd)
+                segmentStart = segmentEnd
+            }
+            return@forEachLineRange
+        }
+        if (chunkStart >= 0 && chunkWeight + lineWeight > targetLineWeight) {
+            flushChunk()
+        }
+        if (chunkStart < 0) {
+            chunkStart = lineStart
+        }
+        chunkEnd = lineEnd
+        chunkWeight += lineWeight
+    }
+    flushChunk()
+
+    return chunks.filter { chunk -> chunk.text.text.isNotBlank() }
+        .ifEmpty { listOf(ReaderAnnotatedChunk(text = this, sourceStartOffset = 0)) }
+}
+
+private inline fun String.forEachLineRange(action: (start: Int, endExclusive: Int) -> Unit) {
+    var lineStart = 0
+    while (lineStart <= length) {
+        val newline = indexOf('\n', startIndex = lineStart)
+        val lineEnd = if (newline < 0) length else newline
+        action(lineStart, lineEnd)
+        if (newline < 0) {
+            return
+        }
+        lineStart = newline + 1
+    }
 }
 
 private fun AnnotatedString.splitAnnotatedAtSentenceBoundaries(targetChars: Int): List<AnnotatedString> {
@@ -7143,17 +7566,49 @@ private fun releaseDocumentPermission(context: Context, uri: Uri) {
 private const val READER_HEADER_ITEM_COUNT = 1
 private const val READER_DEFAULT_PAGE_WEIGHT = 18
 private const val READER_MIN_PAGE_WEIGHT = 8
-private const val READER_MAX_PAGE_WEIGHT = 48
-private const val READER_PAGE_FILL_MULTIPLIER = 1.55f
-private const val READER_BODY_CHARS_PER_LINE = 42
+private const val READER_MAX_PAGE_WEIGHT = 56
+private const val READER_BODY_CHARS_PER_LINE = 62
 private const val READER_MIN_CHARS_PER_LINE = 24
-private const val READER_MAX_CHARS_PER_LINE = 68
-private const val READER_HORIZONTAL_PADDING_DP = 56f
-private const val READER_VERTICAL_PADDING_DP = 54f
+private const val READER_MAX_CHARS_PER_LINE = 74
+private const val READER_CONTENT_SIDE_PADDING_DP = 28f
+private const val READER_CONTENT_TOP_PADDING_DP = 18f
+private const val READER_CONTENT_BOTTOM_PADDING_DP = 24f
+private const val READER_HORIZONTAL_PADDING_DP = READER_CONTENT_SIDE_PADDING_DP * 2f
+private const val READER_VERTICAL_PADDING_DP = READER_CONTENT_TOP_PADDING_DP + READER_CONTENT_BOTTOM_PADDING_DP
 private const val READER_REFERENCE_TEXT_WIDTH_DP = 340f
-private const val READER_PAGE_CHROME_RESERVE_LINES = 3.8f
-private const val READER_LARGE_FONT_RESERVE_LINES = 7.2f
-private const val READER_SMALL_FONT_FILL_BONUS = 3.3f
+private const val READER_BODY_FONT_SIZE_DP = 17f
+private const val READER_BODY_LINE_HEIGHT_DP = 27f
+private const val READER_CODE_LINE_HEIGHT_DP = 22f
+private const val READER_BODY_TEXT_BOTTOM_PADDING_DP = 7f
+private const val READER_HEADING_TEXT_BOTTOM_PADDING_DP = 10f
+private const val READER_CODE_DEFAULT_TEXT_FIXED_VERTICAL_PADDING_DP = 10f
+private const val READER_CODE_LARGE_TEXT_FIXED_VERTICAL_PADDING_DP = 5f
+private const val READER_CODE_ONE_LINE_VISUAL_LINE_COST_FACTOR = 0.75f
+private const val READER_CODE_TWO_LINE_VISUAL_LINE_COST_FACTOR = 0.94f
+private const val READER_CODE_THREE_TO_FOUR_LINE_VISUAL_LINE_COST_FACTOR = 0.95f
+private const val READER_CODE_FIVE_TO_SIX_LINE_VISUAL_LINE_COST_FACTOR = 0.98f
+private const val READER_CODE_SEVEN_LINE_VISUAL_LINE_COST_FACTOR = 1.02f
+private const val READER_CODE_EIGHT_LINE_VISUAL_LINE_COST_FACTOR = 0.95f
+private const val READER_CODE_NINE_LINE_VISUAL_LINE_COST_FACTOR = 1.02f
+private const val READER_CODE_TEN_TO_ELEVEN_LINE_VISUAL_LINE_COST_FACTOR = 0.95f
+private const val READER_CODE_LONG_MULTI_LINE_VISUAL_LINE_COST_FACTOR = 1.06f
+private const val READER_CODE_LARGE_TEXT_MULTI_LINE_VISUAL_LINE_COST_FACTOR = 0.99f
+private const val READER_CODE_LONG_MULTI_LINE_COST_THRESHOLD = 12.0
+private const val READER_CODE_WHOLE_BLOCK_SPLIT_ALLOWANCE_FACTOR = 2f
+private const val READER_CODE_SPLIT_SAFETY_LINES = 3
+private const val READER_CODE_SHORT_LINE_WRAP_ALLOWANCE = 1
+private const val READER_DEFAULT_TEXT_FILL_ALLOWANCE_LINES = 4.2f
+private const val READER_BLOCK_OUTER_BOTTOM_PADDING_DP = 6f
+private const val READER_PAGE_SAFETY_RESERVE_LINES = 0.35f
+private const val READER_COMPACT_PAGE_SAFETY_RESERVE_LINES = 1.1f
+private const val READER_LARGE_FONT_SAFETY_LINES = 0.4f
+private const val READER_MAX_RESERVE_SHARE = 0.22f
+private const val READER_COMPACT_VIEWPORT_HEIGHT_DP = 620f
+private const val READER_LARGE_TEXT_GAP_THRESHOLD = 1.25
+private const val READER_DEFAULT_BLOCK_GAP_LINE_COST = 1.0
+private const val READER_COMPACT_BLOCK_GAP_LINE_COST = 1.0
+private const val READER_TALL_BLOCK_GAP_LINE_COST = 0.35
+private const val READER_LARGE_TEXT_BLOCK_GAP_LINE_COST = 0.7
 private const val READER_PREVIOUS_TAP_EDGE_FRACTION = 0.12f
 private const val READER_ANNOTATION_RANGE_WORD_STEP = 6
 private const val MAX_RECENT_PROGRESS_REPLACEMENTS = 3

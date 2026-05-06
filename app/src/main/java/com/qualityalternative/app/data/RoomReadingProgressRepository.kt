@@ -80,6 +80,7 @@ private fun ReadingProgress.normalized(): ReadingProgress {
     return copy(
         progressPercent = if (completedAtMillis == null) safePercent.coerceAtMost(99) else 100,
         lastVisibleParagraphIndex = lastVisibleParagraphIndex.coerceIn(0, safeParagraphCount - 1),
+        lastVisibleTextOffset = lastVisibleTextOffset.coerceAtLeast(0),
         paragraphCount = safeParagraphCount,
     )
 }
@@ -99,6 +100,7 @@ private fun ReadingProgress.toEntity(): ReadingProgressEntity {
         contentId = contentId,
         progressPercent = progressPercent,
         lastVisibleParagraphIndex = lastVisibleParagraphIndex,
+        lastVisibleTextOffset = lastVisibleTextOffset,
         paragraphCount = paragraphCount,
         updatedAtMillis = updatedAtMillis,
         completedAtMillis = completedAtMillis,
@@ -110,6 +112,7 @@ private fun ReadingProgressEntity.toModel(): ReadingProgress {
         contentId = contentId,
         progressPercent = progressPercent,
         lastVisibleParagraphIndex = lastVisibleParagraphIndex,
+        lastVisibleTextOffset = lastVisibleTextOffset,
         paragraphCount = paragraphCount,
         updatedAtMillis = updatedAtMillis,
         completedAtMillis = completedAtMillis,

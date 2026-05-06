@@ -92,6 +92,8 @@ class MainActivityTest {
         "sprint17-typography-settings-${System.currentTimeMillis()}"
     private val sprint17DefaultsScreenshotDirName =
         "sprint17-default-settings-${System.currentTimeMillis()}"
+    private val sprint17AdaptivePaginationScreenshotDirName =
+        "sprint17-adaptive-pagination-${System.currentTimeMillis()}"
 
     @Before
     fun resetAppState() {
@@ -795,6 +797,568 @@ class MainActivityTest {
         UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).pressBack()
         waitForHome()
         assertFalse(hasTag("reader-screen"))
+    }
+
+    @Test
+    fun readerPaginationFitRespondsToViewportAndReaderTextSize() {
+        val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+        fun repeatedCodeFixture(prefix: String, lineCount: Int): String {
+            return (1..24).joinToString(separator = "\n\n") { index ->
+                val codeLines = (1..lineCount).joinToString(separator = "\n") { line ->
+                    "val ${prefix}${index}_$line = ${index + line}"
+                }
+                "```kotlin\n$codeLines\n```"
+            }
+        }
+        val fixtureBody = (1..34)
+            .joinToString(separator = "\n\n") { index ->
+                "Sprint 17 adaptive paragraph $index uses steady reader prose so the page fit can prove it responds to screen height and configured reader text size."
+            }
+        val fixtureCodeBody = (1..32)
+            .joinToString(separator = "\n\n") { index ->
+                "```kotlin\nval sprint17CodeBlock$index = $index\n```"
+            }
+        val fixtureMultiLineCodeBody = (1..10)
+            .joinToString(separator = "\n\n") { index ->
+                val codeLines = (1..8).joinToString(separator = "\n") { line ->
+                    "val sprint17CodeBlock${index}_line$line = $line"
+                }
+                "```kotlin\n$codeLines\n```"
+            }
+        val fixtureShortMultiLineCodeBody = (1..24)
+            .joinToString(separator = "\n\n") { index ->
+                "```kotlin\n" +
+                    "val shortMultiLine${index}_a = $index\n" +
+                    "val shortMultiLine${index}_b = ${index + 1}\n" +
+                    "```"
+            }
+        val fixtureThreeLineCodeBody = (1..24)
+            .joinToString(separator = "\n\n") { index ->
+                "```kotlin\n" +
+                    "val threeLine${index}_a = $index\n" +
+                    "val threeLine${index}_b = ${index + 1}\n" +
+                    "val threeLine${index}_c = ${index + 2}\n" +
+                    "```"
+            }
+        val fixtureFiveLineCodeBody = repeatedCodeFixture(prefix = "fiveLine", lineCount = 5)
+        val fixtureSixLineCodeBody = repeatedCodeFixture(prefix = "sixLine", lineCount = 6)
+        val fixtureSevenLineCodeBody = repeatedCodeFixture(prefix = "sevenLine", lineCount = 7)
+        val fixtureNineLineCodeBody = repeatedCodeFixture(prefix = "nineLine", lineCount = 9)
+        val fixtureSplitTailShortLineCodeBody = "```kotlin\n" +
+            (1..36).joinToString(separator = "\n") { line -> "x$line" } +
+            "\n```"
+        val fixtureOversizedShortLineCodeBody = "```kotlin\n" +
+            (1..40).joinToString(separator = "\n") { line -> "x$line" } +
+            "\n```"
+        val fixtureAdjacentWholeShortLineCodeBody = "```kotlin\n" +
+            (1..19).joinToString(separator = "\n") { line -> "x$line" } +
+            "\n```\n\n```kotlin\n" +
+            (1..17).joinToString(separator = "\n") { line -> "y$line" } +
+            "\n```"
+        val fixtureMixedShortLineCodeAndBody = "```kotlin\n" +
+            (1..34).joinToString(separator = "\n") { line -> "x$line" } +
+            "\n```\n\nA short body tail must not squeeze below two full code chunks."
+        var tallDefaultWeight = 0
+
+        fun assertTallDefaultRepeatedCodeFit(
+            title: String,
+            displayName: String,
+            body: String,
+            expectedBlocks: Int,
+            summaryName: String,
+            context: String,
+            nowMillis: Long,
+        ) {
+            val document = addSeedMarkdownDocument(
+                title = title,
+                displayName = displayName,
+                body = body,
+                nowMillis = nowMillis,
+            )
+            scenario?.onActivity { activity ->
+                activity.mainViewModel.setReaderFontScale(DEFAULT_READER_FONT_SCALE)
+                activity.mainViewModel.openLibraryItem(document)
+            }
+            composeRule.waitUntil(timeoutMillis = 10_000) {
+                currentReaderFontScale() == DEFAULT_READER_FONT_SCALE &&
+                    hasTag("reader-screen") &&
+                    readerPageFitWeight(readerPageFitSummary()) > 0
+            }
+            val summary = readerPageFitSummary()
+            assertTrue(
+                "$context should admit the rendered-safe $expectedBlocks-block page. summary=$summary",
+                readerPageFitBlocks(summary) >= expectedBlocks,
+            )
+            assertTrue(
+                "$context should reject the next unsafe block. summary=$summary",
+                readerPageFitBlocks(summary) <= expectedBlocks,
+            )
+            assertReaderVisibleContentStaysAboveFooter(
+                context = context,
+                expectAnotherBlock = true,
+            )
+            recordSprint17AdaptivePaginationSummary(summaryName, summary)
+            captureSprint17AdaptivePaginationScreenshot(summaryName)
+        }
+
+        try {
+            launchOnboardedApp()
+            val tallDocument = addSeedMarkdownDocument(
+                title = "Sprint 17 Pagination Fit",
+                displayName = "sprint17-pagination-fit-tall.md",
+                body = fixtureBody,
+                nowMillis = 88_000L,
+            )
+
+            scenario?.onActivity { activity -> activity.mainViewModel.openLibraryItem(tallDocument) }
+            composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") && readerPageFitWeight(readerPageFitSummary()) > 0 }
+            val tallDefaultSummary = readerPageFitSummary()
+            tallDefaultWeight = readerPageFitWeight(tallDefaultSummary)
+            val tallDefaultBlocks = readerPageFitBlocks(tallDefaultSummary)
+            assertTrue("Tall phone default text should use the available reader area without clipping. summary=$tallDefaultSummary", tallDefaultBlocks >= 9)
+            assertTrue("Tall phone default text should obey rendered block cap. summary=$tallDefaultSummary", tallDefaultBlocks <= readerPageFitMaxBlocks(tallDefaultSummary))
+            assertReaderVisibleContentStaysAboveFooter(
+                context = "tall phone default",
+                expectAnotherBlock = readerPageFitPages(tallDefaultSummary) > 1,
+            )
+            recordSprint17AdaptivePaginationSummary("01_tall_phone_default_text", tallDefaultSummary)
+            captureSprint17AdaptivePaginationScreenshot("01_tall_phone_default_text")
+
+            scenario?.onActivity { activity ->
+                activity.mainViewModel.openLibraryItem(
+                    content = tallDocument,
+                    startParagraphIndex = 9,
+                )
+            }
+            composeRule.waitUntil(timeoutMillis = 10_000) {
+                hasTag("reader-screen") &&
+                    readerPageFitSummary().contains("blocks-9") &&
+                    visibleReaderParagraphIndices().contains(9)
+            }
+            assertTrue(
+                "Reader should reconcile a target paragraph after measured viewport shifts boundaries " +
+                    "without changing page count. summary=${readerPageFitSummary()} visible=${visibleReaderParagraphIndices()}",
+                visibleReaderParagraphIndices().contains(9),
+            )
+
+            scenario?.onActivity { activity ->
+                activity.mainViewModel.setReaderFontScale(1.3)
+                activity.mainViewModel.openLibraryItem(tallDocument)
+            }
+            composeRule.waitUntil(timeoutMillis = 10_000) {
+                currentReaderFontScale() == 1.3 &&
+                    readerPageFitWeight(readerPageFitSummary()).let { weight -> weight in 1 until tallDefaultWeight }
+            }
+            val largeTextSummary = readerPageFitSummary()
+            val largeTextWeight = readerPageFitWeight(largeTextSummary)
+            assertTrue("Large reader text should reduce page capacity. default=$tallDefaultSummary large=$largeTextSummary", largeTextWeight < tallDefaultWeight)
+            assertTrue("Large reader text should still use the available tall-phone area safely. summary=$largeTextSummary", readerPageFitBlocks(largeTextSummary) >= 5)
+            assertTrue("Large reader text should obey rendered block cap. summary=$largeTextSummary", readerPageFitBlocks(largeTextSummary) <= readerPageFitMaxBlocks(largeTextSummary))
+            assertReaderVisibleContentStaysAboveFooter(
+                context = "tall phone large text",
+                expectAnotherBlock = readerPageFitPages(largeTextSummary) > 1,
+            )
+            recordSprint17AdaptivePaginationSummary("02_tall_phone_large_text", largeTextSummary)
+            captureSprint17AdaptivePaginationScreenshot("02_tall_phone_large_text")
+
+            val codeDocument = addSeedMarkdownDocument(
+                title = "Sprint 17 Code Pagination Fit",
+                displayName = "sprint17-pagination-fit-code.md",
+                body = fixtureCodeBody,
+                nowMillis = 88_500L,
+            )
+            scenario?.onActivity { activity ->
+                activity.mainViewModel.setReaderFontScale(DEFAULT_READER_FONT_SCALE)
+                activity.mainViewModel.openLibraryItem(codeDocument)
+            }
+            composeRule.waitUntil(timeoutMillis = 10_000) {
+                currentReaderFontScale() == DEFAULT_READER_FONT_SCALE &&
+                    hasTag("reader-screen") &&
+                    readerPageFitWeight(readerPageFitSummary()) > 0
+            }
+            val codeDefaultSummary = readerPageFitSummary()
+            assertTrue("Default code blocks should use the available tall-phone area. summary=$codeDefaultSummary", readerPageFitBlocks(codeDefaultSummary) >= 26)
+            assertTrue("Default code blocks should stay footer-safe after rendered code-cost admission. summary=$codeDefaultSummary", readerPageFitBlocks(codeDefaultSummary) <= 26)
+            assertReaderVisibleContentStaysAboveFooter(
+                context = "tall phone code default",
+                expectAnotherBlock = readerPageFitPages(codeDefaultSummary) > 1,
+            )
+            recordSprint17AdaptivePaginationSummary("03_tall_phone_code_blocks", codeDefaultSummary)
+            captureSprint17AdaptivePaginationScreenshot("03_tall_phone_code_blocks")
+
+            scenario?.onActivity { activity ->
+                activity.mainViewModel.setReaderFontScale(1.3)
+                activity.mainViewModel.openLibraryItem(codeDocument)
+            }
+            composeRule.waitUntil(timeoutMillis = 10_000) {
+                currentReaderFontScale() == 1.3 &&
+                    readerPageFitWeight(readerPageFitSummary()).let { weight -> weight in 1 until tallDefaultWeight }
+            }
+            val codeLargeTextSummary = readerPageFitSummary()
+            assertTrue("Large-text code blocks should use the available tall-phone area. summary=$codeLargeTextSummary", readerPageFitBlocks(codeLargeTextSummary) >= 22)
+            assertTrue("Large-text code blocks should stay footer-safe after rendered code-cost admission. summary=$codeLargeTextSummary", readerPageFitBlocks(codeLargeTextSummary) <= 22)
+            assertReaderVisibleContentStaysAboveFooter(
+                context = "tall phone code large text",
+                expectAnotherBlock = readerPageFitPages(codeLargeTextSummary) > 1,
+            )
+            recordSprint17AdaptivePaginationSummary("04_tall_phone_large_code_blocks", codeLargeTextSummary)
+            captureSprint17AdaptivePaginationScreenshot("04_tall_phone_large_code_blocks")
+
+            val multiLineCodeDocument = addSeedMarkdownDocument(
+                title = "Sprint 17 Multi-line Code Pagination Fit",
+                displayName = "sprint17-pagination-fit-multiline-code.md",
+                body = fixtureMultiLineCodeBody,
+                nowMillis = 88_750L,
+            )
+            scenario?.onActivity { activity ->
+                activity.mainViewModel.setReaderFontScale(DEFAULT_READER_FONT_SCALE)
+                activity.mainViewModel.openLibraryItem(multiLineCodeDocument)
+            }
+            composeRule.waitUntil(timeoutMillis = 10_000) {
+                currentReaderFontScale() == DEFAULT_READER_FONT_SCALE &&
+                    hasTag("reader-screen") &&
+                    readerPageFitWeight(readerPageFitSummary()) > 0
+            }
+            val multiLineCodeDefaultSummary = readerPageFitSummary()
+            assertTrue(
+                "Default multi-line code blocks should admit only rendered-safe full blocks. summary=$multiLineCodeDefaultSummary",
+                readerPageFitBlocks(multiLineCodeDefaultSummary) <= 4,
+            )
+            assertTrue(
+                "Default multi-line code blocks should use the available tall-phone area. summary=$multiLineCodeDefaultSummary",
+                readerPageFitBlocks(multiLineCodeDefaultSummary) >= 4,
+            )
+            assertReaderVisibleContentStaysAboveFooter(
+                context = "tall phone multiline code default",
+                expectAnotherBlock = readerPageFitPages(multiLineCodeDefaultSummary) > 1,
+            )
+            recordSprint17AdaptivePaginationSummary("05_tall_phone_multiline_code_blocks", multiLineCodeDefaultSummary)
+            captureSprint17AdaptivePaginationScreenshot("05_tall_phone_multiline_code_blocks")
+
+            scenario?.onActivity { activity ->
+                activity.mainViewModel.setReaderFontScale(1.3)
+                activity.mainViewModel.openLibraryItem(multiLineCodeDocument)
+            }
+            composeRule.waitUntil(timeoutMillis = 10_000) {
+                currentReaderFontScale() == 1.3 &&
+                    readerPageFitWeight(readerPageFitSummary()).let { weight -> weight in 1 until tallDefaultWeight }
+            }
+            val multiLineCodeLargeSummary = readerPageFitSummary()
+            assertTrue(
+                "Large-text multi-line code blocks should admit only rendered-safe full blocks. summary=$multiLineCodeLargeSummary",
+                readerPageFitBlocks(multiLineCodeLargeSummary) <= 1,
+            )
+            assertTrue(
+                "Large-text multi-line code blocks should use the available tall-phone area. summary=$multiLineCodeLargeSummary",
+                readerPageFitBlocks(multiLineCodeLargeSummary) >= 1,
+            )
+            assertReaderVisibleContentStaysAboveFooter(
+                context = "tall phone multiline code large text",
+                expectAnotherBlock = readerPageFitPages(multiLineCodeLargeSummary) > 1,
+            )
+            recordSprint17AdaptivePaginationSummary("06_tall_phone_large_multiline_code_blocks", multiLineCodeLargeSummary)
+            captureSprint17AdaptivePaginationScreenshot("06_tall_phone_large_multiline_code_blocks")
+
+            val shortMultiLineCodeDocument = addSeedMarkdownDocument(
+                title = "Sprint 17 Short Multi-line Code Fit",
+                displayName = "sprint17-pagination-fit-short-multiline-code.md",
+                body = fixtureShortMultiLineCodeBody,
+                nowMillis = 88_825L,
+            )
+            scenario?.onActivity { activity ->
+                activity.mainViewModel.setReaderFontScale(DEFAULT_READER_FONT_SCALE)
+                activity.mainViewModel.openLibraryItem(shortMultiLineCodeDocument)
+            }
+            composeRule.waitUntil(timeoutMillis = 10_000) {
+                currentReaderFontScale() == DEFAULT_READER_FONT_SCALE &&
+                    hasTag("reader-screen") &&
+                    readerPageFitWeight(readerPageFitSummary()) > 0
+            }
+            val shortMultiLineCodeDefaultSummary = readerPageFitSummary()
+            assertTrue(
+                "Default short multi-line code should admit the rendered-safe 15-block page. " +
+                    "summary=$shortMultiLineCodeDefaultSummary",
+                readerPageFitBlocks(shortMultiLineCodeDefaultSummary) >= 15,
+            )
+            assertTrue(
+                "Default short multi-line code should still reject the next block. " +
+                    "summary=$shortMultiLineCodeDefaultSummary",
+                readerPageFitBlocks(shortMultiLineCodeDefaultSummary) <= 15,
+            )
+            assertReaderVisibleContentStaysAboveFooter(
+                context = "tall phone short multiline code default",
+                expectAnotherBlock = true,
+            )
+            recordSprint17AdaptivePaginationSummary("07_tall_phone_short_multiline_code_blocks", shortMultiLineCodeDefaultSummary)
+            captureSprint17AdaptivePaginationScreenshot("07_tall_phone_short_multiline_code_blocks")
+
+            val threeLineCodeDocument = addSeedMarkdownDocument(
+                title = "Sprint 17 Three-line Code Fit",
+                displayName = "sprint17-pagination-fit-three-line-code.md",
+                body = fixtureThreeLineCodeBody,
+                nowMillis = 88_850L,
+            )
+            scenario?.onActivity { activity ->
+                activity.mainViewModel.setReaderFontScale(DEFAULT_READER_FONT_SCALE)
+                activity.mainViewModel.openLibraryItem(threeLineCodeDocument)
+            }
+            composeRule.waitUntil(timeoutMillis = 10_000) {
+                currentReaderFontScale() == DEFAULT_READER_FONT_SCALE &&
+                    hasTag("reader-screen") &&
+                    readerPageFitWeight(readerPageFitSummary()) > 0
+            }
+            val threeLineCodeDefaultSummary = readerPageFitSummary()
+            assertTrue(
+                "Default three-line code should admit the rendered-safe 10-block page. " +
+                    "summary=$threeLineCodeDefaultSummary",
+                readerPageFitBlocks(threeLineCodeDefaultSummary) >= 10,
+            )
+            assertTrue(
+                "Default three-line code should reject the unsafe 11th block. " +
+                    "summary=$threeLineCodeDefaultSummary",
+                readerPageFitBlocks(threeLineCodeDefaultSummary) <= 10,
+            )
+            assertReaderVisibleContentStaysAboveFooter(
+                context = "tall phone three-line code default",
+                expectAnotherBlock = true,
+            )
+            recordSprint17AdaptivePaginationSummary("08_tall_phone_three_line_code_blocks", threeLineCodeDefaultSummary)
+            captureSprint17AdaptivePaginationScreenshot("08_tall_phone_three_line_code_blocks")
+
+            assertTallDefaultRepeatedCodeFit(
+                title = "Sprint 17 Five-line Code Fit",
+                displayName = "sprint17-pagination-fit-five-line-code.md",
+                body = fixtureFiveLineCodeBody,
+                expectedBlocks = 6,
+                summaryName = "09_tall_phone_five_line_code_blocks",
+                context = "tall phone five-line code default",
+                nowMillis = 88_860L,
+            )
+
+            assertTallDefaultRepeatedCodeFit(
+                title = "Sprint 17 Six-line Code Fit",
+                displayName = "sprint17-pagination-fit-six-line-code.md",
+                body = fixtureSixLineCodeBody,
+                expectedBlocks = 5,
+                summaryName = "10_tall_phone_six_line_code_blocks",
+                context = "tall phone six-line code default",
+                nowMillis = 88_865L,
+            )
+
+            assertTallDefaultRepeatedCodeFit(
+                title = "Sprint 17 Seven-line Code Fit",
+                displayName = "sprint17-pagination-fit-seven-line-code.md",
+                body = fixtureSevenLineCodeBody,
+                expectedBlocks = 4,
+                summaryName = "11_tall_phone_seven_line_code_blocks",
+                context = "tall phone seven-line code default",
+                nowMillis = 88_870L,
+            )
+
+            assertTallDefaultRepeatedCodeFit(
+                title = "Sprint 17 Nine-line Code Fit",
+                displayName = "sprint17-pagination-fit-nine-line-code.md",
+                body = fixtureNineLineCodeBody,
+                expectedBlocks = 3,
+                summaryName = "12_tall_phone_nine_line_code_blocks",
+                context = "tall phone nine-line code default",
+                nowMillis = 88_872L,
+            )
+
+            val splitTailShortLineCodeDocument = addSeedMarkdownDocument(
+                title = "Sprint 17 Split-tail Short-line Code Fit",
+                displayName = "sprint17-pagination-fit-split-tail-short-line-code.md",
+                body = fixtureSplitTailShortLineCodeBody,
+                nowMillis = 88_875L,
+            )
+            scenario?.onActivity { activity ->
+                activity.mainViewModel.setReaderFontScale(DEFAULT_READER_FONT_SCALE)
+                activity.mainViewModel.openLibraryItem(splitTailShortLineCodeDocument)
+            }
+            composeRule.waitUntil(timeoutMillis = 10_000) {
+                currentReaderFontScale() == DEFAULT_READER_FONT_SCALE &&
+                    hasTag("reader-screen") &&
+                    readerPageFitWeight(readerPageFitSummary()) > 0
+            }
+            val oversizedShortLineCodeDefaultSummary = readerPageFitSummary()
+            assertTrue(
+                "Default split-tail short-line code should admit only rendered-safe chunks. summary=$oversizedShortLineCodeDefaultSummary",
+                readerPageFitBlocks(oversizedShortLineCodeDefaultSummary) <= 2,
+            )
+            assertTrue(
+                "Default split-tail short-line code should use the available tall-phone area. summary=$oversizedShortLineCodeDefaultSummary",
+                readerPageFitBlocks(oversizedShortLineCodeDefaultSummary) >= 2,
+            )
+            assertTrue(
+                "Default split-tail short-line code should keep a real next page for rejected chunks. summary=$oversizedShortLineCodeDefaultSummary",
+                readerPageFitPages(oversizedShortLineCodeDefaultSummary) > 1,
+            )
+            assertReaderVisibleContentStaysAboveFooter(
+                context = "tall phone oversized short-line code default",
+                expectAnotherBlock = true,
+            )
+            recordSprint17AdaptivePaginationSummary("13_tall_phone_oversized_short_line_code_blocks", oversizedShortLineCodeDefaultSummary)
+            captureSprint17AdaptivePaginationScreenshot("13_tall_phone_oversized_short_line_code_blocks")
+
+            val oversizedShortLineCodeDocument = addSeedMarkdownDocument(
+                title = "Sprint 17 Oversized Short-line Code Tail Fit",
+                displayName = "sprint17-pagination-fit-oversized-short-line-code.md",
+                body = fixtureOversizedShortLineCodeBody,
+                nowMillis = 88_900L,
+            )
+            scenario?.onActivity { activity ->
+                activity.mainViewModel.setReaderFontScale(1.3)
+                activity.mainViewModel.openLibraryItem(oversizedShortLineCodeDocument)
+            }
+            composeRule.waitUntil(timeoutMillis = 10_000) {
+                currentReaderFontScale() == 1.3 &&
+                    readerPageFitWeight(readerPageFitSummary()).let { weight -> weight in 1 until tallDefaultWeight }
+            }
+            val oversizedShortLineCodeLargeSummary = readerPageFitSummary()
+            assertTrue(
+                "Large-text oversized short-line code should split into rendered-safe page chunks. summary=$oversizedShortLineCodeLargeSummary",
+                readerPageFitBlocks(oversizedShortLineCodeLargeSummary) <= 1,
+            )
+            assertTrue(
+                "Large-text oversized short-line code should keep a real next page for rejected chunks. summary=$oversizedShortLineCodeLargeSummary",
+                readerPageFitPages(oversizedShortLineCodeLargeSummary) > 1,
+            )
+            assertReaderVisibleContentStaysAboveFooter(
+                context = "tall phone oversized short-line code large text",
+                expectAnotherBlock = true,
+            )
+            recordSprint17AdaptivePaginationSummary("14_tall_phone_large_oversized_short_line_code_blocks", oversizedShortLineCodeLargeSummary)
+            captureSprint17AdaptivePaginationScreenshot("14_tall_phone_large_oversized_short_line_code_blocks")
+
+            advanceReaderPage()
+            composeRule.waitUntil(timeoutMillis = 10_000) {
+                readerPageFitBlocks(readerPageFitSummary()) == 2 && currentReaderPageEndParagraphIndex() == 2
+            }
+            val oversizedShortLineCodeLargeTailSummary = readerPageFitSummary()
+            assertTrue(
+                "Large-text oversized short-line code should admit the 10-line tail with the second 15-line chunk. " +
+                    "summary=$oversizedShortLineCodeLargeTailSummary",
+                readerPageFitBlocks(oversizedShortLineCodeLargeTailSummary) >= 2,
+            )
+            assertReaderVisibleContentStaysAboveFooter(
+                context = "tall phone oversized short-line code large text tail",
+                expectAnotherBlock = false,
+            )
+            recordSprint17AdaptivePaginationSummary("15_tall_phone_large_oversized_short_line_code_tail_blocks", oversizedShortLineCodeLargeTailSummary)
+            captureSprint17AdaptivePaginationScreenshot("15_tall_phone_large_oversized_short_line_code_tail_blocks")
+
+            val adjacentWholeShortLineCodeDocument = addSeedMarkdownDocument(
+                title = "Sprint 17 Adjacent Whole Short-line Code Fit",
+                displayName = "sprint17-pagination-fit-adjacent-whole-short-line-code.md",
+                body = fixtureAdjacentWholeShortLineCodeBody,
+                nowMillis = 88_925L,
+            )
+            scenario?.onActivity { activity ->
+                activity.mainViewModel.setReaderFontScale(DEFAULT_READER_FONT_SCALE)
+                activity.mainViewModel.openLibraryItem(adjacentWholeShortLineCodeDocument)
+            }
+            composeRule.waitUntil(timeoutMillis = 10_000) {
+                currentReaderFontScale() == DEFAULT_READER_FONT_SCALE &&
+                    hasTag("reader-screen") &&
+                    readerPageFitWeight(readerPageFitSummary()) > 0
+            }
+            val adjacentWholeShortLineCodeDefaultSummary = readerPageFitSummary()
+            assertTrue(
+                "Adjacent whole short-line code should split before the unsafe 19+17 geometry. " +
+                    "summary=$adjacentWholeShortLineCodeDefaultSummary",
+                readerPageFitBlocks(adjacentWholeShortLineCodeDefaultSummary) <= 2,
+            )
+            assertTrue(
+                "Adjacent whole short-line code should still use the available tall-phone area. " +
+                    "summary=$adjacentWholeShortLineCodeDefaultSummary",
+                readerPageFitBlocks(adjacentWholeShortLineCodeDefaultSummary) >= 2,
+            )
+            assertTrue(
+                "Adjacent whole short-line code should keep a real next page for the following 17-line block. " +
+                    "summary=$adjacentWholeShortLineCodeDefaultSummary",
+                readerPageFitPages(adjacentWholeShortLineCodeDefaultSummary) > 1,
+            )
+            assertReaderVisibleContentStaysAboveFooter(
+                context = "tall phone adjacent whole short-line code default",
+                expectAnotherBlock = true,
+            )
+            recordSprint17AdaptivePaginationSummary("16_tall_phone_adjacent_whole_short_line_code_blocks", adjacentWholeShortLineCodeDefaultSummary)
+            captureSprint17AdaptivePaginationScreenshot("16_tall_phone_adjacent_whole_short_line_code_blocks")
+
+            val mixedShortLineCodeAndBodyDocument = addSeedMarkdownDocument(
+                title = "Sprint 17 Mixed Code Body Fit",
+                displayName = "sprint17-pagination-fit-mixed-code-body.md",
+                body = fixtureMixedShortLineCodeAndBody,
+                nowMillis = 88_950L,
+            )
+            scenario?.onActivity { activity ->
+                activity.mainViewModel.setReaderFontScale(DEFAULT_READER_FONT_SCALE)
+                activity.mainViewModel.openLibraryItem(mixedShortLineCodeAndBodyDocument)
+            }
+            composeRule.waitUntil(timeoutMillis = 10_000) {
+                currentReaderFontScale() == DEFAULT_READER_FONT_SCALE &&
+                    hasTag("reader-screen") &&
+                    readerPageFitWeight(readerPageFitSummary()) > 0
+            }
+            val mixedShortLineCodeAndBodySummary = readerPageFitSummary()
+            assertTrue(
+                "Mixed code/body page should keep only the two 17-line code chunks. " +
+                    "summary=$mixedShortLineCodeAndBodySummary",
+                readerPageFitBlocks(mixedShortLineCodeAndBodySummary) <= 2,
+            )
+            assertTrue(
+                "Mixed code/body page should still use the available tall-phone area. " +
+                    "summary=$mixedShortLineCodeAndBodySummary",
+                readerPageFitBlocks(mixedShortLineCodeAndBodySummary) >= 2,
+            )
+            assertTrue(
+                "Mixed code/body page should move the body tail to a real next page. " +
+                    "summary=$mixedShortLineCodeAndBodySummary",
+                readerPageFitPages(mixedShortLineCodeAndBodySummary) > 1,
+            )
+            assertReaderVisibleContentStaysAboveFooter(
+                context = "tall phone mixed short-line code and body default",
+                expectAnotherBlock = true,
+            )
+            recordSprint17AdaptivePaginationSummary("17_tall_phone_mixed_short_line_code_body_blocks", mixedShortLineCodeAndBodySummary)
+            captureSprint17AdaptivePaginationScreenshot("17_tall_phone_mixed_short_line_code_body_blocks")
+
+            scenario?.close()
+            scenario = null
+            device.executeShellCommand("wm size 720x1280")
+            device.executeShellCommand("wm density 320")
+            Thread.sleep(1_000)
+
+            launchOnboardedApp()
+            val smallDocument = addSeedMarkdownDocument(
+                title = "Sprint 17 Small Phone Fit",
+                displayName = "sprint17-pagination-fit-small.md",
+                body = fixtureBody,
+                nowMillis = 89_000L,
+            )
+            scenario?.onActivity { activity ->
+                activity.mainViewModel.setReaderFontScale(DEFAULT_READER_FONT_SCALE)
+                activity.mainViewModel.openLibraryItem(smallDocument)
+            }
+            composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") && readerPageFitWeight(readerPageFitSummary()) > 0 }
+            val smallPhoneSummary = readerPageFitSummary()
+            val smallPhoneWeight = readerPageFitWeight(smallPhoneSummary)
+            assertTrue("Small phone viewport should receive a smaller page budget. tall=$tallDefaultSummary small=$smallPhoneSummary", smallPhoneWeight < tallDefaultWeight)
+            assertTrue("Small phone should still use the available reader area for multiple blocks. summary=$smallPhoneSummary", readerPageFitBlocks(smallPhoneSummary) >= 4)
+            assertTrue("Small phone text should obey rendered block cap. summary=$smallPhoneSummary", readerPageFitBlocks(smallPhoneSummary) <= readerPageFitMaxBlocks(smallPhoneSummary))
+            assertReaderVisibleContentStaysAboveFooter(
+                context = "small phone default",
+                expectAnotherBlock = readerPageFitPages(smallPhoneSummary) > 1,
+            )
+            recordSprint17AdaptivePaginationSummary("18_small_phone_default_text", smallPhoneSummary)
+            captureSprint17AdaptivePaginationScreenshot("18_small_phone_default_text")
+        } finally {
+            scenario?.close()
+            scenario = null
+            device.executeShellCommand("wm size reset")
+            device.executeShellCommand("wm density reset")
+            Thread.sleep(1_000)
+        }
     }
 
     @Test
@@ -1897,6 +2461,108 @@ class MainActivityTest {
         }
     }
 
+    private fun currentReaderPageEndParagraphIndex(): Int {
+        return (0..160).firstOrNull { index ->
+            hasContentDescriptionNode("reader-current-page-end-paragraph-$index")
+        } ?: -1
+    }
+
+    private fun readerPageFitSummary(): String {
+        return runCatching {
+            val contentDescriptions = composeRule.onNodeWithTag("reader-page-fit-summary")
+                .fetchSemanticsNode()
+                .config
+                .get(SemanticsProperties.ContentDescription)
+            contentDescriptions.joinToString(separator = " ")
+        }.getOrDefault("")
+    }
+
+    private fun readerPageFitWeight(summary: String): Int {
+        return Regex("""weight-(\d+)""")
+            .find(summary)
+            ?.groupValues
+            ?.getOrNull(1)
+            ?.toIntOrNull()
+            ?: 0
+    }
+
+    private fun readerPageFitBlocks(summary: String): Int {
+        return Regex("""blocks-(\d+)""")
+            .find(summary)
+            ?.groupValues
+            ?.getOrNull(1)
+            ?.toIntOrNull()
+            ?: 0
+    }
+
+    private fun readerPageFitMaxBlocks(summary: String): Int {
+        return Regex("""cap-(\d+)""")
+            .find(summary)
+            ?.groupValues
+            ?.getOrNull(1)
+            ?.toIntOrNull()
+            ?: Int.MAX_VALUE
+    }
+
+    private fun readerPageFitPages(summary: String): Int {
+        return Regex("""pages-(\d+)""")
+            .find(summary)
+            ?.groupValues
+            ?.getOrNull(1)
+            ?.toIntOrNull()
+            ?: 1
+    }
+
+    private fun assertReaderVisibleContentStaysAboveFooter(
+        context: String,
+        expectAnotherBlock: Boolean = true,
+    ) {
+        val lastVisibleParagraph = currentReaderPageEndParagraphIndex()
+        assertTrue("Expected current reader page end marker for $context.", lastVisibleParagraph >= 0)
+        val renderedNode = composeRule.onNodeWithTag("reader-annotation-rendered-block-$lastVisibleParagraph")
+            .fetchSemanticsNode()
+        val blockBottom = renderedNode
+            .boundsInRoot
+            .bottom
+        val footerLabelTop = composeRule.onNodeWithTag("reader-page-label")
+            .fetchSemanticsNode()
+            .boundsInRoot
+            .top
+        val viewportBottom = composeRule.onNodeWithTag("reader-page-viewport")
+            .fetchSemanticsNode()
+            .boundsInRoot
+            .bottom
+        val contentBoundaryBottom = minOf(footerLabelTop, viewportBottom)
+        assertTrue(
+            "Reader content should not cross the viewport/footer boundary for $context. " +
+                "blockBottom=$blockBottom viewportBottom=$viewportBottom footerLabelTop=$footerLabelTop",
+            blockBottom <= contentBoundaryBottom,
+        )
+        val blockHeight = renderedNode.boundsInRoot.bottom - renderedNode.boundsInRoot.top
+        val residualSpace = contentBoundaryBottom - blockBottom
+        if (expectAnotherBlock) {
+            val nextBlockIndex = lastVisibleParagraph + 1
+            advanceReaderPage()
+            composeRule.waitUntil(timeoutMillis = 10_000) {
+                hasTag("reader-annotation-rendered-block-$nextBlockIndex")
+            }
+            val nextBlockBounds = composeRule.onNodeWithTag("reader-annotation-block-$nextBlockIndex")
+                .fetchSemanticsNode()
+                .boundsInRoot
+            val nextBlockHeight = nextBlockBounds.bottom - nextBlockBounds.top
+            composeRule.onNodeWithTag("reader-page-viewport")
+                .performTouchInput { swipeRight() }
+            composeRule.waitUntil(timeoutMillis = 10_000) {
+                currentReaderPageEndParagraphIndex() == lastVisibleParagraph
+            }
+            assertTrue(
+                "Reader page should not leave enough residual space for the actual next block for $context. " +
+                    "residual=$residualSpace currentRenderedBlockHeight=$blockHeight nextFullBlockHeight=$nextBlockHeight",
+                residualSpace < nextBlockHeight,
+            )
+        }
+    }
+
     private fun visibleAnnotationHighlightIndices(): List<Int> {
         return (0..120).filter { index ->
             hasTag("reader-annotation-highlight-$index")
@@ -2764,6 +3430,22 @@ class MainActivityTest {
         val output = File(outputDir, "$name.png")
         assertTrue("Expected screenshot capture for $name", UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).takeScreenshot(output))
         assertTrue("Expected screenshot file for $name", output.exists() && output.length() > 0L)
+    }
+
+    private fun captureSprint17AdaptivePaginationScreenshot(name: String) {
+        val outputDir = File("/sdcard/Download/qualityalternative/$sprint17AdaptivePaginationScreenshotDirName")
+        assertTrue("Expected screenshot output directory for $name", outputDir.mkdirs() || outputDir.exists())
+        composeRule.waitForIdle()
+        Thread.sleep(300)
+        val output = File(outputDir, "$name.png")
+        assertTrue("Expected screenshot capture for $name", UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).takeScreenshot(output))
+        assertTrue("Expected screenshot file for $name", output.exists() && output.length() > 0L)
+    }
+
+    private fun recordSprint17AdaptivePaginationSummary(name: String, summary: String) {
+        val outputDir = File("/sdcard/Download/qualityalternative/$sprint17AdaptivePaginationScreenshotDirName")
+        assertTrue("Expected summary output directory for $name", outputDir.mkdirs() || outputDir.exists())
+        File(outputDir, "page-fit-summaries.txt").appendText("$name: $summary\n")
     }
 
     private fun assertHomeHeroIsDisplayed() {

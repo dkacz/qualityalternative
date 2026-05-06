@@ -932,6 +932,36 @@ class AccountLightProfileImporterTest {
         assertTrue(warningMessages.none { it.contains(".") })
     }
 
+    @Test
+    fun validateImportProfileJson_acceptsReadingProgressTextOffsetWithoutUnknownWarning() = runBlocking {
+        val target = PreferencesSettingsRepository(
+            dataStore = testDataStore(),
+            supportedApps = SupportedCatalog.distractingApps,
+        )
+        val importer = AccountLightProfileImporter(settingsRepository = target)
+        val linkContentId = "user-link-33333333-3333-4333-8333-333333333333"
+
+        val plan = importer.validateImportProfileJson(
+            validProfileJson()
+                .withUserLinks(listOf(validUserLink(contentId = linkContentId)))
+                .withReadingProgress(
+                    contentId = linkContentId,
+                    progressPercent = JsonPrimitive(40),
+                    lastVisibleParagraphIndex = 4,
+                    lastVisibleTextOffset = 77,
+                    paragraphCount = 12,
+                    completedAtMillis = JsonNull,
+                ),
+        )
+
+        val progress = plan.profile.reading.progress.single()
+        val warningMessages = plan.allWarnings
+            .filter { it.code == "UNKNOWN_FIELD_IGNORED" }
+            .mapNotNull { it.message }
+        assertEquals(77, progress.lastVisibleTextOffset)
+        assertTrue(warningMessages.none { it == "An unknown reading progress field was ignored" })
+    }
+
     private fun validProfileJson(): String = runBlocking {
         val repository = PreferencesSettingsRepository(
             dataStore = testDataStore(),
@@ -1247,27 +1277,28 @@ class AccountLightProfileImporterTest {
         contentId: String,
         progressPercent: JsonElement,
         lastVisibleParagraphIndex: Int,
+        lastVisibleTextOffset: Int? = null,
         paragraphCount: Int,
         completedAtMillis: JsonElement,
     ): String {
         val root = Json.parseToJsonElement(this).jsonObject
         val reading = root.getValue("reading").jsonObject
+        val fields = mutableMapOf<String, JsonElement>(
+            "contentId" to JsonPrimitive(contentId),
+            "progressPercent" to progressPercent,
+            "lastVisibleParagraphIndex" to JsonPrimitive(lastVisibleParagraphIndex),
+            "paragraphCount" to JsonPrimitive(paragraphCount),
+            "updatedAtMillis" to JsonPrimitive(20_000L),
+            "completedAtMillis" to completedAtMillis,
+        )
+        lastVisibleTextOffset?.let { fields["lastVisibleTextOffset"] = JsonPrimitive(it) }
         return JsonObject(
             root + (
                 "reading" to JsonObject(
                     reading + (
                         "progress" to JsonArray(
                             listOf(
-                                JsonObject(
-                                    mapOf(
-                                        "contentId" to JsonPrimitive(contentId),
-                                        "progressPercent" to progressPercent,
-                                        "lastVisibleParagraphIndex" to JsonPrimitive(lastVisibleParagraphIndex),
-                                        "paragraphCount" to JsonPrimitive(paragraphCount),
-                                        "updatedAtMillis" to JsonPrimitive(20_000L),
-                                        "completedAtMillis" to completedAtMillis,
-                                    ),
-                                ),
+                                JsonObject(fields),
                             ),
                         )
                         ),

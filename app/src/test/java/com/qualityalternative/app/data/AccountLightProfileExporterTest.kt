@@ -382,6 +382,7 @@ class AccountLightProfileExporterTest {
                         contentId = link.id,
                         progressPercent = 42,
                         lastVisibleParagraphIndex = 4,
+                        lastVisibleTextOffset = 37,
                         paragraphCount = 12,
                         updatedAtMillis = 9_000L,
                     ),
@@ -425,6 +426,7 @@ class AccountLightProfileExporterTest {
             },
         )
         assertEquals(exportedLink.contentId, profile.reading.progress.single().contentId)
+        assertEquals(37, profile.reading.progress.single().lastVisibleTextOffset)
         assertFalse(rawJson.contains("content://"))
         assertFalse(rawJson.contains("raw-book"))
         assertFalse(rawJson.contains("raw-link"))

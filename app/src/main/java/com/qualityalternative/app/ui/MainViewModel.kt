@@ -1876,6 +1876,7 @@ class MainViewModel(
     fun saveCurrentReadingProgress(
         progressPercent: Int,
         lastVisibleParagraphIndex: Int,
+        lastVisibleTextOffset: Int = 0,
         paragraphCount: Int,
         nowMillis: Long = nowProvider(),
     ) {
@@ -1888,6 +1889,7 @@ class MainViewModel(
             contentId = content.id,
             progressPercent = progressPercent.coerceIn(1, 99),
             lastVisibleParagraphIndex = lastVisibleParagraphIndex.coerceIn(0, safeParagraphCount - 1),
+            lastVisibleTextOffset = lastVisibleTextOffset.coerceAtLeast(0),
             paragraphCount = safeParagraphCount,
             updatedAtMillis = nowMillis,
         )
@@ -3257,6 +3259,7 @@ class MainViewModel(
             progressPercent = 100,
             lastVisibleParagraphIndex = (current?.lastVisibleParagraphIndex ?: (paragraphCount - 1))
                 .coerceIn(0, paragraphCount - 1),
+            lastVisibleTextOffset = current?.lastVisibleTextOffset?.coerceAtLeast(0) ?: 0,
             paragraphCount = paragraphCount,
             updatedAtMillis = completedAtMillis,
             completedAtMillis = completedAtMillis,
@@ -3412,6 +3415,7 @@ private fun ReadingProgress.sameVisiblePosition(other: ReadingProgress): Boolean
     return contentId == other.contentId &&
         progressPercent == other.progressPercent &&
         lastVisibleParagraphIndex == other.lastVisibleParagraphIndex &&
+        lastVisibleTextOffset == other.lastVisibleTextOffset &&
         paragraphCount == other.paragraphCount &&
         completedAtMillis == other.completedAtMillis
 }
@@ -3420,6 +3424,7 @@ private fun ReadingProgress.analyticsMetadata(): Map<String, String> {
     return mapOf(
         "progressPercent" to progressPercent.toString(),
         "lastVisibleParagraphIndex" to lastVisibleParagraphIndex.toString(),
+        "lastVisibleTextOffset" to lastVisibleTextOffset.toString(),
         "paragraphCount" to paragraphCount.toString(),
         "completed" to isCompleted().toString(),
         "updatedAtMillis" to updatedAtMillis.toString(),

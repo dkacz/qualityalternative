@@ -85,4 +85,32 @@ class QualityAlternativeDatabaseMigrationTest {
 
         assertTrue(statements.any { it.contains("ADD COLUMN documentFingerprintSizeBytes INTEGER") })
     }
+
+    @Test
+    fun migration12To13AddsReadingProgressSourceTextOffsetColumn() {
+        val statements = mutableListOf<String>()
+        val db = Proxy.newProxyInstance(
+            SupportSQLiteDatabase::class.java.classLoader,
+            arrayOf(SupportSQLiteDatabase::class.java),
+        ) { _, method, args ->
+            if (method.name == "execSQL" && args?.firstOrNull() is String) {
+                statements += args.first() as String
+            }
+            when (method.returnType) {
+                java.lang.Boolean.TYPE -> false
+                java.lang.Integer.TYPE -> 0
+                java.lang.Long.TYPE -> 0L
+                else -> null
+            }
+        } as SupportSQLiteDatabase
+
+        QualityAlternativeDatabase.MIGRATION_12_13.migrate(db)
+
+        assertTrue(
+            statements.any {
+                it.contains("ALTER TABLE reading_progress") &&
+                    it.contains("ADD COLUMN lastVisibleTextOffset INTEGER NOT NULL DEFAULT 0")
+            },
+        )
+    }
 }

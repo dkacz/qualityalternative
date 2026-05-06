@@ -6,6 +6,7 @@ import com.qualityalternative.app.domain.model.AnalyticsEvent
 import com.qualityalternative.app.domain.model.AnalyticsEventType
 import com.qualityalternative.app.domain.model.MEDITATION_TIMER_CONTENT_ID
 import com.qualityalternative.app.domain.model.RecommendationSource
+import com.qualityalternative.app.domain.model.ReadingAnnotation
 import com.qualityalternative.app.domain.model.ReadingAnnotationSelector
 import com.qualityalternative.app.domain.model.ReplacementHistoryEntry
 import com.qualityalternative.app.domain.model.TopicTag
@@ -369,6 +370,27 @@ class ProgressSnapshotTest {
     }
 
     @Test
+    fun readerPageBoundarySignatureChangesWhenSamePageCountBoundariesShift() {
+        val fallbackPages = listOf(
+            ReaderPage(start = 0, endInclusive = 9),
+            ReaderPage(start = 10, endInclusive = 18),
+            ReaderPage(start = 19, endInclusive = 27),
+            ReaderPage(start = 28, endInclusive = 33),
+        )
+        val measuredPages = listOf(
+            ReaderPage(start = 0, endInclusive = 8),
+            ReaderPage(start = 9, endInclusive = 17),
+            ReaderPage(start = 18, endInclusive = 26),
+            ReaderPage(start = 27, endInclusive = 33),
+        )
+
+        assertEquals(fallbackPages.size, measuredPages.size)
+        assertTrue(readerPageBoundarySignature(fallbackPages) != readerPageBoundarySignature(measuredPages))
+        assertEquals(0, readerPageIndexForParagraph(pages = fallbackPages, paragraphIndex = 9))
+        assertEquals(1, readerPageIndexForParagraph(pages = measuredPages, paragraphIndex = 9))
+    }
+
+    @Test
     fun readerLayoutSplitsLongSingleBlockBeforePagination() {
         val longParagraph = (1..20)
             .joinToString(separator = " ") { index ->
@@ -414,16 +436,469 @@ class ProgressSnapshotTest {
         )
 
         assertTrue("Taller reader viewport should fit more content.", tallPhone > compactPhone)
+        assertTrue("Tall phone pages should use most of the measured reader height.", tallPhone >= compactPhone + 12)
+        assertTrue("Tall phone pages should keep avoidable blank space low.", tallPhone >= 25)
         assertTrue("Larger reader text should fit less content.", tallLargeText < tallPhone)
         assertTrue("Smaller reader text should fit more content.", tallSmallText > tallPhone)
         assertTrue("Smaller reader text should fit more content.", tallSmallText > tallLargeText)
+        assertTrue("Small reader text should materially increase tall-phone page capacity.", tallSmallText >= 29)
+        assertTrue("Page budget should include only a bounded tall-phone fill allowance.", tallPhone <= 32)
         assertTrue(
             "Reader text width should adapt to the app-level font size.",
             adaptiveReaderCharsPerLine(viewportWidthDp = 360f, readerFontScale = 0.9) >
                 adaptiveReaderCharsPerLine(viewportWidthDp = 360f, readerFontScale = 1.3),
         )
         assertTrue("Reader block chunks should stay smaller than the page budget.", adaptiveReaderBlockChunkWeight(tallLargeText) < tallLargeText)
-        assertTrue("Large reader text should keep a no-scroll viewport safety reserve.", tallLargeText <= 22)
+        assertTrue("Large reader text should stay within the measured line capacity after reserve.", tallLargeText <= 21)
+    }
+
+    @Test
+    fun adaptiveReaderPageFitReturnsConsistentViewportBudget() {
+        val compactFit = adaptiveReaderPageFit(
+            viewportWidthDp = 360f,
+            viewportHeightDp = 420f,
+            readerFontScale = 1.0,
+        )
+        val tallFit = adaptiveReaderPageFit(
+            viewportWidthDp = 360f,
+            viewportHeightDp = 780f,
+            readerFontScale = 1.0,
+        )
+        val largeTextFit = adaptiveReaderPageFit(
+            viewportWidthDp = 360f,
+            viewportHeightDp = 780f,
+            readerFontScale = 1.3,
+        )
+
+        assertEquals(tallFit.maxPageWeight, adaptiveReaderPageWeight(360f, 780f, 1.0))
+        assertEquals(tallFit.charsPerLine, adaptiveReaderCharsPerLine(360f, 1.0))
+        assertEquals(tallFit.maxBlockWeight, adaptiveReaderBlockChunkWeight(tallFit.maxPageWeight))
+        assertTrue("Compact screens should keep a larger per-block gap reserve.", compactFit.blockGapLineCost > tallFit.blockGapLineCost)
+        assertTrue("Large reader text should not inherit compact screen spacing.", largeTextFit.blockGapLineCost < compactFit.blockGapLineCost)
+        assertTrue("Measured tall reader viewport should admit more rendered blocks.", tallFit.maxBlocksPerPage > compactFit.maxBlocksPerPage)
+        assertTrue("Large configured reader text should reduce rendered-block capacity.", largeTextFit.maxBlocksPerPage < tallFit.maxBlocksPerPage)
+        assertTrue("Measured tall reader viewport should receive a larger page budget.", tallFit.maxPageWeight > compactFit.maxPageWeight)
+        assertTrue("Large configured reader text should reduce line and page capacity.", largeTextFit.maxPageWeight < tallFit.maxPageWeight)
+        assertTrue("Large configured reader text should reduce line width.", largeTextFit.charsPerLine < tallFit.charsPerLine)
+    }
+
+    @Test
+    fun adaptiveReaderPaginationPacksMoreBlocksOnTallViewport() {
+        val blocks = (1..24).map { index ->
+            readerMarkdownBlock("Paragraph $index keeps enough words for reader wrapping while still being short enough to show packing differences.")
+        }
+        val compactFit = adaptiveReaderPageFit(
+            viewportWidthDp = 360f,
+            viewportHeightDp = 420f,
+            readerFontScale = 1.0,
+        )
+        val tallFit = adaptiveReaderPageFit(
+            viewportWidthDp = 360f,
+            viewportHeightDp = 780f,
+            readerFontScale = 1.0,
+        )
+        val compactPages = readerPagesForBlocks(
+            blocks = blocks,
+            maxPageWeight = compactFit.maxPageWeight,
+            charsPerLine = compactFit.charsPerLine,
+            blockGapLineCost = compactFit.blockGapLineCost,
+            maxBlocksPerPage = compactFit.maxBlocksPerPage,
+        )
+        val tallPages = readerPagesForBlocks(
+            blocks = blocks,
+            maxPageWeight = tallFit.maxPageWeight,
+            charsPerLine = tallFit.charsPerLine,
+            blockGapLineCost = tallFit.blockGapLineCost,
+            maxBlocksPerPage = tallFit.maxBlocksPerPage,
+        )
+
+        assertTrue("Tall viewport should put more reader blocks on the first page.", tallPages.first().endInclusive > compactPages.first().endInclusive)
+        assertTrue("Tall viewport should need fewer reader pages for the same text.", tallPages.size < compactPages.size)
+    }
+
+    @Test
+    fun adaptiveReaderPaginationCapsShortParagraphsByRenderedBlockHeight() {
+        val shortBlocks = (1..32).map { index -> readerMarkdownBlock("Short paragraph $index.") }
+        val tallFit = adaptiveReaderPageFit(
+            viewportWidthDp = 411f,
+            viewportHeightDp = 815f,
+            readerFontScale = 1.0,
+        )
+        val tallLargeTextFit = adaptiveReaderPageFit(
+            viewportWidthDp = 411f,
+            viewportHeightDp = 815f,
+            readerFontScale = 1.3,
+        )
+
+        val tallPages = readerPagesForBlocks(
+            blocks = shortBlocks,
+            maxPageWeight = tallFit.maxPageWeight,
+            charsPerLine = tallFit.charsPerLine,
+            blockGapLineCost = tallFit.blockGapLineCost,
+            maxBlocksPerPage = tallFit.maxBlocksPerPage,
+        )
+        val tallLargeTextPages = readerPagesForBlocks(
+            blocks = shortBlocks,
+            maxPageWeight = tallLargeTextFit.maxPageWeight,
+            charsPerLine = tallLargeTextFit.charsPerLine,
+            blockGapLineCost = tallLargeTextFit.blockGapLineCost,
+            maxBlocksPerPage = tallLargeTextFit.maxBlocksPerPage,
+            readerFontScale = tallLargeTextFit.readerFontScale,
+        )
+
+        val tallBlockCount = tallPages.first().endInclusive - tallPages.first().start + 1
+        val tallLargeTextBlockCount = tallLargeTextPages.first().endInclusive - tallLargeTextPages.first().start + 1
+        assertTrue("Tall one-line pages must obey the rendered block-height cap.", tallBlockCount <= tallFit.maxBlocksPerPage)
+        assertTrue("Tall default one-line pages must not admit the 20-block clipping case.", tallBlockCount < 20)
+        assertTrue("Tall large-text one-line pages must obey the rendered block-height cap.", tallLargeTextBlockCount <= tallLargeTextFit.maxBlocksPerPage)
+        assertTrue("Tall large-text one-line pages must not admit the 18-block clipping case.", tallLargeTextBlockCount < 18)
+    }
+
+    @Test
+    fun adaptiveReaderPaginationChargesBodyLikeBlocksForRenderedPadding() {
+        val twoLineBodyBlocks = (1..24).map { index ->
+            readerMarkdownBlock("Large text line $index.\nSecond rendered line $index.")
+        }
+        val tallLargeTextFit = adaptiveReaderPageFit(
+            viewportWidthDp = 411f,
+            viewportHeightDp = 815f,
+            readerFontScale = 1.3,
+        )
+
+        val tallLargeTextPages = readerPagesForBlocks(
+            blocks = twoLineBodyBlocks,
+            maxPageWeight = tallLargeTextFit.maxPageWeight,
+            charsPerLine = tallLargeTextFit.charsPerLine,
+            blockGapLineCost = tallLargeTextFit.blockGapLineCost,
+            maxBlocksPerPage = tallLargeTextFit.maxBlocksPerPage,
+            readerFontScale = tallLargeTextFit.readerFontScale,
+        )
+
+        val tallLargeTextBodyBlockCount = tallLargeTextPages.first().endInclusive - tallLargeTextPages.first().start + 1
+        assertTrue("Tall large-text two-line body pages must not admit the 10-block clipping case.", tallLargeTextBodyBlockCount < 10)
+        assertTrue("Tall large-text two-line body pages should account for body bottom padding.", tallLargeTextBodyBlockCount <= 9)
+    }
+
+    @Test
+    fun adaptiveReaderPaginationCostsCodeBlocksByRenderedPadding() {
+        val codeBlocks = (1..32).map { index ->
+            readerMarkdownBlock(
+                rawBlock = """
+                    ```kotlin
+                    val sprint17CodeBlock$index = $index
+                    ```
+                """.trimIndent(),
+            )
+        }
+        val tallFit = adaptiveReaderPageFit(
+            viewportWidthDp = 411f,
+            viewportHeightDp = 815f,
+            readerFontScale = 1.0,
+        )
+        val tallLargeTextFit = adaptiveReaderPageFit(
+            viewportWidthDp = 411f,
+            viewportHeightDp = 815f,
+            readerFontScale = 1.3,
+        )
+        val tallPages = readerPagesForBlocks(
+            blocks = codeBlocks,
+            maxPageWeight = tallFit.maxPageWeight,
+            charsPerLine = tallFit.charsPerLine,
+            blockGapLineCost = tallFit.blockGapLineCost,
+            maxBlocksPerPage = tallFit.maxBlocksPerPage,
+            readerFontScale = tallFit.readerFontScale,
+        )
+        val tallLargeTextPages = readerPagesForBlocks(
+            blocks = codeBlocks,
+            maxPageWeight = tallLargeTextFit.maxPageWeight,
+            charsPerLine = tallLargeTextFit.charsPerLine,
+            blockGapLineCost = tallLargeTextFit.blockGapLineCost,
+            maxBlocksPerPage = tallLargeTextFit.maxBlocksPerPage,
+            readerFontScale = tallLargeTextFit.readerFontScale,
+        )
+
+        val tallCodeBlockCount = tallPages.first().endInclusive - tallPages.first().start + 1
+        val tallLargeCodeBlockCount = tallLargeTextPages.first().endInclusive - tallLargeTextPages.first().start + 1
+        assertTrue("Tall default one-line code pages should still use the available viewport.", tallCodeBlockCount >= 26)
+        assertTrue("Tall default one-line code pages should fit within rendered code padding.", tallCodeBlockCount <= 26)
+        assertTrue(
+            "Tall large-text one-line code pages should still use the available viewport. " +
+                "count=$tallLargeCodeBlockCount fit=$tallLargeTextFit",
+            tallLargeCodeBlockCount >= 22,
+        )
+        assertTrue("Tall large-text one-line code pages should fit within rendered code padding.", tallLargeCodeBlockCount <= 22)
+    }
+
+    @Test
+    fun adaptiveReaderPaginationCostsMultiLineCodeByFullRenderedLineHeight() {
+        val codeBlocks = (1..10).map { index ->
+            readerMarkdownBlock(
+                rawBlock = """
+                    ```kotlin
+                    val sprint17CodeBlock${index}_line1 = 1
+                    val sprint17CodeBlock${index}_line2 = 2
+                    val sprint17CodeBlock${index}_line3 = 3
+                    val sprint17CodeBlock${index}_line4 = 4
+                    val sprint17CodeBlock${index}_line5 = 5
+                    val sprint17CodeBlock${index}_line6 = 6
+                    val sprint17CodeBlock${index}_line7 = 7
+                    val sprint17CodeBlock${index}_line8 = 8
+                    ```
+                """.trimIndent(),
+            )
+        }
+        val tallFit = adaptiveReaderPageFit(
+            viewportWidthDp = 411f,
+            viewportHeightDp = 815f,
+            readerFontScale = 1.0,
+        )
+        val tallLargeTextFit = adaptiveReaderPageFit(
+            viewportWidthDp = 411f,
+            viewportHeightDp = 815f,
+            readerFontScale = 1.3,
+        )
+        val tallLargeTextLayout = splitOversizedReaderBlocks(
+            blocks = codeBlocks,
+            maxBlockWeight = tallLargeTextFit.maxBlockWeight,
+            charsPerLine = tallLargeTextFit.charsPerLine,
+        )
+
+        val tallPages = readerPagesForBlocks(
+            blocks = codeBlocks,
+            maxPageWeight = tallFit.maxPageWeight,
+            charsPerLine = tallFit.charsPerLine,
+            blockGapLineCost = tallFit.blockGapLineCost,
+            maxBlocksPerPage = tallFit.maxBlocksPerPage,
+            readerFontScale = tallFit.readerFontScale,
+        )
+        val tallLargeTextPages = readerPagesForBlocks(
+            blocks = codeBlocks,
+            maxPageWeight = tallLargeTextFit.maxPageWeight,
+            charsPerLine = tallLargeTextFit.charsPerLine,
+            blockGapLineCost = tallLargeTextFit.blockGapLineCost,
+            maxBlocksPerPage = tallLargeTextFit.maxBlocksPerPage,
+            readerFontScale = tallLargeTextFit.readerFontScale,
+        )
+
+        val tallCodeBlockCount = tallPages.first().endInclusive - tallPages.first().start + 1
+        val tallLargeCodeBlockCount = tallLargeTextPages.first().endInclusive - tallLargeTextPages.first().start + 1
+        assertEquals(
+            "Large-text eight-line code blocks should stay whole because the rendered code cost still fits one page.",
+            codeBlocks.size,
+            tallLargeTextLayout.blocks.size,
+        )
+        assertEquals("Tall default eight-line code pages should admit four rendered-safe blocks.", 4, tallCodeBlockCount)
+        assertEquals("Tall large-text eight-line code pages should admit one rendered-safe block.", 1, tallLargeCodeBlockCount)
+    }
+
+    @Test
+    fun adaptiveReaderPaginationPacksShortMultiLineCodeWithoutUnderfill() {
+        fun repeatedCodeBlocks(lineCount: Int): List<ReaderMarkdownBlock> {
+            return (1..24).map { index ->
+                val codeLines = (1..lineCount).joinToString(separator = "\n") { line ->
+                    "val code${lineCount}Line${index}_$line = ${index + line}"
+                }
+                readerMarkdownBlock(rawBlock = "```kotlin\n$codeLines\n```")
+            }
+        }
+        val tallFit = adaptiveReaderPageFit(
+            viewportWidthDp = 411f,
+            viewportHeightDp = 815f,
+            readerFontScale = 1.0,
+        )
+        val expectedFirstPageBlocksByLineCount = mapOf(
+            2 to 15,
+            3 to 10,
+            4 to 8,
+            5 to 6,
+            6 to 5,
+            7 to 4,
+            8 to 4,
+            9 to 3,
+            10 to 3,
+            11 to 3,
+        )
+
+        expectedFirstPageBlocksByLineCount.forEach { (lineCount, expectedFirstPageBlocks) ->
+            val tallPages = readerPagesForBlocks(
+                blocks = repeatedCodeBlocks(lineCount),
+                maxPageWeight = tallFit.maxPageWeight,
+                charsPerLine = tallFit.charsPerLine,
+                blockGapLineCost = tallFit.blockGapLineCost,
+                maxBlocksPerPage = tallFit.maxBlocksPerPage,
+                readerFontScale = tallFit.readerFontScale,
+            )
+            val tallCodeBlockCount = tallPages.first().endInclusive - tallPages.first().start + 1
+            assertEquals(
+                "Tall default $lineCount-line CODE pages should admit only rendered-safe blocks.",
+                expectedFirstPageBlocks,
+                tallCodeBlockCount,
+            )
+            assertTrue("Tall default $lineCount-line CODE should still leave a real next page.", tallPages.size > 1)
+        }
+    }
+
+    @Test
+    fun adaptiveReaderPaginationSplitsOversizedShortLineCodeBlocksBeforePaging() {
+        fun shortLineCodeBlock(lineCount: Int, sourceBlockIndex: Int = 0): ReaderMarkdownBlock {
+            return readerMarkdownBlock(
+                rawBlock = "```kotlin\n" +
+                    (1..lineCount).joinToString(separator = "\n") { line -> "x$line" } +
+                    "\n```",
+                sourceBlockIndex = sourceBlockIndex,
+            )
+        }
+        val oversizedCodeBlock = shortLineCodeBlock(lineCount = 40)
+        val splitTailCodeBlock = shortLineCodeBlock(lineCount = 36)
+        val adjacentWholeCodeBlocks = listOf(
+            shortLineCodeBlock(lineCount = 19, sourceBlockIndex = 0),
+            shortLineCodeBlock(lineCount = 17, sourceBlockIndex = 1),
+        )
+        val mixedCodeAndBodyBlocks = listOf(
+            shortLineCodeBlock(lineCount = 34, sourceBlockIndex = 0),
+            readerMarkdownBlock(
+                rawBlock = "A short body tail must not squeeze below two full code chunks.",
+                sourceBlockIndex = 1,
+            ),
+        )
+        val tallFit = adaptiveReaderPageFit(
+            viewportWidthDp = 411f,
+            viewportHeightDp = 815f,
+            readerFontScale = 1.0,
+        )
+        val tallLargeTextFit = adaptiveReaderPageFit(
+            viewportWidthDp = 411f,
+            viewportHeightDp = 815f,
+            readerFontScale = 1.3,
+        )
+
+        val tallLayout = splitOversizedReaderBlocks(
+            blocks = listOf(oversizedCodeBlock),
+            maxBlockWeight = tallFit.maxBlockWeight,
+            charsPerLine = tallFit.charsPerLine,
+        )
+        val tallMixedCodeAndBodyLayout = splitOversizedReaderBlocks(
+            blocks = mixedCodeAndBodyBlocks,
+            maxBlockWeight = tallFit.maxBlockWeight,
+            charsPerLine = tallFit.charsPerLine,
+        )
+        val tallLargeTextLayout = splitOversizedReaderBlocks(
+            blocks = listOf(oversizedCodeBlock),
+            maxBlockWeight = tallLargeTextFit.maxBlockWeight,
+            charsPerLine = tallLargeTextFit.charsPerLine,
+        )
+        val tallSplitTailLayout = splitOversizedReaderBlocks(
+            blocks = listOf(splitTailCodeBlock),
+            maxBlockWeight = tallFit.maxBlockWeight,
+            charsPerLine = tallFit.charsPerLine,
+        )
+        val tallAdjacentWholeLayout = splitOversizedReaderBlocks(
+            blocks = adjacentWholeCodeBlocks,
+            maxBlockWeight = tallFit.maxBlockWeight,
+            charsPerLine = tallFit.charsPerLine,
+        )
+        val tallPages = readerPagesForBlocks(
+            blocks = tallLayout.blocks,
+            maxPageWeight = tallFit.maxPageWeight,
+            charsPerLine = tallFit.charsPerLine,
+            blockGapLineCost = tallFit.blockGapLineCost,
+            maxBlocksPerPage = tallFit.maxBlocksPerPage,
+            readerFontScale = tallFit.readerFontScale,
+        )
+        val tallLargeTextPages = readerPagesForBlocks(
+            blocks = tallLargeTextLayout.blocks,
+            maxPageWeight = tallLargeTextFit.maxPageWeight,
+            charsPerLine = tallLargeTextFit.charsPerLine,
+            blockGapLineCost = tallLargeTextFit.blockGapLineCost,
+            maxBlocksPerPage = tallLargeTextFit.maxBlocksPerPage,
+            readerFontScale = tallLargeTextFit.readerFontScale,
+        )
+        val tallSplitTailPages = readerPagesForBlocks(
+            blocks = tallSplitTailLayout.blocks,
+            maxPageWeight = tallFit.maxPageWeight,
+            charsPerLine = tallFit.charsPerLine,
+            blockGapLineCost = tallFit.blockGapLineCost,
+            maxBlocksPerPage = tallFit.maxBlocksPerPage,
+            readerFontScale = tallFit.readerFontScale,
+        )
+        val tallAdjacentWholePages = readerPagesForBlocks(
+            blocks = tallAdjacentWholeLayout.blocks,
+            maxPageWeight = tallFit.maxPageWeight,
+            charsPerLine = tallFit.charsPerLine,
+            blockGapLineCost = tallFit.blockGapLineCost,
+            maxBlocksPerPage = tallFit.maxBlocksPerPage,
+            readerFontScale = tallFit.readerFontScale,
+        )
+        val tallMixedCodeAndBodyPages = readerPagesForBlocks(
+            blocks = tallMixedCodeAndBodyLayout.blocks,
+            maxPageWeight = tallFit.maxPageWeight,
+            charsPerLine = tallFit.charsPerLine,
+            blockGapLineCost = tallFit.blockGapLineCost,
+            maxBlocksPerPage = tallFit.maxBlocksPerPage,
+            readerFontScale = tallFit.readerFontScale,
+        )
+
+        assertEquals(listOf(17, 17, 6), tallLayout.blocks.map { block -> block.text.text.lines().size })
+        assertEquals(listOf(15, 15, 10), tallLargeTextLayout.blocks.map { block -> block.text.text.lines().size })
+        assertEquals(listOf(17, 17, 2), tallSplitTailLayout.blocks.map { block -> block.text.text.lines().size })
+        assertEquals(listOf(17, 2, 17), tallAdjacentWholeLayout.blocks.map { block -> block.text.text.lines().size })
+        assertEquals(listOf(17, 17, 1), tallMixedCodeAndBodyLayout.blocks.map { block -> block.text.text.lines().size })
+        assertEquals(listOf(0, 0, 1), tallAdjacentWholeLayout.blocks.map { block -> block.sourceBlockIndex })
+        assertEquals(listOf(0, 0, 1), tallMixedCodeAndBodyLayout.blocks.map { block -> block.sourceBlockIndex })
+        assertEquals(listOf(0, 59, 127), tallLayout.blocks.map { block -> block.sourceTextStartOffset })
+        assertEquals(listOf(0, 59, 127), tallSplitTailLayout.blocks.map { block -> block.sourceTextStartOffset })
+        assertTrue("Default oversized short-line CODE should need multiple pages.", tallPages.size > 1)
+        assertTrue("Large-text oversized short-line CODE should need multiple pages.", tallLargeTextPages.size > 1)
+        assertTrue("Default split-tail short-line CODE should need multiple pages.", tallSplitTailPages.size > 1)
+        assertTrue("Adjacent whole short-line CODE should need multiple pages.", tallAdjacentWholePages.size > 1)
+        assertTrue("Mixed CODE and body should need multiple pages.", tallMixedCodeAndBodyPages.size > 1)
+        assertEquals("Default oversized CODE first chunk should remain page-contained.", 0, tallPages.first().start)
+        assertEquals("Default oversized CODE should safely co-admit two 17-line chunks.", 1, tallPages.first().endInclusive)
+        assertEquals("Large-text oversized CODE first chunk should remain page-contained.", 0, tallLargeTextPages.first().start)
+        assertEquals("Large-text oversized CODE first page should reject the next 15-line chunk.", 0, tallLargeTextPages.first().endInclusive)
+        assertEquals("Large-text oversized CODE second page should start at the second 15-line chunk.", 1, tallLargeTextPages[1].start)
+        assertEquals("Large-text oversized CODE second page should safely admit the 10-line tail.", 2, tallLargeTextPages[1].endInclusive)
+        assertEquals("Default split-tail CODE should safely co-admit two 17-line chunks.", 1, tallSplitTailPages.first().endInclusive)
+        assertEquals("Adjacent whole CODE first source block should split before the unsafe 19+17 geometry.", 1, tallAdjacentWholePages.first().endInclusive)
+        assertEquals("Adjacent whole CODE should move the following 17-line block to the next page.", 2, tallAdjacentWholePages[1].start)
+        assertEquals("Mixed CODE and body first page should keep only two 17-line CODE chunks.", 1, tallMixedCodeAndBodyPages.first().endInclusive)
+        assertEquals("Mixed CODE and body should move the body-like tail to the next page.", 2, tallMixedCodeAndBodyPages[1].start)
+    }
+
+    @Test
+    fun readerProgressSourceIndexSurvivesAdaptiveResplitting() {
+        val longParagraph = (1..60)
+            .joinToString(separator = " ") { index -> "sourceword$index" }
+            .plus(".")
+        val sourceBlocks = listOf(
+            readerMarkdownBlock(rawBlock = longParagraph, sourceBlockIndex = 0),
+            readerMarkdownBlock(rawBlock = "Stable second source block for progress.", sourceBlockIndex = 1),
+            readerMarkdownBlock(rawBlock = "Stable third source block for progress.", sourceBlockIndex = 2),
+        )
+        val compactLayout = splitOversizedReaderBlocks(
+            blocks = sourceBlocks,
+            maxBlockWeight = 7,
+            charsPerLine = 28,
+        )
+        val compactPages = readerPagesForBlocks(
+            blocks = compactLayout.blocks,
+            maxPageWeight = 18,
+            charsPerLine = 28,
+        )
+        val savedSourcePosition = compactLayout.sourcePositionForDisplayBlock(compactPages.first().endInclusive)
+        val roomyLayout = splitOversizedReaderBlocks(
+            blocks = sourceBlocks,
+            maxBlockWeight = 12,
+            charsPerLine = 42,
+        )
+        val restoredDisplayIndex = roomyLayout.displayBlockIndexForSourcePosition(
+            sourceBlockIndex = savedSourcePosition.sourceBlockIndex,
+            textOffset = savedSourcePosition.textOffset,
+        )
+
+        assertEquals(savedSourcePosition.sourceBlockIndex, roomyLayout.blocks[restoredDisplayIndex].sourceBlockIndex)
+        assertTrue(roomyLayout.blocks[restoredDisplayIndex].sourceTextStartOffset < savedSourcePosition.textOffset)
+        assertTrue(roomyLayout.blocks[restoredDisplayIndex].sourceTextEndOffset() >= savedSourcePosition.textOffset)
     }
 
     @Test
@@ -448,6 +923,53 @@ class ProgressSnapshotTest {
         )
 
         assertEquals(laterChunk, layout.displayBlockIndexForSelector(selector))
+    }
+
+    @Test
+    fun readerAnnotationMappingPrefersSourceSelectorOverStaleParagraphIndex() {
+        val firstBlock = readerMarkdownBlock(
+            rawBlock = "Repeated quote lives in the first source paragraph only.",
+            sourceBlockIndex = 0,
+        )
+        val secondBlock = readerMarkdownBlock(
+            rawBlock = "Repeated quote appears in display text but is not the saved source.",
+            sourceBlockIndex = 1,
+        )
+        val sourceAnchoredAnnotation = ReadingAnnotation(
+            id = "annotation-1",
+            contentId = "content-1",
+            paragraphIndex = 1,
+            quotedText = "Repeated quote",
+            noteText = "source anchored",
+            createdAtMillis = 1L,
+            updatedAtMillis = 2L,
+            selector = ReadingAnnotationSelector(
+                sourceBlockIndex = 0,
+                textStartOffset = 0,
+                textEndOffset = 14,
+            ),
+        )
+        val annotationsByParagraph = mapOf(sourceAnchoredAnnotation.paragraphIndex to sourceAnchoredAnnotation)
+        val annotations = listOf(sourceAnchoredAnnotation)
+
+        assertEquals(
+            sourceAnchoredAnnotation,
+            readingAnnotationForBlock(
+                paragraphIndex = 0,
+                block = firstBlock,
+                annotationsByParagraph = annotationsByParagraph,
+                annotationsForContent = annotations,
+            ),
+        )
+        assertEquals(
+            null,
+            readingAnnotationForBlock(
+                paragraphIndex = 1,
+                block = secondBlock,
+                annotationsByParagraph = annotationsByParagraph,
+                annotationsForContent = annotations,
+            ),
+        )
     }
 
     @Test

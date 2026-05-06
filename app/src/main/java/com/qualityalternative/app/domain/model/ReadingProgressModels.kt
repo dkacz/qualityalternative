@@ -7,6 +7,7 @@ data class ReadingProgress(
     val paragraphCount: Int,
     val updatedAtMillis: Long,
     val completedAtMillis: Long? = null,
+    val lastVisibleTextOffset: Int = 0,
 ) {
     fun isUnfinished(): Boolean {
         return completedAtMillis == null && progressPercent in 1..99

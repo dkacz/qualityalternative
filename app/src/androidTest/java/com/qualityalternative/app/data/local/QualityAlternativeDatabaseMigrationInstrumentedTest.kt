@@ -158,6 +158,73 @@ class QualityAlternativeDatabaseMigrationInstrumentedTest {
         }
     }
 
+    @Test
+    fun migration12To13ValidatesRoomSchemaAndDefaultsReadingProgressOffset() {
+        val databaseName = "qa-migration-12-13.db"
+        deleteDatabase(databaseName)
+        val legacy = helper.createDatabase(databaseName, 12)
+        legacy.execSQL(
+            """
+            INSERT INTO reading_progress (
+                contentId,
+                progressPercent,
+                lastVisibleParagraphIndex,
+                paragraphCount,
+                updatedAtMillis,
+                completedAtMillis
+            ) VALUES (
+                'content-1',
+                42,
+                7,
+                20,
+                1234,
+                NULL
+            )
+            """.trimIndent(),
+        )
+        legacy.close()
+
+        val migrated = helper.runMigrationsAndValidate(
+            databaseName,
+            13,
+            true,
+            QualityAlternativeDatabase.MIGRATION_12_13,
+        )
+        try {
+            assertTrue(readingProgressColumns(migrated).contains("lastVisibleTextOffset"))
+            migrated.query(
+                """
+                SELECT
+                    progressPercent,
+                    lastVisibleParagraphIndex,
+                    paragraphCount,
+                    lastVisibleTextOffset
+                FROM reading_progress
+                WHERE contentId = 'content-1'
+                """.trimIndent(),
+            ).use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals(42, cursor.getInt(0))
+                assertEquals(7, cursor.getInt(1))
+                assertEquals(20, cursor.getInt(2))
+                assertEquals(0, cursor.getInt(3))
+            }
+        } finally {
+            migrated.close()
+            deleteDatabase(databaseName)
+        }
+    }
+
+    private fun readingProgressColumns(db: SupportSQLiteDatabase): List<String> {
+        return db.query("PRAGMA table_info(reading_progress)").use { cursor ->
+            buildList {
+                while (cursor.moveToNext()) {
+                    add(cursor.getString(cursor.getColumnIndexOrThrow("name")))
+                }
+            }
+        }
+    }
+
     private fun readingAnnotationColumns(db: SupportSQLiteDatabase): List<String> {
         return db.query("PRAGMA table_info(reading_annotations)").use { cursor ->
             buildList {

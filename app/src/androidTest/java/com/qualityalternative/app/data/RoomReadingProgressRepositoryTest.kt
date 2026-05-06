@@ -42,6 +42,7 @@ class RoomReadingProgressRepositoryTest {
                         contentId = "content-1",
                         progressPercent = 44,
                         lastVisibleParagraphIndex = 3,
+                        lastVisibleTextOffset = 128,
                         paragraphCount = 10,
                         updatedAtMillis = 1_000L,
                     ),
@@ -52,6 +53,7 @@ class RoomReadingProgressRepositoryTest {
                 }
                 assertEquals("content-1", saved.contentId)
                 assertEquals(44, saved.progressPercent)
+                assertEquals(128, saved.lastVisibleTextOffset)
                 assertTrue(saved.isUnfinished())
 
                 repository.saveProgress(

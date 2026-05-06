@@ -305,6 +305,7 @@ data class AccountLightReadingProgress(
     val contentId: String,
     val progressPercent: Int,
     val lastVisibleParagraphIndex: Int,
+    val lastVisibleTextOffset: Int = 0,
     val paragraphCount: Int,
     val updatedAtMillis: Long,
     val completedAtMillis: Long? = null,
@@ -316,6 +317,7 @@ data class AccountLightReadingProgress(
         require(lastVisibleParagraphIndex in 0 until paragraphCount) {
             "reading progress lastVisibleParagraphIndex is invalid."
         }
+        require(lastVisibleTextOffset >= 0) { "reading progress lastVisibleTextOffset must be non-negative." }
         require(updatedAtMillis >= 0L) { "reading progress updatedAtMillis must be non-negative." }
         require(completedAtMillis == null || completedAtMillis >= 0L) {
             "reading progress completedAtMillis must be non-negative."
@@ -1037,7 +1039,7 @@ private fun findUnknownFieldWarnings(root: JsonObject): List<UnknownFieldWarning
         root["reading"]?.jsonObjectOrNull()?.let { reading ->
             addUnknownKeys(reading, RequiredReadingKeys, "reading", "reading.progress")
             reading["progress"]?.jsonArrayOrNull()?.forEachIndexed { index, element ->
-                element.jsonObjectOrNull()?.let { addUnknownKeys(it, RequiredReadingProgressKeys, "reading.progress[$index]", "reading.progress") }
+                element.jsonObjectOrNull()?.let { addUnknownKeys(it, AllowedReadingProgressKeys, "reading.progress[$index]", "reading.progress") }
             }
         }
         root["annotations"]?.jsonObjectOrNull()?.let { annotations ->
@@ -1228,7 +1230,7 @@ private fun JsonObject.validateReadingShape(allowedContentIds: Set<String>) {
     requireArray("progress", "reading.progress").forEachIndexed { index, element ->
         val path = "reading.progress[$index]"
         val progress = element.requireObject(path)
-        progress.validateRequiredKeys(path = path, required = RequiredReadingProgressKeys, allowed = RequiredReadingProgressKeys)
+        progress.validateRequiredKeys(path = path, required = RequiredReadingProgressKeys, allowed = AllowedReadingProgressKeys)
         val contentId = progress.requireString("contentId", path)
         require(contentId.matches(ContentIdRegex)) { "$path.contentId is invalid." }
         require(contentId in allowedContentIds) {
@@ -1237,6 +1239,9 @@ private fun JsonObject.validateReadingShape(allowedContentIds: Set<String>) {
         require(progressIds.add(contentId)) { "$path.contentId is duplicated." }
         val progressPercent = progress.requireInt("progressPercent", path, 0..100)
         val lastVisibleParagraphIndex = progress.requireInt("lastVisibleParagraphIndex", path, 0..Int.MAX_VALUE)
+        progress["lastVisibleTextOffset"]?.let {
+            progress.requireInt("lastVisibleTextOffset", path, 0..Int.MAX_VALUE)
+        }
         val paragraphCount = progress.requireInt("paragraphCount", path, 1..Int.MAX_VALUE)
         progress.requireLong("updatedAtMillis", path, minimum = 0L)
         val completedAtMillis = progress.requireNullableLong("completedAtMillis", path, minimum = 0L, required = true)
@@ -1608,6 +1613,7 @@ private fun ReadingProgress.toAccountLightReadingProgress(
         contentId = portableId,
         progressPercent = portablePercent,
         lastVisibleParagraphIndex = safeLastVisible,
+        lastVisibleTextOffset = lastVisibleTextOffset.coerceAtLeast(0),
         paragraphCount = safeParagraphCount,
         updatedAtMillis = updatedAtMillis.coerceAtLeast(0L),
         completedAtMillis = completedAtMillis?.coerceAtLeast(0L),
@@ -1666,6 +1672,7 @@ private fun AccountLightReadingProgress.toReadingProgress(contentId: String = th
         contentId = contentId,
         progressPercent = progressPercent,
         lastVisibleParagraphIndex = lastVisibleParagraphIndex,
+        lastVisibleTextOffset = lastVisibleTextOffset,
         paragraphCount = paragraphCount,
         updatedAtMillis = updatedAtMillis,
         completedAtMillis = completedAtMillis,
@@ -2193,6 +2200,7 @@ private val RequiredReadingProgressKeys = setOf(
     "updatedAtMillis",
     "completedAtMillis",
 )
+private val AllowedReadingProgressKeys = RequiredReadingProgressKeys + "lastVisibleTextOffset"
 private val RequiredAnnotationsKeys = setOf("export", "driveSync", "sidecarIndex")
 private val RequiredAnnotationExportKeys = setOf("destinationDisplayName", "lastSuccessfulAtMillis")
 private val RequiredAnnotationDriveSyncKeys = setOf(

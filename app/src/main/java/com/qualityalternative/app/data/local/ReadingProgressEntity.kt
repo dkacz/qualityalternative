@@ -12,6 +12,7 @@ data class ReadingProgressEntity(
     @PrimaryKey val contentId: String,
     val progressPercent: Int,
     val lastVisibleParagraphIndex: Int,
+    val lastVisibleTextOffset: Int,
     val paragraphCount: Int,
     val updatedAtMillis: Long,
     val completedAtMillis: Long?,
