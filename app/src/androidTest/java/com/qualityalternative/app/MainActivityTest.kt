@@ -100,6 +100,8 @@ class MainActivityTest {
         "sprint17-annotation-surface-${System.currentTimeMillis()}"
     private val sprint18ProgressHotfixScreenshotDirName =
         "sprint18-progress-hotfix-${System.currentTimeMillis()}"
+    private val sprint19RegressionScreenshotDirName =
+        "sprint19-reader-form-regression-${System.currentTimeMillis()}"
 
     @Before
     fun resetAppState() {
@@ -163,6 +165,12 @@ class MainActivityTest {
         composeRule.onNodeWithText("Pause 15 min")
             .assertIsDisplayed()
             .assertIsEnabled()
+        composeRule.onNodeWithText("Open in", substring = true)
+            .assertIsDisplayed()
+            .assertIsNotEnabled()
+        composeRule.onNodeWithTag("form-intervention-unlock-wait")
+            .assertIsDisplayed()
+        waitForOpenAnywayUnlock()
         composeRule.onNodeWithText("Open Fixture Feed One")
             .assertIsDisplayed()
             .assertIsEnabled()
@@ -189,6 +197,7 @@ class MainActivityTest {
     @Test
     fun systemInterventionOpenAnywayActionIsClickableWithoutScrolling() {
         launchFixtureSystemIntervention()
+        waitForOpenAnywayUnlock()
 
         composeRule.onNodeWithText("Open Fixture Feed One")
             .assertIsDisplayed()
@@ -689,6 +698,7 @@ class MainActivityTest {
 
         seedFixtureSelection()
         relaunchFixtureSystemIntervention()
+        waitForOpenAnywayUnlock()
         composeRule.onNodeWithText("Open Fixture Feed One")
             .assertIsDisplayed()
             .assertIsEnabled()
@@ -1487,6 +1497,165 @@ class MainActivityTest {
             hasNodeContaining("table-of-contents target") && !hasTag("reader-toc-sheet")
         }
         composeRule.onNodeWithText("table-of-contents target", substring = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun sprint19EpubProgressAndAnnotationStartStayAnchoredInLaterChapter() {
+        launchOnboardedApp()
+        val document = addSeedEpubDocument(
+            title = "Sprint 19 Chaptered Reader",
+            displayName = "sprint19-reader-regression.epub",
+            bytes = sprint19RegressionEpubBytes(),
+            nowMillis = 91_000L,
+        )
+
+        scenario?.onActivity { activity -> activity.mainViewModel.openLibraryItem(document) }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
+        composeRule.onNodeWithTag("reader-toc-open")
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-toc-sheet") }
+        val chapterThreeIndex = readerTocEntryIndex("Chapter Three")
+        val chapterThreeBlockIndex = readerTocEntryBlockIndex("Chapter Three")
+        composeRule.onNodeWithTag("reader-toc-entry-$chapterThreeIndex")
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            !hasTag("reader-toc-sheet") &&
+                visibleReaderParagraphIndices().any { index -> index >= chapterThreeBlockIndex }
+        }
+
+        val pageLabelBeforeFontChange = readerPagePositionFromLabel()
+        val progressBeforeFontChange = currentReaderProgressPercentFromLabel()
+        assertTrue(
+            "Chapter three should not display a beginning-of-book 1% progress label; label=${readerPageLabelText()}",
+            progressBeforeFontChange > 40,
+        )
+        captureSprint19RegressionScreenshot("01_chapter_three_progress_not_one_percent")
+
+        scenario?.onActivity { activity -> activity.mainViewModel.setReaderFontScale(1.3) }
+        composeRule.waitUntil(timeoutMillis = 10_000) { currentReaderFontScale() == 1.3 }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            readerPagePositionFromLabel().totalPages > pageLabelBeforeFontChange.totalPages
+        }
+        val pageLabelAfterFontChange = readerPagePositionFromLabel()
+        val progressAfterFontChange = currentReaderProgressPercentFromLabel()
+        assertTrue(
+            "Reader font-size changes should preserve the source-anchored progress. " +
+                "before=$progressBeforeFontChange after=$progressAfterFontChange " +
+                "beforeLabel=$pageLabelBeforeFontChange afterLabel=$pageLabelAfterFontChange label=${readerPageLabelText()}",
+            progressAfterFontChange in (progressBeforeFontChange - 1)..(progressBeforeFontChange + 1),
+        )
+        assertTrue(
+            "Reader font-size change should visibly repaginate the fixture instead of staying on the same tiny 3-page layout. " +
+                "before=$pageLabelBeforeFontChange after=$pageLabelAfterFontChange",
+            pageLabelAfterFontChange.totalPages > pageLabelBeforeFontChange.totalPages,
+        )
+        captureSprint19RegressionScreenshot("02_chapter_three_large_font_progress_stable")
+
+        composeRule.onNodeWithTag("reader-toc-open")
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-toc-sheet") }
+        composeRule.onNodeWithTag("reader-toc-entry-$chapterThreeIndex")
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            !hasTag("reader-toc-sheet") &&
+                visibleReaderParagraphIndices().any { index -> index >= chapterThreeBlockIndex }
+        }
+
+        val contentId = currentContentId()
+        val annotationParagraph = chapterThreeBlockIndex + 1
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasTag("reader-annotation-block-$annotationParagraph")
+        }
+        composeRule.onNodeWithTag("reader-annotation-block-$annotationParagraph")
+            .assertIsDisplayed()
+            .performTouchInput { longClick(position = Offset(24f, 24f)) }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-annotation-editor-$annotationParagraph") }
+        val initialQuote = readerSelectedQuoteText(annotationParagraph)
+        assertTrue(initialQuote.contains("third chapter anchor"))
+        captureSprint19RegressionScreenshot("03_annotation_before_start_back")
+        repeat(30) {
+            if (!readerSelectedQuoteText(annotationParagraph).contains("second chapter marker") &&
+                hasTag("reader-annotation-start-earlier")
+            ) {
+                composeRule.onNodeWithTag("reader-annotation-start-earlier")
+                    .assertIsDisplayed()
+                    .performClick()
+                composeRule.waitForIdle()
+            }
+        }
+
+        val expandedQuote = readerSelectedQuoteText(annotationParagraph)
+        assertFalse(
+            "Moving annotation start backward from chapter three must not jump to the first source page. " +
+                "visible=${visibleReaderParagraphIndices()} quote=$expandedQuote",
+            visibleReaderParagraphIndices().contains(0),
+        )
+        assertTrue(
+            "Expanded quote should cross into the previous chapter while remaining anchored around chapter three text.",
+            expandedQuote.contains("second chapter marker") && expandedQuote.contains("third chapter anchor"),
+        )
+        captureSprint19RegressionScreenshot("04_annotation_start_back_without_book_start_jump")
+
+        val noteText = "Sprint 19 saved cross-chapter selector."
+        composeRule.onNodeWithTag("reader-annotation-note-input-$annotationParagraph")
+            .assertIsDisplayed()
+            .performClick()
+            .performTextInput(noteText)
+        UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).pressBack()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("reader-annotation-save-$annotationParagraph")
+            .assertIsDisplayed()
+            .assertIsEnabled()
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            !hasTag("reader-annotation-editor-$annotationParagraph") &&
+                hasReadingAnnotationNote(contentId = contentId, paragraphIndex = annotationParagraph, noteText = noteText) &&
+                hasReadingAnnotationQuoteContaining(contentId, annotationParagraph, "second chapter marker") &&
+                hasReadingAnnotationQuoteContaining(contentId, annotationParagraph, "third chapter anchor")
+        }
+        captureSprint19RegressionScreenshot("05_annotation_saved_cross_chapter_highlight")
+        scenario?.onActivity { activity -> activity.mainViewModel.dismissMessage() }
+        composeRule.waitUntil(timeoutMillis = 10_000) { !hasNode("Annotation saved.") }
+
+        val reopenedParagraph = visibleAnnotationHighlightIndices().maxOrNull() ?: annotationParagraph
+        composeRule.onNodeWithTag("reader-annotation-block-$reopenedParagraph")
+            .assertIsDisplayed()
+            .performTouchInput { longClick(position = Offset(24f, 24f)) }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-annotation-editor-$reopenedParagraph") }
+        val reopenedQuote = readerSelectedQuoteText(reopenedParagraph)
+        assertTrue(
+            "Reopened note should preserve the saved cross-chapter selector. quote=$reopenedQuote",
+            reopenedQuote.contains("second chapter marker") && reopenedQuote.contains("third chapter anchor"),
+        )
+        captureSprint19RegressionScreenshot("06_annotation_reopened_cross_chapter_selector")
+    }
+
+    @Test
+    fun sprint19FormInterventionShowsFiveSecondUnlockBeforeOpenAnyway() {
+        launchFixtureSystemIntervention()
+
+        composeRule.onNodeWithTag("form-intervention-unlock-wait")
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("Open in", substring = true)
+            .assertIsDisplayed()
+            .assertIsNotEnabled()
+        composeRule.onNodeWithTag("intervention-open-anyway-close")
+            .assertIsDisplayed()
+            .assertIsNotEnabled()
+        captureSprint19RegressionScreenshot("07_form_intervention_waiting_locked")
+
+        waitForOpenAnywayUnlock()
+        composeRule.onNodeWithText("Open Fixture Feed One")
+            .assertIsDisplayed()
+            .assertIsEnabled()
+        composeRule.onNodeWithTag("intervention-open-anyway-close")
+            .assertIsDisplayed()
+            .assertIsEnabled()
+        captureSprint19RegressionScreenshot("08_form_intervention_unlock_ready")
     }
 
     @Test
@@ -2788,7 +2957,7 @@ class MainActivityTest {
     }
 
     private fun visibleReaderParagraphIndices(): List<Int> {
-        return (0..80).filter { index ->
+        return (0..180).filter { index ->
             hasContentDescriptionNode("reader-first-visible-paragraph-$index")
         }
     }
@@ -2903,7 +3072,7 @@ class MainActivityTest {
     }
 
     private fun visibleAnnotationHighlightIndices(): List<Int> {
-        return (0..120).filter { index ->
+        return (0..180).filter { index ->
             hasTag("reader-annotation-highlight-$index")
         }
     }
@@ -2950,6 +3119,36 @@ class MainActivityTest {
             scale = activity.mainViewModel.uiState.readerFontScale
         }
         return scale
+    }
+
+    private fun readerPageLabelText(): String {
+        val config = composeRule.onNodeWithTag("reader-page-label")
+            .fetchSemanticsNode()
+            .config
+        return config[SemanticsProperties.Text]
+            .joinToString(separator = " ") { text -> text.text }
+    }
+
+    private fun currentReaderProgressPercentFromLabel(): Int {
+        return Regex("""(\d+)%""")
+            .find(readerPageLabelText())
+            ?.groupValues
+            ?.getOrNull(1)
+            ?.toIntOrNull()
+            ?: 0
+    }
+
+    private data class ReaderPagePosition(
+        val currentPage: Int,
+        val totalPages: Int,
+    )
+
+    private fun readerPagePositionFromLabel(): ReaderPagePosition {
+        val match = Regex("""(\d+)/(\d+)""").find(readerPageLabelText())
+        return ReaderPagePosition(
+            currentPage = match?.groupValues?.getOrNull(1)?.toIntOrNull() ?: 0,
+            totalPages = match?.groupValues?.getOrNull(2)?.toIntOrNull() ?: 0,
+        )
     }
 
     private fun currentInterfaceTextScale(): Double {
@@ -3365,6 +3564,12 @@ class MainActivityTest {
         }
     }
 
+    private fun waitForOpenAnywayUnlock() {
+        composeRule.waitUntil(timeoutMillis = 8_000) {
+            hasNode("Open Fixture Feed One") && !hasTag("form-intervention-unlock-wait")
+        }
+    }
+
     private fun relaunchFixtureSystemInterventionWithoutWaitingForIntervention() {
         scenario?.close()
         scenario = null
@@ -3694,6 +3899,84 @@ class MainActivityTest {
         )
     }
 
+    private fun sprint19RegressionEpubBytes(): ByteArray {
+        val chapterOneFiller = (1..12).joinToString(separator = "\n") { index ->
+            "<p>Opening source marker $index keeps the first chapter long enough for calibrated progress.</p>"
+        }
+        val chapterTwoFiller = (1..12).joinToString(separator = "\n") { index ->
+            "<p>The second chapter marker $index stays before the target so backward annotation selection has real previous-source text.</p>"
+        }
+        val chapterThreeTail = (1..18).joinToString(separator = "\n") { index ->
+            "<p>Trailing third-chapter source marker $index keeps the chapter from being the final page during progress checks.</p>"
+        }
+        return epubBytes(
+            "META-INF/container.xml" to """
+                <?xml version="1.0"?>
+                <container>
+                  <rootfiles>
+                    <rootfile full-path="OPS/package.opf" media-type="application/oebps-package+xml"/>
+                  </rootfiles>
+                </container>
+            """.trimIndent(),
+            "OPS/package.opf" to """
+                <package>
+                  <manifest>
+                    <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
+                    <item id="chapter-one" href="chapter1.xhtml" media-type="application/xhtml+xml"/>
+                    <item id="chapter-two" href="chapter2.xhtml" media-type="application/xhtml+xml"/>
+                    <item id="chapter-three" href="chapter3.xhtml" media-type="application/xhtml+xml"/>
+                  </manifest>
+                  <spine>
+                    <itemref idref="chapter-one"/>
+                    <itemref idref="chapter-two"/>
+                    <itemref idref="chapter-three"/>
+                  </spine>
+                </package>
+            """.trimIndent(),
+            "OPS/nav.xhtml" to """
+                <html xmlns:epub="http://www.idpf.org/2007/ops"><body>
+                  <nav epub:type="toc">
+                    <ol>
+                      <li><a href="chapter1.xhtml#chapter-one">Chapter One</a></li>
+                      <li><a href="chapter2.xhtml#chapter-two">Chapter Two</a></li>
+                      <li><a href="chapter3.xhtml#chapter-three">Chapter Three</a></li>
+                    </ol>
+                  </nav>
+                </body></html>
+            """.trimIndent(),
+            "OPS/chapter1.xhtml" to """
+                <html><body>
+                  <h1 id="chapter-one">Chapter One</h1>
+                  <p>The first chapter establishes baseline source ordering for the regression fixture.</p>
+                  <p>Its paragraphs are deliberately ordinary so progress can only come from source anchors.</p>
+                  <p>This opening material should never be shown after chapter-three annotation adjustment begins.</p>
+                  <p>Another first chapter paragraph makes the chapter large enough to affect whole-book percentage.</p>
+                  $chapterOneFiller
+                </body></html>
+            """.trimIndent(),
+            "OPS/chapter2.xhtml" to """
+                <html><body>
+                  <h1 id="chapter-two">Chapter Two</h1>
+                  <p>The second chapter adds a middle source range before the target chapter.</p>
+                  <p>Reader progress should count this middle material before reporting chapter three.</p>
+                  <p>Annotation controls may cross nearby source ranges, but should not confuse this chapter with the first.</p>
+                  <p>The final middle paragraph protects against duplicate local EPUB block indexes.</p>
+                  $chapterTwoFiller
+                </body></html>
+            """.trimIndent(),
+            "OPS/chapter3.xhtml" to """
+                <html><body>
+                  <h1 id="chapter-three">Chapter Three</h1>
+                  <p>The third chapter anchor is the user-visible target for Sprint 19 progress and selection testing.</p>
+                  <p>This third chapter anchor sentence is selected for a note so the start handle can move backward safely.</p>
+                  <p>Changing reader text size here should not make the progress label drift back toward the beginning.</p>
+                  <p>The final chapter-three paragraph keeps the page representative after large-font repagination.</p>
+                  $chapterThreeTail
+                </body></html>
+            """.trimIndent(),
+        )
+    }
+
     private fun epubBytes(vararg entries: Pair<String, String>): ByteArray {
         val output = ByteArrayOutputStream()
         ZipOutputStream(output).use { zip ->
@@ -3882,6 +4165,16 @@ class MainActivityTest {
 
     private fun captureSprint18ProgressHotfixScreenshot(name: String) {
         val outputDir = File("/sdcard/Download/qualityalternative/$sprint18ProgressHotfixScreenshotDirName")
+        assertTrue("Expected screenshot output directory for $name", outputDir.mkdirs() || outputDir.exists())
+        composeRule.waitForIdle()
+        Thread.sleep(300)
+        val output = File(outputDir, "$name.png")
+        assertTrue("Expected screenshot capture for $name", UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).takeScreenshot(output))
+        assertTrue("Expected screenshot file for $name", output.exists() && output.length() > 0L)
+    }
+
+    private fun captureSprint19RegressionScreenshot(name: String) {
+        val outputDir = File("/sdcard/Download/qualityalternative/$sprint19RegressionScreenshotDirName")
         assertTrue("Expected screenshot output directory for $name", outputDir.mkdirs() || outputDir.exists())
         composeRule.waitForIdle()
         Thread.sleep(300)

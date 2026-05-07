@@ -390,6 +390,24 @@ class ProgressSnapshotTest {
     }
 
     @Test
+    fun readerProgressPercentUsesSourceBlockIdentityInsteadOfAssumingDenseIndexes() {
+        val blocks = listOf(
+            readerMarkdownBlock(rawBlock = "AAAAAA", sourceBlockIndex = 10),
+            readerMarkdownBlock(rawBlock = "BBBBBB", sourceBlockIndex = 20),
+            readerMarkdownBlock(rawBlock = "CCCCCC", sourceBlockIndex = 30),
+        )
+
+        assertEquals(
+            50,
+            readerProgressPercentForSourcePosition(
+                sourceBlockIndex = 20,
+                textOffset = 3,
+                sourceBlocks = blocks,
+            ),
+        )
+    }
+
+    @Test
     fun readerPageBoundarySignatureChangesWhenSamePageCountBoundariesShift() {
         val fallbackPages = listOf(
             ReaderPage(start = 0, endInclusive = 9),

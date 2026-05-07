@@ -57,6 +57,47 @@ class EpubTextExtractorTest {
     }
 
     @Test
+    fun extractDocumentKeepsSourceBlockIndexesGlobalAcrossSpineDocuments() {
+        val epub = epubBytes(
+            "META-INF/container.xml" to """
+                <?xml version="1.0"?>
+                <container>
+                  <rootfiles>
+                    <rootfile full-path="OPS/package.opf" media-type="application/oebps-package+xml"/>
+                  </rootfiles>
+                </container>
+            """.trimIndent(),
+            "OPS/package.opf" to """
+                <package>
+                  <manifest>
+                    <item id="chapter-one" href="chapter1.xhtml" media-type="application/xhtml+xml"/>
+                    <item id="chapter-two" href="chapter2.xhtml" media-type="application/xhtml+xml"/>
+                    <item id="chapter-three" href="chapter3.xhtml" media-type="application/xhtml+xml"/>
+                  </manifest>
+                  <spine>
+                    <itemref idref="chapter-one"/>
+                    <itemref idref="chapter-two"/>
+                    <itemref idref="chapter-three"/>
+                  </spine>
+                </package>
+            """.trimIndent(),
+            "OPS/chapter1.xhtml" to "<html><body><h1>One</h1><p>First body.</p></body></html>",
+            "OPS/chapter2.xhtml" to "<html><body><h1>Two</h1><p>Second body.</p></body></html>",
+            "OPS/chapter3.xhtml" to "<html><body><h1>Three</h1><p>Third body.</p></body></html>",
+        )
+
+        val document = EpubTextExtractor.extractDocument(ByteArrayInputStream(epub))
+
+        assertEquals((0..5).toList(), document.blocks.map { block -> block.sourceBlockIndex })
+        assertEquals(
+            listOf(0, 2, 4),
+            document.blocks
+                .filter { block -> block.text.startsWith("# ") }
+                .map { block -> block.sourceBlockIndex },
+        )
+    }
+
+    @Test
     fun extractPreservesEpubStructureAsReaderMarkdown() {
         val epub = epubBytes(
             "META-INF/container.xml" to """

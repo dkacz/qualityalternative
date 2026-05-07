@@ -3264,21 +3264,24 @@ class MainViewModelTest {
     @OptIn(ExperimentalCoroutinesApi::class)
     fun requestSystemInterception_opensFixtureTargetAndOpenAnywayReturnsTrue() = runTest {
         val fixtureTarget = FixtureTargetRegistry.fixtureDistractors.first()
+        var nowMillis = 5_000L
         val viewModel = createViewModel(
             settingsRepository = FakeSettingsRepository(
                 initial = completedSettings(selectedAppPackages = setOf(fixtureTarget.packageName)),
             ),
+            nowProvider = { nowMillis },
         )
 
         advanceUntilIdle()
 
-        viewModel.requestSystemInterception(targetAppPackage = fixtureTarget.packageName, nowMillis = 5_000L)
+        viewModel.requestSystemInterception(targetAppPackage = fixtureTarget.packageName, nowMillis = nowMillis)
         advanceUntilIdle()
 
         assertEquals(MainScreen.Intervention, viewModel.uiState.screen)
         assertEquals(InterventionOrigin.SYSTEM, viewModel.uiState.currentInterventionOrigin)
         assertEquals(fixtureTarget.packageName, viewModel.uiState.selectedTargetApp?.packageName)
 
+        nowMillis = 10_000L
         val exitsToTarget = viewModel.openAnyway()
 
         assertTrue(exitsToTarget)
@@ -3311,6 +3314,7 @@ class MainViewModelTest {
         advanceUntilIdle()
         assertEquals(MainScreen.Intervention, viewModel.uiState.screen)
 
+        nowMillis += FORM_INTERVENTION_UNLOCK_DELAY_MILLIS
         assertTrue(viewModel.openAnyway())
         advanceUntilIdle()
 
@@ -3336,6 +3340,67 @@ class MainViewModelTest {
                 nowMillis = 10_000L + 121 * 60_000L,
             ),
         )
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun openAnyway_isBlockedUntilFiveSecondFormInterventionUnlockFinishes() = runTest {
+        val fixtureTarget = FixtureTargetRegistry.fixtureDistractors.first()
+        var nowMillis = 20_000L
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val viewModel = createViewModel(
+            settingsRepository = FakeSettingsRepository(
+                initial = completedSettings(selectedAppPackages = setOf(fixtureTarget.packageName)),
+            ),
+            analyticsTracker = analyticsTracker,
+            nowProvider = { nowMillis },
+        )
+
+        advanceUntilIdle()
+        viewModel.requestSystemInterception(targetAppPackage = fixtureTarget.packageName, nowMillis = nowMillis)
+        advanceUntilIdle()
+
+        assertEquals(25_000L, viewModel.uiState.currentOpenAnywayUnlockAvailableAtMillis)
+        assertFalse(viewModel.openAnyway())
+        assertEquals(MainScreen.Intervention, viewModel.uiState.screen)
+        assertTrue(analyticsTracker.allEvents().any { it.type == AnalyticsEventType.FORM_INTERVENTION_UNLOCK_BLOCKED })
+
+        nowMillis = 25_000L
+        viewModel.recordFormInterventionUnlockAvailable(nowMillis = nowMillis)
+        assertTrue(viewModel.openAnyway())
+        assertEquals(MainScreen.Home, viewModel.uiState.screen)
+        assertTrue(analyticsTracker.allEvents().any { it.type == AnalyticsEventType.FORM_INTERVENTION_UNLOCK_USED })
+        assertTrue(analyticsTracker.allEvents().any { it.type == AnalyticsEventType.FORM_INTERVENTION_UNLOCK_ENABLED })
+        assertTrue(analyticsTracker.allEvents().any {
+            it.type == AnalyticsEventType.FORM_INTERVENTION_COMPLETED &&
+                it.metadata["action"] == "open_anyway"
+        })
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun formInterventionAbandonmentRecordsAnalyticsAndClearsIntervention() = runTest {
+        val fixtureTarget = FixtureTargetRegistry.fixtureDistractors.first()
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val viewModel = createViewModel(
+            settingsRepository = FakeSettingsRepository(
+                initial = completedSettings(selectedAppPackages = setOf(fixtureTarget.packageName)),
+            ),
+            analyticsTracker = analyticsTracker,
+            nowProvider = { 30_000L },
+        )
+
+        advanceUntilIdle()
+        viewModel.requestSystemInterception(targetAppPackage = fixtureTarget.packageName, nowMillis = 30_000L)
+        advanceUntilIdle()
+
+        assertEquals(MainScreen.Intervention, viewModel.uiState.screen)
+        viewModel.abandonFormIntervention(reason = "back", nowMillis = 31_000L)
+
+        assertEquals(MainScreen.Home, viewModel.uiState.screen)
+        assertEquals(null, viewModel.uiState.currentRecommendationSet)
+        val abandoned = analyticsTracker.allEvents().last { it.type == AnalyticsEventType.FORM_INTERVENTION_ABANDONED }
+        assertEquals("back", abandoned.metadata["reason"])
     }
 
     @Test
@@ -3549,13 +3614,17 @@ class MainViewModelTest {
         viewModel.saveCurrentReadingProgress(
             progressPercent = 35,
             lastVisibleParagraphIndex = 2,
+            lastVisibleTextOffset = 77,
             paragraphCount = 10,
             nowMillis = 2_300L,
         )
         advanceUntilIdle()
 
         assertEquals(3, profileWriter.writes.size)
-        assertTrue(profileWriter.writes.last().third.contains("\"progressPercent\""))
+        val progressAutosaveJson = profileWriter.writes.last().third
+        assertTrue(progressAutosaveJson.contains("\"progressPercent\""))
+        assertTrue(progressAutosaveJson.contains("\"lastVisibleParagraphIndex\": 2"))
+        assertTrue(progressAutosaveJson.contains("\"lastVisibleTextOffset\": 77"))
 
         val link = userLinkRepository.links.value.single()
         viewModel.togglePriorityContent(link)

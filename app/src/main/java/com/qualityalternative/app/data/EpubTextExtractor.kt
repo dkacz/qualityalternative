@@ -58,7 +58,7 @@ object EpubTextExtractor {
             entries[path]
                 ?.toString(Charsets.UTF_8)
                 ?.let { html -> htmlToReaderDocumentBlocks(html = html, sourceHref = path) }
-        }
+        }.withGlobalSourceBlockIndexes()
         val blocks = parsedDocuments.flatMap(ParsedSpineDocument::blocks)
         if (blocks.isEmpty()) {
             throw IllegalArgumentException("EPUB contains no readable text")
@@ -228,16 +228,28 @@ object EpubTextExtractor {
             .mapValues { (_, indexes) -> indexes.minOrNull() ?: 0 }
     }
 
-    private fun anchorBlockIndexesBySource(parsedDocuments: List<ParsedSpineDocument>): Map<String, Int> {
+    private fun List<ParsedSpineDocument>.withGlobalSourceBlockIndexes(): List<ParsedSpineDocument> {
         var globalOffset = 0
-        val indexes = mutableMapOf<String, Int>()
-        parsedDocuments.forEach { document ->
-            document.anchorBlockIndexes.forEach { (anchor, localIndex) ->
-                indexes["${document.sourceHref}#$anchor"] = globalOffset + localIndex
+        return map { document ->
+            val reindexedBlocks = document.blocks.mapIndexed { localIndex, block ->
+                block.copy(sourceBlockIndex = globalOffset + localIndex)
+            }
+            val reindexedAnchors = document.anchorBlockIndexes.mapValues { (_, localIndex) ->
+                globalOffset + localIndex
             }
             globalOffset += document.blocks.size
+            document.copy(blocks = reindexedBlocks, anchorBlockIndexes = reindexedAnchors)
         }
-        return indexes
+    }
+
+    private fun anchorBlockIndexesBySource(parsedDocuments: List<ParsedSpineDocument>): Map<String, Int> {
+        return parsedDocuments
+            .flatMap { document ->
+                document.anchorBlockIndexes.map { (anchor, globalIndex) ->
+                    "${document.sourceHref}#$anchor" to globalIndex
+                }
+            }
+            .toMap()
     }
 
     private fun epubTableOfContents(

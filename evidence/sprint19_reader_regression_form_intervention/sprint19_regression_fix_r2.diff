@@ -1,0 +1,1260 @@
+diff --git a/PRD.md b/PRD.md
+index c3e6fdd..ba27dc5 100644
+--- a/PRD.md
++++ b/PRD.md
+@@ -283,8 +283,8 @@ The intervention must provide three clear actions that map to the MVP value prop
+ - User can choose Read now for the primary recommendation.
+ - User can choose one of the backup recommendations instead of the primary item.
+ - User can choose Pause 15 min, which creates a 15-minute delay window.
+-- User can choose Open anyway.
+-- No additional mandatory step is inserted after the user chooses Open anyway.
++- User can choose Open anyway after a short, visible 5-second form intervention wait.
++- The wait is presented before unlock is available, not as an extra screen after the user chooses Open anyway.
+ - After Open anyway from a system intervention, repeated opens of the same distracting app are quiet for the user-configured unlock window.
+ 
+ ### FR8. Replacement Session Experience
+diff --git a/app/src/androidTest/java/com/qualityalternative/app/MainActivityTest.kt b/app/src/androidTest/java/com/qualityalternative/app/MainActivityTest.kt
+index ffff940..84e5c41 100644
+--- a/app/src/androidTest/java/com/qualityalternative/app/MainActivityTest.kt
++++ b/app/src/androidTest/java/com/qualityalternative/app/MainActivityTest.kt
+@@ -100,6 +100,8 @@ class MainActivityTest {
+         "sprint17-annotation-surface-${System.currentTimeMillis()}"
+     private val sprint18ProgressHotfixScreenshotDirName =
+         "sprint18-progress-hotfix-${System.currentTimeMillis()}"
++    private val sprint19RegressionScreenshotDirName =
++        "sprint19-reader-form-regression-${System.currentTimeMillis()}"
+ 
+     @Before
+     fun resetAppState() {
+@@ -163,6 +165,12 @@ class MainActivityTest {
+         composeRule.onNodeWithText("Pause 15 min")
+             .assertIsDisplayed()
+             .assertIsEnabled()
++        composeRule.onNodeWithText("Open in", substring = true)
++            .assertIsDisplayed()
++            .assertIsNotEnabled()
++        composeRule.onNodeWithTag("form-intervention-unlock-wait")
++            .assertIsDisplayed()
++        waitForOpenAnywayUnlock()
+         composeRule.onNodeWithText("Open Fixture Feed One")
+             .assertIsDisplayed()
+             .assertIsEnabled()
+@@ -189,6 +197,7 @@ class MainActivityTest {
+     @Test
+     fun systemInterventionOpenAnywayActionIsClickableWithoutScrolling() {
+         launchFixtureSystemIntervention()
++        waitForOpenAnywayUnlock()
+ 
+         composeRule.onNodeWithText("Open Fixture Feed One")
+             .assertIsDisplayed()
+@@ -689,6 +698,7 @@ class MainActivityTest {
+ 
+         seedFixtureSelection()
+         relaunchFixtureSystemIntervention()
++        waitForOpenAnywayUnlock()
+         composeRule.onNodeWithText("Open Fixture Feed One")
+             .assertIsDisplayed()
+             .assertIsEnabled()
+@@ -1489,6 +1499,165 @@ class MainActivityTest {
+         composeRule.onNodeWithText("table-of-contents target", substring = true).assertIsDisplayed()
+     }
+ 
++    @Test
++    fun sprint19EpubProgressAndAnnotationStartStayAnchoredInLaterChapter() {
++        launchOnboardedApp()
++        val document = addSeedEpubDocument(
++            title = "Sprint 19 Chaptered Reader",
++            displayName = "sprint19-reader-regression.epub",
++            bytes = sprint19RegressionEpubBytes(),
++            nowMillis = 91_000L,
++        )
++
++        scenario?.onActivity { activity -> activity.mainViewModel.openLibraryItem(document) }
++        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
++        composeRule.onNodeWithTag("reader-toc-open")
++            .assertIsDisplayed()
++            .performClick()
++        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-toc-sheet") }
++        val chapterThreeIndex = readerTocEntryIndex("Chapter Three")
++        val chapterThreeBlockIndex = readerTocEntryBlockIndex("Chapter Three")
++        composeRule.onNodeWithTag("reader-toc-entry-$chapterThreeIndex")
++            .assertIsDisplayed()
++            .performClick()
++        composeRule.waitUntil(timeoutMillis = 10_000) {
++            !hasTag("reader-toc-sheet") &&
++                visibleReaderParagraphIndices().any { index -> index >= chapterThreeBlockIndex }
++        }
++
++        val pageLabelBeforeFontChange = readerPagePositionFromLabel()
++        val progressBeforeFontChange = currentReaderProgressPercentFromLabel()
++        assertTrue(
++            "Chapter three should not display a beginning-of-book 1% progress label; label=${readerPageLabelText()}",
++            progressBeforeFontChange > 40,
++        )
++        captureSprint19RegressionScreenshot("01_chapter_three_progress_not_one_percent")
++
++        scenario?.onActivity { activity -> activity.mainViewModel.setReaderFontScale(1.3) }
++        composeRule.waitUntil(timeoutMillis = 10_000) { currentReaderFontScale() == 1.3 }
++        composeRule.waitUntil(timeoutMillis = 10_000) {
++            readerPagePositionFromLabel().totalPages > pageLabelBeforeFontChange.totalPages
++        }
++        val pageLabelAfterFontChange = readerPagePositionFromLabel()
++        val progressAfterFontChange = currentReaderProgressPercentFromLabel()
++        assertTrue(
++            "Reader font-size changes should preserve the source-anchored progress. " +
++                "before=$progressBeforeFontChange after=$progressAfterFontChange " +
++                "beforeLabel=$pageLabelBeforeFontChange afterLabel=$pageLabelAfterFontChange label=${readerPageLabelText()}",
++            progressAfterFontChange in (progressBeforeFontChange - 1)..(progressBeforeFontChange + 1),
++        )
++        assertTrue(
++            "Reader font-size change should visibly repaginate the fixture instead of staying on the same tiny 3-page layout. " +
++                "before=$pageLabelBeforeFontChange after=$pageLabelAfterFontChange",
++            pageLabelAfterFontChange.totalPages > pageLabelBeforeFontChange.totalPages,
++        )
++        captureSprint19RegressionScreenshot("02_chapter_three_large_font_progress_stable")
++
++        composeRule.onNodeWithTag("reader-toc-open")
++            .assertIsDisplayed()
++            .performClick()
++        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-toc-sheet") }
++        composeRule.onNodeWithTag("reader-toc-entry-$chapterThreeIndex")
++            .assertIsDisplayed()
++            .performClick()
++        composeRule.waitUntil(timeoutMillis = 10_000) {
++            !hasTag("reader-toc-sheet") &&
++                visibleReaderParagraphIndices().any { index -> index >= chapterThreeBlockIndex }
++        }
++
++        val contentId = currentContentId()
++        val annotationParagraph = chapterThreeBlockIndex + 1
++        composeRule.waitUntil(timeoutMillis = 10_000) {
++            hasTag("reader-annotation-block-$annotationParagraph")
++        }
++        composeRule.onNodeWithTag("reader-annotation-block-$annotationParagraph")
++            .assertIsDisplayed()
++            .performTouchInput { longClick(position = Offset(24f, 24f)) }
++        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-annotation-editor-$annotationParagraph") }
++        val initialQuote = readerSelectedQuoteText(annotationParagraph)
++        assertTrue(initialQuote.contains("third chapter anchor"))
++        captureSprint19RegressionScreenshot("03_annotation_before_start_back")
++        repeat(30) {
++            if (!readerSelectedQuoteText(annotationParagraph).contains("second chapter marker") &&
++                hasTag("reader-annotation-start-earlier")
++            ) {
++                composeRule.onNodeWithTag("reader-annotation-start-earlier")
++                    .assertIsDisplayed()
++                    .performClick()
++                composeRule.waitForIdle()
++            }
++        }
++
++        val expandedQuote = readerSelectedQuoteText(annotationParagraph)
++        assertFalse(
++            "Moving annotation start backward from chapter three must not jump to the first source page. " +
++                "visible=${visibleReaderParagraphIndices()} quote=$expandedQuote",
++            visibleReaderParagraphIndices().contains(0),
++        )
++        assertTrue(
++            "Expanded quote should cross into the previous chapter while remaining anchored around chapter three text.",
++            expandedQuote.contains("second chapter marker") && expandedQuote.contains("third chapter anchor"),
++        )
++        captureSprint19RegressionScreenshot("04_annotation_start_back_without_book_start_jump")
++
++        val noteText = "Sprint 19 saved cross-chapter selector."
++        composeRule.onNodeWithTag("reader-annotation-note-input-$annotationParagraph")
++            .assertIsDisplayed()
++            .performClick()
++            .performTextInput(noteText)
++        UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).pressBack()
++        composeRule.waitForIdle()
++        composeRule.onNodeWithTag("reader-annotation-save-$annotationParagraph")
++            .assertIsDisplayed()
++            .assertIsEnabled()
++            .performClick()
++        composeRule.waitUntil(timeoutMillis = 10_000) {
++            !hasTag("reader-annotation-editor-$annotationParagraph") &&
++                hasReadingAnnotationNote(contentId = contentId, paragraphIndex = annotationParagraph, noteText = noteText) &&
++                hasReadingAnnotationQuoteContaining(contentId, annotationParagraph, "second chapter marker") &&
++                hasReadingAnnotationQuoteContaining(contentId, annotationParagraph, "third chapter anchor")
++        }
++        captureSprint19RegressionScreenshot("05_annotation_saved_cross_chapter_highlight")
++        scenario?.onActivity { activity -> activity.mainViewModel.dismissMessage() }
++        composeRule.waitUntil(timeoutMillis = 10_000) { !hasNode("Annotation saved.") }
++
++        val reopenedParagraph = visibleAnnotationHighlightIndices().maxOrNull() ?: annotationParagraph
++        composeRule.onNodeWithTag("reader-annotation-block-$reopenedParagraph")
++            .assertIsDisplayed()
++            .performTouchInput { longClick(position = Offset(24f, 24f)) }
++        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-annotation-editor-$reopenedParagraph") }
++        val reopenedQuote = readerSelectedQuoteText(reopenedParagraph)
++        assertTrue(
++            "Reopened note should preserve the saved cross-chapter selector. quote=$reopenedQuote",
++            reopenedQuote.contains("second chapter marker") && reopenedQuote.contains("third chapter anchor"),
++        )
++        captureSprint19RegressionScreenshot("06_annotation_reopened_cross_chapter_selector")
++    }
++
++    @Test
++    fun sprint19FormInterventionShowsFiveSecondUnlockBeforeOpenAnyway() {
++        launchFixtureSystemIntervention()
++
++        composeRule.onNodeWithTag("form-intervention-unlock-wait")
++            .assertIsDisplayed()
++        composeRule.onNodeWithText("Open in", substring = true)
++            .assertIsDisplayed()
++            .assertIsNotEnabled()
++        composeRule.onNodeWithTag("intervention-open-anyway-close")
++            .assertIsDisplayed()
++            .assertIsNotEnabled()
++        captureSprint19RegressionScreenshot("07_form_intervention_waiting_locked")
++
++        waitForOpenAnywayUnlock()
++        composeRule.onNodeWithText("Open Fixture Feed One")
++            .assertIsDisplayed()
++            .assertIsEnabled()
++        composeRule.onNodeWithTag("intervention-open-anyway-close")
++            .assertIsDisplayed()
++            .assertIsEnabled()
++        captureSprint19RegressionScreenshot("08_form_intervention_unlock_ready")
++    }
++
+     @Test
+     fun systemInterventionShowsContinueProgressRemainingTimeAndScrollableOtherOptions() {
+         launchOnboardedApp()
+@@ -2788,7 +2957,7 @@ class MainActivityTest {
+     }
+ 
+     private fun visibleReaderParagraphIndices(): List<Int> {
+-        return (0..80).filter { index ->
++        return (0..180).filter { index ->
+             hasContentDescriptionNode("reader-first-visible-paragraph-$index")
+         }
+     }
+@@ -2903,7 +3072,7 @@ class MainActivityTest {
+     }
+ 
+     private fun visibleAnnotationHighlightIndices(): List<Int> {
+-        return (0..120).filter { index ->
++        return (0..180).filter { index ->
+             hasTag("reader-annotation-highlight-$index")
+         }
+     }
+@@ -2952,6 +3121,36 @@ class MainActivityTest {
+         return scale
+     }
+ 
++    private fun readerPageLabelText(): String {
++        val config = composeRule.onNodeWithTag("reader-page-label")
++            .fetchSemanticsNode()
++            .config
++        return config[SemanticsProperties.Text]
++            .joinToString(separator = " ") { text -> text.text }
++    }
++
++    private fun currentReaderProgressPercentFromLabel(): Int {
++        return Regex("""(\d+)%""")
++            .find(readerPageLabelText())
++            ?.groupValues
++            ?.getOrNull(1)
++            ?.toIntOrNull()
++            ?: 0
++    }
++
++    private data class ReaderPagePosition(
++        val currentPage: Int,
++        val totalPages: Int,
++    )
++
++    private fun readerPagePositionFromLabel(): ReaderPagePosition {
++        val match = Regex("""(\d+)/(\d+)""").find(readerPageLabelText())
++        return ReaderPagePosition(
++            currentPage = match?.groupValues?.getOrNull(1)?.toIntOrNull() ?: 0,
++            totalPages = match?.groupValues?.getOrNull(2)?.toIntOrNull() ?: 0,
++        )
++    }
++
+     private fun currentInterfaceTextScale(): Double {
+         var scale = 0.0
+         scenario?.onActivity { activity ->
+@@ -3365,6 +3564,12 @@ class MainActivityTest {
+         }
+     }
+ 
++    private fun waitForOpenAnywayUnlock() {
++        composeRule.waitUntil(timeoutMillis = 8_000) {
++            hasNode("Open Fixture Feed One") && !hasTag("form-intervention-unlock-wait")
++        }
++    }
++
+     private fun relaunchFixtureSystemInterventionWithoutWaitingForIntervention() {
+         scenario?.close()
+         scenario = null
+@@ -3694,6 +3899,84 @@ class MainActivityTest {
+         )
+     }
+ 
++    private fun sprint19RegressionEpubBytes(): ByteArray {
++        val chapterOneFiller = (1..12).joinToString(separator = "\n") { index ->
++            "<p>Opening source marker $index keeps the first chapter long enough for calibrated progress.</p>"
++        }
++        val chapterTwoFiller = (1..12).joinToString(separator = "\n") { index ->
++            "<p>The second chapter marker $index stays before the target so backward annotation selection has real previous-source text.</p>"
++        }
++        val chapterThreeTail = (1..18).joinToString(separator = "\n") { index ->
++            "<p>Trailing third-chapter source marker $index keeps the chapter from being the final page during progress checks.</p>"
++        }
++        return epubBytes(
++            "META-INF/container.xml" to """
++                <?xml version="1.0"?>
++                <container>
++                  <rootfiles>
++                    <rootfile full-path="OPS/package.opf" media-type="application/oebps-package+xml"/>
++                  </rootfiles>
++                </container>
++            """.trimIndent(),
++            "OPS/package.opf" to """
++                <package>
++                  <manifest>
++                    <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
++                    <item id="chapter-one" href="chapter1.xhtml" media-type="application/xhtml+xml"/>
++                    <item id="chapter-two" href="chapter2.xhtml" media-type="application/xhtml+xml"/>
++                    <item id="chapter-three" href="chapter3.xhtml" media-type="application/xhtml+xml"/>
++                  </manifest>
++                  <spine>
++                    <itemref idref="chapter-one"/>
++                    <itemref idref="chapter-two"/>
++                    <itemref idref="chapter-three"/>
++                  </spine>
++                </package>
++            """.trimIndent(),
++            "OPS/nav.xhtml" to """
++                <html xmlns:epub="http://www.idpf.org/2007/ops"><body>
++                  <nav epub:type="toc">
++                    <ol>
++                      <li><a href="chapter1.xhtml#chapter-one">Chapter One</a></li>
++                      <li><a href="chapter2.xhtml#chapter-two">Chapter Two</a></li>
++                      <li><a href="chapter3.xhtml#chapter-three">Chapter Three</a></li>
++                    </ol>
++                  </nav>
++                </body></html>
++            """.trimIndent(),
++            "OPS/chapter1.xhtml" to """
++                <html><body>
++                  <h1 id="chapter-one">Chapter One</h1>
++                  <p>The first chapter establishes baseline source ordering for the regression fixture.</p>
++                  <p>Its paragraphs are deliberately ordinary so progress can only come from source anchors.</p>
++                  <p>This opening material should never be shown after chapter-three annotation adjustment begins.</p>
++                  <p>Another first chapter paragraph makes the chapter large enough to affect whole-book percentage.</p>
++                  $chapterOneFiller
++                </body></html>
++            """.trimIndent(),
++            "OPS/chapter2.xhtml" to """
++                <html><body>
++                  <h1 id="chapter-two">Chapter Two</h1>
++                  <p>The second chapter adds a middle source range before the target chapter.</p>
++                  <p>Reader progress should count this middle material before reporting chapter three.</p>
++                  <p>Annotation controls may cross nearby source ranges, but should not confuse this chapter with the first.</p>
++                  <p>The final middle paragraph protects against duplicate local EPUB block indexes.</p>
++                  $chapterTwoFiller
++                </body></html>
++            """.trimIndent(),
++            "OPS/chapter3.xhtml" to """
++                <html><body>
++                  <h1 id="chapter-three">Chapter Three</h1>
++                  <p>The third chapter anchor is the user-visible target for Sprint 19 progress and selection testing.</p>
++                  <p>This third chapter anchor sentence is selected for a note so the start handle can move backward safely.</p>
++                  <p>Changing reader text size here should not make the progress label drift back toward the beginning.</p>
++                  <p>The final chapter-three paragraph keeps the page representative after large-font repagination.</p>
++                  $chapterThreeTail
++                </body></html>
++            """.trimIndent(),
++        )
++    }
++
+     private fun epubBytes(vararg entries: Pair<String, String>): ByteArray {
+         val output = ByteArrayOutputStream()
+         ZipOutputStream(output).use { zip ->
+@@ -3890,6 +4173,16 @@ class MainActivityTest {
+         assertTrue("Expected screenshot file for $name", output.exists() && output.length() > 0L)
+     }
+ 
++    private fun captureSprint19RegressionScreenshot(name: String) {
++        val outputDir = File("/sdcard/Download/qualityalternative/$sprint19RegressionScreenshotDirName")
++        assertTrue("Expected screenshot output directory for $name", outputDir.mkdirs() || outputDir.exists())
++        composeRule.waitForIdle()
++        Thread.sleep(300)
++        val output = File(outputDir, "$name.png")
++        assertTrue("Expected screenshot capture for $name", UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).takeScreenshot(output))
++        assertTrue("Expected screenshot file for $name", output.exists() && output.length() > 0L)
++    }
++
+     private fun recordSprint17AdaptivePaginationSummary(name: String, summary: String) {
+         val outputDir = File("/sdcard/Download/qualityalternative/$sprint17AdaptivePaginationScreenshotDirName")
+         assertTrue("Expected summary output directory for $name", outputDir.mkdirs() || outputDir.exists())
+diff --git a/app/src/androidTest/java/com/qualityalternative/app/VisualQaScreenshotTest.kt b/app/src/androidTest/java/com/qualityalternative/app/VisualQaScreenshotTest.kt
+index 24990cf..2af6752 100644
+--- a/app/src/androidTest/java/com/qualityalternative/app/VisualQaScreenshotTest.kt
++++ b/app/src/androidTest/java/com/qualityalternative/app/VisualQaScreenshotTest.kt
+@@ -1111,6 +1111,9 @@ class VisualQaScreenshotTest {
+ 
+         seedAttentionClassicsSelection()
+         launchFixtureSystemIntervention()
++        composeRule.waitUntil(timeoutMillis = 8_000) {
++            hasNode("Open Fixture Feed One") && !hasTag("form-intervention-unlock-wait")
++        }
+         composeRule.onNodeWithText("Open Fixture Feed One").performClick()
+         composeRule.waitUntil(timeoutMillis = 10_000) {
+             scenario?.state == androidx.lifecycle.Lifecycle.State.DESTROYED
+diff --git a/app/src/main/java/com/qualityalternative/app/data/EpubTextExtractor.kt b/app/src/main/java/com/qualityalternative/app/data/EpubTextExtractor.kt
+index 02826f3..b767b43 100644
+--- a/app/src/main/java/com/qualityalternative/app/data/EpubTextExtractor.kt
++++ b/app/src/main/java/com/qualityalternative/app/data/EpubTextExtractor.kt
+@@ -58,7 +58,7 @@ object EpubTextExtractor {
+             entries[path]
+                 ?.toString(Charsets.UTF_8)
+                 ?.let { html -> htmlToReaderDocumentBlocks(html = html, sourceHref = path) }
+-        }
++        }.withGlobalSourceBlockIndexes()
+         val blocks = parsedDocuments.flatMap(ParsedSpineDocument::blocks)
+         if (blocks.isEmpty()) {
+             throw IllegalArgumentException("EPUB contains no readable text")
+@@ -228,16 +228,28 @@ object EpubTextExtractor {
+             .mapValues { (_, indexes) -> indexes.minOrNull() ?: 0 }
+     }
+ 
+-    private fun anchorBlockIndexesBySource(parsedDocuments: List<ParsedSpineDocument>): Map<String, Int> {
++    private fun List<ParsedSpineDocument>.withGlobalSourceBlockIndexes(): List<ParsedSpineDocument> {
+         var globalOffset = 0
+-        val indexes = mutableMapOf<String, Int>()
+-        parsedDocuments.forEach { document ->
+-            document.anchorBlockIndexes.forEach { (anchor, localIndex) ->
+-                indexes["${document.sourceHref}#$anchor"] = globalOffset + localIndex
++        return map { document ->
++            val reindexedBlocks = document.blocks.mapIndexed { localIndex, block ->
++                block.copy(sourceBlockIndex = globalOffset + localIndex)
++            }
++            val reindexedAnchors = document.anchorBlockIndexes.mapValues { (_, localIndex) ->
++                globalOffset + localIndex
+             }
+             globalOffset += document.blocks.size
++            document.copy(blocks = reindexedBlocks, anchorBlockIndexes = reindexedAnchors)
+         }
+-        return indexes
++    }
++
++    private fun anchorBlockIndexesBySource(parsedDocuments: List<ParsedSpineDocument>): Map<String, Int> {
++        return parsedDocuments
++            .flatMap { document ->
++                document.anchorBlockIndexes.map { (anchor, globalIndex) ->
++                    "${document.sourceHref}#$anchor" to globalIndex
++                }
++            }
++            .toMap()
+     }
+ 
+     private fun epubTableOfContents(
+diff --git a/app/src/main/java/com/qualityalternative/app/domain/model/InterventionModels.kt b/app/src/main/java/com/qualityalternative/app/domain/model/InterventionModels.kt
+index 88dd516..3ba0418 100644
+--- a/app/src/main/java/com/qualityalternative/app/domain/model/InterventionModels.kt
++++ b/app/src/main/java/com/qualityalternative/app/domain/model/InterventionModels.kt
+@@ -33,6 +33,12 @@ enum class AnalyticsEventType {
+     DELAY_SELECTED,
+     DELAY_ALTERNATIVE_STARTED,
+     OPEN_ANYWAY_SELECTED,
++    FORM_INTERVENTION_SHOWN,
++    FORM_INTERVENTION_UNLOCK_BLOCKED,
++    FORM_INTERVENTION_UNLOCK_ENABLED,
++    FORM_INTERVENTION_UNLOCK_USED,
++    FORM_INTERVENTION_COMPLETED,
++    FORM_INTERVENTION_ABANDONED,
+     READER_COMPLETED,
+     READER_SKIPPED,
+     FEEDBACK_SUBMITTED,
+diff --git a/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt b/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
+index d95cc29..273f810 100644
+--- a/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
++++ b/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
+@@ -113,6 +113,7 @@ data class MainUiState(
+     val starterPacks: List<EditorialPack> = emptyList(),
+     val currentInterventionId: String? = null,
+     val currentInterventionShownAtMillis: Long? = null,
++    val currentOpenAnywayUnlockAvailableAtMillis: Long? = null,
+     val currentRecommendationSet: RecommendationSet? = null,
+     val currentInterventionOrigin: InterventionOrigin? = null,
+     val currentContent: ContentItem? = null,
+@@ -1243,6 +1244,7 @@ class MainViewModel(
+         uiState = uiState.copy(
+             currentInterventionId = null,
+             currentInterventionShownAtMillis = null,
++            currentOpenAnywayUnlockAvailableAtMillis = null,
+             currentRecommendationSet = null,
+             currentInterventionOrigin = null,
+             currentContent = content,
+@@ -1571,6 +1573,7 @@ class MainViewModel(
+                     selectedTargetApp = targetApp,
+                     currentInterventionId = null,
+                     currentInterventionShownAtMillis = null,
++                    currentOpenAnywayUnlockAvailableAtMillis = null,
+                     currentRecommendationSet = null,
+                     activeDelayWindow = null,
+                     activeDelaySuggestion = null,
+@@ -1591,6 +1594,7 @@ class MainViewModel(
+                     activeDelaySuggestion = activeDelaySuggestionFor(activeDelayWindow),
+                     latestMessage = "${targetApp.displayName} is paused for 15 minutes.",
+                     screen = MainScreen.Home,
++                    currentOpenAnywayUnlockAvailableAtMillis = null,
+                     currentInterventionOrigin = null,
+                 )
+                 return@launch
+@@ -1653,6 +1657,7 @@ class MainViewModel(
+                     selectedTargetApp = targetApp,
+                     currentInterventionId = null,
+                     currentInterventionShownAtMillis = null,
++                    currentOpenAnywayUnlockAvailableAtMillis = null,
+                     currentRecommendationSet = null,
+                     activeDelayWindow = null,
+                     activeDelaySuggestion = null,
+@@ -1692,6 +1697,20 @@ class MainViewModel(
+                     ),
+                 )
+             }
++            recordEvent(
++                AnalyticsEvent(
++                    type = AnalyticsEventType.FORM_INTERVENTION_SHOWN,
++                    timestampMillis = processingNowMillis,
++                    interventionId = interventionId,
++                    targetAppPackage = targetApp.packageName,
++                    primaryContentId = recommendationSet.primary.id,
++                    backupContentIds = backupIds,
++                    contentId = recommendationSet.primary.id,
++                    metadata = recommendationSet.analyticsMetadata() + mapOf(
++                        "openAnywayUnlockDelayMillis" to FORM_INTERVENTION_UNLOCK_DELAY_MILLIS.toString(),
++                    ),
++                ),
++            )
+             unfinishedProgressFor(recommendationSet.primary.id)?.let { progress ->
+                 recordEvent(
+                     AnalyticsEvent(
+@@ -1713,6 +1732,7 @@ class MainViewModel(
+                 selectedTargetApp = targetApp,
+                 currentInterventionId = interventionId,
+                 currentInterventionShownAtMillis = processingNowMillis,
++                currentOpenAnywayUnlockAvailableAtMillis = processingNowMillis + FORM_INTERVENTION_UNLOCK_DELAY_MILLIS,
+                 currentRecommendationSet = recommendationSet,
+                 currentInterventionOrigin = origin,
+                 activeDelayWindow = null,
+@@ -1753,6 +1773,7 @@ class MainViewModel(
+                     metadata = recommendationSet.primary.analyticsMetadata(),
+                 ),
+             )
++            recordFormInterventionCompleted(action = "primary", nowMillis = nowMillis, contentId = recommendationSet.primary.id)
+             openReplacementSession(content = recommendationSet.primary, sessionId = sessionId, startedAtMillis = nowMillis)
+         }
+     }
+@@ -1787,6 +1808,7 @@ class MainViewModel(
+                     metadata = content.analyticsMetadata(),
+                 ),
+             )
++            recordFormInterventionCompleted(action = "backup", nowMillis = nowMillis, contentId = content.id)
+             openReplacementSession(content = content, sessionId = sessionId, startedAtMillis = nowMillis)
+         }
+     }
+@@ -1806,10 +1828,12 @@ class MainViewModel(
+                 backupContentIds = recommendationSet.backups.map(ContentItem::id),
+             )
+             recordDelaySelectedDurably(window)
++            recordFormInterventionCompleted(action = "delay", nowMillis = nowMillis)
+             uiState = uiState.copy(
+                 screen = MainScreen.Home,
+                 currentInterventionId = null,
+                 currentInterventionShownAtMillis = null,
++                currentOpenAnywayUnlockAvailableAtMillis = null,
+                 currentRecommendationSet = null,
+                 currentInterventionOrigin = null,
+                 activeDelayWindow = window,
+@@ -1819,6 +1843,58 @@ class MainViewModel(
+         }
+     }
+ 
++    fun recordFormInterventionUnlockAvailable(nowMillis: Long = nowProvider()) {
++        val targetApp = uiState.selectedTargetApp ?: return
++        val recommendationSet = uiState.currentRecommendationSet ?: return
++        val interventionId = uiState.currentInterventionId ?: return
++        val availableAtMillis = uiState.currentOpenAnywayUnlockAvailableAtMillis ?: return
++        recordEvent(
++            AnalyticsEvent(
++                type = AnalyticsEventType.FORM_INTERVENTION_UNLOCK_ENABLED,
++                timestampMillis = nowMillis,
++                interventionId = interventionId,
++                targetAppPackage = targetApp.packageName,
++                primaryContentId = recommendationSet.primary.id,
++                backupContentIds = recommendationSet.backups.map(ContentItem::id),
++                metadata = mapOf(
++                    "openAnywayUnlockAvailableAtMillis" to availableAtMillis.toString(),
++                    "elapsedMillis" to (nowMillis - (uiState.currentInterventionShownAtMillis ?: nowMillis))
++                        .coerceAtLeast(0L)
++                        .toString(),
++                ),
++            ),
++        )
++    }
++
++    fun abandonFormIntervention(reason: String = "back", nowMillis: Long = nowProvider()) {
++        val targetApp = uiState.selectedTargetApp ?: return
++        val recommendationSet = uiState.currentRecommendationSet ?: return
++        val interventionId = uiState.currentInterventionId ?: return
++        recordEvent(
++            AnalyticsEvent(
++                type = AnalyticsEventType.FORM_INTERVENTION_ABANDONED,
++                timestampMillis = nowMillis,
++                interventionId = interventionId,
++                targetAppPackage = targetApp.packageName,
++                primaryContentId = recommendationSet.primary.id,
++                backupContentIds = recommendationSet.backups.map(ContentItem::id),
++                metadata = mapOf(
++                    "reason" to reason,
++                    "openAnywayUnlockAvailableAtMillis" to uiState.currentOpenAnywayUnlockAvailableAtMillis.orEmptyString(),
++                ),
++            ),
++        )
++        uiState = uiState.copy(
++            screen = MainScreen.Home,
++            currentInterventionId = null,
++            currentInterventionShownAtMillis = null,
++            currentOpenAnywayUnlockAvailableAtMillis = null,
++            currentRecommendationSet = null,
++            currentInterventionOrigin = null,
++            latestMessage = null,
++        )
++    }
++
+     fun startActiveDelayAlternative() {
+         val targetApp = uiState.selectedTargetApp ?: return
+         val delayWindow = uiState.activeDelayWindow ?: return
+@@ -1884,6 +1960,7 @@ class MainViewModel(
+             uiState = uiState.copy(
+                 currentInterventionId = interventionId,
+                 currentInterventionShownAtMillis = interventionShownAtMillis,
++                currentOpenAnywayUnlockAvailableAtMillis = null,
+                 currentRecommendationSet = recommendationSet,
+                 currentInterventionOrigin = null,
+             )
+@@ -1895,6 +1972,25 @@ class MainViewModel(
+         val targetApp = uiState.selectedTargetApp ?: return false
+         val recommendationSet = uiState.currentRecommendationSet
+         val nowMillis = nowProvider()
++        val openAnywayAvailableAtMillis = uiState.currentOpenAnywayUnlockAvailableAtMillis
++        if (openAnywayAvailableAtMillis != null && nowMillis < openAnywayAvailableAtMillis) {
++            recordEvent(
++                AnalyticsEvent(
++                    type = AnalyticsEventType.FORM_INTERVENTION_UNLOCK_BLOCKED,
++                    timestampMillis = nowMillis,
++                    interventionId = uiState.currentInterventionId,
++                    targetAppPackage = targetApp.packageName,
++                    primaryContentId = recommendationSet?.primary?.id,
++                    backupContentIds = recommendationSet?.backups.orEmpty().map(ContentItem::id),
++                    metadata = mapOf(
++                        "openAnywayUnlockAvailableAtMillis" to openAnywayAvailableAtMillis.toString(),
++                        "remainingMillis" to (openAnywayAvailableAtMillis - nowMillis).toString(),
++                    ),
++                ),
++            )
++            uiState = uiState.copy(latestMessage = "Take five seconds before opening ${targetApp.displayName}.")
++            return false
++        }
+         val shouldExitToTarget = uiState.currentInterventionOrigin == InterventionOrigin.SYSTEM
+         val unlockMinutes = uiState.openAnywayUnlockMinutes
+             .coerceIn(MIN_OPEN_ANYWAY_UNLOCK_MINUTES, MAX_OPEN_ANYWAY_UNLOCK_MINUTES)
+@@ -1910,9 +2006,25 @@ class MainViewModel(
+                 metadata = mapOf(
+                     "openAnywayUnlockMinutes" to unlockMinutes.toString(),
+                     "openAnywayUnlockUntilMillis" to unlockUntilMillis.toString(),
++                    "formUnlockWaitMillis" to FORM_INTERVENTION_UNLOCK_DELAY_MILLIS.toString(),
++                ),
++            ),
++        )
++        recordEvent(
++            AnalyticsEvent(
++                type = AnalyticsEventType.FORM_INTERVENTION_UNLOCK_USED,
++                timestampMillis = nowMillis,
++                interventionId = uiState.currentInterventionId,
++                targetAppPackage = targetApp.packageName,
++                primaryContentId = recommendationSet?.primary?.id,
++                backupContentIds = recommendationSet?.backups.orEmpty().map(ContentItem::id),
++                metadata = mapOf(
++                    "openAnywayUnlockAvailableAtMillis" to (openAnywayAvailableAtMillis?.toString() ?: "0"),
++                    "openAnywayUnlockUntilMillis" to unlockUntilMillis.toString(),
+                 ),
+             ),
+         )
++        recordFormInterventionCompleted(action = "open_anyway", nowMillis = nowMillis)
+         if (shouldExitToTarget) {
+             InterceptionRuntimeGate.suppressPackage(
+                 targetAppPackage = targetApp.packageName,
+@@ -1923,6 +2035,7 @@ class MainViewModel(
+             screen = MainScreen.Home,
+             currentInterventionId = null,
+             currentInterventionShownAtMillis = null,
++            currentOpenAnywayUnlockAvailableAtMillis = null,
+             currentRecommendationSet = null,
+             currentInterventionOrigin = null,
+             activeDelaySuggestion = null,
+@@ -2890,6 +3003,11 @@ class MainViewModel(
+         }
+         val existingProgress = unfinishedProgressFor(content.id)
+         uiState = uiState.copy(
++            currentInterventionId = null,
++            currentInterventionShownAtMillis = null,
++            currentOpenAnywayUnlockAvailableAtMillis = null,
++            currentRecommendationSet = null,
++            currentInterventionOrigin = null,
+             currentContent = content,
+             currentReaderDocument = readerDocument,
+             currentContentBody = readerDocument.plainText,
+@@ -3137,6 +3255,7 @@ class MainViewModel(
+             screen = screen,
+             currentInterventionId = null,
+             currentInterventionShownAtMillis = null,
++            currentOpenAnywayUnlockAvailableAtMillis = null,
+             currentContent = null,
+             currentReaderDocument = null,
+             currentContentBody = "",
+@@ -3202,6 +3321,31 @@ class MainViewModel(
+         analyticsTracker.record(event)
+     }
+ 
++    private fun recordFormInterventionCompleted(
++        action: String,
++        nowMillis: Long,
++        contentId: String? = null,
++    ) {
++        val targetApp = uiState.selectedTargetApp ?: return
++        val recommendationSet = uiState.currentRecommendationSet ?: return
++        val interventionId = uiState.currentInterventionId ?: return
++        recordEvent(
++            AnalyticsEvent(
++                type = AnalyticsEventType.FORM_INTERVENTION_COMPLETED,
++                timestampMillis = nowMillis,
++                interventionId = interventionId,
++                targetAppPackage = targetApp.packageName,
++                primaryContentId = recommendationSet.primary.id,
++                backupContentIds = recommendationSet.backups.map(ContentItem::id),
++                contentId = contentId,
++                metadata = mapOf(
++                    "action" to action,
++                    "openAnywayUnlockAvailableAtMillis" to uiState.currentOpenAnywayUnlockAvailableAtMillis.orEmptyString(),
++                ),
++            ),
++        )
++    }
++
+     private suspend fun recordEventDurably(event: AnalyticsEvent) {
+         analyticsTracker.recordDurably(event)
+     }
+@@ -3622,6 +3766,7 @@ private fun unavailablePermissionReadiness(): PermissionReadiness {
+ 
+ private const val ACTIVE_DELAY_REFRESH_INTERVAL_MILLIS = 1_000L
+ private const val INTERVENTION_DEGRADED_THRESHOLD_MILLIS = 2_000L
++internal const val FORM_INTERVENTION_UNLOCK_DELAY_MILLIS = 5_000L
+ private const val MIN_SELECTED_DISTRACTING_APPS = 3
+ private const val MAX_READING_ANNOTATION_QUOTE_LENGTH = 1_200
+ private const val PROGRESS_HISTORY_WINDOW_DAYS = 31
+@@ -3897,6 +4042,8 @@ private fun deletedLibraryMessage(count: Int): String {
+ 
+ private fun Int?.orZeroString(): String = (this ?: 0).toString()
+ 
++private fun Long?.orEmptyString(): String = this?.toString() ?: ""
++
+ private object EmptyUserLinkRepository : UserLinkRepository {
+     override fun userLinks(): List<ContentItem> = emptyList()
+ 
+diff --git a/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt b/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
+index fa38d20..c64bf13 100644
+--- a/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
++++ b/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
+@@ -641,6 +641,8 @@ private fun MainRoute(
+             onAcceptBackup = viewModel::acceptBackup,
+             onSelectMeditationDuration = viewModel::setMeditationDurationMinutes,
+             onDelay = viewModel::delayFor15Minutes,
++            onUnlockAvailable = viewModel::recordFormInterventionUnlockAvailable,
++            onAbandon = { viewModel.abandonFormIntervention(reason = "back") },
+             onOpenAnyway = {
+                 if (viewModel.openAnyway()) {
+                     onExitToTarget()
+@@ -1785,6 +1787,8 @@ private fun InterventionScreen(
+     onAcceptBackup: (ContentItem) -> Unit,
+     onSelectMeditationDuration: (Int) -> Unit,
+     onDelay: () -> Unit,
++    onUnlockAvailable: () -> Unit,
++    onAbandon: () -> Unit,
+     onOpenAnyway: () -> Unit,
+ ) {
+     val recommendationSet = state.currentRecommendationSet ?: return
+@@ -1803,6 +1807,35 @@ private fun InterventionScreen(
+             colors.background,
+         ),
+     )
++    val openAnywayAvailableAtMillis = state.currentOpenAnywayUnlockAvailableAtMillis
++    var openAnywayNowMillis by remember(state.currentInterventionId, openAnywayAvailableAtMillis) {
++        mutableStateOf(System.currentTimeMillis())
++    }
++    LaunchedEffect(state.currentInterventionId, openAnywayAvailableAtMillis) {
++        if (openAnywayAvailableAtMillis != null) {
++            while (true) {
++                val nowMillis = System.currentTimeMillis()
++                openAnywayNowMillis = nowMillis
++                if (nowMillis >= openAnywayAvailableAtMillis) {
++                    break
++                }
++                delay(250)
++            }
++        }
++    }
++    val openAnywayRemainingMillis = ((openAnywayAvailableAtMillis ?: 0L) - openAnywayNowMillis).coerceAtLeast(0L)
++    val openAnywayRemainingSeconds = ((openAnywayRemainingMillis + 999L) / 1_000L).toInt()
++    val canOpenAnyway = openAnywayRemainingSeconds <= 0
++    var unlockAvailableReported by remember(state.currentInterventionId, openAnywayAvailableAtMillis) {
++        mutableStateOf(openAnywayAvailableAtMillis == null)
++    }
++    LaunchedEffect(canOpenAnyway, unlockAvailableReported, openAnywayAvailableAtMillis) {
++        if (openAnywayAvailableAtMillis != null && canOpenAnyway && !unlockAvailableReported) {
++            unlockAvailableReported = true
++            onUnlockAvailable()
++        }
++    }
++    BackHandler { onAbandon() }
+ 
+     Column(
+         modifier = Modifier
+@@ -1825,7 +1858,12 @@ private fun InterventionScreen(
+                 modifier = Modifier.weight(1f),
+                 fontSize = 13.5.sp,
+             )
+-            QaIconButton(icon = QaIconKind.Close, onClick = onOpenAnyway)
++            QaIconButton(
++                icon = QaIconKind.Close,
++                onClick = onOpenAnyway,
++                enabled = canOpenAnyway,
++                modifier = Modifier.testTag("intervention-open-anyway-close"),
++            )
+         }
+         QaCard(
+             borderColor = colors.lineStrong,
+@@ -1921,6 +1959,14 @@ private fun InterventionScreen(
+                 }
+             }
+         }
++        if (!canOpenAnyway) {
++            OpenAnywayUnlockStatus(
++                remainingSeconds = openAnywayRemainingSeconds,
++                modifier = Modifier
++                    .padding(top = 4.dp, bottom = 2.dp)
++                    .testTag("form-intervention-unlock-wait"),
++            )
++        }
+         Row(
+             horizontalArrangement = Arrangement.spacedBy(8.dp),
+             modifier = Modifier
+@@ -1937,17 +1983,48 @@ private fun InterventionScreen(
+                 leadingIcon = QaIconKind.Pause,
+             )
+             QaButton(
+-                text = "Open ${targetApp.displayName}",
++                text = if (canOpenAnyway) "Open ${targetApp.displayName}" else "Open in ${openAnywayRemainingSeconds}s",
+                 onClick = onOpenAnyway,
+                 variant = QaButtonVariant.Ghost,
+                 modifier = Modifier.weight(1f),
++                enabled = canOpenAnyway,
+                 fullWidth = false,
+                 size = QaButtonSize.Compact,
++                leadingIcon = if (canOpenAnyway) null else QaIconKind.Clock,
+             )
+         }
+     }
+ }
+ 
++@Composable
++private fun OpenAnywayUnlockStatus(
++    remainingSeconds: Int,
++    modifier: Modifier = Modifier,
++) {
++    val colors = QualityAlternativeThemeTokens.colors
++    Surface(
++        modifier = modifier.fillMaxWidth(),
++        shape = RoundedCornerShape(10.dp),
++        color = colors.elevatedSurface,
++        border = BorderStroke(1.dp, colors.line),
++    ) {
++        Row(
++            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
++            verticalAlignment = Alignment.CenterVertically,
++            horizontalArrangement = Arrangement.spacedBy(8.dp),
++        ) {
++            QaIcon(kind = QaIconKind.Clock, color = colors.mutedText, size = 15.dp)
++            BodyText(
++                text = "Take five seconds",
++                color = colors.mutedText,
++                fontSize = 12.5.sp,
++                modifier = Modifier.weight(1f),
++            )
++            MonoText("${remainingSeconds.coerceAtLeast(0)}s")
++        }
++    }
++}
++
+ @Composable
+ private fun RecommendationExplanationBlock(
+     explanation: RecommendationExplanation,
+@@ -2168,6 +2245,7 @@ private fun ReaderScreen(
+         readerStartParagraphIndex,
+         restoredProgressParagraphIndex,
+     ) { mutableStateOf(initialPageIndex) }
++    var currentReaderSourceAnchor by remember(content.id) { mutableStateOf<ReaderSourcePosition?>(null) }
+     val listState = rememberLazyListState()
+     var annotationSelection by remember(content.id) { mutableStateOf<ReaderAnnotationSelection?>(null) }
+     var annotationNoteDraft by remember(content.id) { mutableStateOf("") }
+@@ -2193,9 +2271,30 @@ private fun ReaderScreen(
+     }
+     val currentPage = pages.getOrElse(safeCurrentPageIndex) { ReaderPage(0, (blocks.size - 1).coerceAtLeast(0)) }
+     val currentSourcePosition = readerBlockLayout.sourcePositionForDisplayBlock(currentPage.endInclusive)
++    LaunchedEffect(content.id, currentSourcePosition) {
++        if (currentReaderSourceAnchor == null) {
++            currentReaderSourceAnchor = currentSourcePosition
++        }
++    }
++    LaunchedEffect(content.id, pageBoundarySignature, hasManualReaderNavigation, readerBlockLayout, pages) {
++        val anchor = currentReaderSourceAnchor
++        if (hasManualReaderNavigation && anchor != null) {
++            val remappedDisplayIndex = readerBlockLayout.displayBlockIndexForSourcePosition(
++                sourceBlockIndex = anchor.sourceBlockIndex,
++                textOffset = anchor.textOffset,
++            )
++            val remappedPageIndex = readerPageIndexForParagraph(pages = pages, paragraphIndex = remappedDisplayIndex)
++            if (currentPageIndex != remappedPageIndex) {
++                currentPageIndex = remappedPageIndex
++            }
++        }
++    }
++    val progressSourcePosition = currentReaderSourceAnchor
++        ?.takeIf { hasManualReaderNavigation }
++        ?: currentSourcePosition
+     val sourceDerivedProgress = readerProgressPercentForSourcePosition(
+-        sourceBlockIndex = currentSourcePosition.sourceBlockIndex,
+-        textOffset = currentSourcePosition.textOffset,
++        sourceBlockIndex = progressSourcePosition.sourceBlockIndex,
++        textOffset = progressSourcePosition.textOffset,
+         sourceBlocks = rawBlocks,
+     )
+     val displayedProgress = restoredProgress
+@@ -2215,11 +2314,12 @@ private fun ReaderScreen(
+             hasManualReaderNavigation = true
+         }
+         currentPageIndex = nextPageIndex
++        val sourcePosition = readerBlockLayout.sourcePositionForDisplayBlock(nextPage.endInclusive)
++        currentReaderSourceAnchor = sourcePosition
+         annotationSelection = null
+         annotationNoteDraft = ""
+         isTocOpen = false
+         if (nextPageIndex > safeCurrentPageIndex) {
+-            val sourcePosition = readerBlockLayout.sourcePositionForDisplayBlock(nextPage.endInclusive)
+             onProgressChanged(
+                 readerProgressPercentForSourcePosition(
+                     sourceBlockIndex = sourcePosition.sourceBlockIndex,
+@@ -2247,6 +2347,9 @@ private fun ReaderScreen(
+         if (nextPageIndex != safeCurrentPageIndex) {
+             hasManualReaderNavigation = true
+             currentPageIndex = nextPageIndex
++            currentReaderSourceAnchor = readerBlockLayout.sourcePositionForDisplayBlock(
++                pages[nextPageIndex].endInclusive,
++            )
+         }
+     }
+     val canHandlePageTap = annotationSelection == null && !isTocOpen
+@@ -5636,10 +5739,18 @@ private fun QaIcon(
+ }
+ 
+ @Composable
+-private fun QaIconButton(icon: QaIconKind, onClick: () -> Unit, modifier: Modifier = Modifier) {
++private fun QaIconButton(
++    icon: QaIconKind,
++    onClick: () -> Unit,
++    modifier: Modifier = Modifier,
++    enabled: Boolean = true,
++) {
+     Surface(
+-        modifier = modifier.size(34.dp),
++        modifier = modifier
++            .size(34.dp)
++            .alpha(if (enabled) 1f else 0.35f),
+         onClick = onClick,
++        enabled = enabled,
+         shape = RoundedCornerShape(10.dp),
+         color = Color.Transparent,
+         contentColor = QualityAlternativeThemeTokens.colors.mutedText,
+@@ -6147,6 +6258,8 @@ internal data class ReaderBlockLayout(
+                 safeOffset >= block.sourceTextStartOffset &&
+                 safeOffset <= block.sourceTextEndOffset()
+         }.takeIf { index -> index >= 0 }
++            ?: blocks.indexOfFirst { block -> block.sourceBlockIndex == sourceBlockIndex }
++                .takeIf { index -> index >= 0 }
+             ?: displayBlockIndexFor(sourceBlockIndex)
+     }
+ }
+@@ -6864,7 +6977,10 @@ internal fun readerProgressPercentForSourcePosition(
+     val blockLengths = sourceBlocks.map { block ->
+         (block.sourceFullText ?: block.text.text).length.coerceAtLeast(1)
+     }
+-    val safeBlockIndex = sourceBlockIndex.coerceIn(0, blockLengths.lastIndex)
++    val safeBlockIndex = sourceBlocks
++        .indexOfFirst { block -> block.sourceBlockIndex == sourceBlockIndex }
++        .takeIf { index -> index >= 0 }
++        ?: sourceBlockIndex.coerceIn(0, blockLengths.lastIndex)
+     val completedBeforeBlock = blockLengths
+         .take(safeBlockIndex)
+         .sum()
+diff --git a/app/src/test/java/com/qualityalternative/app/data/AccountLightProfileExporterTest.kt b/app/src/test/java/com/qualityalternative/app/data/AccountLightProfileExporterTest.kt
+index 680c402..5fafe29 100644
+--- a/app/src/test/java/com/qualityalternative/app/data/AccountLightProfileExporterTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/data/AccountLightProfileExporterTest.kt
+@@ -426,6 +426,7 @@ class AccountLightProfileExporterTest {
+             },
+         )
+         assertEquals(exportedLink.contentId, profile.reading.progress.single().contentId)
++        assertEquals(4, profile.reading.progress.single().lastVisibleParagraphIndex)
+         assertEquals(37, profile.reading.progress.single().lastVisibleTextOffset)
+         assertFalse(rawJson.contains("content://"))
+         assertFalse(rawJson.contains("raw-book"))
+diff --git a/app/src/test/java/com/qualityalternative/app/data/EpubTextExtractorTest.kt b/app/src/test/java/com/qualityalternative/app/data/EpubTextExtractorTest.kt
+index 527b768..906dd4b 100644
+--- a/app/src/test/java/com/qualityalternative/app/data/EpubTextExtractorTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/data/EpubTextExtractorTest.kt
+@@ -56,6 +56,47 @@ class EpubTextExtractorTest {
+         assertTrue(text.contains("- One page"))
+     }
+ 
++    @Test
++    fun extractDocumentKeepsSourceBlockIndexesGlobalAcrossSpineDocuments() {
++        val epub = epubBytes(
++            "META-INF/container.xml" to """
++                <?xml version="1.0"?>
++                <container>
++                  <rootfiles>
++                    <rootfile full-path="OPS/package.opf" media-type="application/oebps-package+xml"/>
++                  </rootfiles>
++                </container>
++            """.trimIndent(),
++            "OPS/package.opf" to """
++                <package>
++                  <manifest>
++                    <item id="chapter-one" href="chapter1.xhtml" media-type="application/xhtml+xml"/>
++                    <item id="chapter-two" href="chapter2.xhtml" media-type="application/xhtml+xml"/>
++                    <item id="chapter-three" href="chapter3.xhtml" media-type="application/xhtml+xml"/>
++                  </manifest>
++                  <spine>
++                    <itemref idref="chapter-one"/>
++                    <itemref idref="chapter-two"/>
++                    <itemref idref="chapter-three"/>
++                  </spine>
++                </package>
++            """.trimIndent(),
++            "OPS/chapter1.xhtml" to "<html><body><h1>One</h1><p>First body.</p></body></html>",
++            "OPS/chapter2.xhtml" to "<html><body><h1>Two</h1><p>Second body.</p></body></html>",
++            "OPS/chapter3.xhtml" to "<html><body><h1>Three</h1><p>Third body.</p></body></html>",
++        )
++
++        val document = EpubTextExtractor.extractDocument(ByteArrayInputStream(epub))
++
++        assertEquals((0..5).toList(), document.blocks.map { block -> block.sourceBlockIndex })
++        assertEquals(
++            listOf(0, 2, 4),
++            document.blocks
++                .filter { block -> block.text.startsWith("# ") }
++                .map { block -> block.sourceBlockIndex },
++        )
++    }
++
+     @Test
+     fun extractPreservesEpubStructureAsReaderMarkdown() {
+         val epub = epubBytes(
+diff --git a/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt b/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
+index 9e56883..9471a46 100644
+--- a/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
+@@ -3264,21 +3264,24 @@ class MainViewModelTest {
+     @OptIn(ExperimentalCoroutinesApi::class)
+     fun requestSystemInterception_opensFixtureTargetAndOpenAnywayReturnsTrue() = runTest {
+         val fixtureTarget = FixtureTargetRegistry.fixtureDistractors.first()
++        var nowMillis = 5_000L
+         val viewModel = createViewModel(
+             settingsRepository = FakeSettingsRepository(
+                 initial = completedSettings(selectedAppPackages = setOf(fixtureTarget.packageName)),
+             ),
++            nowProvider = { nowMillis },
+         )
+ 
+         advanceUntilIdle()
+ 
+-        viewModel.requestSystemInterception(targetAppPackage = fixtureTarget.packageName, nowMillis = 5_000L)
++        viewModel.requestSystemInterception(targetAppPackage = fixtureTarget.packageName, nowMillis = nowMillis)
+         advanceUntilIdle()
+ 
+         assertEquals(MainScreen.Intervention, viewModel.uiState.screen)
+         assertEquals(InterventionOrigin.SYSTEM, viewModel.uiState.currentInterventionOrigin)
+         assertEquals(fixtureTarget.packageName, viewModel.uiState.selectedTargetApp?.packageName)
+ 
++        nowMillis = 10_000L
+         val exitsToTarget = viewModel.openAnyway()
+ 
+         assertTrue(exitsToTarget)
+@@ -3311,6 +3314,7 @@ class MainViewModelTest {
+         advanceUntilIdle()
+         assertEquals(MainScreen.Intervention, viewModel.uiState.screen)
+ 
++        nowMillis += FORM_INTERVENTION_UNLOCK_DELAY_MILLIS
+         assertTrue(viewModel.openAnyway())
+         advanceUntilIdle()
+ 
+@@ -3338,6 +3342,67 @@ class MainViewModelTest {
+         )
+     }
+ 
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun openAnyway_isBlockedUntilFiveSecondFormInterventionUnlockFinishes() = runTest {
++        val fixtureTarget = FixtureTargetRegistry.fixtureDistractors.first()
++        var nowMillis = 20_000L
++        val analyticsTracker = InMemoryAnalyticsTracker()
++        val viewModel = createViewModel(
++            settingsRepository = FakeSettingsRepository(
++                initial = completedSettings(selectedAppPackages = setOf(fixtureTarget.packageName)),
++            ),
++            analyticsTracker = analyticsTracker,
++            nowProvider = { nowMillis },
++        )
++
++        advanceUntilIdle()
++        viewModel.requestSystemInterception(targetAppPackage = fixtureTarget.packageName, nowMillis = nowMillis)
++        advanceUntilIdle()
++
++        assertEquals(25_000L, viewModel.uiState.currentOpenAnywayUnlockAvailableAtMillis)
++        assertFalse(viewModel.openAnyway())
++        assertEquals(MainScreen.Intervention, viewModel.uiState.screen)
++        assertTrue(analyticsTracker.allEvents().any { it.type == AnalyticsEventType.FORM_INTERVENTION_UNLOCK_BLOCKED })
++
++        nowMillis = 25_000L
++        viewModel.recordFormInterventionUnlockAvailable(nowMillis = nowMillis)
++        assertTrue(viewModel.openAnyway())
++        assertEquals(MainScreen.Home, viewModel.uiState.screen)
++        assertTrue(analyticsTracker.allEvents().any { it.type == AnalyticsEventType.FORM_INTERVENTION_UNLOCK_USED })
++        assertTrue(analyticsTracker.allEvents().any { it.type == AnalyticsEventType.FORM_INTERVENTION_UNLOCK_ENABLED })
++        assertTrue(analyticsTracker.allEvents().any {
++            it.type == AnalyticsEventType.FORM_INTERVENTION_COMPLETED &&
++                it.metadata["action"] == "open_anyway"
++        })
++    }
++
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun formInterventionAbandonmentRecordsAnalyticsAndClearsIntervention() = runTest {
++        val fixtureTarget = FixtureTargetRegistry.fixtureDistractors.first()
++        val analyticsTracker = InMemoryAnalyticsTracker()
++        val viewModel = createViewModel(
++            settingsRepository = FakeSettingsRepository(
++                initial = completedSettings(selectedAppPackages = setOf(fixtureTarget.packageName)),
++            ),
++            analyticsTracker = analyticsTracker,
++            nowProvider = { 30_000L },
++        )
++
++        advanceUntilIdle()
++        viewModel.requestSystemInterception(targetAppPackage = fixtureTarget.packageName, nowMillis = 30_000L)
++        advanceUntilIdle()
++
++        assertEquals(MainScreen.Intervention, viewModel.uiState.screen)
++        viewModel.abandonFormIntervention(reason = "back", nowMillis = 31_000L)
++
++        assertEquals(MainScreen.Home, viewModel.uiState.screen)
++        assertEquals(null, viewModel.uiState.currentRecommendationSet)
++        val abandoned = analyticsTracker.allEvents().last { it.type == AnalyticsEventType.FORM_INTERVENTION_ABANDONED }
++        assertEquals("back", abandoned.metadata["reason"])
++    }
++
+     @Test
+     @OptIn(ExperimentalCoroutinesApi::class)
+     fun requestSystemInterception_ignoresUnselectedTargetPackage() = runTest {
+@@ -3549,13 +3614,17 @@ class MainViewModelTest {
+         viewModel.saveCurrentReadingProgress(
+             progressPercent = 35,
+             lastVisibleParagraphIndex = 2,
++            lastVisibleTextOffset = 77,
+             paragraphCount = 10,
+             nowMillis = 2_300L,
+         )
+         advanceUntilIdle()
+ 
+         assertEquals(3, profileWriter.writes.size)
+-        assertTrue(profileWriter.writes.last().third.contains("\"progressPercent\""))
++        val progressAutosaveJson = profileWriter.writes.last().third
++        assertTrue(progressAutosaveJson.contains("\"progressPercent\""))
++        assertTrue(progressAutosaveJson.contains("\"lastVisibleParagraphIndex\": 2"))
++        assertTrue(progressAutosaveJson.contains("\"lastVisibleTextOffset\": 77"))
+ 
+         val link = userLinkRepository.links.value.single()
+         viewModel.togglePriorityContent(link)
+diff --git a/app/src/test/java/com/qualityalternative/app/ui/ProgressSnapshotTest.kt b/app/src/test/java/com/qualityalternative/app/ui/ProgressSnapshotTest.kt
+index 5de03a2..0b52abd 100644
+--- a/app/src/test/java/com/qualityalternative/app/ui/ProgressSnapshotTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/ui/ProgressSnapshotTest.kt
+@@ -389,6 +389,24 @@ class ProgressSnapshotTest {
+         assertEquals(57, readerProgressPercentForPageIndex(pageIndex = 3, pageCount = 7))
+     }
+ 
++    @Test
++    fun readerProgressPercentUsesSourceBlockIdentityInsteadOfAssumingDenseIndexes() {
++        val blocks = listOf(
++            readerMarkdownBlock(rawBlock = "AAAAAA", sourceBlockIndex = 10),
++            readerMarkdownBlock(rawBlock = "BBBBBB", sourceBlockIndex = 20),
++            readerMarkdownBlock(rawBlock = "CCCCCC", sourceBlockIndex = 30),
++        )
++
++        assertEquals(
++            50,
++            readerProgressPercentForSourcePosition(
++                sourceBlockIndex = 20,
++                textOffset = 3,
++                sourceBlocks = blocks,
++            ),
++        )
++    }
++
+     @Test
+     fun readerPageBoundarySignatureChangesWhenSamePageCountBoundariesShift() {
+         val fallbackPages = listOf(
+diff --git a/docs/SPRINT_19_AI_NOTE_ASSIST.md b/docs/SPRINT_19_AI_NOTE_ASSIST.md
+index e01ebcd..65f082d 100644
+--- a/docs/SPRINT_19_AI_NOTE_ASSIST.md
++++ b/docs/SPRINT_19_AI_NOTE_ASSIST.md
+@@ -1,6 +1,6 @@
+ # Sprint 19 - Reader Regression, Form Intervention, And AI Notes
+ 
+-Status: `planned_not_started`
++Status: `regression_fixes_in_progress`
+ 
+ Requested on: 2026-05-07
+ 
+@@ -29,6 +29,15 @@ Mapped PRD items: FR6, FR7, FR8, FR8A, FR13, NFR privacy, NFR reliability, NFR c
+ - Do not ship a private OpenRouter API key inside the APK. Sprint 19 must choose a safe tester configuration path before AI implementation, such as developer local properties for debug builds, a user-provided key, or a later backend/token broker.
+ - The active reader must remain calm and finite. `Ask AI` must not turn the reader into chat, browsing, or an infinite assistant feed.
+ 
++## Implementation Notes
++
++- 2026-05-07: EPUB reader extraction now assigns global source block indexes across spine documents instead of restarting at zero per chapter. This directly addresses chapter-local progress and annotation-selection jumps.
++- 2026-05-07: Reader progress now resolves source positions by source block identity and preserves a source anchor across font-size repagination instead of holding only a display page number.
++- 2026-05-07: Form intervention now gates `Open anyway` for 5 seconds with a visible waiting state; the close icon and button are disabled until the countdown completes.
++- 2026-05-07: PRD FR7 was updated intentionally: the 5-second wait happens before `Open anyway` becomes available, not as an extra screen after choosing it.
++- 2026-05-07: GPT Pro R1 regression gate returned `7/10 FAIL`; R2 work added raw logs, larger repagination evidence, saved/reopened annotation evidence, Portable Profile progress-autosave assertions, and form-intervention unlock/completion/abandonment analytics.
++- AI implementation remains blocked until the regression-fix APK in Slice 19.5 is reviewed and released.
++
+ ## Slice Plan
+ 
+ ### Slice 19.0: Contract And Regression Reproduction

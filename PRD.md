@@ -283,8 +283,8 @@ The intervention must provide three clear actions that map to the MVP value prop
 - User can choose Read now for the primary recommendation.
 - User can choose one of the backup recommendations instead of the primary item.
 - User can choose Pause 15 min, which creates a 15-minute delay window.
-- User can choose Open anyway.
-- No additional mandatory step is inserted after the user chooses Open anyway.
+- User can choose Open anyway after a short, visible 5-second form intervention wait.
+- The wait is presented before unlock is available, not as an extra screen after the user chooses Open anyway.
 - After Open anyway from a system intervention, repeated opens of the same distracting app are quiet for the user-configured unlock window.
 
 ### FR8. Replacement Session Experience

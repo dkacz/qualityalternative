@@ -1111,6 +1111,9 @@ class VisualQaScreenshotTest {
 
         seedAttentionClassicsSelection()
         launchFixtureSystemIntervention()
+        composeRule.waitUntil(timeoutMillis = 8_000) {
+            hasNode("Open Fixture Feed One") && !hasTag("form-intervention-unlock-wait")
+        }
         composeRule.onNodeWithText("Open Fixture Feed One").performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) {
             scenario?.state == androidx.lifecycle.Lifecycle.State.DESTROYED

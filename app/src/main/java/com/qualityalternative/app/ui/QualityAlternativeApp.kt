@@ -641,6 +641,8 @@ private fun MainRoute(
             onAcceptBackup = viewModel::acceptBackup,
             onSelectMeditationDuration = viewModel::setMeditationDurationMinutes,
             onDelay = viewModel::delayFor15Minutes,
+            onUnlockAvailable = viewModel::recordFormInterventionUnlockAvailable,
+            onAbandon = { viewModel.abandonFormIntervention(reason = "back") },
             onOpenAnyway = {
                 if (viewModel.openAnyway()) {
                     onExitToTarget()
@@ -1785,6 +1787,8 @@ private fun InterventionScreen(
     onAcceptBackup: (ContentItem) -> Unit,
     onSelectMeditationDuration: (Int) -> Unit,
     onDelay: () -> Unit,
+    onUnlockAvailable: () -> Unit,
+    onAbandon: () -> Unit,
     onOpenAnyway: () -> Unit,
 ) {
     val recommendationSet = state.currentRecommendationSet ?: return
@@ -1803,6 +1807,35 @@ private fun InterventionScreen(
             colors.background,
         ),
     )
+    val openAnywayAvailableAtMillis = state.currentOpenAnywayUnlockAvailableAtMillis
+    var openAnywayNowMillis by remember(state.currentInterventionId, openAnywayAvailableAtMillis) {
+        mutableStateOf(System.currentTimeMillis())
+    }
+    LaunchedEffect(state.currentInterventionId, openAnywayAvailableAtMillis) {
+        if (openAnywayAvailableAtMillis != null) {
+            while (true) {
+                val nowMillis = System.currentTimeMillis()
+                openAnywayNowMillis = nowMillis
+                if (nowMillis >= openAnywayAvailableAtMillis) {
+                    break
+                }
+                delay(250)
+            }
+        }
+    }
+    val openAnywayRemainingMillis = ((openAnywayAvailableAtMillis ?: 0L) - openAnywayNowMillis).coerceAtLeast(0L)
+    val openAnywayRemainingSeconds = ((openAnywayRemainingMillis + 999L) / 1_000L).toInt()
+    val canOpenAnyway = openAnywayRemainingSeconds <= 0
+    var unlockAvailableReported by remember(state.currentInterventionId, openAnywayAvailableAtMillis) {
+        mutableStateOf(openAnywayAvailableAtMillis == null)
+    }
+    LaunchedEffect(canOpenAnyway, unlockAvailableReported, openAnywayAvailableAtMillis) {
+        if (openAnywayAvailableAtMillis != null && canOpenAnyway && !unlockAvailableReported) {
+            unlockAvailableReported = true
+            onUnlockAvailable()
+        }
+    }
+    BackHandler { onAbandon() }
 
     Column(
         modifier = Modifier
@@ -1825,7 +1858,12 @@ private fun InterventionScreen(
                 modifier = Modifier.weight(1f),
                 fontSize = 13.5.sp,
             )
-            QaIconButton(icon = QaIconKind.Close, onClick = onOpenAnyway)
+            QaIconButton(
+                icon = QaIconKind.Close,
+                onClick = onOpenAnyway,
+                enabled = canOpenAnyway,
+                modifier = Modifier.testTag("intervention-open-anyway-close"),
+            )
         }
         QaCard(
             borderColor = colors.lineStrong,
@@ -1921,6 +1959,14 @@ private fun InterventionScreen(
                 }
             }
         }
+        if (!canOpenAnyway) {
+            OpenAnywayUnlockStatus(
+                remainingSeconds = openAnywayRemainingSeconds,
+                modifier = Modifier
+                    .padding(top = 4.dp, bottom = 2.dp)
+                    .testTag("form-intervention-unlock-wait"),
+            )
+        }
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier
@@ -1937,13 +1983,44 @@ private fun InterventionScreen(
                 leadingIcon = QaIconKind.Pause,
             )
             QaButton(
-                text = "Open ${targetApp.displayName}",
+                text = if (canOpenAnyway) "Open ${targetApp.displayName}" else "Open in ${openAnywayRemainingSeconds}s",
                 onClick = onOpenAnyway,
                 variant = QaButtonVariant.Ghost,
                 modifier = Modifier.weight(1f),
+                enabled = canOpenAnyway,
                 fullWidth = false,
                 size = QaButtonSize.Compact,
+                leadingIcon = if (canOpenAnyway) null else QaIconKind.Clock,
             )
+        }
+    }
+}
+
+@Composable
+private fun OpenAnywayUnlockStatus(
+    remainingSeconds: Int,
+    modifier: Modifier = Modifier,
+) {
+    val colors = QualityAlternativeThemeTokens.colors
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(10.dp),
+        color = colors.elevatedSurface,
+        border = BorderStroke(1.dp, colors.line),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            QaIcon(kind = QaIconKind.Clock, color = colors.mutedText, size = 15.dp)
+            BodyText(
+                text = "Take five seconds",
+                color = colors.mutedText,
+                fontSize = 12.5.sp,
+                modifier = Modifier.weight(1f),
+            )
+            MonoText("${remainingSeconds.coerceAtLeast(0)}s")
         }
     }
 }
@@ -2168,6 +2245,7 @@ private fun ReaderScreen(
         readerStartParagraphIndex,
         restoredProgressParagraphIndex,
     ) { mutableStateOf(initialPageIndex) }
+    var currentReaderSourceAnchor by remember(content.id) { mutableStateOf<ReaderSourcePosition?>(null) }
     val listState = rememberLazyListState()
     var annotationSelection by remember(content.id) { mutableStateOf<ReaderAnnotationSelection?>(null) }
     var annotationNoteDraft by remember(content.id) { mutableStateOf("") }
@@ -2193,9 +2271,30 @@ private fun ReaderScreen(
     }
     val currentPage = pages.getOrElse(safeCurrentPageIndex) { ReaderPage(0, (blocks.size - 1).coerceAtLeast(0)) }
     val currentSourcePosition = readerBlockLayout.sourcePositionForDisplayBlock(currentPage.endInclusive)
+    LaunchedEffect(content.id, currentSourcePosition) {
+        if (currentReaderSourceAnchor == null) {
+            currentReaderSourceAnchor = currentSourcePosition
+        }
+    }
+    LaunchedEffect(content.id, pageBoundarySignature, hasManualReaderNavigation, readerBlockLayout, pages) {
+        val anchor = currentReaderSourceAnchor
+        if (hasManualReaderNavigation && anchor != null) {
+            val remappedDisplayIndex = readerBlockLayout.displayBlockIndexForSourcePosition(
+                sourceBlockIndex = anchor.sourceBlockIndex,
+                textOffset = anchor.textOffset,
+            )
+            val remappedPageIndex = readerPageIndexForParagraph(pages = pages, paragraphIndex = remappedDisplayIndex)
+            if (currentPageIndex != remappedPageIndex) {
+                currentPageIndex = remappedPageIndex
+            }
+        }
+    }
+    val progressSourcePosition = currentReaderSourceAnchor
+        ?.takeIf { hasManualReaderNavigation }
+        ?: currentSourcePosition
     val sourceDerivedProgress = readerProgressPercentForSourcePosition(
-        sourceBlockIndex = currentSourcePosition.sourceBlockIndex,
-        textOffset = currentSourcePosition.textOffset,
+        sourceBlockIndex = progressSourcePosition.sourceBlockIndex,
+        textOffset = progressSourcePosition.textOffset,
         sourceBlocks = rawBlocks,
     )
     val displayedProgress = restoredProgress
@@ -2215,11 +2314,12 @@ private fun ReaderScreen(
             hasManualReaderNavigation = true
         }
         currentPageIndex = nextPageIndex
+        val sourcePosition = readerBlockLayout.sourcePositionForDisplayBlock(nextPage.endInclusive)
+        currentReaderSourceAnchor = sourcePosition
         annotationSelection = null
         annotationNoteDraft = ""
         isTocOpen = false
         if (nextPageIndex > safeCurrentPageIndex) {
-            val sourcePosition = readerBlockLayout.sourcePositionForDisplayBlock(nextPage.endInclusive)
             onProgressChanged(
                 readerProgressPercentForSourcePosition(
                     sourceBlockIndex = sourcePosition.sourceBlockIndex,
@@ -2247,6 +2347,9 @@ private fun ReaderScreen(
         if (nextPageIndex != safeCurrentPageIndex) {
             hasManualReaderNavigation = true
             currentPageIndex = nextPageIndex
+            currentReaderSourceAnchor = readerBlockLayout.sourcePositionForDisplayBlock(
+                pages[nextPageIndex].endInclusive,
+            )
         }
     }
     val canHandlePageTap = annotationSelection == null && !isTocOpen
@@ -5636,10 +5739,18 @@ private fun QaIcon(
 }
 
 @Composable
-private fun QaIconButton(icon: QaIconKind, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun QaIconButton(
+    icon: QaIconKind,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
     Surface(
-        modifier = modifier.size(34.dp),
+        modifier = modifier
+            .size(34.dp)
+            .alpha(if (enabled) 1f else 0.35f),
         onClick = onClick,
+        enabled = enabled,
         shape = RoundedCornerShape(10.dp),
         color = Color.Transparent,
         contentColor = QualityAlternativeThemeTokens.colors.mutedText,
@@ -6147,6 +6258,8 @@ internal data class ReaderBlockLayout(
                 safeOffset >= block.sourceTextStartOffset &&
                 safeOffset <= block.sourceTextEndOffset()
         }.takeIf { index -> index >= 0 }
+            ?: blocks.indexOfFirst { block -> block.sourceBlockIndex == sourceBlockIndex }
+                .takeIf { index -> index >= 0 }
             ?: displayBlockIndexFor(sourceBlockIndex)
     }
 }
@@ -6864,7 +6977,10 @@ internal fun readerProgressPercentForSourcePosition(
     val blockLengths = sourceBlocks.map { block ->
         (block.sourceFullText ?: block.text.text).length.coerceAtLeast(1)
     }
-    val safeBlockIndex = sourceBlockIndex.coerceIn(0, blockLengths.lastIndex)
+    val safeBlockIndex = sourceBlocks
+        .indexOfFirst { block -> block.sourceBlockIndex == sourceBlockIndex }
+        .takeIf { index -> index >= 0 }
+        ?: sourceBlockIndex.coerceIn(0, blockLengths.lastIndex)
     val completedBeforeBlock = blockLengths
         .take(safeBlockIndex)
         .sum()

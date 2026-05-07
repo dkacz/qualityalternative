@@ -113,6 +113,7 @@ data class MainUiState(
     val starterPacks: List<EditorialPack> = emptyList(),
     val currentInterventionId: String? = null,
     val currentInterventionShownAtMillis: Long? = null,
+    val currentOpenAnywayUnlockAvailableAtMillis: Long? = null,
     val currentRecommendationSet: RecommendationSet? = null,
     val currentInterventionOrigin: InterventionOrigin? = null,
     val currentContent: ContentItem? = null,
@@ -1243,6 +1244,7 @@ class MainViewModel(
         uiState = uiState.copy(
             currentInterventionId = null,
             currentInterventionShownAtMillis = null,
+            currentOpenAnywayUnlockAvailableAtMillis = null,
             currentRecommendationSet = null,
             currentInterventionOrigin = null,
             currentContent = content,
@@ -1571,6 +1573,7 @@ class MainViewModel(
                     selectedTargetApp = targetApp,
                     currentInterventionId = null,
                     currentInterventionShownAtMillis = null,
+                    currentOpenAnywayUnlockAvailableAtMillis = null,
                     currentRecommendationSet = null,
                     activeDelayWindow = null,
                     activeDelaySuggestion = null,
@@ -1591,6 +1594,7 @@ class MainViewModel(
                     activeDelaySuggestion = activeDelaySuggestionFor(activeDelayWindow),
                     latestMessage = "${targetApp.displayName} is paused for 15 minutes.",
                     screen = MainScreen.Home,
+                    currentOpenAnywayUnlockAvailableAtMillis = null,
                     currentInterventionOrigin = null,
                 )
                 return@launch
@@ -1653,6 +1657,7 @@ class MainViewModel(
                     selectedTargetApp = targetApp,
                     currentInterventionId = null,
                     currentInterventionShownAtMillis = null,
+                    currentOpenAnywayUnlockAvailableAtMillis = null,
                     currentRecommendationSet = null,
                     activeDelayWindow = null,
                     activeDelaySuggestion = null,
@@ -1692,6 +1697,20 @@ class MainViewModel(
                     ),
                 )
             }
+            recordEvent(
+                AnalyticsEvent(
+                    type = AnalyticsEventType.FORM_INTERVENTION_SHOWN,
+                    timestampMillis = processingNowMillis,
+                    interventionId = interventionId,
+                    targetAppPackage = targetApp.packageName,
+                    primaryContentId = recommendationSet.primary.id,
+                    backupContentIds = backupIds,
+                    contentId = recommendationSet.primary.id,
+                    metadata = recommendationSet.analyticsMetadata() + mapOf(
+                        "openAnywayUnlockDelayMillis" to FORM_INTERVENTION_UNLOCK_DELAY_MILLIS.toString(),
+                    ),
+                ),
+            )
             unfinishedProgressFor(recommendationSet.primary.id)?.let { progress ->
                 recordEvent(
                     AnalyticsEvent(
@@ -1713,6 +1732,7 @@ class MainViewModel(
                 selectedTargetApp = targetApp,
                 currentInterventionId = interventionId,
                 currentInterventionShownAtMillis = processingNowMillis,
+                currentOpenAnywayUnlockAvailableAtMillis = processingNowMillis + FORM_INTERVENTION_UNLOCK_DELAY_MILLIS,
                 currentRecommendationSet = recommendationSet,
                 currentInterventionOrigin = origin,
                 activeDelayWindow = null,
@@ -1753,6 +1773,7 @@ class MainViewModel(
                     metadata = recommendationSet.primary.analyticsMetadata(),
                 ),
             )
+            recordFormInterventionCompleted(action = "primary", nowMillis = nowMillis, contentId = recommendationSet.primary.id)
             openReplacementSession(content = recommendationSet.primary, sessionId = sessionId, startedAtMillis = nowMillis)
         }
     }
@@ -1787,6 +1808,7 @@ class MainViewModel(
                     metadata = content.analyticsMetadata(),
                 ),
             )
+            recordFormInterventionCompleted(action = "backup", nowMillis = nowMillis, contentId = content.id)
             openReplacementSession(content = content, sessionId = sessionId, startedAtMillis = nowMillis)
         }
     }
@@ -1806,10 +1828,12 @@ class MainViewModel(
                 backupContentIds = recommendationSet.backups.map(ContentItem::id),
             )
             recordDelaySelectedDurably(window)
+            recordFormInterventionCompleted(action = "delay", nowMillis = nowMillis)
             uiState = uiState.copy(
                 screen = MainScreen.Home,
                 currentInterventionId = null,
                 currentInterventionShownAtMillis = null,
+                currentOpenAnywayUnlockAvailableAtMillis = null,
                 currentRecommendationSet = null,
                 currentInterventionOrigin = null,
                 activeDelayWindow = window,
@@ -1817,6 +1841,58 @@ class MainViewModel(
                 latestMessage = "${targetApp.displayName} paused for 15 minutes.",
             )
         }
+    }
+
+    fun recordFormInterventionUnlockAvailable(nowMillis: Long = nowProvider()) {
+        val targetApp = uiState.selectedTargetApp ?: return
+        val recommendationSet = uiState.currentRecommendationSet ?: return
+        val interventionId = uiState.currentInterventionId ?: return
+        val availableAtMillis = uiState.currentOpenAnywayUnlockAvailableAtMillis ?: return
+        recordEvent(
+            AnalyticsEvent(
+                type = AnalyticsEventType.FORM_INTERVENTION_UNLOCK_ENABLED,
+                timestampMillis = nowMillis,
+                interventionId = interventionId,
+                targetAppPackage = targetApp.packageName,
+                primaryContentId = recommendationSet.primary.id,
+                backupContentIds = recommendationSet.backups.map(ContentItem::id),
+                metadata = mapOf(
+                    "openAnywayUnlockAvailableAtMillis" to availableAtMillis.toString(),
+                    "elapsedMillis" to (nowMillis - (uiState.currentInterventionShownAtMillis ?: nowMillis))
+                        .coerceAtLeast(0L)
+                        .toString(),
+                ),
+            ),
+        )
+    }
+
+    fun abandonFormIntervention(reason: String = "back", nowMillis: Long = nowProvider()) {
+        val targetApp = uiState.selectedTargetApp ?: return
+        val recommendationSet = uiState.currentRecommendationSet ?: return
+        val interventionId = uiState.currentInterventionId ?: return
+        recordEvent(
+            AnalyticsEvent(
+                type = AnalyticsEventType.FORM_INTERVENTION_ABANDONED,
+                timestampMillis = nowMillis,
+                interventionId = interventionId,
+                targetAppPackage = targetApp.packageName,
+                primaryContentId = recommendationSet.primary.id,
+                backupContentIds = recommendationSet.backups.map(ContentItem::id),
+                metadata = mapOf(
+                    "reason" to reason,
+                    "openAnywayUnlockAvailableAtMillis" to uiState.currentOpenAnywayUnlockAvailableAtMillis.orEmptyString(),
+                ),
+            ),
+        )
+        uiState = uiState.copy(
+            screen = MainScreen.Home,
+            currentInterventionId = null,
+            currentInterventionShownAtMillis = null,
+            currentOpenAnywayUnlockAvailableAtMillis = null,
+            currentRecommendationSet = null,
+            currentInterventionOrigin = null,
+            latestMessage = null,
+        )
     }
 
     fun startActiveDelayAlternative() {
@@ -1884,6 +1960,7 @@ class MainViewModel(
             uiState = uiState.copy(
                 currentInterventionId = interventionId,
                 currentInterventionShownAtMillis = interventionShownAtMillis,
+                currentOpenAnywayUnlockAvailableAtMillis = null,
                 currentRecommendationSet = recommendationSet,
                 currentInterventionOrigin = null,
             )
@@ -1895,6 +1972,25 @@ class MainViewModel(
         val targetApp = uiState.selectedTargetApp ?: return false
         val recommendationSet = uiState.currentRecommendationSet
         val nowMillis = nowProvider()
+        val openAnywayAvailableAtMillis = uiState.currentOpenAnywayUnlockAvailableAtMillis
+        if (openAnywayAvailableAtMillis != null && nowMillis < openAnywayAvailableAtMillis) {
+            recordEvent(
+                AnalyticsEvent(
+                    type = AnalyticsEventType.FORM_INTERVENTION_UNLOCK_BLOCKED,
+                    timestampMillis = nowMillis,
+                    interventionId = uiState.currentInterventionId,
+                    targetAppPackage = targetApp.packageName,
+                    primaryContentId = recommendationSet?.primary?.id,
+                    backupContentIds = recommendationSet?.backups.orEmpty().map(ContentItem::id),
+                    metadata = mapOf(
+                        "openAnywayUnlockAvailableAtMillis" to openAnywayAvailableAtMillis.toString(),
+                        "remainingMillis" to (openAnywayAvailableAtMillis - nowMillis).toString(),
+                    ),
+                ),
+            )
+            uiState = uiState.copy(latestMessage = "Take five seconds before opening ${targetApp.displayName}.")
+            return false
+        }
         val shouldExitToTarget = uiState.currentInterventionOrigin == InterventionOrigin.SYSTEM
         val unlockMinutes = uiState.openAnywayUnlockMinutes
             .coerceIn(MIN_OPEN_ANYWAY_UNLOCK_MINUTES, MAX_OPEN_ANYWAY_UNLOCK_MINUTES)
@@ -1910,9 +2006,25 @@ class MainViewModel(
                 metadata = mapOf(
                     "openAnywayUnlockMinutes" to unlockMinutes.toString(),
                     "openAnywayUnlockUntilMillis" to unlockUntilMillis.toString(),
+                    "formUnlockWaitMillis" to FORM_INTERVENTION_UNLOCK_DELAY_MILLIS.toString(),
                 ),
             ),
         )
+        recordEvent(
+            AnalyticsEvent(
+                type = AnalyticsEventType.FORM_INTERVENTION_UNLOCK_USED,
+                timestampMillis = nowMillis,
+                interventionId = uiState.currentInterventionId,
+                targetAppPackage = targetApp.packageName,
+                primaryContentId = recommendationSet?.primary?.id,
+                backupContentIds = recommendationSet?.backups.orEmpty().map(ContentItem::id),
+                metadata = mapOf(
+                    "openAnywayUnlockAvailableAtMillis" to (openAnywayAvailableAtMillis?.toString() ?: "0"),
+                    "openAnywayUnlockUntilMillis" to unlockUntilMillis.toString(),
+                ),
+            ),
+        )
+        recordFormInterventionCompleted(action = "open_anyway", nowMillis = nowMillis)
         if (shouldExitToTarget) {
             InterceptionRuntimeGate.suppressPackage(
                 targetAppPackage = targetApp.packageName,
@@ -1923,6 +2035,7 @@ class MainViewModel(
             screen = MainScreen.Home,
             currentInterventionId = null,
             currentInterventionShownAtMillis = null,
+            currentOpenAnywayUnlockAvailableAtMillis = null,
             currentRecommendationSet = null,
             currentInterventionOrigin = null,
             activeDelaySuggestion = null,
@@ -2890,6 +3003,11 @@ class MainViewModel(
         }
         val existingProgress = unfinishedProgressFor(content.id)
         uiState = uiState.copy(
+            currentInterventionId = null,
+            currentInterventionShownAtMillis = null,
+            currentOpenAnywayUnlockAvailableAtMillis = null,
+            currentRecommendationSet = null,
+            currentInterventionOrigin = null,
             currentContent = content,
             currentReaderDocument = readerDocument,
             currentContentBody = readerDocument.plainText,
@@ -3137,6 +3255,7 @@ class MainViewModel(
             screen = screen,
             currentInterventionId = null,
             currentInterventionShownAtMillis = null,
+            currentOpenAnywayUnlockAvailableAtMillis = null,
             currentContent = null,
             currentReaderDocument = null,
             currentContentBody = "",
@@ -3200,6 +3319,31 @@ class MainViewModel(
 
     private fun recordEvent(event: AnalyticsEvent) {
         analyticsTracker.record(event)
+    }
+
+    private fun recordFormInterventionCompleted(
+        action: String,
+        nowMillis: Long,
+        contentId: String? = null,
+    ) {
+        val targetApp = uiState.selectedTargetApp ?: return
+        val recommendationSet = uiState.currentRecommendationSet ?: return
+        val interventionId = uiState.currentInterventionId ?: return
+        recordEvent(
+            AnalyticsEvent(
+                type = AnalyticsEventType.FORM_INTERVENTION_COMPLETED,
+                timestampMillis = nowMillis,
+                interventionId = interventionId,
+                targetAppPackage = targetApp.packageName,
+                primaryContentId = recommendationSet.primary.id,
+                backupContentIds = recommendationSet.backups.map(ContentItem::id),
+                contentId = contentId,
+                metadata = mapOf(
+                    "action" to action,
+                    "openAnywayUnlockAvailableAtMillis" to uiState.currentOpenAnywayUnlockAvailableAtMillis.orEmptyString(),
+                ),
+            ),
+        )
     }
 
     private suspend fun recordEventDurably(event: AnalyticsEvent) {
@@ -3622,6 +3766,7 @@ private fun unavailablePermissionReadiness(): PermissionReadiness {
 
 private const val ACTIVE_DELAY_REFRESH_INTERVAL_MILLIS = 1_000L
 private const val INTERVENTION_DEGRADED_THRESHOLD_MILLIS = 2_000L
+internal const val FORM_INTERVENTION_UNLOCK_DELAY_MILLIS = 5_000L
 private const val MIN_SELECTED_DISTRACTING_APPS = 3
 private const val MAX_READING_ANNOTATION_QUOTE_LENGTH = 1_200
 private const val PROGRESS_HISTORY_WINDOW_DAYS = 31
@@ -3896,6 +4041,8 @@ private fun deletedLibraryMessage(count: Int): String {
 }
 
 private fun Int?.orZeroString(): String = (this ?: 0).toString()
+
+private fun Long?.orEmptyString(): String = this?.toString() ?: ""
 
 private object EmptyUserLinkRepository : UserLinkRepository {
     override fun userLinks(): List<ContentItem> = emptyList()

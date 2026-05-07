@@ -426,6 +426,7 @@ class AccountLightProfileExporterTest {
             },
         )
         assertEquals(exportedLink.contentId, profile.reading.progress.single().contentId)
+        assertEquals(4, profile.reading.progress.single().lastVisibleParagraphIndex)
         assertEquals(37, profile.reading.progress.single().lastVisibleTextOffset)
         assertFalse(rawJson.contains("content://"))
         assertFalse(rawJson.contains("raw-book"))

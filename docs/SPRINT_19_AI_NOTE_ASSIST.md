@@ -1,6 +1,6 @@
 # Sprint 19 - Reader Regression, Form Intervention, And AI Notes
 
-Status: `planned_not_started`
+Status: `regression_gate_passed_release_in_progress`
 
 Requested on: 2026-05-07
 
@@ -28,6 +28,16 @@ Mapped PRD items: FR6, FR7, FR8, FR8A, FR13, NFR privacy, NFR reliability, NFR c
 - No API key, OpenRouter credential, Google credential, account email, raw Drive file id, or model-provider secret may be exported through Portable Profile or annotation sync.
 - Do not ship a private OpenRouter API key inside the APK. Sprint 19 must choose a safe tester configuration path before AI implementation, such as developer local properties for debug builds, a user-provided key, or a later backend/token broker.
 - The active reader must remain calm and finite. `Ask AI` must not turn the reader into chat, browsing, or an infinite assistant feed.
+
+## Implementation Notes
+
+- 2026-05-07: EPUB reader extraction now assigns global source block indexes across spine documents instead of restarting at zero per chapter. This directly addresses chapter-local progress and annotation-selection jumps.
+- 2026-05-07: Reader progress now resolves source positions by source block identity and preserves a source anchor across font-size repagination instead of holding only a display page number.
+- 2026-05-07: Form intervention now gates `Open anyway` for 5 seconds with a visible waiting state; the close icon and button are disabled until the countdown completes.
+- 2026-05-07: PRD FR7 was updated intentionally: the 5-second wait happens before `Open anyway` becomes available, not as an extra screen after choosing it.
+- 2026-05-07: GPT Pro R1 regression gate returned `7/10 FAIL`; R2 work added raw logs, larger repagination evidence, saved/reopened annotation evidence, Portable Profile progress-autosave assertions, and form-intervention unlock/completion/abandonment analytics.
+- 2026-05-07: GPT Pro R2 regression gate returned `10/10 PASS` with `VISUAL REVIEW: PASS`. Slice 19.5 release packaging may proceed.
+- AI implementation remains blocked until the regression-fix APK in Slice 19.5 is reviewed and released.
 
 ## Slice Plan
 
