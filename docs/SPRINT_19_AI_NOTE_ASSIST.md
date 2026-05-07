@@ -1,6 +1,6 @@
 # Sprint 19 - Reader Regression, Form Intervention, And AI Notes
 
-Status: `regression_gate_passed_release_in_progress`
+Status: `regression_release_candidate_ready`
 
 Requested on: 2026-05-07
 
@@ -37,6 +37,8 @@ Mapped PRD items: FR6, FR7, FR8, FR8A, FR13, NFR privacy, NFR reliability, NFR c
 - 2026-05-07: PRD FR7 was updated intentionally: the 5-second wait happens before `Open anyway` becomes available, not as an extra screen after choosing it.
 - 2026-05-07: GPT Pro R1 regression gate returned `7/10 FAIL`; R2 work added raw logs, larger repagination evidence, saved/reopened annotation evidence, Portable Profile progress-autosave assertions, and form-intervention unlock/completion/abandonment analytics.
 - 2026-05-07: GPT Pro R2 regression gate returned `10/10 PASS` with `VISUAL REVIEW: PASS`. Slice 19.5 release packaging may proceed.
+- 2026-05-07: Slice 19.5 release candidate `v0.11.2-reader-regression-form-alpha` passed unit validation, debug APK build, connected reader/annotation E2E, connected form-intervention E2E, signature verification, emulator install smoke, launch smoke, and emulator shutdown.
+- 2026-05-07: GPT Pro final release gate returned `10/10 PASS` with `VISUAL REVIEW: PASS`; tagging and GitHub release publication may proceed.
 - AI implementation remains blocked until the regression-fix APK in Slice 19.5 is reviewed and released.
 
 ## Slice Plan
