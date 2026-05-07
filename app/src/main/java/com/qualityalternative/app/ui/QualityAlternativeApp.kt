@@ -2192,10 +2192,16 @@ private fun ReaderScreen(
         }
     }
     val currentPage = pages.getOrElse(safeCurrentPageIndex) { ReaderPage(0, (blocks.size - 1).coerceAtLeast(0)) }
-    val displayedProgress = readerProgressPercentForPageIndex(
-        pageIndex = safeCurrentPageIndex,
-        pageCount = pages.size,
+    val currentSourcePosition = readerBlockLayout.sourcePositionForDisplayBlock(currentPage.endInclusive)
+    val sourceDerivedProgress = readerProgressPercentForSourcePosition(
+        sourceBlockIndex = currentSourcePosition.sourceBlockIndex,
+        textOffset = currentSourcePosition.textOffset,
+        sourceBlocks = rawBlocks,
     )
+    val displayedProgress = restoredProgress
+        ?.progressPercent
+        ?.takeIf { !hasManualReaderNavigation }
+        ?: sourceDerivedProgress
     val firstVisibleParagraphIndex = currentPage.start
     val pageParagraphIndices = currentPage.start..currentPage.endInclusive
     LaunchedEffect(content.id, safeCurrentPageIndex, currentPage.start, currentPage.endInclusive) {
@@ -2215,9 +2221,10 @@ private fun ReaderScreen(
         if (nextPageIndex > safeCurrentPageIndex) {
             val sourcePosition = readerBlockLayout.sourcePositionForDisplayBlock(nextPage.endInclusive)
             onProgressChanged(
-                readerProgressPercentForPageIndex(
-                    pageIndex = nextPageIndex,
-                    pageCount = pages.size,
+                readerProgressPercentForSourcePosition(
+                    sourceBlockIndex = sourcePosition.sourceBlockIndex,
+                    textOffset = sourcePosition.textOffset,
+                    sourceBlocks = rawBlocks,
                 ),
                 sourcePosition.sourceBlockIndex,
                 sourcePosition.textOffset,
@@ -2802,13 +2809,6 @@ private fun BoxScope.ReaderAnnotationEditorOverlay(
                             modifier = Modifier.testTag("reader-annotation-close-${selection.paragraphIndex}"),
                         )
                     }
-                    MonoText(
-                        text = selection.rangeSummaryText(),
-                        color = colors.mutedText,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.testTag("reader-annotation-range-summary-${selection.paragraphIndex}"),
-                    )
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -2882,7 +2882,7 @@ private fun ReaderAnnotationRangeControls(
     val colors = QualityAlternativeThemeTokens.colors
     Row(
         modifier = Modifier
-            .semantics { contentDescription = "Annotation range controls, ${selection.rangePositionText()}" }
+            .semantics { contentDescription = "Annotation range controls" }
             .testTag("reader-annotation-range-controls"),
         horizontalArrangement = Arrangement.spacedBy(1.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -6225,37 +6225,6 @@ internal data class ReaderAnnotationSelection(
     val canExpandEnd: Boolean
         get() = endSentenceIndex < sentenceRanges.lastIndex
 
-    fun rangePositionText(): String {
-        val startRange = sentenceRanges[startSentenceIndex]
-        val endRange = sentenceRanges[endSentenceIndex]
-        val blockText = if (startRange.sourceBlockIndex == endRange.sourceBlockIndex) {
-            "block ${startRange.sourceBlockIndex + 1}"
-        } else {
-            "blocks ${startRange.sourceBlockIndex + 1}-${endRange.sourceBlockIndex + 1}"
-        }
-        return "$blockText, steps ${startSentenceIndex + 1}-${endSentenceIndex + 1} of ${sentenceRanges.size}"
-    }
-
-    fun rangeSummaryText(): String {
-        val summary = "Selection ${rangePositionText()}"
-        val startSnippet = rangeEndpointSnippet(startSentenceIndex)
-        val endSnippet = rangeEndpointSnippet(endSentenceIndex)
-        return if (startSentenceIndex == endSentenceIndex) {
-            "$summary | $startSnippet"
-        } else {
-            "$summary | Start: $startSnippet | End: $endSnippet"
-        }
-    }
-
-    private fun rangeEndpointSnippet(sentenceIndex: Int): String {
-        val range = sentenceRanges[sentenceIndex]
-        return sourceText
-            .substring(range.start, range.endExclusive)
-            .replace(Regex("\\s+"), " ")
-            .trim()
-            .take(56)
-    }
-
     fun expandStart(): ReaderAnnotationSelection {
         return if (canExpandStart) copy(startSentenceIndex = startSentenceIndex - 1) else this
     }
@@ -6882,6 +6851,27 @@ internal fun readerProgressPercentForParagraphIndex(paragraphIndex: Int, paragra
     }
     val visibleParagraphs = (paragraphIndex + 1).coerceIn(0, paragraphCount)
     return ((visibleParagraphs * 100) / paragraphCount).coerceIn(1, 100)
+}
+
+internal fun readerProgressPercentForSourcePosition(
+    sourceBlockIndex: Int,
+    textOffset: Int,
+    sourceBlocks: List<ReaderMarkdownBlock>,
+): Int {
+    if (sourceBlocks.isEmpty()) {
+        return 100
+    }
+    val blockLengths = sourceBlocks.map { block ->
+        (block.sourceFullText ?: block.text.text).length.coerceAtLeast(1)
+    }
+    val safeBlockIndex = sourceBlockIndex.coerceIn(0, blockLengths.lastIndex)
+    val completedBeforeBlock = blockLengths
+        .take(safeBlockIndex)
+        .sum()
+    val completedInsideBlock = textOffset.coerceIn(0, blockLengths[safeBlockIndex])
+    val totalSourceLength = blockLengths.sum().coerceAtLeast(1)
+    val visibleSourceLength = (completedBeforeBlock + completedInsideBlock).coerceIn(1, totalSourceLength)
+    return ((visibleSourceLength * 100) / totalSourceLength).coerceIn(1, 100)
 }
 
 internal fun readerProgressPercentForPageIndex(pageIndex: Int, pageCount: Int): Int {

@@ -32,7 +32,7 @@ Make the live Google Drive authorization path testable end to end for developer-
   - scope: `https://www.googleapis.com/auth/drive.file`
   - configured internal emulator tester account
 - Fixed plain-text/Markdown reader documents so each paragraph receives a stable `sourceBlockIndex`. Before this, all plain-text blocks defaulted to `0`, so cross-block annotation selection collapsed to the first block and the start handle appeared unable to move backward.
-- Compacted annotation range controls and added a small live range summary in the annotation popup so a long cross-page selection does not visually hide its preserved endpoint.
+- Compacted annotation range controls in the annotation popup and removed the user-facing technical range summary so long cross-page selections preserve their endpoints without showing debug-style copy.
 - Changed reader pagination to use measured Compose text heights after the viewport is known. The first render still has a conservative heuristic fallback, then the measured pass creates pages that keep the last rendered line above the footer without requiring reader scrolling.
 
 ## Live Google Drive Evidence

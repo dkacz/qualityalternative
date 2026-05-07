@@ -370,6 +370,26 @@ class ProgressSnapshotTest {
     }
 
     @Test
+    fun readerProgressPercentUsesSourcePositionInsteadOfRepaginatedPageCount() {
+        val blocks = listOf(
+            readerMarkdownBlock(rawBlock = "AAAAAA", sourceBlockIndex = 0),
+            readerMarkdownBlock(rawBlock = "BBBBBB", sourceBlockIndex = 1),
+            readerMarkdownBlock(rawBlock = "CCCCCC", sourceBlockIndex = 2),
+        )
+
+        assertEquals(
+            50,
+            readerProgressPercentForSourcePosition(
+                sourceBlockIndex = 1,
+                textOffset = 3,
+                sourceBlocks = blocks,
+            ),
+        )
+        assertEquals(66, readerProgressPercentForPageIndex(pageIndex = 1, pageCount = 3))
+        assertEquals(57, readerProgressPercentForPageIndex(pageIndex = 3, pageCount = 7))
+    }
+
+    @Test
     fun readerPageBoundarySignatureChangesWhenSamePageCountBoundariesShift() {
         val fallbackPages = listOf(
             ReaderPage(start = 0, endInclusive = 9),

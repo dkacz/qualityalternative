@@ -1,0 +1,1 @@
+5ec7fa54fdefc2aaa15c87fbaf8b57546d04d1a371f955a4ab541a50c5062b26  release_artifacts/quality-alternative-v0.11.1-reader-progress-hotfix-alpha-debug.apk

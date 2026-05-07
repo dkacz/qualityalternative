@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.qualityalternative.app.data.AccountLightProfileExporterTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-05-07T10:21:52.304Z" hostname="mac-studio.home" time="0.22">
+  <properties/>
+  <testcase name="exportSettingsOnlyProfileJson_omitsUnsafeSelectedPackIds" classname="com.qualityalternative.app.data.AccountLightProfileExporterTest" time="0.139"/>
+  <testcase name="decode_rejectsUnsupportedFutureSchemaVersion" classname="com.qualityalternative.app.data.AccountLightProfileExporterTest" time="0.001"/>
+  <testcase name="exportSettingsOnlyProfileJson_emitsVersionedPortableSettingsProfile" classname="com.qualityalternative.app.data.AccountLightProfileExporterTest" time="0.039"/>
+  <testcase name="exportSettingsOnlyProfileJson_filtersNonPortableSettingsReferencesAndDisplayNames" classname="com.qualityalternative.app.data.AccountLightProfileExporterTest" time="0.011"/>
+  <testcase name="exportSettingsOnlyProfileJson_warnsWhenUserDocumentHasNoVerifiedFingerprint" classname="com.qualityalternative.app.data.AccountLightProfileExporterTest" time="0.008"/>
+  <testcase name="exportSettingsOnlyProfileJson_clampsUpdatedAtWhenDeviceClockMovesBackward" classname="com.qualityalternative.app.data.AccountLightProfileExporterTest" time="0.003"/>
+  <testcase name="exportSettingsOnlyProfileJson_includesPortableLibraryAndReadingStateWithoutRawUris" classname="com.qualityalternative.app.data.AccountLightProfileExporterTest" time="0.011"/>
+  <testcase name="warningAndAutosaveDtosEnforceApprovedSchemaDomains" classname="com.qualityalternative.app.data.AccountLightProfileExporterTest" time="0.002"/>
+  <testcase name="exportSettingsOnlyProfileJson_reusesLocalProfileIdentityAcrossExports" classname="com.qualityalternative.app.data.AccountLightProfileExporterTest" time="0.004"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

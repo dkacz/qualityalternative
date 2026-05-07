@@ -98,6 +98,8 @@ class MainActivityTest {
         "sprint17-cross-page-annotation-${System.currentTimeMillis()}"
     private val sprint17AnnotationSurfaceScreenshotDirName =
         "sprint17-annotation-surface-${System.currentTimeMillis()}"
+    private val sprint18ProgressHotfixScreenshotDirName =
+        "sprint18-progress-hotfix-${System.currentTimeMillis()}"
 
     @Before
     fun resetAppState() {
@@ -553,6 +555,41 @@ class MainActivityTest {
         composeRule.waitUntil(timeoutMillis = 10_000) { currentReaderFontScale() == 0.9 }
         composeRule.onNodeWithTag("reader-page-label").assertIsDisplayed()
         captureSprint17TypographyScreenshot("03_reader_small_font_light")
+    }
+
+    @Test
+    fun readerProgressPercentRestoresFromSourceAnchorAfterReaderFontChange() {
+        launchOnboardedApp()
+        val document = addSeedMarkdownDocument(
+            title = "Progress percent source anchor regression",
+            displayName = "progress-percent-source-anchor.md",
+            body = (1..36).joinToString(separator = "\n\n") { index ->
+                "Progress anchor paragraph $index keeps enough text to paginate differently when reader text grows, but its saved percent should remain source anchored."
+            },
+            nowMillis = 85_000L,
+        )
+
+        scenario?.onActivity { activity -> activity.mainViewModel.openLibraryItem(document) }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
+        advanceReaderPage()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasUnfinishedProgressFor(document.id) }
+        val savedPercent = savedProgressPercentFor(document.id)
+        val savedParagraphIndex = savedProgressParagraphIndexFor(document.id)
+        assertTrue(savedPercent in 1..99)
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasNodeContaining("$savedPercent%") }
+        captureSprint18ProgressHotfixScreenshot("01_default_font_saved_progress")
+
+        scenario?.onActivity { activity -> activity.mainViewModel.openHome() }
+        waitForHome()
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.setReaderFontScale(1.3)
+            activity.mainViewModel.openLibraryItem(document)
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasNodeContaining("$savedPercent%") }
+        assertEquals(savedPercent, savedProgressPercentFor(document.id))
+        assertEquals(savedParagraphIndex, savedProgressParagraphIndexFor(document.id))
+        captureSprint18ProgressHotfixScreenshot("02_large_font_restored_same_progress")
     }
 
     @Test
@@ -1730,10 +1767,9 @@ class MainActivityTest {
         composeRule.waitForIdle()
 
         val expandedQuote = readerSelectedQuoteText(9)
-        val expandedSummary = readerRangeSummaryText(9)
         assertTrue(
             "Expected start range control to move into earlier source blocks. " +
-                "quote=$expandedQuote summary=$expandedSummary",
+                "quote=$expandedQuote",
             expandedQuote.contains("sourceblock0") && expandedQuote.contains("sourceblock9"),
         )
         composeRule.onNodeWithTag("reader-annotation-start-earlier").assertIsNotEnabled()
@@ -1781,7 +1817,6 @@ class MainActivityTest {
             }
         }
         composeRule.waitForIdle()
-        captureSprint17CrossPageAnnotationScreenshot("02_after_end_later_clicks_light")
         val expandedQuote = readerSelectedQuoteText(0)
         val expectedSavedEndAnchor = Regex("""anchor\d+""")
             .findAll(expandedQuote)
@@ -1834,16 +1869,16 @@ class MainActivityTest {
         }
         composeRule.onNodeWithTag("reader-annotation-start-earlier").assertIsDisplayed()
         composeRule.onNodeWithTag("reader-annotation-end-later").assertIsDisplayed()
-        captureSprint17CrossPageAnnotationScreenshot("03_compact_controls_later_page_light")
+        captureSprint17CrossPageAnnotationScreenshot("02_compact_controls_later_page_light")
         composeRule.onNodeWithTag("reader-annotation-selected-quote-scroll-0")
             .performTouchInput {
                 swipeUp(
                     startY = bottom - 12f,
                     endY = top + 12f,
                 )
-            }
+        }
         composeRule.waitForIdle()
-        captureSprint17CrossPageAnnotationScreenshot("04_long_quote_scroll_region_light")
+        captureSprint17CrossPageAnnotationScreenshot("03_long_quote_scroll_region_light")
         assertTrue(
             "Expected internal quote scrolling to preserve the same selected range.",
             readerSelectedQuoteText(0).contains(expectedSavedEndAnchor),
@@ -1877,7 +1912,7 @@ class MainActivityTest {
         val reopenedQuote = readerSelectedQuoteText(laterHighlight)
         assertTrue("Expected reopened quote to keep the source-anchored start.", reopenedQuote.contains("anchor1"))
         assertTrue("Expected reopened quote to keep the later-page end.", reopenedQuote.contains(expectedSavedEndAnchor))
-        captureSprint17CrossPageAnnotationScreenshot("05_reopened_cross_page_quote_light")
+        captureSprint17CrossPageAnnotationScreenshot("04_reopened_cross_page_quote_light")
     }
 
     @Test
@@ -2949,13 +2984,6 @@ class MainActivityTest {
             .joinToString(separator = "\n") { text -> text.text }
     }
 
-    private fun readerRangeSummaryText(paragraphIndex: Int): String {
-        return composeRule.onNodeWithTag("reader-annotation-range-summary-$paragraphIndex")
-            .fetchSemanticsNode()
-            .config[SemanticsProperties.Text]
-            .joinToString(separator = "\n") { text -> text.text }
-    }
-
     private fun nodeHeight(tag: String): Float {
         val bounds = composeRule.onNodeWithTag(tag)
             .fetchSemanticsNode()
@@ -3844,6 +3872,16 @@ class MainActivityTest {
 
     private fun captureSprint17AnnotationSurfaceScreenshot(name: String) {
         val outputDir = File("/sdcard/Download/qualityalternative/$sprint17AnnotationSurfaceScreenshotDirName")
+        assertTrue("Expected screenshot output directory for $name", outputDir.mkdirs() || outputDir.exists())
+        composeRule.waitForIdle()
+        Thread.sleep(300)
+        val output = File(outputDir, "$name.png")
+        assertTrue("Expected screenshot capture for $name", UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).takeScreenshot(output))
+        assertTrue("Expected screenshot file for $name", output.exists() && output.length() > 0L)
+    }
+
+    private fun captureSprint18ProgressHotfixScreenshot(name: String) {
+        val outputDir = File("/sdcard/Download/qualityalternative/$sprint18ProgressHotfixScreenshotDirName")
         assertTrue("Expected screenshot output directory for $name", outputDir.mkdirs() || outputDir.exists())
         composeRule.waitForIdle()
         Thread.sleep(300)
