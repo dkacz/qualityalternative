@@ -1,4 +1,4 @@
-# Sprint 19 - AI-Assisted Annotation Notes
+# Sprint 19 - Reader Regression, Form Intervention, And AI Notes
 
 Status: `planned_not_started`
 
@@ -6,32 +6,144 @@ Requested on: 2026-05-07
 
 ## Goal
 
-Add an explicit `Ask AI` action to the reader annotation flow. The action saves the user's note, then asks an external LLM for a context-aware response using the full source material, the annotation's selected quote, its source anchor/range, and the user's note.
+Start Sprint 19 by fixing the current reader and intervention regressions, release an APK with those fixes, and only then move into AI-assisted annotation notes in the second part of the sprint. AI work must not begin until there is a reviewed, installable APK that fixes annotation selection, progress, and form intervention.
 
-Mapped PRD items: FR8, FR8A, FR13, NFR privacy, NFR reliability, NFR calm interaction model.
+Mapped PRD items: FR6, FR7, FR8, FR8A, FR13, NFR privacy, NFR reliability, NFR calm interaction model.
 
-## User Story
+## User-Reported Problems To Fix First
+
+- Annotation range adjustment is still unstable. When the user tries to move the start of an annotation backward, it can jump as if it moved to the beginning of the book.
+- Reading progress can still be wrong. The user can be in chapter 3 while the app shows `1%`, which suggests progress is being calculated from the wrong anchor, wrong display block, or wrong scope.
+- Form intervention is not working as desired. The desired behavior is a lightweight form-style unlock similar in feel to the existing edit-breath interaction: the user performs the small intervention and waits about 5 seconds before unlock is available.
+- AI-assisted notes remain desired, but they come after these regressions and after a release APK containing the fixes.
+
+## Product Rules
+
+- Sprint 19 order is regression-first, release APK second, AI last.
+- Annotation selection must be source-anchored. Moving the start backward may cross display pages and source blocks, but it must never teleport to the beginning of the book unless the actual selected source range begins there.
+- Reading progress must be derived from the stable source location, not transient paginated display indexes. If the UI shows whole-material progress, chapter navigation and font repagination must not reset it to a misleading low value. If any chapter-local progress is shown, the UI must label that scope clearly.
+- Form intervention must be calm and bounded. It may slow unlocking with a short 5-second wait, but it must not become punitive, feed-like, or confusing.
+- Any form-intervention change must explicitly reconcile with FR7, which currently says no additional mandatory step is inserted after `Open anyway`. If Sprint 19 changes that behavior, the PRD must be updated intentionally instead of silently drifting.
+- AI note assistance is optional and explicit. Ordinary annotation saving must keep working offline and without an AI key.
+- No API key, OpenRouter credential, Google credential, account email, raw Drive file id, or model-provider secret may be exported through Portable Profile or annotation sync.
+- Do not ship a private OpenRouter API key inside the APK. Sprint 19 must choose a safe tester configuration path before AI implementation, such as developer local properties for debug builds, a user-provided key, or a later backend/token broker.
+- The active reader must remain calm and finite. `Ask AI` must not turn the reader into chat, browsing, or an infinite assistant feed.
+
+## Slice Plan
+
+### Slice 19.0: Contract And Regression Reproduction
+
+Deliverables:
+
+- Convert this sprint plan into a reviewable contract.
+- Reproduce the annotation start-backward jump with an instrumented reader fixture.
+- Reproduce the wrong `1%` progress state in a chaptered or multi-section source.
+- Identify the current form-intervention path and the exact place where the 5-second unlock wait should live.
+- Decide whether form intervention changes require a PRD update to FR7 before implementation.
+- GPT Pro review of the contract before code begins.
+
+Acceptance:
+
+- The plan explicitly covers annotation jump, wrong progress, form intervention, and AI-last sequencing.
+- Reproduction evidence exists for both reader regressions, or the plan records why a specific fixture is needed first.
+- GPT Pro returns `SCORE: 10/10`, `VERDICT: PASS`, and `VISUAL REVIEW: PASS` for the contract packet.
+
+### Slice 19.1: Annotation Start-Backward Stability
+
+Deliverables:
+
+- Fix annotation start adjustment so moving backward walks stable source ranges instead of display-page or chapter-local indexes.
+- Preserve end anchor while the start anchor moves backward.
+- Keep cross-page selected quotes stable after save, reopen, pagination changes, and font-size changes.
+- Add regression tests for backward movement from later chapters/sections.
+
+Acceptance:
+
+- Moving start backward from a later chapter never jumps to the beginning of the book unless the user actually reaches the first source range.
+- Start and end controls can move across source/page boundaries without corrupting selected quote text.
+- Connected visual evidence shows the selected range before movement, after backward movement, and after reopen.
+- GPT Pro slice review returns `SCORE: 10/10`, `VERDICT: PASS`, and `VISUAL REVIEW: PASS`.
+
+### Slice 19.2: Reader Progress Scope And Chapter Correctness
+
+Deliverables:
+
+- Audit all reader progress inputs: source block index, text offset, chapter/section navigation, displayed page index, restored progress, and exported progress.
+- Fix progress percent so it reflects the intended stable source scope and does not reset to `1%` when the reader is already in a later chapter.
+- Ensure font-size repagination still preserves progress percent, building on Sprint 18's source-anchored progress hotfix.
+- Add tests for chaptered material, imported documents, EPUB/table-of-contents jumps where applicable, and Markdown/plain-text sources.
+
+Acceptance:
+
+- A reader positioned in chapter 3 shows progress consistent with the whole source or a clearly labeled chapter-local scope.
+- TOC/chapter jumps do not corrupt saved progress.
+- Progress remains stable across reader font-size changes.
+- Account Light/Portable Profile and annotation sync paths preserve the corrected progress anchors.
+- GPT Pro slice review returns `SCORE: 10/10`, `VERDICT: PASS`, and `VISUAL REVIEW: PASS`.
+
+### Slice 19.3: Form Intervention 5-Second Unlock
+
+Deliverables:
+
+- Repair the form-intervention flow so it works end to end.
+- Shape the interaction like the existing edit-breath style: small, finite, calm, and focused.
+- Add a 5-second wait before unlock becomes available.
+- Make unlock countdown, disabled state, completion state, and cancellation/back behavior visually clear.
+- Record analytics for form shown, form completed, unlock enabled, unlock used, and abandonment.
+
+Acceptance:
+
+- The form intervention appears reliably from the intended trigger.
+- Unlock is disabled for about 5 seconds, then becomes available.
+- The user understands what is happening without moralizing copy.
+- Tests cover timer behavior, unlock gating, cancellation, repeated trigger behavior, and analytics events.
+- Visual evidence covers initial, waiting, unlock-ready, and completed states.
+- GPT Pro slice review returns `SCORE: 10/10`, `VERDICT: PASS`, and `VISUAL REVIEW: PASS`.
+
+### Slice 19.4: Regression Gate Before Release APK
+
+Deliverables:
+
+- Run focused and full validation for annotation selection, reader progress, form intervention, Google Drive annotation sync, and Portable Profile.
+- Produce visual evidence for the three regression areas.
+- Run GPT Pro regression gate before building the first Sprint 19 APK.
+
+Acceptance:
+
+- Annotation start-backward, progress correctness, and form intervention all pass tests and visual review.
+- GPT Pro regression gate returns `SCORE: 10/10`, `VERDICT: PASS`, and `VISUAL REVIEW: PASS`.
+- Only after this gate passes may Sprint 19 build the regression-fix APK.
+
+### Slice 19.5: Regression-Fix APK Release Before AI
+
+Deliverables:
+
+- Version bump and release notes for the regression-fix APK.
+- Full unit and connected Android validation.
+- APK build, signature verification, emulator install smoke, and emulator shutdown evidence.
+- GitHub release with the installable debug APK.
+- Changelog versus the previous release, focused on annotation selection, progress correctness, and form intervention.
+
+Acceptance:
+
+- The APK installs successfully and contains the annotation/progress/form-intervention fixes.
+- GPT Pro has already returned `SCORE: 10/10`, `VERDICT: PASS`, and `VISUAL REVIEW: PASS` for the regression gate.
+- Release notes clearly state that AI note assistance is not included yet and starts only in the second part of Sprint 19.
+- Only after this APK is released may Sprint 19 begin AI note work.
+
+## AI Note Feature - Second Part Of Sprint 19
+
+### User Story
 
 When adding a note to selected reader text, the user can choose ordinary `Save` or `Ask AI`. `Ask AI` must save the note first and then request an AI response that understands the annotation in the context of the complete material, not a summary.
 
-## Requested Model And Provider
+### Requested Model And Provider
 
 - Target provider path: OpenRouter API.
 - Requested target model: Google Gemini 3.1 Flash Lite Preview.
 - Implementation must verify the current OpenRouter model id, context window, pricing, rate limits, and availability at Sprint 19 implementation time. The exact model name is treated as a requested target, not a hard-coded assumption until verified.
 
-## Product Rules
-
-- `Ask AI` is optional and explicit. Ordinary annotation saving must keep working offline and without an AI key.
-- No API key, OpenRouter credential, Google credential, account email, raw Drive file id, or model-provider secret may be exported through Portable Profile or annotation sync.
-- Do not ship a private OpenRouter API key inside the APK. Sprint 19 must choose a safe tester configuration path before implementation, such as developer local properties for debug builds, a user-provided key, or a later backend/token broker. A bundled secret in source or APK is not acceptable.
-- The app must clearly tell the user that `Ask AI` sends the full source material and annotation context to an external AI provider.
-- The AI request must include the full source material without lossy summarization. If the material is too large for the configured model, the app must show a clear failure or use a non-lossy chunking protocol whose final answer is grounded in every chunk. It must not silently send a shortened summary.
-- The saved user note is canonical user-authored data. The AI answer is generated commentary linked to the annotation and must be stored/exported as a distinct field or sidecar record.
-- AI failure must be non-destructive: the note remains saved, the user can retry, and local/Drive annotation sync remains safe.
-- The active reader must remain calm and finite. `Ask AI` must not turn the reader into chat, browsing, or an infinite assistant feed.
-
-## Prompt Design Requirements
+### Prompt Design Requirements
 
 Sprint 19 must design and review a strong prompt before implementation. The prompt should adapt to the nature of both the annotation and the source material.
 
@@ -58,33 +170,23 @@ The response should adapt by annotation character:
 
 The first implementation should produce one high-quality assistant response, not an ongoing chat thread.
 
-## Data Model Questions To Resolve
-
-- Where to store AI responses: embedded annotation extension, separate AI response table, or sidecar JSON-LD body.
-- How to represent AI output in W3C Web Annotation JSON-LD without confusing it with the user's note.
-- Whether multiple AI attempts per annotation are retained, replaced, or versioned.
-- Whether Drive sync should upload AI responses immediately with the annotation or only after explicit local save.
-- How to expose retry, cancel, and failed states without crowding the annotation popup.
-
-## Slice Plan
-
-### Slice 19.0: Contract, Model Verification, And Prompt Review
+### Slice 19.6: AI Contract, Model Verification, And Prompt Review
 
 Deliverables:
 
 - Verify OpenRouter model id and context limits for the requested Gemini 3.1 Flash Lite Preview target.
 - Decide safe tester API-key configuration and document it.
 - Draft the full prompt contract and expected response shape.
-- Update PRD/sprint docs if the provider/model constraints require a safer first implementation.
-- GPT Pro review of the contract and prompt before code begins.
+- Update PRD/sprint docs if provider/model constraints require a safer first implementation.
+- GPT Pro review of the AI contract and prompt before AI code begins.
 
 Acceptance:
 
-- No implementation starts until the prompt and credential path are reviewed.
+- No AI implementation starts until the prompt and credential path are reviewed.
 - The contract explicitly protects ordinary local note saving, privacy, and no-lossy-summary behavior.
-- GPT Pro returns `SCORE: 10/10`, `VERDICT: PASS`, and `VISUAL REVIEW: PASS` for the contract/prompt packet.
+- GPT Pro returns `SCORE: 10/10`, `VERDICT: PASS`, and `VISUAL REVIEW: PASS` for the AI contract/prompt packet.
 
-### Slice 19.1: OpenRouter Client And Safe Configuration
+### Slice 19.7: OpenRouter Client And Safe Configuration
 
 Deliverables:
 
@@ -98,26 +200,12 @@ Acceptance:
 - No key appears in git, Portable Profile export, annotation export, logs, screenshots, or APK metadata.
 - Unit tests cover success, timeout, provider error, missing key, cancellation, and oversized material behavior.
 
-### Slice 19.2: Annotation UI Integration
+### Slice 19.8: Annotation UI And Full-Context Prompt Assembly
 
 Deliverables:
 
 - Add `Ask AI` next to ordinary save in the annotation popup.
 - Ensure `Ask AI` saves the note first, then launches the AI request.
-- Show calm progress, success, failure, and retry states without expanding the reader page or breaking pagination.
-- Keep ordinary `Save` visually clear and not downgraded.
-
-Acceptance:
-
-- User can save a note without AI exactly as before.
-- User can tap `Ask AI`, leave with the note saved, and see AI request state.
-- Failure never loses the note.
-- Visual evidence covers unconfigured, ready, loading, success, and failure states.
-
-### Slice 19.3: Full-Context Prompt Assembly
-
-Deliverables:
-
 - Assemble prompt inputs from the complete source material, selected quote, source anchor/range, and user note.
 - Preserve source order, paragraph/block boundaries, and reader anchor metadata.
 - Detect context overflow before sending.
@@ -125,11 +213,13 @@ Deliverables:
 
 Acceptance:
 
-- Tests prove the prompt includes the complete source text for normal-size sources.
-- Tests prove annotation quote, note, and source offsets are included.
+- User can save a note without AI exactly as before.
+- User can tap `Ask AI`, leave with the note saved, and see AI request state.
+- Tests prove the prompt includes complete source text for normal-size sources.
 - Tests prove the app does not silently truncate or summarize oversized sources.
+- Visual evidence covers unconfigured, ready, loading, success, and failure states.
 
-### Slice 19.4: Store, Export, And Sync AI Responses
+### Slice 19.9: Store, Export, And Sync AI Responses
 
 Deliverables:
 
@@ -145,7 +235,7 @@ Acceptance:
 - Drive sync round-trip/readback proves both fields survive.
 - Portable Profile remains secret-free.
 
-### Slice 19.5: Final E2E Review And APK
+### Slice 19.10: Final AI E2E Review And APK
 
 Deliverables:
 
@@ -158,7 +248,7 @@ Acceptance:
 
 - Every implemented slice has preserved review/evidence.
 - Final GPT Pro gate returns `SCORE: 10/10`, `VERDICT: PASS`, and `VISUAL REVIEW: PASS`.
-- APK installs successfully and release notes identify the AI note feature, privacy behavior, provider configuration, and known model limitations.
+- APK installs successfully and release notes identify the reader fixes, form intervention behavior, AI note feature, privacy behavior, provider configuration, and known model limitations.
 
 ## Out Of Scope For Sprint 19
 
