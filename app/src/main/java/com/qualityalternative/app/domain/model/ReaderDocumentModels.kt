@@ -11,10 +11,10 @@ data class ReaderDocument(
         fun fromPlainText(text: String): ReaderDocument {
             val blocks = text
                 .split(Regex("""\n[ \t\r\f]*\n"""))
-                .mapNotNull { raw ->
+                .mapIndexedNotNull { index, raw ->
                     raw.trim()
                         .takeIf(String::isNotBlank)
-                        ?.let { blockText -> ReaderDocumentBlock(text = blockText) }
+                        ?.let { blockText -> ReaderDocumentBlock(text = blockText, sourceBlockIndex = index) }
                 }
             return ReaderDocument(blocks = blocks)
         }

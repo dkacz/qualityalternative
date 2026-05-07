@@ -517,6 +517,24 @@ class ProgressSnapshotTest {
     }
 
     @Test
+    fun measuredReaderPaginationUsesRenderedPixelBudgetAndHeadingBreaks() {
+        val blocks = listOf(
+            readerMarkdownBlock("Measured body paragraph 1."),
+            readerMarkdownBlock("Measured body paragraph 2."),
+            readerMarkdownBlock(rawBlock = "## Measured section"),
+            readerMarkdownBlock("Measured body paragraph 3."),
+        )
+
+        val pages = readerPagesForMeasuredBlocks(
+            blocks = blocks,
+            blockHeightsPx = listOf(90, 90, 30, 90),
+            maxPageHeightPx = 190,
+        )
+
+        assertEquals(listOf(ReaderPage(start = 0, endInclusive = 1), ReaderPage(start = 2, endInclusive = 3)), pages)
+    }
+
+    @Test
     fun adaptiveReaderPaginationCapsShortParagraphsByRenderedBlockHeight() {
         val shortBlocks = (1..32).map { index -> readerMarkdownBlock("Short paragraph $index.") }
         val tallFit = adaptiveReaderPageFit(
@@ -619,14 +637,14 @@ class ProgressSnapshotTest {
 
         val tallCodeBlockCount = tallPages.first().endInclusive - tallPages.first().start + 1
         val tallLargeCodeBlockCount = tallLargeTextPages.first().endInclusive - tallLargeTextPages.first().start + 1
-        assertTrue("Tall default one-line code pages should still use the available viewport.", tallCodeBlockCount >= 26)
-        assertTrue("Tall default one-line code pages should fit within rendered code padding.", tallCodeBlockCount <= 26)
+        assertTrue("Tall default one-line code pages should still use the visible, footer-safe viewport.", tallCodeBlockCount >= 20)
+        assertTrue("Tall default one-line code pages should fit within rendered code padding.", tallCodeBlockCount <= 20)
         assertTrue(
-            "Tall large-text one-line code pages should still use the available viewport. " +
+            "Tall large-text one-line code pages should still use the visible, footer-safe viewport. " +
                 "count=$tallLargeCodeBlockCount fit=$tallLargeTextFit",
-            tallLargeCodeBlockCount >= 22,
+            tallLargeCodeBlockCount >= 18,
         )
-        assertTrue("Tall large-text one-line code pages should fit within rendered code padding.", tallLargeCodeBlockCount <= 22)
+        assertTrue("Tall large-text one-line code pages should fit within rendered code padding.", tallLargeCodeBlockCount <= 18)
     }
 
     @Test
@@ -687,7 +705,7 @@ class ProgressSnapshotTest {
             codeBlocks.size,
             tallLargeTextLayout.blocks.size,
         )
-        assertEquals("Tall default eight-line code pages should admit four rendered-safe blocks.", 4, tallCodeBlockCount)
+        assertEquals("Tall default eight-line code pages should admit four footer-safe rendered blocks.", 4, tallCodeBlockCount)
         assertEquals("Tall large-text eight-line code pages should admit one rendered-safe block.", 1, tallLargeCodeBlockCount)
     }
 
@@ -707,9 +725,9 @@ class ProgressSnapshotTest {
             readerFontScale = 1.0,
         )
         val expectedFirstPageBlocksByLineCount = mapOf(
-            2 to 15,
-            3 to 10,
-            4 to 8,
+            2 to 13,
+            3 to 9,
+            4 to 7,
             5 to 6,
             6 to 5,
             7 to 4,
@@ -853,16 +871,17 @@ class ProgressSnapshotTest {
         assertTrue("Adjacent whole short-line CODE should need multiple pages.", tallAdjacentWholePages.size > 1)
         assertTrue("Mixed CODE and body should need multiple pages.", tallMixedCodeAndBodyPages.size > 1)
         assertEquals("Default oversized CODE first chunk should remain page-contained.", 0, tallPages.first().start)
-        assertEquals("Default oversized CODE should safely co-admit two 17-line chunks.", 1, tallPages.first().endInclusive)
+        assertEquals("Default oversized CODE first page should keep only one 17-line chunk above the footer.", 0, tallPages.first().endInclusive)
         assertEquals("Large-text oversized CODE first chunk should remain page-contained.", 0, tallLargeTextPages.first().start)
         assertEquals("Large-text oversized CODE first page should reject the next 15-line chunk.", 0, tallLargeTextPages.first().endInclusive)
         assertEquals("Large-text oversized CODE second page should start at the second 15-line chunk.", 1, tallLargeTextPages[1].start)
         assertEquals("Large-text oversized CODE second page should safely admit the 10-line tail.", 2, tallLargeTextPages[1].endInclusive)
-        assertEquals("Default split-tail CODE should safely co-admit two 17-line chunks.", 1, tallSplitTailPages.first().endInclusive)
+        assertEquals("Default split-tail CODE first page should keep only one 17-line chunk above the footer.", 0, tallSplitTailPages.first().endInclusive)
         assertEquals("Adjacent whole CODE first source block should split before the unsafe 19+17 geometry.", 1, tallAdjacentWholePages.first().endInclusive)
         assertEquals("Adjacent whole CODE should move the following 17-line block to the next page.", 2, tallAdjacentWholePages[1].start)
-        assertEquals("Mixed CODE and body first page should keep only two 17-line CODE chunks.", 1, tallMixedCodeAndBodyPages.first().endInclusive)
-        assertEquals("Mixed CODE and body should move the body-like tail to the next page.", 2, tallMixedCodeAndBodyPages[1].start)
+        assertEquals("Mixed CODE and body first page should keep only one 17-line CODE chunk above the footer.", 0, tallMixedCodeAndBodyPages.first().endInclusive)
+        assertEquals("Mixed CODE and body should move the second code chunk to the next page.", 1, tallMixedCodeAndBodyPages[1].start)
+        assertEquals("Mixed CODE and body second page should safely admit the body-like tail.", 2, tallMixedCodeAndBodyPages[1].endInclusive)
     }
 
     @Test
@@ -1204,6 +1223,36 @@ class ProgressSnapshotTest {
         assertTrue("Expected the quote to include text before the original page block.", selection.quotedText.contains("alpha"))
         assertTrue("Expected the quote to preserve the original later-page anchor.", selection.quotedText.contains("omega5"))
         assertTrue("Expected a multi-block selector to keep an end offset in the ending block.", selection.selector.textEndOffset > 0)
+    }
+
+    @Test
+    fun readerAnnotationSelectionStartPreservesEndAcrossManySourceBlocks() {
+        val sourceBlocks = (0..11).map { index ->
+            readerMarkdownBlock(
+                rawBlock = "sourceblock$index carries one compact sentence for cross page start selection.",
+                sourceBlockIndex = index,
+            )
+        }
+        val layout = splitOversizedReaderBlocks(blocks = sourceBlocks, maxBlockWeight = 40)
+        val laterBlock = layout.blocks.first { block -> block.sourceBlockIndex == 9 }
+        var selection = initialReaderAnnotationSelection(
+            paragraphIndex = 9,
+            block = laterBlock,
+            charOffset = 0,
+            annotation = null,
+            selectionBlocks = layout.blocks,
+        )
+
+        repeat(32) {
+            if (selection.canExpandStart) {
+                selection = selection.expandStart()
+            }
+        }
+
+        assertEquals(0, selection.selector.sourceBlockIndex)
+        assertEquals(9, selection.selector.endSourceBlockIndex)
+        assertTrue("Expected the quote to include the earliest source block.", selection.quotedText.contains("sourceblock0"))
+        assertTrue("Expected the quote to preserve the original ending block.", selection.quotedText.contains("sourceblock9"))
     }
 
     @Test

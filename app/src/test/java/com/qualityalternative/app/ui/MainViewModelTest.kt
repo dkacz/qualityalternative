@@ -1121,7 +1121,8 @@ class MainViewModelTest {
         val driveFolderUri = "content://com.google.android.apps.docs.storage/document/tree%3Aqa-annotations"
         val settingsRepository = FakeSettingsRepository(
             initial = completedSettings(selectedAppPackages = setOf("feed.one")).copy(
-                annotationDriveLastError = "Google Drive authorization was cancelled.",
+                annotationDriveLastError =
+                    "Authorization was cancelled or blocked by Google. No folder destination was changed.",
             ),
         )
         val annotationRepository = FakeReadingAnnotationRepository()

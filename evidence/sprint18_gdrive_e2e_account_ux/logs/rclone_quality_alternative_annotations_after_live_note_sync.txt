@@ -1,0 +1,2 @@
+quality-alternative-annotations.index.json\t2026-05-07 09:14:11\t280\tapplication/json
+quality-alternative-care-for-the-soul-first-care-for-the-soul-first.annotations.jsonld\t2026-05-07 09:14:13\t1718\tapplication/ld+json

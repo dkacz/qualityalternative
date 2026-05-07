@@ -1,0 +1,14 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<testsuites tests="4" failures="0" errors="0" skipped="0" time="53.161" timestamp="2026-05-07T08:40:36" hostname="localhost">
+  <testsuite name="com.qualityalternative.app.MainActivityTest" tests="4" failures="0" errors="0" skipped="0" time="52.538" timestamp="2026-05-07T08:40:36" hostname="localhost">
+    <properties>
+      <property name="device" value="qaApi36(AVD) - 16" />
+      <property name="flavor" value="" />
+      <property name="project" value=":app" />
+    </properties>
+    <testcase name="readerAnnotationStartCanMoveBackIntoPreviousSourceBlocks" classname="com.qualityalternative.app.MainActivityTest" time="6.109" />
+    <testcase name="crossPageAnnotationSelectionPersistsAcrossPagedSourceChunks" classname="com.qualityalternative.app.MainActivityTest" time="26.273" />
+    <testcase name="readerAnnotationControlsExpandAndReopenAcrossPages" classname="com.qualityalternative.app.MainActivityTest" time="16.544" />
+    <testcase name="annotationDriveSyncSettingsShowsConnectFailureConnectedAndRetryStates" classname="com.qualityalternative.app.MainActivityTest" time="3.612" />
+  </testsuite>
+</testsuites>

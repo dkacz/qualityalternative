@@ -97,14 +97,17 @@ import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
@@ -355,31 +358,9 @@ private fun MainRoute(
             viewModel.connectAnnotationDriveSync(token)
         }
     }
-    val annotationDriveFolderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
-        if (uri == null) {
-            viewModel.reportAnnotationDriveAuthorizationFailure("Google Drive folder was not selected.")
-            return@rememberLauncherForActivityResult
-        }
-        val metadata = context.documentMetadata(uri)
-        viewModel.connectAnnotationDriveFolderProvider(
-            uri = uri.toString(),
-            displayName = metadata.displayName,
-            persistWritePermission = { uriString ->
-                persistAnnotationExportPermission(context = context, uri = Uri.parse(uriString))
-            },
-        )
-    }
-    fun startGoogleDriveFolderProvider() {
-        viewModel.beginAnnotationDriveAuthorization()
-        annotationDriveFolderPicker.launch(null)
-    }
     val driveAuthorizationLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartIntentSenderForResult(),
     ) { result ->
-        if (result.resultCode == Activity.RESULT_CANCELED && result.data == null) {
-            startGoogleDriveFolderProvider()
-            return@rememberLauncherForActivityResult
-        }
         googleDriveAuthorizationMissingResultMessage(
             resultCode = result.resultCode,
             hasResultIntent = result.data != null,
@@ -390,11 +371,7 @@ private fun MainRoute(
         runCatching {
             driveAuthorizationClient.getAuthorizationResultFromIntent(result.data!!)
         }.onSuccess(::handleDriveAuthorizationResult).onFailure { error ->
-            if (error.googleDriveAuthMessage() == "Google Drive authorization was cancelled.") {
-                startGoogleDriveFolderProvider()
-            } else {
-                viewModel.reportAnnotationDriveAuthorizationFailure(error.googleDriveAuthMessage())
-            }
+            viewModel.reportAnnotationDriveAuthorizationFailure(error.googleDriveAuthMessage())
         }
     }
     val startGoogleDriveSyncAuthorization: (AnnotationDriveSyncMode) -> Unit = { mode ->
@@ -421,11 +398,7 @@ private fun MainRoute(
                 }
             }
             .addOnFailureListener { error ->
-                if (error.googleDriveAuthMessage() == "Google Drive authorization was cancelled.") {
-                    startGoogleDriveFolderProvider()
-                } else {
-                    viewModel.reportAnnotationDriveAuthorizationFailure(error.googleDriveAuthMessage())
-                }
+                viewModel.reportAnnotationDriveAuthorizationFailure(error.googleDriveAuthMessage())
             }
     }
     val disconnectGoogleDriveSync = {
@@ -952,7 +925,6 @@ private fun OnboardingWelcome(onNext: () -> Unit) {
             WelcomeValue("Return", "Back to your day.")
         }
         QaButton(text = "Begin", onClick = onNext, variant = QaButtonVariant.Primary, trailingIcon = QaIconKind.ArrowRight)
-        QaButton(text = "I have an account", onClick = {}, variant = QaButtonVariant.Ghost)
     }
 }
 
@@ -2075,6 +2047,30 @@ private fun ReaderScreen(
         )
     }
     val blocks = readerBlockLayout.blocks
+    val textMeasurer = rememberTextMeasurer()
+    val interfaceTextScale = LocalAppInterfaceTextScale.current
+        .coerceIn(MIN_INTERFACE_TEXT_SCALE, MAX_INTERFACE_TEXT_SCALE)
+        .toFloat()
+    val readerMeasureDensity = Density(
+        density = density.density,
+        fontScale = density.fontScale / interfaceTextScale,
+    )
+    val readerMeasureScale = effectiveReaderFontScale.toFloat()
+    val readerMeasureBaseStyle = MaterialTheme.typography.bodyLarge.copy(
+        fontFamily = QualityDisplayFontFamily,
+        fontSize = (READER_BODY_FONT_SIZE_DP * readerMeasureScale).sp,
+        lineHeight = (READER_BODY_LINE_HEIGHT_DP * readerMeasureScale).sp,
+    )
+    val measuredReaderContentWidthPx = with(density) {
+        (readerViewportWidthDp - READER_HORIZONTAL_PADDING_DP).coerceAtLeast(1f).dp.toPx().roundToInt()
+    }
+    val measuredReaderPageHeightPx = with(density) {
+        readerPageItemBudgetHeightDp(readerViewportHeightDp)
+            .coerceAtLeast(1f)
+            .dp
+            .toPx()
+            .roundToInt()
+    }
     val tableOfContents = remember(readerDocument, rawBlocks.size, readerBlockLayout) {
         readerDocument?.tableOfContents
             .orEmpty()
@@ -2085,8 +2081,22 @@ private fun ReaderScreen(
     }
     val readerStartParagraphIndex = state.currentReaderStartParagraphIndex
     val readerStartSelector = state.currentReaderStartSelector
-    val pages = remember(content.id, blocks, maxPageWeight, charsPerLine, blockGapLineCost, maxBlocksPerPage, effectiveReaderFontScale) {
-        readerPagesForBlocks(
+    val pages = remember(
+        content.id,
+        blocks,
+        maxPageWeight,
+        charsPerLine,
+        blockGapLineCost,
+        maxBlocksPerPage,
+        effectiveReaderFontScale,
+        measuredReaderContentWidthPx,
+        measuredReaderPageHeightPx,
+        readerMeasureBaseStyle,
+        readerMeasureScale,
+        readerMeasureDensity,
+        textMeasurer,
+    ) {
+        val fallbackPages = readerPagesForBlocks(
             blocks = blocks,
             maxPageWeight = maxPageWeight,
             charsPerLine = charsPerLine,
@@ -2094,6 +2104,25 @@ private fun ReaderScreen(
             maxBlocksPerPage = maxBlocksPerPage,
             readerFontScale = effectiveReaderFontScale,
         )
+        if (measuredReaderWidthDp <= 0f || measuredReaderHeightDp <= 0f) {
+            fallbackPages
+        } else {
+            readerPagesForMeasuredBlocks(
+                blocks = blocks,
+                blockHeightsPx = blocks.map { block ->
+                    measuredReaderBlockHeightPx(
+                        block = block,
+                        textMeasurer = textMeasurer,
+                        baseStyle = readerMeasureBaseStyle,
+                        scale = readerMeasureScale,
+                        contentWidthPx = measuredReaderContentWidthPx,
+                        density = density,
+                        textDensity = readerMeasureDensity,
+                    )
+                },
+                maxPageHeightPx = measuredReaderPageHeightPx,
+            )
+        }
     }
     val pageBoundarySignature = remember(pages) {
         readerPageBoundarySignature(pages)
@@ -2753,7 +2782,7 @@ private fun BoxScope.ReaderAnnotationEditorOverlay(
                             .fillMaxWidth()
                             .heightIn(min = if (isKeyboardConstrained) 34.dp else 44.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         DisplayText(
                             "Note",
@@ -2773,6 +2802,13 @@ private fun BoxScope.ReaderAnnotationEditorOverlay(
                             modifier = Modifier.testTag("reader-annotation-close-${selection.paragraphIndex}"),
                         )
                     }
+                    MonoText(
+                        text = selection.rangeSummaryText(),
+                        color = colors.mutedText,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.testTag("reader-annotation-range-summary-${selection.paragraphIndex}"),
+                    )
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -2787,7 +2823,9 @@ private fun BoxScope.ReaderAnnotationEditorOverlay(
                             text = selection.quotedText,
                             style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp, lineHeight = 18.sp),
                             color = colors.primaryText,
-                            modifier = Modifier.testTag("reader-annotation-selected-quote-${selection.paragraphIndex}"),
+                            modifier = Modifier
+                                .semantics { contentDescription = selection.quotedText }
+                                .testTag("reader-annotation-selected-quote-${selection.paragraphIndex}"),
                         )
                     }
                     QaMultilineTextField(
@@ -2844,9 +2882,9 @@ private fun ReaderAnnotationRangeControls(
     val colors = QualityAlternativeThemeTokens.colors
     Row(
         modifier = Modifier
-            .semantics { contentDescription = "Annotation range controls" }
+            .semantics { contentDescription = "Annotation range controls, ${selection.rangePositionText()}" }
             .testTag("reader-annotation-range-controls"),
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        horizontalArrangement = Arrangement.spacedBy(1.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         ReaderRangeIconButton(
@@ -2865,7 +2903,7 @@ private fun ReaderAnnotationRangeControls(
         )
         Box(
             modifier = Modifier
-                .height(12.dp)
+                .height(10.dp)
                 .width(1.dp)
                 .background(colors.line),
         )
@@ -2898,21 +2936,46 @@ private fun ReaderRangeIconButton(
     val contentColor = if (enabled) colors.primaryText else colors.faintText
     Box(
         modifier = modifier
-            .size(36.dp)
+            .size(28.dp)
             .alpha(if (enabled) 1f else 0.42f)
             .semantics { contentDescription = label }
             .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Surface(
-            modifier = Modifier.size(22.dp),
-            shape = RoundedCornerShape(6.dp),
+            modifier = Modifier.size(18.dp),
+            shape = RoundedCornerShape(5.dp),
             color = colors.background.copy(alpha = 0.42f),
             border = BorderStroke(1.dp, colors.line),
             contentColor = contentColor,
         ) {
-            QaIcon(kind = icon, color = contentColor, size = 11.dp)
+            QaIcon(kind = icon, color = contentColor, size = 9.dp)
         }
+    }
+}
+
+private fun readerMarkdownTextStyle(
+    kind: ReaderMarkdownBlockKind,
+    baseStyle: TextStyle,
+    scale: Float,
+): TextStyle {
+    return when (kind) {
+        ReaderMarkdownBlockKind.HEADING -> baseStyle.copy(
+            fontSize = (22f * scale).sp,
+            lineHeight = (29f * scale).sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+
+        ReaderMarkdownBlockKind.CODE -> baseStyle.copy(
+            fontFamily = QualityMonoFontFamily,
+            fontSize = (14f * scale).sp,
+            lineHeight = (READER_CODE_LINE_HEIGHT_DP * scale).sp,
+        )
+
+        ReaderMarkdownBlockKind.QUOTE -> baseStyle.copy(fontStyle = FontStyle.Italic)
+        ReaderMarkdownBlockKind.BODY,
+        ReaderMarkdownBlockKind.LIST,
+        -> baseStyle
     }
 }
 
@@ -2939,24 +3002,7 @@ private fun ReaderMarkdownBlockText(
         fontSize = (17f * scale).sp,
         lineHeight = (27f * scale).sp,
     )
-    val style = when (block.kind) {
-        ReaderMarkdownBlockKind.HEADING -> baseStyle.copy(
-            fontSize = (22f * scale).sp,
-            lineHeight = (29f * scale).sp,
-            fontWeight = FontWeight.SemiBold,
-        )
-
-        ReaderMarkdownBlockKind.CODE -> baseStyle.copy(
-            fontFamily = QualityMonoFontFamily,
-            fontSize = (14f * scale).sp,
-            lineHeight = (22f * scale).sp,
-        )
-
-        ReaderMarkdownBlockKind.QUOTE -> baseStyle.copy(fontStyle = FontStyle.Italic)
-        ReaderMarkdownBlockKind.BODY,
-        ReaderMarkdownBlockKind.LIST,
-        -> baseStyle
-    }
+    val style = readerMarkdownTextStyle(kind = block.kind, baseStyle = baseStyle, scale = scale)
     val textColor = when (block.kind) {
         ReaderMarkdownBlockKind.QUOTE -> colors.mutedText
         else -> colors.primaryText
@@ -4354,7 +4400,7 @@ private fun AnnotationAutosaveSettingsSection(
                     MonoText(
                         text = annotationDriveStatusText(state),
                         color = if (state.annotationDriveLastError == null) colors.mutedText else colors.accent,
-                        maxLines = 2,
+                        maxLines = if (state.annotationDriveLastError == null) 2 else 3,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier
                             .padding(top = 4.dp)
@@ -6179,6 +6225,37 @@ internal data class ReaderAnnotationSelection(
     val canExpandEnd: Boolean
         get() = endSentenceIndex < sentenceRanges.lastIndex
 
+    fun rangePositionText(): String {
+        val startRange = sentenceRanges[startSentenceIndex]
+        val endRange = sentenceRanges[endSentenceIndex]
+        val blockText = if (startRange.sourceBlockIndex == endRange.sourceBlockIndex) {
+            "block ${startRange.sourceBlockIndex + 1}"
+        } else {
+            "blocks ${startRange.sourceBlockIndex + 1}-${endRange.sourceBlockIndex + 1}"
+        }
+        return "$blockText, steps ${startSentenceIndex + 1}-${endSentenceIndex + 1} of ${sentenceRanges.size}"
+    }
+
+    fun rangeSummaryText(): String {
+        val summary = "Selection ${rangePositionText()}"
+        val startSnippet = rangeEndpointSnippet(startSentenceIndex)
+        val endSnippet = rangeEndpointSnippet(endSentenceIndex)
+        return if (startSentenceIndex == endSentenceIndex) {
+            "$summary | $startSnippet"
+        } else {
+            "$summary | Start: $startSnippet | End: $endSnippet"
+        }
+    }
+
+    private fun rangeEndpointSnippet(sentenceIndex: Int): String {
+        val range = sentenceRanges[sentenceIndex]
+        return sourceText
+            .substring(range.start, range.endExclusive)
+            .replace(Regex("\\s+"), " ")
+            .trim()
+            .take(56)
+    }
+
     fun expandStart(): ReaderAnnotationSelection {
         return if (canExpandStart) copy(startSentenceIndex = startSentenceIndex - 1) else this
     }
@@ -6507,13 +6584,85 @@ internal fun readerPagesForBlocks(
     return pages
 }
 
+internal fun readerPagesForMeasuredBlocks(
+    blocks: List<ReaderMarkdownBlock>,
+    blockHeightsPx: List<Int>,
+    maxPageHeightPx: Int,
+): List<ReaderPage> {
+    if (blocks.isEmpty()) {
+        return listOf(ReaderPage(start = 0, endInclusive = 0))
+    }
+    val safeMaxPageHeightPx = maxPageHeightPx.coerceAtLeast(1)
+    val pages = mutableListOf<ReaderPage>()
+    var pageStart = 0
+    var pageHeightPx = 0
+    var pageHasBodyBlock = false
+    blocks.forEachIndexed { index, block ->
+        val blockHeightPx = blockHeightsPx.getOrNull(index)?.coerceAtLeast(1) ?: 1
+        val startsReaderSection = block.kind == ReaderMarkdownBlockKind.HEADING && pageHasBodyBlock
+        if (index > pageStart && (startsReaderSection || pageHeightPx + blockHeightPx > safeMaxPageHeightPx)) {
+            pages += ReaderPage(start = pageStart, endInclusive = index - 1)
+            pageStart = index
+            pageHeightPx = 0
+            pageHasBodyBlock = false
+        }
+        pageHeightPx += blockHeightPx
+        if (block.kind != ReaderMarkdownBlockKind.HEADING) {
+            pageHasBodyBlock = true
+        }
+    }
+    pages += ReaderPage(start = pageStart, endInclusive = blocks.lastIndex)
+    return pages
+}
+
+private fun measuredReaderBlockHeightPx(
+    block: ReaderMarkdownBlock,
+    textMeasurer: TextMeasurer,
+    baseStyle: TextStyle,
+    scale: Float,
+    contentWidthPx: Int,
+    density: Density,
+    textDensity: Density,
+): Int {
+    val horizontalPaddingPx = with(density) {
+        if (block.kind == ReaderMarkdownBlockKind.CODE) 24.dp.toPx().roundToInt() else 0
+    }
+    val measuredTextWidthPx = (contentWidthPx - horizontalPaddingPx).coerceAtLeast(1)
+    val textLayout = textMeasurer.measure(
+        text = block.text,
+        style = readerMarkdownTextStyle(kind = block.kind, baseStyle = baseStyle, scale = scale),
+        constraints = Constraints(maxWidth = measuredTextWidthPx),
+        density = textDensity,
+    )
+    val innerVerticalPaddingPx = with(density) {
+        when (block.kind) {
+            ReaderMarkdownBlockKind.CODE -> 6.dp.toPx()
+            ReaderMarkdownBlockKind.HEADING -> READER_HEADING_TEXT_BOTTOM_PADDING_DP.dp.toPx()
+            ReaderMarkdownBlockKind.BODY,
+            ReaderMarkdownBlockKind.LIST,
+            ReaderMarkdownBlockKind.QUOTE,
+            -> READER_BODY_TEXT_BOTTOM_PADDING_DP.dp.toPx()
+        }
+    }
+    val measuredInterBlockSpacingPx = with(density) {
+        if (block.kind == ReaderMarkdownBlockKind.CODE) {
+            READER_CODE_MEASURED_BLOCK_SPACING_DP.dp.toPx()
+        } else {
+            READER_BLOCK_OUTER_BOTTOM_PADDING_DP.dp.toPx()
+        }
+    }
+    return (textLayout.size.height + innerVerticalPaddingPx + measuredInterBlockSpacingPx)
+        .roundToInt()
+        .coerceAtLeast(1)
+}
+
 internal fun adaptiveReaderPageWeight(
     viewportWidthDp: Float,
     viewportHeightDp: Float,
     readerFontScale: Double,
 ): Int {
     val safeFontScale = readerFontScale.coerceIn(MIN_READER_FONT_SCALE, MAX_READER_FONT_SCALE).toFloat()
-    val usableHeightDp = (viewportHeightDp - READER_VERTICAL_PADDING_DP).coerceAtLeast(180f)
+    val usableHeightDp = readerPageItemBudgetHeightDp(viewportHeightDp).coerceAtLeast(180f)
     val lineHeightDp = READER_BODY_LINE_HEIGHT_DP * safeFontScale
     val visibleLineCapacity = (usableHeightDp / lineHeightDp).coerceAtLeast(6f)
     val baseReserve = if (viewportHeightDp < READER_COMPACT_VIEWPORT_HEIGHT_DP) {
@@ -6534,6 +6683,10 @@ internal fun adaptiveReaderPageWeight(
     return floor(safeLineCapacity)
         .toInt()
         .coerceIn(READER_MIN_PAGE_WEIGHT, READER_MAX_PAGE_WEIGHT)
+}
+
+private fun readerPageItemBudgetHeightDp(viewportHeightDp: Float): Float {
+    return viewportHeightDp - READER_CONTENT_TOP_PADDING_DP - READER_VISIBLE_BOTTOM_CLEARANCE_DP
 }
 
 internal data class AdaptiveReaderPageFit(
@@ -6584,7 +6737,7 @@ internal fun adaptiveReaderMaxBlocksPerPage(
     readerFontScale: Double,
 ): Int {
     val safeFontScale = readerFontScale.coerceIn(MIN_READER_FONT_SCALE, MAX_READER_FONT_SCALE).toFloat()
-    val usableHeightDp = (viewportHeightDp - READER_VERTICAL_PADDING_DP).coerceAtLeast(180f)
+    val usableHeightDp = readerPageItemBudgetHeightDp(viewportHeightDp).coerceAtLeast(180f)
     val shortestRenderedBodyBlockDp =
         (READER_BODY_LINE_HEIGHT_DP * safeFontScale) +
             READER_BODY_TEXT_BOTTOM_PADDING_DP +
@@ -7600,7 +7753,7 @@ internal fun googleDriveAuthorizationMissingResultMessage(resultCode: Int, hasRe
         return null
     }
     return if (resultCode == Activity.RESULT_CANCELED) {
-        "Google Drive authorization was cancelled."
+        "Authorization was cancelled or blocked by Google. No folder destination was changed."
     } else {
         "Google Drive authorization returned no result. Retry Google Drive connection."
     }
@@ -7610,7 +7763,7 @@ internal fun Throwable.googleDriveAuthMessage(): String {
     val apiException = this as? ApiException
     if (apiException != null) {
         return when (apiException.statusCode) {
-            CommonStatusCodes.CANCELED -> "Google Drive authorization was cancelled."
+            CommonStatusCodes.CANCELED -> "Authorization was cancelled or blocked by Google. No folder destination was changed."
             CommonStatusCodes.NETWORK_ERROR,
             CommonStatusCodes.TIMEOUT -> "Google Drive authorization could not reach Google services. Check connection and retry."
             CommonStatusCodes.SIGN_IN_REQUIRED -> "Choose a Google account to connect Google Drive."
@@ -7894,22 +8047,24 @@ private const val READER_BODY_TEXT_BOTTOM_PADDING_DP = 7f
 private const val READER_HEADING_TEXT_BOTTOM_PADDING_DP = 10f
 private const val READER_CODE_DEFAULT_TEXT_FIXED_VERTICAL_PADDING_DP = 10f
 private const val READER_CODE_LARGE_TEXT_FIXED_VERTICAL_PADDING_DP = 5f
-private const val READER_CODE_ONE_LINE_VISUAL_LINE_COST_FACTOR = 0.75f
-private const val READER_CODE_TWO_LINE_VISUAL_LINE_COST_FACTOR = 0.94f
-private const val READER_CODE_THREE_TO_FOUR_LINE_VISUAL_LINE_COST_FACTOR = 0.95f
-private const val READER_CODE_FIVE_TO_SIX_LINE_VISUAL_LINE_COST_FACTOR = 0.98f
-private const val READER_CODE_SEVEN_LINE_VISUAL_LINE_COST_FACTOR = 1.02f
-private const val READER_CODE_EIGHT_LINE_VISUAL_LINE_COST_FACTOR = 0.95f
-private const val READER_CODE_NINE_LINE_VISUAL_LINE_COST_FACTOR = 1.02f
-private const val READER_CODE_TEN_TO_ELEVEN_LINE_VISUAL_LINE_COST_FACTOR = 0.95f
+private const val READER_CODE_ONE_LINE_VISUAL_LINE_COST_FACTOR = 1.0f
+private const val READER_CODE_TWO_LINE_VISUAL_LINE_COST_FACTOR = 1.0f
+private const val READER_CODE_THREE_TO_FOUR_LINE_VISUAL_LINE_COST_FACTOR = 1.0f
+private const val READER_CODE_FIVE_TO_SIX_LINE_VISUAL_LINE_COST_FACTOR = 1.0f
+private const val READER_CODE_SEVEN_LINE_VISUAL_LINE_COST_FACTOR = 1.0f
+private const val READER_CODE_EIGHT_LINE_VISUAL_LINE_COST_FACTOR = 1.0f
+private const val READER_CODE_NINE_LINE_VISUAL_LINE_COST_FACTOR = 1.0f
+private const val READER_CODE_TEN_TO_ELEVEN_LINE_VISUAL_LINE_COST_FACTOR = 1.0f
 private const val READER_CODE_LONG_MULTI_LINE_VISUAL_LINE_COST_FACTOR = 1.06f
-private const val READER_CODE_LARGE_TEXT_MULTI_LINE_VISUAL_LINE_COST_FACTOR = 0.99f
+private const val READER_CODE_LARGE_TEXT_MULTI_LINE_VISUAL_LINE_COST_FACTOR = 1.0f
 private const val READER_CODE_LONG_MULTI_LINE_COST_THRESHOLD = 12.0
 private const val READER_CODE_WHOLE_BLOCK_SPLIT_ALLOWANCE_FACTOR = 2f
 private const val READER_CODE_SPLIT_SAFETY_LINES = 3
 private const val READER_CODE_SHORT_LINE_WRAP_ALLOWANCE = 1
-private const val READER_DEFAULT_TEXT_FILL_ALLOWANCE_LINES = 4.2f
+private const val READER_DEFAULT_TEXT_FILL_ALLOWANCE_LINES = 0.75f
 private const val READER_BLOCK_OUTER_BOTTOM_PADDING_DP = 6f
+private const val READER_CODE_MEASURED_BLOCK_SPACING_DP = 6f
+private const val READER_VISIBLE_BOTTOM_CLEARANCE_DP = 14f
 private const val READER_PAGE_SAFETY_RESERVE_LINES = 0.35f
 private const val READER_COMPACT_PAGE_SAFETY_RESERVE_LINES = 1.1f
 private const val READER_LARGE_FONT_SAFETY_LINES = 0.4f

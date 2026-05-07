@@ -130,6 +130,15 @@ class MainActivityTest {
     }
 
     @Test
+    fun onboardingWelcomeDoesNotShowAccountShortcutWithoutAccountFlow() {
+        launchApp()
+
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasNodeContaining("Turn an impulse") }
+        composeRule.onNodeWithText("Begin").assertIsDisplayed().assertIsEnabled()
+        assertFalse(hasNode("I have an account"))
+    }
+
+    @Test
     fun systemInterceptionIntentShowsLiveInterventionForFixtureTarget() {
         seedFixtureSelection()
         relaunchFixtureSystemIntervention()
@@ -919,7 +928,7 @@ class MainActivityTest {
             val tallDefaultSummary = readerPageFitSummary()
             tallDefaultWeight = readerPageFitWeight(tallDefaultSummary)
             val tallDefaultBlocks = readerPageFitBlocks(tallDefaultSummary)
-            assertTrue("Tall phone default text should use the available reader area without clipping. summary=$tallDefaultSummary", tallDefaultBlocks >= 9)
+            assertTrue("Tall phone default text should use the footer-safe reader area without clipping. summary=$tallDefaultSummary", tallDefaultBlocks >= 8)
             assertTrue("Tall phone default text should obey rendered block cap. summary=$tallDefaultSummary", tallDefaultBlocks <= readerPageFitMaxBlocks(tallDefaultSummary))
             assertReaderVisibleContentStaysAboveFooter(
                 context = "tall phone default",
@@ -936,7 +945,7 @@ class MainActivityTest {
             }
             composeRule.waitUntil(timeoutMillis = 10_000) {
                 hasTag("reader-screen") &&
-                    readerPageFitSummary().contains("blocks-9") &&
+                    readerPageFitBlocks(readerPageFitSummary()) >= 8 &&
                     visibleReaderParagraphIndices().contains(9)
             }
             assertTrue(
@@ -981,8 +990,8 @@ class MainActivityTest {
                     readerPageFitWeight(readerPageFitSummary()) > 0
             }
             val codeDefaultSummary = readerPageFitSummary()
-            assertTrue("Default code blocks should use the available tall-phone area. summary=$codeDefaultSummary", readerPageFitBlocks(codeDefaultSummary) >= 26)
-            assertTrue("Default code blocks should stay footer-safe after rendered code-cost admission. summary=$codeDefaultSummary", readerPageFitBlocks(codeDefaultSummary) <= 26)
+            assertTrue("Default code blocks should use the measured footer-safe tall-phone area. summary=$codeDefaultSummary", readerPageFitBlocks(codeDefaultSummary) >= 20)
+            assertTrue("Default code blocks should stay footer-safe after measured code admission. summary=$codeDefaultSummary", readerPageFitBlocks(codeDefaultSummary) <= 32)
             assertReaderVisibleContentStaysAboveFooter(
                 context = "tall phone code default",
                 expectAnotherBlock = readerPageFitPages(codeDefaultSummary) > 1,
@@ -999,8 +1008,8 @@ class MainActivityTest {
                     readerPageFitWeight(readerPageFitSummary()).let { weight -> weight in 1 until tallDefaultWeight }
             }
             val codeLargeTextSummary = readerPageFitSummary()
-            assertTrue("Large-text code blocks should use the available tall-phone area. summary=$codeLargeTextSummary", readerPageFitBlocks(codeLargeTextSummary) >= 22)
-            assertTrue("Large-text code blocks should stay footer-safe after rendered code-cost admission. summary=$codeLargeTextSummary", readerPageFitBlocks(codeLargeTextSummary) <= 22)
+            assertTrue("Large-text code blocks should use the footer-safe tall-phone area. summary=$codeLargeTextSummary", readerPageFitBlocks(codeLargeTextSummary) >= 18)
+            assertTrue("Large-text code blocks should stay footer-safe after measured code admission. summary=$codeLargeTextSummary", readerPageFitBlocks(codeLargeTextSummary) <= 21)
             assertReaderVisibleContentStaysAboveFooter(
                 context = "tall phone code large text",
                 expectAnotherBlock = readerPageFitPages(codeLargeTextSummary) > 1,
@@ -1029,7 +1038,7 @@ class MainActivityTest {
                 readerPageFitBlocks(multiLineCodeDefaultSummary) <= 4,
             )
             assertTrue(
-                "Default multi-line code blocks should use the available tall-phone area. summary=$multiLineCodeDefaultSummary",
+                "Default multi-line code blocks should use the footer-safe tall-phone area. summary=$multiLineCodeDefaultSummary",
                 readerPageFitBlocks(multiLineCodeDefaultSummary) >= 4,
             )
             assertReaderVisibleContentStaysAboveFooter(
@@ -1080,14 +1089,14 @@ class MainActivityTest {
             }
             val shortMultiLineCodeDefaultSummary = readerPageFitSummary()
             assertTrue(
-                "Default short multi-line code should admit the rendered-safe 15-block page. " +
+                    "Default short multi-line code should admit the measured footer-safe 14-block page. " +
                     "summary=$shortMultiLineCodeDefaultSummary",
-                readerPageFitBlocks(shortMultiLineCodeDefaultSummary) >= 15,
+                readerPageFitBlocks(shortMultiLineCodeDefaultSummary) >= 14,
             )
             assertTrue(
                 "Default short multi-line code should still reject the next block. " +
                     "summary=$shortMultiLineCodeDefaultSummary",
-                readerPageFitBlocks(shortMultiLineCodeDefaultSummary) <= 15,
+                readerPageFitBlocks(shortMultiLineCodeDefaultSummary) <= 14,
             )
             assertReaderVisibleContentStaysAboveFooter(
                 context = "tall phone short multiline code default",
@@ -1113,7 +1122,7 @@ class MainActivityTest {
             }
             val threeLineCodeDefaultSummary = readerPageFitSummary()
             assertTrue(
-                "Default three-line code should admit the rendered-safe 10-block page. " +
+                    "Default three-line code should admit the measured footer-safe 10-block page. " +
                     "summary=$threeLineCodeDefaultSummary",
                 readerPageFitBlocks(threeLineCodeDefaultSummary) >= 10,
             )
@@ -1190,7 +1199,7 @@ class MainActivityTest {
                 readerPageFitBlocks(oversizedShortLineCodeDefaultSummary) <= 2,
             )
             assertTrue(
-                "Default split-tail short-line code should use the available tall-phone area. summary=$oversizedShortLineCodeDefaultSummary",
+                "Default split-tail short-line code should use the footer-safe tall-phone area. summary=$oversizedShortLineCodeDefaultSummary",
                 readerPageFitBlocks(oversizedShortLineCodeDefaultSummary) >= 2,
             )
             assertTrue(
@@ -1306,12 +1315,12 @@ class MainActivityTest {
             }
             val mixedShortLineCodeAndBodySummary = readerPageFitSummary()
             assertTrue(
-                "Mixed code/body page should keep only the two 17-line code chunks. " +
+                "Mixed code/body page should keep only the measured footer-safe first two chunks. " +
                     "summary=$mixedShortLineCodeAndBodySummary",
                 readerPageFitBlocks(mixedShortLineCodeAndBodySummary) <= 2,
             )
             assertTrue(
-                "Mixed code/body page should still use the available tall-phone area. " +
+                "Mixed code/body page should still use the footer-safe tall-phone area. " +
                     "summary=$mixedShortLineCodeAndBodySummary",
                 readerPageFitBlocks(mixedShortLineCodeAndBodySummary) >= 2,
             )
@@ -1711,8 +1720,10 @@ class MainActivityTest {
         composeRule.waitForIdle()
 
         val expandedQuote = readerSelectedQuoteText(9)
+        val expandedSummary = readerRangeSummaryText(9)
         assertTrue(
-            "Expected start range control to move into earlier source blocks. quote=$expandedQuote",
+            "Expected start range control to move into earlier source blocks. " +
+                "quote=$expandedQuote summary=$expandedSummary",
             expandedQuote.contains("sourceblock0") && expandedQuote.contains("sourceblock9"),
         )
         composeRule.onNodeWithTag("reader-annotation-start-earlier").assertIsNotEnabled()
@@ -2132,22 +2143,21 @@ class MainActivityTest {
         }
         captureSprint17DriveAuthScreenshot("02_drive_connecting_light")
 
+        val cancelledAuthorizationMessage =
+            "Authorization was cancelled or blocked by Google. No folder destination was changed."
         scenario?.onActivity { activity ->
-            activity.mainViewModel.reportAnnotationDriveAuthorizationFailure(
-                "Google Drive authorization returned no result. Retry Google Drive connection.",
-            )
+            activity.mainViewModel.reportAnnotationDriveAuthorizationFailure(cancelledAuthorizationMessage)
         }
         composeRule.waitUntil(timeoutMillis = 10_000) {
             var hasFailure = false
             scenario?.onActivity { activity ->
-                hasFailure = activity.mainViewModel.uiState.annotationDriveLastError ==
-                    "Google Drive authorization returned no result. Retry Google Drive connection."
+                hasFailure = activity.mainViewModel.uiState.annotationDriveLastError == cancelledAuthorizationMessage
             }
             hasFailure
         }
         composeRule.onNodeWithTag("settings-list")
             .performScrollToNode(hasTestTag("settings-annotation-drive-status"))
-        composeRule.onNodeWithText("AUTHORIZATION RETURNED NO RESULT", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("CANCELLED OR BLOCKED", substring = true).assertIsDisplayed()
         composeRule.onNodeWithTag("settings-annotation-drive-connect").assertIsEnabled()
         scenario?.onActivity { activity -> activity.mainViewModel.dismissMessage() }
         composeRule.waitForIdle()
@@ -2810,13 +2820,20 @@ class MainActivityTest {
             .boundsInRoot
             .bottom
         val contentBoundaryBottom = minOf(footerLabelTop, viewportBottom)
+        val bottomGuardPx = InstrumentationRegistry.getInstrumentation()
+            .targetContext
+            .resources
+            .displayMetrics
+            .density * 10f
+        val safeContentBoundaryBottom = contentBoundaryBottom - bottomGuardPx
         assertTrue(
-            "Reader content should not cross the viewport/footer boundary for $context. " +
-                "blockBottom=$blockBottom viewportBottom=$viewportBottom footerLabelTop=$footerLabelTop",
-            blockBottom <= contentBoundaryBottom,
+            "Reader content should keep a visible bottom-line guard above the viewport/footer boundary for $context. " +
+                "blockBottom=$blockBottom safeBoundary=$safeContentBoundaryBottom " +
+                "viewportBottom=$viewportBottom footerLabelTop=$footerLabelTop",
+            blockBottom <= safeContentBoundaryBottom,
         )
         val blockHeight = renderedNode.boundsInRoot.bottom - renderedNode.boundsInRoot.top
-        val residualSpace = contentBoundaryBottom - blockBottom
+        val residualSpace = safeContentBoundaryBottom - blockBottom
         if (expectAnotherBlock) {
             val nextBlockIndex = lastVisibleParagraph + 1
             advanceReaderPage()
@@ -2835,7 +2852,7 @@ class MainActivityTest {
             assertTrue(
                 "Reader page should not leave enough residual space for the actual next block for $context. " +
                     "residual=$residualSpace currentRenderedBlockHeight=$blockHeight nextFullBlockHeight=$nextBlockHeight",
-                residualSpace < nextBlockHeight,
+                residualSpace < nextBlockHeight + bottomGuardPx,
             )
         }
     }
@@ -2913,7 +2930,17 @@ class MainActivityTest {
     }
 
     private fun readerSelectedQuoteText(paragraphIndex: Int): String {
-        return composeRule.onNodeWithTag("reader-annotation-selected-quote-$paragraphIndex")
+        val config = composeRule.onNodeWithTag("reader-annotation-selected-quote-$paragraphIndex")
+            .fetchSemanticsNode()
+            .config
+        return runCatching { config[SemanticsProperties.ContentDescription] }.getOrNull()
+            ?.joinToString(separator = "\n")
+            ?: config[SemanticsProperties.Text]
+            .joinToString(separator = "\n") { text -> text.text }
+    }
+
+    private fun readerRangeSummaryText(paragraphIndex: Int): String {
+        return composeRule.onNodeWithTag("reader-annotation-range-summary-$paragraphIndex")
             .fetchSemanticsNode()
             .config[SemanticsProperties.Text]
             .joinToString(separator = "\n") { text -> text.text }

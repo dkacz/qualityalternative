@@ -21,7 +21,7 @@ class GoogleDriveAuthorizationUiTest {
     @Test
     fun authorizationResultWithoutIntentDistinguishesCancelFromTechnicalFailure() {
         assertEquals(
-            "Google Drive authorization was cancelled.",
+            "Authorization was cancelled or blocked by Google. No folder destination was changed.",
             googleDriveAuthorizationMissingResultMessage(
                 resultCode = 0,
                 hasResultIntent = false,
@@ -38,6 +38,10 @@ class GoogleDriveAuthorizationUiTest {
 
     @Test
     fun apiExceptionMessagesDistinguishConfigurationAndServiceFailures() {
+        assertEquals(
+            "Authorization was cancelled or blocked by Google. No folder destination was changed.",
+            ApiException(Status(CommonStatusCodes.CANCELED)).googleDriveAuthMessage(),
+        )
         assertEquals(
             "Google Drive authorization is not configured for this app build.",
             ApiException(Status(CommonStatusCodes.DEVELOPER_ERROR, "bad client")).googleDriveAuthMessage(),
