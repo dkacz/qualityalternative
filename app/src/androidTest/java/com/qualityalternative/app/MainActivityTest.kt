@@ -1539,6 +1539,16 @@ class MainActivityTest {
         composeRule.onNodeWithTag("reader-annotation-selected-quote-$annotationParagraph").assertIsDisplayed()
         val initialSelectedQuote = readerSelectedQuoteText(annotationParagraph)
         composeRule.onNodeWithText("End later").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("Move end later")
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag("reader-annotation-end-later")
+            .assertIsDisplayed()
+            .assertIsEnabled()
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            readerSelectedQuoteText(annotationParagraph).length > initialSelectedQuote.length
+        }
+        val expandedSelectedQuote = readerSelectedQuoteText(annotationParagraph)
         composeRule.onNodeWithContentDescription("Move end earlier")
             .assertIsDisplayed()
         composeRule.onNodeWithTag("reader-annotation-end-earlier")
@@ -1546,7 +1556,7 @@ class MainActivityTest {
             .assertIsEnabled()
             .performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) {
-            readerSelectedQuoteText(annotationParagraph).length < initialSelectedQuote.length
+            readerSelectedQuoteText(annotationParagraph).length < expandedSelectedQuote.length
         }
         val refinedSelectedQuote = readerSelectedQuoteText(annotationParagraph)
         val refinedQuoteProbe = refinedSelectedQuote.take(40)
