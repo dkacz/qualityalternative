@@ -1,0 +1,1 @@
+fc139465669db35f7a8c4744a54b4fe637381236f00708c36b7754583e1c7e71  release_artifacts/quality-alternative-v0.11.4-intervention-mode-settings-alpha-debug.apk
