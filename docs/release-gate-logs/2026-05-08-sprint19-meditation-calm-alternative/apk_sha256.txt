@@ -1,0 +1,1 @@
+eda076a3fbf5a5d8f7efc40bcbb85f5b2d54d1a87d9225fe937fff64789ac891  release_artifacts/quality-alternative-v0.11.5-meditation-calm-alternative-alpha-debug.apk
