@@ -1,6 +1,6 @@
 # Sprint 19 - Reader Regression, Form Intervention, And AI Notes
 
-Status: `session_progress_hotfix_release_ready`
+Status: `intervention_mode_settings_fixed`
 
 Requested on: 2026-05-07
 
@@ -49,6 +49,7 @@ Mapped PRD items: FR6, FR7, FR8, FR8A, FR13, NFR privacy, NFR reliability, NFR c
 - 2026-05-08: GPT Pro R3 hotfix review returned `8/10 FAIL`; R4 moves completion-downgrade protection to the repository write boundary and adds a delayed unfinished-save/in-flight completion regression test.
 - 2026-05-08: GPT Pro R4 hotfix review returned `10/10 PASS` with `VISUAL REVIEW: PASS`; release packaging may proceed.
 - 2026-05-08: Release candidate `v0.11.3-session-progress-meditation-alpha` passed targeted unit validation, debug/APK build, connected session-progress E2E, connected meditation-backup E2E, signature verification, emulator install smoke, and launch smoke.
+- 2026-05-08: A tester found Settings Mode was hard-coded to show Soft while behavior was Firm. Slice 19.5B adds a persisted Soft/Firm mode selector: Soft makes Open anyway immediate, Firm keeps the 5-second form-intervention pause. Visual E2E evidence covers both behaviors.
 - AI implementation remains blocked until the regression-fix APK and the emergency session-progress hotfix are reviewed and released.
 
 ## Slice Plan
@@ -169,6 +170,23 @@ Acceptance:
 - The durable reading-progress row is refreshed on lifecycle stop/pause/disposal even when the UI page did not visibly change.
 - Recommendation backups include the meditation reset when reading dominates the ranked list and meditation is otherwise eligible.
 - GPT Pro hotfix review returns `SCORE: 10/10`, `VERDICT: PASS`, and `VISUAL REVIEW: PASS`.
+
+### Slice 19.5B: Intervention Mode Settings Fix
+
+Deliverables:
+
+- Replace the static Settings Mode rows with a real persisted `Soft`/`Firm` intervention mode.
+- Keep the current released behavior as `Firm`: Open anyway becomes available after the 5-second form-intervention wait.
+- Make `Soft` mode immediate: Open anyway is enabled as soon as the intervention appears.
+- Include the mode in Portable Profile export/import without breaking older profiles that do not yet contain the field.
+- Add unit coverage for persistence and behavior, plus connected visual E2E coverage for Settings selection, Soft behavior, and Firm behavior.
+
+Acceptance:
+
+- Settings no longer always shows Soft as selected.
+- Tapping Soft persists `SOFT` and removes the Open anyway countdown.
+- Tapping Firm persists `FIRM` and restores the 5-second countdown.
+- GPT Pro review must pass before this fix is included in a release APK.
 
 ## AI Note Feature - Second Part Of Sprint 19
 

@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import com.qualityalternative.app.domain.model.AppThemeMode
 import com.qualityalternative.app.domain.model.ContentPriority
 import com.qualityalternative.app.domain.model.DurationBucket
+import com.qualityalternative.app.domain.model.InterventionMode
 import com.qualityalternative.app.domain.model.OnboardingSelection
 import com.qualityalternative.app.domain.model.TopicTag
 import java.io.File
@@ -67,6 +68,29 @@ class PreferencesSettingsRepositoryTest {
         assertTrue(restored.hasCompletedOnboarding)
         assertEquals(selection.selectedAppPackages, restored.selectedAppPackages)
         assertEquals(AppThemeMode.DARK, restored.themeMode)
+    }
+
+    @Test
+    fun saveInterventionMode_persistsWithoutResettingOnboarding() = runBlocking {
+        val repository = PreferencesSettingsRepository(
+            dataStore = testDataStore(),
+            supportedApps = SupportedCatalog.distractingApps,
+        )
+        val selection = OnboardingSelection(
+            selectedAppPackages = SupportedCatalog.distractingApps.take(3).mapTo(mutableSetOf()) { it.packageName },
+            preferredTopics = setOf(TopicTag.PHILOSOPHY, TopicTag.SCIENCE, TopicTag.HISTORY),
+            preferredDurationBucket = DurationBucket.DEEP,
+            selectedPackIds = setOf("science"),
+        )
+
+        repository.saveOnboardingSelection(selection)
+        assertEquals(InterventionMode.FIRM, repository.observeAppSettings().first().interventionMode)
+        repository.saveInterventionMode(InterventionMode.SOFT)
+
+        val restored = repository.observeAppSettings().first()
+        assertTrue(restored.hasCompletedOnboarding)
+        assertEquals(selection.selectedAppPackages, restored.selectedAppPackages)
+        assertEquals(InterventionMode.SOFT, restored.interventionMode)
     }
 
     @Test

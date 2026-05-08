@@ -8,6 +8,8 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasContentDescription
@@ -38,6 +40,7 @@ import com.qualityalternative.app.domain.model.ContentItem
 import com.qualityalternative.app.domain.model.DEFAULT_READER_FONT_SCALE
 import com.qualityalternative.app.domain.model.DurationBucket
 import com.qualityalternative.app.domain.model.AnalyticsEventType
+import com.qualityalternative.app.domain.model.InterventionMode
 import com.qualityalternative.app.domain.model.MEDITATION_TIMER_CONTENT_ID
 import com.qualityalternative.app.domain.model.OnboardingSelection
 import com.qualityalternative.app.domain.model.ReadingAnnotationDraft
@@ -490,6 +493,52 @@ class MainActivityTest {
 
         composeRule.onNodeWithText("Dark")
             .assertIsDisplayed()
+    }
+
+    @Test
+    fun interventionModeSettingControlsOpenAnywayFriction() {
+        seedFixtureSelection()
+        launchApp()
+        waitForHome()
+
+        scenario?.onActivity { activity -> activity.mainViewModel.openSettings() }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("settings-list") }
+        composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasTestTag("intervention-mode-FIRM"))
+        composeRule.onNodeWithTag("intervention-mode-FIRM")
+            .assertIsDisplayed()
+            .assertIsSelected()
+        composeRule.onNodeWithTag("intervention-mode-SOFT")
+            .assertIsDisplayed()
+            .assertIsNotSelected()
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { currentInterventionMode() == InterventionMode.SOFT }
+        composeRule.onNodeWithTag("intervention-mode-SOFT")
+            .assertIsSelected()
+        captureSprint19RegressionScreenshot("13_intervention_mode_soft_selected")
+
+        scenario?.onActivity { activity -> activity.mainViewModel.triggerDebugIntervention(nowMillis = System.currentTimeMillis()) }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasNode("You reached for Fixture Feed One") }
+        composeRule.onNodeWithTag("form-intervention-unlock-wait")
+            .assertDoesNotExist()
+        composeRule.onNodeWithText("Open Fixture Feed One")
+            .assertIsDisplayed()
+            .assertIsEnabled()
+        captureSprint19RegressionScreenshot("14_soft_mode_open_anyway_immediate")
+
+        scenario?.onActivity {
+            it.mainViewModel.openSettings()
+            it.mainViewModel.selectInterventionMode(InterventionMode.FIRM)
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) { currentInterventionMode() == InterventionMode.FIRM }
+        scenario?.onActivity { activity -> activity.mainViewModel.triggerDebugIntervention(nowMillis = System.currentTimeMillis()) }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasNode("You reached for Fixture Feed One") }
+        composeRule.onNodeWithTag("form-intervention-unlock-wait")
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("Open in", substring = true)
+            .assertIsDisplayed()
+            .assertIsNotEnabled()
+        captureSprint19RegressionScreenshot("15_firm_mode_open_anyway_wait")
     }
 
     @Test
@@ -3234,6 +3283,14 @@ class MainActivityTest {
             scale = activity.mainViewModel.uiState.interfaceTextScale
         }
         return scale
+    }
+
+    private fun currentInterventionMode(): InterventionMode? {
+        var mode: InterventionMode? = null
+        scenario?.onActivity { activity ->
+            mode = activity.mainViewModel.uiState.interventionMode
+        }
+        return mode
     }
 
     private fun exportAccountLightProfileJsonFromViewModel(): String {

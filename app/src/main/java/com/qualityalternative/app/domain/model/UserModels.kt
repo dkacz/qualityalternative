@@ -29,6 +29,13 @@ const val DEFAULT_INTERFACE_TEXT_SCALE = 1.0
 const val MIN_INTERFACE_TEXT_SCALE = 0.90
 const val MAX_INTERFACE_TEXT_SCALE = 1.30
 
+enum class InterventionMode {
+    SOFT,
+    FIRM,
+}
+
+val DEFAULT_INTERVENTION_MODE = InterventionMode.FIRM
+
 enum class AppThemeMode {
     LIGHT,
     DARK,
@@ -48,6 +55,7 @@ data class AppSettings(
     val preferredTopics: Set<TopicTag>,
     val preferredDurationBucket: DurationBucket,
     val selectedPackIds: Set<String>,
+    val interventionMode: InterventionMode = DEFAULT_INTERVENTION_MODE,
     val themeMode: AppThemeMode = AppThemeMode.LIGHT,
     val meditationDurationMinutes: Int = DEFAULT_MEDITATION_MINUTES,
     val contentPriority: ContentPriority = ContentPriority.BALANCED,

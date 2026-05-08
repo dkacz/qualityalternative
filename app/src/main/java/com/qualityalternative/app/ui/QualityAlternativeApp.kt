@@ -134,6 +134,7 @@ import com.qualityalternative.app.domain.model.DelayWindow
 import com.qualityalternative.app.domain.model.DistractingApp
 import com.qualityalternative.app.domain.model.DurationBucket
 import com.qualityalternative.app.domain.model.EditorialPack
+import com.qualityalternative.app.domain.model.InterventionMode
 import com.qualityalternative.app.domain.model.DEFAULT_INTERFACE_TEXT_SCALE
 import com.qualityalternative.app.domain.model.DEFAULT_READER_FONT_SCALE
 import com.qualityalternative.app.domain.model.MEDITATION_TIMER_CONTENT_ID
@@ -581,6 +582,7 @@ private fun MainRoute(
                 onSelectInterfaceTextScale = viewModel::setInterfaceTextScale,
                 onSelectContentPriority = viewModel::setContentPriority,
                 onSelectOpenAnywayUnlock = viewModel::setOpenAnywayUnlockMinutes,
+                onSelectInterventionMode = viewModel::selectInterventionMode,
                 onSelectTheme = viewModel::selectThemeMode,
                 onRefreshReadiness = viewModel::refreshPermissionReadiness,
                 onSelectAnnotationExport = onSelectAnnotationExport,
@@ -3694,6 +3696,7 @@ private fun SettingsTab(
     onSelectInterfaceTextScale: (Double) -> Unit,
     onSelectContentPriority: (ContentPriority) -> Unit,
     onSelectOpenAnywayUnlock: (Int) -> Unit,
+    onSelectInterventionMode: (InterventionMode) -> Unit,
     onSelectTheme: (AppThemeMode) -> Unit,
     onRefreshReadiness: () -> Unit,
     onSelectAnnotationExport: () -> Unit,
@@ -3965,9 +3968,21 @@ private fun SettingsTab(
         item {
             SectionLabel("Mode")
             QaCard(padding = 0.dp) {
-                ModeRow("Soft intervention", "Offer an alternative. You always have an override.", selected = true)
+                ModeRow(
+                    title = "Soft intervention",
+                    desc = "Offer an alternative. Open anyway is immediate.",
+                    selected = state.interventionMode == InterventionMode.SOFT,
+                    onClick = { onSelectInterventionMode(InterventionMode.SOFT) },
+                    modifier = Modifier.testTag("intervention-mode-SOFT"),
+                )
                 HorizontalDivider(color = colors.line)
-                ModeRow("Firm intervention", "Add a small friction step before opening anyway.", selected = false)
+                ModeRow(
+                    title = "Firm intervention",
+                    desc = "Add a five-second pause before opening anyway.",
+                    selected = state.interventionMode == InterventionMode.FIRM,
+                    onClick = { onSelectInterventionMode(InterventionMode.FIRM) },
+                    modifier = Modifier.testTag("intervention-mode-FIRM"),
+                )
             }
         }
         item {
@@ -5388,10 +5403,18 @@ private fun PermissionRow(name: String, desc: String, granted: Boolean, onClick:
 }
 
 @Composable
-private fun ModeRow(title: String, desc: String, selected: Boolean) {
+private fun ModeRow(
+    title: String,
+    desc: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .semantics { this.selected = selected }
             .padding(horizontal = 18.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp),

@@ -1,0 +1,830 @@
+diff --git a/PRD.md b/PRD.md
+index 73ac86f..28a184f 100644
+--- a/PRD.md
++++ b/PRD.md
+@@ -284,8 +284,9 @@ The intervention must provide three clear actions that map to the MVP value prop
+ - User can choose Read now for the primary recommendation.
+ - User can choose one of the backup recommendations instead of the primary item.
+ - User can choose Pause 15 min, which creates a 15-minute delay window.
+-- User can choose Open anyway after a short, visible 5-second form intervention wait.
+-- The wait is presented before unlock is available, not as an extra screen after the user chooses Open anyway.
++- User can choose Open anyway immediately in Soft intervention mode.
++- User can choose Open anyway after a short, visible 5-second form intervention wait in Firm intervention mode.
++- When enabled, the wait is presented before unlock is available, not as an extra screen after the user chooses Open anyway.
+ - After Open anyway from a system intervention, repeated opens of the same distracting app are quiet for the user-configured unlock window.
+ 
+ ### FR8. Replacement Session Experience
+@@ -349,6 +350,7 @@ The system must allow the user to consciously postpone access to the distracting
+ - The delay expires automatically after 15 minutes.
+ - The app logs whether the user returned after the delay window ended.
+ - Settings include a configurable Open anyway unlock duration so the user can choose a longer quiet window without changing the 15-minute pause behavior.
++- Settings include a working Soft/Firm intervention mode selector. Soft mode keeps Open anyway immediate; Firm mode adds the 5-second form-intervention pause before Open anyway becomes available.
+ 
+ ### FR10. Feedback Loop
+ 
+diff --git a/app/src/androidTest/java/com/qualityalternative/app/MainActivityTest.kt b/app/src/androidTest/java/com/qualityalternative/app/MainActivityTest.kt
+index d984294..0377e88 100644
+--- a/app/src/androidTest/java/com/qualityalternative/app/MainActivityTest.kt
++++ b/app/src/androidTest/java/com/qualityalternative/app/MainActivityTest.kt
+@@ -8,6 +8,8 @@ import androidx.compose.ui.semantics.SemanticsProperties
+ import androidx.compose.ui.test.assertIsDisplayed
+ import androidx.compose.ui.test.assertIsEnabled
+ import androidx.compose.ui.test.assertIsNotEnabled
++import androidx.compose.ui.test.assertIsNotSelected
++import androidx.compose.ui.test.assertIsSelected
+ import androidx.compose.ui.test.assertTextContains
+ import androidx.compose.ui.test.click
+ import androidx.compose.ui.test.hasContentDescription
+@@ -38,6 +40,7 @@ import com.qualityalternative.app.domain.model.ContentItem
+ import com.qualityalternative.app.domain.model.DEFAULT_READER_FONT_SCALE
+ import com.qualityalternative.app.domain.model.DurationBucket
+ import com.qualityalternative.app.domain.model.AnalyticsEventType
++import com.qualityalternative.app.domain.model.InterventionMode
+ import com.qualityalternative.app.domain.model.MEDITATION_TIMER_CONTENT_ID
+ import com.qualityalternative.app.domain.model.OnboardingSelection
+ import com.qualityalternative.app.domain.model.ReadingAnnotationDraft
+@@ -492,6 +495,52 @@ class MainActivityTest {
+             .assertIsDisplayed()
+     }
+ 
++    @Test
++    fun interventionModeSettingControlsOpenAnywayFriction() {
++        seedFixtureSelection()
++        launchApp()
++        waitForHome()
++
++        scenario?.onActivity { activity -> activity.mainViewModel.openSettings() }
++        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("settings-list") }
++        composeRule.onNodeWithTag("settings-list")
++            .performScrollToNode(hasTestTag("intervention-mode-FIRM"))
++        composeRule.onNodeWithTag("intervention-mode-FIRM")
++            .assertIsDisplayed()
++            .assertIsSelected()
++        composeRule.onNodeWithTag("intervention-mode-SOFT")
++            .assertIsDisplayed()
++            .assertIsNotSelected()
++            .performClick()
++        composeRule.waitUntil(timeoutMillis = 10_000) { currentInterventionMode() == InterventionMode.SOFT }
++        composeRule.onNodeWithTag("intervention-mode-SOFT")
++            .assertIsSelected()
++        captureSprint19RegressionScreenshot("13_intervention_mode_soft_selected")
++
++        scenario?.onActivity { activity -> activity.mainViewModel.triggerDebugIntervention(nowMillis = System.currentTimeMillis()) }
++        composeRule.waitUntil(timeoutMillis = 10_000) { hasNode("You reached for Fixture Feed One") }
++        composeRule.onNodeWithTag("form-intervention-unlock-wait")
++            .assertDoesNotExist()
++        composeRule.onNodeWithText("Open Fixture Feed One")
++            .assertIsDisplayed()
++            .assertIsEnabled()
++        captureSprint19RegressionScreenshot("14_soft_mode_open_anyway_immediate")
++
++        scenario?.onActivity {
++            it.mainViewModel.openSettings()
++            it.mainViewModel.selectInterventionMode(InterventionMode.FIRM)
++        }
++        composeRule.waitUntil(timeoutMillis = 10_000) { currentInterventionMode() == InterventionMode.FIRM }
++        scenario?.onActivity { activity -> activity.mainViewModel.triggerDebugIntervention(nowMillis = System.currentTimeMillis()) }
++        composeRule.waitUntil(timeoutMillis = 10_000) { hasNode("You reached for Fixture Feed One") }
++        composeRule.onNodeWithTag("form-intervention-unlock-wait")
++            .assertIsDisplayed()
++        composeRule.onNodeWithText("Open in", substring = true)
++            .assertIsDisplayed()
++            .assertIsNotEnabled()
++        captureSprint19RegressionScreenshot("15_firm_mode_open_anyway_wait")
++    }
++
+     @Test
+     fun readerFontSizeSettingUsesAppLevelPreference() {
+         launchOnboardedApp()
+@@ -3236,6 +3285,14 @@ class MainActivityTest {
+         return scale
+     }
+ 
++    private fun currentInterventionMode(): InterventionMode? {
++        var mode: InterventionMode? = null
++        scenario?.onActivity { activity ->
++            mode = activity.mainViewModel.uiState.interventionMode
++        }
++        return mode
++    }
++
+     private fun exportAccountLightProfileJsonFromViewModel(): String {
+         var exportedJson = ""
+         scenario?.onActivity { activity ->
+diff --git a/app/src/androidTest/java/com/qualityalternative/app/data/RoomAnalyticsTrackerTest.kt b/app/src/androidTest/java/com/qualityalternative/app/data/RoomAnalyticsTrackerTest.kt
+index a08d402..d45871f 100644
+--- a/app/src/androidTest/java/com/qualityalternative/app/data/RoomAnalyticsTrackerTest.kt
++++ b/app/src/androidTest/java/com/qualityalternative/app/data/RoomAnalyticsTrackerTest.kt
+@@ -22,6 +22,7 @@ import com.qualityalternative.app.domain.model.ContentItem
+ import com.qualityalternative.app.domain.model.DelayWindow
+ import com.qualityalternative.app.domain.model.DistractingApp
+ import com.qualityalternative.app.domain.model.DurationBucket
++import com.qualityalternative.app.domain.model.InterventionMode
+ import com.qualityalternative.app.domain.model.OnboardingSelection
+ import com.qualityalternative.app.domain.model.PermissionReadiness
+ import com.qualityalternative.app.domain.model.PermissionStatus
+@@ -685,6 +686,7 @@ class RoomAnalyticsTrackerTest {
+                 preferredTopics = settings.preferredTopics,
+                 preferredDurationBucket = settings.preferredDurationBucket,
+                 selectedPackIds = settings.selectedPackIds,
++                interventionMode = settings.interventionMode,
+                 themeMode = settings.themeMode,
+                 meditationDurationMinutes = settings.meditationDurationMinutes,
+                 readerFontScale = settings.readerFontScale,
+@@ -702,6 +704,7 @@ class RoomAnalyticsTrackerTest {
+                 preferredTopics = selection.preferredTopics,
+                 preferredDurationBucket = selection.preferredDurationBucket,
+                 selectedPackIds = selection.selectedPackIds,
++                interventionMode = state.value.interventionMode,
+                 themeMode = state.value.themeMode,
+                 meditationDurationMinutes = state.value.meditationDurationMinutes,
+                 contentPriority = state.value.contentPriority,
+@@ -731,6 +734,10 @@ class RoomAnalyticsTrackerTest {
+             state.value = state.value.copy(preferredDurationBucket = bucket)
+         }
+ 
++        override suspend fun saveInterventionMode(mode: InterventionMode) {
++            state.value = state.value.copy(interventionMode = mode)
++        }
++
+         override suspend fun saveThemeMode(themeMode: AppThemeMode) {
+             state.value = state.value.copy(themeMode = themeMode)
+         }
+diff --git a/app/src/main/java/com/qualityalternative/app/data/AccountLightProfile.kt b/app/src/main/java/com/qualityalternative/app/data/AccountLightProfile.kt
+index 213999b..ba569aa 100644
+--- a/app/src/main/java/com/qualityalternative/app/data/AccountLightProfile.kt
++++ b/app/src/main/java/com/qualityalternative/app/data/AccountLightProfile.kt
+@@ -9,9 +9,11 @@ import com.qualityalternative.app.domain.model.ContentPriority
+ import com.qualityalternative.app.domain.model.ContentRightsMetadata
+ import com.qualityalternative.app.domain.model.ContentSourceType
+ import com.qualityalternative.app.domain.model.DEFAULT_INTERFACE_TEXT_SCALE
++import com.qualityalternative.app.domain.model.DEFAULT_INTERVENTION_MODE
+ import com.qualityalternative.app.domain.model.DEFAULT_READER_FONT_SCALE
+ import com.qualityalternative.app.domain.model.DistractingApp
+ import com.qualityalternative.app.domain.model.DurationBucket
++import com.qualityalternative.app.domain.model.InterventionMode
+ import com.qualityalternative.app.domain.model.LocalProfileIdentity
+ import com.qualityalternative.app.domain.model.MAX_INTERFACE_TEXT_SCALE
+ import com.qualityalternative.app.domain.model.MAX_OPEN_ANYWAY_UNLOCK_MINUTES
+@@ -118,6 +120,7 @@ data class AccountLightSettings(
+     val preferredTopics: List<String>,
+     val preferredDurationBucket: String,
+     val selectedPackIds: List<String>,
++    val interventionMode: String = DEFAULT_INTERVENTION_MODE.name,
+     val themeMode: String,
+     val meditationDurationMinutes: Int,
+     val readerFontScale: Double,
+@@ -138,6 +141,7 @@ data class AccountLightSettings(
+             "preferredDurationBucket is invalid."
+         }
+         require(selectedPackIds.all { it.isSafePortablePackId() }) { "selectedPackIds contains a non-portable pack id." }
++        require(interventionMode in InterventionMode.entries.map(InterventionMode::name)) { "interventionMode is invalid." }
+         require(themeMode in AppThemeMode.entries.map(AppThemeMode::name)) { "themeMode is invalid." }
+         require(meditationDurationMinutes in 1..60) { "meditationDurationMinutes is outside the portable range." }
+         require(readerFontScale in MIN_READER_FONT_SCALE..MAX_READER_FONT_SCALE) {
+@@ -1486,6 +1490,7 @@ private fun AccountLightSettings.toPortableAppSettings(supportedPackages: Set<St
+         preferredTopics = preferredTopics.mapTo(mutableSetOf()) { TopicTag.valueOf(it) },
+         preferredDurationBucket = DurationBucket.valueOf(preferredDurationBucket),
+         selectedPackIds = selectedPackIds.filter(String::isSafePortablePackId).toSet(),
++        interventionMode = InterventionMode.valueOf(interventionMode),
+         themeMode = AppThemeMode.valueOf(themeMode),
+         meditationDurationMinutes = meditationDurationMinutes,
+         contentPriority = ContentPriority.valueOf(contentPriority),
+@@ -1509,6 +1514,7 @@ private fun AppSettings.toAccountLightSettings(
+         preferredTopics = preferredTopics.map { it.name }.sorted(),
+         preferredDurationBucket = preferredDurationBucket.name,
+         selectedPackIds = selectedPackIds.filter(String::isSafePortablePackId).sorted(),
++        interventionMode = interventionMode.name,
+         themeMode = themeMode.name,
+         meditationDurationMinutes = meditationDurationMinutes,
+         readerFontScale = readerFontScale.toPortableReaderFontScale(),
+@@ -2153,7 +2159,7 @@ private val RequiredSettingsKeys = setOf(
+     "reactivatedCompletedContentIds",
+     "openAnywayUnlockMinutes",
+ )
+-private val AllowedSettingsKeys = RequiredSettingsKeys + setOf("interfaceTextScale")
++private val AllowedSettingsKeys = RequiredSettingsKeys + setOf("interfaceTextScale", "interventionMode")
+ private val RequiredLibraryKeys = setOf("userLinks", "userDocuments")
+ private val RequiredUserLinkKeys = setOf(
+     "contentId",
+diff --git a/app/src/main/java/com/qualityalternative/app/data/PreferencesSettingsRepository.kt b/app/src/main/java/com/qualityalternative/app/data/PreferencesSettingsRepository.kt
+index efe937e..e5e8fa7 100644
+--- a/app/src/main/java/com/qualityalternative/app/data/PreferencesSettingsRepository.kt
++++ b/app/src/main/java/com/qualityalternative/app/data/PreferencesSettingsRepository.kt
+@@ -15,10 +15,12 @@ import com.qualityalternative.app.domain.model.AppThemeMode
+ import com.qualityalternative.app.domain.model.ContentPriority
+ import com.qualityalternative.app.domain.model.DEFAULT_MEDITATION_MINUTES
+ import com.qualityalternative.app.domain.model.DEFAULT_INTERFACE_TEXT_SCALE
++import com.qualityalternative.app.domain.model.DEFAULT_INTERVENTION_MODE
+ import com.qualityalternative.app.domain.model.DEFAULT_OPEN_ANYWAY_UNLOCK_MINUTES
+ import com.qualityalternative.app.domain.model.DEFAULT_READER_FONT_SCALE
+ import com.qualityalternative.app.domain.model.DistractingApp
+ import com.qualityalternative.app.domain.model.DurationBucket
++import com.qualityalternative.app.domain.model.InterventionMode
+ import com.qualityalternative.app.domain.model.LocalProfileIdentity
+ import com.qualityalternative.app.domain.model.MAX_MEDITATION_MINUTES
+ import com.qualityalternative.app.domain.model.MAX_INTERFACE_TEXT_SCALE
+@@ -63,6 +65,7 @@ class PreferencesSettingsRepository(
+                         DurationBucket.valueOf(preferences[PreferredDurationBucket] ?: DurationBucket.FOCUS.name)
+                     }.getOrDefault(DurationBucket.FOCUS),
+                     selectedPackIds = preferences[SelectedPackIds].orEmpty(),
++                    interventionMode = parseInterventionMode(preferences[InterventionModePreference]),
+                     themeMode = parseThemeMode(preferences[ThemeMode]),
+                     meditationDurationMinutes = (preferences[MeditationDurationMinutes] ?: DEFAULT_MEDITATION_MINUTES)
+                         .coerceIn(MIN_MEDITATION_MINUTES, MAX_MEDITATION_MINUTES),
+@@ -125,6 +128,7 @@ class PreferencesSettingsRepository(
+             preferences[PreferredTopics] = settings.preferredTopics.mapTo(mutableSetOf(), TopicTag::name)
+             preferences[PreferredDurationBucket] = settings.preferredDurationBucket.name
+             preferences[SelectedPackIds] = settings.selectedPackIds
++            preferences[InterventionModePreference] = settings.interventionMode.name
+             preferences[ThemeMode] = settings.themeMode.name
+             preferences[MeditationDurationMinutes] = settings.meditationDurationMinutes
+                 .coerceIn(MIN_MEDITATION_MINUTES, MAX_MEDITATION_MINUTES)
+@@ -160,6 +164,12 @@ class PreferencesSettingsRepository(
+         }
+     }
+ 
++    override suspend fun saveInterventionMode(mode: InterventionMode) {
++        dataStore.edit { preferences ->
++            preferences[InterventionModePreference] = mode.name
++        }
++    }
++
+     override suspend fun saveThemeMode(themeMode: AppThemeMode) {
+         dataStore.edit { preferences ->
+             preferences[ThemeMode] = themeMode.name
+@@ -321,6 +331,12 @@ class PreferencesSettingsRepository(
+             }.getOrDefault(AppThemeMode.LIGHT)
+         }
+ 
++        fun parseInterventionMode(raw: String?): InterventionMode {
++            return runCatching {
++                InterventionMode.valueOf(raw ?: DEFAULT_INTERVENTION_MODE.name)
++            }.getOrDefault(DEFAULT_INTERVENTION_MODE)
++        }
++
+         fun parseContentPriority(raw: String?): ContentPriority {
+             return runCatching {
+                 ContentPriority.valueOf(raw ?: ContentPriority.BALANCED.name)
+@@ -346,6 +362,7 @@ class PreferencesSettingsRepository(
+         val PreferredTopics = stringSetPreferencesKey("preferred_topics")
+         val PreferredDurationBucket = stringPreferencesKey("preferred_duration_bucket")
+         val SelectedPackIds = stringSetPreferencesKey("selected_pack_ids")
++        val InterventionModePreference = stringPreferencesKey("intervention_mode")
+         val ThemeMode = stringPreferencesKey("theme_mode")
+         val MeditationDurationMinutes = intPreferencesKey("meditation_duration_minutes")
+         val ReaderFontScale = doublePreferencesKey("reader_font_scale")
+diff --git a/app/src/main/java/com/qualityalternative/app/domain/model/UserModels.kt b/app/src/main/java/com/qualityalternative/app/domain/model/UserModels.kt
+index db8fb2a..134d11e 100644
+--- a/app/src/main/java/com/qualityalternative/app/domain/model/UserModels.kt
++++ b/app/src/main/java/com/qualityalternative/app/domain/model/UserModels.kt
+@@ -29,6 +29,13 @@ const val DEFAULT_INTERFACE_TEXT_SCALE = 1.0
+ const val MIN_INTERFACE_TEXT_SCALE = 0.90
+ const val MAX_INTERFACE_TEXT_SCALE = 1.30
+ 
++enum class InterventionMode {
++    SOFT,
++    FIRM,
++}
++
++val DEFAULT_INTERVENTION_MODE = InterventionMode.FIRM
++
+ enum class AppThemeMode {
+     LIGHT,
+     DARK,
+@@ -48,6 +55,7 @@ data class AppSettings(
+     val preferredTopics: Set<TopicTag>,
+     val preferredDurationBucket: DurationBucket,
+     val selectedPackIds: Set<String>,
++    val interventionMode: InterventionMode = DEFAULT_INTERVENTION_MODE,
+     val themeMode: AppThemeMode = AppThemeMode.LIGHT,
+     val meditationDurationMinutes: Int = DEFAULT_MEDITATION_MINUTES,
+     val contentPriority: ContentPriority = ContentPriority.BALANCED,
+diff --git a/app/src/main/java/com/qualityalternative/app/domain/service/Contracts.kt b/app/src/main/java/com/qualityalternative/app/domain/service/Contracts.kt
+index be12c36..8636a19 100644
+--- a/app/src/main/java/com/qualityalternative/app/domain/service/Contracts.kt
++++ b/app/src/main/java/com/qualityalternative/app/domain/service/Contracts.kt
+@@ -10,6 +10,7 @@ import com.qualityalternative.app.domain.model.DelayWindow
+ import com.qualityalternative.app.domain.model.DistractingApp
+ import com.qualityalternative.app.domain.model.DurationBucket
+ import com.qualityalternative.app.domain.model.EditorialPack
++import com.qualityalternative.app.domain.model.InterventionMode
+ import com.qualityalternative.app.domain.model.LocalProfileIdentity
+ import com.qualityalternative.app.domain.model.OnboardingSelection
+ import com.qualityalternative.app.domain.model.PermissionReadiness
+@@ -120,6 +121,7 @@ interface SettingsRepository {
+     suspend fun saveOnboardingSelection(selection: OnboardingSelection)
+     suspend fun saveSelectedAppPackages(packages: Set<String>)
+     suspend fun savePreferredDurationBucket(bucket: DurationBucket)
++    suspend fun saveInterventionMode(mode: InterventionMode)
+     suspend fun saveThemeMode(themeMode: AppThemeMode)
+     suspend fun saveMeditationDurationMinutes(minutes: Int)
+     suspend fun saveReaderFontScale(scale: Double)
+diff --git a/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt b/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
+index 9277105..ad60876 100644
+--- a/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
++++ b/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
+@@ -29,6 +29,7 @@ import com.qualityalternative.app.domain.model.ContentItem
+ import com.qualityalternative.app.domain.model.ContentPriority
+ import com.qualityalternative.app.domain.model.ContentSourceType
+ import com.qualityalternative.app.domain.model.DEFAULT_INTERFACE_TEXT_SCALE
++import com.qualityalternative.app.domain.model.DEFAULT_INTERVENTION_MODE
+ import com.qualityalternative.app.domain.model.DEFAULT_MEDITATION_MINUTES
+ import com.qualityalternative.app.domain.model.DEFAULT_OPEN_ANYWAY_UNLOCK_MINUTES
+ import com.qualityalternative.app.domain.model.DelayWindow
+@@ -36,6 +37,7 @@ import com.qualityalternative.app.domain.model.DistractingApp
+ import com.qualityalternative.app.domain.model.DurationBucket
+ import com.qualityalternative.app.domain.model.EditorialPack
+ import com.qualityalternative.app.domain.model.DEFAULT_READER_FONT_SCALE
++import com.qualityalternative.app.domain.model.InterventionMode
+ import com.qualityalternative.app.domain.model.MEDITATION_TIMER_CONTENT_ID
+ import com.qualityalternative.app.domain.model.MAX_INTERFACE_TEXT_SCALE
+ import com.qualityalternative.app.domain.model.MAX_OPEN_ANYWAY_UNLOCK_MINUTES
+@@ -136,6 +138,7 @@ data class MainUiState(
+     val addLinkForm: AddLinkFormState = AddLinkFormState(),
+     val addDocumentForm: AddDocumentFormState = AddDocumentFormState(),
+     val savedLinkConfirmation: AddLinkConfirmation? = null,
++    val interventionMode: InterventionMode = DEFAULT_INTERVENTION_MODE,
+     val themeMode: AppThemeMode = AppThemeMode.LIGHT,
+     val meditationDurationMinutes: Int = DEFAULT_MEDITATION_MINUTES,
+     val readerFontScale: Double = DEFAULT_READER_FONT_SCALE,
+@@ -1700,20 +1703,29 @@ class MainViewModel(
+                     ),
+                 )
+             }
+-            recordEvent(
+-                AnalyticsEvent(
+-                    type = AnalyticsEventType.FORM_INTERVENTION_SHOWN,
+-                    timestampMillis = processingNowMillis,
+-                    interventionId = interventionId,
+-                    targetAppPackage = targetApp.packageName,
+-                    primaryContentId = recommendationSet.primary.id,
+-                    backupContentIds = backupIds,
+-                    contentId = recommendationSet.primary.id,
+-                    metadata = recommendationSet.analyticsMetadata() + mapOf(
+-                        "openAnywayUnlockDelayMillis" to FORM_INTERVENTION_UNLOCK_DELAY_MILLIS.toString(),
++            val interventionMode = uiState.interventionMode
++            val openAnywayAvailableAtMillis = if (interventionMode == InterventionMode.FIRM) {
++                processingNowMillis + FORM_INTERVENTION_UNLOCK_DELAY_MILLIS
++            } else {
++                null
++            }
++            if (interventionMode == InterventionMode.FIRM) {
++                recordEvent(
++                    AnalyticsEvent(
++                        type = AnalyticsEventType.FORM_INTERVENTION_SHOWN,
++                        timestampMillis = processingNowMillis,
++                        interventionId = interventionId,
++                        targetAppPackage = targetApp.packageName,
++                        primaryContentId = recommendationSet.primary.id,
++                        backupContentIds = backupIds,
++                        contentId = recommendationSet.primary.id,
++                        metadata = recommendationSet.analyticsMetadata() + mapOf(
++                            "interventionMode" to interventionMode.name,
++                            "openAnywayUnlockDelayMillis" to FORM_INTERVENTION_UNLOCK_DELAY_MILLIS.toString(),
++                        ),
+                     ),
+-                ),
+-            )
++                )
++            }
+             unfinishedProgressFor(recommendationSet.primary.id)?.let { progress ->
+                 recordEvent(
+                     AnalyticsEvent(
+@@ -1735,7 +1747,7 @@ class MainViewModel(
+                 selectedTargetApp = targetApp,
+                 currentInterventionId = interventionId,
+                 currentInterventionShownAtMillis = processingNowMillis,
+-                currentOpenAnywayUnlockAvailableAtMillis = processingNowMillis + FORM_INTERVENTION_UNLOCK_DELAY_MILLIS,
++                currentOpenAnywayUnlockAvailableAtMillis = openAnywayAvailableAtMillis,
+                 currentRecommendationSet = recommendationSet,
+                 currentInterventionOrigin = origin,
+                 activeDelayWindow = null,
+@@ -1860,6 +1872,7 @@ class MainViewModel(
+                 primaryContentId = recommendationSet.primary.id,
+                 backupContentIds = recommendationSet.backups.map(ContentItem::id),
+                 metadata = mapOf(
++                    "interventionMode" to uiState.interventionMode.name,
+                     "openAnywayUnlockAvailableAtMillis" to availableAtMillis.toString(),
+                     "elapsedMillis" to (nowMillis - (uiState.currentInterventionShownAtMillis ?: nowMillis))
+                         .coerceAtLeast(0L)
+@@ -1873,20 +1886,23 @@ class MainViewModel(
+         val targetApp = uiState.selectedTargetApp ?: return
+         val recommendationSet = uiState.currentRecommendationSet ?: return
+         val interventionId = uiState.currentInterventionId ?: return
+-        recordEvent(
+-            AnalyticsEvent(
+-                type = AnalyticsEventType.FORM_INTERVENTION_ABANDONED,
+-                timestampMillis = nowMillis,
+-                interventionId = interventionId,
+-                targetAppPackage = targetApp.packageName,
+-                primaryContentId = recommendationSet.primary.id,
+-                backupContentIds = recommendationSet.backups.map(ContentItem::id),
+-                metadata = mapOf(
+-                    "reason" to reason,
+-                    "openAnywayUnlockAvailableAtMillis" to uiState.currentOpenAnywayUnlockAvailableAtMillis.orEmptyString(),
++        if (uiState.interventionMode == InterventionMode.FIRM) {
++            recordEvent(
++                AnalyticsEvent(
++                    type = AnalyticsEventType.FORM_INTERVENTION_ABANDONED,
++                    timestampMillis = nowMillis,
++                    interventionId = interventionId,
++                    targetAppPackage = targetApp.packageName,
++                    primaryContentId = recommendationSet.primary.id,
++                    backupContentIds = recommendationSet.backups.map(ContentItem::id),
++                    metadata = mapOf(
++                        "reason" to reason,
++                        "interventionMode" to uiState.interventionMode.name,
++                        "openAnywayUnlockAvailableAtMillis" to uiState.currentOpenAnywayUnlockAvailableAtMillis.orEmptyString(),
++                    ),
+                 ),
+-            ),
+-        )
++            )
++        }
+         uiState = uiState.copy(
+             screen = MainScreen.Home,
+             currentInterventionId = null,
+@@ -1976,6 +1992,7 @@ class MainViewModel(
+         val recommendationSet = uiState.currentRecommendationSet
+         val nowMillis = nowProvider()
+         val openAnywayAvailableAtMillis = uiState.currentOpenAnywayUnlockAvailableAtMillis
++        val isFirmMode = uiState.interventionMode == InterventionMode.FIRM
+         if (openAnywayAvailableAtMillis != null && nowMillis < openAnywayAvailableAtMillis) {
+             recordEvent(
+                 AnalyticsEvent(
+@@ -1986,6 +2003,7 @@ class MainViewModel(
+                     primaryContentId = recommendationSet?.primary?.id,
+                     backupContentIds = recommendationSet?.backups.orEmpty().map(ContentItem::id),
+                     metadata = mapOf(
++                        "interventionMode" to uiState.interventionMode.name,
+                         "openAnywayUnlockAvailableAtMillis" to openAnywayAvailableAtMillis.toString(),
+                         "remainingMillis" to (openAnywayAvailableAtMillis - nowMillis).toString(),
+                     ),
+@@ -2007,26 +2025,30 @@ class MainViewModel(
+                 primaryContentId = recommendationSet?.primary?.id,
+                 backupContentIds = recommendationSet?.backups.orEmpty().map(ContentItem::id),
+                 metadata = mapOf(
++                    "interventionMode" to uiState.interventionMode.name,
+                     "openAnywayUnlockMinutes" to unlockMinutes.toString(),
+                     "openAnywayUnlockUntilMillis" to unlockUntilMillis.toString(),
+-                    "formUnlockWaitMillis" to FORM_INTERVENTION_UNLOCK_DELAY_MILLIS.toString(),
++                    "formUnlockWaitMillis" to if (isFirmMode) FORM_INTERVENTION_UNLOCK_DELAY_MILLIS.toString() else "0",
+                 ),
+             ),
+         )
+-        recordEvent(
+-            AnalyticsEvent(
+-                type = AnalyticsEventType.FORM_INTERVENTION_UNLOCK_USED,
+-                timestampMillis = nowMillis,
+-                interventionId = uiState.currentInterventionId,
+-                targetAppPackage = targetApp.packageName,
+-                primaryContentId = recommendationSet?.primary?.id,
+-                backupContentIds = recommendationSet?.backups.orEmpty().map(ContentItem::id),
+-                metadata = mapOf(
+-                    "openAnywayUnlockAvailableAtMillis" to (openAnywayAvailableAtMillis?.toString() ?: "0"),
+-                    "openAnywayUnlockUntilMillis" to unlockUntilMillis.toString(),
++        if (isFirmMode) {
++            recordEvent(
++                AnalyticsEvent(
++                    type = AnalyticsEventType.FORM_INTERVENTION_UNLOCK_USED,
++                    timestampMillis = nowMillis,
++                    interventionId = uiState.currentInterventionId,
++                    targetAppPackage = targetApp.packageName,
++                    primaryContentId = recommendationSet?.primary?.id,
++                    backupContentIds = recommendationSet?.backups.orEmpty().map(ContentItem::id),
++                    metadata = mapOf(
++                        "interventionMode" to uiState.interventionMode.name,
++                        "openAnywayUnlockAvailableAtMillis" to (openAnywayAvailableAtMillis?.toString() ?: "0"),
++                        "openAnywayUnlockUntilMillis" to unlockUntilMillis.toString(),
++                    ),
+                 ),
+-            ),
+-        )
++            )
++        }
+         recordFormInterventionCompleted(action = "open_anyway", nowMillis = nowMillis)
+         if (shouldExitToTarget) {
+             InterceptionRuntimeGate.suppressPackage(
+@@ -2323,6 +2345,15 @@ class MainViewModel(
+         }
+     }
+ 
++    fun selectInterventionMode(mode: InterventionMode) {
++        if (uiState.interventionMode == mode) return
++        uiState = uiState.copy(interventionMode = mode)
++        viewModelScope.launch {
++            settingsRepository.saveInterventionMode(mode)
++            autosaveAccountLightProfileAfterPortableMutation()
++        }
++    }
++
+     fun dismissMessage() {
+         uiState = uiState.copy(latestMessage = null)
+     }
+@@ -2616,6 +2647,7 @@ class MainViewModel(
+             availableTargetApps = availableTargetApps,
+             selectedTargetApp = selectedTargetApp,
+             preferences = preferences.takeIf { settings.hasCompletedOnboarding },
++            interventionMode = settings.interventionMode,
+             themeMode = settings.themeMode,
+             meditationDurationMinutes = settings.meditationDurationMinutes,
+             readerFontScale = settings.readerFontScale,
+@@ -3337,6 +3369,7 @@ class MainViewModel(
+         val targetApp = uiState.selectedTargetApp ?: return
+         val recommendationSet = uiState.currentRecommendationSet ?: return
+         val interventionId = uiState.currentInterventionId ?: return
++        if (uiState.interventionMode != InterventionMode.FIRM) return
+         recordEvent(
+             AnalyticsEvent(
+                 type = AnalyticsEventType.FORM_INTERVENTION_COMPLETED,
+@@ -3348,6 +3381,7 @@ class MainViewModel(
+                 contentId = contentId,
+                 metadata = mapOf(
+                     "action" to action,
++                    "interventionMode" to uiState.interventionMode.name,
+                     "openAnywayUnlockAvailableAtMillis" to uiState.currentOpenAnywayUnlockAvailableAtMillis.orEmptyString(),
+                 ),
+             ),
+diff --git a/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt b/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
+index 7dd8ea9..52e01c1 100644
+--- a/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
++++ b/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
+@@ -134,6 +134,7 @@ import com.qualityalternative.app.domain.model.DelayWindow
+ import com.qualityalternative.app.domain.model.DistractingApp
+ import com.qualityalternative.app.domain.model.DurationBucket
+ import com.qualityalternative.app.domain.model.EditorialPack
++import com.qualityalternative.app.domain.model.InterventionMode
+ import com.qualityalternative.app.domain.model.DEFAULT_INTERFACE_TEXT_SCALE
+ import com.qualityalternative.app.domain.model.DEFAULT_READER_FONT_SCALE
+ import com.qualityalternative.app.domain.model.MEDITATION_TIMER_CONTENT_ID
+@@ -581,6 +582,7 @@ private fun MainRoute(
+                 onSelectInterfaceTextScale = viewModel::setInterfaceTextScale,
+                 onSelectContentPriority = viewModel::setContentPriority,
+                 onSelectOpenAnywayUnlock = viewModel::setOpenAnywayUnlockMinutes,
++                onSelectInterventionMode = viewModel::selectInterventionMode,
+                 onSelectTheme = viewModel::selectThemeMode,
+                 onRefreshReadiness = viewModel::refreshPermissionReadiness,
+                 onSelectAnnotationExport = onSelectAnnotationExport,
+@@ -3694,6 +3696,7 @@ private fun SettingsTab(
+     onSelectInterfaceTextScale: (Double) -> Unit,
+     onSelectContentPriority: (ContentPriority) -> Unit,
+     onSelectOpenAnywayUnlock: (Int) -> Unit,
++    onSelectInterventionMode: (InterventionMode) -> Unit,
+     onSelectTheme: (AppThemeMode) -> Unit,
+     onRefreshReadiness: () -> Unit,
+     onSelectAnnotationExport: () -> Unit,
+@@ -3965,9 +3968,21 @@ private fun SettingsTab(
+         item {
+             SectionLabel("Mode")
+             QaCard(padding = 0.dp) {
+-                ModeRow("Soft intervention", "Offer an alternative. You always have an override.", selected = true)
++                ModeRow(
++                    title = "Soft intervention",
++                    desc = "Offer an alternative. Open anyway is immediate.",
++                    selected = state.interventionMode == InterventionMode.SOFT,
++                    onClick = { onSelectInterventionMode(InterventionMode.SOFT) },
++                    modifier = Modifier.testTag("intervention-mode-SOFT"),
++                )
+                 HorizontalDivider(color = colors.line)
+-                ModeRow("Firm intervention", "Add a small friction step before opening anyway.", selected = false)
++                ModeRow(
++                    title = "Firm intervention",
++                    desc = "Add a five-second pause before opening anyway.",
++                    selected = state.interventionMode == InterventionMode.FIRM,
++                    onClick = { onSelectInterventionMode(InterventionMode.FIRM) },
++                    modifier = Modifier.testTag("intervention-mode-FIRM"),
++                )
+             }
+         }
+         item {
+@@ -5388,10 +5403,18 @@ private fun PermissionRow(name: String, desc: String, granted: Boolean, onClick:
+ }
+ 
+ @Composable
+-private fun ModeRow(title: String, desc: String, selected: Boolean) {
++private fun ModeRow(
++    title: String,
++    desc: String,
++    selected: Boolean,
++    onClick: () -> Unit,
++    modifier: Modifier = Modifier,
++) {
+     Row(
+-        modifier = Modifier
++        modifier = modifier
+             .fillMaxWidth()
++            .clickable(onClick = onClick)
++            .semantics { this.selected = selected }
+             .padding(horizontal = 18.dp, vertical = 14.dp),
+         verticalAlignment = Alignment.CenterVertically,
+         horizontalArrangement = Arrangement.spacedBy(14.dp),
+diff --git a/app/src/test/java/com/qualityalternative/app/data/AccountLightProfileExporterTest.kt b/app/src/test/java/com/qualityalternative/app/data/AccountLightProfileExporterTest.kt
+index 5fafe29..73d9785 100644
+--- a/app/src/test/java/com/qualityalternative/app/data/AccountLightProfileExporterTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/data/AccountLightProfileExporterTest.kt
+@@ -11,6 +11,7 @@ import com.qualityalternative.app.domain.model.ContentPriority
+ import com.qualityalternative.app.domain.model.ContentRightsMetadata
+ import com.qualityalternative.app.domain.model.ContentSourceType
+ import com.qualityalternative.app.domain.model.DurationBucket
++import com.qualityalternative.app.domain.model.InterventionMode
+ import com.qualityalternative.app.domain.model.OnboardingSelection
+ import com.qualityalternative.app.domain.model.ReadingProgress
+ import com.qualityalternative.app.domain.model.TopicTag
+@@ -46,6 +47,7 @@ class AccountLightProfileExporterTest {
+                 selectedPackIds = setOf("starter_pack", "attention_reset_v1"),
+             ),
+         )
++        repository.saveInterventionMode(InterventionMode.SOFT)
+         repository.saveThemeMode(AppThemeMode.DARK)
+         repository.saveMeditationDurationMinutes(7)
+         repository.saveReaderFontScale(1.254)
+@@ -100,6 +102,7 @@ class AccountLightProfileExporterTest {
+         assertEquals(listOf("HISTORY", "PHILOSOPHY", "SCIENCE"), profile.settings.preferredTopics)
+         assertEquals("DEEP", profile.settings.preferredDurationBucket)
+         assertEquals(listOf("attention_reset_v1", "starter_pack"), profile.settings.selectedPackIds)
++        assertEquals("SOFT", profile.settings.interventionMode)
+         assertEquals("DARK", profile.settings.themeMode)
+         assertEquals(7, profile.settings.meditationDurationMinutes)
+         assertEquals(1.25, profile.settings.readerFontScale, 0.0)
+diff --git a/app/src/test/java/com/qualityalternative/app/data/PreferencesSettingsRepositoryTest.kt b/app/src/test/java/com/qualityalternative/app/data/PreferencesSettingsRepositoryTest.kt
+index 9e324ba..62b7417 100644
+--- a/app/src/test/java/com/qualityalternative/app/data/PreferencesSettingsRepositoryTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/data/PreferencesSettingsRepositoryTest.kt
+@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
+ import com.qualityalternative.app.domain.model.AppThemeMode
+ import com.qualityalternative.app.domain.model.ContentPriority
+ import com.qualityalternative.app.domain.model.DurationBucket
++import com.qualityalternative.app.domain.model.InterventionMode
+ import com.qualityalternative.app.domain.model.OnboardingSelection
+ import com.qualityalternative.app.domain.model.TopicTag
+ import java.io.File
+@@ -69,6 +70,29 @@ class PreferencesSettingsRepositoryTest {
+         assertEquals(AppThemeMode.DARK, restored.themeMode)
+     }
+ 
++    @Test
++    fun saveInterventionMode_persistsWithoutResettingOnboarding() = runBlocking {
++        val repository = PreferencesSettingsRepository(
++            dataStore = testDataStore(),
++            supportedApps = SupportedCatalog.distractingApps,
++        )
++        val selection = OnboardingSelection(
++            selectedAppPackages = SupportedCatalog.distractingApps.take(3).mapTo(mutableSetOf()) { it.packageName },
++            preferredTopics = setOf(TopicTag.PHILOSOPHY, TopicTag.SCIENCE, TopicTag.HISTORY),
++            preferredDurationBucket = DurationBucket.DEEP,
++            selectedPackIds = setOf("science"),
++        )
++
++        repository.saveOnboardingSelection(selection)
++        assertEquals(InterventionMode.FIRM, repository.observeAppSettings().first().interventionMode)
++        repository.saveInterventionMode(InterventionMode.SOFT)
++
++        val restored = repository.observeAppSettings().first()
++        assertTrue(restored.hasCompletedOnboarding)
++        assertEquals(selection.selectedAppPackages, restored.selectedAppPackages)
++        assertEquals(InterventionMode.SOFT, restored.interventionMode)
++    }
++
+     @Test
+     fun saveMeditationDuration_persistsWithoutResettingOnboarding() = runBlocking {
+         val repository = PreferencesSettingsRepository(
+diff --git a/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt b/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
+index f187f30..34f2ff8 100644
+--- a/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
+@@ -24,6 +24,7 @@ import com.qualityalternative.app.domain.model.ContentSourceType
+ import com.qualityalternative.app.domain.model.DistractingApp
+ import com.qualityalternative.app.domain.model.DurationBucket
+ import com.qualityalternative.app.domain.model.EditorialPack
++import com.qualityalternative.app.domain.model.InterventionMode
+ import com.qualityalternative.app.domain.model.MEDITATION_TIMER_CONTENT_ID
+ import com.qualityalternative.app.domain.model.MeditationTimerContentItem
+ import com.qualityalternative.app.domain.model.OnboardingSelection
+@@ -3506,6 +3507,55 @@ class MainViewModelTest {
+         })
+     }
+ 
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun selectInterventionMode_persistsAndUpdatesUiState() = runTest {
++        val settingsRepository = FakeSettingsRepository(
++            initial = completedSettings(
++                selectedAppPackages = setOf(FixtureTargetRegistry.fixtureDistractors.first().packageName),
++            ),
++        )
++        val viewModel = createViewModel(settingsRepository = settingsRepository)
++
++        advanceUntilIdle()
++        assertEquals(InterventionMode.FIRM, viewModel.uiState.interventionMode)
++
++        viewModel.selectInterventionMode(InterventionMode.SOFT)
++        advanceUntilIdle()
++
++        assertEquals(InterventionMode.SOFT, viewModel.uiState.interventionMode)
++        assertEquals(InterventionMode.SOFT, settingsRepository.state.value.interventionMode)
++    }
++
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun softInterventionModeLeavesOpenAnywayImmediatelyAvailable() = runTest {
++        val fixtureTarget = FixtureTargetRegistry.fixtureDistractors.first()
++        val analyticsTracker = InMemoryAnalyticsTracker()
++        val viewModel = createViewModel(
++            settingsRepository = FakeSettingsRepository(
++                initial = completedSettings(selectedAppPackages = setOf(fixtureTarget.packageName))
++                    .copy(interventionMode = InterventionMode.SOFT),
++            ),
++            analyticsTracker = analyticsTracker,
++            nowProvider = { 40_000L },
++        )
++
++        advanceUntilIdle()
++        viewModel.requestSystemInterception(targetAppPackage = fixtureTarget.packageName, nowMillis = 40_000L)
++        advanceUntilIdle()
++
++        assertEquals(MainScreen.Intervention, viewModel.uiState.screen)
++        assertEquals(null, viewModel.uiState.currentOpenAnywayUnlockAvailableAtMillis)
++        assertTrue(viewModel.openAnyway())
++        val events = analyticsTracker.allEvents()
++        assertFalse(events.any { it.type == AnalyticsEventType.FORM_INTERVENTION_SHOWN })
++        assertFalse(events.any { it.type == AnalyticsEventType.FORM_INTERVENTION_UNLOCK_USED })
++        val openAnyway = events.first { it.type == AnalyticsEventType.OPEN_ANYWAY_SELECTED }
++        assertEquals("SOFT", openAnyway.metadata["interventionMode"])
++        assertEquals("0", openAnyway.metadata["formUnlockWaitMillis"])
++    }
++
+     @Test
+     @OptIn(ExperimentalCoroutinesApi::class)
+     fun formInterventionAbandonmentRecordsAnalyticsAndClearsIntervention() = runTest {
+@@ -3993,6 +4043,7 @@ class MainViewModelTest {
+                 preferredTopics = selection.preferredTopics,
+                 preferredDurationBucket = selection.preferredDurationBucket,
+                 selectedPackIds = selection.selectedPackIds,
++                interventionMode = state.value.interventionMode,
+                 themeMode = state.value.themeMode,
+                 meditationDurationMinutes = state.value.meditationDurationMinutes,
+                 contentPriority = state.value.contentPriority,
+@@ -4032,6 +4083,7 @@ class MainViewModelTest {
+                 preferredTopics = settings.preferredTopics,
+                 preferredDurationBucket = settings.preferredDurationBucket,
+                 selectedPackIds = settings.selectedPackIds,
++                interventionMode = settings.interventionMode,
+                 themeMode = settings.themeMode,
+                 meditationDurationMinutes = settings.meditationDurationMinutes,
+                 readerFontScale = settings.readerFontScale,
+@@ -4051,6 +4103,10 @@ class MainViewModelTest {
+             state.value = state.value.copy(preferredDurationBucket = bucket)
+         }
+ 
++        override suspend fun saveInterventionMode(mode: InterventionMode) {
++            state.value = state.value.copy(interventionMode = mode)
++        }
++
+         override suspend fun saveThemeMode(themeMode: AppThemeMode) {
+             state.value = state.value.copy(themeMode = themeMode)
+         }
+diff --git a/docs/SPRINT_19_AI_NOTE_ASSIST.md b/docs/SPRINT_19_AI_NOTE_ASSIST.md
+index 27107d2..49ebe04 100644
+--- a/docs/SPRINT_19_AI_NOTE_ASSIST.md
++++ b/docs/SPRINT_19_AI_NOTE_ASSIST.md
+@@ -1,6 +1,6 @@
+ # Sprint 19 - Reader Regression, Form Intervention, And AI Notes
+ 
+-Status: `session_progress_hotfix_release_ready`
++Status: `intervention_mode_settings_fixed`
+ 
+ Requested on: 2026-05-07
+ 
+@@ -49,6 +49,7 @@ Mapped PRD items: FR6, FR7, FR8, FR8A, FR13, NFR privacy, NFR reliability, NFR c
+ - 2026-05-08: GPT Pro R3 hotfix review returned `8/10 FAIL`; R4 moves completion-downgrade protection to the repository write boundary and adds a delayed unfinished-save/in-flight completion regression test.
+ - 2026-05-08: GPT Pro R4 hotfix review returned `10/10 PASS` with `VISUAL REVIEW: PASS`; release packaging may proceed.
+ - 2026-05-08: Release candidate `v0.11.3-session-progress-meditation-alpha` passed targeted unit validation, debug/APK build, connected session-progress E2E, connected meditation-backup E2E, signature verification, emulator install smoke, and launch smoke.
++- 2026-05-08: A tester found Settings Mode was hard-coded to show Soft while behavior was Firm. Slice 19.5B adds a persisted Soft/Firm mode selector: Soft makes Open anyway immediate, Firm keeps the 5-second form-intervention pause. Visual E2E evidence covers both behaviors.
+ - AI implementation remains blocked until the regression-fix APK and the emergency session-progress hotfix are reviewed and released.
+ 
+ ## Slice Plan
+@@ -170,6 +171,23 @@ Acceptance:
+ - Recommendation backups include the meditation reset when reading dominates the ranked list and meditation is otherwise eligible.
+ - GPT Pro hotfix review returns `SCORE: 10/10`, `VERDICT: PASS`, and `VISUAL REVIEW: PASS`.
+ 
++### Slice 19.5B: Intervention Mode Settings Fix
++
++Deliverables:
++
++- Replace the static Settings Mode rows with a real persisted `Soft`/`Firm` intervention mode.
++- Keep the current released behavior as `Firm`: Open anyway becomes available after the 5-second form-intervention wait.
++- Make `Soft` mode immediate: Open anyway is enabled as soon as the intervention appears.
++- Include the mode in Portable Profile export/import without breaking older profiles that do not yet contain the field.
++- Add unit coverage for persistence and behavior, plus connected visual E2E coverage for Settings selection, Soft behavior, and Firm behavior.
++
++Acceptance:
++
++- Settings no longer always shows Soft as selected.
++- Tapping Soft persists `SOFT` and removes the Open anyway countdown.
++- Tapping Firm persists `FIRM` and restores the 5-second countdown.
++- GPT Pro review must pass before this fix is included in a release APK.
++
+ ## AI Note Feature - Second Part Of Sprint 19
+ 
+ ### User Story

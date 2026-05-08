@@ -22,6 +22,7 @@ import com.qualityalternative.app.domain.model.ContentItem
 import com.qualityalternative.app.domain.model.DelayWindow
 import com.qualityalternative.app.domain.model.DistractingApp
 import com.qualityalternative.app.domain.model.DurationBucket
+import com.qualityalternative.app.domain.model.InterventionMode
 import com.qualityalternative.app.domain.model.OnboardingSelection
 import com.qualityalternative.app.domain.model.PermissionReadiness
 import com.qualityalternative.app.domain.model.PermissionStatus
@@ -685,6 +686,7 @@ class RoomAnalyticsTrackerTest {
                 preferredTopics = settings.preferredTopics,
                 preferredDurationBucket = settings.preferredDurationBucket,
                 selectedPackIds = settings.selectedPackIds,
+                interventionMode = settings.interventionMode,
                 themeMode = settings.themeMode,
                 meditationDurationMinutes = settings.meditationDurationMinutes,
                 readerFontScale = settings.readerFontScale,
@@ -702,6 +704,7 @@ class RoomAnalyticsTrackerTest {
                 preferredTopics = selection.preferredTopics,
                 preferredDurationBucket = selection.preferredDurationBucket,
                 selectedPackIds = selection.selectedPackIds,
+                interventionMode = state.value.interventionMode,
                 themeMode = state.value.themeMode,
                 meditationDurationMinutes = state.value.meditationDurationMinutes,
                 contentPriority = state.value.contentPriority,
@@ -729,6 +732,10 @@ class RoomAnalyticsTrackerTest {
 
         override suspend fun savePreferredDurationBucket(bucket: DurationBucket) {
             state.value = state.value.copy(preferredDurationBucket = bucket)
+        }
+
+        override suspend fun saveInterventionMode(mode: InterventionMode) {
+            state.value = state.value.copy(interventionMode = mode)
         }
 
         override suspend fun saveThemeMode(themeMode: AppThemeMode) {

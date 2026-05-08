@@ -15,10 +15,12 @@ import com.qualityalternative.app.domain.model.AppThemeMode
 import com.qualityalternative.app.domain.model.ContentPriority
 import com.qualityalternative.app.domain.model.DEFAULT_MEDITATION_MINUTES
 import com.qualityalternative.app.domain.model.DEFAULT_INTERFACE_TEXT_SCALE
+import com.qualityalternative.app.domain.model.DEFAULT_INTERVENTION_MODE
 import com.qualityalternative.app.domain.model.DEFAULT_OPEN_ANYWAY_UNLOCK_MINUTES
 import com.qualityalternative.app.domain.model.DEFAULT_READER_FONT_SCALE
 import com.qualityalternative.app.domain.model.DistractingApp
 import com.qualityalternative.app.domain.model.DurationBucket
+import com.qualityalternative.app.domain.model.InterventionMode
 import com.qualityalternative.app.domain.model.LocalProfileIdentity
 import com.qualityalternative.app.domain.model.MAX_MEDITATION_MINUTES
 import com.qualityalternative.app.domain.model.MAX_INTERFACE_TEXT_SCALE
@@ -63,6 +65,7 @@ class PreferencesSettingsRepository(
                         DurationBucket.valueOf(preferences[PreferredDurationBucket] ?: DurationBucket.FOCUS.name)
                     }.getOrDefault(DurationBucket.FOCUS),
                     selectedPackIds = preferences[SelectedPackIds].orEmpty(),
+                    interventionMode = parseInterventionMode(preferences[InterventionModePreference]),
                     themeMode = parseThemeMode(preferences[ThemeMode]),
                     meditationDurationMinutes = (preferences[MeditationDurationMinutes] ?: DEFAULT_MEDITATION_MINUTES)
                         .coerceIn(MIN_MEDITATION_MINUTES, MAX_MEDITATION_MINUTES),
@@ -125,6 +128,7 @@ class PreferencesSettingsRepository(
             preferences[PreferredTopics] = settings.preferredTopics.mapTo(mutableSetOf(), TopicTag::name)
             preferences[PreferredDurationBucket] = settings.preferredDurationBucket.name
             preferences[SelectedPackIds] = settings.selectedPackIds
+            preferences[InterventionModePreference] = settings.interventionMode.name
             preferences[ThemeMode] = settings.themeMode.name
             preferences[MeditationDurationMinutes] = settings.meditationDurationMinutes
                 .coerceIn(MIN_MEDITATION_MINUTES, MAX_MEDITATION_MINUTES)
@@ -157,6 +161,12 @@ class PreferencesSettingsRepository(
     override suspend fun savePreferredDurationBucket(bucket: DurationBucket) {
         dataStore.edit { preferences ->
             preferences[PreferredDurationBucket] = bucket.name
+        }
+    }
+
+    override suspend fun saveInterventionMode(mode: InterventionMode) {
+        dataStore.edit { preferences ->
+            preferences[InterventionModePreference] = mode.name
         }
     }
 
@@ -321,6 +331,12 @@ class PreferencesSettingsRepository(
             }.getOrDefault(AppThemeMode.LIGHT)
         }
 
+        fun parseInterventionMode(raw: String?): InterventionMode {
+            return runCatching {
+                InterventionMode.valueOf(raw ?: DEFAULT_INTERVENTION_MODE.name)
+            }.getOrDefault(DEFAULT_INTERVENTION_MODE)
+        }
+
         fun parseContentPriority(raw: String?): ContentPriority {
             return runCatching {
                 ContentPriority.valueOf(raw ?: ContentPriority.BALANCED.name)
@@ -346,6 +362,7 @@ class PreferencesSettingsRepository(
         val PreferredTopics = stringSetPreferencesKey("preferred_topics")
         val PreferredDurationBucket = stringPreferencesKey("preferred_duration_bucket")
         val SelectedPackIds = stringSetPreferencesKey("selected_pack_ids")
+        val InterventionModePreference = stringPreferencesKey("intervention_mode")
         val ThemeMode = stringPreferencesKey("theme_mode")
         val MeditationDurationMinutes = intPreferencesKey("meditation_duration_minutes")
         val ReaderFontScale = doublePreferencesKey("reader_font_scale")

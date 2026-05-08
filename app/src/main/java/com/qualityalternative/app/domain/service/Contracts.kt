@@ -10,6 +10,7 @@ import com.qualityalternative.app.domain.model.DelayWindow
 import com.qualityalternative.app.domain.model.DistractingApp
 import com.qualityalternative.app.domain.model.DurationBucket
 import com.qualityalternative.app.domain.model.EditorialPack
+import com.qualityalternative.app.domain.model.InterventionMode
 import com.qualityalternative.app.domain.model.LocalProfileIdentity
 import com.qualityalternative.app.domain.model.OnboardingSelection
 import com.qualityalternative.app.domain.model.PermissionReadiness
@@ -120,6 +121,7 @@ interface SettingsRepository {
     suspend fun saveOnboardingSelection(selection: OnboardingSelection)
     suspend fun saveSelectedAppPackages(packages: Set<String>)
     suspend fun savePreferredDurationBucket(bucket: DurationBucket)
+    suspend fun saveInterventionMode(mode: InterventionMode)
     suspend fun saveThemeMode(themeMode: AppThemeMode)
     suspend fun saveMeditationDurationMinutes(minutes: Int)
     suspend fun saveReaderFontScale(scale: Double)

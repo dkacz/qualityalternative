@@ -11,6 +11,7 @@ import com.qualityalternative.app.domain.model.ContentPriority
 import com.qualityalternative.app.domain.model.ContentRightsMetadata
 import com.qualityalternative.app.domain.model.ContentSourceType
 import com.qualityalternative.app.domain.model.DurationBucket
+import com.qualityalternative.app.domain.model.InterventionMode
 import com.qualityalternative.app.domain.model.OnboardingSelection
 import com.qualityalternative.app.domain.model.ReadingProgress
 import com.qualityalternative.app.domain.model.TopicTag
@@ -46,6 +47,7 @@ class AccountLightProfileExporterTest {
                 selectedPackIds = setOf("starter_pack", "attention_reset_v1"),
             ),
         )
+        repository.saveInterventionMode(InterventionMode.SOFT)
         repository.saveThemeMode(AppThemeMode.DARK)
         repository.saveMeditationDurationMinutes(7)
         repository.saveReaderFontScale(1.254)
@@ -100,6 +102,7 @@ class AccountLightProfileExporterTest {
         assertEquals(listOf("HISTORY", "PHILOSOPHY", "SCIENCE"), profile.settings.preferredTopics)
         assertEquals("DEEP", profile.settings.preferredDurationBucket)
         assertEquals(listOf("attention_reset_v1", "starter_pack"), profile.settings.selectedPackIds)
+        assertEquals("SOFT", profile.settings.interventionMode)
         assertEquals("DARK", profile.settings.themeMode)
         assertEquals(7, profile.settings.meditationDurationMinutes)
         assertEquals(1.25, profile.settings.readerFontScale, 0.0)

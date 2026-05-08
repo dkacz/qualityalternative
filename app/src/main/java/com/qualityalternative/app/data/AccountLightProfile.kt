@@ -9,9 +9,11 @@ import com.qualityalternative.app.domain.model.ContentPriority
 import com.qualityalternative.app.domain.model.ContentRightsMetadata
 import com.qualityalternative.app.domain.model.ContentSourceType
 import com.qualityalternative.app.domain.model.DEFAULT_INTERFACE_TEXT_SCALE
+import com.qualityalternative.app.domain.model.DEFAULT_INTERVENTION_MODE
 import com.qualityalternative.app.domain.model.DEFAULT_READER_FONT_SCALE
 import com.qualityalternative.app.domain.model.DistractingApp
 import com.qualityalternative.app.domain.model.DurationBucket
+import com.qualityalternative.app.domain.model.InterventionMode
 import com.qualityalternative.app.domain.model.LocalProfileIdentity
 import com.qualityalternative.app.domain.model.MAX_INTERFACE_TEXT_SCALE
 import com.qualityalternative.app.domain.model.MAX_OPEN_ANYWAY_UNLOCK_MINUTES
@@ -118,6 +120,7 @@ data class AccountLightSettings(
     val preferredTopics: List<String>,
     val preferredDurationBucket: String,
     val selectedPackIds: List<String>,
+    val interventionMode: String = DEFAULT_INTERVENTION_MODE.name,
     val themeMode: String,
     val meditationDurationMinutes: Int,
     val readerFontScale: Double,
@@ -138,6 +141,7 @@ data class AccountLightSettings(
             "preferredDurationBucket is invalid."
         }
         require(selectedPackIds.all { it.isSafePortablePackId() }) { "selectedPackIds contains a non-portable pack id." }
+        require(interventionMode in InterventionMode.entries.map(InterventionMode::name)) { "interventionMode is invalid." }
         require(themeMode in AppThemeMode.entries.map(AppThemeMode::name)) { "themeMode is invalid." }
         require(meditationDurationMinutes in 1..60) { "meditationDurationMinutes is outside the portable range." }
         require(readerFontScale in MIN_READER_FONT_SCALE..MAX_READER_FONT_SCALE) {
@@ -1486,6 +1490,7 @@ private fun AccountLightSettings.toPortableAppSettings(supportedPackages: Set<St
         preferredTopics = preferredTopics.mapTo(mutableSetOf()) { TopicTag.valueOf(it) },
         preferredDurationBucket = DurationBucket.valueOf(preferredDurationBucket),
         selectedPackIds = selectedPackIds.filter(String::isSafePortablePackId).toSet(),
+        interventionMode = InterventionMode.valueOf(interventionMode),
         themeMode = AppThemeMode.valueOf(themeMode),
         meditationDurationMinutes = meditationDurationMinutes,
         contentPriority = ContentPriority.valueOf(contentPriority),
@@ -1509,6 +1514,7 @@ private fun AppSettings.toAccountLightSettings(
         preferredTopics = preferredTopics.map { it.name }.sorted(),
         preferredDurationBucket = preferredDurationBucket.name,
         selectedPackIds = selectedPackIds.filter(String::isSafePortablePackId).sorted(),
+        interventionMode = interventionMode.name,
         themeMode = themeMode.name,
         meditationDurationMinutes = meditationDurationMinutes,
         readerFontScale = readerFontScale.toPortableReaderFontScale(),
@@ -2153,7 +2159,7 @@ private val RequiredSettingsKeys = setOf(
     "reactivatedCompletedContentIds",
     "openAnywayUnlockMinutes",
 )
-private val AllowedSettingsKeys = RequiredSettingsKeys + setOf("interfaceTextScale")
+private val AllowedSettingsKeys = RequiredSettingsKeys + setOf("interfaceTextScale", "interventionMode")
 private val RequiredLibraryKeys = setOf("userLinks", "userDocuments")
 private val RequiredUserLinkKeys = setOf(
     "contentId",

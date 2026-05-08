@@ -24,6 +24,7 @@ import com.qualityalternative.app.domain.model.ContentSourceType
 import com.qualityalternative.app.domain.model.DistractingApp
 import com.qualityalternative.app.domain.model.DurationBucket
 import com.qualityalternative.app.domain.model.EditorialPack
+import com.qualityalternative.app.domain.model.InterventionMode
 import com.qualityalternative.app.domain.model.MEDITATION_TIMER_CONTENT_ID
 import com.qualityalternative.app.domain.model.MeditationTimerContentItem
 import com.qualityalternative.app.domain.model.OnboardingSelection
@@ -3508,6 +3509,55 @@ class MainViewModelTest {
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
+    fun selectInterventionMode_persistsAndUpdatesUiState() = runTest {
+        val settingsRepository = FakeSettingsRepository(
+            initial = completedSettings(
+                selectedAppPackages = setOf(FixtureTargetRegistry.fixtureDistractors.first().packageName),
+            ),
+        )
+        val viewModel = createViewModel(settingsRepository = settingsRepository)
+
+        advanceUntilIdle()
+        assertEquals(InterventionMode.FIRM, viewModel.uiState.interventionMode)
+
+        viewModel.selectInterventionMode(InterventionMode.SOFT)
+        advanceUntilIdle()
+
+        assertEquals(InterventionMode.SOFT, viewModel.uiState.interventionMode)
+        assertEquals(InterventionMode.SOFT, settingsRepository.state.value.interventionMode)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun softInterventionModeLeavesOpenAnywayImmediatelyAvailable() = runTest {
+        val fixtureTarget = FixtureTargetRegistry.fixtureDistractors.first()
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val viewModel = createViewModel(
+            settingsRepository = FakeSettingsRepository(
+                initial = completedSettings(selectedAppPackages = setOf(fixtureTarget.packageName))
+                    .copy(interventionMode = InterventionMode.SOFT),
+            ),
+            analyticsTracker = analyticsTracker,
+            nowProvider = { 40_000L },
+        )
+
+        advanceUntilIdle()
+        viewModel.requestSystemInterception(targetAppPackage = fixtureTarget.packageName, nowMillis = 40_000L)
+        advanceUntilIdle()
+
+        assertEquals(MainScreen.Intervention, viewModel.uiState.screen)
+        assertEquals(null, viewModel.uiState.currentOpenAnywayUnlockAvailableAtMillis)
+        assertTrue(viewModel.openAnyway())
+        val events = analyticsTracker.allEvents()
+        assertFalse(events.any { it.type == AnalyticsEventType.FORM_INTERVENTION_SHOWN })
+        assertFalse(events.any { it.type == AnalyticsEventType.FORM_INTERVENTION_UNLOCK_USED })
+        val openAnyway = events.first { it.type == AnalyticsEventType.OPEN_ANYWAY_SELECTED }
+        assertEquals("SOFT", openAnyway.metadata["interventionMode"])
+        assertEquals("0", openAnyway.metadata["formUnlockWaitMillis"])
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
     fun formInterventionAbandonmentRecordsAnalyticsAndClearsIntervention() = runTest {
         val fixtureTarget = FixtureTargetRegistry.fixtureDistractors.first()
         val analyticsTracker = InMemoryAnalyticsTracker()
@@ -3993,6 +4043,7 @@ class MainViewModelTest {
                 preferredTopics = selection.preferredTopics,
                 preferredDurationBucket = selection.preferredDurationBucket,
                 selectedPackIds = selection.selectedPackIds,
+                interventionMode = state.value.interventionMode,
                 themeMode = state.value.themeMode,
                 meditationDurationMinutes = state.value.meditationDurationMinutes,
                 contentPriority = state.value.contentPriority,
@@ -4032,6 +4083,7 @@ class MainViewModelTest {
                 preferredTopics = settings.preferredTopics,
                 preferredDurationBucket = settings.preferredDurationBucket,
                 selectedPackIds = settings.selectedPackIds,
+                interventionMode = settings.interventionMode,
                 themeMode = settings.themeMode,
                 meditationDurationMinutes = settings.meditationDurationMinutes,
                 readerFontScale = settings.readerFontScale,
@@ -4049,6 +4101,10 @@ class MainViewModelTest {
 
         override suspend fun savePreferredDurationBucket(bucket: DurationBucket) {
             state.value = state.value.copy(preferredDurationBucket = bucket)
+        }
+
+        override suspend fun saveInterventionMode(mode: InterventionMode) {
+            state.value = state.value.copy(interventionMode = mode)
         }
 
         override suspend fun saveThemeMode(themeMode: AppThemeMode) {

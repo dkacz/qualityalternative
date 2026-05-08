@@ -29,6 +29,7 @@ import com.qualityalternative.app.domain.model.ContentItem
 import com.qualityalternative.app.domain.model.ContentPriority
 import com.qualityalternative.app.domain.model.ContentSourceType
 import com.qualityalternative.app.domain.model.DEFAULT_INTERFACE_TEXT_SCALE
+import com.qualityalternative.app.domain.model.DEFAULT_INTERVENTION_MODE
 import com.qualityalternative.app.domain.model.DEFAULT_MEDITATION_MINUTES
 import com.qualityalternative.app.domain.model.DEFAULT_OPEN_ANYWAY_UNLOCK_MINUTES
 import com.qualityalternative.app.domain.model.DelayWindow
@@ -36,6 +37,7 @@ import com.qualityalternative.app.domain.model.DistractingApp
 import com.qualityalternative.app.domain.model.DurationBucket
 import com.qualityalternative.app.domain.model.EditorialPack
 import com.qualityalternative.app.domain.model.DEFAULT_READER_FONT_SCALE
+import com.qualityalternative.app.domain.model.InterventionMode
 import com.qualityalternative.app.domain.model.MEDITATION_TIMER_CONTENT_ID
 import com.qualityalternative.app.domain.model.MAX_INTERFACE_TEXT_SCALE
 import com.qualityalternative.app.domain.model.MAX_OPEN_ANYWAY_UNLOCK_MINUTES
@@ -136,6 +138,7 @@ data class MainUiState(
     val addLinkForm: AddLinkFormState = AddLinkFormState(),
     val addDocumentForm: AddDocumentFormState = AddDocumentFormState(),
     val savedLinkConfirmation: AddLinkConfirmation? = null,
+    val interventionMode: InterventionMode = DEFAULT_INTERVENTION_MODE,
     val themeMode: AppThemeMode = AppThemeMode.LIGHT,
     val meditationDurationMinutes: Int = DEFAULT_MEDITATION_MINUTES,
     val readerFontScale: Double = DEFAULT_READER_FONT_SCALE,
@@ -1700,20 +1703,29 @@ class MainViewModel(
                     ),
                 )
             }
-            recordEvent(
-                AnalyticsEvent(
-                    type = AnalyticsEventType.FORM_INTERVENTION_SHOWN,
-                    timestampMillis = processingNowMillis,
-                    interventionId = interventionId,
-                    targetAppPackage = targetApp.packageName,
-                    primaryContentId = recommendationSet.primary.id,
-                    backupContentIds = backupIds,
-                    contentId = recommendationSet.primary.id,
-                    metadata = recommendationSet.analyticsMetadata() + mapOf(
-                        "openAnywayUnlockDelayMillis" to FORM_INTERVENTION_UNLOCK_DELAY_MILLIS.toString(),
+            val interventionMode = uiState.interventionMode
+            val openAnywayAvailableAtMillis = if (interventionMode == InterventionMode.FIRM) {
+                processingNowMillis + FORM_INTERVENTION_UNLOCK_DELAY_MILLIS
+            } else {
+                null
+            }
+            if (interventionMode == InterventionMode.FIRM) {
+                recordEvent(
+                    AnalyticsEvent(
+                        type = AnalyticsEventType.FORM_INTERVENTION_SHOWN,
+                        timestampMillis = processingNowMillis,
+                        interventionId = interventionId,
+                        targetAppPackage = targetApp.packageName,
+                        primaryContentId = recommendationSet.primary.id,
+                        backupContentIds = backupIds,
+                        contentId = recommendationSet.primary.id,
+                        metadata = recommendationSet.analyticsMetadata() + mapOf(
+                            "interventionMode" to interventionMode.name,
+                            "openAnywayUnlockDelayMillis" to FORM_INTERVENTION_UNLOCK_DELAY_MILLIS.toString(),
+                        ),
                     ),
-                ),
-            )
+                )
+            }
             unfinishedProgressFor(recommendationSet.primary.id)?.let { progress ->
                 recordEvent(
                     AnalyticsEvent(
@@ -1735,7 +1747,7 @@ class MainViewModel(
                 selectedTargetApp = targetApp,
                 currentInterventionId = interventionId,
                 currentInterventionShownAtMillis = processingNowMillis,
-                currentOpenAnywayUnlockAvailableAtMillis = processingNowMillis + FORM_INTERVENTION_UNLOCK_DELAY_MILLIS,
+                currentOpenAnywayUnlockAvailableAtMillis = openAnywayAvailableAtMillis,
                 currentRecommendationSet = recommendationSet,
                 currentInterventionOrigin = origin,
                 activeDelayWindow = null,
@@ -1860,6 +1872,7 @@ class MainViewModel(
                 primaryContentId = recommendationSet.primary.id,
                 backupContentIds = recommendationSet.backups.map(ContentItem::id),
                 metadata = mapOf(
+                    "interventionMode" to uiState.interventionMode.name,
                     "openAnywayUnlockAvailableAtMillis" to availableAtMillis.toString(),
                     "elapsedMillis" to (nowMillis - (uiState.currentInterventionShownAtMillis ?: nowMillis))
                         .coerceAtLeast(0L)
@@ -1873,20 +1886,23 @@ class MainViewModel(
         val targetApp = uiState.selectedTargetApp ?: return
         val recommendationSet = uiState.currentRecommendationSet ?: return
         val interventionId = uiState.currentInterventionId ?: return
-        recordEvent(
-            AnalyticsEvent(
-                type = AnalyticsEventType.FORM_INTERVENTION_ABANDONED,
-                timestampMillis = nowMillis,
-                interventionId = interventionId,
-                targetAppPackage = targetApp.packageName,
-                primaryContentId = recommendationSet.primary.id,
-                backupContentIds = recommendationSet.backups.map(ContentItem::id),
-                metadata = mapOf(
-                    "reason" to reason,
-                    "openAnywayUnlockAvailableAtMillis" to uiState.currentOpenAnywayUnlockAvailableAtMillis.orEmptyString(),
+        if (uiState.interventionMode == InterventionMode.FIRM) {
+            recordEvent(
+                AnalyticsEvent(
+                    type = AnalyticsEventType.FORM_INTERVENTION_ABANDONED,
+                    timestampMillis = nowMillis,
+                    interventionId = interventionId,
+                    targetAppPackage = targetApp.packageName,
+                    primaryContentId = recommendationSet.primary.id,
+                    backupContentIds = recommendationSet.backups.map(ContentItem::id),
+                    metadata = mapOf(
+                        "reason" to reason,
+                        "interventionMode" to uiState.interventionMode.name,
+                        "openAnywayUnlockAvailableAtMillis" to uiState.currentOpenAnywayUnlockAvailableAtMillis.orEmptyString(),
+                    ),
                 ),
-            ),
-        )
+            )
+        }
         uiState = uiState.copy(
             screen = MainScreen.Home,
             currentInterventionId = null,
@@ -1976,6 +1992,7 @@ class MainViewModel(
         val recommendationSet = uiState.currentRecommendationSet
         val nowMillis = nowProvider()
         val openAnywayAvailableAtMillis = uiState.currentOpenAnywayUnlockAvailableAtMillis
+        val isFirmMode = uiState.interventionMode == InterventionMode.FIRM
         if (openAnywayAvailableAtMillis != null && nowMillis < openAnywayAvailableAtMillis) {
             recordEvent(
                 AnalyticsEvent(
@@ -1986,6 +2003,7 @@ class MainViewModel(
                     primaryContentId = recommendationSet?.primary?.id,
                     backupContentIds = recommendationSet?.backups.orEmpty().map(ContentItem::id),
                     metadata = mapOf(
+                        "interventionMode" to uiState.interventionMode.name,
                         "openAnywayUnlockAvailableAtMillis" to openAnywayAvailableAtMillis.toString(),
                         "remainingMillis" to (openAnywayAvailableAtMillis - nowMillis).toString(),
                     ),
@@ -2007,26 +2025,30 @@ class MainViewModel(
                 primaryContentId = recommendationSet?.primary?.id,
                 backupContentIds = recommendationSet?.backups.orEmpty().map(ContentItem::id),
                 metadata = mapOf(
+                    "interventionMode" to uiState.interventionMode.name,
                     "openAnywayUnlockMinutes" to unlockMinutes.toString(),
                     "openAnywayUnlockUntilMillis" to unlockUntilMillis.toString(),
-                    "formUnlockWaitMillis" to FORM_INTERVENTION_UNLOCK_DELAY_MILLIS.toString(),
+                    "formUnlockWaitMillis" to if (isFirmMode) FORM_INTERVENTION_UNLOCK_DELAY_MILLIS.toString() else "0",
                 ),
             ),
         )
-        recordEvent(
-            AnalyticsEvent(
-                type = AnalyticsEventType.FORM_INTERVENTION_UNLOCK_USED,
-                timestampMillis = nowMillis,
-                interventionId = uiState.currentInterventionId,
-                targetAppPackage = targetApp.packageName,
-                primaryContentId = recommendationSet?.primary?.id,
-                backupContentIds = recommendationSet?.backups.orEmpty().map(ContentItem::id),
-                metadata = mapOf(
-                    "openAnywayUnlockAvailableAtMillis" to (openAnywayAvailableAtMillis?.toString() ?: "0"),
-                    "openAnywayUnlockUntilMillis" to unlockUntilMillis.toString(),
+        if (isFirmMode) {
+            recordEvent(
+                AnalyticsEvent(
+                    type = AnalyticsEventType.FORM_INTERVENTION_UNLOCK_USED,
+                    timestampMillis = nowMillis,
+                    interventionId = uiState.currentInterventionId,
+                    targetAppPackage = targetApp.packageName,
+                    primaryContentId = recommendationSet?.primary?.id,
+                    backupContentIds = recommendationSet?.backups.orEmpty().map(ContentItem::id),
+                    metadata = mapOf(
+                        "interventionMode" to uiState.interventionMode.name,
+                        "openAnywayUnlockAvailableAtMillis" to (openAnywayAvailableAtMillis?.toString() ?: "0"),
+                        "openAnywayUnlockUntilMillis" to unlockUntilMillis.toString(),
+                    ),
                 ),
-            ),
-        )
+            )
+        }
         recordFormInterventionCompleted(action = "open_anyway", nowMillis = nowMillis)
         if (shouldExitToTarget) {
             InterceptionRuntimeGate.suppressPackage(
@@ -2319,6 +2341,15 @@ class MainViewModel(
         uiState = uiState.copy(themeMode = themeMode)
         viewModelScope.launch {
             settingsRepository.saveThemeMode(themeMode)
+            autosaveAccountLightProfileAfterPortableMutation()
+        }
+    }
+
+    fun selectInterventionMode(mode: InterventionMode) {
+        if (uiState.interventionMode == mode) return
+        uiState = uiState.copy(interventionMode = mode)
+        viewModelScope.launch {
+            settingsRepository.saveInterventionMode(mode)
             autosaveAccountLightProfileAfterPortableMutation()
         }
     }
@@ -2616,6 +2647,7 @@ class MainViewModel(
             availableTargetApps = availableTargetApps,
             selectedTargetApp = selectedTargetApp,
             preferences = preferences.takeIf { settings.hasCompletedOnboarding },
+            interventionMode = settings.interventionMode,
             themeMode = settings.themeMode,
             meditationDurationMinutes = settings.meditationDurationMinutes,
             readerFontScale = settings.readerFontScale,
@@ -3337,6 +3369,7 @@ class MainViewModel(
         val targetApp = uiState.selectedTargetApp ?: return
         val recommendationSet = uiState.currentRecommendationSet ?: return
         val interventionId = uiState.currentInterventionId ?: return
+        if (uiState.interventionMode != InterventionMode.FIRM) return
         recordEvent(
             AnalyticsEvent(
                 type = AnalyticsEventType.FORM_INTERVENTION_COMPLETED,
@@ -3348,6 +3381,7 @@ class MainViewModel(
                 contentId = contentId,
                 metadata = mapOf(
                     "action" to action,
+                    "interventionMode" to uiState.interventionMode.name,
                     "openAnywayUnlockAvailableAtMillis" to uiState.currentOpenAnywayUnlockAvailableAtMillis.orEmptyString(),
                 ),
             ),
