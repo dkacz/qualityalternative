@@ -1,12 +1,12 @@
 # Sprint 19 - Reader Regression, Form Intervention, And AI Notes
 
-Status: `regression_release_candidate_ready`
+Status: `session_progress_hotfix_release_ready`
 
 Requested on: 2026-05-07
 
 ## Goal
 
-Start Sprint 19 by fixing the current reader and intervention regressions, release an APK with those fixes, and only then move into AI-assisted annotation notes in the second part of the sprint. AI work must not begin until there is a reviewed, installable APK that fixes annotation selection, progress, and form intervention.
+Start Sprint 19 by fixing the current reader and intervention regressions, release an APK with those fixes, and only then move into AI-assisted annotation notes in the second part of the sprint. AI work must not begin until there is a reviewed, installable APK that fixes annotation selection, progress, and form intervention. If late tester regressions appear before AI begins, ship those reader/intervention hotfixes first.
 
 Mapped PRD items: FR6, FR7, FR8, FR8A, FR13, NFR privacy, NFR reliability, NFR calm interaction model.
 
@@ -15,6 +15,8 @@ Mapped PRD items: FR6, FR7, FR8, FR8A, FR13, NFR privacy, NFR reliability, NFR c
 - Annotation range adjustment is still unstable. When the user tries to move the start of an annotation backward, it can jump as if it moved to the beginning of the book.
 - Reading progress can still be wrong. The user can be in chapter 3 while the app shows `1%`, which suggests progress is being calculated from the wrong anchor, wrong display block, or wrong scope.
 - Form intervention is not working as desired. The desired behavior is a lightweight form-style unlock similar in feel to the existing edit-breath interaction: the user performs the small intervention and waits about 5 seconds before unlock is available.
+- Reader session progress can still be too weakly persisted. After reading for a while, locking the device, and reopening, the app may return to the pre-session location rather than the last viewed page.
+- Meditation is missing as a visible alternative when the primary recommendation is reading-heavy content. The standing meditation reset must remain available as a finite backup option.
 - AI-assisted notes remain desired, but they come after these regressions and after a release APK containing the fixes.
 
 ## Product Rules
@@ -23,6 +25,8 @@ Mapped PRD items: FR6, FR7, FR8, FR8A, FR13, NFR privacy, NFR reliability, NFR c
 - Annotation selection must be source-anchored. Moving the start backward may cross display pages and source blocks, but it must never teleport to the beginning of the book unless the actual selected source range begins there.
 - Reading progress must be derived from the stable source location, not transient paginated display indexes. If the UI shows whole-material progress, chapter navigation and font repagination must not reset it to a misleading low value. If any chapter-local progress is shown, the UI must label that scope clearly.
 - Form intervention must be calm and bounded. It may slow unlocking with a short 5-second wait, but it must not become punitive, feed-like, or confusing.
+- Reader progress persistence must be lifecycle-safe. The app must durably refresh the current source-anchored reader position on page moves, backward moves, lifecycle pause/stop, and reader disposal.
+- Meditation remains a standing intervention option. When the primary recommendation is reading content and meditation is eligible, the finite backup list must keep meditation visible even if reading items dominate rank order.
 - Any form-intervention change must explicitly reconcile with FR7, which currently says no additional mandatory step is inserted after `Open anyway`. If Sprint 19 changes that behavior, the PRD must be updated intentionally instead of silently drifting.
 - AI note assistance is optional and explicit. Ordinary annotation saving must keep working offline and without an AI key.
 - No API key, OpenRouter credential, Google credential, account email, raw Drive file id, or model-provider secret may be exported through Portable Profile or annotation sync.
@@ -39,7 +43,13 @@ Mapped PRD items: FR6, FR7, FR8, FR8A, FR13, NFR privacy, NFR reliability, NFR c
 - 2026-05-07: GPT Pro R2 regression gate returned `10/10 PASS` with `VISUAL REVIEW: PASS`. Slice 19.5 release packaging may proceed.
 - 2026-05-07: Slice 19.5 release candidate `v0.11.2-reader-regression-form-alpha` passed unit validation, debug APK build, connected reader/annotation E2E, connected form-intervention E2E, signature verification, emulator install smoke, launch smoke, and emulator shutdown.
 - 2026-05-07: GPT Pro final release gate returned `10/10 PASS` with `VISUAL REVIEW: PASS`; tagging and GitHub release publication may proceed.
-- AI implementation remains blocked until the regression-fix APK in Slice 19.5 is reviewed and released.
+- 2026-05-08: A late tester regression requires an emergency hotfix before AI: reader session progress now refreshes durable storage on every visible page move, backward move, lifecycle pause/stop, and reader disposal; same-position lifecycle saves refresh the store without duplicate progress analytics.
+- 2026-05-08: Meditation is restored as a guaranteed finite backup when the primary recommendation is reading and meditation is eligible.
+- 2026-05-08: GPT Pro R1 hotfix review returned `8/10 FAIL`; R2 closes the blocker by persisting before reader back/skip clears active content and by rejecting late incomplete disposal saves after completed reading progress.
+- 2026-05-08: GPT Pro R3 hotfix review returned `8/10 FAIL`; R4 moves completion-downgrade protection to the repository write boundary and adds a delayed unfinished-save/in-flight completion regression test.
+- 2026-05-08: GPT Pro R4 hotfix review returned `10/10 PASS` with `VISUAL REVIEW: PASS`; release packaging may proceed.
+- 2026-05-08: Release candidate `v0.11.3-session-progress-meditation-alpha` passed targeted unit validation, debug/APK build, connected session-progress E2E, connected meditation-backup E2E, signature verification, emulator install smoke, and launch smoke.
+- AI implementation remains blocked until the regression-fix APK and the emergency session-progress hotfix are reviewed and released.
 
 ## Slice Plan
 
@@ -142,6 +152,23 @@ Acceptance:
 - GPT Pro has already returned `SCORE: 10/10`, `VERDICT: PASS`, and `VISUAL REVIEW: PASS` for the regression gate.
 - Release notes clearly state that AI note assistance is not included yet and starts only in the second part of Sprint 19.
 - Only after this APK is released may Sprint 19 begin AI note work.
+
+### Slice 19.5A: Session Progress Durability And Meditation Backup Hotfix
+
+Deliverables:
+
+- Persist the current reader source position after forward page moves, backward page moves, lifecycle pause/stop, and reader disposal.
+- Refresh durable reading-progress storage even when the visible source position is unchanged, while avoiding duplicate progress analytics for lifecycle retries.
+- Preserve meditation as a visible finite backup alternative when the primary recommendation is reading content and meditation is eligible.
+- Add unit and connected Android coverage for same-position lifecycle saves, reopen-to-last-viewed-page behavior, and meditation backup visibility.
+- Produce visual evidence and GPT Pro review before any AI implementation begins.
+
+Acceptance:
+
+- After reading, navigating backward, closing/reopening the app, or lock/unlock-style lifecycle interruption, the reader returns to the last viewed source-anchored page rather than the pre-session location.
+- The durable reading-progress row is refreshed on lifecycle stop/pause/disposal even when the UI page did not visibly change.
+- Recommendation backups include the meditation reset when reading dominates the ranked list and meditation is otherwise eligible.
+- GPT Pro hotfix review returns `SCORE: 10/10`, `VERDICT: PASS`, and `VISUAL REVIEW: PASS`.
 
 ## AI Note Feature - Second Part Of Sprint 19
 

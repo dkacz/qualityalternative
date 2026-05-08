@@ -257,6 +257,7 @@ The system must choose one primary recommendation and a short, bounded backup li
 - The system may expose additional finite backups in a bounded scrollable list, capped below feed-like scale.
 - The primary recommendation may expose the next automatically calculated reading segment length, but the segment length is presentation metadata rather than a whole-source ranking filter.
 - Backup recommendations are ranked by usefulness, priority, unfinished state, freshness, and availability rather than being capped to the primary item's total reading length.
+- If the primary recommendation is reading content and the meditation reset is otherwise eligible, the finite backup list keeps meditation visible as an alternative even when reading items dominate the ranked inventory.
 - If fewer than three suitable items exist, the system still returns at least one recommendation and logs an inventory-shortage event.
 - The intervention flow must not require the user to browse the backup list before making a choice.
 
@@ -298,6 +299,7 @@ The system must deliver a calm replacement session that feels meaningfully diffe
 - If the item is a user-owned Markdown or EPUB document, the user can read it inside the app.
 - If the item is a user-owned PDF, the user can open it through a clearly controlled Android document-viewer fallback.
 - Long-form reader surfaces show reading-position progress that is based on document position, not only elapsed time.
+- Long-form reader progress is durably refreshed on page moves, backward moves, lifecycle pause/stop, and reader disposal so lock/unlock or app reopen returns to the last viewed source-anchored position.
 - The in-app reader is paginated by default. It must not rely on vertical scrolling for active reading.
 - Reader pagination must adapt to the actual page viewport, device size, orientation where supported, and the user's in-app reader font-size setting. It should fill the page comfortably without clipping text or leaving large avoidable empty regions.
 - Reader font size is a first-class app setting, not something the user must change at Android system level. System accessibility font scale may still be respected by the platform, but the product must expose its own reader font-size control.

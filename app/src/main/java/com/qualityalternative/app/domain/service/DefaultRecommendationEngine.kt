@@ -92,7 +92,7 @@ class DefaultRecommendationEngine : RecommendationEngine {
         primary: ScoredCandidate,
         scoredCandidates: List<ScoredCandidate>,
     ): List<ScoredCandidate> {
-        return scoredCandidates
+        val sortedBackups = scoredCandidates
             .filter { candidate ->
                 candidate.item.id != primary.item.id
             }
@@ -103,7 +103,21 @@ class DefaultRecommendationEngine : RecommendationEngine {
                     .thenByDescending { it.addedAtMillis }
                     .thenBy { it.item.title },
             )
-            .take(MAX_BACKUP_OPTIONS)
+        val cappedBackups = sortedBackups.take(MAX_BACKUP_OPTIONS)
+        if (
+            primary.item.sourceType == ContentSourceType.MEDITATION ||
+            cappedBackups.any { candidate -> candidate.item.sourceType == ContentSourceType.MEDITATION }
+        ) {
+            return cappedBackups
+        }
+        val meditationBackup = sortedBackups.firstOrNull { candidate ->
+            candidate.item.sourceType == ContentSourceType.MEDITATION
+        } ?: return cappedBackups
+        return if (cappedBackups.size < MAX_BACKUP_OPTIONS) {
+            cappedBackups + meditationBackup
+        } else {
+            cappedBackups.dropLast(1) + meditationBackup
+        }
     }
 
     private fun selectionRank(item: ContentItem, preferences: UserPreferences): Int {

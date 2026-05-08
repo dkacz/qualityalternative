@@ -1,0 +1,710 @@
+diff --git a/PRD.md b/PRD.md
+index ba27dc5..73ac86f 100644
+--- a/PRD.md
++++ b/PRD.md
+@@ -257,6 +257,7 @@ The system must choose one primary recommendation and a short, bounded backup li
+ - The system may expose additional finite backups in a bounded scrollable list, capped below feed-like scale.
+ - The primary recommendation may expose the next automatically calculated reading segment length, but the segment length is presentation metadata rather than a whole-source ranking filter.
+ - Backup recommendations are ranked by usefulness, priority, unfinished state, freshness, and availability rather than being capped to the primary item's total reading length.
++- If the primary recommendation is reading content and the meditation reset is otherwise eligible, the finite backup list keeps meditation visible as an alternative even when reading items dominate the ranked inventory.
+ - If fewer than three suitable items exist, the system still returns at least one recommendation and logs an inventory-shortage event.
+ - The intervention flow must not require the user to browse the backup list before making a choice.
+ 
+@@ -298,6 +299,7 @@ The system must deliver a calm replacement session that feels meaningfully diffe
+ - If the item is a user-owned Markdown or EPUB document, the user can read it inside the app.
+ - If the item is a user-owned PDF, the user can open it through a clearly controlled Android document-viewer fallback.
+ - Long-form reader surfaces show reading-position progress that is based on document position, not only elapsed time.
++- Long-form reader progress is durably refreshed on page moves, backward moves, lifecycle pause/stop, and reader disposal so lock/unlock or app reopen returns to the last viewed source-anchored position.
+ - The in-app reader is paginated by default. It must not rely on vertical scrolling for active reading.
+ - Reader pagination must adapt to the actual page viewport, device size, orientation where supported, and the user's in-app reader font-size setting. It should fill the page comfortably without clipping text or leaving large avoidable empty regions.
+ - Reader font size is a first-class app setting, not something the user must change at Android system level. System accessibility font scale may still be respected by the platform, but the product must expose its own reader font-size control.
+diff --git a/app/src/androidTest/java/com/qualityalternative/app/MainActivityTest.kt b/app/src/androidTest/java/com/qualityalternative/app/MainActivityTest.kt
+index 84e5c41..d984294 100644
+--- a/app/src/androidTest/java/com/qualityalternative/app/MainActivityTest.kt
++++ b/app/src/androidTest/java/com/qualityalternative/app/MainActivityTest.kt
+@@ -28,6 +28,7 @@ import androidx.compose.ui.test.performTouchInput
+ import androidx.compose.ui.test.swipeLeft
+ import androidx.compose.ui.test.swipeRight
+ import androidx.compose.ui.test.swipeUp
++import androidx.lifecycle.Lifecycle
+ import androidx.test.core.app.ActivityScenario
+ import androidx.test.platform.app.InstrumentationRegistry
+ import androidx.test.uiautomator.UiDevice
+@@ -1658,6 +1659,82 @@ class MainActivityTest {
+         captureSprint19RegressionScreenshot("08_form_intervention_unlock_ready")
+     }
+ 
++    @Test
++    fun sprint19ReaderSessionProgressPersistsLastViewedPageAfterReopen() {
++        launchOnboardedApp()
++        val document = addSeedMarkdownDocument(
++            title = "Sprint 19 Session Progress",
++            displayName = "sprint19-session-progress.md",
++            body = (1..80).joinToString(separator = "\n\n") { index ->
++                "Session progress paragraph $index gives the reader enough source material to page forward, " +
++                    "move back once, lock, and reopen without returning to the stale pre-session location."
++            },
++            nowMillis = 95_000L,
++        )
++
++        scenario?.onActivity { activity -> activity.mainViewModel.openLibraryItem(document) }
++        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
++        repeat(3) {
++            val beforePage = readerPagePositionFromLabel().currentPage
++            advanceReaderPage()
++            composeRule.waitUntil(timeoutMillis = 10_000) {
++                readerPagePositionFromLabel().currentPage > beforePage
++            }
++        }
++        val forwardPage = readerPagePositionFromLabel()
++        composeRule.onNodeWithTag("reader-page-viewport")
++            .performTouchInput { swipeRight() }
++        composeRule.waitUntil(timeoutMillis = 10_000) {
++            readerPagePositionFromLabel().currentPage == forwardPage.currentPage - 1
++        }
++        val lastViewedPage = readerPagePositionFromLabel()
++        val lastViewedPercent = currentReaderProgressPercentFromLabel()
++        composeRule.waitUntil(timeoutMillis = 10_000) {
++            savedProgressPercentFor(document.id) == lastViewedPercent
++        }
++        captureSprint19RegressionScreenshot("09_session_progress_saved_before_pause_stop")
++
++        scenario?.moveToState(Lifecycle.State.CREATED)
++        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
++        Thread.sleep(250)
++        scenario?.moveToState(Lifecycle.State.RESUMED)
++        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
++        composeRule.waitUntil(timeoutMillis = 10_000) {
++            readerPagePositionFromLabel().currentPage == lastViewedPage.currentPage
++        }
++        assertEquals(lastViewedPage.totalPages, readerPagePositionFromLabel().totalPages)
++        captureSprint19RegressionScreenshot("10_session_progress_restored_after_pause_stop")
++
++        scenario?.close()
++        scenario = null
++        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
++        Thread.sleep(250)
++        launchOnboardedApp()
++        scenario?.onActivity { activity -> activity.mainViewModel.openLibraryItem(document) }
++        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
++        composeRule.waitUntil(timeoutMillis = 10_000) {
++            readerPagePositionFromLabel().currentPage == lastViewedPage.currentPage
++        }
++        assertEquals(lastViewedPage.totalPages, readerPagePositionFromLabel().totalPages)
++        captureSprint19RegressionScreenshot("11_session_progress_restored_after_reopen")
++    }
++
++    @Test
++    fun sprint19InterventionKeepsMeditationAlternativeWhenPrimaryIsReading() {
++        launchFixtureSystemIntervention()
++
++        composeRule.waitUntil(timeoutMillis = 10_000) {
++            currentRecommendationPrimaryContentId() != MEDITATION_TIMER_CONTENT_ID &&
++                MEDITATION_TIMER_CONTENT_ID in currentRecommendationBackupContentIds()
++        }
++        composeRule.onNodeWithTag("intervention-backup-list")
++            .performScrollToNode(hasText("3-minute reset", substring = true))
++        composeRule.onNodeWithText("3-minute reset", substring = true)
++            .assertIsDisplayed()
++            .assertIsEnabled()
++        captureSprint19RegressionScreenshot("12_meditation_backup_alternative")
++    }
++
+     @Test
+     fun systemInterventionShowsContinueProgressRemainingTimeAndScrollableOtherOptions() {
+         launchOnboardedApp()
+@@ -3292,6 +3369,25 @@ class MainActivityTest {
+         return contentIds
+     }
+ 
++    private fun currentRecommendationPrimaryContentId(): String? {
++        var contentId: String? = null
++        scenario?.onActivity { activity ->
++            contentId = activity.mainViewModel.uiState.currentRecommendationSet?.primary?.id
++        }
++        return contentId
++    }
++
++    private fun currentRecommendationBackupContentIds(): Set<String> {
++        var contentIds = emptySet<String>()
++        scenario?.onActivity { activity ->
++            contentIds = activity.mainViewModel.uiState.currentRecommendationSet
++                ?.backups
++                .orEmpty()
++                .mapTo(mutableSetOf(), ContentItem::id)
++        }
++        return contentIds
++    }
++
+     private fun hasUnfinishedProgressFor(contentId: String): Boolean {
+         var hasProgress = false
+         scenario?.onActivity { activity ->
+diff --git a/app/src/main/java/com/qualityalternative/app/data/RoomReadingProgressRepository.kt b/app/src/main/java/com/qualityalternative/app/data/RoomReadingProgressRepository.kt
+index 868f016..4b6bc1f 100644
+--- a/app/src/main/java/com/qualityalternative/app/data/RoomReadingProgressRepository.kt
++++ b/app/src/main/java/com/qualityalternative/app/data/RoomReadingProgressRepository.kt
+@@ -47,6 +47,12 @@ class RoomReadingProgressRepository(
+     override suspend fun saveProgress(progress: ReadingProgress) {
+         writeMutex.withLock {
+             val normalized = progress.normalized()
++            val existing = this.progress.value.firstOrNull { current ->
++                current.contentId == normalized.contentId
++            }
++            if (existing?.isCompleted() == true && normalized.isUnfinished()) {
++                return
++            }
+             dao.insertOrReplace(normalized.toEntity())
+             this.progress.value = upsertProgress(this.progress.value, normalized)
+         }
+diff --git a/app/src/main/java/com/qualityalternative/app/domain/service/DefaultRecommendationEngine.kt b/app/src/main/java/com/qualityalternative/app/domain/service/DefaultRecommendationEngine.kt
+index 2b27ace..bd35b50 100644
+--- a/app/src/main/java/com/qualityalternative/app/domain/service/DefaultRecommendationEngine.kt
++++ b/app/src/main/java/com/qualityalternative/app/domain/service/DefaultRecommendationEngine.kt
+@@ -92,7 +92,7 @@ class DefaultRecommendationEngine : RecommendationEngine {
+         primary: ScoredCandidate,
+         scoredCandidates: List<ScoredCandidate>,
+     ): List<ScoredCandidate> {
+-        return scoredCandidates
++        val sortedBackups = scoredCandidates
+             .filter { candidate ->
+                 candidate.item.id != primary.item.id
+             }
+@@ -103,7 +103,21 @@ class DefaultRecommendationEngine : RecommendationEngine {
+                     .thenByDescending { it.addedAtMillis }
+                     .thenBy { it.item.title },
+             )
+-            .take(MAX_BACKUP_OPTIONS)
++        val cappedBackups = sortedBackups.take(MAX_BACKUP_OPTIONS)
++        if (
++            primary.item.sourceType == ContentSourceType.MEDITATION ||
++            cappedBackups.any { candidate -> candidate.item.sourceType == ContentSourceType.MEDITATION }
++        ) {
++            return cappedBackups
++        }
++        val meditationBackup = sortedBackups.firstOrNull { candidate ->
++            candidate.item.sourceType == ContentSourceType.MEDITATION
++        } ?: return cappedBackups
++        return if (cappedBackups.size < MAX_BACKUP_OPTIONS) {
++            cappedBackups + meditationBackup
++        } else {
++            cappedBackups.dropLast(1) + meditationBackup
++        }
+     }
+ 
+     private fun selectionRank(item: ContentItem, preferences: UserPreferences): Int {
+diff --git a/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt b/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
+index 273f810..9277105 100644
+--- a/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
++++ b/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
+@@ -652,6 +652,9 @@ class MainViewModel(
+             },
+         )
+         viewModelScope.launch {
++            if (isReactivated) {
++                readingProgressRepository.deleteProgress(item.id)
++            }
+             settingsRepository.saveReactivatedCompletedContentIds(updatedIds)
+             recordEventDurably(
+                 AnalyticsEvent(
+@@ -2055,6 +2058,9 @@ class MainViewModel(
+         if (!content.usesRepositoryBody()) {
+             return
+         }
++        if (hasCompletedProgressForActiveRead(content.id)) {
++            return
++        }
+         val safeParagraphCount = paragraphCount.coerceAtLeast(1)
+         val progress = ReadingProgress(
+             contentId = content.id,
+@@ -2064,25 +2070,27 @@ class MainViewModel(
+             paragraphCount = safeParagraphCount,
+             updatedAtMillis = nowMillis,
+         )
+-        if (uiState.currentReadingProgress?.sameVisiblePosition(progress) == true) {
+-            return
++        val sameVisiblePosition = uiState.currentReadingProgress?.sameVisiblePosition(progress) == true
++        if (!sameVisiblePosition || uiState.currentReadingProgress?.updatedAtMillis != progress.updatedAtMillis) {
++            uiState = uiState.copy(currentReadingProgress = progress)
+         }
+-        uiState = uiState.copy(currentReadingProgress = progress)
+         viewModelScope.launch {
+             readingProgressRepository.saveProgress(progress)
+-            recordEventDurably(
+-                AnalyticsEvent(
+-                    type = AnalyticsEventType.READING_PROGRESS_SAVED,
+-                    timestampMillis = nowMillis,
+-                    interventionId = uiState.currentInterventionId,
+-                    sessionId = uiState.currentSessionId,
+-                    targetAppPackage = uiState.selectedTargetApp?.packageName,
+-                    primaryContentId = uiState.currentRecommendationSet?.primary?.id,
+-                    backupContentIds = uiState.currentRecommendationSet?.backups.orEmpty().map(ContentItem::id),
+-                    contentId = content.id,
+-                    metadata = content.analyticsMetadata() + progress.analyticsMetadata(),
+-                ),
+-            )
++            if (!sameVisiblePosition) {
++                recordEventDurably(
++                    AnalyticsEvent(
++                        type = AnalyticsEventType.READING_PROGRESS_SAVED,
++                        timestampMillis = nowMillis,
++                        interventionId = uiState.currentInterventionId,
++                        sessionId = uiState.currentSessionId,
++                        targetAppPackage = uiState.selectedTargetApp?.packageName,
++                        primaryContentId = uiState.currentRecommendationSet?.primary?.id,
++                        backupContentIds = uiState.currentRecommendationSet?.backups.orEmpty().map(ContentItem::id),
++                        contentId = content.id,
++                        metadata = content.analyticsMetadata() + progress.analyticsMetadata(),
++                    ),
++                )
++            }
+             autosaveAccountLightProfileAfterPortableMutation(nowMillis = nowMillis)
+         }
+     }
+@@ -3449,6 +3457,21 @@ class MainViewModel(
+         }
+     }
+ 
++    private fun hasCompletedProgressForActiveRead(contentId: String): Boolean {
++        val currentCompleted = uiState.currentReadingProgress
++            ?.takeIf { progress -> progress.contentId == contentId }
++            ?.isCompleted() == true
++        if (currentCompleted) {
++            return true
++        }
++        if (contentId in uiState.reactivatedCompletedContentIds) {
++            return false
++        }
++        return uiState.readingProgress.any { progress ->
++            progress.contentId == contentId && progress.isCompleted()
++        }
++    }
++
+     private fun completedProgressFor(
+         content: ContentItem,
+         completedAtMillis: Long,
+diff --git a/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt b/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
+index c64bf13..7dd8ea9 100644
+--- a/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
++++ b/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
+@@ -72,6 +72,7 @@ import androidx.compose.runtime.derivedStateOf
+ import androidx.compose.runtime.getValue
+ import androidx.compose.runtime.mutableStateOf
+ import androidx.compose.runtime.remember
++import androidx.compose.runtime.rememberUpdatedState
+ import androidx.compose.runtime.setValue
+ import androidx.compose.ui.Alignment
+ import androidx.compose.ui.Modifier
+@@ -113,6 +114,9 @@ import androidx.compose.ui.unit.Density
+ import androidx.compose.ui.unit.Dp
+ import androidx.compose.ui.unit.sp
+ import androidx.core.view.WindowCompat
++import androidx.lifecycle.Lifecycle
++import androidx.lifecycle.LifecycleEventObserver
++import androidx.lifecycle.compose.LocalLifecycleOwner
+ import com.qualityalternative.app.data.ACCOUNT_LIGHT_PROFILE_FILE_NAME
+ import com.qualityalternative.app.data.accountLightTimestampedBackupFileName
+ import com.qualityalternative.app.BuildConfig
+@@ -2303,6 +2307,39 @@ private fun ReaderScreen(
+         ?: sourceDerivedProgress
+     val firstVisibleParagraphIndex = currentPage.start
+     val pageParagraphIndices = currentPage.start..currentPage.endInclusive
++    fun persistReaderProgress(sourcePosition: ReaderSourcePosition) {
++        onProgressChanged(
++            readerProgressPercentForSourcePosition(
++                sourceBlockIndex = sourcePosition.sourceBlockIndex,
++                textOffset = sourcePosition.textOffset,
++                sourceBlocks = rawBlocks,
++            ),
++            sourcePosition.sourceBlockIndex,
++            sourcePosition.textOffset,
++            rawBlocks.size,
++        )
++    }
++    val persistVisibleReaderProgress by rememberUpdatedState {
++        persistReaderProgress(progressSourcePosition)
++    }
++    val lifecycleOwner = LocalLifecycleOwner.current
++    DisposableEffect(lifecycleOwner, content.id) {
++        val observer = LifecycleEventObserver { _, event ->
++            if (event == Lifecycle.Event.ON_PAUSE || event == Lifecycle.Event.ON_STOP) {
++                persistVisibleReaderProgress()
++            }
++        }
++        lifecycleOwner.lifecycle.addObserver(observer)
++        onDispose {
++            lifecycleOwner.lifecycle.removeObserver(observer)
++            persistVisibleReaderProgress()
++        }
++    }
++    LaunchedEffect(content.id, hasManualReaderNavigation, progressSourcePosition, rawBlocks.size) {
++        if (hasManualReaderNavigation) {
++            persistReaderProgress(progressSourcePosition)
++        }
++    }
+     LaunchedEffect(content.id, safeCurrentPageIndex, currentPage.start, currentPage.endInclusive) {
+         listState.scrollToItem(0)
+     }
+@@ -2319,18 +2356,7 @@ private fun ReaderScreen(
+         annotationSelection = null
+         annotationNoteDraft = ""
+         isTocOpen = false
+-        if (nextPageIndex > safeCurrentPageIndex) {
+-            onProgressChanged(
+-                readerProgressPercentForSourcePosition(
+-                    sourceBlockIndex = sourcePosition.sourceBlockIndex,
+-                    textOffset = sourcePosition.textOffset,
+-                    sourceBlocks = rawBlocks,
+-                ),
+-                sourcePosition.sourceBlockIndex,
+-                sourcePosition.textOffset,
+-                rawBlocks.size,
+-            )
+-        }
++        persistReaderProgress(sourcePosition)
+     }
+ 
+     fun updateAnnotationSelection(nextSelection: ReaderAnnotationSelection) {
+@@ -2361,7 +2387,10 @@ private fun ReaderScreen(
+                 annotationSelection = null
+                 annotationNoteDraft = ""
+             }
+-            else -> onBack()
++            else -> {
++                persistVisibleReaderProgress()
++                onBack()
++            }
+         }
+     }
+ 
+diff --git a/app/src/test/java/com/qualityalternative/app/domain/service/DefaultRecommendationEngineTest.kt b/app/src/test/java/com/qualityalternative/app/domain/service/DefaultRecommendationEngineTest.kt
+index aa61581..73ee40f 100644
+--- a/app/src/test/java/com/qualityalternative/app/domain/service/DefaultRecommendationEngineTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/domain/service/DefaultRecommendationEngineTest.kt
+@@ -630,6 +630,48 @@ class DefaultRecommendationEngineTest {
+         assertEquals("a-breathing-meditation", meditationPriorityResult?.primary?.id)
+     }
+ 
++    @Test
++    fun generate_keepsMeditationBackupWhenPrimaryIsReading() {
++        val preferences = UserPreferences(
++            selectedApps = listOf(DistractingApp(packageName = "pkg", displayName = "Instagram")),
++            preferredTopics = setOf(TopicTag.SCIENCE),
++            preferredDurationBucket = DurationBucket.FOCUS,
++            selectedPackIds = setOf("pack", "meditation"),
++            priorityContentIds = setOf("science-primary"),
++        )
++        val inventory = listOf(
++            item(id = "science-primary", minutes = 6, topics = setOf(TopicTag.SCIENCE, TopicTag.TECH)),
++            item(id = "science-backup-1", minutes = 6, topics = setOf(TopicTag.SCIENCE)),
++            item(id = "science-backup-2", minutes = 6, topics = setOf(TopicTag.SCIENCE)),
++            item(id = "science-backup-3", minutes = 6, topics = setOf(TopicTag.SCIENCE)),
++            item(id = "science-backup-4", minutes = 6, topics = setOf(TopicTag.SCIENCE)),
++            item(id = "science-backup-5", minutes = 6, topics = setOf(TopicTag.SCIENCE)),
++            item(id = "science-backup-6", minutes = 6, topics = setOf(TopicTag.SCIENCE)),
++            item(
++                id = "quiet-reset",
++                packId = "meditation",
++                minutes = 3,
++                topics = setOf(TopicTag.PSYCHOLOGY),
++                sourceType = ContentSourceType.MEDITATION,
++                bodyAssetPath = null,
++                rights = ContentRightsMetadata.appUtility(),
++            ),
++        )
++
++        val result = engine.generate(
++            targetApp = DistractingApp(packageName = "pkg", displayName = "Instagram"),
++            preferences = preferences,
++            inventory = inventory,
++            excludedContentIds = emptySet(),
++            signals = RecommendationSignals(timeOfDay = TimeOfDayBucket.MIDDAY),
++            nowMillis = 0L,
++        )
++
++        assertEquals("science-primary", result?.primary?.id)
++        assertEquals(6, result?.backups?.size)
++        assertTrue(result?.backups.orEmpty().any { item -> item.sourceType == ContentSourceType.MEDITATION })
++    }
++
+     @Test
+     fun generate_keepsShortExplicitPriorityAheadOfFreshDocumentWithoutDurationBackupGate() {
+         val preferences = UserPreferences(
+diff --git a/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt b/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
+index 9471a46..f187f30 100644
+--- a/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
+@@ -70,6 +70,7 @@ import com.qualityalternative.app.interception.FixtureTargetRegistry
+ import com.qualityalternative.app.interception.InterceptionRuntimeGate
+ import java.io.ByteArrayInputStream
+ import java.io.File
++import kotlinx.coroutines.CompletableDeferred
+ import kotlinx.coroutines.ExperimentalCoroutinesApi
+ import kotlinx.coroutines.flow.Flow
+ import kotlinx.coroutines.flow.MutableStateFlow
+@@ -77,6 +78,7 @@ import kotlinx.coroutines.flow.asStateFlow
+ import kotlinx.coroutines.flow.first
+ import kotlinx.coroutines.flow.map
+ import kotlinx.coroutines.test.advanceUntilIdle
++import kotlinx.coroutines.test.runCurrent
+ import kotlinx.coroutines.test.runTest
+ import org.junit.After
+ import org.junit.Assert.assertEquals
+@@ -959,6 +961,133 @@ class MainViewModelTest {
+         assertEquals(null, completedEvent.sessionId)
+     }
+ 
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun sameVisibleReaderProgressStillRefreshesDurableStoreForLifecycleStop() = runTest {
++        val document = savedUserDocument(format = ContentFormat.MARKDOWN)
++        val readingProgressRepository = FakeReadingProgressRepository()
++        val analyticsTracker = InMemoryAnalyticsTracker()
++        val viewModel = createViewModel(
++            contentRepository = FakeContentRepository(extraItems = listOf(document)),
++            readingProgressRepository = readingProgressRepository,
++            analyticsTracker = analyticsTracker,
++        )
++
++        advanceUntilIdle()
++        viewModel.completeOnboarding()
++        advanceUntilIdle()
++        viewModel.openLibraryItem(document)
++        advanceUntilIdle()
++
++        viewModel.saveCurrentReadingProgress(
++            progressPercent = 42,
++            lastVisibleParagraphIndex = 3,
++            lastVisibleTextOffset = 12,
++            paragraphCount = 9,
++            nowMillis = 5_100L,
++        )
++        advanceUntilIdle()
++        viewModel.saveCurrentReadingProgress(
++            progressPercent = 42,
++            lastVisibleParagraphIndex = 3,
++            lastVisibleTextOffset = 12,
++            paragraphCount = 9,
++            nowMillis = 5_200L,
++        )
++        advanceUntilIdle()
++
++        assertEquals(2, readingProgressRepository.savedProgress.size)
++        assertEquals(5_200L, readingProgressRepository.progress.value.single().updatedAtMillis)
++        assertEquals(
++            1,
++            analyticsTracker.allEvents().count { event -> event.type == AnalyticsEventType.READING_PROGRESS_SAVED },
++        )
++    }
++
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun incompleteLifecycleSaveAfterCompletionDoesNotDowngradeCompletedProgress() = runTest {
++        val document = savedUserDocument(format = ContentFormat.MARKDOWN)
++        val readingProgressRepository = FakeReadingProgressRepository()
++        val viewModel = createViewModel(
++            contentRepository = FakeContentRepository(extraItems = listOf(document)),
++            readingProgressRepository = readingProgressRepository,
++        )
++
++        advanceUntilIdle()
++        viewModel.completeOnboarding()
++        advanceUntilIdle()
++        viewModel.openLibraryItem(document)
++        advanceUntilIdle()
++
++        viewModel.saveCurrentReadingProgress(
++            progressPercent = 74,
++            lastVisibleParagraphIndex = 5,
++            lastVisibleTextOffset = 20,
++            paragraphCount = 9,
++            nowMillis = 6_100L,
++        )
++        advanceUntilIdle()
++        viewModel.finishReading()
++        advanceUntilIdle()
++        viewModel.saveCurrentReadingProgress(
++            progressPercent = 74,
++            lastVisibleParagraphIndex = 5,
++            lastVisibleTextOffset = 20,
++            paragraphCount = 9,
++            nowMillis = 6_200L,
++        )
++        advanceUntilIdle()
++
++        val storedProgress = readingProgressRepository.progress.value.single()
++        assertTrue(storedProgress.isCompleted())
++        assertEquals(100, storedProgress.progressPercent)
++        assertEquals(6_100L, readingProgressRepository.savedProgress.first().updatedAtMillis)
++        assertTrue(readingProgressRepository.savedProgress.last().isCompleted())
++        assertEquals(2, readingProgressRepository.savedProgress.size)
++    }
++
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun delayedIncompleteLifecycleSaveCannotOverwriteInFlightCompletion() = runTest {
++        val document = savedUserDocument(format = ContentFormat.MARKDOWN)
++        val readingProgressRepository = DelayedUnfinishedReadingProgressRepository()
++        val viewModel = createViewModel(
++            contentRepository = FakeContentRepository(extraItems = listOf(document)),
++            readingProgressRepository = readingProgressRepository,
++        )
++
++        advanceUntilIdle()
++        viewModel.completeOnboarding()
++        advanceUntilIdle()
++        viewModel.openLibraryItem(document)
++        advanceUntilIdle()
++
++        readingProgressRepository.delayNextUnfinishedSave = true
++        viewModel.saveCurrentReadingProgress(
++            progressPercent = 74,
++            lastVisibleParagraphIndex = 5,
++            lastVisibleTextOffset = 20,
++            paragraphCount = 9,
++            nowMillis = 7_100L,
++        )
++        runCurrent()
++        assertTrue(readingProgressRepository.unfinishedSaveStarted.isCompleted)
++
++        viewModel.finishReading()
++        runCurrent()
++        assertTrue(readingProgressRepository.progress.value.single().isCompleted())
++
++        readingProgressRepository.releaseUnfinishedSave.complete(Unit)
++        advanceUntilIdle()
++
++        val storedProgress = readingProgressRepository.progress.value.single()
++        assertTrue(storedProgress.isCompleted())
++        assertEquals(100, storedProgress.progressPercent)
++        assertEquals(1, readingProgressRepository.savedProgress.count(ReadingProgress::isCompleted))
++        assertFalse(readingProgressRepository.savedProgress.last().isUnfinished())
++    }
++
+     @Test
+     @OptIn(ExperimentalCoroutinesApi::class)
+     fun missingPortableDocumentDoesNotOpenFromLibrary() = runTest {
+@@ -4168,12 +4297,13 @@ class MainViewModelTest {
+         }
+     }
+ 
+-    private class FakeReadingProgressRepository(
++    private open class FakeReadingProgressRepository(
+         initialProgress: List<ReadingProgress> = emptyList(),
+         isReady: Boolean = true,
+         private val throwOnSaveProgress: Boolean = false,
+     ) : ReadingProgressRepository {
+         val progress = MutableStateFlow(initialProgress)
++        val savedProgress = mutableListOf<ReadingProgress>()
+         val deletedIds = mutableSetOf<String>()
+         private val ready = MutableStateFlow(isReady)
+ 
+@@ -4192,6 +4322,13 @@ class MainViewModelTest {
+             if (throwOnSaveProgress) {
+                 error("Simulated reading progress persistence failure")
+             }
++            val existing = this.progress.value.firstOrNull { current ->
++                current.contentId == progress.contentId
++            }
++            if (existing?.isCompleted() == true && progress.isUnfinished()) {
++                return
++            }
++            savedProgress += progress
+             this.progress.value = this.progress.value
+                 .filterNot { it.contentId == progress.contentId }
+                 .plus(progress)
+@@ -4213,6 +4350,21 @@ class MainViewModelTest {
+         override fun observeReady(): Flow<Boolean> = ready
+     }
+ 
++    private class DelayedUnfinishedReadingProgressRepository : FakeReadingProgressRepository() {
++        var delayNextUnfinishedSave = false
++        val unfinishedSaveStarted = CompletableDeferred<Unit>()
++        val releaseUnfinishedSave = CompletableDeferred<Unit>()
++
++        override suspend fun saveProgress(progress: ReadingProgress) {
++            if (delayNextUnfinishedSave && progress.isUnfinished()) {
++                delayNextUnfinishedSave = false
++                unfinishedSaveStarted.complete(Unit)
++                releaseUnfinishedSave.await()
++            }
++            super.saveProgress(progress)
++        }
++    }
++
+     private class FakeReadingAnnotationRepository(
+         initialAnnotations: List<ReadingAnnotation> = emptyList(),
+         isReady: Boolean = true,
+diff --git a/docs/SPRINT_19_AI_NOTE_ASSIST.md b/docs/SPRINT_19_AI_NOTE_ASSIST.md
+index e19838d..335e561 100644
+--- a/docs/SPRINT_19_AI_NOTE_ASSIST.md
++++ b/docs/SPRINT_19_AI_NOTE_ASSIST.md
+@@ -1,12 +1,12 @@
+ # Sprint 19 - Reader Regression, Form Intervention, And AI Notes
+ 
+-Status: `regression_release_candidate_ready`
++Status: `session_progress_hotfix_in_review`
+ 
+ Requested on: 2026-05-07
+ 
+ ## Goal
+ 
+-Start Sprint 19 by fixing the current reader and intervention regressions, release an APK with those fixes, and only then move into AI-assisted annotation notes in the second part of the sprint. AI work must not begin until there is a reviewed, installable APK that fixes annotation selection, progress, and form intervention.
++Start Sprint 19 by fixing the current reader and intervention regressions, release an APK with those fixes, and only then move into AI-assisted annotation notes in the second part of the sprint. AI work must not begin until there is a reviewed, installable APK that fixes annotation selection, progress, and form intervention. If late tester regressions appear before AI begins, ship those reader/intervention hotfixes first.
+ 
+ Mapped PRD items: FR6, FR7, FR8, FR8A, FR13, NFR privacy, NFR reliability, NFR calm interaction model.
+ 
+@@ -15,6 +15,8 @@ Mapped PRD items: FR6, FR7, FR8, FR8A, FR13, NFR privacy, NFR reliability, NFR c
+ - Annotation range adjustment is still unstable. When the user tries to move the start of an annotation backward, it can jump as if it moved to the beginning of the book.
+ - Reading progress can still be wrong. The user can be in chapter 3 while the app shows `1%`, which suggests progress is being calculated from the wrong anchor, wrong display block, or wrong scope.
+ - Form intervention is not working as desired. The desired behavior is a lightweight form-style unlock similar in feel to the existing edit-breath interaction: the user performs the small intervention and waits about 5 seconds before unlock is available.
++- Reader session progress can still be too weakly persisted. After reading for a while, locking the device, and reopening, the app may return to the pre-session location rather than the last viewed page.
++- Meditation is missing as a visible alternative when the primary recommendation is reading-heavy content. The standing meditation reset must remain available as a finite backup option.
+ - AI-assisted notes remain desired, but they come after these regressions and after a release APK containing the fixes.
+ 
+ ## Product Rules
+@@ -23,6 +25,8 @@ Mapped PRD items: FR6, FR7, FR8, FR8A, FR13, NFR privacy, NFR reliability, NFR c
+ - Annotation selection must be source-anchored. Moving the start backward may cross display pages and source blocks, but it must never teleport to the beginning of the book unless the actual selected source range begins there.
+ - Reading progress must be derived from the stable source location, not transient paginated display indexes. If the UI shows whole-material progress, chapter navigation and font repagination must not reset it to a misleading low value. If any chapter-local progress is shown, the UI must label that scope clearly.
+ - Form intervention must be calm and bounded. It may slow unlocking with a short 5-second wait, but it must not become punitive, feed-like, or confusing.
++- Reader progress persistence must be lifecycle-safe. The app must durably refresh the current source-anchored reader position on page moves, backward moves, lifecycle pause/stop, and reader disposal.
++- Meditation remains a standing intervention option. When the primary recommendation is reading content and meditation is eligible, the finite backup list must keep meditation visible even if reading items dominate rank order.
+ - Any form-intervention change must explicitly reconcile with FR7, which currently says no additional mandatory step is inserted after `Open anyway`. If Sprint 19 changes that behavior, the PRD must be updated intentionally instead of silently drifting.
+ - AI note assistance is optional and explicit. Ordinary annotation saving must keep working offline and without an AI key.
+ - No API key, OpenRouter credential, Google credential, account email, raw Drive file id, or model-provider secret may be exported through Portable Profile or annotation sync.
+@@ -39,7 +43,11 @@ Mapped PRD items: FR6, FR7, FR8, FR8A, FR13, NFR privacy, NFR reliability, NFR c
+ - 2026-05-07: GPT Pro R2 regression gate returned `10/10 PASS` with `VISUAL REVIEW: PASS`. Slice 19.5 release packaging may proceed.
+ - 2026-05-07: Slice 19.5 release candidate `v0.11.2-reader-regression-form-alpha` passed unit validation, debug APK build, connected reader/annotation E2E, connected form-intervention E2E, signature verification, emulator install smoke, launch smoke, and emulator shutdown.
+ - 2026-05-07: GPT Pro final release gate returned `10/10 PASS` with `VISUAL REVIEW: PASS`; tagging and GitHub release publication may proceed.
+-- AI implementation remains blocked until the regression-fix APK in Slice 19.5 is reviewed and released.
++- 2026-05-08: A late tester regression requires an emergency hotfix before AI: reader session progress now refreshes durable storage on every visible page move, backward move, lifecycle pause/stop, and reader disposal; same-position lifecycle saves refresh the store without duplicate progress analytics.
++- 2026-05-08: Meditation is restored as a guaranteed finite backup when the primary recommendation is reading and meditation is eligible.
++- 2026-05-08: GPT Pro R1 hotfix review returned `8/10 FAIL`; R2 closes the blocker by persisting before reader back/skip clears active content and by rejecting late incomplete disposal saves after completed reading progress.
++- 2026-05-08: GPT Pro R3 hotfix review returned `8/10 FAIL`; R4 moves completion-downgrade protection to the repository write boundary and adds a delayed unfinished-save/in-flight completion regression test.
++- AI implementation remains blocked until the regression-fix APK and the emergency session-progress hotfix are reviewed and released.
+ 
+ ## Slice Plan
+ 
+@@ -143,6 +151,23 @@ Acceptance:
+ - Release notes clearly state that AI note assistance is not included yet and starts only in the second part of Sprint 19.
+ - Only after this APK is released may Sprint 19 begin AI note work.
+ 
++### Slice 19.5A: Session Progress Durability And Meditation Backup Hotfix
++
++Deliverables:
++
++- Persist the current reader source position after forward page moves, backward page moves, lifecycle pause/stop, and reader disposal.
++- Refresh durable reading-progress storage even when the visible source position is unchanged, while avoiding duplicate progress analytics for lifecycle retries.
++- Preserve meditation as a visible finite backup alternative when the primary recommendation is reading content and meditation is eligible.
++- Add unit and connected Android coverage for same-position lifecycle saves, reopen-to-last-viewed-page behavior, and meditation backup visibility.
++- Produce visual evidence and GPT Pro review before any AI implementation begins.
++
++Acceptance:
++
++- After reading, navigating backward, closing/reopening the app, or lock/unlock-style lifecycle interruption, the reader returns to the last viewed source-anchored page rather than the pre-session location.
++- The durable reading-progress row is refreshed on lifecycle stop/pause/disposal even when the UI page did not visibly change.
++- Recommendation backups include the meditation reset when reading dominates the ranked list and meditation is otherwise eligible.
++- GPT Pro hotfix review returns `SCORE: 10/10`, `VERDICT: PASS`, and `VISUAL REVIEW: PASS`.
++
+ ## AI Note Feature - Second Part Of Sprint 19
+ 
+ ### User Story

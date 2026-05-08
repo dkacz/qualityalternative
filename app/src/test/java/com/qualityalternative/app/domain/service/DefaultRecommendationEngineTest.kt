@@ -631,6 +631,48 @@ class DefaultRecommendationEngineTest {
     }
 
     @Test
+    fun generate_keepsMeditationBackupWhenPrimaryIsReading() {
+        val preferences = UserPreferences(
+            selectedApps = listOf(DistractingApp(packageName = "pkg", displayName = "Instagram")),
+            preferredTopics = setOf(TopicTag.SCIENCE),
+            preferredDurationBucket = DurationBucket.FOCUS,
+            selectedPackIds = setOf("pack", "meditation"),
+            priorityContentIds = setOf("science-primary"),
+        )
+        val inventory = listOf(
+            item(id = "science-primary", minutes = 6, topics = setOf(TopicTag.SCIENCE, TopicTag.TECH)),
+            item(id = "science-backup-1", minutes = 6, topics = setOf(TopicTag.SCIENCE)),
+            item(id = "science-backup-2", minutes = 6, topics = setOf(TopicTag.SCIENCE)),
+            item(id = "science-backup-3", minutes = 6, topics = setOf(TopicTag.SCIENCE)),
+            item(id = "science-backup-4", minutes = 6, topics = setOf(TopicTag.SCIENCE)),
+            item(id = "science-backup-5", minutes = 6, topics = setOf(TopicTag.SCIENCE)),
+            item(id = "science-backup-6", minutes = 6, topics = setOf(TopicTag.SCIENCE)),
+            item(
+                id = "quiet-reset",
+                packId = "meditation",
+                minutes = 3,
+                topics = setOf(TopicTag.PSYCHOLOGY),
+                sourceType = ContentSourceType.MEDITATION,
+                bodyAssetPath = null,
+                rights = ContentRightsMetadata.appUtility(),
+            ),
+        )
+
+        val result = engine.generate(
+            targetApp = DistractingApp(packageName = "pkg", displayName = "Instagram"),
+            preferences = preferences,
+            inventory = inventory,
+            excludedContentIds = emptySet(),
+            signals = RecommendationSignals(timeOfDay = TimeOfDayBucket.MIDDAY),
+            nowMillis = 0L,
+        )
+
+        assertEquals("science-primary", result?.primary?.id)
+        assertEquals(6, result?.backups?.size)
+        assertTrue(result?.backups.orEmpty().any { item -> item.sourceType == ContentSourceType.MEDITATION })
+    }
+
+    @Test
     fun generate_keepsShortExplicitPriorityAheadOfFreshDocumentWithoutDurationBackupGate() {
         val preferences = UserPreferences(
             selectedApps = listOf(DistractingApp(packageName = "pkg", displayName = "Instagram")),

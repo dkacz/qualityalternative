@@ -652,6 +652,9 @@ class MainViewModel(
             },
         )
         viewModelScope.launch {
+            if (isReactivated) {
+                readingProgressRepository.deleteProgress(item.id)
+            }
             settingsRepository.saveReactivatedCompletedContentIds(updatedIds)
             recordEventDurably(
                 AnalyticsEvent(
@@ -2055,6 +2058,9 @@ class MainViewModel(
         if (!content.usesRepositoryBody()) {
             return
         }
+        if (hasCompletedProgressForActiveRead(content.id)) {
+            return
+        }
         val safeParagraphCount = paragraphCount.coerceAtLeast(1)
         val progress = ReadingProgress(
             contentId = content.id,
@@ -2064,25 +2070,27 @@ class MainViewModel(
             paragraphCount = safeParagraphCount,
             updatedAtMillis = nowMillis,
         )
-        if (uiState.currentReadingProgress?.sameVisiblePosition(progress) == true) {
-            return
+        val sameVisiblePosition = uiState.currentReadingProgress?.sameVisiblePosition(progress) == true
+        if (!sameVisiblePosition || uiState.currentReadingProgress?.updatedAtMillis != progress.updatedAtMillis) {
+            uiState = uiState.copy(currentReadingProgress = progress)
         }
-        uiState = uiState.copy(currentReadingProgress = progress)
         viewModelScope.launch {
             readingProgressRepository.saveProgress(progress)
-            recordEventDurably(
-                AnalyticsEvent(
-                    type = AnalyticsEventType.READING_PROGRESS_SAVED,
-                    timestampMillis = nowMillis,
-                    interventionId = uiState.currentInterventionId,
-                    sessionId = uiState.currentSessionId,
-                    targetAppPackage = uiState.selectedTargetApp?.packageName,
-                    primaryContentId = uiState.currentRecommendationSet?.primary?.id,
-                    backupContentIds = uiState.currentRecommendationSet?.backups.orEmpty().map(ContentItem::id),
-                    contentId = content.id,
-                    metadata = content.analyticsMetadata() + progress.analyticsMetadata(),
-                ),
-            )
+            if (!sameVisiblePosition) {
+                recordEventDurably(
+                    AnalyticsEvent(
+                        type = AnalyticsEventType.READING_PROGRESS_SAVED,
+                        timestampMillis = nowMillis,
+                        interventionId = uiState.currentInterventionId,
+                        sessionId = uiState.currentSessionId,
+                        targetAppPackage = uiState.selectedTargetApp?.packageName,
+                        primaryContentId = uiState.currentRecommendationSet?.primary?.id,
+                        backupContentIds = uiState.currentRecommendationSet?.backups.orEmpty().map(ContentItem::id),
+                        contentId = content.id,
+                        metadata = content.analyticsMetadata() + progress.analyticsMetadata(),
+                    ),
+                )
+            }
             autosaveAccountLightProfileAfterPortableMutation(nowMillis = nowMillis)
         }
     }
@@ -3446,6 +3454,21 @@ class MainViewModel(
     private fun unfinishedProgressFor(contentId: String): ReadingProgress? {
         return uiState.readingProgress.firstOrNull { progress ->
             progress.contentId == contentId && progress.isUnfinished()
+        }
+    }
+
+    private fun hasCompletedProgressForActiveRead(contentId: String): Boolean {
+        val currentCompleted = uiState.currentReadingProgress
+            ?.takeIf { progress -> progress.contentId == contentId }
+            ?.isCompleted() == true
+        if (currentCompleted) {
+            return true
+        }
+        if (contentId in uiState.reactivatedCompletedContentIds) {
+            return false
+        }
+        return uiState.readingProgress.any { progress ->
+            progress.contentId == contentId && progress.isCompleted()
         }
     }
 

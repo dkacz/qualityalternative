@@ -47,6 +47,12 @@ class RoomReadingProgressRepository(
     override suspend fun saveProgress(progress: ReadingProgress) {
         writeMutex.withLock {
             val normalized = progress.normalized()
+            val existing = this.progress.value.firstOrNull { current ->
+                current.contentId == normalized.contentId
+            }
+            if (existing?.isCompleted() == true && normalized.isUnfinished()) {
+                return
+            }
             dao.insertOrReplace(normalized.toEntity())
             this.progress.value = upsertProgress(this.progress.value, normalized)
         }

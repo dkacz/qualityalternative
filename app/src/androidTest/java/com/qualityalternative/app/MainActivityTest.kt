@@ -28,6 +28,7 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.swipeRight
 import androidx.compose.ui.test.swipeUp
+import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.UiDevice
@@ -1659,6 +1660,82 @@ class MainActivityTest {
     }
 
     @Test
+    fun sprint19ReaderSessionProgressPersistsLastViewedPageAfterReopen() {
+        launchOnboardedApp()
+        val document = addSeedMarkdownDocument(
+            title = "Sprint 19 Session Progress",
+            displayName = "sprint19-session-progress.md",
+            body = (1..80).joinToString(separator = "\n\n") { index ->
+                "Session progress paragraph $index gives the reader enough source material to page forward, " +
+                    "move back once, lock, and reopen without returning to the stale pre-session location."
+            },
+            nowMillis = 95_000L,
+        )
+
+        scenario?.onActivity { activity -> activity.mainViewModel.openLibraryItem(document) }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
+        repeat(3) {
+            val beforePage = readerPagePositionFromLabel().currentPage
+            advanceReaderPage()
+            composeRule.waitUntil(timeoutMillis = 10_000) {
+                readerPagePositionFromLabel().currentPage > beforePage
+            }
+        }
+        val forwardPage = readerPagePositionFromLabel()
+        composeRule.onNodeWithTag("reader-page-viewport")
+            .performTouchInput { swipeRight() }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            readerPagePositionFromLabel().currentPage == forwardPage.currentPage - 1
+        }
+        val lastViewedPage = readerPagePositionFromLabel()
+        val lastViewedPercent = currentReaderProgressPercentFromLabel()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            savedProgressPercentFor(document.id) == lastViewedPercent
+        }
+        captureSprint19RegressionScreenshot("09_session_progress_saved_before_pause_stop")
+
+        scenario?.moveToState(Lifecycle.State.CREATED)
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+        Thread.sleep(250)
+        scenario?.moveToState(Lifecycle.State.RESUMED)
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            readerPagePositionFromLabel().currentPage == lastViewedPage.currentPage
+        }
+        assertEquals(lastViewedPage.totalPages, readerPagePositionFromLabel().totalPages)
+        captureSprint19RegressionScreenshot("10_session_progress_restored_after_pause_stop")
+
+        scenario?.close()
+        scenario = null
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+        Thread.sleep(250)
+        launchOnboardedApp()
+        scenario?.onActivity { activity -> activity.mainViewModel.openLibraryItem(document) }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            readerPagePositionFromLabel().currentPage == lastViewedPage.currentPage
+        }
+        assertEquals(lastViewedPage.totalPages, readerPagePositionFromLabel().totalPages)
+        captureSprint19RegressionScreenshot("11_session_progress_restored_after_reopen")
+    }
+
+    @Test
+    fun sprint19InterventionKeepsMeditationAlternativeWhenPrimaryIsReading() {
+        launchFixtureSystemIntervention()
+
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            currentRecommendationPrimaryContentId() != MEDITATION_TIMER_CONTENT_ID &&
+                MEDITATION_TIMER_CONTENT_ID in currentRecommendationBackupContentIds()
+        }
+        composeRule.onNodeWithTag("intervention-backup-list")
+            .performScrollToNode(hasText("3-minute reset", substring = true))
+        composeRule.onNodeWithText("3-minute reset", substring = true)
+            .assertIsDisplayed()
+            .assertIsEnabled()
+        captureSprint19RegressionScreenshot("12_meditation_backup_alternative")
+    }
+
+    @Test
     fun systemInterventionShowsContinueProgressRemainingTimeAndScrollableOtherOptions() {
         launchOnboardedApp()
         seedFixtureSelection()
@@ -3287,6 +3364,25 @@ class MainActivityTest {
             val recommendationSet = activity.mainViewModel.uiState.currentRecommendationSet
             contentIds = listOfNotNull(recommendationSet?.primary)
                 .plus(recommendationSet?.backups.orEmpty())
+                .mapTo(mutableSetOf(), ContentItem::id)
+        }
+        return contentIds
+    }
+
+    private fun currentRecommendationPrimaryContentId(): String? {
+        var contentId: String? = null
+        scenario?.onActivity { activity ->
+            contentId = activity.mainViewModel.uiState.currentRecommendationSet?.primary?.id
+        }
+        return contentId
+    }
+
+    private fun currentRecommendationBackupContentIds(): Set<String> {
+        var contentIds = emptySet<String>()
+        scenario?.onActivity { activity ->
+            contentIds = activity.mainViewModel.uiState.currentRecommendationSet
+                ?.backups
+                .orEmpty()
                 .mapTo(mutableSetOf(), ContentItem::id)
         }
         return contentIds
