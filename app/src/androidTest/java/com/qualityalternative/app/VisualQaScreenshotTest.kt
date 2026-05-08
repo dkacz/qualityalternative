@@ -1709,6 +1709,13 @@ class VisualQaScreenshotTest {
     }
 
     private fun startMeditationFromIntervention() {
+        if (hasTag("intervention-meditation-start")) {
+            composeRule.onNodeWithTag("intervention-meditation-start")
+                .assertIsDisplayed()
+                .performClick()
+            return
+        }
+
         if (hasNodeContaining("Start timer")) {
             composeRule.onNodeWithText("Start timer", substring = true).performClick()
             return

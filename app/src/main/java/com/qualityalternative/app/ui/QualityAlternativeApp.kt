@@ -1802,7 +1802,10 @@ private fun InterventionScreen(
     val preferences = state.preferences ?: return
     val colors = QualityAlternativeThemeTokens.colors
     val primary = recommendationSet.primary
-    val backups = recommendationSet.backups
+    val meditationAlternative = recommendationSet.backups.firstOrNull { item -> item.usesMeditationTimer() }
+    val backups = recommendationSet.backups.withIndex().filterNot { indexedBackup ->
+        indexedBackup.value.usesMeditationTimer()
+    }
     val primaryExplanation = RecommendationExplainer.explain(primary, preferences)
     val primaryContinueProgress = continueProgressMetaFor(item = primary, progress = state.readingProgress)
     val canAdjustMeditationBeforeStart = primary.usesMeditationTimer()
@@ -1934,10 +1937,21 @@ private fun InterventionScreen(
                     testTagPrefix = "intervention-meditation-duration",
                 )
             }
+            if (meditationAlternative != null) {
+                MeditationAlternativeCard(
+                    item = meditationAlternative,
+                    selectedMinutes = state.meditationDurationMinutes,
+                    onSelectMinutes = onSelectMeditationDuration,
+                    onStart = { onAcceptBackup(meditationAlternative) },
+                    modifier = Modifier
+                        .padding(bottom = 8.dp)
+                        .testTag("intervention-meditation-alternative"),
+                )
+            }
             MonoText("Other options", modifier = Modifier.padding(bottom = 4.dp))
             if (backups.isEmpty()) {
                 BodyText(
-                    text = "No extra choices are available right now.",
+                    text = "No extra reading choices are available right now.",
                     color = colors.mutedText,
                     modifier = Modifier.testTag("intervention-empty-backups"),
                 )
@@ -1950,10 +1964,12 @@ private fun InterventionScreen(
                     verticalArrangement = Arrangement.spacedBy(5.dp),
                     contentPadding = PaddingValues(bottom = 2.dp),
                 ) {
-                    itemsIndexed(
+                    items(
                         items = backups,
-                        key = { _, backup -> backup.id },
-                    ) { index, backup ->
+                        key = { indexedBackup -> indexedBackup.value.id },
+                    ) { indexedBackup ->
+                        val index = indexedBackup.index
+                        val backup = indexedBackup.value
                         BackupRow(
                             item = backup,
                             continueProgress = continueProgressMetaFor(item = backup, progress = state.readingProgress),
@@ -5216,6 +5232,84 @@ private fun BackupRow(
             )
         }
         QaIcon(kind = QaIconKind.ChevronRight, color = colors.faintText, size = 16.dp)
+    }
+}
+
+@Composable
+private fun MeditationAlternativeCard(
+    item: ContentItem,
+    selectedMinutes: Int,
+    onSelectMinutes: (Int) -> Unit,
+    onStart: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = QualityAlternativeThemeTokens.colors
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .semantics {
+                contentDescription = "Calm reset, ${item.title}, ${item.durationMinutes} min"
+            },
+        shape = RoundedCornerShape(18.dp),
+        color = colors.successSoft,
+        border = BorderStroke(1.dp, colors.success.copy(alpha = 0.36f)),
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(CircleShape)
+                        .background(colors.background.copy(alpha = 0.72f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    QaIcon(kind = QaIconKind.Pause, color = colors.success, size = 18.dp)
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    MonoText(
+                        text = "Calm reset",
+                        color = colors.success,
+                        preserveCase = true,
+                        modifier = Modifier.padding(bottom = 2.dp),
+                    )
+                    Text(
+                        text = item.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontSize = 16.sp,
+                        lineHeight = 18.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                QaButton(
+                    text = "Start",
+                    onClick = onStart,
+                    variant = QaButtonVariant.Outline,
+                    size = QaButtonSize.Small,
+                    fullWidth = false,
+                    leadingIcon = QaIconKind.Pause,
+                    modifier = Modifier.testTag("intervention-meditation-start"),
+                )
+            }
+            BodyText(
+                text = item.description,
+                color = colors.mutedText,
+                fontSize = 12.5.sp,
+                lineHeight = 16.sp,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+            MeditationDurationChooser(
+                selectedMinutes = selectedMinutes,
+                onSelect = onSelectMinutes,
+                modifier = Modifier.padding(top = 8.dp),
+                testTagPrefix = "intervention-calm-duration",
+            )
+        }
     }
 }
 

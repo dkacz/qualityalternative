@@ -257,7 +257,7 @@ The system must choose one primary recommendation and a short, bounded backup li
 - The system may expose additional finite backups in a bounded scrollable list, capped below feed-like scale.
 - The primary recommendation may expose the next automatically calculated reading segment length, but the segment length is presentation metadata rather than a whole-source ranking filter.
 - Backup recommendations are ranked by usefulness, priority, unfinished state, freshness, and availability rather than being capped to the primary item's total reading length.
-- If the primary recommendation is reading content and the meditation reset is otherwise eligible, the finite backup list keeps meditation visible as an alternative even when reading items dominate the ranked inventory.
+- If the primary recommendation is reading content and the meditation reset is otherwise eligible, the intervention keeps meditation visible as a separate calm-reset alternative, not as a normal item inside the `Other options` backup list.
 - If fewer than three suitable items exist, the system still returns at least one recommendation and logs an inventory-shortage event.
 - The intervention flow must not require the user to browse the backup list before making a choice.
 

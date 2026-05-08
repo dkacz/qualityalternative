@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -17,6 +18,7 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.longClick
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -1769,19 +1771,34 @@ class MainActivityTest {
     }
 
     @Test
-    fun sprint19InterventionKeepsMeditationAlternativeWhenPrimaryIsReading() {
+    fun sprint19InterventionShowsMeditationAsCalmAlternativeWhenPrimaryIsReading() {
         launchFixtureSystemIntervention()
 
+        var meditationBackupIndex = -1
         composeRule.waitUntil(timeoutMillis = 10_000) {
-            currentRecommendationPrimaryContentId() != MEDITATION_TIMER_CONTENT_ID &&
-                MEDITATION_TIMER_CONTENT_ID in currentRecommendationBackupContentIds()
+            val backupIds = currentRecommendationBackupContentIds()
+            meditationBackupIndex = backupIds.indexOf(MEDITATION_TIMER_CONTENT_ID)
+            currentRecommendationPrimaryContentId() != MEDITATION_TIMER_CONTENT_ID && meditationBackupIndex >= 0
         }
-        composeRule.onNodeWithTag("intervention-backup-list")
-            .performScrollToNode(hasText("3-minute reset", substring = true))
+        composeRule.onNodeWithTag("intervention-meditation-alternative")
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("Calm reset")
+            .assertIsDisplayed()
         composeRule.onNodeWithText("3-minute reset", substring = true)
             .assertIsDisplayed()
+        composeRule.onNodeWithTag("intervention-meditation-start")
+            .assertIsDisplayed()
             .assertIsEnabled()
-        captureSprint19RegressionScreenshot("12_meditation_backup_alternative")
+        composeRule.onAllNodesWithTag("intervention-backup-action-$meditationBackupIndex")
+            .assertCountEquals(0)
+        captureSprint19RegressionScreenshot("12_meditation_calm_alternative")
+        composeRule.onNodeWithTag("intervention-meditation-start")
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasTag("meditation-timer-screen")
+        }
+        composeRule.onNodeWithTag("meditation-timer-screen")
+            .assertIsDisplayed()
     }
 
     @Test

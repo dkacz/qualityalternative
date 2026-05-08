@@ -1,6 +1,6 @@
 # Sprint 19 - Reader Regression, Form Intervention, And AI Notes
 
-Status: `intervention_mode_settings_fixed`
+Status: `meditation_calm_alternative_in_progress`
 
 Requested on: 2026-05-07
 
@@ -26,7 +26,7 @@ Mapped PRD items: FR6, FR7, FR8, FR8A, FR13, NFR privacy, NFR reliability, NFR c
 - Reading progress must be derived from the stable source location, not transient paginated display indexes. If the UI shows whole-material progress, chapter navigation and font repagination must not reset it to a misleading low value. If any chapter-local progress is shown, the UI must label that scope clearly.
 - Form intervention must be calm and bounded. It may slow unlocking with a short 5-second wait, but it must not become punitive, feed-like, or confusing.
 - Reader progress persistence must be lifecycle-safe. The app must durably refresh the current source-anchored reader position on page moves, backward moves, lifecycle pause/stop, and reader disposal.
-- Meditation remains a standing intervention option. When the primary recommendation is reading content and meditation is eligible, the finite backup list must keep meditation visible even if reading items dominate rank order.
+- Meditation remains a standing intervention option. When the primary recommendation is reading content and meditation is eligible, it must be presented as a distinct calm-reset alternative, not as a normal item inside `Other options`.
 - Any form-intervention change must explicitly reconcile with FR7, which currently says no additional mandatory step is inserted after `Open anyway`. If Sprint 19 changes that behavior, the PRD must be updated intentionally instead of silently drifting.
 - AI note assistance is optional and explicit. Ordinary annotation saving must keep working offline and without an AI key.
 - No API key, OpenRouter credential, Google credential, account email, raw Drive file id, or model-provider secret may be exported through Portable Profile or annotation sync.
@@ -50,6 +50,7 @@ Mapped PRD items: FR6, FR7, FR8, FR8A, FR13, NFR privacy, NFR reliability, NFR c
 - 2026-05-08: GPT Pro R4 hotfix review returned `10/10 PASS` with `VISUAL REVIEW: PASS`; release packaging may proceed.
 - 2026-05-08: Release candidate `v0.11.3-session-progress-meditation-alpha` passed targeted unit validation, debug/APK build, connected session-progress E2E, connected meditation-backup E2E, signature verification, emulator install smoke, and launch smoke.
 - 2026-05-08: A tester found Settings Mode was hard-coded to show Soft while behavior was Firm. Slice 19.5B adds a persisted Soft/Firm mode selector: Soft makes Open anyway immediate, Firm keeps the 5-second form-intervention pause. Visual E2E evidence covers both behaviors.
+- 2026-05-08: A tester clarified meditation should not appear as a normal `Other options` row. Slice 19.5C separates eligible meditation into a calm-reset panel with its own start action and duration chips while leaving normal backup rows for reading/link/file alternatives.
 - AI implementation remains blocked until the regression-fix APK and the emergency session-progress hotfix are reviewed and released.
 
 ## Slice Plan
