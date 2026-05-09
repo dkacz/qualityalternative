@@ -51,6 +51,7 @@ import com.qualityalternative.app.domain.model.ReadingProgress
 import com.qualityalternative.app.domain.model.TopicTag
 import com.qualityalternative.app.domain.model.UserDocumentDraft
 import com.qualityalternative.app.domain.service.AddUserDocumentResult
+import com.qualityalternative.app.data.RoomReadingProgressRepository
 import com.qualityalternative.app.interception.FixtureTargetRegistry
 import com.qualityalternative.app.interception.InterceptionRuntimeGate
 import kotlinx.coroutines.flow.first
@@ -1740,9 +1741,18 @@ class MainActivityTest {
         }
         val lastViewedPage = readerPagePositionFromLabel()
         val lastViewedPercent = currentReaderProgressPercentFromLabel()
+        val lastViewedEndParagraph = currentReaderPageEndParagraphIndex()
         composeRule.waitUntil(timeoutMillis = 10_000) {
-            savedProgressPercentFor(document.id) == lastViewedPercent
+            durableRoomSavedProgressPercentFor(document.id) == lastViewedPercent &&
+                durableRoomSavedProgressParagraphIndexFor(document.id) == lastViewedEndParagraph
         }
+        appendSprint19RegressionEvidence(
+            stage = "saved_before_pause_stop",
+            page = lastViewedPage,
+            progressPercent = lastViewedPercent,
+            pageEndParagraph = lastViewedEndParagraph,
+            durableSavedParagraph = durableRoomSavedProgressParagraphIndexFor(document.id),
+        )
         captureSprint19RegressionScreenshot("09_session_progress_saved_before_pause_stop")
 
         scenario?.moveToState(Lifecycle.State.CREATED)
@@ -1754,6 +1764,14 @@ class MainActivityTest {
             readerPagePositionFromLabel().currentPage == lastViewedPage.currentPage
         }
         assertEquals(lastViewedPage.totalPages, readerPagePositionFromLabel().totalPages)
+        assertEquals(lastViewedEndParagraph, currentReaderPageEndParagraphIndex())
+        appendSprint19RegressionEvidence(
+            stage = "restored_after_pause_stop",
+            page = readerPagePositionFromLabel(),
+            progressPercent = currentReaderProgressPercentFromLabel(),
+            pageEndParagraph = currentReaderPageEndParagraphIndex(),
+            durableSavedParagraph = durableRoomSavedProgressParagraphIndexFor(document.id),
+        )
         captureSprint19RegressionScreenshot("10_session_progress_restored_after_pause_stop")
 
         scenario?.close()
@@ -1767,7 +1785,104 @@ class MainActivityTest {
             readerPagePositionFromLabel().currentPage == lastViewedPage.currentPage
         }
         assertEquals(lastViewedPage.totalPages, readerPagePositionFromLabel().totalPages)
+        assertEquals(lastViewedEndParagraph, currentReaderPageEndParagraphIndex())
+        appendSprint19RegressionEvidence(
+            stage = "restored_after_reopen",
+            page = readerPagePositionFromLabel(),
+            progressPercent = currentReaderProgressPercentFromLabel(),
+            pageEndParagraph = currentReaderPageEndParagraphIndex(),
+            durableSavedParagraph = durableRoomSavedProgressParagraphIndexFor(document.id),
+        )
         captureSprint19RegressionScreenshot("11_session_progress_restored_after_reopen")
+    }
+
+    @Test
+    fun sprint19ReaderResumeUsesPendingLatestProgressAcrossImmediateReopenBeforeRoomWrite() {
+        launchOnboardedApp()
+        val document = addSeedMarkdownDocument(
+            title = "Sprint 19 Pending Progress",
+            displayName = "sprint19-pending-progress.md",
+            body = (1..80).joinToString(separator = "\n\n") { index ->
+                "Pending progress paragraph $index gives the reader enough source material to save a latest " +
+                    "anchor, close immediately, reopen before Room writes, and avoid falling back to stale state."
+            },
+            nowMillis = 97_000L,
+        )
+
+        scenario?.onActivity { activity -> activity.mainViewModel.openLibraryItem(document) }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
+        repeat(2) {
+            val beforePage = readerPagePositionFromLabel().currentPage
+            advanceReaderPage()
+            composeRule.waitUntil(timeoutMillis = 10_000) {
+                readerPagePositionFromLabel().currentPage > beforePage
+            }
+        }
+        val stablePage = readerPagePositionFromLabel()
+        val stablePercent = currentReaderProgressPercentFromLabel()
+        val stableEndParagraph = currentReaderPageEndParagraphIndex()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            durableRoomSavedProgressPercentFor(document.id) == stablePercent &&
+                durableRoomSavedProgressParagraphIndexFor(document.id) == stableEndParagraph
+        }
+
+        val delay = roomReadingProgressRepositoryForTests().delayNextUnfinishedSaveForTests()
+        advanceReaderPage()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            delay.started.isCompleted &&
+                readerPagePositionFromLabel().currentPage == stablePage.currentPage + 1
+        }
+        val latestPage = readerPagePositionFromLabel()
+        val latestPercent = currentReaderProgressPercentFromLabel()
+        val latestEndParagraph = currentReaderPageEndParagraphIndex()
+        assertEquals(stableEndParagraph, durableRoomSavedProgressParagraphIndexFor(document.id))
+        appendSprint19RegressionEvidence(
+            stage = "pending_latest_before_room_write",
+            page = latestPage,
+            progressPercent = latestPercent,
+            pageEndParagraph = latestEndParagraph,
+            durableSavedParagraph = durableRoomSavedProgressParagraphIndexFor(document.id),
+        )
+        captureSprint19RegressionScreenshot("12_pending_latest_before_room_write")
+
+        scenario?.close()
+        scenario = null
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+        Thread.sleep(250)
+        launchOnboardedApp()
+        scenario?.onActivity { activity -> activity.mainViewModel.openLibraryItem(document) }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            readerPagePositionFromLabel().currentPage == latestPage.currentPage
+        }
+        assertEquals(latestEndParagraph, currentReaderPageEndParagraphIndex())
+        appendSprint19RegressionEvidence(
+            stage = "immediate_reopen_before_room_write",
+            page = readerPagePositionFromLabel(),
+            progressPercent = currentReaderProgressPercentFromLabel(),
+            pageEndParagraph = currentReaderPageEndParagraphIndex(),
+            durableSavedParagraph = durableRoomSavedProgressParagraphIndexFor(document.id),
+        )
+        captureSprint19RegressionScreenshot("13_immediate_reopen_before_room_write")
+
+        scenario?.moveToState(Lifecycle.State.CREATED)
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+        Thread.sleep(250)
+        scenario?.moveToState(Lifecycle.State.RESUMED)
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
+        delay.release.complete(Unit)
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            durableRoomSavedProgressPercentFor(document.id) == latestPercent &&
+                durableRoomSavedProgressParagraphIndexFor(document.id) == latestEndParagraph
+        }
+        appendSprint19RegressionEvidence(
+            stage = "room_write_released_after_reopen",
+            page = readerPagePositionFromLabel(),
+            progressPercent = currentReaderProgressPercentFromLabel(),
+            pageEndParagraph = currentReaderPageEndParagraphIndex(),
+            durableSavedParagraph = durableRoomSavedProgressParagraphIndexFor(document.id),
+        )
+        captureSprint19RegressionScreenshot("14_room_write_released_after_reopen")
     }
 
     @Test
@@ -3492,6 +3607,49 @@ class MainActivityTest {
                 ?: -1
         }
         return index
+    }
+
+    private fun durableRoomSavedProgressPercentFor(contentId: String): Int {
+        val app = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication)
+        return runBlocking {
+            app.appContainer.readingProgressRowForTests(contentId)
+                ?.takeIf { row -> row.completedAtMillis == null }
+                ?.progressPercent
+                ?: 0
+        }
+    }
+
+    private fun durableRoomSavedProgressParagraphIndexFor(contentId: String): Int {
+        val app = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication)
+        return runBlocking {
+            app.appContainer.readingProgressRowForTests(contentId)
+                ?.takeIf { row -> row.completedAtMillis == null }
+                ?.lastVisibleParagraphIndex
+                ?: -1
+        }
+    }
+
+    private fun roomReadingProgressRepositoryForTests(): RoomReadingProgressRepository {
+        val app = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication)
+        val repository = app.appContainer.readingProgressRepository
+        assertTrue("Expected RoomReadingProgressRepository in instrumentation", repository is RoomReadingProgressRepository)
+        return repository as RoomReadingProgressRepository
+    }
+
+    private fun appendSprint19RegressionEvidence(
+        stage: String,
+        page: ReaderPagePosition,
+        progressPercent: Int,
+        pageEndParagraph: Int,
+        durableSavedParagraph: Int,
+    ) {
+        val outputDir = File("/sdcard/Download/qualityalternative/$sprint19RegressionScreenshotDirName")
+        assertTrue("Expected evidence output directory for $stage", outputDir.mkdirs() || outputDir.exists())
+        File(outputDir, "reader_resume_stage_assertions.txt").appendText(
+            "$stage: page=${page.currentPage}/${page.totalPages}, " +
+                "progress=$progressPercent, pageEndParagraph=$pageEndParagraph, " +
+                "durableSavedParagraph=$durableSavedParagraph\n",
+        )
     }
 
     private fun hasCompletedProgressFor(contentId: String): Boolean {

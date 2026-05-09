@@ -1,0 +1,1060 @@
+diff --git a/app/src/androidTest/java/com/qualityalternative/app/MainActivityTest.kt b/app/src/androidTest/java/com/qualityalternative/app/MainActivityTest.kt
+index 5d88152..3aed446 100644
+--- a/app/src/androidTest/java/com/qualityalternative/app/MainActivityTest.kt
++++ b/app/src/androidTest/java/com/qualityalternative/app/MainActivityTest.kt
+@@ -51,6 +51,7 @@ import com.qualityalternative.app.domain.model.ReadingProgress
+ import com.qualityalternative.app.domain.model.TopicTag
+ import com.qualityalternative.app.domain.model.UserDocumentDraft
+ import com.qualityalternative.app.domain.service.AddUserDocumentResult
++import com.qualityalternative.app.data.RoomReadingProgressRepository
+ import com.qualityalternative.app.interception.FixtureTargetRegistry
+ import com.qualityalternative.app.interception.InterceptionRuntimeGate
+ import kotlinx.coroutines.flow.first
+@@ -1740,9 +1741,18 @@ class MainActivityTest {
+         }
+         val lastViewedPage = readerPagePositionFromLabel()
+         val lastViewedPercent = currentReaderProgressPercentFromLabel()
++        val lastViewedEndParagraph = currentReaderPageEndParagraphIndex()
+         composeRule.waitUntil(timeoutMillis = 10_000) {
+-            savedProgressPercentFor(document.id) == lastViewedPercent
+-        }
++            durableRoomSavedProgressPercentFor(document.id) == lastViewedPercent &&
++                durableRoomSavedProgressParagraphIndexFor(document.id) == lastViewedEndParagraph
++        }
++        appendSprint19RegressionEvidence(
++            stage = "saved_before_pause_stop",
++            page = lastViewedPage,
++            progressPercent = lastViewedPercent,
++            pageEndParagraph = lastViewedEndParagraph,
++            durableSavedParagraph = durableRoomSavedProgressParagraphIndexFor(document.id),
++        )
+         captureSprint19RegressionScreenshot("09_session_progress_saved_before_pause_stop")
+ 
+         scenario?.moveToState(Lifecycle.State.CREATED)
+@@ -1754,6 +1764,14 @@ class MainActivityTest {
+             readerPagePositionFromLabel().currentPage == lastViewedPage.currentPage
+         }
+         assertEquals(lastViewedPage.totalPages, readerPagePositionFromLabel().totalPages)
++        assertEquals(lastViewedEndParagraph, currentReaderPageEndParagraphIndex())
++        appendSprint19RegressionEvidence(
++            stage = "restored_after_pause_stop",
++            page = readerPagePositionFromLabel(),
++            progressPercent = currentReaderProgressPercentFromLabel(),
++            pageEndParagraph = currentReaderPageEndParagraphIndex(),
++            durableSavedParagraph = durableRoomSavedProgressParagraphIndexFor(document.id),
++        )
+         captureSprint19RegressionScreenshot("10_session_progress_restored_after_pause_stop")
+ 
+         scenario?.close()
+@@ -1767,9 +1785,106 @@ class MainActivityTest {
+             readerPagePositionFromLabel().currentPage == lastViewedPage.currentPage
+         }
+         assertEquals(lastViewedPage.totalPages, readerPagePositionFromLabel().totalPages)
++        assertEquals(lastViewedEndParagraph, currentReaderPageEndParagraphIndex())
++        appendSprint19RegressionEvidence(
++            stage = "restored_after_reopen",
++            page = readerPagePositionFromLabel(),
++            progressPercent = currentReaderProgressPercentFromLabel(),
++            pageEndParagraph = currentReaderPageEndParagraphIndex(),
++            durableSavedParagraph = durableRoomSavedProgressParagraphIndexFor(document.id),
++        )
+         captureSprint19RegressionScreenshot("11_session_progress_restored_after_reopen")
+     }
+ 
++    @Test
++    fun sprint19ReaderResumeUsesPendingLatestProgressAcrossImmediateReopenBeforeRoomWrite() {
++        launchOnboardedApp()
++        val document = addSeedMarkdownDocument(
++            title = "Sprint 19 Pending Progress",
++            displayName = "sprint19-pending-progress.md",
++            body = (1..80).joinToString(separator = "\n\n") { index ->
++                "Pending progress paragraph $index gives the reader enough source material to save a latest " +
++                    "anchor, close immediately, reopen before Room writes, and avoid falling back to stale state."
++            },
++            nowMillis = 97_000L,
++        )
++
++        scenario?.onActivity { activity -> activity.mainViewModel.openLibraryItem(document) }
++        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
++        repeat(2) {
++            val beforePage = readerPagePositionFromLabel().currentPage
++            advanceReaderPage()
++            composeRule.waitUntil(timeoutMillis = 10_000) {
++                readerPagePositionFromLabel().currentPage > beforePage
++            }
++        }
++        val stablePage = readerPagePositionFromLabel()
++        val stablePercent = currentReaderProgressPercentFromLabel()
++        val stableEndParagraph = currentReaderPageEndParagraphIndex()
++        composeRule.waitUntil(timeoutMillis = 10_000) {
++            durableRoomSavedProgressPercentFor(document.id) == stablePercent &&
++                durableRoomSavedProgressParagraphIndexFor(document.id) == stableEndParagraph
++        }
++
++        val delay = roomReadingProgressRepositoryForTests().delayNextUnfinishedSaveForTests()
++        advanceReaderPage()
++        composeRule.waitUntil(timeoutMillis = 10_000) {
++            delay.started.isCompleted &&
++                readerPagePositionFromLabel().currentPage == stablePage.currentPage + 1
++        }
++        val latestPage = readerPagePositionFromLabel()
++        val latestPercent = currentReaderProgressPercentFromLabel()
++        val latestEndParagraph = currentReaderPageEndParagraphIndex()
++        assertEquals(stableEndParagraph, durableRoomSavedProgressParagraphIndexFor(document.id))
++        appendSprint19RegressionEvidence(
++            stage = "pending_latest_before_room_write",
++            page = latestPage,
++            progressPercent = latestPercent,
++            pageEndParagraph = latestEndParagraph,
++            durableSavedParagraph = durableRoomSavedProgressParagraphIndexFor(document.id),
++        )
++        captureSprint19RegressionScreenshot("12_pending_latest_before_room_write")
++
++        scenario?.close()
++        scenario = null
++        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
++        Thread.sleep(250)
++        launchOnboardedApp()
++        scenario?.onActivity { activity -> activity.mainViewModel.openLibraryItem(document) }
++        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
++        composeRule.waitUntil(timeoutMillis = 10_000) {
++            readerPagePositionFromLabel().currentPage == latestPage.currentPage
++        }
++        assertEquals(latestEndParagraph, currentReaderPageEndParagraphIndex())
++        appendSprint19RegressionEvidence(
++            stage = "immediate_reopen_before_room_write",
++            page = readerPagePositionFromLabel(),
++            progressPercent = currentReaderProgressPercentFromLabel(),
++            pageEndParagraph = currentReaderPageEndParagraphIndex(),
++            durableSavedParagraph = durableRoomSavedProgressParagraphIndexFor(document.id),
++        )
++        captureSprint19RegressionScreenshot("13_immediate_reopen_before_room_write")
++
++        scenario?.moveToState(Lifecycle.State.CREATED)
++        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
++        Thread.sleep(250)
++        scenario?.moveToState(Lifecycle.State.RESUMED)
++        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
++        delay.release.complete(Unit)
++        composeRule.waitUntil(timeoutMillis = 10_000) {
++            durableRoomSavedProgressPercentFor(document.id) == latestPercent &&
++                durableRoomSavedProgressParagraphIndexFor(document.id) == latestEndParagraph
++        }
++        appendSprint19RegressionEvidence(
++            stage = "room_write_released_after_reopen",
++            page = readerPagePositionFromLabel(),
++            progressPercent = currentReaderProgressPercentFromLabel(),
++            pageEndParagraph = currentReaderPageEndParagraphIndex(),
++            durableSavedParagraph = durableRoomSavedProgressParagraphIndexFor(document.id),
++        )
++        captureSprint19RegressionScreenshot("14_room_write_released_after_reopen")
++    }
++
+     @Test
+     fun sprint19InterventionShowsMeditationAsCalmAlternativeWhenPrimaryIsReading() {
+         launchFixtureSystemIntervention()
+@@ -3494,6 +3609,49 @@ class MainActivityTest {
+         return index
+     }
+ 
++    private fun durableRoomSavedProgressPercentFor(contentId: String): Int {
++        val app = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication)
++        return runBlocking {
++            app.appContainer.readingProgressRowForTests(contentId)
++                ?.takeIf { row -> row.completedAtMillis == null }
++                ?.progressPercent
++                ?: 0
++        }
++    }
++
++    private fun durableRoomSavedProgressParagraphIndexFor(contentId: String): Int {
++        val app = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication)
++        return runBlocking {
++            app.appContainer.readingProgressRowForTests(contentId)
++                ?.takeIf { row -> row.completedAtMillis == null }
++                ?.lastVisibleParagraphIndex
++                ?: -1
++        }
++    }
++
++    private fun roomReadingProgressRepositoryForTests(): RoomReadingProgressRepository {
++        val app = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication)
++        val repository = app.appContainer.readingProgressRepository
++        assertTrue("Expected RoomReadingProgressRepository in instrumentation", repository is RoomReadingProgressRepository)
++        return repository as RoomReadingProgressRepository
++    }
++
++    private fun appendSprint19RegressionEvidence(
++        stage: String,
++        page: ReaderPagePosition,
++        progressPercent: Int,
++        pageEndParagraph: Int,
++        durableSavedParagraph: Int,
++    ) {
++        val outputDir = File("/sdcard/Download/qualityalternative/$sprint19RegressionScreenshotDirName")
++        assertTrue("Expected evidence output directory for $stage", outputDir.mkdirs() || outputDir.exists())
++        File(outputDir, "reader_resume_stage_assertions.txt").appendText(
++            "$stage: page=${page.currentPage}/${page.totalPages}, " +
++                "progress=$progressPercent, pageEndParagraph=$pageEndParagraph, " +
++                "durableSavedParagraph=$durableSavedParagraph\n",
++        )
++    }
++
+     private fun hasCompletedProgressFor(contentId: String): Boolean {
+         var hasCompleted = false
+         scenario?.onActivity { activity ->
+diff --git a/app/src/androidTest/java/com/qualityalternative/app/data/RoomReadingProgressRepositoryTest.kt b/app/src/androidTest/java/com/qualityalternative/app/data/RoomReadingProgressRepositoryTest.kt
+index 4aac4a7..2787f54 100644
+--- a/app/src/androidTest/java/com/qualityalternative/app/data/RoomReadingProgressRepositoryTest.kt
++++ b/app/src/androidTest/java/com/qualityalternative/app/data/RoomReadingProgressRepositoryTest.kt
+@@ -4,6 +4,7 @@ import androidx.room.Room
+ import androidx.test.ext.junit.runners.AndroidJUnit4
+ import androidx.test.platform.app.InstrumentationRegistry
+ import com.qualityalternative.app.data.local.QualityAlternativeDatabase
++import com.qualityalternative.app.data.local.ReadingProgressEntity
+ import com.qualityalternative.app.domain.model.ReadingProgress
+ import kotlinx.coroutines.CoroutineScope
+ import kotlinx.coroutines.Dispatchers
+@@ -96,4 +97,152 @@ class RoomReadingProgressRepositoryTest {
+             }
+         }
+     }
++
++    @Test
++    fun saveProgress_keepsNewerUnfinishedPositionWhenOlderSaveArrivesLater() {
++        runBlocking {
++            val context = InstrumentationRegistry.getInstrumentation().targetContext
++            val database = Room.inMemoryDatabaseBuilder(
++                context,
++                QualityAlternativeDatabase::class.java,
++            ).allowMainThreadQueries().build()
++            val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
++
++            try {
++                val repository = RoomReadingProgressRepository(
++                    dao = database.readingProgressDao(),
++                    scope = appScope,
++                )
++                repository.observeReady().first { it }
++
++                repository.saveProgress(
++                    ReadingProgress(
++                        contentId = "content-1",
++                        progressPercent = 40,
++                        lastVisibleParagraphIndex = 12,
++                        paragraphCount = 40,
++                        updatedAtMillis = 2_000L,
++                    ),
++                )
++                repository.saveProgress(
++                    ReadingProgress(
++                        contentId = "content-1",
++                        progressPercent = 12,
++                        lastVisibleParagraphIndex = 3,
++                        paragraphCount = 40,
++                        updatedAtMillis = 1_000L,
++                    ),
++                )
++
++                val saved = withTimeout(10_000L) {
++                    repository.observeReadingProgress().first { it.size == 1 }.single()
++                }
++                assertEquals(40, saved.progressPercent)
++                assertEquals(12, saved.lastVisibleParagraphIndex)
++                assertEquals(2_000L, saved.updatedAtMillis)
++            } finally {
++                appScope.cancel()
++                delay(100)
++                database.close()
++            }
++        }
++    }
++
++    @Test
++    fun cachePendingProgress_survivesStaleRoomEmissionAndOlderWrite() {
++        runBlocking {
++            val context = InstrumentationRegistry.getInstrumentation().targetContext
++            val database = Room.inMemoryDatabaseBuilder(
++                context,
++                QualityAlternativeDatabase::class.java,
++            ).allowMainThreadQueries().build()
++            val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
++
++            try {
++                val repository = RoomReadingProgressRepository(
++                    dao = database.readingProgressDao(),
++                    scope = appScope,
++                )
++                repository.observeReady().first { it }
++
++                val olderDurable = ReadingProgress(
++                    contentId = "content-1",
++                    progressPercent = 12,
++                    lastVisibleParagraphIndex = 3,
++                    paragraphCount = 40,
++                    updatedAtMillis = 1_000L,
++                )
++                repository.saveProgress(olderDurable)
++
++                repository.cachePendingProgress(
++                    ReadingProgress(
++                        contentId = "content-1",
++                        progressPercent = 40,
++                        lastVisibleParagraphIndex = 12,
++                        paragraphCount = 40,
++                        updatedAtMillis = 2_000L,
++                    ),
++                )
++                database.readingProgressDao().insertOrReplace(
++                    ReadingProgressEntity(
++                        contentId = "content-1",
++                        progressPercent = 12,
++                        lastVisibleParagraphIndex = 3,
++                        lastVisibleTextOffset = 0,
++                        paragraphCount = 40,
++                        updatedAtMillis = 1_000L,
++                        completedAtMillis = null,
++                    ),
++                )
++                delay(250L)
++
++                val afterStaleRoomEmission = repository.readingProgress().single()
++                assertEquals(40, afterStaleRoomEmission.progressPercent)
++                assertEquals(12, afterStaleRoomEmission.lastVisibleParagraphIndex)
++                assertEquals(2_000L, afterStaleRoomEmission.updatedAtMillis)
++
++                repository.saveProgress(
++                    olderDurable.copy(
++                        progressPercent = 16,
++                        lastVisibleParagraphIndex = 4,
++                        updatedAtMillis = 1_500L,
++                    ),
++                )
++
++                val afterOlderWrite = repository.readingProgress().single()
++                assertEquals(40, afterOlderWrite.progressPercent)
++                assertEquals(12, afterOlderWrite.lastVisibleParagraphIndex)
++                assertEquals(2_000L, afterOlderWrite.updatedAtMillis)
++
++                repository.cachePendingProgress(
++                    ReadingProgress(
++                        contentId = "content-1",
++                        progressPercent = 41,
++                        lastVisibleParagraphIndex = 12,
++                        lastVisibleTextOffset = 20,
++                        paragraphCount = 40,
++                        updatedAtMillis = 3_000L,
++                    ),
++                )
++                repository.saveProgress(
++                    ReadingProgress(
++                        contentId = "content-1",
++                        progressPercent = 41,
++                        lastVisibleParagraphIndex = 12,
++                        lastVisibleTextOffset = 5,
++                        paragraphCount = 40,
++                        updatedAtMillis = 3_000L,
++                    ),
++                )
++
++                val afterSameTimestampEarlierOffset = repository.readingProgress().single()
++                assertEquals(20, afterSameTimestampEarlierOffset.lastVisibleTextOffset)
++                assertEquals(3_000L, afterSameTimestampEarlierOffset.updatedAtMillis)
++            } finally {
++                appScope.cancel()
++                delay(100)
++                database.close()
++            }
++        }
++    }
+ }
+diff --git a/app/src/main/java/com/qualityalternative/app/data/AppContainer.kt b/app/src/main/java/com/qualityalternative/app/data/AppContainer.kt
+index 616e873..dfb3578 100644
+--- a/app/src/main/java/com/qualityalternative/app/data/AppContainer.kt
++++ b/app/src/main/java/com/qualityalternative/app/data/AppContainer.kt
+@@ -5,6 +5,7 @@ import android.net.Uri
+ import androidx.datastore.preferences.preferencesDataStore
+ import com.qualityalternative.app.BuildConfig
+ import com.qualityalternative.app.data.local.QualityAlternativeDatabase
++import com.qualityalternative.app.data.local.ReadingProgressEntity
+ import com.qualityalternative.app.domain.model.ContentItem
+ import com.qualityalternative.app.domain.service.AnalyticsTracker
+ import com.qualityalternative.app.domain.service.ContentRepository
+@@ -34,7 +35,7 @@ private val Context.delayGateDataStore by preferencesDataStore(name = "delay_gat
+ 
+ class AppContainer(context: Context) {
+     private val appJob = SupervisorJob()
+-    private val appScope = CoroutineScope(appJob + Dispatchers.IO)
++    internal val appScope = CoroutineScope(appJob + Dispatchers.IO)
+     private val database = QualityAlternativeDatabase.build(context)
+     private val annotationSyncDirectory = File(context.filesDir, "annotation-sync").apply { mkdirs() }
+     private val profileBackupDirectory = File(context.filesDir, "profile-backup").apply { mkdirs() }
+@@ -114,6 +115,10 @@ class AppContainer(context: Context) {
+         InterceptionRuntimeGate.clearAll()
+     }
+ 
++    suspend fun readingProgressRowForTests(contentId: String): ReadingProgressEntity? {
++        return database.readingProgressDao().findByContentId(contentId)
++    }
++
+     fun closeForTests() {
+         runBlocking {
+             appJob.cancelAndJoin()
+diff --git a/app/src/main/java/com/qualityalternative/app/data/RoomReadingProgressRepository.kt b/app/src/main/java/com/qualityalternative/app/data/RoomReadingProgressRepository.kt
+index 4b6bc1f..611ee2a 100644
+--- a/app/src/main/java/com/qualityalternative/app/data/RoomReadingProgressRepository.kt
++++ b/app/src/main/java/com/qualityalternative/app/data/RoomReadingProgressRepository.kt
+@@ -4,6 +4,8 @@ import com.qualityalternative.app.data.local.ReadingProgressDao
+ import com.qualityalternative.app.data.local.ReadingProgressEntity
+ import com.qualityalternative.app.domain.model.ReadingProgress
+ import com.qualityalternative.app.domain.service.ReadingProgressRepository
++import java.util.concurrent.atomic.AtomicReference
++import kotlinx.coroutines.CompletableDeferred
+ import kotlinx.coroutines.CoroutineScope
+ import kotlinx.coroutines.flow.Flow
+ import kotlinx.coroutines.flow.MutableStateFlow
+@@ -21,13 +23,19 @@ class RoomReadingProgressRepository(
+     private val progress = MutableStateFlow<List<ReadingProgress>>(emptyList())
+     private val ready = MutableStateFlow(false)
+     private val writeMutex = Mutex()
++    private val nextUnfinishedSaveDelayForTests = AtomicReference<SaveDelayForTests?>(null)
++
++    class SaveDelayForTests internal constructor() {
++        val started = CompletableDeferred<Unit>()
++        val release = CompletableDeferred<Unit>()
++    }
+ 
+     init {
+         scope.launch {
+             dao.observeAll()
+                 .map { rows -> rows.map(ReadingProgressEntity::toModel) }
+                 .collect { loadedProgress ->
+-                    progress.value = loadedProgress.sortedByDescending(ReadingProgress::updatedAtMillis)
++                    progress.mergeLoadedProgress(loadedProgress)
+                     ready.value = true
+                 }
+         }
+@@ -44,17 +52,19 @@ class RoomReadingProgressRepository(
+         }
+     }
+ 
++    override fun cachePendingProgress(progress: ReadingProgress) {
++        val normalized = progress.normalized()
++        this.progress.tryUpsertNewestProgress(normalized)
++    }
++
+     override suspend fun saveProgress(progress: ReadingProgress) {
+         writeMutex.withLock {
+             val normalized = progress.normalized()
+-            val existing = this.progress.value.firstOrNull { current ->
+-                current.contentId == normalized.contentId
+-            }
+-            if (existing?.isCompleted() == true && normalized.isUnfinished()) {
++            if (!this.progress.tryUpsertNewestProgress(normalized)) {
+                 return
+             }
++            awaitSaveDelayForTestsIfNeeded(normalized)
+             dao.insertOrReplace(normalized.toEntity())
+-            this.progress.value = upsertProgress(this.progress.value, normalized)
+         }
+     }
+ 
+@@ -78,6 +88,22 @@ class RoomReadingProgressRepository(
+     override fun isReady(): Boolean = ready.value
+ 
+     override fun observeReady(): Flow<Boolean> = ready.asStateFlow()
++
++    fun delayNextUnfinishedSaveForTests(): SaveDelayForTests {
++        val delay = SaveDelayForTests()
++        nextUnfinishedSaveDelayForTests.set(delay)
++        return delay
++    }
++
++    private suspend fun awaitSaveDelayForTestsIfNeeded(progress: ReadingProgress) {
++        if (!progress.isUnfinished()) {
++            return
++        }
++        nextUnfinishedSaveDelayForTests.getAndSet(null)?.let { delay ->
++            delay.started.complete(Unit)
++            delay.release.await()
++        }
++    }
+ }
+ 
+ private fun ReadingProgress.normalized(): ReadingProgress {
+@@ -91,16 +117,85 @@ private fun ReadingProgress.normalized(): ReadingProgress {
+     )
+ }
+ 
+-private fun upsertProgress(
++private fun mergeProgressLists(
+     currentProgress: List<ReadingProgress>,
+-    updatedProgress: ReadingProgress,
++    loadedProgress: List<ReadingProgress>,
+ ): List<ReadingProgress> {
++    return (currentProgress + loadedProgress)
++        .groupBy(ReadingProgress::contentId)
++        .values
++        .map { candidates ->
++            candidates.reduce { kept, candidate ->
++                if (shouldKeepExistingProgress(existing = kept, incoming = candidate)) kept else candidate
++            }
++        }
++        .sortedByDescending(ReadingProgress::updatedAtMillis)
++}
++
++private fun MutableStateFlow<List<ReadingProgress>>.mergeLoadedProgress(
++    loadedProgress: List<ReadingProgress>,
++) {
++    while (true) {
++        val currentProgress = value
++        val mergedProgress = mergeProgressLists(currentProgress, loadedProgress)
++        if (mergedProgress == currentProgress || compareAndSet(currentProgress, mergedProgress)) {
++            return
++        }
++    }
++}
++
++private fun MutableStateFlow<List<ReadingProgress>>.tryUpsertNewestProgress(
++    updatedProgress: ReadingProgress,
++): Boolean {
++    while (true) {
++        val currentProgress = value
++        val nextProgress = upsertNewestProgress(currentProgress, updatedProgress) ?: return false
++        if (compareAndSet(currentProgress, nextProgress)) {
++            return true
++        }
++    }
++}
++
++private fun upsertNewestProgress(
++    currentProgress: List<ReadingProgress>,
++    updatedProgress: ReadingProgress,
++): List<ReadingProgress>? {
++    val existing = currentProgress.firstOrNull { it.contentId == updatedProgress.contentId }
++    if (shouldKeepExistingProgress(existing = existing, incoming = updatedProgress)) {
++        return null
++    }
+     return currentProgress
+         .filterNot { it.contentId == updatedProgress.contentId }
+         .plus(updatedProgress)
+         .sortedByDescending(ReadingProgress::updatedAtMillis)
+ }
+ 
++private fun shouldKeepExistingProgress(
++    existing: ReadingProgress?,
++    incoming: ReadingProgress,
++): Boolean {
++    if (existing == null) {
++        return false
++    }
++    if (existing.isCompleted() && incoming.isUnfinished()) {
++        return true
++    }
++    if (existing.isUnfinished() && incoming.isCompleted()) {
++        return false
++    }
++    if (incoming.updatedAtMillis < existing.updatedAtMillis) {
++        return true
++    }
++    if (incoming.updatedAtMillis > existing.updatedAtMillis) {
++        return false
++    }
++    if (incoming.lastVisibleParagraphIndex < existing.lastVisibleParagraphIndex) {
++        return true
++    }
++    return incoming.lastVisibleParagraphIndex == existing.lastVisibleParagraphIndex &&
++        incoming.lastVisibleTextOffset < existing.lastVisibleTextOffset
++}
++
+ private fun ReadingProgress.toEntity(): ReadingProgressEntity {
+     return ReadingProgressEntity(
+         contentId = contentId,
+diff --git a/app/src/main/java/com/qualityalternative/app/data/local/ReadingProgressDao.kt b/app/src/main/java/com/qualityalternative/app/data/local/ReadingProgressDao.kt
+index e6d73db..6fd1bd0 100644
+--- a/app/src/main/java/com/qualityalternative/app/data/local/ReadingProgressDao.kt
++++ b/app/src/main/java/com/qualityalternative/app/data/local/ReadingProgressDao.kt
+@@ -11,6 +11,9 @@ interface ReadingProgressDao {
+     @Query("SELECT * FROM reading_progress ORDER BY updatedAtMillis DESC")
+     fun observeAll(): Flow<List<ReadingProgressEntity>>
+ 
++    @Query("SELECT * FROM reading_progress WHERE contentId = :contentId LIMIT 1")
++    suspend fun findByContentId(contentId: String): ReadingProgressEntity?
++
+     @Insert(onConflict = OnConflictStrategy.REPLACE)
+     suspend fun insertOrReplace(progress: ReadingProgressEntity)
+ 
+diff --git a/app/src/main/java/com/qualityalternative/app/domain/service/Contracts.kt b/app/src/main/java/com/qualityalternative/app/domain/service/Contracts.kt
+index 8636a19..a55372b 100644
+--- a/app/src/main/java/com/qualityalternative/app/domain/service/Contracts.kt
++++ b/app/src/main/java/com/qualityalternative/app/domain/service/Contracts.kt
+@@ -292,6 +292,8 @@ interface ReadingProgressRepository {
+                 .mapTo(mutableSetOf(), ReadingProgress::contentId),
+         )
+ 
++    fun cachePendingProgress(progress: ReadingProgress) = Unit
++
+     suspend fun saveProgress(progress: ReadingProgress)
+ 
+     suspend fun deleteProgress(contentId: String)
+diff --git a/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt b/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
+index ad60876..9ef1087 100644
+--- a/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
++++ b/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
+@@ -93,6 +93,7 @@ import com.qualityalternative.app.interception.InterceptionRuntimeGate
+ import java.io.InputStream
+ import java.util.UUID
+ import kotlinx.coroutines.CancellationException
++import kotlinx.coroutines.CoroutineScope
+ import kotlinx.coroutines.cancel
+ import kotlinx.coroutines.delay
+ import kotlinx.coroutines.flow.collect
+@@ -290,6 +291,7 @@ class MainViewModel(
+     private val defaultProfileAutosaveDisplayName: String = LOCAL_PROFILE_BACKUP_DISPLAY_NAME,
+     private val interceptionMonitor: InterceptionMonitor,
+     private val enableDelayRefreshTicker: Boolean = true,
++    private val progressPersistenceScope: CoroutineScope? = null,
+     private val nowProvider: () -> Long = System::currentTimeMillis,
+ ) : ViewModel() {
+     private val supportedApps = settingsRepository.supportedDistractingApps()
+@@ -304,6 +306,7 @@ class MainViewModel(
+     private var delayReady = delayGate.isReady()
+     private var historyCompletedContentIds: Set<String> = emptySet()
+     private var readingProgressCompletedContentIds: Set<String> = emptySet()
++    private var lastReadingProgressUpdatedAtMillis = 0L
+     private var pendingSystemInterception: PendingSystemInterception? = null
+     private var pendingAccountLightImportPlan: AccountLightImportPlan? = null
+     private var annotationDriveAccessToken: String? = null
+@@ -382,15 +385,24 @@ class MainViewModel(
+         }
+         viewModelScope.launch {
+             readingProgressRepository.observeReadingProgress().collect { progress ->
+-                readingProgressCompletedContentIds = progress.filter(ReadingProgress::isCompleted)
++                val effectiveProgress = progress.withActiveProgressOverride(
++                    activeProgress = uiState.currentReadingProgress?.takeIf { currentProgress ->
++                        currentProgress.contentId == uiState.currentContent?.id &&
++                            progress.none { storedProgress ->
++                                storedProgress.contentId == currentProgress.contentId &&
++                                    storedProgress.updatedAtMillis >= currentProgress.updatedAtMillis
++                            }
++                    },
++                )
++                readingProgressCompletedContentIds = effectiveProgress.filter(ReadingProgress::isCompleted)
+                     .mapTo(mutableSetOf(), ReadingProgress::contentId)
+                     .trackedCompletedContentIds()
+-                val unfinishedIds = progress.unfinishedContentIds()
++                val unfinishedIds = effectiveProgress.unfinishedContentIds()
+                 uiState = uiState.copy(
+-                    readingProgress = progress,
++                    readingProgress = effectiveProgress,
+                     preferences = uiState.preferences?.copy(unfinishedContentIds = unfinishedIds),
+                     currentReadingProgress = uiState.currentContent?.id?.let { contentId ->
+-                        progress.firstOrNull { candidate -> candidate.contentId == contentId && candidate.isUnfinished() }
++                        effectiveProgress.firstOrNull { candidate -> candidate.contentId == contentId && candidate.isUnfinished() }
+                     },
+                 )
+                 updateCompletedContentIds()
+@@ -2084,25 +2096,40 @@ class MainViewModel(
+             return
+         }
+         val safeParagraphCount = paragraphCount.coerceAtLeast(1)
++        val progressUpdatedAtMillis = nextReadingProgressUpdatedAtMillis(
++            contentId = content.id,
++            nowMillis = nowMillis,
++        )
+         val progress = ReadingProgress(
+             contentId = content.id,
+             progressPercent = progressPercent.coerceIn(1, 99),
+             lastVisibleParagraphIndex = lastVisibleParagraphIndex.coerceIn(0, safeParagraphCount - 1),
+             lastVisibleTextOffset = lastVisibleTextOffset.coerceAtLeast(0),
+             paragraphCount = safeParagraphCount,
+-            updatedAtMillis = nowMillis,
++            updatedAtMillis = progressUpdatedAtMillis,
+         )
+         val sameVisiblePosition = uiState.currentReadingProgress?.sameVisiblePosition(progress) == true
+         if (!sameVisiblePosition || uiState.currentReadingProgress?.updatedAtMillis != progress.updatedAtMillis) {
+-            uiState = uiState.copy(currentReadingProgress = progress)
++            val updatedReadingProgress = uiState.readingProgress.upsertReadingProgress(progress)
++            uiState = uiState.copy(
++                readingProgress = updatedReadingProgress,
++                preferences = uiState.preferences?.copy(
++                    unfinishedContentIds = updatedReadingProgress.unfinishedContentIds(),
++                ),
++                currentReadingProgress = progress,
++            )
+         }
+-        viewModelScope.launch {
++        readingProgressRepository.cachePendingProgress(progress)
++        val progressSaveJob = (progressPersistenceScope ?: viewModelScope).launch {
+             readingProgressRepository.saveProgress(progress)
++        }
++        viewModelScope.launch {
++            progressSaveJob.join()
+             if (!sameVisiblePosition) {
+                 recordEventDurably(
+                     AnalyticsEvent(
+                         type = AnalyticsEventType.READING_PROGRESS_SAVED,
+-                        timestampMillis = nowMillis,
++                        timestampMillis = progressUpdatedAtMillis,
+                         interventionId = uiState.currentInterventionId,
+                         sessionId = uiState.currentSessionId,
+                         targetAppPackage = uiState.selectedTargetApp?.packageName,
+@@ -2113,7 +2140,7 @@ class MainViewModel(
+                     ),
+                 )
+             }
+-            autosaveAccountLightProfileAfterPortableMutation(nowMillis = nowMillis)
++            autosaveAccountLightProfileAfterPortableMutation(nowMillis = progressUpdatedAtMillis)
+         }
+     }
+ 
+@@ -3525,6 +3552,28 @@ class MainViewModel(
+         )
+     }
+ 
++    private fun nextReadingProgressUpdatedAtMillis(
++        contentId: String,
++        nowMillis: Long,
++    ): Long {
++        val currentUpdatedAtMillis = uiState.currentReadingProgress
++            ?.takeIf { progress -> progress.contentId == contentId }
++            ?.updatedAtMillis
++            ?: 0L
++        val storedUpdatedAtMillis = uiState.readingProgress
++            .firstOrNull { progress -> progress.contentId == contentId }
++            ?.updatedAtMillis
++            ?: 0L
++        val floor = maxOf(
++            lastReadingProgressUpdatedAtMillis,
++            currentUpdatedAtMillis,
++            storedUpdatedAtMillis,
++        )
++        val nextUpdatedAtMillis = maxOf(nowMillis, floor + 1)
++        lastReadingProgressUpdatedAtMillis = nextUpdatedAtMillis
++        return nextUpdatedAtMillis
++    }
++
+     internal fun closeForTests() {
+         viewModelScope.cancel()
+     }
+@@ -3584,6 +3633,7 @@ class MainViewModelFactory(
+             accountLightProfileExporter = appContainer.accountLightProfileExporter,
+             accountLightProfileImporter = appContainer.accountLightProfileImporter,
+             accountLightProfileAutosaveWriter = appContainer.accountLightProfileAutosaveWriter,
++            progressPersistenceScope = appContainer.appScope,
+             defaultAnnotationExportUri = appContainer.defaultAnnotationExportUri,
+             defaultProfileAutosaveUri = appContainer.defaultProfileAutosaveUri,
+             interceptionMonitor = appContainer.interceptionMonitor,
+@@ -3670,6 +3720,22 @@ private fun List<ReadingProgress>.unfinishedContentIds(): Set<String> {
+         .mapTo(mutableSetOf(), ReadingProgress::contentId)
+ }
+ 
++private fun List<ReadingProgress>.upsertReadingProgress(progress: ReadingProgress): List<ReadingProgress> {
++    return filterNot { current -> current.contentId == progress.contentId }
++        .plus(progress)
++        .sortedByDescending(ReadingProgress::updatedAtMillis)
++}
++
++private fun List<ReadingProgress>.withActiveProgressOverride(
++    activeProgress: ReadingProgress?,
++): List<ReadingProgress> {
++    return if (activeProgress == null) {
++        this
++    } else {
++        upsertReadingProgress(activeProgress)
++    }
++}
++
+ private fun ReadingProgress.sameVisiblePosition(other: ReadingProgress): Boolean {
+     return contentId == other.contentId &&
+         progressPercent == other.progressPercent &&
+diff --git a/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt b/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
+index 664a2ae..865b6ce 100644
+--- a/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
++++ b/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
+@@ -2226,7 +2226,7 @@ private fun ReaderScreen(
+     val pageBoundarySignature = remember(pages) {
+         readerPageBoundarySignature(pages)
+     }
+-    val restoredProgress = remember(content.id) {
++    val restoredProgress = remember(content.id, state.currentReadingProgress) {
+         state.currentReadingProgress?.takeIf { it.contentId == content.id && it.isUnfinished() }
+     }
+     val selectorStartParagraphIndex = remember(readerStartSelector, readerBlockLayout) {
+diff --git a/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt b/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
+index 34f2ff8..fcb8edc 100644
+--- a/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
+@@ -72,6 +72,7 @@ import com.qualityalternative.app.interception.InterceptionRuntimeGate
+ import java.io.ByteArrayInputStream
+ import java.io.File
+ import kotlinx.coroutines.CompletableDeferred
++import kotlinx.coroutines.CoroutineScope
+ import kotlinx.coroutines.ExperimentalCoroutinesApi
+ import kotlinx.coroutines.flow.Flow
+ import kotlinx.coroutines.flow.MutableStateFlow
+@@ -1089,6 +1090,179 @@ class MainViewModelTest {
+         assertFalse(readingProgressRepository.savedProgress.last().isUnfinished())
+     }
+ 
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun delayedOlderReaderProgressSaveCannotOverwriteNewerVisiblePosition() = runTest {
++        val document = savedUserDocument(format = ContentFormat.MARKDOWN)
++        val readingProgressRepository = DelayedUnfinishedReadingProgressRepository()
++        val viewModel = createViewModel(
++            contentRepository = FakeContentRepository(extraItems = listOf(document)),
++            readingProgressRepository = readingProgressRepository,
++        )
++
++        advanceUntilIdle()
++        viewModel.completeOnboarding()
++        advanceUntilIdle()
++        viewModel.openLibraryItem(document)
++        advanceUntilIdle()
++
++        readingProgressRepository.delayNextUnfinishedSave = true
++        viewModel.saveCurrentReadingProgress(
++            progressPercent = 12,
++            lastVisibleParagraphIndex = 3,
++            lastVisibleTextOffset = 0,
++            paragraphCount = 40,
++            nowMillis = 8_100L,
++        )
++        runCurrent()
++        assertTrue(readingProgressRepository.unfinishedSaveStarted.isCompleted)
++
++        viewModel.saveCurrentReadingProgress(
++            progressPercent = 12,
++            lastVisibleParagraphIndex = 12,
++            lastVisibleTextOffset = 0,
++            paragraphCount = 40,
++            nowMillis = 8_100L,
++        )
++        runCurrent()
++
++        val newerProgress = readingProgressRepository.progress.value.single()
++        assertEquals(12, newerProgress.lastVisibleParagraphIndex)
++        assertEquals(8_101L, newerProgress.updatedAtMillis)
++
++        readingProgressRepository.releaseUnfinishedSave.complete(Unit)
++        advanceUntilIdle()
++
++        val storedProgress = readingProgressRepository.progress.value.single()
++        assertEquals(12, storedProgress.lastVisibleParagraphIndex)
++        assertEquals(8_101L, storedProgress.updatedAtMillis)
++        assertEquals(1, readingProgressRepository.savedProgress.size)
++        assertEquals(12, viewModel.uiState.currentReadingProgress?.lastVisibleParagraphIndex)
++    }
++
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun latestReaderProgressSaveSurvivesViewModelCloseBeforeRepositoryWriteCompletes() = runTest {
++        val document = savedUserDocument(format = ContentFormat.MARKDOWN)
++        val readingProgressRepository = DelayedUnfinishedReadingProgressRepository()
++        val contentRepository = FakeContentRepository(extraItems = listOf(document))
++        val viewModel = createViewModel(
++            contentRepository = contentRepository,
++            readingProgressRepository = readingProgressRepository,
++            progressPersistenceScope = this,
++        )
++
++        advanceUntilIdle()
++        viewModel.completeOnboarding()
++        advanceUntilIdle()
++        viewModel.openLibraryItem(document)
++        advanceUntilIdle()
++
++        viewModel.saveCurrentReadingProgress(
++            progressPercent = 8,
++            lastVisibleParagraphIndex = 3,
++            lastVisibleTextOffset = 0,
++            paragraphCount = 40,
++            nowMillis = 9_100L,
++        )
++        advanceUntilIdle()
++        assertEquals(3, readingProgressRepository.progress.value.single().lastVisibleParagraphIndex)
++
++        readingProgressRepository.delayNextUnfinishedSave = true
++        viewModel.saveCurrentReadingProgress(
++            progressPercent = 30,
++            lastVisibleParagraphIndex = 12,
++            lastVisibleTextOffset = 0,
++            paragraphCount = 40,
++            nowMillis = 9_200L,
++        )
++        runCurrent()
++        assertTrue(readingProgressRepository.unfinishedSaveStarted.isCompleted)
++        viewModel.closeForTests()
++
++        readingProgressRepository.releaseUnfinishedSave.complete(Unit)
++        advanceUntilIdle()
++
++        val storedProgress = readingProgressRepository.progress.value.single()
++        assertEquals(12, storedProgress.lastVisibleParagraphIndex)
++        assertEquals(9_200L, storedProgress.updatedAtMillis)
++
++        val reopenedViewModel = createViewModel(
++            contentRepository = contentRepository,
++            readingProgressRepository = readingProgressRepository,
++        )
++        advanceUntilIdle()
++        reopenedViewModel.completeOnboarding()
++        advanceUntilIdle()
++        reopenedViewModel.openLibraryItem(document)
++        advanceUntilIdle()
++
++        assertEquals(12, reopenedViewModel.uiState.currentReadingProgress?.lastVisibleParagraphIndex)
++        assertEquals(30, reopenedViewModel.uiState.currentReadingProgress?.progressPercent)
++    }
++
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun reopenedReaderUsesPendingLatestProgressBeforeRepositoryWriteCompletes() = runTest {
++        val document = savedUserDocument(format = ContentFormat.MARKDOWN)
++        val readingProgressRepository = DelayedUnfinishedReadingProgressRepository()
++        val contentRepository = FakeContentRepository(extraItems = listOf(document))
++        val viewModel = createViewModel(
++            contentRepository = contentRepository,
++            readingProgressRepository = readingProgressRepository,
++            progressPersistenceScope = this,
++        )
++
++        advanceUntilIdle()
++        viewModel.completeOnboarding()
++        advanceUntilIdle()
++        viewModel.openLibraryItem(document)
++        advanceUntilIdle()
++
++        viewModel.saveCurrentReadingProgress(
++            progressPercent = 8,
++            lastVisibleParagraphIndex = 3,
++            lastVisibleTextOffset = 0,
++            paragraphCount = 40,
++            nowMillis = 10_100L,
++        )
++        advanceUntilIdle()
++        assertEquals(3, readingProgressRepository.progress.value.single().lastVisibleParagraphIndex)
++
++        readingProgressRepository.delayNextUnfinishedSave = true
++        viewModel.saveCurrentReadingProgress(
++            progressPercent = 30,
++            lastVisibleParagraphIndex = 12,
++            lastVisibleTextOffset = 0,
++            paragraphCount = 40,
++            nowMillis = 10_200L,
++        )
++        runCurrent()
++        assertTrue(readingProgressRepository.unfinishedSaveStarted.isCompleted)
++        assertEquals(12, readingProgressRepository.progress.value.single().lastVisibleParagraphIndex)
++        viewModel.closeForTests()
++
++        val reopenedViewModel = createViewModel(
++            contentRepository = contentRepository,
++            readingProgressRepository = readingProgressRepository,
++        )
++        runCurrent()
++        reopenedViewModel.completeOnboarding()
++        runCurrent()
++        reopenedViewModel.openLibraryItem(document)
++        runCurrent()
++
++        assertEquals(12, reopenedViewModel.uiState.currentReadingProgress?.lastVisibleParagraphIndex)
++        assertEquals(30, reopenedViewModel.uiState.currentReadingProgress?.progressPercent)
++
++        readingProgressRepository.releaseUnfinishedSave.complete(Unit)
++        advanceUntilIdle()
++
++        val storedProgress = readingProgressRepository.progress.value.single()
++        assertEquals(12, storedProgress.lastVisibleParagraphIndex)
++        assertEquals(10_200L, storedProgress.updatedAtMillis)
++    }
++
+     @Test
+     @OptIn(ExperimentalCoroutinesApi::class)
+     fun missingPortableDocumentDoesNotOpenFromLibrary() = runTest {
+@@ -3987,6 +4161,7 @@ class MainViewModelTest {
+         defaultProfileAutosaveUri: String? = null,
+         defaultProfileAutosaveDisplayName: String = "App storage - Profile backup",
+         recommendationEngine: RecommendationEngine = DefaultRecommendationEngine(),
++        progressPersistenceScope: CoroutineScope? = null,
+         nowProvider: () -> Long = { 1_000L },
+     ): MainViewModel {
+         return track(
+@@ -4011,6 +4186,7 @@ class MainViewModelTest {
+                 defaultProfileAutosaveDisplayName = defaultProfileAutosaveDisplayName,
+                 interceptionMonitor = FakeInterceptionMonitor(),
+                 enableDelayRefreshTicker = false,
++                progressPersistenceScope = progressPersistenceScope,
+                 nowProvider = nowProvider,
+             ),
+         )
+@@ -4374,6 +4550,10 @@ class MainViewModelTest {
+             }
+         }
+ 
++        override fun cachePendingProgress(progress: ReadingProgress) {
++            this.progress.value = upsertNewestProgress(this.progress.value, progress)
++        }
++
+         override suspend fun saveProgress(progress: ReadingProgress) {
+             if (throwOnSaveProgress) {
+                 error("Simulated reading progress persistence failure")
+@@ -4381,14 +4561,11 @@ class MainViewModelTest {
+             val existing = this.progress.value.firstOrNull { current ->
+                 current.contentId == progress.contentId
+             }
+-            if (existing?.isCompleted() == true && progress.isUnfinished()) {
++            if (shouldKeepExistingProgress(existing = existing, incoming = progress)) {
+                 return
+             }
+             savedProgress += progress
+-            this.progress.value = this.progress.value
+-                .filterNot { it.contentId == progress.contentId }
+-                .plus(progress)
+-                .sortedByDescending(ReadingProgress::updatedAtMillis)
++            this.progress.value = upsertNewestProgress(this.progress.value, progress)
+         }
+ 
+         override suspend fun deleteProgress(contentId: String) {
+@@ -4404,6 +4581,40 @@ class MainViewModelTest {
+         override fun isReady(): Boolean = ready.value
+ 
+         override fun observeReady(): Flow<Boolean> = ready
++
++        private fun upsertNewestProgress(
++            currentProgress: List<ReadingProgress>,
++            updatedProgress: ReadingProgress,
++        ): List<ReadingProgress> {
++            val existing = currentProgress.firstOrNull { it.contentId == updatedProgress.contentId }
++            if (shouldKeepExistingProgress(existing = existing, incoming = updatedProgress)) {
++                return currentProgress.sortedByDescending(ReadingProgress::updatedAtMillis)
++            }
++            return currentProgress
++                .filterNot { it.contentId == updatedProgress.contentId }
++                .plus(updatedProgress)
++                .sortedByDescending(ReadingProgress::updatedAtMillis)
++        }
++
++        private fun shouldKeepExistingProgress(
++            existing: ReadingProgress?,
++            incoming: ReadingProgress,
++        ): Boolean {
++            if (existing == null) {
++                return false
++            }
++            if (existing.isCompleted() && incoming.isUnfinished()) {
++                return true
++            }
++            if (existing.isUnfinished() && incoming.isCompleted()) {
++                return false
++            }
++            if (incoming.updatedAtMillis < existing.updatedAtMillis) {
++                return true
++            }
++            return incoming.updatedAtMillis == existing.updatedAtMillis &&
++                incoming.lastVisibleParagraphIndex < existing.lastVisibleParagraphIndex
++        }
+     }
+ 
+     private class DelayedUnfinishedReadingProgressRepository : FakeReadingProgressRepository() {

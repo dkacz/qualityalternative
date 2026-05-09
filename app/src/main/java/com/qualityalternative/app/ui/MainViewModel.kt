@@ -93,6 +93,7 @@ import com.qualityalternative.app.interception.InterceptionRuntimeGate
 import java.io.InputStream
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
@@ -290,6 +291,7 @@ class MainViewModel(
     private val defaultProfileAutosaveDisplayName: String = LOCAL_PROFILE_BACKUP_DISPLAY_NAME,
     private val interceptionMonitor: InterceptionMonitor,
     private val enableDelayRefreshTicker: Boolean = true,
+    private val progressPersistenceScope: CoroutineScope? = null,
     private val nowProvider: () -> Long = System::currentTimeMillis,
 ) : ViewModel() {
     private val supportedApps = settingsRepository.supportedDistractingApps()
@@ -304,6 +306,7 @@ class MainViewModel(
     private var delayReady = delayGate.isReady()
     private var historyCompletedContentIds: Set<String> = emptySet()
     private var readingProgressCompletedContentIds: Set<String> = emptySet()
+    private var lastReadingProgressUpdatedAtMillis = 0L
     private var pendingSystemInterception: PendingSystemInterception? = null
     private var pendingAccountLightImportPlan: AccountLightImportPlan? = null
     private var annotationDriveAccessToken: String? = null
@@ -382,15 +385,24 @@ class MainViewModel(
         }
         viewModelScope.launch {
             readingProgressRepository.observeReadingProgress().collect { progress ->
-                readingProgressCompletedContentIds = progress.filter(ReadingProgress::isCompleted)
+                val effectiveProgress = progress.withActiveProgressOverride(
+                    activeProgress = uiState.currentReadingProgress?.takeIf { currentProgress ->
+                        currentProgress.contentId == uiState.currentContent?.id &&
+                            progress.none { storedProgress ->
+                                storedProgress.contentId == currentProgress.contentId &&
+                                    storedProgress.updatedAtMillis >= currentProgress.updatedAtMillis
+                            }
+                    },
+                )
+                readingProgressCompletedContentIds = effectiveProgress.filter(ReadingProgress::isCompleted)
                     .mapTo(mutableSetOf(), ReadingProgress::contentId)
                     .trackedCompletedContentIds()
-                val unfinishedIds = progress.unfinishedContentIds()
+                val unfinishedIds = effectiveProgress.unfinishedContentIds()
                 uiState = uiState.copy(
-                    readingProgress = progress,
+                    readingProgress = effectiveProgress,
                     preferences = uiState.preferences?.copy(unfinishedContentIds = unfinishedIds),
                     currentReadingProgress = uiState.currentContent?.id?.let { contentId ->
-                        progress.firstOrNull { candidate -> candidate.contentId == contentId && candidate.isUnfinished() }
+                        effectiveProgress.firstOrNull { candidate -> candidate.contentId == contentId && candidate.isUnfinished() }
                     },
                 )
                 updateCompletedContentIds()
@@ -2084,25 +2096,40 @@ class MainViewModel(
             return
         }
         val safeParagraphCount = paragraphCount.coerceAtLeast(1)
+        val progressUpdatedAtMillis = nextReadingProgressUpdatedAtMillis(
+            contentId = content.id,
+            nowMillis = nowMillis,
+        )
         val progress = ReadingProgress(
             contentId = content.id,
             progressPercent = progressPercent.coerceIn(1, 99),
             lastVisibleParagraphIndex = lastVisibleParagraphIndex.coerceIn(0, safeParagraphCount - 1),
             lastVisibleTextOffset = lastVisibleTextOffset.coerceAtLeast(0),
             paragraphCount = safeParagraphCount,
-            updatedAtMillis = nowMillis,
+            updatedAtMillis = progressUpdatedAtMillis,
         )
         val sameVisiblePosition = uiState.currentReadingProgress?.sameVisiblePosition(progress) == true
         if (!sameVisiblePosition || uiState.currentReadingProgress?.updatedAtMillis != progress.updatedAtMillis) {
-            uiState = uiState.copy(currentReadingProgress = progress)
+            val updatedReadingProgress = uiState.readingProgress.upsertReadingProgress(progress)
+            uiState = uiState.copy(
+                readingProgress = updatedReadingProgress,
+                preferences = uiState.preferences?.copy(
+                    unfinishedContentIds = updatedReadingProgress.unfinishedContentIds(),
+                ),
+                currentReadingProgress = progress,
+            )
+        }
+        readingProgressRepository.cachePendingProgress(progress)
+        val progressSaveJob = (progressPersistenceScope ?: viewModelScope).launch {
+            readingProgressRepository.saveProgress(progress)
         }
         viewModelScope.launch {
-            readingProgressRepository.saveProgress(progress)
+            progressSaveJob.join()
             if (!sameVisiblePosition) {
                 recordEventDurably(
                     AnalyticsEvent(
                         type = AnalyticsEventType.READING_PROGRESS_SAVED,
-                        timestampMillis = nowMillis,
+                        timestampMillis = progressUpdatedAtMillis,
                         interventionId = uiState.currentInterventionId,
                         sessionId = uiState.currentSessionId,
                         targetAppPackage = uiState.selectedTargetApp?.packageName,
@@ -2113,7 +2140,7 @@ class MainViewModel(
                     ),
                 )
             }
-            autosaveAccountLightProfileAfterPortableMutation(nowMillis = nowMillis)
+            autosaveAccountLightProfileAfterPortableMutation(nowMillis = progressUpdatedAtMillis)
         }
     }
 
@@ -3525,6 +3552,28 @@ class MainViewModel(
         )
     }
 
+    private fun nextReadingProgressUpdatedAtMillis(
+        contentId: String,
+        nowMillis: Long,
+    ): Long {
+        val currentUpdatedAtMillis = uiState.currentReadingProgress
+            ?.takeIf { progress -> progress.contentId == contentId }
+            ?.updatedAtMillis
+            ?: 0L
+        val storedUpdatedAtMillis = uiState.readingProgress
+            .firstOrNull { progress -> progress.contentId == contentId }
+            ?.updatedAtMillis
+            ?: 0L
+        val floor = maxOf(
+            lastReadingProgressUpdatedAtMillis,
+            currentUpdatedAtMillis,
+            storedUpdatedAtMillis,
+        )
+        val nextUpdatedAtMillis = maxOf(nowMillis, floor + 1)
+        lastReadingProgressUpdatedAtMillis = nextUpdatedAtMillis
+        return nextUpdatedAtMillis
+    }
+
     internal fun closeForTests() {
         viewModelScope.cancel()
     }
@@ -3584,6 +3633,7 @@ class MainViewModelFactory(
             accountLightProfileExporter = appContainer.accountLightProfileExporter,
             accountLightProfileImporter = appContainer.accountLightProfileImporter,
             accountLightProfileAutosaveWriter = appContainer.accountLightProfileAutosaveWriter,
+            progressPersistenceScope = appContainer.appScope,
             defaultAnnotationExportUri = appContainer.defaultAnnotationExportUri,
             defaultProfileAutosaveUri = appContainer.defaultProfileAutosaveUri,
             interceptionMonitor = appContainer.interceptionMonitor,
@@ -3668,6 +3718,22 @@ private fun UserPreferences.withReadingProgress(progress: List<ReadingProgress>)
 private fun List<ReadingProgress>.unfinishedContentIds(): Set<String> {
     return filter(ReadingProgress::isUnfinished)
         .mapTo(mutableSetOf(), ReadingProgress::contentId)
+}
+
+private fun List<ReadingProgress>.upsertReadingProgress(progress: ReadingProgress): List<ReadingProgress> {
+    return filterNot { current -> current.contentId == progress.contentId }
+        .plus(progress)
+        .sortedByDescending(ReadingProgress::updatedAtMillis)
+}
+
+private fun List<ReadingProgress>.withActiveProgressOverride(
+    activeProgress: ReadingProgress?,
+): List<ReadingProgress> {
+    return if (activeProgress == null) {
+        this
+    } else {
+        upsertReadingProgress(activeProgress)
+    }
 }
 
 private fun ReadingProgress.sameVisiblePosition(other: ReadingProgress): Boolean {

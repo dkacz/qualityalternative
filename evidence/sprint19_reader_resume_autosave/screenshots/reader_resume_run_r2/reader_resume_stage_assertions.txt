@@ -1,0 +1,3 @@
+saved_before_pause_stop: page=3/12, progress=26, pageEndParagraph=20, durableSavedParagraph=20
+restored_after_pause_stop: page=3/12, progress=26, pageEndParagraph=20, durableSavedParagraph=20
+restored_after_reopen: page=3/12, progress=26, pageEndParagraph=20, durableSavedParagraph=20

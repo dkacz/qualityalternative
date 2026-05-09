@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.datastore.preferences.preferencesDataStore
 import com.qualityalternative.app.BuildConfig
 import com.qualityalternative.app.data.local.QualityAlternativeDatabase
+import com.qualityalternative.app.data.local.ReadingProgressEntity
 import com.qualityalternative.app.domain.model.ContentItem
 import com.qualityalternative.app.domain.service.AnalyticsTracker
 import com.qualityalternative.app.domain.service.ContentRepository
@@ -34,7 +35,7 @@ private val Context.delayGateDataStore by preferencesDataStore(name = "delay_gat
 
 class AppContainer(context: Context) {
     private val appJob = SupervisorJob()
-    private val appScope = CoroutineScope(appJob + Dispatchers.IO)
+    internal val appScope = CoroutineScope(appJob + Dispatchers.IO)
     private val database = QualityAlternativeDatabase.build(context)
     private val annotationSyncDirectory = File(context.filesDir, "annotation-sync").apply { mkdirs() }
     private val profileBackupDirectory = File(context.filesDir, "profile-backup").apply { mkdirs() }
@@ -112,6 +113,10 @@ class AppContainer(context: Context) {
         (settingsRepository as PreferencesSettingsRepository).clearForTests()
         (delayGate as PreferencesDelayGate).clearForTests()
         InterceptionRuntimeGate.clearAll()
+    }
+
+    suspend fun readingProgressRowForTests(contentId: String): ReadingProgressEntity? {
+        return database.readingProgressDao().findByContentId(contentId)
     }
 
     fun closeForTests() {

@@ -2226,7 +2226,7 @@ private fun ReaderScreen(
     val pageBoundarySignature = remember(pages) {
         readerPageBoundarySignature(pages)
     }
-    val restoredProgress = remember(content.id) {
+    val restoredProgress = remember(content.id, state.currentReadingProgress) {
         state.currentReadingProgress?.takeIf { it.contentId == content.id && it.isUnfinished() }
     }
     val selectorStartParagraphIndex = remember(readerStartSelector, readerBlockLayout) {

@@ -1,0 +1,3 @@
+05-09 15:31:53.028  3728  3749 I TestRunner: started: cachePendingProgress_survivesStaleRoomEmissionAndOlderWrite(com.qualityalternative.app.data.RoomReadingProgressRepositoryTest)
+05-09 15:31:53.128   669   701 I system_server: NativeAlloc concurrent mark compact GC freed 8367KB AllocSpace bytes, 5(92KB) LOS objects, 43% free, 30MB/54MB, paused 1.622ms,1.685ms total 175.871ms
+05-09 15:31:53.408  3728  3749 I TestRunner: finished: cachePendingProgress_survivesStaleRoomEmissionAndOlderWrite(com.qualityalternative.app.data.RoomReadingProgressRepositoryTest)

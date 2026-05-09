@@ -292,6 +292,8 @@ interface ReadingProgressRepository {
                 .mapTo(mutableSetOf(), ReadingProgress::contentId),
         )
 
+    fun cachePendingProgress(progress: ReadingProgress) = Unit
+
     suspend fun saveProgress(progress: ReadingProgress)
 
     suspend fun deleteProgress(contentId: String)

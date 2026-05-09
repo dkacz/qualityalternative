@@ -11,6 +11,9 @@ interface ReadingProgressDao {
     @Query("SELECT * FROM reading_progress ORDER BY updatedAtMillis DESC")
     fun observeAll(): Flow<List<ReadingProgressEntity>>
 
+    @Query("SELECT * FROM reading_progress WHERE contentId = :contentId LIMIT 1")
+    suspend fun findByContentId(contentId: String): ReadingProgressEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOrReplace(progress: ReadingProgressEntity)
 

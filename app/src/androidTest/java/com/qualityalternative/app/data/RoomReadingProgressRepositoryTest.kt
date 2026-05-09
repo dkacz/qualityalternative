@@ -4,6 +4,7 @@ import androidx.room.Room
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.qualityalternative.app.data.local.QualityAlternativeDatabase
+import com.qualityalternative.app.data.local.ReadingProgressEntity
 import com.qualityalternative.app.domain.model.ReadingProgress
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -89,6 +90,154 @@ class RoomReadingProgressRepositoryTest {
                 withTimeout(10_000L) {
                     repository.observeReadingProgress().first { it.isEmpty() }
                 }
+            } finally {
+                appScope.cancel()
+                delay(100)
+                database.close()
+            }
+        }
+    }
+
+    @Test
+    fun saveProgress_keepsNewerUnfinishedPositionWhenOlderSaveArrivesLater() {
+        runBlocking {
+            val context = InstrumentationRegistry.getInstrumentation().targetContext
+            val database = Room.inMemoryDatabaseBuilder(
+                context,
+                QualityAlternativeDatabase::class.java,
+            ).allowMainThreadQueries().build()
+            val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+            try {
+                val repository = RoomReadingProgressRepository(
+                    dao = database.readingProgressDao(),
+                    scope = appScope,
+                )
+                repository.observeReady().first { it }
+
+                repository.saveProgress(
+                    ReadingProgress(
+                        contentId = "content-1",
+                        progressPercent = 40,
+                        lastVisibleParagraphIndex = 12,
+                        paragraphCount = 40,
+                        updatedAtMillis = 2_000L,
+                    ),
+                )
+                repository.saveProgress(
+                    ReadingProgress(
+                        contentId = "content-1",
+                        progressPercent = 12,
+                        lastVisibleParagraphIndex = 3,
+                        paragraphCount = 40,
+                        updatedAtMillis = 1_000L,
+                    ),
+                )
+
+                val saved = withTimeout(10_000L) {
+                    repository.observeReadingProgress().first { it.size == 1 }.single()
+                }
+                assertEquals(40, saved.progressPercent)
+                assertEquals(12, saved.lastVisibleParagraphIndex)
+                assertEquals(2_000L, saved.updatedAtMillis)
+            } finally {
+                appScope.cancel()
+                delay(100)
+                database.close()
+            }
+        }
+    }
+
+    @Test
+    fun cachePendingProgress_survivesStaleRoomEmissionAndOlderWrite() {
+        runBlocking {
+            val context = InstrumentationRegistry.getInstrumentation().targetContext
+            val database = Room.inMemoryDatabaseBuilder(
+                context,
+                QualityAlternativeDatabase::class.java,
+            ).allowMainThreadQueries().build()
+            val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+            try {
+                val repository = RoomReadingProgressRepository(
+                    dao = database.readingProgressDao(),
+                    scope = appScope,
+                )
+                repository.observeReady().first { it }
+
+                val olderDurable = ReadingProgress(
+                    contentId = "content-1",
+                    progressPercent = 12,
+                    lastVisibleParagraphIndex = 3,
+                    paragraphCount = 40,
+                    updatedAtMillis = 1_000L,
+                )
+                repository.saveProgress(olderDurable)
+
+                repository.cachePendingProgress(
+                    ReadingProgress(
+                        contentId = "content-1",
+                        progressPercent = 40,
+                        lastVisibleParagraphIndex = 12,
+                        paragraphCount = 40,
+                        updatedAtMillis = 2_000L,
+                    ),
+                )
+                database.readingProgressDao().insertOrReplace(
+                    ReadingProgressEntity(
+                        contentId = "content-1",
+                        progressPercent = 12,
+                        lastVisibleParagraphIndex = 3,
+                        lastVisibleTextOffset = 0,
+                        paragraphCount = 40,
+                        updatedAtMillis = 1_000L,
+                        completedAtMillis = null,
+                    ),
+                )
+                delay(250L)
+
+                val afterStaleRoomEmission = repository.readingProgress().single()
+                assertEquals(40, afterStaleRoomEmission.progressPercent)
+                assertEquals(12, afterStaleRoomEmission.lastVisibleParagraphIndex)
+                assertEquals(2_000L, afterStaleRoomEmission.updatedAtMillis)
+
+                repository.saveProgress(
+                    olderDurable.copy(
+                        progressPercent = 16,
+                        lastVisibleParagraphIndex = 4,
+                        updatedAtMillis = 1_500L,
+                    ),
+                )
+
+                val afterOlderWrite = repository.readingProgress().single()
+                assertEquals(40, afterOlderWrite.progressPercent)
+                assertEquals(12, afterOlderWrite.lastVisibleParagraphIndex)
+                assertEquals(2_000L, afterOlderWrite.updatedAtMillis)
+
+                repository.cachePendingProgress(
+                    ReadingProgress(
+                        contentId = "content-1",
+                        progressPercent = 41,
+                        lastVisibleParagraphIndex = 12,
+                        lastVisibleTextOffset = 20,
+                        paragraphCount = 40,
+                        updatedAtMillis = 3_000L,
+                    ),
+                )
+                repository.saveProgress(
+                    ReadingProgress(
+                        contentId = "content-1",
+                        progressPercent = 41,
+                        lastVisibleParagraphIndex = 12,
+                        lastVisibleTextOffset = 5,
+                        paragraphCount = 40,
+                        updatedAtMillis = 3_000L,
+                    ),
+                )
+
+                val afterSameTimestampEarlierOffset = repository.readingProgress().single()
+                assertEquals(20, afterSameTimestampEarlierOffset.lastVisibleTextOffset)
+                assertEquals(3_000L, afterSameTimestampEarlierOffset.updatedAtMillis)
             } finally {
                 appScope.cancel()
                 delay(100)

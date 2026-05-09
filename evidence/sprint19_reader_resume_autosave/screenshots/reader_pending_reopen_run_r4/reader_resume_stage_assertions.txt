@@ -1,0 +1,3 @@
+pending_latest_before_room_write: page=4/12, progress=34, pageEndParagraph=27, durableSavedParagraph=20
+immediate_reopen_before_room_write: page=4/12, progress=34, pageEndParagraph=27, durableSavedParagraph=20
+room_write_released_after_reopen: page=4/12, progress=34, pageEndParagraph=27, durableSavedParagraph=27

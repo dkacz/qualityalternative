@@ -1,0 +1,21 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<testsuites tests="4" failures="0" errors="0" skipped="0" time="19.167" timestamp="2026-05-09T14:45:00" hostname="localhost">
+  <testsuite name="com.qualityalternative.app.MainActivityTest" tests="2" failures="0" errors="0" skipped="0" time="17.971" timestamp="2026-05-09T14:45:00" hostname="localhost">
+    <properties>
+      <property name="device" value="qaApi36(AVD) - 16" />
+      <property name="flavor" value="" />
+      <property name="project" value=":app" />
+    </properties>
+    <testcase name="sprint19ReaderSessionProgressPersistsLastViewedPageAfterReopen" classname="com.qualityalternative.app.MainActivityTest" time="9.181" />
+    <testcase name="sprint19ReaderResumeUsesPendingLatestProgressAcrossImmediateReopenBeforeRoomWrite" classname="com.qualityalternative.app.MainActivityTest" time="8.79" />
+  </testsuite>
+  <testsuite name="com.qualityalternative.app.data.RoomReadingProgressRepositoryTest" tests="2" failures="0" errors="0" skipped="0" time="0.457" timestamp="2026-05-09T14:45:00" hostname="localhost">
+    <properties>
+      <property name="device" value="qaApi36(AVD) - 16" />
+      <property name="flavor" value="" />
+      <property name="project" value=":app" />
+    </properties>
+    <testcase name="cachePendingProgress_survivesStaleRoomEmissionAndOlderWrite" classname="com.qualityalternative.app.data.RoomReadingProgressRepositoryTest" time="0.368" />
+    <testcase name="saveProgress_keepsNewerUnfinishedPositionWhenOlderSaveArrivesLater" classname="com.qualityalternative.app.data.RoomReadingProgressRepositoryTest" time="0.089" />
+  </testsuite>
+</testsuites>
