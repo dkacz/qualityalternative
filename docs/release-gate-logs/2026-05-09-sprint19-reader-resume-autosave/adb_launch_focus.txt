@@ -1,0 +1,9 @@
+  bash arg: -p
+  bash arg: com.qualityalternative.app
+  bash arg: 1
+args: [-p, com.qualityalternative.app, 1]
+ arg: "-p"
+ arg: "com.qualityalternative.app"
+ arg: "1"
+data="com.qualityalternative.app"
+** SYS_KEYS has no physical keys but with factor 2.0%.
