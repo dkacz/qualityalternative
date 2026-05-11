@@ -93,12 +93,15 @@ import com.qualityalternative.app.interception.InterceptionRuntimeGate
 import java.io.InputStream
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class MainUiState(
     val isLoadingSettings: Boolean = true,
@@ -122,6 +125,7 @@ data class MainUiState(
     val currentContent: ContentItem? = null,
     val currentReaderDocument: ReaderDocument? = null,
     val currentContentBody: String = "",
+    val isReaderOpening: Boolean = false,
     val currentReadingProgress: ReadingProgress? = null,
     val currentReaderStartParagraphIndex: Int? = null,
     val currentReaderStartSelector: ReadingAnnotationSelector? = null,
@@ -221,6 +225,7 @@ data class AddDocumentFormState(
     val markPriority: Boolean = false,
     val validationErrors: Set<UserDocumentValidationError> = emptySet(),
     val canSave: Boolean = false,
+    val isPreparing: Boolean = false,
     val isSaving: Boolean = false,
 ) {
     val importCount: Int
@@ -292,6 +297,7 @@ class MainViewModel(
     private val interceptionMonitor: InterceptionMonitor,
     private val enableDelayRefreshTicker: Boolean = true,
     private val progressPersistenceScope: CoroutineScope? = null,
+    private val documentWorkDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val nowProvider: () -> Long = System::currentTimeMillis,
 ) : ViewModel() {
     private val supportedApps = settingsRepository.supportedDistractingApps()
@@ -310,6 +316,8 @@ class MainViewModel(
     private var pendingSystemInterception: PendingSystemInterception? = null
     private var pendingAccountLightImportPlan: AccountLightImportPlan? = null
     private var annotationDriveAccessToken: String? = null
+    private var documentImportPreparationRequestId = 0
+    private var readerOpenRequestId = 0
     private val readingAnnotationExportFormatter = ReadingAnnotationExportFormatter()
 
     var uiState by mutableStateOf(
@@ -976,6 +984,8 @@ class MainViewModel(
     }
 
     fun openAddLink() {
+        invalidatePendingReaderOpen()
+        invalidatePendingDocumentImportPreparation()
         uiState = uiState.copy(
             screen = MainScreen.AddLink,
             addLinkForm = AddLinkFormState(),
@@ -985,38 +995,87 @@ class MainViewModel(
         )
     }
 
+    fun beginUserDocumentImportPreparation(): Int {
+        documentImportPreparationRequestId += 1
+        uiState = uiState.copy(
+            screen = MainScreen.AddDocument,
+            addDocumentForm = AddDocumentFormState(isPreparing = true),
+            savedLinkConfirmation = null,
+            latestMessage = null,
+        )
+        return documentImportPreparationRequestId
+    }
+
+    fun reportUserDocumentImportPreparationFailure(requestId: Int? = null) {
+        if (requestId != null && requestId != documentImportPreparationRequestId) {
+            return
+        }
+        documentImportPreparationRequestId += 1
+        uiState = uiState.copy(
+            screen = MainScreen.AddDocument,
+            addDocumentForm = AddDocumentFormState(),
+            latestMessage = "The selected files could not be prepared. Try a smaller batch.",
+        )
+    }
+
     fun prepareUserDocumentImport(
         uri: String,
         displayName: String,
         mimeType: String?,
         openInputStream: () -> InputStream? = { null },
     ) {
-        val candidate = DocumentImportCandidateFactory.fromPickedDocument(
-            uri = uri,
-            displayName = displayName,
-            mimeType = mimeType,
-            openInputStream = openInputStream,
-        )
-        updateAddDocumentForm(
-            form = AddDocumentFormState(
-                uri = candidate.uri,
-                displayName = candidate.displayName,
-                mimeType = mimeType,
-                title = candidate.title,
-                durationMinutes = candidate.durationMinutes,
-                candidates = listOf(candidate),
-            ),
+        val requestId = ++documentImportPreparationRequestId
+        uiState = uiState.copy(
             screen = MainScreen.AddDocument,
+            addDocumentForm = AddDocumentFormState(isPreparing = true),
+            savedLinkConfirmation = null,
+            latestMessage = null,
         )
+        viewModelScope.launch {
+            val candidate = runCatching {
+                withContext(documentWorkDispatcher) {
+                    DocumentImportCandidateFactory.fromPickedDocument(
+                        uri = uri,
+                        displayName = displayName,
+                        mimeType = mimeType,
+                        openInputStream = openInputStream,
+                    )
+                }
+            }.getOrElse {
+                if (requestId == documentImportPreparationRequestId) {
+                    reportUserDocumentImportPreparationFailure(requestId = requestId)
+                }
+                return@launch
+            }
+            if (requestId != documentImportPreparationRequestId) {
+                return@launch
+            }
+            updateAddDocumentForm(
+                form = AddDocumentFormState(
+                    uri = candidate.uri,
+                    displayName = candidate.displayName,
+                    mimeType = mimeType,
+                    title = candidate.title,
+                    durationMinutes = candidate.durationMinutes,
+                    candidates = listOf(candidate),
+                ),
+                screen = MainScreen.AddDocument,
+            )
+        }
     }
 
     fun prepareUserDocumentBatchImport(
         candidates: List<DocumentImportCandidate>,
         nowMillis: Long = nowProvider(),
+        requestId: Int = documentImportPreparationRequestId,
     ) {
+        if (requestId != documentImportPreparationRequestId) {
+            return
+        }
         val cleanedCandidates = candidates
             .map(DocumentImportCandidate::cleaned)
             .distinctBy(DocumentImportCandidate::uri)
+        documentImportPreparationRequestId += 1
         if (cleanedCandidates.isEmpty()) {
             uiState = uiState.copy(latestMessage = "Choose local PDF, Markdown, or EPUB files first.")
             return
@@ -1051,8 +1110,11 @@ class MainViewModel(
     }
 
     fun openHome() {
+        invalidatePendingReaderOpen()
+        invalidatePendingDocumentImportPreparation()
         uiState = uiState.copy(
             screen = MainScreen.Home,
+            isReaderOpening = false,
             isManagingLibrary = false,
             selectedLibraryContentIds = emptySet(),
             currentReaderStartParagraphIndex = null,
@@ -1062,8 +1124,11 @@ class MainViewModel(
     }
 
     fun openLibrary() {
+        invalidatePendingReaderOpen()
+        invalidatePendingDocumentImportPreparation()
         uiState = uiState.copy(
             screen = MainScreen.Library,
+            isReaderOpening = false,
             currentReaderStartParagraphIndex = null,
             currentReaderStartSelector = null,
             latestMessage = null,
@@ -1160,8 +1225,11 @@ class MainViewModel(
     }
 
     fun openProgress() {
+        invalidatePendingReaderOpen()
+        invalidatePendingDocumentImportPreparation()
         uiState = uiState.copy(
             screen = MainScreen.Progress,
+            isReaderOpening = false,
             currentReaderStartParagraphIndex = null,
             currentReaderStartSelector = null,
             latestMessage = null,
@@ -1169,8 +1237,11 @@ class MainViewModel(
     }
 
     fun openSettings() {
+        invalidatePendingReaderOpen()
+        invalidatePendingDocumentImportPreparation()
         uiState = uiState.copy(
             screen = MainScreen.Settings,
+            isReaderOpening = false,
             currentReaderStartParagraphIndex = null,
             currentReaderStartSelector = null,
             latestMessage = null,
@@ -1178,8 +1249,11 @@ class MainViewModel(
     }
 
     fun openAnnotationLibrary() {
+        invalidatePendingReaderOpen()
+        invalidatePendingDocumentImportPreparation()
         uiState = uiState.copy(
             screen = MainScreen.Annotations,
+            isReaderOpening = false,
             isManagingLibrary = false,
             selectedLibraryContentIds = emptySet(),
             currentReaderStartParagraphIndex = null,
@@ -1228,59 +1302,66 @@ class MainViewModel(
             return
         }
         val startedAtMillis = nowProvider()
-        val readerDocument = if (content.usesRepositoryBody()) {
-            try {
-                contentRepository.readerDocument(content)
-            } catch (error: Throwable) {
-                if (error is CancellationException) throw error
-                viewModelScope.launch {
-                    handleRepositoryBodyLoadFailure(
-                        content = content,
-                        sessionId = null,
-                        failedAtMillis = startedAtMillis,
-                        error = error,
-                    )
-                }
-                return
-            }
+        val requestId = ++readerOpenRequestId
+        val opensPrivateReader = content.usesRepositoryBody()
+        if (opensPrivateReader) {
+            uiState = uiState.copy(
+                isReaderOpening = true,
+                latestMessage = null,
+            )
         } else {
-            ReaderDocument.fromPlainText("")
+            uiState = uiState.copy(isReaderOpening = false)
         }
-        val existingProgress = unfinishedProgressFor(content.id)
-        if (existingProgress != null) {
-            recordEvent(
-                AnalyticsEvent(
-                    type = AnalyticsEventType.MANUAL_CONTINUE_STARTED,
-                    timestampMillis = startedAtMillis,
-                    contentId = content.id,
-                    metadata = content.analyticsMetadata() + existingProgress.analyticsMetadata() + mapOf(
-                        "origin" to origin,
+        viewModelScope.launch {
+            val readerDocument = loadReaderDocumentForSession(
+                content = content,
+                sessionId = null,
+                startedAtMillis = startedAtMillis,
+                requestId = requestId,
+            ) ?: return@launch
+            if (requestId != readerOpenRequestId) {
+                return@launch
+            }
+            val existingProgress = unfinishedProgressFor(content.id)
+            if (existingProgress != null) {
+                recordEvent(
+                    AnalyticsEvent(
+                        type = AnalyticsEventType.MANUAL_CONTINUE_STARTED,
+                        timestampMillis = startedAtMillis,
+                        contentId = content.id,
+                        metadata = content.analyticsMetadata() + existingProgress.analyticsMetadata() + mapOf(
+                            "origin" to origin,
+                        ),
                     ),
-                ),
+                )
+            }
+            uiState = uiState.copy(
+                currentInterventionId = null,
+                currentInterventionShownAtMillis = null,
+                currentOpenAnywayUnlockAvailableAtMillis = null,
+                currentRecommendationSet = null,
+                currentInterventionOrigin = null,
+                currentContent = content,
+                currentReaderDocument = readerDocument,
+                currentContentBody = readerDocument.plainText,
+                isReaderOpening = false,
+                currentReadingProgress = existingProgress,
+                currentReaderStartParagraphIndex = startParagraphIndex,
+                currentReaderStartSelector = startSelector,
+                currentSessionId = null,
+                currentSessionStartedAtMillis = startedAtMillis,
+                screen = screenForReplacement(content),
+                latestMessage = null,
             )
         }
-        uiState = uiState.copy(
-            currentInterventionId = null,
-            currentInterventionShownAtMillis = null,
-            currentOpenAnywayUnlockAvailableAtMillis = null,
-            currentRecommendationSet = null,
-            currentInterventionOrigin = null,
-            currentContent = content,
-            currentReaderDocument = readerDocument,
-            currentContentBody = readerDocument.plainText,
-            currentReadingProgress = existingProgress,
-            currentReaderStartParagraphIndex = startParagraphIndex,
-            currentReaderStartSelector = startSelector,
-            currentSessionId = null,
-            currentSessionStartedAtMillis = startedAtMillis,
-            screen = screenForReplacement(content),
-            latestMessage = null,
-        )
     }
 
     fun cancelAddLink() {
+        invalidatePendingReaderOpen()
+        invalidatePendingDocumentImportPreparation()
         uiState = uiState.copy(
             screen = MainScreen.Home,
+            isReaderOpening = false,
             addLinkForm = AddLinkFormState(),
             addDocumentForm = AddDocumentFormState(),
             savedLinkConfirmation = null,
@@ -1417,6 +1498,9 @@ class MainViewModel(
         persistReadPermission: (String) -> Unit = {},
     ) {
         val form = uiState.addDocumentForm
+        if (form.isPreparing) {
+            return
+        }
         val candidates = form.documentCandidates()
         val supportedCandidates = candidates.filter { candidate -> candidate.format != null }
         val drafts = supportedCandidates.mapNotNull { candidate -> candidate.toDraftOrNull(form.selectedTopics) }
@@ -3052,21 +3136,23 @@ class MainViewModel(
     }
 
     private suspend fun openReplacementSession(content: ContentItem, sessionId: String, startedAtMillis: Long) {
-        val readerDocument = if (content.usesRepositoryBody()) {
-            try {
-                contentRepository.readerDocument(content)
-            } catch (error: Throwable) {
-                if (error is CancellationException) throw error
-                handleRepositoryBodyLoadFailure(
-                    content = content,
-                    sessionId = sessionId,
-                    failedAtMillis = startedAtMillis,
-                    error = error,
-                )
-                return
-            }
+        val requestId = ++readerOpenRequestId
+        if (content.usesRepositoryBody()) {
+            uiState = uiState.copy(
+                isReaderOpening = true,
+                latestMessage = null,
+            )
         } else {
-            ReaderDocument.fromPlainText("")
+            uiState = uiState.copy(isReaderOpening = false)
+        }
+        val readerDocument = loadReaderDocumentForSession(
+            content = content,
+            sessionId = sessionId,
+            startedAtMillis = startedAtMillis,
+            requestId = requestId,
+        ) ?: return
+        if (requestId != readerOpenRequestId) {
+            return
         }
         val existingProgress = unfinishedProgressFor(content.id)
         uiState = uiState.copy(
@@ -3078,13 +3164,43 @@ class MainViewModel(
             currentContent = content,
             currentReaderDocument = readerDocument,
             currentContentBody = readerDocument.plainText,
+            isReaderOpening = false,
             currentReadingProgress = existingProgress,
             currentReaderStartParagraphIndex = null,
             currentReaderStartSelector = null,
             currentSessionId = sessionId,
             currentSessionStartedAtMillis = startedAtMillis,
             screen = screenForReplacement(content),
+            latestMessage = null,
         )
+    }
+
+    private suspend fun loadReaderDocumentForSession(
+        content: ContentItem,
+        sessionId: String?,
+        startedAtMillis: Long,
+        requestId: Int,
+    ): ReaderDocument? {
+        if (!content.usesRepositoryBody()) {
+            return ReaderDocument.fromPlainText("")
+        }
+        return try {
+            withContext(documentWorkDispatcher) {
+                contentRepository.readerDocument(content)
+            }
+        } catch (error: Throwable) {
+            if (error is CancellationException) throw error
+            if (requestId != readerOpenRequestId) {
+                return null
+            }
+            handleRepositoryBodyLoadFailure(
+                content = content,
+                sessionId = sessionId,
+                failedAtMillis = startedAtMillis,
+                error = error,
+            )
+            null
+        }
     }
 
     private suspend fun handleRepositoryBodyLoadFailure(
@@ -3318,6 +3434,7 @@ class MainViewModel(
         screen: MainScreen = MainScreen.Home,
         latestMessage: String,
     ) {
+        readerOpenRequestId += 1
         uiState = uiState.copy(
             screen = screen,
             currentInterventionId = null,
@@ -3326,6 +3443,7 @@ class MainViewModel(
             currentContent = null,
             currentReaderDocument = null,
             currentContentBody = "",
+            isReaderOpening = false,
             currentRecommendationSet = null,
             currentInterventionOrigin = null,
             currentSessionId = null,
@@ -3597,16 +3715,26 @@ class MainViewModel(
         form: AddDocumentFormState,
         screen: MainScreen = uiState.screen,
     ) {
+        val validationErrors = form.visibleValidationErrors()
         uiState = uiState.copy(
             screen = screen,
             addDocumentForm = form.copy(
-                validationErrors = form.visibleValidationErrors(),
-                canSave = form.localValidationErrors().isEmpty(),
+                validationErrors = validationErrors,
+                canSave = !form.isPreparing && form.localValidationErrors().isEmpty(),
+                isPreparing = form.isPreparing,
                 isSaving = false,
             ),
             savedLinkConfirmation = null,
             latestMessage = null,
         )
+    }
+
+    private fun invalidatePendingReaderOpen() {
+        readerOpenRequestId += 1
+    }
+
+    private fun invalidatePendingDocumentImportPreparation() {
+        documentImportPreparationRequestId += 1
     }
 }
 

@@ -735,6 +735,171 @@ class EpubTextExtractorTest {
         assertEquals("OPS/chapter.xhtml", document.tableOfContents.single().sourceHref)
     }
 
+    @Test
+    fun extractDocumentIgnoresLargeBinaryAssetsWhileKeepingReadableSpine() {
+        val epub = epubByteEntries(
+            "META-INF/container.xml" to """
+                <container><rootfiles><rootfile full-path="OPS/package.opf"/></rootfiles></container>
+            """.trimIndent().toByteArray(Charsets.UTF_8),
+            "OPS/package.opf" to """
+                <package>
+                  <manifest>
+                    <item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/>
+                    <item id="image" href="images/plate.jpg" media-type="image/jpeg"/>
+                  </manifest>
+                  <spine><itemref idref="chapter"/></spine>
+                </package>
+            """.trimIndent().toByteArray(Charsets.UTF_8),
+            "OPS/chapter.xhtml" to "<html><body><h1>Readable</h1><p>Text still loads.</p></body></html>"
+                .toByteArray(Charsets.UTF_8),
+            "OPS/images/plate.jpg" to ByteArray(3 * 1024 * 1024) { index -> (index % 251).toByte() },
+        )
+
+        val document = EpubTextExtractor.extractDocument(ByteArrayInputStream(epub))
+
+        assertEquals(listOf("# Readable", "Text still loads."), document.blocks.map { block -> block.text })
+    }
+
+    @Test
+    fun extractDocumentMapsManyAnchorsWithoutChangingGlobalBlockTargets() {
+        val sections = (1..80).joinToString("\n") { index ->
+            """<section id="s$index"><h2>Section $index</h2><p>Body $index.</p></section>"""
+        }
+        val tocItems = (1..80).joinToString("\n") { index ->
+            """<li><a href="chapter.xhtml#s$index">Section $index</a></li>"""
+        }
+        val epub = epubBytes(
+            "META-INF/container.xml" to """
+                <container><rootfiles><rootfile full-path="OPS/package.opf"/></rootfiles></container>
+            """.trimIndent(),
+            "OPS/package.opf" to """
+                <package>
+                  <manifest>
+                    <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
+                    <item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/>
+                  </manifest>
+                  <spine><itemref idref="chapter"/></spine>
+                </package>
+            """.trimIndent(),
+            "OPS/nav.xhtml" to """
+                <html xmlns:epub="http://www.idpf.org/2007/ops">
+                  <body><nav epub:type="toc"><ol>$tocItems</ol></nav></body>
+                </html>
+            """.trimIndent(),
+            "OPS/chapter.xhtml" to "<html><body>$sections</body></html>",
+        )
+
+        val document = EpubTextExtractor.extractDocument(ByteArrayInputStream(epub))
+
+        assertEquals(80, document.tableOfContents.size)
+        assertEquals(0, document.tableOfContents.first().blockIndex)
+        assertEquals(158, document.tableOfContents.last().blockIndex)
+        assertEquals("s80", document.blocks[158].anchor)
+    }
+
+    @Test
+    fun extractDocumentMapsLaterTocAnchorAfterInlinePagebreakWithoutDrift() {
+        val epub = epubBytes(
+            "META-INF/container.xml" to """
+                <container><rootfiles><rootfile full-path="OPS/package.opf"/></rootfiles></container>
+            """.trimIndent(),
+            "OPS/package.opf" to """
+                <package>
+                  <manifest>
+                    <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
+                    <item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/>
+                  </manifest>
+                  <spine><itemref idref="chapter"/></spine>
+                </package>
+            """.trimIndent(),
+            "OPS/nav.xhtml" to """
+                <html xmlns:epub="http://www.idpf.org/2007/ops">
+                  <body>
+                    <nav epub:type="toc">
+                      <ol>
+                        <li><a href="chapter.xhtml#target-section">Target Section</a></li>
+                      </ol>
+                    </nav>
+                  </body>
+                </html>
+            """.trimIndent(),
+            "OPS/chapter.xhtml" to """
+                <html><body>
+                  <p>Opening paragraph <span id="page-2"></span>continues after an inline pagebreak.</p>
+                  <h2 id="target-section">Target Section</h2>
+                  <p>Target body.</p>
+                </body></html>
+            """.trimIndent(),
+        )
+
+        val document = EpubTextExtractor.extractDocument(ByteArrayInputStream(epub))
+
+        assertEquals(
+            listOf(
+                "Opening paragraph continues after an inline pagebreak.",
+                "## Target Section",
+                "Target body.",
+            ),
+            document.blocks.map { block -> block.text },
+        )
+        assertEquals("Target Section", document.tableOfContents.single().title)
+        assertEquals("target-section", document.tableOfContents.single().anchor)
+        assertEquals(1, document.tableOfContents.single().blockIndex)
+        assertEquals("target-section", document.blocks[1].anchor)
+    }
+
+    @Test
+    fun extractThrowsWhenReadableEntryExceedsSafetyLimit() {
+        val epub = epubByteEntries(
+            "META-INF/container.xml" to """
+                <container><rootfiles><rootfile full-path="OPS/package.opf"/></rootfiles></container>
+            """.trimIndent().toByteArray(Charsets.UTF_8),
+            "OPS/package.opf" to """
+                <package>
+                  <manifest>
+                    <item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/>
+                  </manifest>
+                  <spine><itemref idref="chapter"/></spine>
+                </package>
+            """.trimIndent().toByteArray(Charsets.UTF_8),
+            "OPS/chapter.xhtml" to ByteArray(24 * 1024 * 1024 + 1) { 'a'.code.toByte() },
+        )
+
+        try {
+            EpubTextExtractor.extractDocument(ByteArrayInputStream(epub))
+            fail("Oversized readable EPUB entry should be rejected")
+        } catch (expected: IllegalArgumentException) {
+            assertTrue(expected.message?.contains("entry is too large", ignoreCase = true) == true)
+        }
+    }
+
+    @Test
+    fun extractThrowsWhenAggregateReadableTextExceedsSafetyLimit() {
+        val manifestItems = (1..5).joinToString("\n") { index ->
+            """<item id="chapter-$index" href="chapter$index.xhtml" media-type="application/xhtml+xml"/>"""
+        }
+        val spineItems = (1..5).joinToString("\n") { index -> """<itemref idref="chapter-$index"/>""" }
+        val epub = epubGeneratedEntries(
+            "META-INF/container.xml" to """
+                <container><rootfiles><rootfile full-path="OPS/package.opf"/></rootfiles></container>
+            """.trimIndent().toByteArray(Charsets.UTF_8),
+            "OPS/package.opf" to """
+                <package>
+                  <manifest>$manifestItems</manifest>
+                  <spine>$spineItems</spine>
+                </package>
+            """.trimIndent().toByteArray(Charsets.UTF_8),
+            generatedEntries = (1..5).map { index -> "OPS/chapter$index.xhtml" to (20 * 1024 * 1024) },
+        )
+
+        try {
+            EpubTextExtractor.extractDocument(ByteArrayInputStream(epub))
+            fail("Aggregate readable EPUB text should be rejected")
+        } catch (expected: IllegalArgumentException) {
+            assertTrue(expected.message?.contains("readable text is too large", ignoreCase = true) == true)
+        }
+    }
+
     @Test(expected = IllegalArgumentException::class)
     fun extractThrowsWhenPackageDocumentIsMissing() {
         val epub = epubBytes("OPS/chapter.xhtml" to "<html><body><p>Lost.</p></body></html>")
@@ -762,11 +927,43 @@ class EpubTextExtractorTest {
     }
 
     private fun epubBytes(vararg entries: Pair<String, String>): ByteArray {
+        return epubByteEntries(
+            *entries.map { (name, body) -> name to body.toByteArray(Charsets.UTF_8) }.toTypedArray(),
+        )
+    }
+
+    private fun epubByteEntries(vararg entries: Pair<String, ByteArray>): ByteArray {
         val output = ByteArrayOutputStream()
         ZipOutputStream(output).use { zip ->
             entries.forEach { (name, body) ->
                 zip.putNextEntry(ZipEntry(name))
-                zip.write(body.toByteArray(Charsets.UTF_8))
+                zip.write(body)
+                zip.closeEntry()
+            }
+        }
+        return output.toByteArray()
+    }
+
+    private fun epubGeneratedEntries(
+        vararg staticEntries: Pair<String, ByteArray>,
+        generatedEntries: List<Pair<String, Int>>,
+    ): ByteArray {
+        val output = ByteArrayOutputStream()
+        ZipOutputStream(output).use { zip ->
+            staticEntries.forEach { (name, body) ->
+                zip.putNextEntry(ZipEntry(name))
+                zip.write(body)
+                zip.closeEntry()
+            }
+            val chunk = ByteArray(64 * 1024) { 'a'.code.toByte() }
+            generatedEntries.forEach { (name, byteCount) ->
+                zip.putNextEntry(ZipEntry(name))
+                var remaining = byteCount
+                while (remaining > 0) {
+                    val count = minOf(remaining, chunk.size)
+                    zip.write(chunk, 0, count)
+                    remaining -= count
+                }
                 zip.closeEntry()
             }
         }

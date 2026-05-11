@@ -72,13 +72,16 @@ import com.qualityalternative.app.interception.InterceptionRuntimeGate
 import java.io.ByteArrayInputStream
 import java.io.File
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -2231,6 +2234,215 @@ class MainViewModelTest {
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
+    fun beginUserDocumentImportPreparationShowsBusyStateUntilCandidatesAreReady() = runTest {
+        val viewModel = createViewModel()
+
+        advanceUntilIdle()
+        viewModel.beginUserDocumentImportPreparation()
+
+        assertEquals(MainScreen.AddDocument, viewModel.uiState.screen)
+        assertTrue(viewModel.uiState.addDocumentForm.isPreparing)
+        assertFalse(viewModel.uiState.addDocumentForm.canSave)
+
+        viewModel.prepareUserDocumentBatchImport(
+            candidates = listOf(
+                DocumentImportCandidate(
+                    uri = "content://quality/book.epub",
+                    displayName = "book.epub",
+                    mimeType = "application/epub+zip",
+                    title = "book",
+                    durationMinutes = "20",
+                    format = ContentFormat.EPUB,
+                ),
+            ),
+        )
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.addDocumentForm.isPreparing)
+        assertEquals("book", viewModel.uiState.addDocumentForm.title)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun cancelAddDocumentImportPreparationIgnoresLateBatchResult() = runTest {
+        val viewModel = createViewModel()
+
+        advanceUntilIdle()
+        val requestId = viewModel.beginUserDocumentImportPreparation()
+        viewModel.cancelAddLink()
+        viewModel.prepareUserDocumentBatchImport(
+            requestId = requestId,
+            candidates = listOf(
+                DocumentImportCandidate(
+                    uri = "content://quality/book.epub",
+                    displayName = "book.epub",
+                    mimeType = "application/epub+zip",
+                    title = "book",
+                    durationMinutes = "20",
+                    format = ContentFormat.EPUB,
+                ),
+            ),
+        )
+        advanceUntilIdle()
+
+        assertEquals(MainScreen.Home, viewModel.uiState.screen)
+        assertFalse(viewModel.uiState.addDocumentForm.isPreparing)
+        assertTrue(viewModel.uiState.addDocumentForm.candidates.isEmpty())
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun cancelSingleDocumentImportPreparationIgnoresLateCandidateResult() = runTest {
+        val viewModel = createViewModel(documentWorkDispatcher = StandardTestDispatcher(testScheduler))
+
+        advanceUntilIdle()
+        viewModel.prepareUserDocumentImport(
+            uri = "content://quality/slow-notes.md",
+            displayName = "slow-notes.md",
+            mimeType = "text/markdown",
+        ) {
+            ByteArrayInputStream("slow notes".toByteArray(Charsets.UTF_8))
+        }
+        assertEquals(MainScreen.AddDocument, viewModel.uiState.screen)
+        assertTrue(viewModel.uiState.addDocumentForm.isPreparing)
+
+        viewModel.cancelAddLink()
+        advanceUntilIdle()
+
+        assertEquals(MainScreen.Home, viewModel.uiState.screen)
+        assertFalse(viewModel.uiState.addDocumentForm.isPreparing)
+        assertTrue(viewModel.uiState.addDocumentForm.candidates.isEmpty())
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun addDocumentEditsDoNotClearPreparingStateBeforeCandidateReturns() = runTest {
+        val viewModel = createViewModel()
+
+        advanceUntilIdle()
+        viewModel.beginUserDocumentImportPreparation()
+        viewModel.updateAddDocumentTitle("Still preparing")
+        viewModel.toggleAddDocumentTopic(TopicTag.SCIENCE)
+        viewModel.toggleAddDocumentPriority()
+
+        assertEquals(MainScreen.AddDocument, viewModel.uiState.screen)
+        assertTrue(viewModel.uiState.addDocumentForm.isPreparing)
+        assertFalse(viewModel.uiState.addDocumentForm.canSave)
+        assertEquals("Still preparing", viewModel.uiState.addDocumentForm.title)
+        assertTrue(TopicTag.SCIENCE in viewModel.uiState.addDocumentForm.selectedTopics)
+        assertTrue(viewModel.uiState.addDocumentForm.markPriority)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun openLibraryItemLoadsPrivateReaderBodyAwayFromMainStatePath() = runTest {
+        val userDocument = savedUserDocument(format = ContentFormat.EPUB)
+        val viewModel = createViewModel(
+            contentRepository = FakeContentRepository(extraItems = listOf(userDocument)),
+            documentWorkDispatcher = StandardTestDispatcher(testScheduler),
+        )
+
+        advanceUntilIdle()
+        viewModel.openLibraryItem(userDocument)
+
+        assertTrue(viewModel.uiState.isReaderOpening)
+        assertEquals(null, viewModel.uiState.latestMessage)
+
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.isReaderOpening)
+        assertEquals(MainScreen.Reader, viewModel.uiState.screen)
+        assertEquals("Private notes", viewModel.uiState.currentContentBody)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun openLibraryItemIgnoresStalePrivateReaderLoadWhenAnotherOpenStarts() = runTest {
+        val firstDocument = savedUserDocument(format = ContentFormat.EPUB).copy(
+            id = "first-document",
+            title = "First document",
+            description = "First private notes",
+        )
+        val secondDocument = savedUserDocument(format = ContentFormat.EPUB).copy(
+            id = "second-document",
+            title = "Second document",
+            description = "Second private notes",
+        )
+        val viewModel = createViewModel(
+            contentRepository = FakeContentRepository(extraItems = listOf(firstDocument, secondDocument)),
+            documentWorkDispatcher = StandardTestDispatcher(testScheduler),
+        )
+
+        advanceUntilIdle()
+        viewModel.openLibraryItem(firstDocument)
+        viewModel.openLibraryItem(secondDocument)
+        advanceUntilIdle()
+
+        assertEquals(MainScreen.Reader, viewModel.uiState.screen)
+        assertEquals("second-document", viewModel.uiState.currentContent?.id)
+        assertEquals("Second private notes", viewModel.uiState.currentContentBody)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun openLibraryItemIgnoresSlowPrivateReaderLoadAfterNavigationAway() = runTest {
+        val userDocument = savedUserDocument(format = ContentFormat.EPUB)
+        val viewModel = createViewModel(
+            contentRepository = FakeContentRepository(extraItems = listOf(userDocument)),
+            documentWorkDispatcher = StandardTestDispatcher(testScheduler),
+        )
+
+        advanceUntilIdle()
+        viewModel.openLibraryItem(userDocument)
+        assertTrue(viewModel.uiState.isReaderOpening)
+
+        viewModel.openSettings()
+        advanceUntilIdle()
+
+        assertEquals(MainScreen.Settings, viewModel.uiState.screen)
+        assertFalse(viewModel.uiState.isReaderOpening)
+        assertEquals(null, viewModel.uiState.currentContent)
+        assertEquals("", viewModel.uiState.currentContentBody)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun staleFailedPrivateReaderLoadDoesNotClearNewerOpen() = runTest {
+        val firstDocument = savedUserDocument(format = ContentFormat.EPUB).copy(
+            id = "first-document",
+            title = "First document",
+            description = "First private notes",
+        )
+        val secondDocument = savedUserDocument(format = ContentFormat.EPUB).copy(
+            id = "second-document",
+            title = "Second document",
+            description = "Second private notes",
+        )
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val viewModel = createViewModel(
+            contentRepository = FakeContentRepository(
+                extraItems = listOf(firstDocument, secondDocument),
+                failingUserDocumentIds = setOf("first-document"),
+            ),
+            analyticsTracker = analyticsTracker,
+            documentWorkDispatcher = StandardTestDispatcher(testScheduler),
+        )
+
+        advanceUntilIdle()
+        viewModel.openLibraryItem(firstDocument)
+        viewModel.openLibraryItem(secondDocument)
+        advanceUntilIdle()
+
+        assertEquals(MainScreen.Reader, viewModel.uiState.screen)
+        assertEquals("second-document", viewModel.uiState.currentContent?.id)
+        assertEquals("Second private notes", viewModel.uiState.currentContentBody)
+        assertTrue(analyticsTracker.allEvents().none { event ->
+            event.type == AnalyticsEventType.USER_DOCUMENT_BODY_LOAD_FAILED && event.contentId == "first-document"
+        })
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
     fun saveUserDocument_retainsReadPermissionOnlyAfterSuccessfulSave() = runTest {
         val userDocumentRepository = FakeUserDocumentRepository()
         val retainedUris = mutableListOf<String>()
@@ -4162,6 +4374,7 @@ class MainViewModelTest {
         defaultProfileAutosaveDisplayName: String = "App storage - Profile backup",
         recommendationEngine: RecommendationEngine = DefaultRecommendationEngine(),
         progressPersistenceScope: CoroutineScope? = null,
+        documentWorkDispatcher: CoroutineDispatcher = Dispatchers.Main,
         nowProvider: () -> Long = { 1_000L },
     ): MainViewModel {
         return track(
@@ -4187,6 +4400,7 @@ class MainViewModelTest {
                 interceptionMonitor = FakeInterceptionMonitor(),
                 enableDelayRefreshTicker = false,
                 progressPersistenceScope = progressPersistenceScope,
+                documentWorkDispatcher = documentWorkDispatcher,
                 nowProvider = nowProvider,
             ),
         )
@@ -4798,6 +5012,7 @@ class MainViewModelTest {
         includeLinkOnlyModern: Boolean = false,
         includeSprint9Packs: Boolean = false,
         private val failUserDocumentBodyLoad: Boolean = false,
+        private val failingUserDocumentIds: Set<String> = emptySet(),
     ) : ContentRepository {
         private val ready = MutableStateFlow(isReady)
         private var extraItems = extraItems
@@ -4929,7 +5144,10 @@ class MainViewModelTest {
         override fun inventory(): List<ContentItem> = packs.flatMap(EditorialPack::items) + extraItems
 
         override fun contentBody(item: ContentItem): String {
-            if (item.sourceType == ContentSourceType.USER_DOCUMENT && failUserDocumentBodyLoad) {
+            if (
+                item.sourceType == ContentSourceType.USER_DOCUMENT &&
+                (failUserDocumentBodyLoad || item.id in failingUserDocumentIds)
+            ) {
                 error("Simulated private document body load failure")
             }
             return if (item.sourceType == ContentSourceType.USER_DOCUMENT) item.description else item.title

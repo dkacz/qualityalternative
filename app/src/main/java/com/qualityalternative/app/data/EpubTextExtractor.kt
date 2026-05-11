@@ -14,6 +14,12 @@ import org.xml.sax.InputSource
 
 object EpubTextExtractor {
     private const val semanticIndentSentinel = "\uE000"
+    private const val anchorMarkerSentinel = "\uE001"
+    private const val MAX_RETAINED_ENTRY_BYTES = 24 * 1024 * 1024
+    private const val MAX_RETAINED_EPUB_TEXT_BYTES = 96 * 1024 * 1024
+    private val anchorMarkerRegex = Regex(
+        "${Regex.escape(anchorMarkerSentinel)}QA_ANCHOR_(\\d+)${Regex.escape(anchorMarkerSentinel)}",
+    )
 
     fun extract(input: InputStream): String = extractDocument(input).plainText
 
@@ -81,12 +87,17 @@ object EpubTextExtractor {
 
     private fun readZipEntries(input: InputStream): Map<String, ByteArray> {
         val entries = linkedMapOf<String, ByteArray>()
+        var retainedBytes = 0L
         ZipInputStream(input.buffered()).use { zip ->
             while (true) {
                 val entry = zip.nextEntry ?: break
-                if (!entry.isDirectory) {
+                if (!entry.isDirectory && entry.name.isRetainedEpubEntryPath()) {
                     val out = ByteArrayOutputStream()
-                    zip.copyTo(out)
+                    val bytes = zip.copyToBounded(out)
+                    retainedBytes += bytes
+                    if (retainedBytes > MAX_RETAINED_EPUB_TEXT_BYTES) {
+                        throw IllegalArgumentException("EPUB readable text is too large to import safely")
+                    }
                     entries[entry.name] = out.toByteArray()
                 }
                 zip.closeEntry()
@@ -209,17 +220,46 @@ object EpubTextExtractor {
     }
 
     private fun anchorsInBody(body: String): List<AnchorPosition> {
-        return Regex("""<[^>]+\b(?:id|name)\s*=\s*["']([^"']+)["'][^>]*>""", RegexOption.IGNORE_CASE)
-            .findAll(body)
-            .mapNotNull { match ->
-                val anchor = match.groupValues.getOrNull(1)?.trim()?.takeIf(String::isNotBlank)
-                val blockIndex = htmlFragmentToReadableText(body.substring(0, match.range.first))
-                    .toReaderBlockTexts()
-                    .size
-                anchor?.let { AnchorPosition(anchor = it, blockIndex = blockIndex) }
+        val anchorNames = mutableListOf<String>()
+        val markedBody = buildString {
+            var cursor = 0
+            Regex("""<[^>]+\b(?:id|name)\s*=\s*["']([^"']+)["'][^>]*>""", RegexOption.IGNORE_CASE)
+                .findAll(body)
+                .forEach { match ->
+                    append(body, cursor, match.range.last + 1)
+                    match.groupValues
+                        .getOrNull(1)
+                        ?.trim()
+                        ?.takeIf(String::isNotBlank)
+                        ?.let { anchor ->
+                            val markerIndex = anchorNames.size
+                            anchorNames += anchor
+                            append(anchorMarker(markerIndex))
+                        }
+                    cursor = match.range.last + 1
+                }
+            append(body, cursor, body.length)
+        }
+        val anchors = mutableListOf<AnchorPosition>()
+        var blockIndex = 0
+        htmlFragmentToReadableText(markedBody)
+            .toReaderBlockTexts()
+            .forEach { block ->
+                anchorMarkerRegex.findAll(block).forEach { match ->
+                    match.groupValues
+                        .getOrNull(1)
+                        ?.toIntOrNull()
+                        ?.let(anchorNames::getOrNull)
+                        ?.let { anchor -> anchors += AnchorPosition(anchor = anchor, blockIndex = blockIndex) }
+                }
+                if (anchorMarkerRegex.replace(block, "").trim().isNotBlank()) {
+                    blockIndex += 1
+                }
             }
-            .toList()
+        return anchors
     }
+
+    private fun anchorMarker(index: Int): String = "${anchorMarkerSentinel}QA_ANCHOR_${index}${anchorMarkerSentinel}"
 
     private fun firstBlockIndexesBySource(blocks: List<ReaderDocumentBlock>): Map<String, Int> {
         return blocks
@@ -472,6 +512,31 @@ object EpubTextExtractor {
             return false
         }
         return !path.isAuxiliaryDocumentPath()
+    }
+
+    private fun String.isRetainedEpubEntryPath(): Boolean {
+        return equals("META-INF/container.xml", ignoreCase = true) ||
+            endsWith(".opf", ignoreCase = true) ||
+            endsWith(".ncx", ignoreCase = true) ||
+            endsWith(".xhtml", ignoreCase = true) ||
+            endsWith(".html", ignoreCase = true) ||
+            endsWith(".htm", ignoreCase = true)
+    }
+
+    private fun ZipInputStream.copyToBounded(out: ByteArrayOutputStream): Long {
+        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+        var total = 0L
+        while (true) {
+            val read = read(buffer)
+            if (read <= 0) {
+                return total
+            }
+            total += read.toLong()
+            if (total > MAX_RETAINED_ENTRY_BYTES) {
+                throw IllegalArgumentException("EPUB entry is too large to import safely")
+            }
+            out.write(buffer, 0, read)
+        }
     }
 
     private fun String.isAuxiliaryDocumentPath(): Boolean {

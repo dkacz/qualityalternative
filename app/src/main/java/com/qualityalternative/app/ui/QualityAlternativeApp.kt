@@ -72,6 +72,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -180,7 +181,10 @@ import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.math.min
 import kotlin.math.roundToInt
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private val LocalAppInterfaceTextScale = compositionLocalOf { DEFAULT_INTERFACE_TEXT_SCALE }
 
@@ -345,6 +349,7 @@ private fun MainRoute(
     onExitToTarget: () -> Unit,
 ) {
     val context = LocalContext.current
+    val documentImportScope = rememberCoroutineScope()
     val driveAuthorizationContext = context.findActivity() ?: context
     val driveAuthorizationClient = remember(driveAuthorizationContext) {
         Identity.getAuthorizationClient(driveAuthorizationContext)
@@ -417,9 +422,18 @@ private fun MainRoute(
         if (uris.isEmpty()) {
             return@rememberLauncherForActivityResult
         }
-        viewModel.prepareUserDocumentBatchImport(
-            candidates = uris.map { uri -> context.documentImportCandidate(uri) },
-        )
+        val requestId = viewModel.beginUserDocumentImportPreparation()
+        documentImportScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    uris.map { uri -> context.documentImportCandidate(uri) }
+                }
+            }.onSuccess { candidates ->
+                viewModel.prepareUserDocumentBatchImport(candidates = candidates, requestId = requestId)
+            }.onFailure {
+                viewModel.reportUserDocumentImportPreparationFailure(requestId = requestId)
+            }
+        }
     }
     val annotationExportPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri == null) {
@@ -485,15 +499,16 @@ private fun MainRoute(
         releaseProfileAutosavePermission(context = context, uri = Uri.parse(uri))
     }
 
-    when (state.screen) {
-        MainScreen.Onboarding -> OnboardingFlow(
-            selection = state.onboardingSelection,
-            supportedApps = state.allSupportedApps,
-            onToggleApp = viewModel::toggleOnboardingApp,
-            onToggleTopic = viewModel::toggleOnboardingTopic,
-            onSelectDuration = viewModel::setOnboardingDuration,
-            onComplete = viewModel::completeOnboarding,
-        )
+    Box(modifier = Modifier.fillMaxSize()) {
+        when (state.screen) {
+            MainScreen.Onboarding -> OnboardingFlow(
+                selection = state.onboardingSelection,
+                supportedApps = state.allSupportedApps,
+                onToggleApp = viewModel::toggleOnboardingApp,
+                onToggleTopic = viewModel::toggleOnboardingTopic,
+                onSelectDuration = viewModel::setOnboardingDuration,
+                onComplete = viewModel::completeOnboarding,
+            )
 
         MainScreen.Home -> TabScaffold(
             active = MainScreen.Home,
@@ -694,11 +709,15 @@ private fun MainRoute(
             onBack = viewModel::skipMeditationReset,
         )
 
-        MainScreen.Feedback -> FeedbackScreen(
-            state = state,
-            onSubmit = viewModel::submitFeedback,
-            onSkip = viewModel::skipFeedback,
-        )
+            MainScreen.Feedback -> FeedbackScreen(
+                state = state,
+                onSubmit = viewModel::submitFeedback,
+                onSkip = viewModel::skipFeedback,
+            )
+        }
+        if (state.isReaderOpening) {
+            ReaderOpeningOverlay()
+        }
     }
 }
 
@@ -717,6 +736,33 @@ private fun LoadingScreen() {
             style = MaterialTheme.typography.bodyLarge,
             color = QualityAlternativeThemeTokens.colors.mutedText,
         )
+    }
+}
+
+@Composable
+private fun ReaderOpeningOverlay() {
+    val colors = QualityAlternativeThemeTokens.colors
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(colors.background.copy(alpha = 0.86f))
+            .clickable(onClick = {})
+            .testTag("reader-opening-overlay"),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+            modifier = Modifier.padding(28.dp),
+        ) {
+            CircularProgressIndicator(color = colors.accent)
+            Text(
+                text = "Opening reader...",
+                modifier = Modifier.padding(top = 16.dp),
+                style = MaterialTheme.typography.bodyLarge,
+                color = colors.mutedText,
+            )
+        }
     }
 }
 
@@ -1577,6 +1623,7 @@ private fun AddDocumentScreen(
     onPickAnother: () -> Unit,
 ) {
     val saveLabel = when {
+        form.isPreparing -> "Reading file details..."
         form.isSaving -> "Saving..."
         form.supportedImportCount > 1 -> "Add files to library"
         else -> "Add file to library"
@@ -1600,25 +1647,41 @@ private fun AddDocumentScreen(
                 modifier = Modifier.padding(top = 6.dp, bottom = 16.dp),
             )
             QaCard(modifier = Modifier.padding(bottom = 18.dp), padding = 16.dp) {
-                MonoText("${form.supportedImportCount} ready · ${form.unsupportedImportCount} skipped", modifier = Modifier.padding(bottom = 8.dp))
-                form.candidates.ifEmpty {
-                    listOf(
-                        DocumentImportCandidate(
-                            uri = form.uri,
-                            displayName = form.displayName,
-                            mimeType = form.mimeType,
-                            title = form.title,
-                            durationMinutes = form.durationMinutes,
-                            format = UserDocumentValidator.detectFormat(form.displayName, form.mimeType),
-                        ),
+                MonoText(
+                    text = if (form.isPreparing) {
+                        "Preparing selected files..."
+                    } else {
+                        "${form.supportedImportCount} ready · ${form.unsupportedImportCount} skipped"
+                    },
+                    modifier = Modifier.padding(bottom = 8.dp),
+                )
+                if (form.isPreparing) {
+                    BodyText(
+                        text = "Preparing the book. Large EPUBs can take a moment.",
+                        color = QualityAlternativeThemeTokens.colors.mutedText,
+                        fontSize = 12.5.sp,
                     )
-                }.forEach { candidate ->
-                    DocumentImportRow(candidate = candidate)
+                } else {
+                    form.candidates.ifEmpty {
+                        listOf(
+                            DocumentImportCandidate(
+                                uri = form.uri,
+                                displayName = form.displayName,
+                                mimeType = form.mimeType,
+                                title = form.title,
+                                durationMinutes = form.durationMinutes,
+                                format = UserDocumentValidator.detectFormat(form.displayName, form.mimeType),
+                            ),
+                        )
+                    }.forEach { candidate ->
+                        DocumentImportRow(candidate = candidate)
+                    }
                 }
             }
             QaButton(
                 text = "Choose files",
                 onClick = onPickAnother,
+                enabled = !form.isPreparing && !form.isSaving,
                 variant = QaButtonVariant.Outline,
                 size = QaButtonSize.Small,
                 leadingIcon = QaIconKind.Book,
@@ -1688,7 +1751,7 @@ private fun AddDocumentScreen(
             QaButton(
                 text = saveLabel,
                 onClick = onSave,
-                enabled = form.canSave && !form.isSaving,
+                enabled = form.canSave && !form.isPreparing && !form.isSaving,
                 variant = QaButtonVariant.Primary,
                 modifier = Modifier.testTag("add-document-save"),
             )

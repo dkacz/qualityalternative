@@ -19,11 +19,13 @@ import java.io.InputStream
 import java.security.MessageDigest
 import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class RoomUserDocumentRepository(
     private val dao: UserDocumentDao,
@@ -33,6 +35,7 @@ class RoomUserDocumentRepository(
 ) : UserDocumentRepository {
     private val documents = MutableStateFlow(emptyList<ContentItem>())
     private val ready = MutableStateFlow(false)
+    private val readerDocumentCache = linkedMapOf<String, ReaderDocument>()
 
     init {
         scope.launch {
@@ -52,11 +55,11 @@ class RoomUserDocumentRepository(
     override suspend fun addDocument(
         draft: UserDocumentDraft,
         nowMillis: Long,
-    ): AddUserDocumentResult {
+    ): AddUserDocumentResult = withContext(Dispatchers.IO) {
         val validation = UserDocumentValidator.validate(draft)
         val format = validation.format
         if (!validation.isValid || format == null) {
-            return AddUserDocumentResult.Rejected(validation.errors)
+            return@withContext AddUserDocumentResult.Rejected(validation.errors)
         }
 
         val normalizedUri = draft.uri.trim()
@@ -121,7 +124,7 @@ class RoomUserDocumentRepository(
             ),
         )
         documents.value = upsertUserDocumentForOptimisticState(documents.value, item)
-        return AddUserDocumentResult.Added(item)
+        AddUserDocumentResult.Added(item)
     }
 
     override suspend fun markUnavailable(
@@ -193,7 +196,7 @@ class RoomUserDocumentRepository(
 
     override fun contentBody(item: ContentItem): String {
         return if (item.sourceType == ContentSourceType.USER_DOCUMENT && item.format.usesPrivateReader()) {
-            bodyLoader.loadBody(uri = item.rights.sourceUrl.orEmpty(), format = item.format)
+            readerDocument(item).plainText
         } else {
             item.description
         }
@@ -201,9 +204,14 @@ class RoomUserDocumentRepository(
 
     override fun readerDocument(item: ContentItem): ReaderDocument {
         return if (item.sourceType == ContentSourceType.USER_DOCUMENT && item.format.usesPrivateReader()) {
+            val uri = item.rights.sourceUrl.orEmpty()
+            val cacheKey = item.readerDocumentCacheKey(uri = uri)
+            cachedReaderDocument(cacheKey)?.let { cached -> return cached }
             val structuredLoader = bodyLoader as? UserDocumentReaderDocumentLoader
-            structuredLoader?.loadReaderDocument(uri = item.rights.sourceUrl.orEmpty(), format = item.format)
-                ?: ReaderDocument.fromPlainText(contentBody(item))
+            val document = structuredLoader?.loadReaderDocument(uri = uri, format = item.format)
+                ?: ReaderDocument.fromPlainText(bodyLoader.loadBody(uri = uri, format = item.format))
+            cacheReaderDocument(cacheKey = cacheKey, document = document)
+            document
         } else {
             ReaderDocument.fromPlainText(item.description)
         }
@@ -215,6 +223,23 @@ class RoomUserDocumentRepository(
 
     private companion object {
         const val USER_DOCUMENT_PACK_ID = "user-documents"
+        const val MAX_READER_DOCUMENT_CACHE_SIZE = 1
+    }
+
+    private fun cachedReaderDocument(cacheKey: String): ReaderDocument? = synchronized(readerDocumentCache) {
+        readerDocumentCache.remove(cacheKey)?.also { cached ->
+            readerDocumentCache[cacheKey] = cached
+        }
+    }
+
+    private fun cacheReaderDocument(cacheKey: String, document: ReaderDocument) {
+        synchronized(readerDocumentCache) {
+            readerDocumentCache[cacheKey] = document
+            while (readerDocumentCache.size > MAX_READER_DOCUMENT_CACHE_SIZE) {
+                val eldestKey = readerDocumentCache.keys.firstOrNull() ?: break
+                readerDocumentCache.remove(eldestKey)
+            }
+        }
     }
 }
 
@@ -357,6 +382,15 @@ internal fun ContentItem.verifiedDocumentFingerprintSha256(): String? =
 
 internal fun ContentItem.verifiedDocumentFingerprintSizeBytes(): Long? =
     documentFingerprintSizeBytes?.takeIf { size -> size >= 0L && verifiedDocumentFingerprintSha256() != null }
+
+private fun ContentItem.readerDocumentCacheKey(uri: String): String {
+    return listOf(
+        uri,
+        format.name,
+        verifiedDocumentFingerprintSha256().orEmpty(),
+        verifiedDocumentFingerprintSizeBytes()?.toString().orEmpty(),
+    ).joinToString(separator = "|")
+}
 
 private fun ContentFormat.usesPrivateReader(): Boolean = this == ContentFormat.MARKDOWN || this == ContentFormat.EPUB
 

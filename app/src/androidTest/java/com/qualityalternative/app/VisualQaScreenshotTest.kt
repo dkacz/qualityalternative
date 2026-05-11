@@ -38,6 +38,7 @@ import com.qualityalternative.app.domain.service.AddUserLinkResult
 import com.qualityalternative.app.interception.FixtureTargetRegistry
 import com.qualityalternative.app.data.ReadingTimeEstimateSource
 import com.qualityalternative.app.ui.DocumentImportCandidate
+import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.zip.ZipEntry
@@ -59,6 +60,7 @@ class VisualQaScreenshotTest {
     private val sprint15ScreenshotDirName = "sprint15-slice15-0-auto-time-${System.currentTimeMillis()}"
     private val sprint15Slice151ScreenshotDirName = "sprint15-slice15-1-epub-toc-${System.currentTimeMillis()}"
     private val sprint15Slice152ScreenshotDirName = "sprint15-slice15-2-kindle-toc-${System.currentTimeMillis()}"
+    private val sprint20ScreenshotDirName = "sprint20-epub-loading-performance-${System.currentTimeMillis()}"
     private lateinit var screenshotDir: File
     private lateinit var legacyScreenshotDir: File
     private lateinit var sprint10ScreenshotDir: File
@@ -69,6 +71,7 @@ class VisualQaScreenshotTest {
     private lateinit var sprint15ScreenshotDir: File
     private lateinit var sprint15Slice151ScreenshotDir: File
     private lateinit var sprint15Slice152ScreenshotDir: File
+    private lateinit var sprint20ScreenshotDir: File
 
     @Before
     fun resetAppState() {
@@ -105,6 +108,9 @@ class VisualQaScreenshotTest {
         sprint15Slice152ScreenshotDir = File("/sdcard/Download/qualityalternative/$sprint15Slice152ScreenshotDirName")
         sprint15Slice152ScreenshotDir.deleteRecursively()
         sprint15Slice152ScreenshotDir.mkdirs()
+        sprint20ScreenshotDir = File("/sdcard/Download/qualityalternative/$sprint20ScreenshotDirName")
+        sprint20ScreenshotDir.deleteRecursively()
+        sprint20ScreenshotDir.mkdirs()
     }
 
     @After
@@ -1201,6 +1207,38 @@ class VisualQaScreenshotTest {
     }
 
     @Test
+    fun captureSprint20EpubLoadingBusyStatesScreens() {
+        launchOnboardedApp()
+
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.prepareUserDocumentImport(
+                uri = "content://visual/slow-import.epub",
+                displayName = "slow-import.epub",
+                mimeType = "application/epub+zip",
+            ) {
+                Thread.sleep(4_000)
+                ByteArrayInputStream(sprint10EpubBytes())
+            }
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("add-document-screen") }
+        composeRule.onNodeWithText("Preparing selected files...", ignoreCase = true).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Preparing the book. Large EPUBs can take a moment.").performScrollTo().assertIsDisplayed()
+        captureSprint20("01_epub_import_preparing_light")
+
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasNodeContaining("ready") }
+
+        val content = seedUserEpubSelection(
+            title = "Large EPUB Opening Fixture",
+            fileName = "large-opening.epub",
+            epubBytes = sprint20LargeOpeningEpubBytes(),
+        )
+        scenario?.onActivity { activity -> activity.mainViewModel.openLibraryItem(content) }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-opening-overlay") }
+        composeRule.onNodeWithTag("reader-opening-overlay").assertIsDisplayed()
+        captureSprint20("02_reader_opening_overlay_light")
+    }
+
+    @Test
     fun captureSprint15KindlePagingAndTocScreens() {
         launchOnboardedApp()
         val content = seedUserEpubSelection(title = "Kindle Paging EPUB", fileName = "kindle-paging-toc.epub")
@@ -1291,6 +1329,10 @@ class VisualQaScreenshotTest {
 
     private fun captureSprint15Slice152(name: String) {
         captureTo(sprint15Slice152ScreenshotDir, name)
+    }
+
+    private fun captureSprint20(name: String) {
+        captureTo(sprint20ScreenshotDir, name)
     }
 
     private fun captureTo(directory: File, name: String) {
@@ -1805,12 +1847,13 @@ class VisualQaScreenshotTest {
         title: String = "The Long Quiet EPUB",
         fileName: String = "long-quiet.epub",
         nowMillis: Long = 1_000L,
+        epubBytes: ByteArray = sprint10EpubBytes(),
     ) = runBlocking {
         val targetContext = InstrumentationRegistry.getInstrumentation().targetContext
         val app = targetContext.applicationContext as QualityAlternativeApplication
         val fixture = File(targetContext.filesDir, "visual-qa-fixtures/$fileName")
         fixture.parentFile?.mkdirs()
-        fixture.writeBytes(sprint10EpubBytes())
+        fixture.writeBytes(epubBytes)
 
         app.appContainer.userDocumentRepository.observeReady().first { it }
         val result = app.appContainer.userDocumentRepository.addDocument(
@@ -2009,6 +2052,33 @@ class VisualQaScreenshotTest {
                   <p>This final paragraph is intentionally plain. If it is readable, the layout is doing its job.</p>
                 </body></html>
             """.trimIndent(),
+        )
+    }
+
+    private fun sprint20LargeOpeningEpubBytes(): ByteArray {
+        val paragraphs = (1..15_000).joinToString("\n") { index ->
+            "<p>Large EPUB paragraph $index keeps the reader-opening overlay visible while the private book is parsed off the interface path.</p>"
+        }
+        return epubBytes(
+            "META-INF/container.xml" to """
+                <?xml version="1.0"?>
+                <container>
+                  <rootfiles>
+                    <rootfile full-path="OPS/package.opf" media-type="application/oebps-package+xml"/>
+                  </rootfiles>
+                </container>
+            """.trimIndent(),
+            "OPS/package.opf" to """
+                <package>
+                  <manifest>
+                    <item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/>
+                  </manifest>
+                  <spine>
+                    <itemref idref="chapter"/>
+                  </spine>
+                </package>
+            """.trimIndent(),
+            "OPS/chapter.xhtml" to "<html><body><h1>Large Opening Fixture</h1>$paragraphs</body></html>",
         )
     }
 

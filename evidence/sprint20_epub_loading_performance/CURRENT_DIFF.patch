@@ -1,0 +1,1553 @@
+diff --git a/app/src/androidTest/java/com/qualityalternative/app/VisualQaScreenshotTest.kt b/app/src/androidTest/java/com/qualityalternative/app/VisualQaScreenshotTest.kt
+index 2b21411..84baa0b 100644
+--- a/app/src/androidTest/java/com/qualityalternative/app/VisualQaScreenshotTest.kt
++++ b/app/src/androidTest/java/com/qualityalternative/app/VisualQaScreenshotTest.kt
+@@ -38,6 +38,7 @@ import com.qualityalternative.app.domain.service.AddUserLinkResult
+ import com.qualityalternative.app.interception.FixtureTargetRegistry
+ import com.qualityalternative.app.data.ReadingTimeEstimateSource
+ import com.qualityalternative.app.ui.DocumentImportCandidate
++import java.io.ByteArrayInputStream
+ import java.io.ByteArrayOutputStream
+ import java.io.File
+ import java.util.zip.ZipEntry
+@@ -59,6 +60,7 @@ class VisualQaScreenshotTest {
+     private val sprint15ScreenshotDirName = "sprint15-slice15-0-auto-time-${System.currentTimeMillis()}"
+     private val sprint15Slice151ScreenshotDirName = "sprint15-slice15-1-epub-toc-${System.currentTimeMillis()}"
+     private val sprint15Slice152ScreenshotDirName = "sprint15-slice15-2-kindle-toc-${System.currentTimeMillis()}"
++    private val sprint20ScreenshotDirName = "sprint20-epub-loading-performance-${System.currentTimeMillis()}"
+     private lateinit var screenshotDir: File
+     private lateinit var legacyScreenshotDir: File
+     private lateinit var sprint10ScreenshotDir: File
+@@ -69,6 +71,7 @@ class VisualQaScreenshotTest {
+     private lateinit var sprint15ScreenshotDir: File
+     private lateinit var sprint15Slice151ScreenshotDir: File
+     private lateinit var sprint15Slice152ScreenshotDir: File
++    private lateinit var sprint20ScreenshotDir: File
+ 
+     @Before
+     fun resetAppState() {
+@@ -105,6 +108,9 @@ class VisualQaScreenshotTest {
+         sprint15Slice152ScreenshotDir = File("/sdcard/Download/qualityalternative/$sprint15Slice152ScreenshotDirName")
+         sprint15Slice152ScreenshotDir.deleteRecursively()
+         sprint15Slice152ScreenshotDir.mkdirs()
++        sprint20ScreenshotDir = File("/sdcard/Download/qualityalternative/$sprint20ScreenshotDirName")
++        sprint20ScreenshotDir.deleteRecursively()
++        sprint20ScreenshotDir.mkdirs()
+     }
+ 
+     @After
+@@ -1200,6 +1206,38 @@ class VisualQaScreenshotTest {
+         captureSprint15Slice151("03_epub_structured_reader_mid_dark")
+     }
+ 
++    @Test
++    fun captureSprint20EpubLoadingBusyStatesScreens() {
++        launchOnboardedApp()
++
++        scenario?.onActivity { activity ->
++            activity.mainViewModel.prepareUserDocumentImport(
++                uri = "content://visual/slow-import.epub",
++                displayName = "slow-import.epub",
++                mimeType = "application/epub+zip",
++            ) {
++                Thread.sleep(4_000)
++                ByteArrayInputStream(sprint10EpubBytes())
++            }
++        }
++        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("add-document-screen") }
++        composeRule.onNodeWithText("Preparing selected files...", ignoreCase = true).performScrollTo().assertIsDisplayed()
++        composeRule.onNodeWithText("Preparing the book. Large EPUBs can take a moment.").performScrollTo().assertIsDisplayed()
++        captureSprint20("01_epub_import_preparing_light")
++
++        composeRule.waitUntil(timeoutMillis = 10_000) { hasNodeContaining("ready") }
++
++        val content = seedUserEpubSelection(
++            title = "Large EPUB Opening Fixture",
++            fileName = "large-opening.epub",
++            epubBytes = sprint20LargeOpeningEpubBytes(),
++        )
++        scenario?.onActivity { activity -> activity.mainViewModel.openLibraryItem(content) }
++        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-opening-overlay") }
++        composeRule.onNodeWithTag("reader-opening-overlay").assertIsDisplayed()
++        captureSprint20("02_reader_opening_overlay_light")
++    }
++
+     @Test
+     fun captureSprint15KindlePagingAndTocScreens() {
+         launchOnboardedApp()
+@@ -1293,6 +1331,10 @@ class VisualQaScreenshotTest {
+         captureTo(sprint15Slice152ScreenshotDir, name)
+     }
+ 
++    private fun captureSprint20(name: String) {
++        captureTo(sprint20ScreenshotDir, name)
++    }
++
+     private fun captureTo(directory: File, name: String) {
+         composeRule.waitForIdle()
+         InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+@@ -1805,12 +1847,13 @@ class VisualQaScreenshotTest {
+         title: String = "The Long Quiet EPUB",
+         fileName: String = "long-quiet.epub",
+         nowMillis: Long = 1_000L,
++        epubBytes: ByteArray = sprint10EpubBytes(),
+     ) = runBlocking {
+         val targetContext = InstrumentationRegistry.getInstrumentation().targetContext
+         val app = targetContext.applicationContext as QualityAlternativeApplication
+         val fixture = File(targetContext.filesDir, "visual-qa-fixtures/$fileName")
+         fixture.parentFile?.mkdirs()
+-        fixture.writeBytes(sprint10EpubBytes())
++        fixture.writeBytes(epubBytes)
+ 
+         app.appContainer.userDocumentRepository.observeReady().first { it }
+         val result = app.appContainer.userDocumentRepository.addDocument(
+@@ -2012,6 +2055,33 @@ class VisualQaScreenshotTest {
+         )
+     }
+ 
++    private fun sprint20LargeOpeningEpubBytes(): ByteArray {
++        val paragraphs = (1..15_000).joinToString("\n") { index ->
++            "<p>Large EPUB paragraph $index keeps the reader-opening overlay visible while the private book is parsed off the interface path.</p>"
++        }
++        return epubBytes(
++            "META-INF/container.xml" to """
++                <?xml version="1.0"?>
++                <container>
++                  <rootfiles>
++                    <rootfile full-path="OPS/package.opf" media-type="application/oebps-package+xml"/>
++                  </rootfiles>
++                </container>
++            """.trimIndent(),
++            "OPS/package.opf" to """
++                <package>
++                  <manifest>
++                    <item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/>
++                  </manifest>
++                  <spine>
++                    <itemref idref="chapter"/>
++                  </spine>
++                </package>
++            """.trimIndent(),
++            "OPS/chapter.xhtml" to "<html><body><h1>Large Opening Fixture</h1>$paragraphs</body></html>",
++        )
++    }
++
+     private fun epubBytes(vararg entries: Pair<String, String>): ByteArray {
+         val output = ByteArrayOutputStream()
+         ZipOutputStream(output).use { zip ->
+diff --git a/app/src/main/java/com/qualityalternative/app/data/EpubTextExtractor.kt b/app/src/main/java/com/qualityalternative/app/data/EpubTextExtractor.kt
+index b767b43..cc366d8 100644
+--- a/app/src/main/java/com/qualityalternative/app/data/EpubTextExtractor.kt
++++ b/app/src/main/java/com/qualityalternative/app/data/EpubTextExtractor.kt
+@@ -14,6 +14,12 @@ import org.xml.sax.InputSource
+ 
+ object EpubTextExtractor {
+     private const val semanticIndentSentinel = "\uE000"
++    private const val anchorMarkerSentinel = "\uE001"
++    private const val MAX_RETAINED_ENTRY_BYTES = 24 * 1024 * 1024
++    private const val MAX_RETAINED_EPUB_TEXT_BYTES = 96 * 1024 * 1024
++    private val anchorMarkerRegex = Regex(
++        "${Regex.escape(anchorMarkerSentinel)}QA_ANCHOR_(\\d+)${Regex.escape(anchorMarkerSentinel)}",
++    )
+ 
+     fun extract(input: InputStream): String = extractDocument(input).plainText
+ 
+@@ -81,12 +87,17 @@ object EpubTextExtractor {
+ 
+     private fun readZipEntries(input: InputStream): Map<String, ByteArray> {
+         val entries = linkedMapOf<String, ByteArray>()
++        var retainedBytes = 0L
+         ZipInputStream(input.buffered()).use { zip ->
+             while (true) {
+                 val entry = zip.nextEntry ?: break
+-                if (!entry.isDirectory) {
++                if (!entry.isDirectory && entry.name.isRetainedEpubEntryPath()) {
+                     val out = ByteArrayOutputStream()
+-                    zip.copyTo(out)
++                    val bytes = zip.copyToBounded(out)
++                    retainedBytes += bytes
++                    if (retainedBytes > MAX_RETAINED_EPUB_TEXT_BYTES) {
++                        throw IllegalArgumentException("EPUB readable text is too large to import safely")
++                    }
+                     entries[entry.name] = out.toByteArray()
+                 }
+                 zip.closeEntry()
+@@ -209,18 +220,47 @@ object EpubTextExtractor {
+     }
+ 
+     private fun anchorsInBody(body: String): List<AnchorPosition> {
+-        return Regex("""<[^>]+\b(?:id|name)\s*=\s*["']([^"']+)["'][^>]*>""", RegexOption.IGNORE_CASE)
+-            .findAll(body)
+-            .mapNotNull { match ->
+-                val anchor = match.groupValues.getOrNull(1)?.trim()?.takeIf(String::isNotBlank)
+-                val blockIndex = htmlFragmentToReadableText(body.substring(0, match.range.first))
+-                    .toReaderBlockTexts()
+-                    .size
+-                anchor?.let { AnchorPosition(anchor = it, blockIndex = blockIndex) }
++        val anchorNames = mutableListOf<String>()
++        val markedBody = buildString {
++            var cursor = 0
++            Regex("""<[^>]+\b(?:id|name)\s*=\s*["']([^"']+)["'][^>]*>""", RegexOption.IGNORE_CASE)
++                .findAll(body)
++                .forEach { match ->
++                    append(body, cursor, match.range.last + 1)
++                    match.groupValues
++                        .getOrNull(1)
++                        ?.trim()
++                        ?.takeIf(String::isNotBlank)
++                        ?.let { anchor ->
++                            val markerIndex = anchorNames.size
++                            anchorNames += anchor
++                            append(anchorMarker(markerIndex))
++                        }
++                    cursor = match.range.last + 1
++                }
++            append(body, cursor, body.length)
++        }
++        val anchors = mutableListOf<AnchorPosition>()
++        var blockIndex = 0
++        htmlFragmentToReadableText(markedBody)
++            .toReaderBlockTexts()
++            .forEach { block ->
++                anchorMarkerRegex.findAll(block).forEach { match ->
++                    match.groupValues
++                        .getOrNull(1)
++                        ?.toIntOrNull()
++                        ?.let(anchorNames::getOrNull)
++                        ?.let { anchor -> anchors += AnchorPosition(anchor = anchor, blockIndex = blockIndex) }
++                }
++                if (anchorMarkerRegex.replace(block, "").trim().isNotBlank()) {
++                    blockIndex += 1
++                }
+             }
+-            .toList()
++        return anchors
+     }
+ 
++    private fun anchorMarker(index: Int): String = "${anchorMarkerSentinel}QA_ANCHOR_${index}${anchorMarkerSentinel}"
++
+     private fun firstBlockIndexesBySource(blocks: List<ReaderDocumentBlock>): Map<String, Int> {
+         return blocks
+             .mapIndexedNotNull { index, block -> block.sourceHref?.let { sourceHref -> sourceHref to index } }
+@@ -474,6 +514,31 @@ object EpubTextExtractor {
+         return !path.isAuxiliaryDocumentPath()
+     }
+ 
++    private fun String.isRetainedEpubEntryPath(): Boolean {
++        return equals("META-INF/container.xml", ignoreCase = true) ||
++            endsWith(".opf", ignoreCase = true) ||
++            endsWith(".ncx", ignoreCase = true) ||
++            endsWith(".xhtml", ignoreCase = true) ||
++            endsWith(".html", ignoreCase = true) ||
++            endsWith(".htm", ignoreCase = true)
++    }
++
++    private fun ZipInputStream.copyToBounded(out: ByteArrayOutputStream): Long {
++        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
++        var total = 0L
++        while (true) {
++            val read = read(buffer)
++            if (read <= 0) {
++                return total
++            }
++            total += read.toLong()
++            if (total > MAX_RETAINED_ENTRY_BYTES) {
++                throw IllegalArgumentException("EPUB entry is too large to import safely")
++            }
++            out.write(buffer, 0, read)
++        }
++    }
++
+     private fun String.isAuxiliaryDocumentPath(): Boolean {
+         val fileName = substringAfterLast('/').substringBeforeLast('.').lowercase()
+         val normalized = fileName.replace(Regex("""[_\-\s]+"""), "")
+diff --git a/app/src/main/java/com/qualityalternative/app/data/RoomUserDocumentRepository.kt b/app/src/main/java/com/qualityalternative/app/data/RoomUserDocumentRepository.kt
+index 59888ba..f92c6f4 100644
+--- a/app/src/main/java/com/qualityalternative/app/data/RoomUserDocumentRepository.kt
++++ b/app/src/main/java/com/qualityalternative/app/data/RoomUserDocumentRepository.kt
+@@ -19,11 +19,13 @@ import java.io.InputStream
+ import java.security.MessageDigest
+ import java.util.UUID
+ import kotlinx.coroutines.CoroutineScope
++import kotlinx.coroutines.Dispatchers
+ import kotlinx.coroutines.flow.Flow
+ import kotlinx.coroutines.flow.MutableStateFlow
+ import kotlinx.coroutines.flow.asStateFlow
+ import kotlinx.coroutines.flow.map
+ import kotlinx.coroutines.launch
++import kotlinx.coroutines.withContext
+ 
+ class RoomUserDocumentRepository(
+     private val dao: UserDocumentDao,
+@@ -33,6 +35,7 @@ class RoomUserDocumentRepository(
+ ) : UserDocumentRepository {
+     private val documents = MutableStateFlow(emptyList<ContentItem>())
+     private val ready = MutableStateFlow(false)
++    private val readerDocumentCache = linkedMapOf<String, ReaderDocument>()
+ 
+     init {
+         scope.launch {
+@@ -52,11 +55,11 @@ class RoomUserDocumentRepository(
+     override suspend fun addDocument(
+         draft: UserDocumentDraft,
+         nowMillis: Long,
+-    ): AddUserDocumentResult {
++    ): AddUserDocumentResult = withContext(Dispatchers.IO) {
+         val validation = UserDocumentValidator.validate(draft)
+         val format = validation.format
+         if (!validation.isValid || format == null) {
+-            return AddUserDocumentResult.Rejected(validation.errors)
++            return@withContext AddUserDocumentResult.Rejected(validation.errors)
+         }
+ 
+         val normalizedUri = draft.uri.trim()
+@@ -121,7 +124,7 @@ class RoomUserDocumentRepository(
+             ),
+         )
+         documents.value = upsertUserDocumentForOptimisticState(documents.value, item)
+-        return AddUserDocumentResult.Added(item)
++        AddUserDocumentResult.Added(item)
+     }
+ 
+     override suspend fun markUnavailable(
+@@ -193,7 +196,7 @@ class RoomUserDocumentRepository(
+ 
+     override fun contentBody(item: ContentItem): String {
+         return if (item.sourceType == ContentSourceType.USER_DOCUMENT && item.format.usesPrivateReader()) {
+-            bodyLoader.loadBody(uri = item.rights.sourceUrl.orEmpty(), format = item.format)
++            readerDocument(item).plainText
+         } else {
+             item.description
+         }
+@@ -201,9 +204,14 @@ class RoomUserDocumentRepository(
+ 
+     override fun readerDocument(item: ContentItem): ReaderDocument {
+         return if (item.sourceType == ContentSourceType.USER_DOCUMENT && item.format.usesPrivateReader()) {
++            val uri = item.rights.sourceUrl.orEmpty()
++            val cacheKey = item.readerDocumentCacheKey(uri = uri)
++            cachedReaderDocument(cacheKey)?.let { cached -> return cached }
+             val structuredLoader = bodyLoader as? UserDocumentReaderDocumentLoader
+-            structuredLoader?.loadReaderDocument(uri = item.rights.sourceUrl.orEmpty(), format = item.format)
+-                ?: ReaderDocument.fromPlainText(contentBody(item))
++            val document = structuredLoader?.loadReaderDocument(uri = uri, format = item.format)
++                ?: ReaderDocument.fromPlainText(bodyLoader.loadBody(uri = uri, format = item.format))
++            cacheReaderDocument(cacheKey = cacheKey, document = document)
++            document
+         } else {
+             ReaderDocument.fromPlainText(item.description)
+         }
+@@ -215,6 +223,23 @@ class RoomUserDocumentRepository(
+ 
+     private companion object {
+         const val USER_DOCUMENT_PACK_ID = "user-documents"
++        const val MAX_READER_DOCUMENT_CACHE_SIZE = 1
++    }
++
++    private fun cachedReaderDocument(cacheKey: String): ReaderDocument? = synchronized(readerDocumentCache) {
++        readerDocumentCache.remove(cacheKey)?.also { cached ->
++            readerDocumentCache[cacheKey] = cached
++        }
++    }
++
++    private fun cacheReaderDocument(cacheKey: String, document: ReaderDocument) {
++        synchronized(readerDocumentCache) {
++            readerDocumentCache[cacheKey] = document
++            while (readerDocumentCache.size > MAX_READER_DOCUMENT_CACHE_SIZE) {
++                val eldestKey = readerDocumentCache.keys.firstOrNull() ?: break
++                readerDocumentCache.remove(eldestKey)
++            }
++        }
+     }
+ }
+ 
+@@ -358,6 +383,15 @@ internal fun ContentItem.verifiedDocumentFingerprintSha256(): String? =
+ internal fun ContentItem.verifiedDocumentFingerprintSizeBytes(): Long? =
+     documentFingerprintSizeBytes?.takeIf { size -> size >= 0L && verifiedDocumentFingerprintSha256() != null }
+ 
++private fun ContentItem.readerDocumentCacheKey(uri: String): String {
++    return listOf(
++        uri,
++        format.name,
++        verifiedDocumentFingerprintSha256().orEmpty(),
++        verifiedDocumentFingerprintSizeBytes()?.toString().orEmpty(),
++    ).joinToString(separator = "|")
++}
++
+ private fun ContentFormat.usesPrivateReader(): Boolean = this == ContentFormat.MARKDOWN || this == ContentFormat.EPUB
+ 
+ private fun defaultDescription(format: ContentFormat, displayName: String): String {
+diff --git a/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt b/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
+index 9ef1087..ca6fd87 100644
+--- a/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
++++ b/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
+@@ -93,12 +93,15 @@ import com.qualityalternative.app.interception.InterceptionRuntimeGate
+ import java.io.InputStream
+ import java.util.UUID
+ import kotlinx.coroutines.CancellationException
++import kotlinx.coroutines.CoroutineDispatcher
+ import kotlinx.coroutines.CoroutineScope
++import kotlinx.coroutines.Dispatchers
+ import kotlinx.coroutines.cancel
+ import kotlinx.coroutines.delay
+ import kotlinx.coroutines.flow.collect
+ import kotlinx.coroutines.flow.flowOf
+ import kotlinx.coroutines.launch
++import kotlinx.coroutines.withContext
+ 
+ data class MainUiState(
+     val isLoadingSettings: Boolean = true,
+@@ -122,6 +125,7 @@ data class MainUiState(
+     val currentContent: ContentItem? = null,
+     val currentReaderDocument: ReaderDocument? = null,
+     val currentContentBody: String = "",
++    val isReaderOpening: Boolean = false,
+     val currentReadingProgress: ReadingProgress? = null,
+     val currentReaderStartParagraphIndex: Int? = null,
+     val currentReaderStartSelector: ReadingAnnotationSelector? = null,
+@@ -221,6 +225,7 @@ data class AddDocumentFormState(
+     val markPriority: Boolean = false,
+     val validationErrors: Set<UserDocumentValidationError> = emptySet(),
+     val canSave: Boolean = false,
++    val isPreparing: Boolean = false,
+     val isSaving: Boolean = false,
+ ) {
+     val importCount: Int
+@@ -292,6 +297,7 @@ class MainViewModel(
+     private val interceptionMonitor: InterceptionMonitor,
+     private val enableDelayRefreshTicker: Boolean = true,
+     private val progressPersistenceScope: CoroutineScope? = null,
++    private val documentWorkDispatcher: CoroutineDispatcher = Dispatchers.IO,
+     private val nowProvider: () -> Long = System::currentTimeMillis,
+ ) : ViewModel() {
+     private val supportedApps = settingsRepository.supportedDistractingApps()
+@@ -310,6 +316,8 @@ class MainViewModel(
+     private var pendingSystemInterception: PendingSystemInterception? = null
+     private var pendingAccountLightImportPlan: AccountLightImportPlan? = null
+     private var annotationDriveAccessToken: String? = null
++    private var documentImportPreparationRequestId = 0
++    private var readerOpenRequestId = 0
+     private val readingAnnotationExportFormatter = ReadingAnnotationExportFormatter()
+ 
+     var uiState by mutableStateOf(
+@@ -976,6 +984,8 @@ class MainViewModel(
+     }
+ 
+     fun openAddLink() {
++        invalidatePendingReaderOpen()
++        invalidatePendingDocumentImportPreparation()
+         uiState = uiState.copy(
+             screen = MainScreen.AddLink,
+             addLinkForm = AddLinkFormState(),
+@@ -985,38 +995,87 @@ class MainViewModel(
+         )
+     }
+ 
++    fun beginUserDocumentImportPreparation(): Int {
++        documentImportPreparationRequestId += 1
++        uiState = uiState.copy(
++            screen = MainScreen.AddDocument,
++            addDocumentForm = AddDocumentFormState(isPreparing = true),
++            savedLinkConfirmation = null,
++            latestMessage = null,
++        )
++        return documentImportPreparationRequestId
++    }
++
++    fun reportUserDocumentImportPreparationFailure(requestId: Int? = null) {
++        if (requestId != null && requestId != documentImportPreparationRequestId) {
++            return
++        }
++        documentImportPreparationRequestId += 1
++        uiState = uiState.copy(
++            screen = MainScreen.AddDocument,
++            addDocumentForm = AddDocumentFormState(),
++            latestMessage = "The selected files could not be prepared. Try a smaller batch.",
++        )
++    }
++
+     fun prepareUserDocumentImport(
+         uri: String,
+         displayName: String,
+         mimeType: String?,
+         openInputStream: () -> InputStream? = { null },
+     ) {
+-        val candidate = DocumentImportCandidateFactory.fromPickedDocument(
+-            uri = uri,
+-            displayName = displayName,
+-            mimeType = mimeType,
+-            openInputStream = openInputStream,
+-        )
+-        updateAddDocumentForm(
+-            form = AddDocumentFormState(
+-                uri = candidate.uri,
+-                displayName = candidate.displayName,
+-                mimeType = mimeType,
+-                title = candidate.title,
+-                durationMinutes = candidate.durationMinutes,
+-                candidates = listOf(candidate),
+-            ),
++        val requestId = ++documentImportPreparationRequestId
++        uiState = uiState.copy(
+             screen = MainScreen.AddDocument,
++            addDocumentForm = AddDocumentFormState(isPreparing = true),
++            savedLinkConfirmation = null,
++            latestMessage = null,
+         )
++        viewModelScope.launch {
++            val candidate = runCatching {
++                withContext(documentWorkDispatcher) {
++                    DocumentImportCandidateFactory.fromPickedDocument(
++                        uri = uri,
++                        displayName = displayName,
++                        mimeType = mimeType,
++                        openInputStream = openInputStream,
++                    )
++                }
++            }.getOrElse {
++                if (requestId == documentImportPreparationRequestId) {
++                    reportUserDocumentImportPreparationFailure(requestId = requestId)
++                }
++                return@launch
++            }
++            if (requestId != documentImportPreparationRequestId) {
++                return@launch
++            }
++            updateAddDocumentForm(
++                form = AddDocumentFormState(
++                    uri = candidate.uri,
++                    displayName = candidate.displayName,
++                    mimeType = mimeType,
++                    title = candidate.title,
++                    durationMinutes = candidate.durationMinutes,
++                    candidates = listOf(candidate),
++                ),
++                screen = MainScreen.AddDocument,
++            )
++        }
+     }
+ 
+     fun prepareUserDocumentBatchImport(
+         candidates: List<DocumentImportCandidate>,
+         nowMillis: Long = nowProvider(),
++        requestId: Int = documentImportPreparationRequestId,
+     ) {
++        if (requestId != documentImportPreparationRequestId) {
++            return
++        }
+         val cleanedCandidates = candidates
+             .map(DocumentImportCandidate::cleaned)
+             .distinctBy(DocumentImportCandidate::uri)
++        documentImportPreparationRequestId += 1
+         if (cleanedCandidates.isEmpty()) {
+             uiState = uiState.copy(latestMessage = "Choose local PDF, Markdown, or EPUB files first.")
+             return
+@@ -1051,8 +1110,11 @@ class MainViewModel(
+     }
+ 
+     fun openHome() {
++        invalidatePendingReaderOpen()
++        invalidatePendingDocumentImportPreparation()
+         uiState = uiState.copy(
+             screen = MainScreen.Home,
++            isReaderOpening = false,
+             isManagingLibrary = false,
+             selectedLibraryContentIds = emptySet(),
+             currentReaderStartParagraphIndex = null,
+@@ -1062,8 +1124,11 @@ class MainViewModel(
+     }
+ 
+     fun openLibrary() {
++        invalidatePendingReaderOpen()
++        invalidatePendingDocumentImportPreparation()
+         uiState = uiState.copy(
+             screen = MainScreen.Library,
++            isReaderOpening = false,
+             currentReaderStartParagraphIndex = null,
+             currentReaderStartSelector = null,
+             latestMessage = null,
+@@ -1160,8 +1225,11 @@ class MainViewModel(
+     }
+ 
+     fun openProgress() {
++        invalidatePendingReaderOpen()
++        invalidatePendingDocumentImportPreparation()
+         uiState = uiState.copy(
+             screen = MainScreen.Progress,
++            isReaderOpening = false,
+             currentReaderStartParagraphIndex = null,
+             currentReaderStartSelector = null,
+             latestMessage = null,
+@@ -1169,8 +1237,11 @@ class MainViewModel(
+     }
+ 
+     fun openSettings() {
++        invalidatePendingReaderOpen()
++        invalidatePendingDocumentImportPreparation()
+         uiState = uiState.copy(
+             screen = MainScreen.Settings,
++            isReaderOpening = false,
+             currentReaderStartParagraphIndex = null,
+             currentReaderStartSelector = null,
+             latestMessage = null,
+@@ -1178,8 +1249,11 @@ class MainViewModel(
+     }
+ 
+     fun openAnnotationLibrary() {
++        invalidatePendingReaderOpen()
++        invalidatePendingDocumentImportPreparation()
+         uiState = uiState.copy(
+             screen = MainScreen.Annotations,
++            isReaderOpening = false,
+             isManagingLibrary = false,
+             selectedLibraryContentIds = emptySet(),
+             currentReaderStartParagraphIndex = null,
+@@ -1228,59 +1302,66 @@ class MainViewModel(
+             return
+         }
+         val startedAtMillis = nowProvider()
+-        val readerDocument = if (content.usesRepositoryBody()) {
+-            try {
+-                contentRepository.readerDocument(content)
+-            } catch (error: Throwable) {
+-                if (error is CancellationException) throw error
+-                viewModelScope.launch {
+-                    handleRepositoryBodyLoadFailure(
+-                        content = content,
+-                        sessionId = null,
+-                        failedAtMillis = startedAtMillis,
+-                        error = error,
+-                    )
+-                }
+-                return
+-            }
++        val requestId = ++readerOpenRequestId
++        val opensPrivateReader = content.usesRepositoryBody()
++        if (opensPrivateReader) {
++            uiState = uiState.copy(
++                isReaderOpening = true,
++                latestMessage = null,
++            )
+         } else {
+-            ReaderDocument.fromPlainText("")
++            uiState = uiState.copy(isReaderOpening = false)
+         }
+-        val existingProgress = unfinishedProgressFor(content.id)
+-        if (existingProgress != null) {
+-            recordEvent(
+-                AnalyticsEvent(
+-                    type = AnalyticsEventType.MANUAL_CONTINUE_STARTED,
+-                    timestampMillis = startedAtMillis,
+-                    contentId = content.id,
+-                    metadata = content.analyticsMetadata() + existingProgress.analyticsMetadata() + mapOf(
+-                        "origin" to origin,
++        viewModelScope.launch {
++            val readerDocument = loadReaderDocumentForSession(
++                content = content,
++                sessionId = null,
++                startedAtMillis = startedAtMillis,
++                requestId = requestId,
++            ) ?: return@launch
++            if (requestId != readerOpenRequestId) {
++                return@launch
++            }
++            val existingProgress = unfinishedProgressFor(content.id)
++            if (existingProgress != null) {
++                recordEvent(
++                    AnalyticsEvent(
++                        type = AnalyticsEventType.MANUAL_CONTINUE_STARTED,
++                        timestampMillis = startedAtMillis,
++                        contentId = content.id,
++                        metadata = content.analyticsMetadata() + existingProgress.analyticsMetadata() + mapOf(
++                            "origin" to origin,
++                        ),
+                     ),
+-                ),
++                )
++            }
++            uiState = uiState.copy(
++                currentInterventionId = null,
++                currentInterventionShownAtMillis = null,
++                currentOpenAnywayUnlockAvailableAtMillis = null,
++                currentRecommendationSet = null,
++                currentInterventionOrigin = null,
++                currentContent = content,
++                currentReaderDocument = readerDocument,
++                currentContentBody = readerDocument.plainText,
++                isReaderOpening = false,
++                currentReadingProgress = existingProgress,
++                currentReaderStartParagraphIndex = startParagraphIndex,
++                currentReaderStartSelector = startSelector,
++                currentSessionId = null,
++                currentSessionStartedAtMillis = startedAtMillis,
++                screen = screenForReplacement(content),
++                latestMessage = null,
+             )
+         }
+-        uiState = uiState.copy(
+-            currentInterventionId = null,
+-            currentInterventionShownAtMillis = null,
+-            currentOpenAnywayUnlockAvailableAtMillis = null,
+-            currentRecommendationSet = null,
+-            currentInterventionOrigin = null,
+-            currentContent = content,
+-            currentReaderDocument = readerDocument,
+-            currentContentBody = readerDocument.plainText,
+-            currentReadingProgress = existingProgress,
+-            currentReaderStartParagraphIndex = startParagraphIndex,
+-            currentReaderStartSelector = startSelector,
+-            currentSessionId = null,
+-            currentSessionStartedAtMillis = startedAtMillis,
+-            screen = screenForReplacement(content),
+-            latestMessage = null,
+-        )
+     }
+ 
+     fun cancelAddLink() {
++        invalidatePendingReaderOpen()
++        invalidatePendingDocumentImportPreparation()
+         uiState = uiState.copy(
+             screen = MainScreen.Home,
++            isReaderOpening = false,
+             addLinkForm = AddLinkFormState(),
+             addDocumentForm = AddDocumentFormState(),
+             savedLinkConfirmation = null,
+@@ -1417,6 +1498,9 @@ class MainViewModel(
+         persistReadPermission: (String) -> Unit = {},
+     ) {
+         val form = uiState.addDocumentForm
++        if (form.isPreparing) {
++            return
++        }
+         val candidates = form.documentCandidates()
+         val supportedCandidates = candidates.filter { candidate -> candidate.format != null }
+         val drafts = supportedCandidates.mapNotNull { candidate -> candidate.toDraftOrNull(form.selectedTopics) }
+@@ -3052,21 +3136,23 @@ class MainViewModel(
+     }
+ 
+     private suspend fun openReplacementSession(content: ContentItem, sessionId: String, startedAtMillis: Long) {
+-        val readerDocument = if (content.usesRepositoryBody()) {
+-            try {
+-                contentRepository.readerDocument(content)
+-            } catch (error: Throwable) {
+-                if (error is CancellationException) throw error
+-                handleRepositoryBodyLoadFailure(
+-                    content = content,
+-                    sessionId = sessionId,
+-                    failedAtMillis = startedAtMillis,
+-                    error = error,
+-                )
+-                return
+-            }
++        val requestId = ++readerOpenRequestId
++        if (content.usesRepositoryBody()) {
++            uiState = uiState.copy(
++                isReaderOpening = true,
++                latestMessage = null,
++            )
+         } else {
+-            ReaderDocument.fromPlainText("")
++            uiState = uiState.copy(isReaderOpening = false)
++        }
++        val readerDocument = loadReaderDocumentForSession(
++            content = content,
++            sessionId = sessionId,
++            startedAtMillis = startedAtMillis,
++            requestId = requestId,
++        ) ?: return
++        if (requestId != readerOpenRequestId) {
++            return
+         }
+         val existingProgress = unfinishedProgressFor(content.id)
+         uiState = uiState.copy(
+@@ -3078,15 +3164,45 @@ class MainViewModel(
+             currentContent = content,
+             currentReaderDocument = readerDocument,
+             currentContentBody = readerDocument.plainText,
++            isReaderOpening = false,
+             currentReadingProgress = existingProgress,
+             currentReaderStartParagraphIndex = null,
+             currentReaderStartSelector = null,
+             currentSessionId = sessionId,
+             currentSessionStartedAtMillis = startedAtMillis,
+             screen = screenForReplacement(content),
++            latestMessage = null,
+         )
+     }
+ 
++    private suspend fun loadReaderDocumentForSession(
++        content: ContentItem,
++        sessionId: String?,
++        startedAtMillis: Long,
++        requestId: Int,
++    ): ReaderDocument? {
++        if (!content.usesRepositoryBody()) {
++            return ReaderDocument.fromPlainText("")
++        }
++        return try {
++            withContext(documentWorkDispatcher) {
++                contentRepository.readerDocument(content)
++            }
++        } catch (error: Throwable) {
++            if (error is CancellationException) throw error
++            if (requestId != readerOpenRequestId) {
++                return null
++            }
++            handleRepositoryBodyLoadFailure(
++                content = content,
++                sessionId = sessionId,
++                failedAtMillis = startedAtMillis,
++                error = error,
++            )
++            null
++        }
++    }
++
+     private suspend fun handleRepositoryBodyLoadFailure(
+         content: ContentItem,
+         sessionId: String?,
+@@ -3318,6 +3434,7 @@ class MainViewModel(
+         screen: MainScreen = MainScreen.Home,
+         latestMessage: String,
+     ) {
++        readerOpenRequestId += 1
+         uiState = uiState.copy(
+             screen = screen,
+             currentInterventionId = null,
+@@ -3326,6 +3443,7 @@ class MainViewModel(
+             currentContent = null,
+             currentReaderDocument = null,
+             currentContentBody = "",
++            isReaderOpening = false,
+             currentRecommendationSet = null,
+             currentInterventionOrigin = null,
+             currentSessionId = null,
+@@ -3597,17 +3715,27 @@ class MainViewModel(
+         form: AddDocumentFormState,
+         screen: MainScreen = uiState.screen,
+     ) {
++        val validationErrors = form.visibleValidationErrors()
+         uiState = uiState.copy(
+             screen = screen,
+             addDocumentForm = form.copy(
+-                validationErrors = form.visibleValidationErrors(),
+-                canSave = form.localValidationErrors().isEmpty(),
++                validationErrors = validationErrors,
++                canSave = !form.isPreparing && form.localValidationErrors().isEmpty(),
++                isPreparing = form.isPreparing,
+                 isSaving = false,
+             ),
+             savedLinkConfirmation = null,
+             latestMessage = null,
+         )
+     }
++
++    private fun invalidatePendingReaderOpen() {
++        readerOpenRequestId += 1
++    }
++
++    private fun invalidatePendingDocumentImportPreparation() {
++        documentImportPreparationRequestId += 1
++    }
+ }
+ 
+ class MainViewModelFactory(
+diff --git a/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt b/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
+index 865b6ce..952bf3c 100644
+--- a/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
++++ b/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
+@@ -72,6 +72,7 @@ import androidx.compose.runtime.derivedStateOf
+ import androidx.compose.runtime.getValue
+ import androidx.compose.runtime.mutableStateOf
+ import androidx.compose.runtime.remember
++import androidx.compose.runtime.rememberCoroutineScope
+ import androidx.compose.runtime.rememberUpdatedState
+ import androidx.compose.runtime.setValue
+ import androidx.compose.ui.Alignment
+@@ -180,7 +181,10 @@ import kotlin.math.abs
+ import kotlin.math.floor
+ import kotlin.math.min
+ import kotlin.math.roundToInt
++import kotlinx.coroutines.Dispatchers
+ import kotlinx.coroutines.delay
++import kotlinx.coroutines.launch
++import kotlinx.coroutines.withContext
+ 
+ private val LocalAppInterfaceTextScale = compositionLocalOf { DEFAULT_INTERFACE_TEXT_SCALE }
+ 
+@@ -345,6 +349,7 @@ private fun MainRoute(
+     onExitToTarget: () -> Unit,
+ ) {
+     val context = LocalContext.current
++    val documentImportScope = rememberCoroutineScope()
+     val driveAuthorizationContext = context.findActivity() ?: context
+     val driveAuthorizationClient = remember(driveAuthorizationContext) {
+         Identity.getAuthorizationClient(driveAuthorizationContext)
+@@ -417,9 +422,18 @@ private fun MainRoute(
+         if (uris.isEmpty()) {
+             return@rememberLauncherForActivityResult
+         }
+-        viewModel.prepareUserDocumentBatchImport(
+-            candidates = uris.map { uri -> context.documentImportCandidate(uri) },
+-        )
++        val requestId = viewModel.beginUserDocumentImportPreparation()
++        documentImportScope.launch {
++            runCatching {
++                withContext(Dispatchers.IO) {
++                    uris.map { uri -> context.documentImportCandidate(uri) }
++                }
++            }.onSuccess { candidates ->
++                viewModel.prepareUserDocumentBatchImport(candidates = candidates, requestId = requestId)
++            }.onFailure {
++                viewModel.reportUserDocumentImportPreparationFailure(requestId = requestId)
++            }
++        }
+     }
+     val annotationExportPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+         if (uri == null) {
+@@ -485,15 +499,16 @@ private fun MainRoute(
+         releaseProfileAutosavePermission(context = context, uri = Uri.parse(uri))
+     }
+ 
+-    when (state.screen) {
+-        MainScreen.Onboarding -> OnboardingFlow(
+-            selection = state.onboardingSelection,
+-            supportedApps = state.allSupportedApps,
+-            onToggleApp = viewModel::toggleOnboardingApp,
+-            onToggleTopic = viewModel::toggleOnboardingTopic,
+-            onSelectDuration = viewModel::setOnboardingDuration,
+-            onComplete = viewModel::completeOnboarding,
+-        )
++    Box(modifier = Modifier.fillMaxSize()) {
++        when (state.screen) {
++            MainScreen.Onboarding -> OnboardingFlow(
++                selection = state.onboardingSelection,
++                supportedApps = state.allSupportedApps,
++                onToggleApp = viewModel::toggleOnboardingApp,
++                onToggleTopic = viewModel::toggleOnboardingTopic,
++                onSelectDuration = viewModel::setOnboardingDuration,
++                onComplete = viewModel::completeOnboarding,
++            )
+ 
+         MainScreen.Home -> TabScaffold(
+             active = MainScreen.Home,
+@@ -694,11 +709,15 @@ private fun MainRoute(
+             onBack = viewModel::skipMeditationReset,
+         )
+ 
+-        MainScreen.Feedback -> FeedbackScreen(
+-            state = state,
+-            onSubmit = viewModel::submitFeedback,
+-            onSkip = viewModel::skipFeedback,
+-        )
++            MainScreen.Feedback -> FeedbackScreen(
++                state = state,
++                onSubmit = viewModel::submitFeedback,
++                onSkip = viewModel::skipFeedback,
++            )
++        }
++        if (state.isReaderOpening) {
++            ReaderOpeningOverlay()
++        }
+     }
+ }
+ 
+@@ -720,6 +739,33 @@ private fun LoadingScreen() {
+     }
+ }
+ 
++@Composable
++private fun ReaderOpeningOverlay() {
++    val colors = QualityAlternativeThemeTokens.colors
++    Box(
++        modifier = Modifier
++            .fillMaxSize()
++            .background(colors.background.copy(alpha = 0.86f))
++            .clickable(onClick = {})
++            .testTag("reader-opening-overlay"),
++        contentAlignment = Alignment.Center,
++    ) {
++        Column(
++            horizontalAlignment = Alignment.CenterHorizontally,
++            verticalArrangement = Arrangement.Center,
++            modifier = Modifier.padding(28.dp),
++        ) {
++            CircularProgressIndicator(color = colors.accent)
++            Text(
++                text = "Opening reader...",
++                modifier = Modifier.padding(top = 16.dp),
++                style = MaterialTheme.typography.bodyLarge,
++                color = colors.mutedText,
++            )
++        }
++    }
++}
++
+ @Composable
+ private fun TabScaffold(
+     active: MainScreen,
+@@ -1577,6 +1623,7 @@ private fun AddDocumentScreen(
+     onPickAnother: () -> Unit,
+ ) {
+     val saveLabel = when {
++        form.isPreparing -> "Reading file details..."
+         form.isSaving -> "Saving..."
+         form.supportedImportCount > 1 -> "Add files to library"
+         else -> "Add file to library"
+@@ -1600,25 +1647,41 @@ private fun AddDocumentScreen(
+                 modifier = Modifier.padding(top = 6.dp, bottom = 16.dp),
+             )
+             QaCard(modifier = Modifier.padding(bottom = 18.dp), padding = 16.dp) {
+-                MonoText("${form.supportedImportCount} ready · ${form.unsupportedImportCount} skipped", modifier = Modifier.padding(bottom = 8.dp))
+-                form.candidates.ifEmpty {
+-                    listOf(
+-                        DocumentImportCandidate(
+-                            uri = form.uri,
+-                            displayName = form.displayName,
+-                            mimeType = form.mimeType,
+-                            title = form.title,
+-                            durationMinutes = form.durationMinutes,
+-                            format = UserDocumentValidator.detectFormat(form.displayName, form.mimeType),
+-                        ),
++                MonoText(
++                    text = if (form.isPreparing) {
++                        "Preparing selected files..."
++                    } else {
++                        "${form.supportedImportCount} ready · ${form.unsupportedImportCount} skipped"
++                    },
++                    modifier = Modifier.padding(bottom = 8.dp),
++                )
++                if (form.isPreparing) {
++                    BodyText(
++                        text = "Preparing the book. Large EPUBs can take a moment.",
++                        color = QualityAlternativeThemeTokens.colors.mutedText,
++                        fontSize = 12.5.sp,
+                     )
+-                }.forEach { candidate ->
+-                    DocumentImportRow(candidate = candidate)
++                } else {
++                    form.candidates.ifEmpty {
++                        listOf(
++                            DocumentImportCandidate(
++                                uri = form.uri,
++                                displayName = form.displayName,
++                                mimeType = form.mimeType,
++                                title = form.title,
++                                durationMinutes = form.durationMinutes,
++                                format = UserDocumentValidator.detectFormat(form.displayName, form.mimeType),
++                            ),
++                        )
++                    }.forEach { candidate ->
++                        DocumentImportRow(candidate = candidate)
++                    }
+                 }
+             }
+             QaButton(
+                 text = "Choose files",
+                 onClick = onPickAnother,
++                enabled = !form.isPreparing && !form.isSaving,
+                 variant = QaButtonVariant.Outline,
+                 size = QaButtonSize.Small,
+                 leadingIcon = QaIconKind.Book,
+@@ -1688,7 +1751,7 @@ private fun AddDocumentScreen(
+             QaButton(
+                 text = saveLabel,
+                 onClick = onSave,
+-                enabled = form.canSave && !form.isSaving,
++                enabled = form.canSave && !form.isPreparing && !form.isSaving,
+                 variant = QaButtonVariant.Primary,
+                 modifier = Modifier.testTag("add-document-save"),
+             )
+diff --git a/app/src/test/java/com/qualityalternative/app/data/EpubTextExtractorTest.kt b/app/src/test/java/com/qualityalternative/app/data/EpubTextExtractorTest.kt
+index 906dd4b..0f98c4c 100644
+--- a/app/src/test/java/com/qualityalternative/app/data/EpubTextExtractorTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/data/EpubTextExtractorTest.kt
+@@ -735,6 +735,171 @@ class EpubTextExtractorTest {
+         assertEquals("OPS/chapter.xhtml", document.tableOfContents.single().sourceHref)
+     }
+ 
++    @Test
++    fun extractDocumentIgnoresLargeBinaryAssetsWhileKeepingReadableSpine() {
++        val epub = epubByteEntries(
++            "META-INF/container.xml" to """
++                <container><rootfiles><rootfile full-path="OPS/package.opf"/></rootfiles></container>
++            """.trimIndent().toByteArray(Charsets.UTF_8),
++            "OPS/package.opf" to """
++                <package>
++                  <manifest>
++                    <item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/>
++                    <item id="image" href="images/plate.jpg" media-type="image/jpeg"/>
++                  </manifest>
++                  <spine><itemref idref="chapter"/></spine>
++                </package>
++            """.trimIndent().toByteArray(Charsets.UTF_8),
++            "OPS/chapter.xhtml" to "<html><body><h1>Readable</h1><p>Text still loads.</p></body></html>"
++                .toByteArray(Charsets.UTF_8),
++            "OPS/images/plate.jpg" to ByteArray(3 * 1024 * 1024) { index -> (index % 251).toByte() },
++        )
++
++        val document = EpubTextExtractor.extractDocument(ByteArrayInputStream(epub))
++
++        assertEquals(listOf("# Readable", "Text still loads."), document.blocks.map { block -> block.text })
++    }
++
++    @Test
++    fun extractDocumentMapsManyAnchorsWithoutChangingGlobalBlockTargets() {
++        val sections = (1..80).joinToString("\n") { index ->
++            """<section id="s$index"><h2>Section $index</h2><p>Body $index.</p></section>"""
++        }
++        val tocItems = (1..80).joinToString("\n") { index ->
++            """<li><a href="chapter.xhtml#s$index">Section $index</a></li>"""
++        }
++        val epub = epubBytes(
++            "META-INF/container.xml" to """
++                <container><rootfiles><rootfile full-path="OPS/package.opf"/></rootfiles></container>
++            """.trimIndent(),
++            "OPS/package.opf" to """
++                <package>
++                  <manifest>
++                    <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
++                    <item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/>
++                  </manifest>
++                  <spine><itemref idref="chapter"/></spine>
++                </package>
++            """.trimIndent(),
++            "OPS/nav.xhtml" to """
++                <html xmlns:epub="http://www.idpf.org/2007/ops">
++                  <body><nav epub:type="toc"><ol>$tocItems</ol></nav></body>
++                </html>
++            """.trimIndent(),
++            "OPS/chapter.xhtml" to "<html><body>$sections</body></html>",
++        )
++
++        val document = EpubTextExtractor.extractDocument(ByteArrayInputStream(epub))
++
++        assertEquals(80, document.tableOfContents.size)
++        assertEquals(0, document.tableOfContents.first().blockIndex)
++        assertEquals(158, document.tableOfContents.last().blockIndex)
++        assertEquals("s80", document.blocks[158].anchor)
++    }
++
++    @Test
++    fun extractDocumentMapsLaterTocAnchorAfterInlinePagebreakWithoutDrift() {
++        val epub = epubBytes(
++            "META-INF/container.xml" to """
++                <container><rootfiles><rootfile full-path="OPS/package.opf"/></rootfiles></container>
++            """.trimIndent(),
++            "OPS/package.opf" to """
++                <package>
++                  <manifest>
++                    <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
++                    <item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/>
++                  </manifest>
++                  <spine><itemref idref="chapter"/></spine>
++                </package>
++            """.trimIndent(),
++            "OPS/nav.xhtml" to """
++                <html xmlns:epub="http://www.idpf.org/2007/ops">
++                  <body>
++                    <nav epub:type="toc">
++                      <ol>
++                        <li><a href="chapter.xhtml#target-section">Target Section</a></li>
++                      </ol>
++                    </nav>
++                  </body>
++                </html>
++            """.trimIndent(),
++            "OPS/chapter.xhtml" to """
++                <html><body>
++                  <p>Opening paragraph <span id="page-2"></span>continues after an inline pagebreak.</p>
++                  <h2 id="target-section">Target Section</h2>
++                  <p>Target body.</p>
++                </body></html>
++            """.trimIndent(),
++        )
++
++        val document = EpubTextExtractor.extractDocument(ByteArrayInputStream(epub))
++
++        assertEquals(
++            listOf(
++                "Opening paragraph continues after an inline pagebreak.",
++                "## Target Section",
++                "Target body.",
++            ),
++            document.blocks.map { block -> block.text },
++        )
++        assertEquals("Target Section", document.tableOfContents.single().title)
++        assertEquals("target-section", document.tableOfContents.single().anchor)
++        assertEquals(1, document.tableOfContents.single().blockIndex)
++        assertEquals("target-section", document.blocks[1].anchor)
++    }
++
++    @Test
++    fun extractThrowsWhenReadableEntryExceedsSafetyLimit() {
++        val epub = epubByteEntries(
++            "META-INF/container.xml" to """
++                <container><rootfiles><rootfile full-path="OPS/package.opf"/></rootfiles></container>
++            """.trimIndent().toByteArray(Charsets.UTF_8),
++            "OPS/package.opf" to """
++                <package>
++                  <manifest>
++                    <item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/>
++                  </manifest>
++                  <spine><itemref idref="chapter"/></spine>
++                </package>
++            """.trimIndent().toByteArray(Charsets.UTF_8),
++            "OPS/chapter.xhtml" to ByteArray(24 * 1024 * 1024 + 1) { 'a'.code.toByte() },
++        )
++
++        try {
++            EpubTextExtractor.extractDocument(ByteArrayInputStream(epub))
++            fail("Oversized readable EPUB entry should be rejected")
++        } catch (expected: IllegalArgumentException) {
++            assertTrue(expected.message?.contains("entry is too large", ignoreCase = true) == true)
++        }
++    }
++
++    @Test
++    fun extractThrowsWhenAggregateReadableTextExceedsSafetyLimit() {
++        val manifestItems = (1..5).joinToString("\n") { index ->
++            """<item id="chapter-$index" href="chapter$index.xhtml" media-type="application/xhtml+xml"/>"""
++        }
++        val spineItems = (1..5).joinToString("\n") { index -> """<itemref idref="chapter-$index"/>""" }
++        val epub = epubGeneratedEntries(
++            "META-INF/container.xml" to """
++                <container><rootfiles><rootfile full-path="OPS/package.opf"/></rootfiles></container>
++            """.trimIndent().toByteArray(Charsets.UTF_8),
++            "OPS/package.opf" to """
++                <package>
++                  <manifest>$manifestItems</manifest>
++                  <spine>$spineItems</spine>
++                </package>
++            """.trimIndent().toByteArray(Charsets.UTF_8),
++            generatedEntries = (1..5).map { index -> "OPS/chapter$index.xhtml" to (20 * 1024 * 1024) },
++        )
++
++        try {
++            EpubTextExtractor.extractDocument(ByteArrayInputStream(epub))
++            fail("Aggregate readable EPUB text should be rejected")
++        } catch (expected: IllegalArgumentException) {
++            assertTrue(expected.message?.contains("readable text is too large", ignoreCase = true) == true)
++        }
++    }
++
+     @Test(expected = IllegalArgumentException::class)
+     fun extractThrowsWhenPackageDocumentIsMissing() {
+         val epub = epubBytes("OPS/chapter.xhtml" to "<html><body><p>Lost.</p></body></html>")
+@@ -762,11 +927,43 @@ class EpubTextExtractorTest {
+     }
+ 
+     private fun epubBytes(vararg entries: Pair<String, String>): ByteArray {
++        return epubByteEntries(
++            *entries.map { (name, body) -> name to body.toByteArray(Charsets.UTF_8) }.toTypedArray(),
++        )
++    }
++
++    private fun epubByteEntries(vararg entries: Pair<String, ByteArray>): ByteArray {
+         val output = ByteArrayOutputStream()
+         ZipOutputStream(output).use { zip ->
+             entries.forEach { (name, body) ->
+                 zip.putNextEntry(ZipEntry(name))
+-                zip.write(body.toByteArray(Charsets.UTF_8))
++                zip.write(body)
++                zip.closeEntry()
++            }
++        }
++        return output.toByteArray()
++    }
++
++    private fun epubGeneratedEntries(
++        vararg staticEntries: Pair<String, ByteArray>,
++        generatedEntries: List<Pair<String, Int>>,
++    ): ByteArray {
++        val output = ByteArrayOutputStream()
++        ZipOutputStream(output).use { zip ->
++            staticEntries.forEach { (name, body) ->
++                zip.putNextEntry(ZipEntry(name))
++                zip.write(body)
++                zip.closeEntry()
++            }
++            val chunk = ByteArray(64 * 1024) { 'a'.code.toByte() }
++            generatedEntries.forEach { (name, byteCount) ->
++                zip.putNextEntry(ZipEntry(name))
++                var remaining = byteCount
++                while (remaining > 0) {
++                    val count = minOf(remaining, chunk.size)
++                    zip.write(chunk, 0, count)
++                    remaining -= count
++                }
+                 zip.closeEntry()
+             }
+         }
+diff --git a/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt b/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
+index fcb8edc..fd3edda 100644
+--- a/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
+@@ -72,13 +72,16 @@ import com.qualityalternative.app.interception.InterceptionRuntimeGate
+ import java.io.ByteArrayInputStream
+ import java.io.File
+ import kotlinx.coroutines.CompletableDeferred
++import kotlinx.coroutines.CoroutineDispatcher
+ import kotlinx.coroutines.CoroutineScope
++import kotlinx.coroutines.Dispatchers
+ import kotlinx.coroutines.ExperimentalCoroutinesApi
+ import kotlinx.coroutines.flow.Flow
+ import kotlinx.coroutines.flow.MutableStateFlow
+ import kotlinx.coroutines.flow.asStateFlow
+ import kotlinx.coroutines.flow.first
+ import kotlinx.coroutines.flow.map
++import kotlinx.coroutines.test.StandardTestDispatcher
+ import kotlinx.coroutines.test.advanceUntilIdle
+ import kotlinx.coroutines.test.runCurrent
+ import kotlinx.coroutines.test.runTest
+@@ -2229,6 +2232,215 @@ class MainViewModelTest {
+         assertEquals(ReadingTimeEstimateSource.EXTRACTED_TEXT, candidate.estimateSource)
+     }
+ 
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun beginUserDocumentImportPreparationShowsBusyStateUntilCandidatesAreReady() = runTest {
++        val viewModel = createViewModel()
++
++        advanceUntilIdle()
++        viewModel.beginUserDocumentImportPreparation()
++
++        assertEquals(MainScreen.AddDocument, viewModel.uiState.screen)
++        assertTrue(viewModel.uiState.addDocumentForm.isPreparing)
++        assertFalse(viewModel.uiState.addDocumentForm.canSave)
++
++        viewModel.prepareUserDocumentBatchImport(
++            candidates = listOf(
++                DocumentImportCandidate(
++                    uri = "content://quality/book.epub",
++                    displayName = "book.epub",
++                    mimeType = "application/epub+zip",
++                    title = "book",
++                    durationMinutes = "20",
++                    format = ContentFormat.EPUB,
++                ),
++            ),
++        )
++        advanceUntilIdle()
++
++        assertFalse(viewModel.uiState.addDocumentForm.isPreparing)
++        assertEquals("book", viewModel.uiState.addDocumentForm.title)
++    }
++
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun cancelAddDocumentImportPreparationIgnoresLateBatchResult() = runTest {
++        val viewModel = createViewModel()
++
++        advanceUntilIdle()
++        val requestId = viewModel.beginUserDocumentImportPreparation()
++        viewModel.cancelAddLink()
++        viewModel.prepareUserDocumentBatchImport(
++            requestId = requestId,
++            candidates = listOf(
++                DocumentImportCandidate(
++                    uri = "content://quality/book.epub",
++                    displayName = "book.epub",
++                    mimeType = "application/epub+zip",
++                    title = "book",
++                    durationMinutes = "20",
++                    format = ContentFormat.EPUB,
++                ),
++            ),
++        )
++        advanceUntilIdle()
++
++        assertEquals(MainScreen.Home, viewModel.uiState.screen)
++        assertFalse(viewModel.uiState.addDocumentForm.isPreparing)
++        assertTrue(viewModel.uiState.addDocumentForm.candidates.isEmpty())
++    }
++
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun cancelSingleDocumentImportPreparationIgnoresLateCandidateResult() = runTest {
++        val viewModel = createViewModel(documentWorkDispatcher = StandardTestDispatcher(testScheduler))
++
++        advanceUntilIdle()
++        viewModel.prepareUserDocumentImport(
++            uri = "content://quality/slow-notes.md",
++            displayName = "slow-notes.md",
++            mimeType = "text/markdown",
++        ) {
++            ByteArrayInputStream("slow notes".toByteArray(Charsets.UTF_8))
++        }
++        assertEquals(MainScreen.AddDocument, viewModel.uiState.screen)
++        assertTrue(viewModel.uiState.addDocumentForm.isPreparing)
++
++        viewModel.cancelAddLink()
++        advanceUntilIdle()
++
++        assertEquals(MainScreen.Home, viewModel.uiState.screen)
++        assertFalse(viewModel.uiState.addDocumentForm.isPreparing)
++        assertTrue(viewModel.uiState.addDocumentForm.candidates.isEmpty())
++    }
++
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun addDocumentEditsDoNotClearPreparingStateBeforeCandidateReturns() = runTest {
++        val viewModel = createViewModel()
++
++        advanceUntilIdle()
++        viewModel.beginUserDocumentImportPreparation()
++        viewModel.updateAddDocumentTitle("Still preparing")
++        viewModel.toggleAddDocumentTopic(TopicTag.SCIENCE)
++        viewModel.toggleAddDocumentPriority()
++
++        assertEquals(MainScreen.AddDocument, viewModel.uiState.screen)
++        assertTrue(viewModel.uiState.addDocumentForm.isPreparing)
++        assertFalse(viewModel.uiState.addDocumentForm.canSave)
++        assertEquals("Still preparing", viewModel.uiState.addDocumentForm.title)
++        assertTrue(TopicTag.SCIENCE in viewModel.uiState.addDocumentForm.selectedTopics)
++        assertTrue(viewModel.uiState.addDocumentForm.markPriority)
++    }
++
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun openLibraryItemLoadsPrivateReaderBodyAwayFromMainStatePath() = runTest {
++        val userDocument = savedUserDocument(format = ContentFormat.EPUB)
++        val viewModel = createViewModel(
++            contentRepository = FakeContentRepository(extraItems = listOf(userDocument)),
++            documentWorkDispatcher = StandardTestDispatcher(testScheduler),
++        )
++
++        advanceUntilIdle()
++        viewModel.openLibraryItem(userDocument)
++
++        assertTrue(viewModel.uiState.isReaderOpening)
++        assertEquals(null, viewModel.uiState.latestMessage)
++
++        advanceUntilIdle()
++
++        assertFalse(viewModel.uiState.isReaderOpening)
++        assertEquals(MainScreen.Reader, viewModel.uiState.screen)
++        assertEquals("Private notes", viewModel.uiState.currentContentBody)
++    }
++
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun openLibraryItemIgnoresStalePrivateReaderLoadWhenAnotherOpenStarts() = runTest {
++        val firstDocument = savedUserDocument(format = ContentFormat.EPUB).copy(
++            id = "first-document",
++            title = "First document",
++            description = "First private notes",
++        )
++        val secondDocument = savedUserDocument(format = ContentFormat.EPUB).copy(
++            id = "second-document",
++            title = "Second document",
++            description = "Second private notes",
++        )
++        val viewModel = createViewModel(
++            contentRepository = FakeContentRepository(extraItems = listOf(firstDocument, secondDocument)),
++            documentWorkDispatcher = StandardTestDispatcher(testScheduler),
++        )
++
++        advanceUntilIdle()
++        viewModel.openLibraryItem(firstDocument)
++        viewModel.openLibraryItem(secondDocument)
++        advanceUntilIdle()
++
++        assertEquals(MainScreen.Reader, viewModel.uiState.screen)
++        assertEquals("second-document", viewModel.uiState.currentContent?.id)
++        assertEquals("Second private notes", viewModel.uiState.currentContentBody)
++    }
++
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun openLibraryItemIgnoresSlowPrivateReaderLoadAfterNavigationAway() = runTest {
++        val userDocument = savedUserDocument(format = ContentFormat.EPUB)
++        val viewModel = createViewModel(
++            contentRepository = FakeContentRepository(extraItems = listOf(userDocument)),
++            documentWorkDispatcher = StandardTestDispatcher(testScheduler),
++        )
++
++        advanceUntilIdle()
++        viewModel.openLibraryItem(userDocument)
++        assertTrue(viewModel.uiState.isReaderOpening)
++
++        viewModel.openSettings()
++        advanceUntilIdle()
++
++        assertEquals(MainScreen.Settings, viewModel.uiState.screen)
++        assertFalse(viewModel.uiState.isReaderOpening)
++        assertEquals(null, viewModel.uiState.currentContent)
++        assertEquals("", viewModel.uiState.currentContentBody)
++    }
++
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun staleFailedPrivateReaderLoadDoesNotClearNewerOpen() = runTest {
++        val firstDocument = savedUserDocument(format = ContentFormat.EPUB).copy(
++            id = "first-document",
++            title = "First document",
++            description = "First private notes",
++        )
++        val secondDocument = savedUserDocument(format = ContentFormat.EPUB).copy(
++            id = "second-document",
++            title = "Second document",
++            description = "Second private notes",
++        )
++        val analyticsTracker = InMemoryAnalyticsTracker()
++        val viewModel = createViewModel(
++            contentRepository = FakeContentRepository(
++                extraItems = listOf(firstDocument, secondDocument),
++                failingUserDocumentIds = setOf("first-document"),
++            ),
++            analyticsTracker = analyticsTracker,
++            documentWorkDispatcher = StandardTestDispatcher(testScheduler),
++        )
++
++        advanceUntilIdle()
++        viewModel.openLibraryItem(firstDocument)
++        viewModel.openLibraryItem(secondDocument)
++        advanceUntilIdle()
++
++        assertEquals(MainScreen.Reader, viewModel.uiState.screen)
++        assertEquals("second-document", viewModel.uiState.currentContent?.id)
++        assertEquals("Second private notes", viewModel.uiState.currentContentBody)
++        assertTrue(analyticsTracker.allEvents().none { event ->
++            event.type == AnalyticsEventType.USER_DOCUMENT_BODY_LOAD_FAILED && event.contentId == "first-document"
++        })
++    }
++
+     @Test
+     @OptIn(ExperimentalCoroutinesApi::class)
+     fun saveUserDocument_retainsReadPermissionOnlyAfterSuccessfulSave() = runTest {
+@@ -4162,6 +4374,7 @@ class MainViewModelTest {
+         defaultProfileAutosaveDisplayName: String = "App storage - Profile backup",
+         recommendationEngine: RecommendationEngine = DefaultRecommendationEngine(),
+         progressPersistenceScope: CoroutineScope? = null,
++        documentWorkDispatcher: CoroutineDispatcher = Dispatchers.Main,
+         nowProvider: () -> Long = { 1_000L },
+     ): MainViewModel {
+         return track(
+@@ -4187,6 +4400,7 @@ class MainViewModelTest {
+                 interceptionMonitor = FakeInterceptionMonitor(),
+                 enableDelayRefreshTicker = false,
+                 progressPersistenceScope = progressPersistenceScope,
++                documentWorkDispatcher = documentWorkDispatcher,
+                 nowProvider = nowProvider,
+             ),
+         )
+@@ -4798,6 +5012,7 @@ class MainViewModelTest {
+         includeLinkOnlyModern: Boolean = false,
+         includeSprint9Packs: Boolean = false,
+         private val failUserDocumentBodyLoad: Boolean = false,
++        private val failingUserDocumentIds: Set<String> = emptySet(),
+     ) : ContentRepository {
+         private val ready = MutableStateFlow(isReady)
+         private var extraItems = extraItems
+@@ -4929,7 +5144,10 @@ class MainViewModelTest {
+         override fun inventory(): List<ContentItem> = packs.flatMap(EditorialPack::items) + extraItems
+ 
+         override fun contentBody(item: ContentItem): String {
+-            if (item.sourceType == ContentSourceType.USER_DOCUMENT && failUserDocumentBodyLoad) {
++            if (
++                item.sourceType == ContentSourceType.USER_DOCUMENT &&
++                (failUserDocumentBodyLoad || item.id in failingUserDocumentIds)
++            ) {
+                 error("Simulated private document body load failure")
+             }
+             return if (item.sourceType == ContentSourceType.USER_DOCUMENT) item.description else item.title
