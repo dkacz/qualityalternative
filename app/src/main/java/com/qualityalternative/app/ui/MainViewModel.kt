@@ -71,6 +71,7 @@ import com.qualityalternative.app.domain.model.usesExternalHandoff
 import com.qualityalternative.app.domain.model.usesMeditationTimer
 import com.qualityalternative.app.domain.model.usesRepositoryBody
 import com.qualityalternative.app.domain.service.AccountLightProfileAutosaveWriter
+import com.qualityalternative.app.domain.service.AccountLightProfileBackupReader
 import com.qualityalternative.app.domain.service.AddUserDocumentResult
 import com.qualityalternative.app.domain.service.AddUserLinkResult
 import com.qualityalternative.app.domain.service.AnalyticsTracker
@@ -290,6 +291,7 @@ class MainViewModel(
         knownContentIdsProvider = { contentRepository.inventory().mapTo(mutableSetOf(), ContentItem::id) },
     ),
     private val accountLightProfileAutosaveWriter: AccountLightProfileAutosaveWriter = NoOpAccountLightProfileAutosaveWriter,
+    private val accountLightProfileBackupReader: AccountLightProfileBackupReader = NoOpAccountLightProfileBackupReader,
     private val defaultAnnotationExportUri: String? = null,
     private val defaultAnnotationExportDisplayName: String = LOCAL_ANNOTATION_EXPORT_DISPLAY_NAME,
     private val defaultProfileAutosaveUri: String? = null,
@@ -2562,7 +2564,7 @@ class MainViewModel(
                 profileAutosaveLastSuccessfulAtMillis = null,
                 profileAutosaveLastError = null,
                 latestMessage = if (hasDefault) {
-                    "Profile backup returned to app storage."
+                    "Profile backup returned to the default folder."
                 } else {
                     "Profile autosave disabled."
                 },
@@ -2585,6 +2587,116 @@ class MainViewModel(
                     "Profile backup failed."
                 },
             )
+        }
+    }
+
+    fun previewDefaultAccountLightProfileImport() {
+        loadDefaultAccountLightProfileImport(applyImmediately = false)
+    }
+
+    fun restoreDefaultAccountLightProfileFromOnboarding() {
+        loadDefaultAccountLightProfileImport(applyImmediately = true)
+    }
+
+    private fun loadDefaultAccountLightProfileImport(applyImmediately: Boolean) {
+        val uri = normalizedDefaultProfileAutosaveUri()
+        if (uri == null) {
+            uiState = uiState.copy(latestMessage = "No default profile backup location is available.")
+            return
+        }
+        viewModelScope.launch {
+            uiState = uiState.copy(
+                isAccountLightImporting = true,
+                accountLightImportError = null,
+                accountLightStatus = "Checking default profile backup...",
+            )
+            val rawJson = try {
+                withContext(documentWorkDispatcher) {
+                    accountLightProfileBackupReader.readProfileJson(
+                        uri = uri,
+                        fileName = ACCOUNT_LIGHT_PROFILE_FILE_NAME,
+                    )
+                }
+            } catch (exception: CancellationException) {
+                uiState = uiState.copy(isAccountLightImporting = false)
+                throw exception
+            } catch (exception: Exception) {
+                null
+            }
+            if (rawJson.isNullOrBlank()) {
+                pendingAccountLightImportPlan = null
+                uiState = uiState.copy(
+                    isAccountLightImporting = false,
+                    accountLightImportPreview = null,
+                    accountLightImportError = "No profile backup found at $defaultProfileAutosaveDisplayName.",
+                    accountLightStatus = null,
+                    isAccountLightReplaceConfirming = false,
+                    screen = if (uiState.hasCompletedOnboarding) uiState.screen else MainScreen.Onboarding,
+                    latestMessage = "No profile backup found.",
+                )
+                return@launch
+            }
+            val plan = try {
+                accountLightProfileImporter.validateImportProfileJson(rawJson)
+            } catch (exception: AccountLightImportException) {
+                pendingAccountLightImportPlan = null
+                uiState = uiState.copy(
+                    isAccountLightImporting = false,
+                    accountLightImportPreview = null,
+                    accountLightImportError = exception.message ?: "Default profile backup is invalid.",
+                    accountLightStatus = null,
+                    isAccountLightReplaceConfirming = false,
+                    latestMessage = "Default profile backup is invalid.",
+                )
+                return@launch
+            } catch (exception: Exception) {
+                pendingAccountLightImportPlan = null
+                uiState = uiState.copy(
+                    isAccountLightImporting = false,
+                    accountLightImportPreview = null,
+                    accountLightImportError = "Default profile backup is invalid.",
+                    accountLightStatus = null,
+                    isAccountLightReplaceConfirming = false,
+                    latestMessage = "Default profile backup is invalid.",
+                )
+                return@launch
+            }
+            if (!applyImmediately) {
+                pendingAccountLightImportPlan = plan
+                uiState = uiState.copy(
+                    isAccountLightImporting = false,
+                    accountLightImportPreview = plan.preview,
+                    accountLightImportError = null,
+                    accountLightStatus = "Default profile backup ready to import.",
+                    isAccountLightReplaceConfirming = false,
+                    latestMessage = "Review default profile backup before replacing local data.",
+                )
+                return@launch
+            }
+            try {
+                accountLightProfileImporter.applyReplace(plan)
+                val profileAutosaved = autosaveAccountLightProfileIfConfigured(nowMillis = nowProvider())
+                pendingAccountLightImportPlan = null
+                uiState = uiState.copy(
+                    isAccountLightImporting = false,
+                    accountLightImportPreview = null,
+                    accountLightImportError = null,
+                    accountLightStatus = "Default backup restored from $defaultProfileAutosaveDisplayName.",
+                    isAccountLightReplaceConfirming = false,
+                    latestMessage = "Portable profile restored.".withProfileAutosaveResult(profileAutosaved),
+                )
+            } catch (exception: CancellationException) {
+                uiState = uiState.copy(isAccountLightImporting = false)
+                throw exception
+            } catch (exception: Exception) {
+                uiState = uiState.copy(
+                    isAccountLightImporting = false,
+                    accountLightImportError = "Default backup restore failed before any settings were changed.",
+                    accountLightStatus = null,
+                    isAccountLightReplaceConfirming = false,
+                    latestMessage = "Default profile backup restore failed.",
+                )
+            }
         }
     }
 
@@ -3761,9 +3873,11 @@ class MainViewModelFactory(
             accountLightProfileExporter = appContainer.accountLightProfileExporter,
             accountLightProfileImporter = appContainer.accountLightProfileImporter,
             accountLightProfileAutosaveWriter = appContainer.accountLightProfileAutosaveWriter,
+            accountLightProfileBackupReader = appContainer.accountLightProfileAutosaveWriter,
             progressPersistenceScope = appContainer.appScope,
             defaultAnnotationExportUri = appContainer.defaultAnnotationExportUri,
             defaultProfileAutosaveUri = appContainer.defaultProfileAutosaveUri,
+            defaultProfileAutosaveDisplayName = appContainer.defaultProfileAutosaveDisplayName,
             interceptionMonitor = appContainer.interceptionMonitor,
         ) as T
     }
@@ -4373,6 +4487,10 @@ private object NoOpReadingAnnotationDriveTokenProvider : ReadingAnnotationDriveT
 
 private object NoOpAccountLightProfileAutosaveWriter : AccountLightProfileAutosaveWriter {
     override suspend fun writeProfileJson(uri: String, fileName: String, json: String) = Unit
+}
+
+private object NoOpAccountLightProfileBackupReader : AccountLightProfileBackupReader {
+    override suspend fun readProfileJson(uri: String, fileName: String): String? = null
 }
 
 private data class AnnotationAutosaveResult(

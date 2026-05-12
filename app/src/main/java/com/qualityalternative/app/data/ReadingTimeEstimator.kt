@@ -18,6 +18,7 @@ object ReadingTimeEstimator {
     private const val WORDS_PER_MINUTE = 225.0
     const val MIN_SESSION_MINUTES = 3
     const val MAX_SESSION_MINUTES = 20
+    const val MAX_DOCUMENT_MINUTES = 720
     const val DEFAULT_LINK_MINUTES = 8
     const val DEFAULT_PDF_MINUTES = 10
     const val DEFAULT_DOCUMENT_MINUTES = 10
@@ -26,7 +27,7 @@ object ReadingTimeEstimator {
         val words = countWords(text)
         val rawMinutes = ceil(words / WORDS_PER_MINUTE).toInt()
         return ReadingTimeEstimate(
-            minutes = rawMinutes.coerceIn(MIN_SESSION_MINUTES, MAX_SESSION_MINUTES),
+            minutes = rawMinutes.coerceIn(MIN_SESSION_MINUTES, MAX_DOCUMENT_MINUTES),
             wordCount = words,
             source = ReadingTimeEstimateSource.EXTRACTED_TEXT,
         )

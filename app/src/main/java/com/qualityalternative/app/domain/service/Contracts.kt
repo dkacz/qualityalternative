@@ -148,6 +148,10 @@ interface AccountLightProfileAutosaveWriter {
     suspend fun writeProfileJson(uri: String, fileName: String, json: String)
 }
 
+interface AccountLightProfileBackupReader {
+    suspend fun readProfileJson(uri: String, fileName: String): String?
+}
+
 interface RecommendationEngine {
     fun generate(
         targetApp: DistractingApp,

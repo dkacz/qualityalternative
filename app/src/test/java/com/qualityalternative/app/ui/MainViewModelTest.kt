@@ -48,6 +48,7 @@ import com.qualityalternative.app.domain.model.UserDocumentValidationError
 import com.qualityalternative.app.domain.model.UserPreferences
 import com.qualityalternative.app.domain.model.meditationTimerContentItem
 import com.qualityalternative.app.domain.service.AccountLightProfileAutosaveWriter
+import com.qualityalternative.app.domain.service.AccountLightProfileBackupReader
 import com.qualityalternative.app.domain.service.AddUserDocumentResult
 import com.qualityalternative.app.domain.service.AddUserLinkResult
 import com.qualityalternative.app.domain.service.ContentRepository
@@ -1870,6 +1871,102 @@ class MainViewModelTest {
         )
         assertEquals("Retry or change profile backup destination.", viewModel.uiState.profileAutosaveLastError)
         assertEquals("Profile backup failed.", viewModel.uiState.latestMessage)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun defaultProfileBackupPreviewRequiresSettingsConfirmationBeforeReplace() = runTest {
+        val defaultBackupUri = "qualityalternative://profile-backup/default"
+        val sourceSettingsRepository = FakeSettingsRepository(
+            initial = completedSettings(selectedAppPackages = setOf("feed.one", "feed.two", "feed.three")).copy(
+                themeMode = AppThemeMode.DARK,
+                readerFontScale = 1.3,
+                meditationDurationMinutes = 5,
+            ),
+        )
+        val exportedJson = AccountLightProfileExporter(
+            settingsRepository = sourceSettingsRepository,
+            appVersionName = "test",
+            appVersionCode = 1,
+            userLinkRepository = FakeUserLinkRepository(),
+            userDocumentRepository = FakeUserDocumentRepository(),
+            readingProgressRepository = FakeReadingProgressRepository(),
+        ).exportSettingsOnlyProfileJson(nowMillis = 12_000L)
+        val backupStore = RecordingAccountLightProfileAutosaveWriter(
+            readableProfiles = mutableMapOf((defaultBackupUri to "quality-alternative-profile.json") to exportedJson),
+        )
+        val targetSettingsRepository = FakeSettingsRepository()
+        val viewModel = createViewModel(
+            settingsRepository = targetSettingsRepository,
+            accountLightProfileAutosaveWriter = backupStore,
+            accountLightProfileBackupReader = backupStore,
+            defaultProfileAutosaveUri = defaultBackupUri,
+            defaultProfileAutosaveDisplayName = "Downloads/Quality Alternative/quality-alternative-profile.json",
+        )
+        advanceUntilIdle()
+
+        viewModel.previewDefaultAccountLightProfileImport()
+        advanceUntilIdle()
+
+        assertFalse(targetSettingsRepository.state.value.hasCompletedOnboarding)
+        assertNotNull(viewModel.uiState.accountLightImportPreview)
+        assertFalse(viewModel.uiState.isAccountLightReplaceConfirming)
+        assertEquals("Default profile backup ready to import.", viewModel.uiState.accountLightStatus)
+        assertEquals("Review default profile backup before replacing local data.", viewModel.uiState.latestMessage)
+
+        viewModel.requestAccountLightReplaceConfirmation()
+        viewModel.confirmAccountLightReplaceImport()
+        advanceUntilIdle()
+
+        assertTrue(targetSettingsRepository.state.value.hasCompletedOnboarding)
+        assertEquals(AppThemeMode.DARK, targetSettingsRepository.state.value.themeMode)
+        assertEquals(1.3, targetSettingsRepository.state.value.readerFontScale, 0.0)
+        assertEquals(5, targetSettingsRepository.state.value.meditationDurationMinutes)
+        assertEquals("Portable profile restored and autosaved.", viewModel.uiState.latestMessage)
+        assertEquals(defaultBackupUri, backupStore.writes.last().first)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun onboardingDefaultProfileRestoreAppliesSharedBackupImmediately() = runTest {
+        val defaultBackupUri = "qualityalternative://profile-backup/default"
+        val sourceSettingsRepository = FakeSettingsRepository(
+            initial = completedSettings(selectedAppPackages = setOf("feed.one", "feed.two", "feed.three")).copy(
+                themeMode = AppThemeMode.DARK,
+                readerFontScale = 1.3,
+                meditationDurationMinutes = 5,
+            ),
+        )
+        val exportedJson = AccountLightProfileExporter(
+            settingsRepository = sourceSettingsRepository,
+            appVersionName = "test",
+            appVersionCode = 1,
+            userLinkRepository = FakeUserLinkRepository(),
+            userDocumentRepository = FakeUserDocumentRepository(),
+            readingProgressRepository = FakeReadingProgressRepository(),
+        ).exportSettingsOnlyProfileJson(nowMillis = 12_000L)
+        val backupStore = RecordingAccountLightProfileAutosaveWriter(
+            readableProfiles = mutableMapOf((defaultBackupUri to "quality-alternative-profile.json") to exportedJson),
+        )
+        val targetSettingsRepository = FakeSettingsRepository()
+        val viewModel = createViewModel(
+            settingsRepository = targetSettingsRepository,
+            accountLightProfileAutosaveWriter = backupStore,
+            accountLightProfileBackupReader = backupStore,
+            defaultProfileAutosaveUri = defaultBackupUri,
+            defaultProfileAutosaveDisplayName = "Downloads/Quality Alternative/quality-alternative-profile.json",
+        )
+        advanceUntilIdle()
+
+        viewModel.restoreDefaultAccountLightProfileFromOnboarding()
+        advanceUntilIdle()
+
+        assertTrue(targetSettingsRepository.state.value.hasCompletedOnboarding)
+        assertEquals(AppThemeMode.DARK, targetSettingsRepository.state.value.themeMode)
+        assertEquals(1.3, targetSettingsRepository.state.value.readerFontScale, 0.0)
+        assertEquals(5, targetSettingsRepository.state.value.meditationDurationMinutes)
+        assertEquals("Portable profile restored and autosaved.", viewModel.uiState.latestMessage)
+        assertEquals(defaultBackupUri, backupStore.writes.last().first)
     }
 
     @Test
@@ -4043,6 +4140,7 @@ class MainViewModelTest {
     }
 
     @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
     fun previewAccountLightImportShowsValidationErrorWithoutMutatingSettings() = runTest {
         val settingsRepository = FakeSettingsRepository(
             initial = completedSettings(selectedAppPackages = setOf("com.instagram.android")).copy(
@@ -4062,6 +4160,7 @@ class MainViewModelTest {
     }
 
     @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
     fun configuredProfileAutosaveWritesPortableProfileAndStatus() = runTest {
         val settingsRepository = FakeSettingsRepository(
             initial = completedSettings(selectedAppPackages = setOf("com.instagram.android")),
@@ -4098,6 +4197,7 @@ class MainViewModelTest {
     }
 
     @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
     fun profileAutosaveFailureKeepsDestinationAndDoesNotBlockAppUse() = runTest {
         val settingsRepository = FakeSettingsRepository(
             initial = completedSettings(selectedAppPackages = setOf("com.instagram.android")),
@@ -4300,6 +4400,7 @@ class MainViewModelTest {
     }
 
     @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
     fun accountLightReplaceImportRequiresConfirmationAndAppliesPortableSettings() = runTest {
         val importedSettingsRepository = FakeSettingsRepository(
             initial = completedSettings(selectedAppPackages = setOf("com.instagram.android")).copy(
@@ -4368,6 +4469,8 @@ class MainViewModelTest {
         readingAnnotationDriveSyncClient: ReadingAnnotationDriveSyncClient = RecordingReadingAnnotationDriveSyncClient(),
         readingAnnotationDriveTokenProvider: ReadingAnnotationDriveTokenProvider = FailingReadingAnnotationDriveTokenProvider(),
         accountLightProfileAutosaveWriter: AccountLightProfileAutosaveWriter = RecordingAccountLightProfileAutosaveWriter(),
+        accountLightProfileBackupReader: AccountLightProfileBackupReader =
+            accountLightProfileAutosaveWriter as? AccountLightProfileBackupReader ?: EmptyAccountLightProfileBackupReader,
         defaultAnnotationExportUri: String? = null,
         defaultAnnotationExportDisplayName: String = "App storage - Annotation sync",
         defaultProfileAutosaveUri: String? = null,
@@ -4393,6 +4496,7 @@ class MainViewModelTest {
                 readingAnnotationDriveSyncClient = readingAnnotationDriveSyncClient,
                 readingAnnotationDriveTokenProvider = readingAnnotationDriveTokenProvider,
                 accountLightProfileAutosaveWriter = accountLightProfileAutosaveWriter,
+                accountLightProfileBackupReader = accountLightProfileBackupReader,
                 defaultAnnotationExportUri = defaultAnnotationExportUri,
                 defaultAnnotationExportDisplayName = defaultAnnotationExportDisplayName,
                 defaultProfileAutosaveUri = defaultProfileAutosaveUri,
@@ -4921,14 +5025,25 @@ class MainViewModelTest {
         }
     }
 
+    private object EmptyAccountLightProfileBackupReader : AccountLightProfileBackupReader {
+        override suspend fun readProfileJson(uri: String, fileName: String): String? = null
+    }
+
     private class RecordingAccountLightProfileAutosaveWriter(
         private val failure: Throwable? = null,
-    ) : AccountLightProfileAutosaveWriter {
+        private val readableProfiles: MutableMap<Pair<String, String>, String> = mutableMapOf(),
+    ) : AccountLightProfileAutosaveWriter, AccountLightProfileBackupReader {
         val writes = mutableListOf<Triple<String, String, String>>()
 
         override suspend fun writeProfileJson(uri: String, fileName: String, json: String) {
             failure?.let { throw it }
             writes += Triple(uri, fileName, json)
+            readableProfiles[uri to fileName] = json
+        }
+
+        override suspend fun readProfileJson(uri: String, fileName: String): String? {
+            failure?.let { throw it }
+            return readableProfiles[uri to fileName]
         }
     }
 

@@ -236,6 +236,7 @@ The system must normalize each piece of replacement content into a small, rankab
   - availability status
 - User-added or imported materials must not require the user to save a manual reading-time estimate.
 - Long readable materials can be recommended as smaller continuation segments from the current reader position.
+- EPUB and Markdown imports store a full-source reading-time estimate from extracted text, capped defensively for extreme inputs, so a many-hour book is not mislabeled as a 20-minute document.
 - Each content item can be marked as accepted, skipped, completed, or opened anyway after recommendation.
 - The system excludes previously completed reading items from recommendation slots unless the user manually reactivates that item from the content library.
 - The meditation reset is not library content, does not count as a completed read, and is not hidden by completion state; it remains a standing intervention option.

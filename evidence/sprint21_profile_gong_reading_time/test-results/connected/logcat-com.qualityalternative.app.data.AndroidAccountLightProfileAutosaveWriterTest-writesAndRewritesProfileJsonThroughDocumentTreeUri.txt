@@ -1,0 +1,2 @@
+05-12 10:04:03.383  3804  3818 I TestRunner: started: writesAndRewritesProfileJsonThroughDocumentTreeUri(com.qualityalternative.app.data.AndroidAccountLightProfileAutosaveWriterTest)
+05-12 10:04:03.402  3804  3818 I TestRunner: finished: writesAndRewritesProfileJsonThroughDocumentTreeUri(com.qualityalternative.app.data.AndroidAccountLightProfileAutosaveWriterTest)

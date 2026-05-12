@@ -13,14 +13,16 @@ class DocumentReadingTimeEstimatorTest {
     fun markdownImportPathEstimatesShortNormalAndVeryLongText() {
         assertDocumentEstimate(ContentFormat.MARKDOWN, markdownBytes(100), expectedMinutes = 3, expectedWords = 100)
         assertDocumentEstimate(ContentFormat.MARKDOWN, markdownBytes(1_125), expectedMinutes = 5, expectedWords = 1_125)
-        assertDocumentEstimate(ContentFormat.MARKDOWN, markdownBytes(10_000), expectedMinutes = 20, expectedWords = 10_000)
+        assertDocumentEstimate(ContentFormat.MARKDOWN, markdownBytes(10_000), expectedMinutes = 45, expectedWords = 10_000)
+        assertDocumentEstimate(ContentFormat.MARKDOWN, markdownBytes(220_000), expectedMinutes = 720, expectedWords = 220_000)
     }
 
     @Test
     fun epubImportPathEstimatesShortNormalAndVeryLongExtractedText() {
         assertDocumentEstimate(ContentFormat.EPUB, epubBytes(100), expectedMinutes = 3, expectedWords = 100)
         assertDocumentEstimate(ContentFormat.EPUB, epubBytes(1_125), expectedMinutes = 5, expectedWords = 1_125)
-        assertDocumentEstimate(ContentFormat.EPUB, epubBytes(10_000), expectedMinutes = 20, expectedWords = 10_000)
+        assertDocumentEstimate(ContentFormat.EPUB, epubBytes(10_000), expectedMinutes = 45, expectedWords = 10_000)
+        assertDocumentEstimate(ContentFormat.EPUB, epubBytes(220_000), expectedMinutes = 720, expectedWords = 220_000)
     }
 
     @Test

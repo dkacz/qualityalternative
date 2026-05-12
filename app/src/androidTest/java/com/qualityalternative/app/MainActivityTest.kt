@@ -51,9 +51,13 @@ import com.qualityalternative.app.domain.model.ReadingProgress
 import com.qualityalternative.app.domain.model.TopicTag
 import com.qualityalternative.app.domain.model.UserDocumentDraft
 import com.qualityalternative.app.domain.service.AddUserDocumentResult
+import com.qualityalternative.app.data.ACCOUNT_LIGHT_PROFILE_FILE_NAME
+import com.qualityalternative.app.data.AndroidAccountLightProfileAutosaveWriter
+import com.qualityalternative.app.data.ReadingTimeEstimateSource
 import com.qualityalternative.app.data.RoomReadingProgressRepository
 import com.qualityalternative.app.interception.FixtureTargetRegistry
 import com.qualityalternative.app.interception.InterceptionRuntimeGate
+import com.qualityalternative.app.ui.DocumentImportCandidate
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import java.io.ByteArrayOutputStream
@@ -89,8 +93,8 @@ class MainActivityTest {
         "sprint14-reader-pagination-${System.currentTimeMillis()}"
     private val sprint17DriveAuthScreenshotDirName =
         "sprint17-drive-auth-${System.currentTimeMillis()}"
-    private val sprint16PortableProfileScreenshotDirName =
-        "sprint16-portable-profile-${System.currentTimeMillis()}"
+    private val accountLightProfileScreenshotDirName =
+        "sprint21-profile-restore-${System.currentTimeMillis()}"
     private val sprint16ProfileAutosaveScreenshotDirName =
         "sprint16-profile-autosave-${System.currentTimeMillis()}"
     private val sprint16AdaptiveReaderScreenshotDirName =
@@ -107,8 +111,10 @@ class MainActivityTest {
         "sprint17-annotation-surface-${System.currentTimeMillis()}"
     private val sprint18ProgressHotfixScreenshotDirName =
         "sprint18-progress-hotfix-${System.currentTimeMillis()}"
-    private val sprint19RegressionScreenshotDirName =
-        "sprint19-reader-form-regression-${System.currentTimeMillis()}"
+    private val readerFormEvidenceScreenshotDirName =
+        "sprint21-meditation-gong-${System.currentTimeMillis()}"
+    private val sprint21ReadingTimeScreenshotDirName =
+        "sprint21-reading-time-${System.currentTimeMillis()}"
 
     @Before
     fun resetAppState() {
@@ -518,7 +524,7 @@ class MainActivityTest {
         composeRule.waitUntil(timeoutMillis = 10_000) { currentInterventionMode() == InterventionMode.SOFT }
         composeRule.onNodeWithTag("intervention-mode-SOFT")
             .assertIsSelected()
-        captureSprint19RegressionScreenshot("13_intervention_mode_soft_selected")
+        captureReaderFormEvidenceScreenshot("13_intervention_mode_soft_selected")
 
         scenario?.onActivity { activity -> activity.mainViewModel.triggerDebugIntervention(nowMillis = System.currentTimeMillis()) }
         composeRule.waitUntil(timeoutMillis = 10_000) { hasNode("You reached for Fixture Feed One") }
@@ -527,7 +533,7 @@ class MainActivityTest {
         composeRule.onNodeWithText("Open Fixture Feed One")
             .assertIsDisplayed()
             .assertIsEnabled()
-        captureSprint19RegressionScreenshot("14_soft_mode_open_anyway_immediate")
+        captureReaderFormEvidenceScreenshot("14_soft_mode_open_anyway_immediate")
 
         scenario?.onActivity {
             it.mainViewModel.openSettings()
@@ -541,7 +547,7 @@ class MainActivityTest {
         composeRule.onNodeWithText("Open in", substring = true)
             .assertIsDisplayed()
             .assertIsNotEnabled()
-        captureSprint19RegressionScreenshot("15_firm_mode_open_anyway_wait")
+        captureReaderFormEvidenceScreenshot("15_firm_mode_open_anyway_wait")
     }
 
     @Test
@@ -1584,7 +1590,7 @@ class MainActivityTest {
             "Chapter three should not display a beginning-of-book 1% progress label; label=${readerPageLabelText()}",
             progressBeforeFontChange > 40,
         )
-        captureSprint19RegressionScreenshot("01_chapter_three_progress_not_one_percent")
+        captureReaderFormEvidenceScreenshot("01_chapter_three_progress_not_one_percent")
 
         scenario?.onActivity { activity -> activity.mainViewModel.setReaderFontScale(1.3) }
         composeRule.waitUntil(timeoutMillis = 10_000) { currentReaderFontScale() == 1.3 }
@@ -1604,7 +1610,7 @@ class MainActivityTest {
                 "before=$pageLabelBeforeFontChange after=$pageLabelAfterFontChange",
             pageLabelAfterFontChange.totalPages > pageLabelBeforeFontChange.totalPages,
         )
-        captureSprint19RegressionScreenshot("02_chapter_three_large_font_progress_stable")
+        captureReaderFormEvidenceScreenshot("02_chapter_three_large_font_progress_stable")
 
         composeRule.onNodeWithTag("reader-toc-open")
             .assertIsDisplayed()
@@ -1629,7 +1635,7 @@ class MainActivityTest {
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-annotation-editor-$annotationParagraph") }
         val initialQuote = readerSelectedQuoteText(annotationParagraph)
         assertTrue(initialQuote.contains("third chapter anchor"))
-        captureSprint19RegressionScreenshot("03_annotation_before_start_back")
+        captureReaderFormEvidenceScreenshot("03_annotation_before_start_back")
         repeat(30) {
             if (!readerSelectedQuoteText(annotationParagraph).contains("second chapter marker") &&
                 hasTag("reader-annotation-start-earlier")
@@ -1651,7 +1657,7 @@ class MainActivityTest {
             "Expanded quote should cross into the previous chapter while remaining anchored around chapter three text.",
             expandedQuote.contains("second chapter marker") && expandedQuote.contains("third chapter anchor"),
         )
-        captureSprint19RegressionScreenshot("04_annotation_start_back_without_book_start_jump")
+        captureReaderFormEvidenceScreenshot("04_annotation_start_back_without_book_start_jump")
 
         val noteText = "Sprint 19 saved cross-chapter selector."
         composeRule.onNodeWithTag("reader-annotation-note-input-$annotationParagraph")
@@ -1670,7 +1676,7 @@ class MainActivityTest {
                 hasReadingAnnotationQuoteContaining(contentId, annotationParagraph, "second chapter marker") &&
                 hasReadingAnnotationQuoteContaining(contentId, annotationParagraph, "third chapter anchor")
         }
-        captureSprint19RegressionScreenshot("05_annotation_saved_cross_chapter_highlight")
+        captureReaderFormEvidenceScreenshot("05_annotation_saved_cross_chapter_highlight")
         scenario?.onActivity { activity -> activity.mainViewModel.dismissMessage() }
         composeRule.waitUntil(timeoutMillis = 10_000) { !hasNode("Annotation saved.") }
 
@@ -1684,7 +1690,7 @@ class MainActivityTest {
             "Reopened note should preserve the saved cross-chapter selector. quote=$reopenedQuote",
             reopenedQuote.contains("second chapter marker") && reopenedQuote.contains("third chapter anchor"),
         )
-        captureSprint19RegressionScreenshot("06_annotation_reopened_cross_chapter_selector")
+        captureReaderFormEvidenceScreenshot("06_annotation_reopened_cross_chapter_selector")
     }
 
     @Test
@@ -1699,7 +1705,7 @@ class MainActivityTest {
         composeRule.onNodeWithTag("intervention-open-anyway-close")
             .assertIsDisplayed()
             .assertIsNotEnabled()
-        captureSprint19RegressionScreenshot("07_form_intervention_waiting_locked")
+        captureReaderFormEvidenceScreenshot("07_form_intervention_waiting_locked")
 
         waitForOpenAnywayUnlock()
         composeRule.onNodeWithText("Open Fixture Feed One")
@@ -1708,7 +1714,7 @@ class MainActivityTest {
         composeRule.onNodeWithTag("intervention-open-anyway-close")
             .assertIsDisplayed()
             .assertIsEnabled()
-        captureSprint19RegressionScreenshot("08_form_intervention_unlock_ready")
+        captureReaderFormEvidenceScreenshot("08_form_intervention_unlock_ready")
     }
 
     @Test
@@ -1746,14 +1752,14 @@ class MainActivityTest {
             durableRoomSavedProgressPercentFor(document.id) == lastViewedPercent &&
                 durableRoomSavedProgressParagraphIndexFor(document.id) == lastViewedEndParagraph
         }
-        appendSprint19RegressionEvidence(
+        appendReaderFormEvidence(
             stage = "saved_before_pause_stop",
             page = lastViewedPage,
             progressPercent = lastViewedPercent,
             pageEndParagraph = lastViewedEndParagraph,
             durableSavedParagraph = durableRoomSavedProgressParagraphIndexFor(document.id),
         )
-        captureSprint19RegressionScreenshot("09_session_progress_saved_before_pause_stop")
+        captureReaderFormEvidenceScreenshot("09_session_progress_saved_before_pause_stop")
 
         scenario?.moveToState(Lifecycle.State.CREATED)
         InstrumentationRegistry.getInstrumentation().waitForIdleSync()
@@ -1765,14 +1771,14 @@ class MainActivityTest {
         }
         assertEquals(lastViewedPage.totalPages, readerPagePositionFromLabel().totalPages)
         assertEquals(lastViewedEndParagraph, currentReaderPageEndParagraphIndex())
-        appendSprint19RegressionEvidence(
+        appendReaderFormEvidence(
             stage = "restored_after_pause_stop",
             page = readerPagePositionFromLabel(),
             progressPercent = currentReaderProgressPercentFromLabel(),
             pageEndParagraph = currentReaderPageEndParagraphIndex(),
             durableSavedParagraph = durableRoomSavedProgressParagraphIndexFor(document.id),
         )
-        captureSprint19RegressionScreenshot("10_session_progress_restored_after_pause_stop")
+        captureReaderFormEvidenceScreenshot("10_session_progress_restored_after_pause_stop")
 
         scenario?.close()
         scenario = null
@@ -1786,14 +1792,14 @@ class MainActivityTest {
         }
         assertEquals(lastViewedPage.totalPages, readerPagePositionFromLabel().totalPages)
         assertEquals(lastViewedEndParagraph, currentReaderPageEndParagraphIndex())
-        appendSprint19RegressionEvidence(
+        appendReaderFormEvidence(
             stage = "restored_after_reopen",
             page = readerPagePositionFromLabel(),
             progressPercent = currentReaderProgressPercentFromLabel(),
             pageEndParagraph = currentReaderPageEndParagraphIndex(),
             durableSavedParagraph = durableRoomSavedProgressParagraphIndexFor(document.id),
         )
-        captureSprint19RegressionScreenshot("11_session_progress_restored_after_reopen")
+        captureReaderFormEvidenceScreenshot("11_session_progress_restored_after_reopen")
     }
 
     @Test
@@ -1836,14 +1842,14 @@ class MainActivityTest {
         val latestPercent = currentReaderProgressPercentFromLabel()
         val latestEndParagraph = currentReaderPageEndParagraphIndex()
         assertEquals(stableEndParagraph, durableRoomSavedProgressParagraphIndexFor(document.id))
-        appendSprint19RegressionEvidence(
+        appendReaderFormEvidence(
             stage = "pending_latest_before_room_write",
             page = latestPage,
             progressPercent = latestPercent,
             pageEndParagraph = latestEndParagraph,
             durableSavedParagraph = durableRoomSavedProgressParagraphIndexFor(document.id),
         )
-        captureSprint19RegressionScreenshot("12_pending_latest_before_room_write")
+        captureReaderFormEvidenceScreenshot("12_pending_latest_before_room_write")
 
         scenario?.close()
         scenario = null
@@ -1856,14 +1862,14 @@ class MainActivityTest {
             readerPagePositionFromLabel().currentPage == latestPage.currentPage
         }
         assertEquals(latestEndParagraph, currentReaderPageEndParagraphIndex())
-        appendSprint19RegressionEvidence(
+        appendReaderFormEvidence(
             stage = "immediate_reopen_before_room_write",
             page = readerPagePositionFromLabel(),
             progressPercent = currentReaderProgressPercentFromLabel(),
             pageEndParagraph = currentReaderPageEndParagraphIndex(),
             durableSavedParagraph = durableRoomSavedProgressParagraphIndexFor(document.id),
         )
-        captureSprint19RegressionScreenshot("13_immediate_reopen_before_room_write")
+        captureReaderFormEvidenceScreenshot("13_immediate_reopen_before_room_write")
 
         scenario?.moveToState(Lifecycle.State.CREATED)
         InstrumentationRegistry.getInstrumentation().waitForIdleSync()
@@ -1875,18 +1881,18 @@ class MainActivityTest {
             durableRoomSavedProgressPercentFor(document.id) == latestPercent &&
                 durableRoomSavedProgressParagraphIndexFor(document.id) == latestEndParagraph
         }
-        appendSprint19RegressionEvidence(
+        appendReaderFormEvidence(
             stage = "room_write_released_after_reopen",
             page = readerPagePositionFromLabel(),
             progressPercent = currentReaderProgressPercentFromLabel(),
             pageEndParagraph = currentReaderPageEndParagraphIndex(),
             durableSavedParagraph = durableRoomSavedProgressParagraphIndexFor(document.id),
         )
-        captureSprint19RegressionScreenshot("14_room_write_released_after_reopen")
+        captureReaderFormEvidenceScreenshot("14_room_write_released_after_reopen")
     }
 
     @Test
-    fun sprint19InterventionShowsMeditationAsCalmAlternativeWhenPrimaryIsReading() {
+    fun meditationInterventionShowsCalmAlternativeWhenPrimaryIsReading() {
         launchFixtureSystemIntervention()
 
         var meditationBackupIndex = -1
@@ -1906,7 +1912,7 @@ class MainActivityTest {
             .assertIsEnabled()
         composeRule.onAllNodesWithTag("intervention-backup-action-$meditationBackupIndex")
             .assertCountEquals(0)
-        captureSprint19RegressionScreenshot("12_meditation_calm_alternative")
+        captureReaderFormEvidenceScreenshot("12_meditation_calm_alternative")
         composeRule.onNodeWithTag("intervention-meditation-start")
             .performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) {
@@ -2696,13 +2702,13 @@ class MainActivityTest {
         scrollToAccountLightSettings()
         composeRule.onNodeWithTag("settings-account-light-section").assertIsDisplayed()
         composeRule.onNodeWithTag("settings-account-light-import").assertIsDisplayed()
-        captureSprint16PortableProfileScreenshot("01_import_entry_light")
+        captureAccountLightProfileScreenshot("01_import_entry_light")
 
         exportAccountLightProfileJsonFromViewModel()
         scrollToAccountLightSettings()
         composeRule.waitUntil(timeoutMillis = 10_000) { hasNodeContaining("PORTABLE PROFILE EXPORTED") }
         composeRule.onNodeWithTag("settings-account-light-status").assertIsDisplayed()
-        captureSprint16PortableProfileScreenshot("00_export_success_light")
+        captureAccountLightProfileScreenshot("00_export_success_light")
         scenario?.onActivity { activity -> activity.mainViewModel.dismissMessage() }
         composeRule.waitForIdle()
 
@@ -2714,11 +2720,26 @@ class MainActivityTest {
                 ),
             )
         }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            var importFinished = false
+            scenario?.onActivity { activity ->
+                val state = activity.mainViewModel.uiState
+                importFinished = state.accountLightImportPreview != null || state.accountLightImportError != null
+            }
+            importFinished
+        }
+        scenario?.onActivity { activity ->
+            val state = activity.mainViewModel.uiState
+            assertTrue(
+                "Portable profile preview failed: ${state.accountLightImportError ?: state.latestMessage}",
+                state.accountLightImportPreview != null,
+            )
+        }
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("settings-account-light-import-preview") }
         scrollToAccountLightSettings()
         composeRule.onNodeWithTag("settings-account-light-import-preview").assertIsDisplayed()
         composeRule.onNodeWithTag("settings-account-light-import-warning-summary").assertIsDisplayed()
-        captureSprint16PortableProfileScreenshot("02_merge_preview_with_unsupported_app_light")
+        captureAccountLightProfileScreenshot("02_merge_preview_with_unsupported_app_light")
 
         composeRule.onNodeWithTag("settings-account-light-import-replace")
             .assertIsDisplayed()
@@ -2734,7 +2755,7 @@ class MainActivityTest {
         composeRule.onNodeWithTag("settings-account-light-replace-backup").assertIsDisplayed()
         composeRule.onNodeWithTag("settings-list")
             .performScrollToNode(hasTestTag("settings-account-light-replace-confirm-action"))
-        captureSprint16PortableProfileScreenshot("03_replace_confirmation_light")
+        captureAccountLightProfileScreenshot("03_replace_confirmation_light")
 
         composeRule.onNodeWithTag("settings-account-light-replace-confirm-action")
             .assertIsDisplayed()
@@ -2744,7 +2765,7 @@ class MainActivityTest {
         }
         scrollToAccountLightSettings()
         composeRule.onNodeWithTag("settings-account-light-status").assertIsDisplayed()
-        captureSprint16PortableProfileScreenshot("04_import_success_dark")
+        captureAccountLightProfileScreenshot("04_import_success_dark")
 
         scenario?.onActivity { activity -> activity.mainViewModel.openLibrary() }
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("library-list") }
@@ -2757,7 +2778,7 @@ class MainActivityTest {
             .assertIsDisplayed()
         composeRule.onNodeWithTag("library-open-user-document-44444444-4444-4444-8444-444444444444")
             .assertDoesNotExist()
-        captureSprint16PortableProfileScreenshot("07_missing_document_library_dark")
+        captureAccountLightProfileScreenshot("07_missing_document_library_dark")
 
         scenario?.onActivity { activity -> activity.mainViewModel.openSettings() }
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("settings-list") }
@@ -2771,7 +2792,7 @@ class MainActivityTest {
         }
         scrollToAccountLightSettings()
         composeRule.onNodeWithTag("settings-account-light-status").assertIsDisplayed()
-        captureSprint16PortableProfileScreenshot("05_invalid_import_dark")
+        captureAccountLightProfileScreenshot("05_invalid_import_dark")
 
         scenario?.onActivity { activity ->
             activity.mainViewModel.previewAccountLightImport(accountLightProfileJson(schemaVersion = 99))
@@ -2781,7 +2802,7 @@ class MainActivityTest {
         }
         scrollToAccountLightSettings()
         composeRule.onNodeWithTag("settings-account-light-status").assertIsDisplayed()
-        captureSprint16PortableProfileScreenshot("06_future_schema_import_dark")
+        captureAccountLightProfileScreenshot("06_future_schema_import_dark")
     }
 
     @Test
@@ -2812,12 +2833,157 @@ class MainActivityTest {
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("settings-list") }
         scrollToAccountLightSettings()
         scenario?.onActivity { activity -> activity.mainViewModel.previewAccountLightImport(exportedJson) }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            var importFinished = false
+            scenario?.onActivity { activity ->
+                val state = activity.mainViewModel.uiState
+                importFinished = state.accountLightImportPreview != null || state.accountLightImportError != null
+            }
+            importFinished
+        }
+        scenario?.onActivity { activity ->
+            val state = activity.mainViewModel.uiState
+            assertTrue(
+                "Default profile preview failed: ${state.accountLightImportError ?: state.latestMessage}",
+                state.accountLightImportPreview != null,
+            )
+        }
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("settings-account-light-import-preview") }
         scenario?.onActivity { activity -> activity.mainViewModel.confirmAccountLightReplaceImport() }
         composeRule.waitUntil(timeoutMillis = 10_000) {
             currentReaderFontScale() == 1.3 &&
                 hasNodeContaining("IMPORTED PROFILE REPLACED LOCAL PORTABLE SETTINGS AND LIBRARY")
         }
+    }
+
+    @Test
+    fun onboardingRestoreProfileLoadsDefaultBackupAfterCleanInstall() {
+        launchOnboardedApp()
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.setReaderFontScale(1.3)
+            activity.mainViewModel.setMeditationDurationMinutes(5)
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            var backupSaved = false
+            scenario?.onActivity { activity ->
+                backupSaved = activity.mainViewModel.uiState.profileAutosaveLastSuccessfulAtMillis != null
+            }
+            currentReaderFontScale() == 1.3 &&
+                currentMeditationDurationMinutes() == 5 &&
+                backupSaved
+        }
+
+        scenario?.close()
+        scenario = null
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+        resetPersistentState()
+
+        launchApp()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasNodeContaining("Turn an impulse") }
+        composeRule.onNodeWithTag("onboarding-restore-profile")
+            .assertIsDisplayed()
+            .performClick()
+
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            currentHasCompletedOnboarding() &&
+                currentReaderFontScale() == 1.3 &&
+                currentMeditationDurationMinutes() == 5
+        }
+    }
+
+    @Test
+    fun settingsDefaultBackupRestoreShowsPreviewBeforeReplace() {
+        seedFixtureSelection()
+        runBlocking {
+            AndroidAccountLightProfileAutosaveWriter(InstrumentationRegistry.getInstrumentation().targetContext)
+                .writeProfileJson(
+                    uri = AndroidAccountLightProfileAutosaveWriter.DEFAULT_PROFILE_BACKUP_URI,
+                    fileName = ACCOUNT_LIGHT_PROFILE_FILE_NAME,
+                    json = accountLightProfileJson(schemaVersion = 1, readerFontScale = 1.3),
+                )
+        }
+        launchApp()
+        waitForHome()
+        assertEquals(DEFAULT_READER_FONT_SCALE, currentReaderFontScale(), 0.0)
+
+        scenario?.onActivity { activity -> activity.mainViewModel.openSettings() }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("settings-list") }
+        scrollToAccountLightSettings()
+        composeRule.onNodeWithTag("settings-account-light-import-default")
+            .assertIsDisplayed()
+            .performClick()
+
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            var importFinished = false
+            scenario?.onActivity { activity ->
+                val state = activity.mainViewModel.uiState
+                importFinished = state.accountLightImportPreview != null || state.accountLightImportError != null
+            }
+            importFinished
+        }
+        scenario?.onActivity { activity ->
+            val state = activity.mainViewModel.uiState
+            assertTrue(
+                "Default profile preview failed: ${state.accountLightImportError ?: state.latestMessage}",
+                state.accountLightImportPreview != null,
+            )
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("settings-account-light-import-preview") }
+        assertEquals(DEFAULT_READER_FONT_SCALE, currentReaderFontScale(), 0.0)
+        composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasTestTag("settings-account-light-import-preview"))
+        captureAccountLightProfileScreenshot("08_default_backup_preview_light")
+        composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasTestTag("settings-account-light-import-replace"))
+        composeRule.onNodeWithTag("settings-account-light-import-replace")
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasTestTag("settings-account-light-replace-confirm"))
+        composeRule.onNodeWithTag("settings-account-light-replace-confirm")
+            .assertIsDisplayed()
+        captureAccountLightProfileScreenshot("09_default_backup_replace_confirm_light")
+        composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasTestTag("settings-account-light-replace-confirm-action"))
+        composeRule.onNodeWithTag("settings-account-light-replace-confirm-action")
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { currentReaderFontScale() == 1.3 }
+        scrollToAccountLightSettings()
+        captureAccountLightProfileScreenshot("10_default_backup_restore_success_dark")
+    }
+
+    @Test
+    fun longDocumentImportPreviewShowsMultiHourReadingTime() {
+        launchOnboardedApp()
+
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.beginUserDocumentImportPreparation()
+            activity.mainViewModel.prepareUserDocumentBatchImport(
+                candidates = listOf(
+                    DocumentImportCandidate(
+                        uri = "content://qa-test/long-book.md",
+                        displayName = "long-book.md",
+                        mimeType = "text/markdown",
+                        title = "Long Book",
+                        durationMinutes = "135",
+                        format = ContentFormat.MARKDOWN,
+                        estimateSource = ReadingTimeEstimateSource.EXTRACTED_TEXT,
+                        estimatedWordCount = 30_375,
+                    ),
+                ),
+                nowMillis = 31_000L,
+            )
+        }
+
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasTag("add-document-screen") && hasNodeContaining("2 hr 15 min")
+        }
+        assertTrue(composeRule.onAllNodesWithText("Long Book").fetchSemanticsNodes().isNotEmpty())
+        composeRule.onNodeWithText("long-book.md", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("2 hr 15 min", substring = true).assertIsDisplayed()
+        assertTrue(composeRule.onAllNodesWithText("auto", substring = true).fetchSemanticsNodes().isNotEmpty())
+        captureSprint21ReadingTimeScreenshot("14_long_document_import_multi_hour")
     }
 
     @Test
@@ -2834,7 +3000,7 @@ class MainActivityTest {
         captureSprint17DefaultsScreenshot("00_annotation_default_light")
 
         scrollToAccountLightSettings()
-        composeRule.onNodeWithText("App storage - Profile backup").assertIsDisplayed()
+        composeRule.onNodeWithText("Downloads/Quality Alternative/quality-alternative-profile.json").assertIsDisplayed()
         composeRule.onNodeWithTag("settings-account-light-autosave-save-now").assertIsEnabled()
         composeRule.onNodeWithTag("settings-account-light-autosave-clear").assertDoesNotExist()
         captureSprint17DefaultsScreenshot("01_profile_default_light")
@@ -2903,7 +3069,7 @@ class MainActivityTest {
 
         scrollToAccountLightSettings()
         composeRule.onNodeWithTag("settings-account-light-autosave-status").assertIsDisplayed()
-        composeRule.onNodeWithText("App storage - Profile backup").assertIsDisplayed()
+        composeRule.onNodeWithText("Downloads/Quality Alternative/quality-alternative-profile.json").assertIsDisplayed()
         composeRule.onNodeWithTag("settings-account-light-autosave-pick").assertIsDisplayed()
         composeRule.onNodeWithTag("settings-account-light-autosave-save-now").assertIsEnabled()
         composeRule.onNodeWithTag("settings-account-light-autosave-clear").assertDoesNotExist()
@@ -2954,7 +3120,7 @@ class MainActivityTest {
     }
 
     @Test
-    fun meditationAlternativeOpensThreeMinuteTimer() {
+    fun meditationAlternativeOpensTimerAndCompletesWithGong() {
         launchMeditationFixtureSystemIntervention()
 
         composeRule.waitUntil(timeoutMillis = 10_000) {
@@ -2977,6 +3143,15 @@ class MainActivityTest {
         composeRule.onNodeWithText("3:00").assertIsDisplayed()
         composeRule.onNodeWithTag("meditation-complete").assertIsNotEnabled()
         composeRule.onNodeWithText("End early").assertIsDisplayed()
+        composeRule.onNodeWithTag("timer-meditation-duration-1")
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasNode("1:00") }
+        composeRule.waitUntil(timeoutMillis = 70_000) {
+            hasNodeContaining("Reset complete. The gong marks the end")
+        }
+        composeRule.onNodeWithTag("meditation-complete").assertIsEnabled()
+        captureReaderFormEvidenceScreenshot("13_meditation_gong_complete")
     }
 
     @Test
@@ -3087,6 +3262,7 @@ class MainActivityTest {
     private fun accountLightProfileJson(
         schemaVersion: Int,
         selectedAppPackages: List<String> = listOf("com.instagram.android"),
+        readerFontScale: Double = 1.25,
     ): String {
         val appJson = selectedAppPackages.joinToString(separator = ",") { packageName -> "\"$packageName\"" }
         return """
@@ -3113,7 +3289,7 @@ class MainActivityTest {
                 "selectedPackIds": ["starter_pack"],
                 "themeMode": "DARK",
                 "meditationDurationMinutes": 5,
-                "readerFontScale": 1.25,
+                "readerFontScale": $readerFontScale,
                 "contentPriority": "MY_FILES",
                 "priorityContentIds": [],
                 "reactivatedCompletedContentIds": [],
@@ -3379,6 +3555,22 @@ class MainActivityTest {
         return scale
     }
 
+    private fun currentHasCompletedOnboarding(): Boolean {
+        var completed = false
+        scenario?.onActivity { activity ->
+            completed = activity.mainViewModel.uiState.hasCompletedOnboarding
+        }
+        return completed
+    }
+
+    private fun currentMeditationDurationMinutes(): Int {
+        var minutes = 0
+        scenario?.onActivity { activity ->
+            minutes = activity.mainViewModel.uiState.meditationDurationMinutes
+        }
+        return minutes
+    }
+
     private fun readerPageLabelText(): String {
         val config = composeRule.onNodeWithTag("reader-page-label")
             .fetchSemanticsNode()
@@ -3636,14 +3828,14 @@ class MainActivityTest {
         return repository as RoomReadingProgressRepository
     }
 
-    private fun appendSprint19RegressionEvidence(
+    private fun appendReaderFormEvidence(
         stage: String,
         page: ReaderPagePosition,
         progressPercent: Int,
         pageEndParagraph: Int,
         durableSavedParagraph: Int,
     ) {
-        val outputDir = File("/sdcard/Download/qualityalternative/$sprint19RegressionScreenshotDirName")
+        val outputDir = File("/sdcard/Download/qualityalternative/$readerFormEvidenceScreenshotDirName")
         assertTrue("Expected evidence output directory for $stage", outputDir.mkdirs() || outputDir.exists())
         File(outputDir, "reader_resume_stage_assertions.txt").appendText(
             "$stage: page=${page.currentPage}/${page.totalPages}, " +
@@ -4411,8 +4603,8 @@ class MainActivityTest {
         assertTrue("Expected screenshot file for $name", output.exists() && output.length() > 0L)
     }
 
-    private fun captureSprint16PortableProfileScreenshot(name: String) {
-        val outputDir = File("/sdcard/Download/qualityalternative/$sprint16PortableProfileScreenshotDirName")
+    private fun captureAccountLightProfileScreenshot(name: String) {
+        val outputDir = File("/sdcard/Download/qualityalternative/$accountLightProfileScreenshotDirName")
         assertTrue("Expected screenshot output directory for $name", outputDir.mkdirs() || outputDir.exists())
         composeRule.waitForIdle()
         Thread.sleep(300)
@@ -4501,8 +4693,18 @@ class MainActivityTest {
         assertTrue("Expected screenshot file for $name", output.exists() && output.length() > 0L)
     }
 
-    private fun captureSprint19RegressionScreenshot(name: String) {
-        val outputDir = File("/sdcard/Download/qualityalternative/$sprint19RegressionScreenshotDirName")
+    private fun captureReaderFormEvidenceScreenshot(name: String) {
+        val outputDir = File("/sdcard/Download/qualityalternative/$readerFormEvidenceScreenshotDirName")
+        assertTrue("Expected screenshot output directory for $name", outputDir.mkdirs() || outputDir.exists())
+        composeRule.waitForIdle()
+        Thread.sleep(300)
+        val output = File(outputDir, "$name.png")
+        assertTrue("Expected screenshot capture for $name", UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).takeScreenshot(output))
+        assertTrue("Expected screenshot file for $name", output.exists() && output.length() > 0L)
+    }
+
+    private fun captureSprint21ReadingTimeScreenshot(name: String) {
+        val outputDir = File("/sdcard/Download/qualityalternative/$sprint21ReadingTimeScreenshotDirName")
         assertTrue("Expected screenshot output directory for $name", outputDir.mkdirs() || outputDir.exists())
         composeRule.waitForIdle()
         Thread.sleep(300)

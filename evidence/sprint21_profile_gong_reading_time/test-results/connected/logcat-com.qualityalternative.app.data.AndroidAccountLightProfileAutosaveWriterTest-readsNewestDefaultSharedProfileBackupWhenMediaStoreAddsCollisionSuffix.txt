@@ -1,0 +1,18 @@
+05-12 10:04:03.403  3804  3818 I TestRunner: started: readsNewestDefaultSharedProfileBackupWhenMediaStoreAddsCollisionSuffix(com.qualityalternative.app.data.AndroidAccountLightProfileAutosaveWriterTest)
+05-12 10:04:03.406  1631  3973 W MediaProvider: isAppCloneUserPair for user 0: false
+05-12 10:04:03.408  1631  3973 I MediaProvider: Open with lower FS for /storage/emulated/0/Download/Quality Alternative/quality-alternative-profile-collision-1778573043404.json. Uid: 10213
+05-12 10:04:03.427  1281  3226 I UriTaskContentObserver: Throttling content uri change event for content://media/external/file/2291 [CONTEXT service_id=218 ]
+05-12 10:04:04.450   963   963 D wpa_supplicant: nl80211: Drv Event 64 (NL80211_CMD_NOTIFY_CQM) received for wlan0
+05-12 10:04:04.451   963   963 D wpa_supplicant: nl80211: Beacon loss event
+05-12 10:04:04.451   963   963 D wpa_supplicant: wlan0: Event BEACON_LOSS (53) received
+05-12 10:04:04.451   963   963 I wpa_supplicant: wlan0: CTRL-EVENT-BEACON-LOSS
+05-12 10:04:04.512  1631  3973 W MediaProvider: isAppCloneUserPair for user 0: false
+05-12 10:04:04.518  1631  3973 I MediaProvider: Open with lower FS for /storage/emulated/0/Download/Quality Alternative/quality-alternative-profile-collision-1778573043404 (1).json. Uid: 10213
+05-12 10:04:04.522  1281  3226 I UriTaskContentObserver: Throttling content uri change event for content://media/external/file/2292 [CONTEXT service_id=218 ]
+05-12 10:04:04.528  1631  3973 I MediaProvider: Open with lower FS for /storage/emulated/0/Download/Quality Alternative/quality-alternative-profile-collision-1778573043404 (1).json. Uid: 10213
+05-12 10:04:04.531  1631  3973 W MediaProvider: Ignoring param:deletedata post U for external apps
+05-12 10:04:04.534  1631  3973 I MediaProvider: Deleted 1 0 0 0 0 0 0 items on external_primary due to com.qualityalternative.app
+05-12 10:04:04.534  1281  3226 I UriTaskContentObserver: Throttling content uri change event for content://media/external/file/2291 [CONTEXT service_id=218 ]
+05-12 10:04:04.538  1631  3973 W MediaProvider: Ignoring param:deletedata post U for external apps
+05-12 10:04:04.539  1631  3973 I MediaProvider: Deleted 1 0 0 0 0 0 0 items on external_primary due to com.qualityalternative.app
+05-12 10:04:04.540  3804  3818 I TestRunner: finished: readsNewestDefaultSharedProfileBackupWhenMediaStoreAddsCollisionSuffix(com.qualityalternative.app.data.AndroidAccountLightProfileAutosaveWriterTest)

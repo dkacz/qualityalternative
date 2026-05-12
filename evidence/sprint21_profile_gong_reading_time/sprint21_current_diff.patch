@@ -1,0 +1,1927 @@
+diff --git a/PRD.md b/PRD.md
+index 481dc77..f29ef28 100644
+--- a/PRD.md
++++ b/PRD.md
+@@ -236,6 +236,7 @@ The system must normalize each piece of replacement content into a small, rankab
+   - availability status
+ - User-added or imported materials must not require the user to save a manual reading-time estimate.
+ - Long readable materials can be recommended as smaller continuation segments from the current reader position.
++- EPUB and Markdown imports store a full-source reading-time estimate from extracted text, capped defensively for extreme inputs, so a many-hour book is not mislabeled as a 20-minute document.
+ - Each content item can be marked as accepted, skipped, completed, or opened anyway after recommendation.
+ - The system excludes previously completed reading items from recommendation slots unless the user manually reactivates that item from the content library.
+ - The meditation reset is not library content, does not count as a completed read, and is not hidden by completion state; it remains a standing intervention option.
+diff --git a/app/src/androidTest/java/com/qualityalternative/app/MainActivityTest.kt b/app/src/androidTest/java/com/qualityalternative/app/MainActivityTest.kt
+index 3aed446..6ca12f1 100644
+--- a/app/src/androidTest/java/com/qualityalternative/app/MainActivityTest.kt
++++ b/app/src/androidTest/java/com/qualityalternative/app/MainActivityTest.kt
+@@ -51,9 +51,13 @@ import com.qualityalternative.app.domain.model.ReadingProgress
+ import com.qualityalternative.app.domain.model.TopicTag
+ import com.qualityalternative.app.domain.model.UserDocumentDraft
+ import com.qualityalternative.app.domain.service.AddUserDocumentResult
++import com.qualityalternative.app.data.ACCOUNT_LIGHT_PROFILE_FILE_NAME
++import com.qualityalternative.app.data.AndroidAccountLightProfileAutosaveWriter
++import com.qualityalternative.app.data.ReadingTimeEstimateSource
+ import com.qualityalternative.app.data.RoomReadingProgressRepository
+ import com.qualityalternative.app.interception.FixtureTargetRegistry
+ import com.qualityalternative.app.interception.InterceptionRuntimeGate
++import com.qualityalternative.app.ui.DocumentImportCandidate
+ import kotlinx.coroutines.flow.first
+ import kotlinx.coroutines.runBlocking
+ import java.io.ByteArrayOutputStream
+@@ -89,8 +93,8 @@ class MainActivityTest {
+         "sprint14-reader-pagination-${System.currentTimeMillis()}"
+     private val sprint17DriveAuthScreenshotDirName =
+         "sprint17-drive-auth-${System.currentTimeMillis()}"
+-    private val sprint16PortableProfileScreenshotDirName =
+-        "sprint16-portable-profile-${System.currentTimeMillis()}"
++    private val accountLightProfileScreenshotDirName =
++        "sprint21-profile-restore-${System.currentTimeMillis()}"
+     private val sprint16ProfileAutosaveScreenshotDirName =
+         "sprint16-profile-autosave-${System.currentTimeMillis()}"
+     private val sprint16AdaptiveReaderScreenshotDirName =
+@@ -107,8 +111,10 @@ class MainActivityTest {
+         "sprint17-annotation-surface-${System.currentTimeMillis()}"
+     private val sprint18ProgressHotfixScreenshotDirName =
+         "sprint18-progress-hotfix-${System.currentTimeMillis()}"
+-    private val sprint19RegressionScreenshotDirName =
+-        "sprint19-reader-form-regression-${System.currentTimeMillis()}"
++    private val readerFormEvidenceScreenshotDirName =
++        "sprint21-meditation-gong-${System.currentTimeMillis()}"
++    private val sprint21ReadingTimeScreenshotDirName =
++        "sprint21-reading-time-${System.currentTimeMillis()}"
+ 
+     @Before
+     fun resetAppState() {
+@@ -518,7 +524,7 @@ class MainActivityTest {
+         composeRule.waitUntil(timeoutMillis = 10_000) { currentInterventionMode() == InterventionMode.SOFT }
+         composeRule.onNodeWithTag("intervention-mode-SOFT")
+             .assertIsSelected()
+-        captureSprint19RegressionScreenshot("13_intervention_mode_soft_selected")
++        captureReaderFormEvidenceScreenshot("13_intervention_mode_soft_selected")
+ 
+         scenario?.onActivity { activity -> activity.mainViewModel.triggerDebugIntervention(nowMillis = System.currentTimeMillis()) }
+         composeRule.waitUntil(timeoutMillis = 10_000) { hasNode("You reached for Fixture Feed One") }
+@@ -527,7 +533,7 @@ class MainActivityTest {
+         composeRule.onNodeWithText("Open Fixture Feed One")
+             .assertIsDisplayed()
+             .assertIsEnabled()
+-        captureSprint19RegressionScreenshot("14_soft_mode_open_anyway_immediate")
++        captureReaderFormEvidenceScreenshot("14_soft_mode_open_anyway_immediate")
+ 
+         scenario?.onActivity {
+             it.mainViewModel.openSettings()
+@@ -541,7 +547,7 @@ class MainActivityTest {
+         composeRule.onNodeWithText("Open in", substring = true)
+             .assertIsDisplayed()
+             .assertIsNotEnabled()
+-        captureSprint19RegressionScreenshot("15_firm_mode_open_anyway_wait")
++        captureReaderFormEvidenceScreenshot("15_firm_mode_open_anyway_wait")
+     }
+ 
+     @Test
+@@ -1584,7 +1590,7 @@ class MainActivityTest {
+             "Chapter three should not display a beginning-of-book 1% progress label; label=${readerPageLabelText()}",
+             progressBeforeFontChange > 40,
+         )
+-        captureSprint19RegressionScreenshot("01_chapter_three_progress_not_one_percent")
++        captureReaderFormEvidenceScreenshot("01_chapter_three_progress_not_one_percent")
+ 
+         scenario?.onActivity { activity -> activity.mainViewModel.setReaderFontScale(1.3) }
+         composeRule.waitUntil(timeoutMillis = 10_000) { currentReaderFontScale() == 1.3 }
+@@ -1604,7 +1610,7 @@ class MainActivityTest {
+                 "before=$pageLabelBeforeFontChange after=$pageLabelAfterFontChange",
+             pageLabelAfterFontChange.totalPages > pageLabelBeforeFontChange.totalPages,
+         )
+-        captureSprint19RegressionScreenshot("02_chapter_three_large_font_progress_stable")
++        captureReaderFormEvidenceScreenshot("02_chapter_three_large_font_progress_stable")
+ 
+         composeRule.onNodeWithTag("reader-toc-open")
+             .assertIsDisplayed()
+@@ -1629,7 +1635,7 @@ class MainActivityTest {
+         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-annotation-editor-$annotationParagraph") }
+         val initialQuote = readerSelectedQuoteText(annotationParagraph)
+         assertTrue(initialQuote.contains("third chapter anchor"))
+-        captureSprint19RegressionScreenshot("03_annotation_before_start_back")
++        captureReaderFormEvidenceScreenshot("03_annotation_before_start_back")
+         repeat(30) {
+             if (!readerSelectedQuoteText(annotationParagraph).contains("second chapter marker") &&
+                 hasTag("reader-annotation-start-earlier")
+@@ -1651,7 +1657,7 @@ class MainActivityTest {
+             "Expanded quote should cross into the previous chapter while remaining anchored around chapter three text.",
+             expandedQuote.contains("second chapter marker") && expandedQuote.contains("third chapter anchor"),
+         )
+-        captureSprint19RegressionScreenshot("04_annotation_start_back_without_book_start_jump")
++        captureReaderFormEvidenceScreenshot("04_annotation_start_back_without_book_start_jump")
+ 
+         val noteText = "Sprint 19 saved cross-chapter selector."
+         composeRule.onNodeWithTag("reader-annotation-note-input-$annotationParagraph")
+@@ -1670,7 +1676,7 @@ class MainActivityTest {
+                 hasReadingAnnotationQuoteContaining(contentId, annotationParagraph, "second chapter marker") &&
+                 hasReadingAnnotationQuoteContaining(contentId, annotationParagraph, "third chapter anchor")
+         }
+-        captureSprint19RegressionScreenshot("05_annotation_saved_cross_chapter_highlight")
++        captureReaderFormEvidenceScreenshot("05_annotation_saved_cross_chapter_highlight")
+         scenario?.onActivity { activity -> activity.mainViewModel.dismissMessage() }
+         composeRule.waitUntil(timeoutMillis = 10_000) { !hasNode("Annotation saved.") }
+ 
+@@ -1684,7 +1690,7 @@ class MainActivityTest {
+             "Reopened note should preserve the saved cross-chapter selector. quote=$reopenedQuote",
+             reopenedQuote.contains("second chapter marker") && reopenedQuote.contains("third chapter anchor"),
+         )
+-        captureSprint19RegressionScreenshot("06_annotation_reopened_cross_chapter_selector")
++        captureReaderFormEvidenceScreenshot("06_annotation_reopened_cross_chapter_selector")
+     }
+ 
+     @Test
+@@ -1699,7 +1705,7 @@ class MainActivityTest {
+         composeRule.onNodeWithTag("intervention-open-anyway-close")
+             .assertIsDisplayed()
+             .assertIsNotEnabled()
+-        captureSprint19RegressionScreenshot("07_form_intervention_waiting_locked")
++        captureReaderFormEvidenceScreenshot("07_form_intervention_waiting_locked")
+ 
+         waitForOpenAnywayUnlock()
+         composeRule.onNodeWithText("Open Fixture Feed One")
+@@ -1708,7 +1714,7 @@ class MainActivityTest {
+         composeRule.onNodeWithTag("intervention-open-anyway-close")
+             .assertIsDisplayed()
+             .assertIsEnabled()
+-        captureSprint19RegressionScreenshot("08_form_intervention_unlock_ready")
++        captureReaderFormEvidenceScreenshot("08_form_intervention_unlock_ready")
+     }
+ 
+     @Test
+@@ -1746,14 +1752,14 @@ class MainActivityTest {
+             durableRoomSavedProgressPercentFor(document.id) == lastViewedPercent &&
+                 durableRoomSavedProgressParagraphIndexFor(document.id) == lastViewedEndParagraph
+         }
+-        appendSprint19RegressionEvidence(
++        appendReaderFormEvidence(
+             stage = "saved_before_pause_stop",
+             page = lastViewedPage,
+             progressPercent = lastViewedPercent,
+             pageEndParagraph = lastViewedEndParagraph,
+             durableSavedParagraph = durableRoomSavedProgressParagraphIndexFor(document.id),
+         )
+-        captureSprint19RegressionScreenshot("09_session_progress_saved_before_pause_stop")
++        captureReaderFormEvidenceScreenshot("09_session_progress_saved_before_pause_stop")
+ 
+         scenario?.moveToState(Lifecycle.State.CREATED)
+         InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+@@ -1765,14 +1771,14 @@ class MainActivityTest {
+         }
+         assertEquals(lastViewedPage.totalPages, readerPagePositionFromLabel().totalPages)
+         assertEquals(lastViewedEndParagraph, currentReaderPageEndParagraphIndex())
+-        appendSprint19RegressionEvidence(
++        appendReaderFormEvidence(
+             stage = "restored_after_pause_stop",
+             page = readerPagePositionFromLabel(),
+             progressPercent = currentReaderProgressPercentFromLabel(),
+             pageEndParagraph = currentReaderPageEndParagraphIndex(),
+             durableSavedParagraph = durableRoomSavedProgressParagraphIndexFor(document.id),
+         )
+-        captureSprint19RegressionScreenshot("10_session_progress_restored_after_pause_stop")
++        captureReaderFormEvidenceScreenshot("10_session_progress_restored_after_pause_stop")
+ 
+         scenario?.close()
+         scenario = null
+@@ -1786,14 +1792,14 @@ class MainActivityTest {
+         }
+         assertEquals(lastViewedPage.totalPages, readerPagePositionFromLabel().totalPages)
+         assertEquals(lastViewedEndParagraph, currentReaderPageEndParagraphIndex())
+-        appendSprint19RegressionEvidence(
++        appendReaderFormEvidence(
+             stage = "restored_after_reopen",
+             page = readerPagePositionFromLabel(),
+             progressPercent = currentReaderProgressPercentFromLabel(),
+             pageEndParagraph = currentReaderPageEndParagraphIndex(),
+             durableSavedParagraph = durableRoomSavedProgressParagraphIndexFor(document.id),
+         )
+-        captureSprint19RegressionScreenshot("11_session_progress_restored_after_reopen")
++        captureReaderFormEvidenceScreenshot("11_session_progress_restored_after_reopen")
+     }
+ 
+     @Test
+@@ -1836,14 +1842,14 @@ class MainActivityTest {
+         val latestPercent = currentReaderProgressPercentFromLabel()
+         val latestEndParagraph = currentReaderPageEndParagraphIndex()
+         assertEquals(stableEndParagraph, durableRoomSavedProgressParagraphIndexFor(document.id))
+-        appendSprint19RegressionEvidence(
++        appendReaderFormEvidence(
+             stage = "pending_latest_before_room_write",
+             page = latestPage,
+             progressPercent = latestPercent,
+             pageEndParagraph = latestEndParagraph,
+             durableSavedParagraph = durableRoomSavedProgressParagraphIndexFor(document.id),
+         )
+-        captureSprint19RegressionScreenshot("12_pending_latest_before_room_write")
++        captureReaderFormEvidenceScreenshot("12_pending_latest_before_room_write")
+ 
+         scenario?.close()
+         scenario = null
+@@ -1856,14 +1862,14 @@ class MainActivityTest {
+             readerPagePositionFromLabel().currentPage == latestPage.currentPage
+         }
+         assertEquals(latestEndParagraph, currentReaderPageEndParagraphIndex())
+-        appendSprint19RegressionEvidence(
++        appendReaderFormEvidence(
+             stage = "immediate_reopen_before_room_write",
+             page = readerPagePositionFromLabel(),
+             progressPercent = currentReaderProgressPercentFromLabel(),
+             pageEndParagraph = currentReaderPageEndParagraphIndex(),
+             durableSavedParagraph = durableRoomSavedProgressParagraphIndexFor(document.id),
+         )
+-        captureSprint19RegressionScreenshot("13_immediate_reopen_before_room_write")
++        captureReaderFormEvidenceScreenshot("13_immediate_reopen_before_room_write")
+ 
+         scenario?.moveToState(Lifecycle.State.CREATED)
+         InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+@@ -1875,18 +1881,18 @@ class MainActivityTest {
+             durableRoomSavedProgressPercentFor(document.id) == latestPercent &&
+                 durableRoomSavedProgressParagraphIndexFor(document.id) == latestEndParagraph
+         }
+-        appendSprint19RegressionEvidence(
++        appendReaderFormEvidence(
+             stage = "room_write_released_after_reopen",
+             page = readerPagePositionFromLabel(),
+             progressPercent = currentReaderProgressPercentFromLabel(),
+             pageEndParagraph = currentReaderPageEndParagraphIndex(),
+             durableSavedParagraph = durableRoomSavedProgressParagraphIndexFor(document.id),
+         )
+-        captureSprint19RegressionScreenshot("14_room_write_released_after_reopen")
++        captureReaderFormEvidenceScreenshot("14_room_write_released_after_reopen")
+     }
+ 
+     @Test
+-    fun sprint19InterventionShowsMeditationAsCalmAlternativeWhenPrimaryIsReading() {
++    fun meditationInterventionShowsCalmAlternativeWhenPrimaryIsReading() {
+         launchFixtureSystemIntervention()
+ 
+         var meditationBackupIndex = -1
+@@ -1906,7 +1912,7 @@ class MainActivityTest {
+             .assertIsEnabled()
+         composeRule.onAllNodesWithTag("intervention-backup-action-$meditationBackupIndex")
+             .assertCountEquals(0)
+-        captureSprint19RegressionScreenshot("12_meditation_calm_alternative")
++        captureReaderFormEvidenceScreenshot("12_meditation_calm_alternative")
+         composeRule.onNodeWithTag("intervention-meditation-start")
+             .performClick()
+         composeRule.waitUntil(timeoutMillis = 10_000) {
+@@ -2696,13 +2702,13 @@ class MainActivityTest {
+         scrollToAccountLightSettings()
+         composeRule.onNodeWithTag("settings-account-light-section").assertIsDisplayed()
+         composeRule.onNodeWithTag("settings-account-light-import").assertIsDisplayed()
+-        captureSprint16PortableProfileScreenshot("01_import_entry_light")
++        captureAccountLightProfileScreenshot("01_import_entry_light")
+ 
+         exportAccountLightProfileJsonFromViewModel()
+         scrollToAccountLightSettings()
+         composeRule.waitUntil(timeoutMillis = 10_000) { hasNodeContaining("PORTABLE PROFILE EXPORTED") }
+         composeRule.onNodeWithTag("settings-account-light-status").assertIsDisplayed()
+-        captureSprint16PortableProfileScreenshot("00_export_success_light")
++        captureAccountLightProfileScreenshot("00_export_success_light")
+         scenario?.onActivity { activity -> activity.mainViewModel.dismissMessage() }
+         composeRule.waitForIdle()
+ 
+@@ -2714,11 +2720,26 @@ class MainActivityTest {
+                 ),
+             )
+         }
++        composeRule.waitUntil(timeoutMillis = 10_000) {
++            var importFinished = false
++            scenario?.onActivity { activity ->
++                val state = activity.mainViewModel.uiState
++                importFinished = state.accountLightImportPreview != null || state.accountLightImportError != null
++            }
++            importFinished
++        }
++        scenario?.onActivity { activity ->
++            val state = activity.mainViewModel.uiState
++            assertTrue(
++                "Portable profile preview failed: ${state.accountLightImportError ?: state.latestMessage}",
++                state.accountLightImportPreview != null,
++            )
++        }
+         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("settings-account-light-import-preview") }
+         scrollToAccountLightSettings()
+         composeRule.onNodeWithTag("settings-account-light-import-preview").assertIsDisplayed()
+         composeRule.onNodeWithTag("settings-account-light-import-warning-summary").assertIsDisplayed()
+-        captureSprint16PortableProfileScreenshot("02_merge_preview_with_unsupported_app_light")
++        captureAccountLightProfileScreenshot("02_merge_preview_with_unsupported_app_light")
+ 
+         composeRule.onNodeWithTag("settings-account-light-import-replace")
+             .assertIsDisplayed()
+@@ -2734,7 +2755,7 @@ class MainActivityTest {
+         composeRule.onNodeWithTag("settings-account-light-replace-backup").assertIsDisplayed()
+         composeRule.onNodeWithTag("settings-list")
+             .performScrollToNode(hasTestTag("settings-account-light-replace-confirm-action"))
+-        captureSprint16PortableProfileScreenshot("03_replace_confirmation_light")
++        captureAccountLightProfileScreenshot("03_replace_confirmation_light")
+ 
+         composeRule.onNodeWithTag("settings-account-light-replace-confirm-action")
+             .assertIsDisplayed()
+@@ -2744,7 +2765,7 @@ class MainActivityTest {
+         }
+         scrollToAccountLightSettings()
+         composeRule.onNodeWithTag("settings-account-light-status").assertIsDisplayed()
+-        captureSprint16PortableProfileScreenshot("04_import_success_dark")
++        captureAccountLightProfileScreenshot("04_import_success_dark")
+ 
+         scenario?.onActivity { activity -> activity.mainViewModel.openLibrary() }
+         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("library-list") }
+@@ -2757,7 +2778,7 @@ class MainActivityTest {
+             .assertIsDisplayed()
+         composeRule.onNodeWithTag("library-open-user-document-44444444-4444-4444-8444-444444444444")
+             .assertDoesNotExist()
+-        captureSprint16PortableProfileScreenshot("07_missing_document_library_dark")
++        captureAccountLightProfileScreenshot("07_missing_document_library_dark")
+ 
+         scenario?.onActivity { activity -> activity.mainViewModel.openSettings() }
+         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("settings-list") }
+@@ -2771,7 +2792,7 @@ class MainActivityTest {
+         }
+         scrollToAccountLightSettings()
+         composeRule.onNodeWithTag("settings-account-light-status").assertIsDisplayed()
+-        captureSprint16PortableProfileScreenshot("05_invalid_import_dark")
++        captureAccountLightProfileScreenshot("05_invalid_import_dark")
+ 
+         scenario?.onActivity { activity ->
+             activity.mainViewModel.previewAccountLightImport(accountLightProfileJson(schemaVersion = 99))
+@@ -2781,7 +2802,7 @@ class MainActivityTest {
+         }
+         scrollToAccountLightSettings()
+         composeRule.onNodeWithTag("settings-account-light-status").assertIsDisplayed()
+-        captureSprint16PortableProfileScreenshot("06_future_schema_import_dark")
++        captureAccountLightProfileScreenshot("06_future_schema_import_dark")
+     }
+ 
+     @Test
+@@ -2812,6 +2833,21 @@ class MainActivityTest {
+         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("settings-list") }
+         scrollToAccountLightSettings()
+         scenario?.onActivity { activity -> activity.mainViewModel.previewAccountLightImport(exportedJson) }
++        composeRule.waitUntil(timeoutMillis = 10_000) {
++            var importFinished = false
++            scenario?.onActivity { activity ->
++                val state = activity.mainViewModel.uiState
++                importFinished = state.accountLightImportPreview != null || state.accountLightImportError != null
++            }
++            importFinished
++        }
++        scenario?.onActivity { activity ->
++            val state = activity.mainViewModel.uiState
++            assertTrue(
++                "Default profile preview failed: ${state.accountLightImportError ?: state.latestMessage}",
++                state.accountLightImportPreview != null,
++            )
++        }
+         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("settings-account-light-import-preview") }
+         scenario?.onActivity { activity -> activity.mainViewModel.confirmAccountLightReplaceImport() }
+         composeRule.waitUntil(timeoutMillis = 10_000) {
+@@ -2820,6 +2856,136 @@ class MainActivityTest {
+         }
+     }
+ 
++    @Test
++    fun onboardingRestoreProfileLoadsDefaultBackupAfterCleanInstall() {
++        launchOnboardedApp()
++        scenario?.onActivity { activity ->
++            activity.mainViewModel.setReaderFontScale(1.3)
++            activity.mainViewModel.setMeditationDurationMinutes(5)
++        }
++        composeRule.waitUntil(timeoutMillis = 10_000) {
++            var backupSaved = false
++            scenario?.onActivity { activity ->
++                backupSaved = activity.mainViewModel.uiState.profileAutosaveLastSuccessfulAtMillis != null
++            }
++            currentReaderFontScale() == 1.3 &&
++                currentMeditationDurationMinutes() == 5 &&
++                backupSaved
++        }
++
++        scenario?.close()
++        scenario = null
++        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
++        resetPersistentState()
++
++        launchApp()
++        composeRule.waitUntil(timeoutMillis = 10_000) { hasNodeContaining("Turn an impulse") }
++        composeRule.onNodeWithTag("onboarding-restore-profile")
++            .assertIsDisplayed()
++            .performClick()
++
++        composeRule.waitUntil(timeoutMillis = 10_000) {
++            currentHasCompletedOnboarding() &&
++                currentReaderFontScale() == 1.3 &&
++                currentMeditationDurationMinutes() == 5
++        }
++    }
++
++    @Test
++    fun settingsDefaultBackupRestoreShowsPreviewBeforeReplace() {
++        seedFixtureSelection()
++        runBlocking {
++            AndroidAccountLightProfileAutosaveWriter(InstrumentationRegistry.getInstrumentation().targetContext)
++                .writeProfileJson(
++                    uri = AndroidAccountLightProfileAutosaveWriter.DEFAULT_PROFILE_BACKUP_URI,
++                    fileName = ACCOUNT_LIGHT_PROFILE_FILE_NAME,
++                    json = accountLightProfileJson(schemaVersion = 1, readerFontScale = 1.3),
++                )
++        }
++        launchApp()
++        waitForHome()
++        assertEquals(DEFAULT_READER_FONT_SCALE, currentReaderFontScale(), 0.0)
++
++        scenario?.onActivity { activity -> activity.mainViewModel.openSettings() }
++        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("settings-list") }
++        scrollToAccountLightSettings()
++        composeRule.onNodeWithTag("settings-account-light-import-default")
++            .assertIsDisplayed()
++            .performClick()
++
++        composeRule.waitUntil(timeoutMillis = 10_000) {
++            var importFinished = false
++            scenario?.onActivity { activity ->
++                val state = activity.mainViewModel.uiState
++                importFinished = state.accountLightImportPreview != null || state.accountLightImportError != null
++            }
++            importFinished
++        }
++        scenario?.onActivity { activity ->
++            val state = activity.mainViewModel.uiState
++            assertTrue(
++                "Default profile preview failed: ${state.accountLightImportError ?: state.latestMessage}",
++                state.accountLightImportPreview != null,
++            )
++        }
++        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("settings-account-light-import-preview") }
++        assertEquals(DEFAULT_READER_FONT_SCALE, currentReaderFontScale(), 0.0)
++        composeRule.onNodeWithTag("settings-list")
++            .performScrollToNode(hasTestTag("settings-account-light-import-preview"))
++        captureAccountLightProfileScreenshot("08_default_backup_preview_light")
++        composeRule.onNodeWithTag("settings-list")
++            .performScrollToNode(hasTestTag("settings-account-light-import-replace"))
++        composeRule.onNodeWithTag("settings-account-light-import-replace")
++            .assertIsDisplayed()
++            .performClick()
++        composeRule.onNodeWithTag("settings-list")
++            .performScrollToNode(hasTestTag("settings-account-light-replace-confirm"))
++        composeRule.onNodeWithTag("settings-account-light-replace-confirm")
++            .assertIsDisplayed()
++        captureAccountLightProfileScreenshot("09_default_backup_replace_confirm_light")
++        composeRule.onNodeWithTag("settings-list")
++            .performScrollToNode(hasTestTag("settings-account-light-replace-confirm-action"))
++        composeRule.onNodeWithTag("settings-account-light-replace-confirm-action")
++            .assertIsDisplayed()
++            .performClick()
++        composeRule.waitUntil(timeoutMillis = 10_000) { currentReaderFontScale() == 1.3 }
++        scrollToAccountLightSettings()
++        captureAccountLightProfileScreenshot("10_default_backup_restore_success_dark")
++    }
++
++    @Test
++    fun longDocumentImportPreviewShowsMultiHourReadingTime() {
++        launchOnboardedApp()
++
++        scenario?.onActivity { activity ->
++            activity.mainViewModel.beginUserDocumentImportPreparation()
++            activity.mainViewModel.prepareUserDocumentBatchImport(
++                candidates = listOf(
++                    DocumentImportCandidate(
++                        uri = "content://qa-test/long-book.md",
++                        displayName = "long-book.md",
++                        mimeType = "text/markdown",
++                        title = "Long Book",
++                        durationMinutes = "135",
++                        format = ContentFormat.MARKDOWN,
++                        estimateSource = ReadingTimeEstimateSource.EXTRACTED_TEXT,
++                        estimatedWordCount = 30_375,
++                    ),
++                ),
++                nowMillis = 31_000L,
++            )
++        }
++
++        composeRule.waitUntil(timeoutMillis = 10_000) {
++            hasTag("add-document-screen") && hasNodeContaining("2 hr 15 min")
++        }
++        assertTrue(composeRule.onAllNodesWithText("Long Book").fetchSemanticsNodes().isNotEmpty())
++        composeRule.onNodeWithText("long-book.md", substring = true).assertIsDisplayed()
++        composeRule.onNodeWithText("2 hr 15 min", substring = true).assertIsDisplayed()
++        assertTrue(composeRule.onAllNodesWithText("auto", substring = true).fetchSemanticsNodes().isNotEmpty())
++        captureSprint21ReadingTimeScreenshot("14_long_document_import_multi_hour")
++    }
++
+     @Test
+     fun settingsShowsLocalDefaultsAndChangedDestinationsForAnnotationSyncAndProfileBackup() {
+         launchOnboardedApp()
+@@ -2834,7 +3000,7 @@ class MainActivityTest {
+         captureSprint17DefaultsScreenshot("00_annotation_default_light")
+ 
+         scrollToAccountLightSettings()
+-        composeRule.onNodeWithText("App storage - Profile backup").assertIsDisplayed()
++        composeRule.onNodeWithText("Downloads/Quality Alternative/quality-alternative-profile.json").assertIsDisplayed()
+         composeRule.onNodeWithTag("settings-account-light-autosave-save-now").assertIsEnabled()
+         composeRule.onNodeWithTag("settings-account-light-autosave-clear").assertDoesNotExist()
+         captureSprint17DefaultsScreenshot("01_profile_default_light")
+@@ -2903,7 +3069,7 @@ class MainActivityTest {
+ 
+         scrollToAccountLightSettings()
+         composeRule.onNodeWithTag("settings-account-light-autosave-status").assertIsDisplayed()
+-        composeRule.onNodeWithText("App storage - Profile backup").assertIsDisplayed()
++        composeRule.onNodeWithText("Downloads/Quality Alternative/quality-alternative-profile.json").assertIsDisplayed()
+         composeRule.onNodeWithTag("settings-account-light-autosave-pick").assertIsDisplayed()
+         composeRule.onNodeWithTag("settings-account-light-autosave-save-now").assertIsEnabled()
+         composeRule.onNodeWithTag("settings-account-light-autosave-clear").assertDoesNotExist()
+@@ -2954,7 +3120,7 @@ class MainActivityTest {
+     }
+ 
+     @Test
+-    fun meditationAlternativeOpensThreeMinuteTimer() {
++    fun meditationAlternativeOpensTimerAndCompletesWithGong() {
+         launchMeditationFixtureSystemIntervention()
+ 
+         composeRule.waitUntil(timeoutMillis = 10_000) {
+@@ -2977,6 +3143,15 @@ class MainActivityTest {
+         composeRule.onNodeWithText("3:00").assertIsDisplayed()
+         composeRule.onNodeWithTag("meditation-complete").assertIsNotEnabled()
+         composeRule.onNodeWithText("End early").assertIsDisplayed()
++        composeRule.onNodeWithTag("timer-meditation-duration-1")
++            .assertIsDisplayed()
++            .performClick()
++        composeRule.waitUntil(timeoutMillis = 10_000) { hasNode("1:00") }
++        composeRule.waitUntil(timeoutMillis = 70_000) {
++            hasNodeContaining("Reset complete. The gong marks the end")
++        }
++        composeRule.onNodeWithTag("meditation-complete").assertIsEnabled()
++        captureReaderFormEvidenceScreenshot("13_meditation_gong_complete")
+     }
+ 
+     @Test
+@@ -3087,6 +3262,7 @@ class MainActivityTest {
+     private fun accountLightProfileJson(
+         schemaVersion: Int,
+         selectedAppPackages: List<String> = listOf("com.instagram.android"),
++        readerFontScale: Double = 1.25,
+     ): String {
+         val appJson = selectedAppPackages.joinToString(separator = ",") { packageName -> "\"$packageName\"" }
+         return """
+@@ -3113,7 +3289,7 @@ class MainActivityTest {
+                 "selectedPackIds": ["starter_pack"],
+                 "themeMode": "DARK",
+                 "meditationDurationMinutes": 5,
+-                "readerFontScale": 1.25,
++                "readerFontScale": $readerFontScale,
+                 "contentPriority": "MY_FILES",
+                 "priorityContentIds": [],
+                 "reactivatedCompletedContentIds": [],
+@@ -3379,6 +3555,22 @@ class MainActivityTest {
+         return scale
+     }
+ 
++    private fun currentHasCompletedOnboarding(): Boolean {
++        var completed = false
++        scenario?.onActivity { activity ->
++            completed = activity.mainViewModel.uiState.hasCompletedOnboarding
++        }
++        return completed
++    }
++
++    private fun currentMeditationDurationMinutes(): Int {
++        var minutes = 0
++        scenario?.onActivity { activity ->
++            minutes = activity.mainViewModel.uiState.meditationDurationMinutes
++        }
++        return minutes
++    }
++
+     private fun readerPageLabelText(): String {
+         val config = composeRule.onNodeWithTag("reader-page-label")
+             .fetchSemanticsNode()
+@@ -3636,14 +3828,14 @@ class MainActivityTest {
+         return repository as RoomReadingProgressRepository
+     }
+ 
+-    private fun appendSprint19RegressionEvidence(
++    private fun appendReaderFormEvidence(
+         stage: String,
+         page: ReaderPagePosition,
+         progressPercent: Int,
+         pageEndParagraph: Int,
+         durableSavedParagraph: Int,
+     ) {
+-        val outputDir = File("/sdcard/Download/qualityalternative/$sprint19RegressionScreenshotDirName")
++        val outputDir = File("/sdcard/Download/qualityalternative/$readerFormEvidenceScreenshotDirName")
+         assertTrue("Expected evidence output directory for $stage", outputDir.mkdirs() || outputDir.exists())
+         File(outputDir, "reader_resume_stage_assertions.txt").appendText(
+             "$stage: page=${page.currentPage}/${page.totalPages}, " +
+@@ -4411,8 +4603,8 @@ class MainActivityTest {
+         assertTrue("Expected screenshot file for $name", output.exists() && output.length() > 0L)
+     }
+ 
+-    private fun captureSprint16PortableProfileScreenshot(name: String) {
+-        val outputDir = File("/sdcard/Download/qualityalternative/$sprint16PortableProfileScreenshotDirName")
++    private fun captureAccountLightProfileScreenshot(name: String) {
++        val outputDir = File("/sdcard/Download/qualityalternative/$accountLightProfileScreenshotDirName")
+         assertTrue("Expected screenshot output directory for $name", outputDir.mkdirs() || outputDir.exists())
+         composeRule.waitForIdle()
+         Thread.sleep(300)
+@@ -4501,8 +4693,18 @@ class MainActivityTest {
+         assertTrue("Expected screenshot file for $name", output.exists() && output.length() > 0L)
+     }
+ 
+-    private fun captureSprint19RegressionScreenshot(name: String) {
+-        val outputDir = File("/sdcard/Download/qualityalternative/$sprint19RegressionScreenshotDirName")
++    private fun captureReaderFormEvidenceScreenshot(name: String) {
++        val outputDir = File("/sdcard/Download/qualityalternative/$readerFormEvidenceScreenshotDirName")
++        assertTrue("Expected screenshot output directory for $name", outputDir.mkdirs() || outputDir.exists())
++        composeRule.waitForIdle()
++        Thread.sleep(300)
++        val output = File(outputDir, "$name.png")
++        assertTrue("Expected screenshot capture for $name", UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).takeScreenshot(output))
++        assertTrue("Expected screenshot file for $name", output.exists() && output.length() > 0L)
++    }
++
++    private fun captureSprint21ReadingTimeScreenshot(name: String) {
++        val outputDir = File("/sdcard/Download/qualityalternative/$sprint21ReadingTimeScreenshotDirName")
+         assertTrue("Expected screenshot output directory for $name", outputDir.mkdirs() || outputDir.exists())
+         composeRule.waitForIdle()
+         Thread.sleep(300)
+diff --git a/app/src/androidTest/java/com/qualityalternative/app/data/AndroidAccountLightProfileAutosaveWriterTest.kt b/app/src/androidTest/java/com/qualityalternative/app/data/AndroidAccountLightProfileAutosaveWriterTest.kt
+index 84efb13..efd2fdd 100644
+--- a/app/src/androidTest/java/com/qualityalternative/app/data/AndroidAccountLightProfileAutosaveWriterTest.kt
++++ b/app/src/androidTest/java/com/qualityalternative/app/data/AndroidAccountLightProfileAutosaveWriterTest.kt
+@@ -1,9 +1,13 @@
+ package com.qualityalternative.app.data
+ 
++import android.content.ContentValues
++import android.os.Environment
+ import android.provider.DocumentsContract
++import android.provider.MediaStore
+ import androidx.test.ext.junit.runners.AndroidJUnit4
+ import androidx.test.platform.app.InstrumentationRegistry
+ import java.io.InputStreamReader
++import java.io.OutputStreamWriter
+ import kotlinx.coroutines.runBlocking
+ import org.junit.Assert.assertEquals
+ import org.junit.Test
+@@ -11,6 +15,69 @@ import org.junit.runner.RunWith
+ 
+ @RunWith(AndroidJUnit4::class)
+ class AndroidAccountLightProfileAutosaveWriterTest {
++    @Test
++    fun writesAndReadsDefaultSharedProfileBackup() = runBlocking {
++        val targetContext = InstrumentationRegistry.getInstrumentation().targetContext
++        val writer = AndroidAccountLightProfileAutosaveWriter(targetContext)
++
++        writer.writeProfileJson(
++            uri = AndroidAccountLightProfileAutosaveWriter.DEFAULT_PROFILE_BACKUP_URI,
++            fileName = ACCOUNT_LIGHT_PROFILE_FILE_NAME,
++            json = """{"schemaVersion":1,"source":"default"}""",
++        )
++
++        assertEquals(
++            """{"schemaVersion":1,"source":"default"}""",
++            writer.readProfileJson(
++                uri = AndroidAccountLightProfileAutosaveWriter.DEFAULT_PROFILE_BACKUP_URI,
++                fileName = ACCOUNT_LIGHT_PROFILE_FILE_NAME,
++            ),
++        )
++
++        writer.writeProfileJson(
++            uri = AndroidAccountLightProfileAutosaveWriter.DEFAULT_PROFILE_BACKUP_URI,
++            fileName = ACCOUNT_LIGHT_PROFILE_FILE_NAME,
++            json = """{"schemaVersion":2,"source":"default"}""",
++        )
++
++        assertEquals(
++            """{"schemaVersion":2,"source":"default"}""",
++            writer.readProfileJson(
++                uri = AndroidAccountLightProfileAutosaveWriter.DEFAULT_PROFILE_BACKUP_URI,
++                fileName = ACCOUNT_LIGHT_PROFILE_FILE_NAME,
++            ),
++        )
++    }
++
++    @Test
++    fun readsNewestDefaultSharedProfileBackupWhenMediaStoreAddsCollisionSuffix() = runBlocking {
++        val targetContext = InstrumentationRegistry.getInstrumentation().targetContext
++        val writer = AndroidAccountLightProfileAutosaveWriter(targetContext)
++        val fileName = "quality-alternative-profile-collision-${System.currentTimeMillis()}.json"
++        val oldUri = targetContext.insertDownloadProfileJson(
++            fileName = fileName,
++            json = """{"schemaVersion":1,"source":"old"}""",
++        )
++        Thread.sleep(1_100L)
++        val newUri = targetContext.insertDownloadProfileJson(
++            fileName = fileName,
++            json = """{"schemaVersion":2,"source":"new"}""",
++        )
++
++        try {
++            assertEquals(
++                """{"schemaVersion":2,"source":"new"}""",
++                writer.readProfileJson(
++                    uri = AndroidAccountLightProfileAutosaveWriter.DEFAULT_PROFILE_BACKUP_URI,
++                    fileName = fileName,
++                ),
++            )
++        } finally {
++            targetContext.contentResolver.delete(oldUri, null, null)
++            targetContext.contentResolver.delete(newUri, null, null)
++        }
++    }
++
+     @Test
+     fun writesAndRewritesProfileJsonThroughDocumentTreeUri() = runBlocking {
+         val instrumentation = InstrumentationRegistry.getInstrumentation()
+@@ -55,6 +122,25 @@ class AndroidAccountLightProfileAutosaveWriterTest {
+         } ?: error("Profile document could not be opened for readback.")
+     }
+ 
++    private fun android.content.Context.insertDownloadProfileJson(
++        fileName: String,
++        json: String,
++    ): android.net.Uri {
++        val values = ContentValues().apply {
++            put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
++            put(MediaStore.MediaColumns.MIME_TYPE, "application/json")
++            put(MediaStore.MediaColumns.RELATIVE_PATH, "${Environment.DIRECTORY_DOWNLOADS}/Quality Alternative/")
++        }
++        val uri = contentResolver.insert(MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY), values)
++            ?: error("Profile document could not be created for collision test.")
++        contentResolver.openOutputStream(uri, "wt")?.use { stream ->
++            OutputStreamWriter(stream, Charsets.UTF_8).use { writer ->
++                writer.write(json)
++            }
++        } ?: error("Profile document could not be written for collision test.")
++        return uri
++    }
++
+     private fun android.content.Context.profileDocumentNames(treeUri: android.net.Uri): List<String> {
+         val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(
+             treeUri,
+diff --git a/app/src/main/java/com/qualityalternative/app/data/AccountLightProfile.kt b/app/src/main/java/com/qualityalternative/app/data/AccountLightProfile.kt
+index ba569aa..db6d5ea 100644
+--- a/app/src/main/java/com/qualityalternative/app/data/AccountLightProfile.kt
++++ b/app/src/main/java/com/qualityalternative/app/data/AccountLightProfile.kt
+@@ -236,7 +236,7 @@ data class AccountLightUserDocument(
+         require(documentFormat in DocumentFormatValues) { "userDocuments documentFormat is invalid." }
+         require(title.isSafePortableTitle()) { "userDocuments title is not portable." }
+         require(description.isSafePortableDescription()) { "userDocuments description is not portable." }
+-        require(durationMinutes in 1..240) { "userDocuments durationMinutes is outside the portable range." }
++        require(durationMinutes in 1..720) { "userDocuments durationMinutes is outside the portable range." }
+         require(topicTags.isNotEmpty() && topicTags.all { it in TopicTag.entries.map(TopicTag::name) }) {
+             "userDocuments topicTags is invalid."
+         }
+@@ -1144,7 +1144,7 @@ private fun JsonObject.validateLibraryShape() {
+             .also { description ->
+                 require(description.isSafePortableDescription()) { "$path.description is not portable." }
+             }
+-        document.requireInt("durationMinutes", path, 1..240)
++        document.requireInt("durationMinutes", path, 1..720)
+         document.requireEnumArray("topicTags", path, TopicTag.entries.mapTo(mutableSetOf(), TopicTag::name), minSize = 1)
+         document.requireEnum("availability", path, AvailabilityValues)
+         val documentImportState = document.requireEnum("documentImportState", path, DocumentImportStateValues)
+@@ -1589,7 +1589,7 @@ private fun ContentItem.toAccountLightUserDocument(exportedAtMillis: Long): Acco
+         documentFormat = portableFormat.name,
+         title = portableTitle,
+         description = description.toPortableDescriptionOrFallback("Saved document metadata."),
+-        durationMinutes = durationMinutes.coerceIn(1, 240),
++        durationMinutes = durationMinutes.coerceIn(1, 720),
+         topicTags = topicTags.map { it.name }.sorted().ifEmpty { listOf(TopicTag.OTHER.name) },
+         availability = availability.name,
+         documentImportState = "MISSING_FILE_NEEDS_REATTACH",
+diff --git a/app/src/main/java/com/qualityalternative/app/data/AndroidAccountLightProfileAutosaveWriter.kt b/app/src/main/java/com/qualityalternative/app/data/AndroidAccountLightProfileAutosaveWriter.kt
+index 8b90730..90b10eb 100644
+--- a/app/src/main/java/com/qualityalternative/app/data/AndroidAccountLightProfileAutosaveWriter.kt
++++ b/app/src/main/java/com/qualityalternative/app/data/AndroidAccountLightProfileAutosaveWriter.kt
+@@ -1,16 +1,25 @@
+ package com.qualityalternative.app.data
+ 
+ import android.content.Context
++import android.content.ContentUris
++import android.content.ContentValues
+ import android.net.Uri
++import android.os.Environment
+ import android.provider.DocumentsContract
++import android.provider.MediaStore
++import com.qualityalternative.app.domain.service.AccountLightProfileBackupReader
+ import com.qualityalternative.app.domain.service.AccountLightProfileAutosaveWriter
+ import java.io.File
+ import java.io.OutputStreamWriter
+ 
+ class AndroidAccountLightProfileAutosaveWriter(
+     private val context: Context,
+-) : AccountLightProfileAutosaveWriter {
++) : AccountLightProfileAutosaveWriter, AccountLightProfileBackupReader {
+     override suspend fun writeProfileJson(uri: String, fileName: String, json: String) {
++        if (uri == DEFAULT_PROFILE_BACKUP_URI) {
++            writeDefaultProfileJson(fileName = fileName, json = json)
++            return
++        }
+         val parsedUri = Uri.parse(uri)
+         if (parsedUri.scheme == "file") {
+             val path = parsedUri.path?.takeIf(String::isNotBlank)
+@@ -34,6 +43,139 @@ class AndroidAccountLightProfileAutosaveWriter(
+             ?: error("Could not write portable profile.")
+     }
+ 
++    override suspend fun readProfileJson(uri: String, fileName: String): String? {
++        if (uri == DEFAULT_PROFILE_BACKUP_URI) {
++            return defaultProfileDocumentUri(fileName)
++                ?.let { documentUri -> runCatching { readTextFromUri(documentUri) }.getOrNull() }
++                ?: readDefaultProfileJsonFromPublicDownloads(fileName)
++        }
++        val parsedUri = Uri.parse(uri)
++        if (parsedUri.scheme == "file") {
++            val path = parsedUri.path?.takeIf(String::isNotBlank) ?: return null
++            val selected = File(path)
++            val inputFile = if (selected.isDirectory) File(selected, fileName) else selected
++            return inputFile.takeIf { it.isFile }?.readText(Charsets.UTF_8)
++        }
++        return readTextFromUri(parsedUri)
++    }
++
++    private fun writeDefaultProfileJson(fileName: String, json: String) {
++        var hadExistingDefaultProfileDocument = false
++        defaultProfileDocumentUri(fileName)?.let { profileDocumentUri ->
++            hadExistingDefaultProfileDocument = true
++            if (writeTextToUri(profileDocumentUri, json)) {
++                return
++            }
++        }
++        val profileDocumentUri = createDefaultProfileDocument(
++            fileName = fileName,
++            preferCollisionName = hadExistingDefaultProfileDocument || hasDefaultProfileFileInPublicDownloads(fileName),
++        )
++        if (!writeTextToUri(profileDocumentUri, json)) {
++            error("Could not write default portable profile backup.")
++        }
++    }
++
++    private fun writeTextToUri(uri: Uri, json: String): Boolean {
++        return runCatching {
++            context.contentResolver.openOutputStream(uri, "wt")
++                ?.use { stream ->
++                    OutputStreamWriter(stream, Charsets.UTF_8).use { writer ->
++                        writer.write(json)
++                    }
++                } != null
++        }.getOrDefault(false)
++    }
++
++    private fun createDefaultProfileDocument(fileName: String, preferCollisionName: Boolean): Uri {
++        if (!preferCollisionName) {
++            insertDefaultProfileDocument(displayName = fileName)?.let { return it }
++        }
++        insertDefaultProfileDocument(displayName = defaultProfileCollisionDisplayName(fileName))?.let { return it }
++        if (preferCollisionName) {
++            insertDefaultProfileDocument(displayName = fileName)?.let { return it }
++        }
++        error("Could not create default portable profile backup.")
++    }
++
++    private fun insertDefaultProfileDocument(displayName: String): Uri? {
++        val values = ContentValues().apply {
++            put(MediaStore.MediaColumns.DISPLAY_NAME, displayName)
++            put(MediaStore.MediaColumns.MIME_TYPE, "application/json")
++            put(MediaStore.MediaColumns.RELATIVE_PATH, DEFAULT_PROFILE_BACKUP_RELATIVE_PATH)
++        }
++        return runCatching {
++            context.contentResolver.insert(DEFAULT_DOWNLOADS_COLLECTION, values)
++        }.getOrNull()
++    }
++
++    private fun defaultProfileCollisionDisplayName(fileName: String): String {
++        val dotIndex = fileName.lastIndexOf('.')
++        val collisionToken = System.currentTimeMillis().toString()
++        return if (dotIndex > 0) {
++            "${fileName.substring(0, dotIndex)} ($collisionToken)${fileName.substring(dotIndex)}"
++        } else {
++            "$fileName ($collisionToken)"
++        }
++    }
++
++    private fun defaultProfileDocumentUri(fileName: String): Uri? {
++        val projection = arrayOf(
++            MediaStore.MediaColumns._ID,
++            MediaStore.MediaColumns.DISPLAY_NAME,
++            MediaStore.MediaColumns.RELATIVE_PATH,
++            MediaStore.MediaColumns.DATE_ADDED,
++            MediaStore.MediaColumns.DATE_MODIFIED,
++        )
++        val selection = "${MediaStore.MediaColumns.DISPLAY_NAME} LIKE ? AND ${MediaStore.MediaColumns.RELATIVE_PATH}=?"
++        val selectionArgs = arrayOf(defaultProfileDisplayNameLike(fileName), DEFAULT_PROFILE_BACKUP_RELATIVE_PATH)
++        context.contentResolver.query(
++            DEFAULT_DOWNLOADS_COLLECTION,
++            projection,
++            selection,
++            selectionArgs,
++            "${MediaStore.MediaColumns.DATE_ADDED} DESC, ${MediaStore.MediaColumns._ID} DESC",
++        )?.use { cursor ->
++            val idIndex = cursor.getColumnIndex(MediaStore.MediaColumns._ID)
++            val nameIndex = cursor.getColumnIndex(MediaStore.MediaColumns.DISPLAY_NAME)
++            while (idIndex >= 0 && nameIndex >= 0 && cursor.moveToNext()) {
++                if (isDefaultProfileFileName(fileName = fileName, displayName = cursor.getString(nameIndex))) {
++                    return ContentUris.withAppendedId(DEFAULT_DOWNLOADS_COLLECTION, cursor.getLong(idIndex))
++                }
++            }
++        }
++        return null
++    }
++
++    private fun readTextFromUri(uri: Uri): String? {
++        return context.contentResolver.openInputStream(uri)
++            ?.bufferedReader(Charsets.UTF_8)
++            ?.use { reader -> reader.readText() }
++    }
++
++    @Suppress("DEPRECATION")
++    private fun readDefaultProfileJsonFromPublicDownloads(fileName: String): String? {
++        val backupDirectory = File(
++            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
++            "Quality Alternative",
++        )
++        return backupDirectory.listFiles()
++            ?.filter { file -> file.isFile && isDefaultProfileFileName(fileName = fileName, displayName = file.name) }
++            ?.maxByOrNull(File::lastModified)
++            ?.let { file -> runCatching { file.readText(Charsets.UTF_8) }.getOrNull() }
++    }
++
++    @Suppress("DEPRECATION")
++    private fun hasDefaultProfileFileInPublicDownloads(fileName: String): Boolean {
++        val backupDirectory = File(
++            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
++            "Quality Alternative",
++        )
++        return backupDirectory.listFiles()
++            ?.any { file -> file.isFile && isDefaultProfileFileName(fileName = fileName, displayName = file.name) }
++            ?: false
++    }
++
+     private fun writeProfileJsonToTree(treeUri: Uri, fileName: String, json: String) {
+         val resolver = context.contentResolver
+         val parentDocumentId = DocumentsContract.getTreeDocumentId(treeUri)
+@@ -82,4 +224,38 @@ class AndroidAccountLightProfileAutosaveWriter(
+         }
+         return null
+     }
++
++    private fun defaultProfileDisplayNameLike(fileName: String): String {
++        val extensionIndex = fileName.lastIndexOf('.')
++        if (extensionIndex <= 0) {
++            return "$fileName%"
++        }
++        val stem = fileName.substring(0, extensionIndex)
++        val extension = fileName.substring(extensionIndex)
++        return "$stem%$extension"
++    }
++
++    private fun isDefaultProfileFileName(fileName: String, displayName: String?): Boolean {
++        val safeDisplayName = displayName ?: return false
++        if (safeDisplayName == fileName) {
++            return true
++        }
++        val extensionIndex = fileName.lastIndexOf('.')
++        if (extensionIndex <= 0) {
++            return false
++        }
++        val stem = Regex.escape(fileName.substring(0, extensionIndex))
++        val extension = Regex.escape(fileName.substring(extensionIndex))
++        return Regex("$stem \\(\\d+\\)$extension").matches(safeDisplayName)
++    }
++
++    companion object {
++        const val DEFAULT_PROFILE_BACKUP_URI = "qualityalternative://profile-backup/default"
++        const val DEFAULT_PROFILE_BACKUP_DISPLAY_NAME =
++            "Downloads/Quality Alternative/quality-alternative-profile.json"
++        private val DEFAULT_DOWNLOADS_COLLECTION: Uri =
++            MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
++        private val DEFAULT_PROFILE_BACKUP_RELATIVE_PATH =
++            "${Environment.DIRECTORY_DOWNLOADS}/Quality Alternative/"
++    }
+ }
+diff --git a/app/src/main/java/com/qualityalternative/app/data/AppContainer.kt b/app/src/main/java/com/qualityalternative/app/data/AppContainer.kt
+index dfb3578..d9af40e 100644
+--- a/app/src/main/java/com/qualityalternative/app/data/AppContainer.kt
++++ b/app/src/main/java/com/qualityalternative/app/data/AppContainer.kt
+@@ -38,9 +38,10 @@ class AppContainer(context: Context) {
+     internal val appScope = CoroutineScope(appJob + Dispatchers.IO)
+     private val database = QualityAlternativeDatabase.build(context)
+     private val annotationSyncDirectory = File(context.filesDir, "annotation-sync").apply { mkdirs() }
+-    private val profileBackupDirectory = File(context.filesDir, "profile-backup").apply { mkdirs() }
+     val defaultAnnotationExportUri: String = Uri.fromFile(annotationSyncDirectory).toString()
+-    val defaultProfileAutosaveUri: String = Uri.fromFile(profileBackupDirectory).toString()
++    val defaultProfileAutosaveUri: String = AndroidAccountLightProfileAutosaveWriter.DEFAULT_PROFILE_BACKUP_URI
++    val defaultProfileAutosaveDisplayName: String =
++        AndroidAccountLightProfileAutosaveWriter.DEFAULT_PROFILE_BACKUP_DISPLAY_NAME
+ 
+     val analyticsTracker: AnalyticsTracker = RoomAnalyticsTracker(
+         dao = database.analyticsEventDao(),
+diff --git a/app/src/main/java/com/qualityalternative/app/data/ReadingTimeEstimator.kt b/app/src/main/java/com/qualityalternative/app/data/ReadingTimeEstimator.kt
+index 4b585fc..4005b50 100644
+--- a/app/src/main/java/com/qualityalternative/app/data/ReadingTimeEstimator.kt
++++ b/app/src/main/java/com/qualityalternative/app/data/ReadingTimeEstimator.kt
+@@ -18,6 +18,7 @@ object ReadingTimeEstimator {
+     private const val WORDS_PER_MINUTE = 225.0
+     const val MIN_SESSION_MINUTES = 3
+     const val MAX_SESSION_MINUTES = 20
++    const val MAX_DOCUMENT_MINUTES = 720
+     const val DEFAULT_LINK_MINUTES = 8
+     const val DEFAULT_PDF_MINUTES = 10
+     const val DEFAULT_DOCUMENT_MINUTES = 10
+@@ -26,7 +27,7 @@ object ReadingTimeEstimator {
+         val words = countWords(text)
+         val rawMinutes = ceil(words / WORDS_PER_MINUTE).toInt()
+         return ReadingTimeEstimate(
+-            minutes = rawMinutes.coerceIn(MIN_SESSION_MINUTES, MAX_SESSION_MINUTES),
++            minutes = rawMinutes.coerceIn(MIN_SESSION_MINUTES, MAX_DOCUMENT_MINUTES),
+             wordCount = words,
+             source = ReadingTimeEstimateSource.EXTRACTED_TEXT,
+         )
+diff --git a/app/src/main/java/com/qualityalternative/app/domain/service/Contracts.kt b/app/src/main/java/com/qualityalternative/app/domain/service/Contracts.kt
+index a55372b..4f84754 100644
+--- a/app/src/main/java/com/qualityalternative/app/domain/service/Contracts.kt
++++ b/app/src/main/java/com/qualityalternative/app/domain/service/Contracts.kt
+@@ -148,6 +148,10 @@ interface AccountLightProfileAutosaveWriter {
+     suspend fun writeProfileJson(uri: String, fileName: String, json: String)
+ }
+ 
++interface AccountLightProfileBackupReader {
++    suspend fun readProfileJson(uri: String, fileName: String): String?
++}
++
+ interface RecommendationEngine {
+     fun generate(
+         targetApp: DistractingApp,
+diff --git a/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt b/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
+index ca6fd87..5a3444f 100644
+--- a/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
++++ b/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
+@@ -71,6 +71,7 @@ import com.qualityalternative.app.domain.model.usesExternalHandoff
+ import com.qualityalternative.app.domain.model.usesMeditationTimer
+ import com.qualityalternative.app.domain.model.usesRepositoryBody
+ import com.qualityalternative.app.domain.service.AccountLightProfileAutosaveWriter
++import com.qualityalternative.app.domain.service.AccountLightProfileBackupReader
+ import com.qualityalternative.app.domain.service.AddUserDocumentResult
+ import com.qualityalternative.app.domain.service.AddUserLinkResult
+ import com.qualityalternative.app.domain.service.AnalyticsTracker
+@@ -290,6 +291,7 @@ class MainViewModel(
+         knownContentIdsProvider = { contentRepository.inventory().mapTo(mutableSetOf(), ContentItem::id) },
+     ),
+     private val accountLightProfileAutosaveWriter: AccountLightProfileAutosaveWriter = NoOpAccountLightProfileAutosaveWriter,
++    private val accountLightProfileBackupReader: AccountLightProfileBackupReader = NoOpAccountLightProfileBackupReader,
+     private val defaultAnnotationExportUri: String? = null,
+     private val defaultAnnotationExportDisplayName: String = LOCAL_ANNOTATION_EXPORT_DISPLAY_NAME,
+     private val defaultProfileAutosaveUri: String? = null,
+@@ -2562,7 +2564,7 @@ class MainViewModel(
+                 profileAutosaveLastSuccessfulAtMillis = null,
+                 profileAutosaveLastError = null,
+                 latestMessage = if (hasDefault) {
+-                    "Profile backup returned to app storage."
++                    "Profile backup returned to the default folder."
+                 } else {
+                     "Profile autosave disabled."
+                 },
+@@ -2588,6 +2590,116 @@ class MainViewModel(
+         }
+     }
+ 
++    fun previewDefaultAccountLightProfileImport() {
++        loadDefaultAccountLightProfileImport(applyImmediately = false)
++    }
++
++    fun restoreDefaultAccountLightProfileFromOnboarding() {
++        loadDefaultAccountLightProfileImport(applyImmediately = true)
++    }
++
++    private fun loadDefaultAccountLightProfileImport(applyImmediately: Boolean) {
++        val uri = normalizedDefaultProfileAutosaveUri()
++        if (uri == null) {
++            uiState = uiState.copy(latestMessage = "No default profile backup location is available.")
++            return
++        }
++        viewModelScope.launch {
++            uiState = uiState.copy(
++                isAccountLightImporting = true,
++                accountLightImportError = null,
++                accountLightStatus = "Checking default profile backup...",
++            )
++            val rawJson = try {
++                withContext(documentWorkDispatcher) {
++                    accountLightProfileBackupReader.readProfileJson(
++                        uri = uri,
++                        fileName = ACCOUNT_LIGHT_PROFILE_FILE_NAME,
++                    )
++                }
++            } catch (exception: CancellationException) {
++                uiState = uiState.copy(isAccountLightImporting = false)
++                throw exception
++            } catch (exception: Exception) {
++                null
++            }
++            if (rawJson.isNullOrBlank()) {
++                pendingAccountLightImportPlan = null
++                uiState = uiState.copy(
++                    isAccountLightImporting = false,
++                    accountLightImportPreview = null,
++                    accountLightImportError = "No profile backup found at $defaultProfileAutosaveDisplayName.",
++                    accountLightStatus = null,
++                    isAccountLightReplaceConfirming = false,
++                    screen = if (uiState.hasCompletedOnboarding) uiState.screen else MainScreen.Onboarding,
++                    latestMessage = "No profile backup found.",
++                )
++                return@launch
++            }
++            val plan = try {
++                accountLightProfileImporter.validateImportProfileJson(rawJson)
++            } catch (exception: AccountLightImportException) {
++                pendingAccountLightImportPlan = null
++                uiState = uiState.copy(
++                    isAccountLightImporting = false,
++                    accountLightImportPreview = null,
++                    accountLightImportError = exception.message ?: "Default profile backup is invalid.",
++                    accountLightStatus = null,
++                    isAccountLightReplaceConfirming = false,
++                    latestMessage = "Default profile backup is invalid.",
++                )
++                return@launch
++            } catch (exception: Exception) {
++                pendingAccountLightImportPlan = null
++                uiState = uiState.copy(
++                    isAccountLightImporting = false,
++                    accountLightImportPreview = null,
++                    accountLightImportError = "Default profile backup is invalid.",
++                    accountLightStatus = null,
++                    isAccountLightReplaceConfirming = false,
++                    latestMessage = "Default profile backup is invalid.",
++                )
++                return@launch
++            }
++            if (!applyImmediately) {
++                pendingAccountLightImportPlan = plan
++                uiState = uiState.copy(
++                    isAccountLightImporting = false,
++                    accountLightImportPreview = plan.preview,
++                    accountLightImportError = null,
++                    accountLightStatus = "Default profile backup ready to import.",
++                    isAccountLightReplaceConfirming = false,
++                    latestMessage = "Review default profile backup before replacing local data.",
++                )
++                return@launch
++            }
++            try {
++                accountLightProfileImporter.applyReplace(plan)
++                val profileAutosaved = autosaveAccountLightProfileIfConfigured(nowMillis = nowProvider())
++                pendingAccountLightImportPlan = null
++                uiState = uiState.copy(
++                    isAccountLightImporting = false,
++                    accountLightImportPreview = null,
++                    accountLightImportError = null,
++                    accountLightStatus = "Default backup restored from $defaultProfileAutosaveDisplayName.",
++                    isAccountLightReplaceConfirming = false,
++                    latestMessage = "Portable profile restored.".withProfileAutosaveResult(profileAutosaved),
++                )
++            } catch (exception: CancellationException) {
++                uiState = uiState.copy(isAccountLightImporting = false)
++                throw exception
++            } catch (exception: Exception) {
++                uiState = uiState.copy(
++                    isAccountLightImporting = false,
++                    accountLightImportError = "Default backup restore failed before any settings were changed.",
++                    accountLightStatus = null,
++                    isAccountLightReplaceConfirming = false,
++                    latestMessage = "Default profile backup restore failed.",
++                )
++            }
++        }
++    }
++
+     fun previewAccountLightImport(rawJson: String) {
+         val plan = try {
+             accountLightProfileImporter.validateImportProfileJson(rawJson)
+@@ -3761,9 +3873,11 @@ class MainViewModelFactory(
+             accountLightProfileExporter = appContainer.accountLightProfileExporter,
+             accountLightProfileImporter = appContainer.accountLightProfileImporter,
+             accountLightProfileAutosaveWriter = appContainer.accountLightProfileAutosaveWriter,
++            accountLightProfileBackupReader = appContainer.accountLightProfileAutosaveWriter,
+             progressPersistenceScope = appContainer.appScope,
+             defaultAnnotationExportUri = appContainer.defaultAnnotationExportUri,
+             defaultProfileAutosaveUri = appContainer.defaultProfileAutosaveUri,
++            defaultProfileAutosaveDisplayName = appContainer.defaultProfileAutosaveDisplayName,
+             interceptionMonitor = appContainer.interceptionMonitor,
+         ) as T
+     }
+@@ -4375,6 +4489,10 @@ private object NoOpAccountLightProfileAutosaveWriter : AccountLightProfileAutosa
+     override suspend fun writeProfileJson(uri: String, fileName: String, json: String) = Unit
+ }
+ 
++private object NoOpAccountLightProfileBackupReader : AccountLightProfileBackupReader {
++    override suspend fun readProfileJson(uri: String, fileName: String): String? = null
++}
++
+ private data class AnnotationAutosaveResult(
+     val fileResult: Boolean?,
+     val driveResult: Boolean?,
+diff --git a/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt b/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
+index 952bf3c..c7ac941 100644
+--- a/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
++++ b/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
+@@ -5,8 +5,9 @@ import android.content.ActivityNotFoundException
+ import android.content.Context
+ import android.content.ContextWrapper
+ import android.content.Intent
+-import android.media.AudioManager
+-import android.media.ToneGenerator
++import android.media.AudioAttributes
++import android.media.AudioFormat
++import android.media.AudioTrack
+ import android.net.Uri
+ import android.provider.OpenableColumns
+ import android.provider.Settings
+@@ -178,9 +179,11 @@ import java.time.ZoneId
+ import java.time.format.DateTimeFormatter
+ import java.util.Locale
+ import kotlin.math.abs
++import kotlin.math.exp
+ import kotlin.math.floor
+ import kotlin.math.min
+ import kotlin.math.roundToInt
++import kotlin.math.sin
+ import kotlinx.coroutines.Dispatchers
+ import kotlinx.coroutines.delay
+ import kotlinx.coroutines.launch
+@@ -233,9 +236,11 @@ fun QualityAlternativeApp(
+                             !uiState.hasCompletedOnboarding -> OnboardingFlow(
+                                 selection = uiState.onboardingSelection,
+                                 supportedApps = uiState.allSupportedApps,
++                                restoreStatus = uiState.accountLightStatus ?: uiState.accountLightImportError,
+                                 onToggleApp = viewModel::toggleOnboardingApp,
+                                 onToggleTopic = viewModel::toggleOnboardingTopic,
+                                 onSelectDuration = viewModel::setOnboardingDuration,
++                                onRestoreProfile = viewModel::restoreDefaultAccountLightProfileFromOnboarding,
+                                 onComplete = viewModel::completeOnboarding,
+                             )
+ 
+@@ -504,9 +509,11 @@ private fun MainRoute(
+             MainScreen.Onboarding -> OnboardingFlow(
+                 selection = state.onboardingSelection,
+                 supportedApps = state.allSupportedApps,
++                restoreStatus = state.accountLightStatus ?: state.accountLightImportError,
+                 onToggleApp = viewModel::toggleOnboardingApp,
+                 onToggleTopic = viewModel::toggleOnboardingTopic,
+                 onSelectDuration = viewModel::setOnboardingDuration,
++                onRestoreProfile = viewModel::restoreDefaultAccountLightProfileFromOnboarding,
+                 onComplete = viewModel::completeOnboarding,
+             )
+ 
+@@ -611,6 +618,7 @@ private fun MainRoute(
+                 onExportAccountLightProfile = { accountLightExportPicker.launch(ACCOUNT_LIGHT_PROFILE_FILE_NAME) },
+                 onExportAccountLightBackup = { accountLightExportPicker.launch(accountLightTimestampedBackupFileName()) },
+                 onImportAccountLightProfile = { accountLightImportPicker.launch(arrayOf("application/json", "text/json", "*/*")) },
++                onImportDefaultAccountLightProfile = viewModel::previewDefaultAccountLightProfileImport,
+                 onSelectAccountLightAutosave = { profileAutosavePicker.launch(null) },
+                 onRetryAccountLightAutosave = { viewModel.retryAccountLightProfileAutosave() },
+                 onClearAccountLightAutosave = {
+@@ -908,14 +916,20 @@ private fun TabGlyphIcon(icon: TabGlyph, color: Color) {
+ private fun OnboardingFlow(
+     selection: OnboardingSelection,
+     supportedApps: List<DistractingApp>,
++    restoreStatus: String?,
+     onToggleApp: (DistractingApp) -> Unit,
+     onToggleTopic: (TopicTag) -> Unit,
+     onSelectDuration: (DurationBucket) -> Unit,
++    onRestoreProfile: () -> Unit,
+     onComplete: () -> Unit,
+ ) {
+     var step by remember { mutableStateOf(0) }
+     when (step) {
+-        0 -> OnboardingWelcome(onNext = { step = 1 })
++        0 -> OnboardingWelcome(
++            restoreStatus = restoreStatus,
++            onRestoreProfile = onRestoreProfile,
++            onNext = { step = 1 },
++        )
+         1 -> OnboardingApps(
+             selection = selection,
+             supportedApps = supportedApps,
+@@ -943,7 +957,11 @@ private fun OnboardingFlow(
+ }
+ 
+ @Composable
+-private fun OnboardingWelcome(onNext: () -> Unit) {
++private fun OnboardingWelcome(
++    restoreStatus: String?,
++    onRestoreProfile: () -> Unit,
++    onNext: () -> Unit,
++) {
+     Column(
+         modifier = Modifier
+             .fillMaxSize()
+@@ -979,6 +997,22 @@ private fun OnboardingWelcome(onNext: () -> Unit) {
+             WelcomeValue("Return", "Back to your day.")
+         }
+         QaButton(text = "Begin", onClick = onNext, variant = QaButtonVariant.Primary, trailingIcon = QaIconKind.ArrowRight)
++        QaButton(
++            text = "Restore profile",
++            onClick = onRestoreProfile,
++            variant = QaButtonVariant.Ghost,
++            leadingIcon = QaIconKind.External,
++            modifier = Modifier.testTag("onboarding-restore-profile"),
++        )
++        restoreStatus?.takeIf(String::isNotBlank)?.let { status ->
++            MonoText(
++                text = status,
++                color = QualityAlternativeThemeTokens.colors.mutedText,
++                maxLines = 2,
++                overflow = TextOverflow.Ellipsis,
++                modifier = Modifier.padding(top = 8.dp).testTag("onboarding-restore-profile-status"),
++            )
++        }
+     }
+ }
+ 
+@@ -1276,7 +1310,7 @@ private fun HomeTab(
+             }
+         }
+         item {
+-            SectionLabel("Your library", right = "${quantityLabel(totalItems, "item")} · $totalMins min")
++            SectionLabel("Your library", right = "${quantityLabel(totalItems, "item")} · ${durationLabel(totalMins)}")
+             QaCard(padding = 0.dp) {
+                 LibrarySummaryRow("Editorial picks", quantityLabel(editorialItems.size, "pick"), ContentSourceType.EDITORIAL)
+                 HorizontalDivider(color = QualityAlternativeThemeTokens.colors.line)
+@@ -1773,7 +1807,7 @@ private fun DocumentImportRow(candidate: DocumentImportCandidate) {
+             modifier = Modifier.padding(top = 3.dp),
+         )
+         Text(
+-            text = "${candidate.displayName} · ${candidate.durationMinutes} min · ${candidate.estimateSource.displayLabel()}",
++            text = "${candidate.displayName} · ${durationLabel(candidate.durationMinutes.toIntOrNull() ?: 0)} · ${candidate.estimateSource.displayLabel()}",
+             style = MaterialTheme.typography.bodyMedium.copy(
+                 fontSize = 12.sp,
+                 lineHeight = 16.sp,
+@@ -3325,11 +3359,6 @@ private fun MeditationTimerScreen(
+     val totalMillis = (content.durationMinutes * 60_000L).coerceAtLeast(1L)
+     var nowMillis by remember(content.id, startedAtMillis) { mutableStateOf(System.currentTimeMillis()) }
+     var hasPlayedGong by remember(content.id, startedAtMillis) { mutableStateOf(false) }
+-    val toneGenerator = remember { runCatching { ToneGenerator(AudioManager.STREAM_MUSIC, 85) }.getOrNull() }
+-
+-    DisposableEffect(toneGenerator) {
+-        onDispose { toneGenerator?.release() }
+-    }
+ 
+     LaunchedEffect(content.id, startedAtMillis) {
+         while (true) {
+@@ -3344,7 +3373,7 @@ private fun MeditationTimerScreen(
+ 
+     LaunchedEffect(isComplete) {
+         if (isComplete && !hasPlayedGong) {
+-            toneGenerator?.startTone(ToneGenerator.TONE_PROP_ACK, 900)
++            MeditationGong.play()
+             hasPlayedGong = true
+         }
+     }
+@@ -3385,7 +3414,7 @@ private fun MeditationTimerScreen(
+                 testTagPrefix = "timer-meditation-duration",
+             )
+             BodyText(
+-                text = "No feed. Just ${content.durationMinutes} minutes back.",
++                text = "No feed. Just ${durationLabel(content.durationMinutes)} back.",
+                 color = QualityAlternativeThemeTokens.colors.mutedText,
+                 textAlign = TextAlign.Center,
+                 modifier = Modifier
+@@ -3416,7 +3445,7 @@ private fun MeditationTimerScreen(
+                     text = if (isComplete) {
+                         "Reset complete. The gong marks the end - log it if it helped."
+                     } else {
+-                        "A gong will sound when the timer ends."
++                        "A calm gong will sound when the timer ends."
+                     },
+                     color = QualityAlternativeThemeTokens.colors.mutedText,
+                     textAlign = TextAlign.Center,
+@@ -3787,6 +3816,7 @@ private fun SettingsTab(
+     onExportAccountLightProfile: () -> Unit,
+     onExportAccountLightBackup: () -> Unit,
+     onImportAccountLightProfile: () -> Unit,
++    onImportDefaultAccountLightProfile: () -> Unit,
+     onSelectAccountLightAutosave: () -> Unit,
+     onRetryAccountLightAutosave: () -> Unit,
+     onClearAccountLightAutosave: () -> Unit,
+@@ -3959,6 +3989,7 @@ private fun SettingsTab(
+                 onExport = onExportAccountLightProfile,
+                 onExportBackup = onExportAccountLightBackup,
+                 onImport = onImportAccountLightProfile,
++                onImportDefault = onImportDefaultAccountLightProfile,
+                 onSelectAutosave = onSelectAccountLightAutosave,
+                 onRetryAutosave = onRetryAccountLightAutosave,
+                 onClearAutosave = onClearAccountLightAutosave,
+@@ -4083,6 +4114,7 @@ private fun AccountLightSettingsSection(
+     onExport: () -> Unit,
+     onExportBackup: () -> Unit,
+     onImport: () -> Unit,
++    onImportDefault: () -> Unit,
+     onSelectAutosave: () -> Unit,
+     onRetryAutosave: () -> Unit,
+     onClearAutosave: () -> Unit,
+@@ -4146,6 +4178,17 @@ private fun AccountLightSettingsSection(
+                     modifier = Modifier.weight(1f).testTag("settings-account-light-import"),
+                 )
+             }
++            QaButton(
++                text = if (state.isAccountLightImporting) "Checking backup" else "Restore default backup",
++                onClick = onImportDefault,
++                variant = QaButtonVariant.Ghost,
++                size = QaButtonSize.Small,
++                enabled = !state.isAccountLightImporting,
++                leadingIcon = QaIconKind.External,
++                modifier = Modifier
++                    .padding(top = 8.dp)
++                    .testTag("settings-account-light-import-default"),
++            )
+             HorizontalDivider(
+                 color = colors.line,
+                 modifier = Modifier.padding(vertical = 12.dp),
+@@ -4241,11 +4284,11 @@ private fun AccountLightAutosaveControls(
+             )
+         }
+         if (configured && !usesLocalDefault) {
+-            QaButton(
+-                text = "Use app storage",
+-                onClick = onClearAutosave,
+-                variant = QaButtonVariant.Ghost,
+-                size = QaButtonSize.Small,
++                QaButton(
++                    text = "Use default folder",
++                    onClick = onClearAutosave,
++                    variant = QaButtonVariant.Ghost,
++                    size = QaButtonSize.Small,
+                 enabled = !state.isProfileAutosaving,
+                 modifier = Modifier.testTag("settings-account-light-autosave-clear"),
+             )
+@@ -4848,7 +4891,7 @@ private fun ActiveDelayCard(
+         )
+         suggestion?.let { content ->
+             QaButton(
+-                text = "Read a ${content.durationMinutes} min alternative",
++                text = "Read a ${durationLabel(content.durationMinutes)} alternative",
+                 onClick = onReadAlternative,
+                 variant = QaButtonVariant.Outline,
+                 size = QaButtonSize.Small,
+@@ -4885,7 +4928,7 @@ private fun ContinueReadingCard(
+         )
+         ProgressLine(progress = progress.progressPercent)
+         BodyText(
+-            text = "${progress.progressPercent}% read · ${remainingMinutes(item.durationMinutes, progress.progressPercent)} min left",
++            text = "${progress.progressPercent}% read · ${durationLabel(remainingMinutes(item.durationMinutes, progress.progressPercent))} left",
+             color = colors.mutedText,
+             fontSize = 12.5.sp,
+             modifier = Modifier.padding(top = 8.dp, bottom = 12.dp),
+@@ -4926,7 +4969,7 @@ private fun ReadNowCard(
+                     fontSize = 18.sp,
+                     lineHeight = 21.sp,
+                 )
+-                MonoText("${quantityLabel(totalItems, "item")} · $totalMinutes min", modifier = Modifier.padding(top = 4.dp))
++                MonoText("${quantityLabel(totalItems, "item")} · ${durationLabel(totalMinutes)}", modifier = Modifier.padding(top = 4.dp))
+             }
+             QaButton(
+                 text = "Library",
+@@ -5066,7 +5109,7 @@ private fun LibraryItemCard(
+             ) {
+                 ProgressLine(progress = progress.progressPercent)
+                 BodyText(
+-                    text = "${progress.progressPercent}% read · ${remainingMinutes(item.durationMinutes, progress.progressPercent)} min left",
++                    text = "${progress.progressPercent}% read · ${durationLabel(remainingMinutes(item.durationMinutes, progress.progressPercent))} left",
+                     color = QualityAlternativeThemeTokens.colors.mutedText,
+                     fontSize = 12.5.sp,
+                     modifier = Modifier.padding(top = 6.dp),
+@@ -5211,7 +5254,7 @@ private fun ContentMetaRow(item: ContentItem, stacked: Boolean = false) {
+         }
+         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+             QaIcon(kind = QaIconKind.Clock, color = QualityAlternativeThemeTokens.colors.faintText, size = 14.dp)
+-            MonoText("${item.durationMinutes} min")
++            MonoText(durationLabel(item.durationMinutes))
+         }
+     }
+ }
+@@ -5228,7 +5271,7 @@ private fun BackupRow(
+     val accessibilityLabel = if (continueProgress != null) {
+         "${item.title}, ${continueProgress.label}"
+     } else {
+-        "${item.title}, ${item.durationMinutes} min"
++        "${item.title}, ${durationLabel(item.durationMinutes)}"
+     }
+     Row(
+         modifier = modifier
+@@ -5272,7 +5315,7 @@ private fun BackupRow(
+                 )
+             } else {
+                 MonoText(
+-                    text = "Try instead · ${item.durationMinutes} min",
++                    text = "Try instead · ${durationLabel(item.durationMinutes)}",
+                     color = colors.accent,
+                     modifier = Modifier.padding(bottom = 2.dp),
+                     maxLines = 1,
+@@ -5311,7 +5354,7 @@ private fun MeditationAlternativeCard(
+         modifier = modifier
+             .fillMaxWidth()
+             .semantics {
+-                contentDescription = "Calm reset, ${item.title}, ${item.durationMinutes} min"
++                contentDescription = "Calm reset, ${item.title}, ${durationLabel(item.durationMinutes)}"
+             },
+         shape = RoundedCornerShape(18.dp),
+         color = colors.successSoft,
+@@ -5380,7 +5423,7 @@ private data class ContinueProgressMeta(
+     val progressPercent: Int,
+     val remainingMinutes: Int,
+ ) {
+-    val label: String = "$progressPercent% read · $remainingMinutes min left"
++    val label: String = "$progressPercent% read · ${durationLabel(remainingMinutes)} left"
+ }
+ 
+ @Composable
+@@ -7904,6 +7947,20 @@ private fun DurationBucket.prototypeMinutes(): Int {
+ 
+ private fun DurationBucket.prototypeMinutesLabel(): String = "${prototypeMinutes()} min"
+ 
++private fun durationLabel(totalMinutes: Int): String {
++    val safeMinutes = totalMinutes.coerceAtLeast(0)
++    if (safeMinutes < 60) {
++        return "$safeMinutes min"
++    }
++    val hours = safeMinutes / 60
++    val minutes = safeMinutes % 60
++    return if (minutes == 0) {
++        "$hours hr"
++    } else {
++        "$hours hr $minutes min"
++    }
++}
++
+ private fun ContentItem.isUserLink(): Boolean = sourceType == ContentSourceType.USER_LINK
+ 
+ private fun ContentItem.isUserDocument(): Boolean = sourceType == ContentSourceType.USER_DOCUMENT
+@@ -7912,10 +7969,10 @@ private fun ContentItem.isUserContent(): Boolean = isUserLink() || isUserDocumen
+ 
+ private fun primaryActionLabel(item: ContentItem): String {
+     return when {
+-        item.usesMeditationTimer() -> "Start timer · ${item.durationMinutes} min"
+-        item.isUserDocument() && item.usesExternalHandoff() -> "Open file · ${item.durationMinutes} min"
+-        item.usesExternalHandoff() -> "Open link · ${item.durationMinutes} min"
+-        else -> "Read this · ${item.durationMinutes} min"
++        item.usesMeditationTimer() -> "Start timer · ${durationLabel(item.durationMinutes)}"
++        item.isUserDocument() && item.usesExternalHandoff() -> "Open file · ${durationLabel(item.durationMinutes)}"
++        item.usesExternalHandoff() -> "Open link · ${durationLabel(item.durationMinutes)}"
++        else -> "Read this · ${durationLabel(item.durationMinutes)}"
+     }
+ }
+ 
+@@ -7933,6 +7990,51 @@ private fun meditationTimeLabel(totalSeconds: Int): String {
+     return "%d:%02d".format(Locale.US, minutes, seconds)
+ }
+ 
++private object MeditationGong {
++    fun play() {
++        runCatching {
++            val sampleRate = 44_100
++            val durationSeconds = 2.4
++            val sampleCount = (sampleRate * durationSeconds).toInt()
++            val samples = ShortArray(sampleCount)
++            for (index in samples.indices) {
++                val t = index.toDouble() / sampleRate
++                val envelope = exp(-1.55 * t)
++                val tone = 0.72 * sin(2.0 * Math.PI * 220.0 * t) +
++                    0.28 * sin(2.0 * Math.PI * 330.0 * t) +
++                    0.16 * sin(2.0 * Math.PI * 440.0 * t)
++                samples[index] = (Short.MAX_VALUE * 0.62 * envelope * tone)
++                    .roundToInt()
++                    .coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt())
++                    .toShort()
++            }
++            val audioTrack = AudioTrack.Builder()
++                .setAudioAttributes(
++                    AudioAttributes.Builder()
++                        .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
++                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
++                        .build(),
++                )
++                .setAudioFormat(
++                    AudioFormat.Builder()
++                        .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
++                        .setSampleRate(sampleRate)
++                        .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
++                        .build(),
++                )
++                .setTransferMode(AudioTrack.MODE_STATIC)
++                .setBufferSizeInBytes(samples.size * Short.SIZE_BYTES)
++                .build()
++            audioTrack.write(samples, 0, samples.size)
++            audioTrack.play()
++            Thread {
++                Thread.sleep((durationSeconds * 1_000).toLong() + 200L)
++                runCatching { audioTrack.release() }
++            }.start()
++        }
++    }
++}
++
+ private fun ContentItem.topicLine(): String {
+     return topicTags.joinToString { it.displayName() }.ifBlank { "Essays" }
+ }
+@@ -8052,12 +8154,12 @@ private fun profileAutosaveStatusText(state: MainUiState): String {
+     }
+     return state.profileAutosaveLastSuccessfulAtMillis?.let { timestampMillis ->
+         if (state.profileAutosaveUsesLocalDefault) {
+-            "Local backup saved ${annotationUpdatedLabel(timestampMillis)}"
++            "Default backup saved ${annotationUpdatedLabel(timestampMillis)}"
+         } else {
+             "Last saved ${annotationUpdatedLabel(timestampMillis)}"
+         }
+     } ?: when {
+-        state.profileAutosaveUsesLocalDefault -> "Stores the profile backup in app storage"
++        state.profileAutosaveUsesLocalDefault -> "Stores the profile backup in the default Downloads folder"
+         !state.profileAutosaveUri.isNullOrBlank() -> "Ready to save profile backups"
+         else -> "No profile backup destination selected"
+     }
+@@ -8135,7 +8237,7 @@ private fun DistractingApp.dotColor(): Color {
+ }
+ 
+ internal fun recentReplacementDurationLabel(entry: ReplacementHistoryEntry): String {
+-    return "${entry.contentDurationMinutes} min"
++    return durationLabel(entry.contentDurationMinutes)
+ }
+ 
+ private fun List<AnalyticsEvent>.distinctProgressEventCount(type: AnalyticsEventType): Int {
+@@ -8223,7 +8325,7 @@ private fun addSuccessMeta(saved: AddLinkConfirmation): String {
+     val savedLabel = if (saved.savedCount > 1) "${saved.savedCount} files" else saved.host
+     val skipped = if (saved.skippedCount > 0) " · ${saved.skippedCount} skipped" else ""
+     val priority = if (saved.priorityMarked) " · priority" else ""
+-    return "$savedLabel · ${saved.durationMinutes} min · ${saved.topicLabel}$priority$skipped"
++    return "$savedLabel · ${durationLabel(saved.durationMinutes)} · ${saved.topicLabel}$priority$skipped"
+ }
+ 
+ private fun launchExternalLink(
+diff --git a/app/src/test/java/com/qualityalternative/app/data/DocumentReadingTimeEstimatorTest.kt b/app/src/test/java/com/qualityalternative/app/data/DocumentReadingTimeEstimatorTest.kt
+index 9ca1c24..bab7d73 100644
+--- a/app/src/test/java/com/qualityalternative/app/data/DocumentReadingTimeEstimatorTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/data/DocumentReadingTimeEstimatorTest.kt
+@@ -13,14 +13,16 @@ class DocumentReadingTimeEstimatorTest {
+     fun markdownImportPathEstimatesShortNormalAndVeryLongText() {
+         assertDocumentEstimate(ContentFormat.MARKDOWN, markdownBytes(100), expectedMinutes = 3, expectedWords = 100)
+         assertDocumentEstimate(ContentFormat.MARKDOWN, markdownBytes(1_125), expectedMinutes = 5, expectedWords = 1_125)
+-        assertDocumentEstimate(ContentFormat.MARKDOWN, markdownBytes(10_000), expectedMinutes = 20, expectedWords = 10_000)
++        assertDocumentEstimate(ContentFormat.MARKDOWN, markdownBytes(10_000), expectedMinutes = 45, expectedWords = 10_000)
++        assertDocumentEstimate(ContentFormat.MARKDOWN, markdownBytes(220_000), expectedMinutes = 720, expectedWords = 220_000)
+     }
+ 
+     @Test
+     fun epubImportPathEstimatesShortNormalAndVeryLongExtractedText() {
+         assertDocumentEstimate(ContentFormat.EPUB, epubBytes(100), expectedMinutes = 3, expectedWords = 100)
+         assertDocumentEstimate(ContentFormat.EPUB, epubBytes(1_125), expectedMinutes = 5, expectedWords = 1_125)
+-        assertDocumentEstimate(ContentFormat.EPUB, epubBytes(10_000), expectedMinutes = 20, expectedWords = 10_000)
++        assertDocumentEstimate(ContentFormat.EPUB, epubBytes(10_000), expectedMinutes = 45, expectedWords = 10_000)
++        assertDocumentEstimate(ContentFormat.EPUB, epubBytes(220_000), expectedMinutes = 720, expectedWords = 220_000)
+     }
+ 
+     @Test
+diff --git a/app/src/test/java/com/qualityalternative/app/data/ReadingTimeEstimatorTest.kt b/app/src/test/java/com/qualityalternative/app/data/ReadingTimeEstimatorTest.kt
+index edca820..6e93415 100644
+--- a/app/src/test/java/com/qualityalternative/app/data/ReadingTimeEstimatorTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/data/ReadingTimeEstimatorTest.kt
+@@ -5,18 +5,21 @@ import org.junit.Test
+ 
+ class ReadingTimeEstimatorTest {
+     @Test
+-    fun estimateFromTextBoundsShortAndVeryLongDocumentsToSessionRange() {
++    fun estimateFromTextUsesFullDocumentTimeWithSafetyCap() {
+         assertEquals(3, ReadingTimeEstimator.estimateFromText("one two three").minutes)
+ 
+         val longText = List(10_000) { "word" }.joinToString(" ")
+         val estimate = ReadingTimeEstimator.estimateFromText(longText)
+ 
+-        assertEquals(20, estimate.minutes)
++        assertEquals(45, estimate.minutes)
+         assertEquals(10_000, estimate.wordCount)
+         assertEquals(ReadingTimeEstimateSource.EXTRACTED_TEXT, estimate.source)
+ 
+         val normalText = List(1_125) { "word" }.joinToString(" ")
+         assertEquals(5, ReadingTimeEstimator.estimateFromText(normalText).minutes)
++
++        val hugeText = List(220_000) { "word" }.joinToString(" ")
++        assertEquals(720, ReadingTimeEstimator.estimateFromText(hugeText).minutes)
+     }
+ 
+     @Test
+diff --git a/app/src/test/java/com/qualityalternative/app/ui/DocumentImportCandidateFactoryTest.kt b/app/src/test/java/com/qualityalternative/app/ui/DocumentImportCandidateFactoryTest.kt
+index 8c15471..b14d0ef 100644
+--- a/app/src/test/java/com/qualityalternative/app/ui/DocumentImportCandidateFactoryTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/ui/DocumentImportCandidateFactoryTest.kt
+@@ -14,14 +14,16 @@ class DocumentImportCandidateFactoryTest {
+     fun pickedMarkdownCandidateUsesExtractedEstimateForShortNormalAndVeryLongFiles() {
+         assertCandidateEstimate("short.md", "text/markdown", markdownBytes(100), ContentFormat.MARKDOWN, 3, 100)
+         assertCandidateEstimate("normal.markdown", "text/markdown", markdownBytes(1_125), ContentFormat.MARKDOWN, 5, 1_125)
+-        assertCandidateEstimate("long.md", "text/markdown", markdownBytes(10_000), ContentFormat.MARKDOWN, 20, 10_000)
++        assertCandidateEstimate("long.md", "text/markdown", markdownBytes(10_000), ContentFormat.MARKDOWN, 45, 10_000)
++        assertCandidateEstimate("huge.md", "text/markdown", markdownBytes(220_000), ContentFormat.MARKDOWN, 720, 220_000)
+     }
+ 
+     @Test
+     fun pickedEpubCandidateUsesExtractedEstimateForShortNormalAndVeryLongFiles() {
+         assertCandidateEstimate("short.epub", "application/epub+zip", epubBytes(100), ContentFormat.EPUB, 3, 100)
+         assertCandidateEstimate("normal.epub", "application/epub+zip", epubBytes(1_125), ContentFormat.EPUB, 5, 1_125)
+-        assertCandidateEstimate("long.epub", "application/epub+zip", epubBytes(10_000), ContentFormat.EPUB, 20, 10_000)
++        assertCandidateEstimate("long.epub", "application/epub+zip", epubBytes(10_000), ContentFormat.EPUB, 45, 10_000)
++        assertCandidateEstimate("huge.epub", "application/epub+zip", epubBytes(220_000), ContentFormat.EPUB, 720, 220_000)
+     }
+ 
+     @Test
+diff --git a/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt b/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
+index fd3edda..41985fd 100644
+--- a/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
+@@ -48,6 +48,7 @@ import com.qualityalternative.app.domain.model.UserDocumentValidationError
+ import com.qualityalternative.app.domain.model.UserPreferences
+ import com.qualityalternative.app.domain.model.meditationTimerContentItem
+ import com.qualityalternative.app.domain.service.AccountLightProfileAutosaveWriter
++import com.qualityalternative.app.domain.service.AccountLightProfileBackupReader
+ import com.qualityalternative.app.domain.service.AddUserDocumentResult
+ import com.qualityalternative.app.domain.service.AddUserLinkResult
+ import com.qualityalternative.app.domain.service.ContentRepository
+@@ -1872,6 +1873,102 @@ class MainViewModelTest {
+         assertEquals("Profile backup failed.", viewModel.uiState.latestMessage)
+     }
+ 
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun defaultProfileBackupPreviewRequiresSettingsConfirmationBeforeReplace() = runTest {
++        val defaultBackupUri = "qualityalternative://profile-backup/default"
++        val sourceSettingsRepository = FakeSettingsRepository(
++            initial = completedSettings(selectedAppPackages = setOf("feed.one", "feed.two", "feed.three")).copy(
++                themeMode = AppThemeMode.DARK,
++                readerFontScale = 1.3,
++                meditationDurationMinutes = 5,
++            ),
++        )
++        val exportedJson = AccountLightProfileExporter(
++            settingsRepository = sourceSettingsRepository,
++            appVersionName = "test",
++            appVersionCode = 1,
++            userLinkRepository = FakeUserLinkRepository(),
++            userDocumentRepository = FakeUserDocumentRepository(),
++            readingProgressRepository = FakeReadingProgressRepository(),
++        ).exportSettingsOnlyProfileJson(nowMillis = 12_000L)
++        val backupStore = RecordingAccountLightProfileAutosaveWriter(
++            readableProfiles = mutableMapOf((defaultBackupUri to "quality-alternative-profile.json") to exportedJson),
++        )
++        val targetSettingsRepository = FakeSettingsRepository()
++        val viewModel = createViewModel(
++            settingsRepository = targetSettingsRepository,
++            accountLightProfileAutosaveWriter = backupStore,
++            accountLightProfileBackupReader = backupStore,
++            defaultProfileAutosaveUri = defaultBackupUri,
++            defaultProfileAutosaveDisplayName = "Downloads/Quality Alternative/quality-alternative-profile.json",
++        )
++        advanceUntilIdle()
++
++        viewModel.previewDefaultAccountLightProfileImport()
++        advanceUntilIdle()
++
++        assertFalse(targetSettingsRepository.state.value.hasCompletedOnboarding)
++        assertNotNull(viewModel.uiState.accountLightImportPreview)
++        assertFalse(viewModel.uiState.isAccountLightReplaceConfirming)
++        assertEquals("Default profile backup ready to import.", viewModel.uiState.accountLightStatus)
++        assertEquals("Review default profile backup before replacing local data.", viewModel.uiState.latestMessage)
++
++        viewModel.requestAccountLightReplaceConfirmation()
++        viewModel.confirmAccountLightReplaceImport()
++        advanceUntilIdle()
++
++        assertTrue(targetSettingsRepository.state.value.hasCompletedOnboarding)
++        assertEquals(AppThemeMode.DARK, targetSettingsRepository.state.value.themeMode)
++        assertEquals(1.3, targetSettingsRepository.state.value.readerFontScale, 0.0)
++        assertEquals(5, targetSettingsRepository.state.value.meditationDurationMinutes)
++        assertEquals("Portable profile restored and autosaved.", viewModel.uiState.latestMessage)
++        assertEquals(defaultBackupUri, backupStore.writes.last().first)
++    }
++
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun onboardingDefaultProfileRestoreAppliesSharedBackupImmediately() = runTest {
++        val defaultBackupUri = "qualityalternative://profile-backup/default"
++        val sourceSettingsRepository = FakeSettingsRepository(
++            initial = completedSettings(selectedAppPackages = setOf("feed.one", "feed.two", "feed.three")).copy(
++                themeMode = AppThemeMode.DARK,
++                readerFontScale = 1.3,
++                meditationDurationMinutes = 5,
++            ),
++        )
++        val exportedJson = AccountLightProfileExporter(
++            settingsRepository = sourceSettingsRepository,
++            appVersionName = "test",
++            appVersionCode = 1,
++            userLinkRepository = FakeUserLinkRepository(),
++            userDocumentRepository = FakeUserDocumentRepository(),
++            readingProgressRepository = FakeReadingProgressRepository(),
++        ).exportSettingsOnlyProfileJson(nowMillis = 12_000L)
++        val backupStore = RecordingAccountLightProfileAutosaveWriter(
++            readableProfiles = mutableMapOf((defaultBackupUri to "quality-alternative-profile.json") to exportedJson),
++        )
++        val targetSettingsRepository = FakeSettingsRepository()
++        val viewModel = createViewModel(
++            settingsRepository = targetSettingsRepository,
++            accountLightProfileAutosaveWriter = backupStore,
++            accountLightProfileBackupReader = backupStore,
++            defaultProfileAutosaveUri = defaultBackupUri,
++            defaultProfileAutosaveDisplayName = "Downloads/Quality Alternative/quality-alternative-profile.json",
++        )
++        advanceUntilIdle()
++
++        viewModel.restoreDefaultAccountLightProfileFromOnboarding()
++        advanceUntilIdle()
++
++        assertTrue(targetSettingsRepository.state.value.hasCompletedOnboarding)
++        assertEquals(AppThemeMode.DARK, targetSettingsRepository.state.value.themeMode)
++        assertEquals(1.3, targetSettingsRepository.state.value.readerFontScale, 0.0)
++        assertEquals(5, targetSettingsRepository.state.value.meditationDurationMinutes)
++        assertEquals("Portable profile restored and autosaved.", viewModel.uiState.latestMessage)
++        assertEquals(defaultBackupUri, backupStore.writes.last().first)
++    }
++
+     @Test
+     @OptIn(ExperimentalCoroutinesApi::class)
+     fun annotationAutosaveFailureKeepsSavedNoteAndShowsRecoverableStatus() = runTest {
+@@ -4043,6 +4140,7 @@ class MainViewModelTest {
+     }
+ 
+     @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
+     fun previewAccountLightImportShowsValidationErrorWithoutMutatingSettings() = runTest {
+         val settingsRepository = FakeSettingsRepository(
+             initial = completedSettings(selectedAppPackages = setOf("com.instagram.android")).copy(
+@@ -4062,6 +4160,7 @@ class MainViewModelTest {
+     }
+ 
+     @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
+     fun configuredProfileAutosaveWritesPortableProfileAndStatus() = runTest {
+         val settingsRepository = FakeSettingsRepository(
+             initial = completedSettings(selectedAppPackages = setOf("com.instagram.android")),
+@@ -4098,6 +4197,7 @@ class MainViewModelTest {
+     }
+ 
+     @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
+     fun profileAutosaveFailureKeepsDestinationAndDoesNotBlockAppUse() = runTest {
+         val settingsRepository = FakeSettingsRepository(
+             initial = completedSettings(selectedAppPackages = setOf("com.instagram.android")),
+@@ -4300,6 +4400,7 @@ class MainViewModelTest {
+     }
+ 
+     @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
+     fun accountLightReplaceImportRequiresConfirmationAndAppliesPortableSettings() = runTest {
+         val importedSettingsRepository = FakeSettingsRepository(
+             initial = completedSettings(selectedAppPackages = setOf("com.instagram.android")).copy(
+@@ -4368,6 +4469,8 @@ class MainViewModelTest {
+         readingAnnotationDriveSyncClient: ReadingAnnotationDriveSyncClient = RecordingReadingAnnotationDriveSyncClient(),
+         readingAnnotationDriveTokenProvider: ReadingAnnotationDriveTokenProvider = FailingReadingAnnotationDriveTokenProvider(),
+         accountLightProfileAutosaveWriter: AccountLightProfileAutosaveWriter = RecordingAccountLightProfileAutosaveWriter(),
++        accountLightProfileBackupReader: AccountLightProfileBackupReader =
++            accountLightProfileAutosaveWriter as? AccountLightProfileBackupReader ?: EmptyAccountLightProfileBackupReader,
+         defaultAnnotationExportUri: String? = null,
+         defaultAnnotationExportDisplayName: String = "App storage - Annotation sync",
+         defaultProfileAutosaveUri: String? = null,
+@@ -4393,6 +4496,7 @@ class MainViewModelTest {
+                 readingAnnotationDriveSyncClient = readingAnnotationDriveSyncClient,
+                 readingAnnotationDriveTokenProvider = readingAnnotationDriveTokenProvider,
+                 accountLightProfileAutosaveWriter = accountLightProfileAutosaveWriter,
++                accountLightProfileBackupReader = accountLightProfileBackupReader,
+                 defaultAnnotationExportUri = defaultAnnotationExportUri,
+                 defaultAnnotationExportDisplayName = defaultAnnotationExportDisplayName,
+                 defaultProfileAutosaveUri = defaultProfileAutosaveUri,
+@@ -4921,14 +5025,25 @@ class MainViewModelTest {
+         }
+     }
+ 
++    private object EmptyAccountLightProfileBackupReader : AccountLightProfileBackupReader {
++        override suspend fun readProfileJson(uri: String, fileName: String): String? = null
++    }
++
+     private class RecordingAccountLightProfileAutosaveWriter(
+         private val failure: Throwable? = null,
+-    ) : AccountLightProfileAutosaveWriter {
++        private val readableProfiles: MutableMap<Pair<String, String>, String> = mutableMapOf(),
++    ) : AccountLightProfileAutosaveWriter, AccountLightProfileBackupReader {
+         val writes = mutableListOf<Triple<String, String, String>>()
+ 
+         override suspend fun writeProfileJson(uri: String, fileName: String, json: String) {
+             failure?.let { throw it }
+             writes += Triple(uri, fileName, json)
++            readableProfiles[uri to fileName] = json
++        }
++
++        override suspend fun readProfileJson(uri: String, fileName: String): String? {
++            failure?.let { throw it }
++            return readableProfiles[uri to fileName]
+         }
+     }
+ 

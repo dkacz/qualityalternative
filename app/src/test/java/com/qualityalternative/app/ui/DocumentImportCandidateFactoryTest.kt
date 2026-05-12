@@ -14,14 +14,16 @@ class DocumentImportCandidateFactoryTest {
     fun pickedMarkdownCandidateUsesExtractedEstimateForShortNormalAndVeryLongFiles() {
         assertCandidateEstimate("short.md", "text/markdown", markdownBytes(100), ContentFormat.MARKDOWN, 3, 100)
         assertCandidateEstimate("normal.markdown", "text/markdown", markdownBytes(1_125), ContentFormat.MARKDOWN, 5, 1_125)
-        assertCandidateEstimate("long.md", "text/markdown", markdownBytes(10_000), ContentFormat.MARKDOWN, 20, 10_000)
+        assertCandidateEstimate("long.md", "text/markdown", markdownBytes(10_000), ContentFormat.MARKDOWN, 45, 10_000)
+        assertCandidateEstimate("huge.md", "text/markdown", markdownBytes(220_000), ContentFormat.MARKDOWN, 720, 220_000)
     }
 
     @Test
     fun pickedEpubCandidateUsesExtractedEstimateForShortNormalAndVeryLongFiles() {
         assertCandidateEstimate("short.epub", "application/epub+zip", epubBytes(100), ContentFormat.EPUB, 3, 100)
         assertCandidateEstimate("normal.epub", "application/epub+zip", epubBytes(1_125), ContentFormat.EPUB, 5, 1_125)
-        assertCandidateEstimate("long.epub", "application/epub+zip", epubBytes(10_000), ContentFormat.EPUB, 20, 10_000)
+        assertCandidateEstimate("long.epub", "application/epub+zip", epubBytes(10_000), ContentFormat.EPUB, 45, 10_000)
+        assertCandidateEstimate("huge.epub", "application/epub+zip", epubBytes(220_000), ContentFormat.EPUB, 720, 220_000)
     }
 
     @Test

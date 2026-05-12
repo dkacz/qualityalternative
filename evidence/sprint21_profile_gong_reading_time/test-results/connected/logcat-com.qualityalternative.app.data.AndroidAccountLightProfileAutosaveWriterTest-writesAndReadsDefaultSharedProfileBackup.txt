@@ -1,0 +1,8 @@
+05-12 10:04:04.542  3804  3818 I TestRunner: started: writesAndReadsDefaultSharedProfileBackup(com.qualityalternative.app.data.AndroidAccountLightProfileAutosaveWriterTest)
+05-12 10:04:04.549  1631  3973 I MediaProvider: Open with lower FS for /storage/emulated/0/Download/Quality Alternative/quality-alternative-profile.json. Uid: 10213
+05-12 10:04:04.555  1631  3973 I MediaProvider: Open with lower FS for /storage/emulated/0/Download/Quality Alternative/quality-alternative-profile.json. Uid: 10213
+05-12 10:04:04.561  1631  3973 I MediaProvider: Open with lower FS for /storage/emulated/0/Download/Quality Alternative/quality-alternative-profile.json. Uid: 10213
+05-12 10:04:04.564  1281  3226 I UriTaskContentObserver: Throttling content uri change event for content://media/external/file/2292 [CONTEXT service_id=218 ]
+05-12 10:04:04.569  1281  3226 I UriTaskContentObserver: Throttling content uri change event for content://media/external/file/2280 [CONTEXT service_id=218 ]
+05-12 10:04:04.570  1631  3973 I MediaProvider: Open with lower FS for /storage/emulated/0/Download/Quality Alternative/quality-alternative-profile.json. Uid: 10213
+05-12 10:04:04.570  3804  3818 I TestRunner: finished: writesAndReadsDefaultSharedProfileBackup(com.qualityalternative.app.data.AndroidAccountLightProfileAutosaveWriterTest)

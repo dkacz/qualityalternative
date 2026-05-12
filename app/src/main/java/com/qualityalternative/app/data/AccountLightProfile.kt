@@ -236,7 +236,7 @@ data class AccountLightUserDocument(
         require(documentFormat in DocumentFormatValues) { "userDocuments documentFormat is invalid." }
         require(title.isSafePortableTitle()) { "userDocuments title is not portable." }
         require(description.isSafePortableDescription()) { "userDocuments description is not portable." }
-        require(durationMinutes in 1..240) { "userDocuments durationMinutes is outside the portable range." }
+        require(durationMinutes in 1..720) { "userDocuments durationMinutes is outside the portable range." }
         require(topicTags.isNotEmpty() && topicTags.all { it in TopicTag.entries.map(TopicTag::name) }) {
             "userDocuments topicTags is invalid."
         }
@@ -1144,7 +1144,7 @@ private fun JsonObject.validateLibraryShape() {
             .also { description ->
                 require(description.isSafePortableDescription()) { "$path.description is not portable." }
             }
-        document.requireInt("durationMinutes", path, 1..240)
+        document.requireInt("durationMinutes", path, 1..720)
         document.requireEnumArray("topicTags", path, TopicTag.entries.mapTo(mutableSetOf(), TopicTag::name), minSize = 1)
         document.requireEnum("availability", path, AvailabilityValues)
         val documentImportState = document.requireEnum("documentImportState", path, DocumentImportStateValues)
@@ -1589,7 +1589,7 @@ private fun ContentItem.toAccountLightUserDocument(exportedAtMillis: Long): Acco
         documentFormat = portableFormat.name,
         title = portableTitle,
         description = description.toPortableDescriptionOrFallback("Saved document metadata."),
-        durationMinutes = durationMinutes.coerceIn(1, 240),
+        durationMinutes = durationMinutes.coerceIn(1, 720),
         topicTags = topicTags.map { it.name }.sorted().ifEmpty { listOf(TopicTag.OTHER.name) },
         availability = availability.name,
         documentImportState = "MISSING_FILE_NEEDS_REATTACH",

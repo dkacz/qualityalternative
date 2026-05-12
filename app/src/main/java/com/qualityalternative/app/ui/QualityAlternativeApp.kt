@@ -5,8 +5,9 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
-import android.media.AudioManager
-import android.media.ToneGenerator
+import android.media.AudioAttributes
+import android.media.AudioFormat
+import android.media.AudioTrack
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.provider.Settings
@@ -178,9 +179,11 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.abs
+import kotlin.math.exp
 import kotlin.math.floor
 import kotlin.math.min
 import kotlin.math.roundToInt
+import kotlin.math.sin
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -233,9 +236,11 @@ fun QualityAlternativeApp(
                             !uiState.hasCompletedOnboarding -> OnboardingFlow(
                                 selection = uiState.onboardingSelection,
                                 supportedApps = uiState.allSupportedApps,
+                                restoreStatus = uiState.accountLightStatus ?: uiState.accountLightImportError,
                                 onToggleApp = viewModel::toggleOnboardingApp,
                                 onToggleTopic = viewModel::toggleOnboardingTopic,
                                 onSelectDuration = viewModel::setOnboardingDuration,
+                                onRestoreProfile = viewModel::restoreDefaultAccountLightProfileFromOnboarding,
                                 onComplete = viewModel::completeOnboarding,
                             )
 
@@ -504,9 +509,11 @@ private fun MainRoute(
             MainScreen.Onboarding -> OnboardingFlow(
                 selection = state.onboardingSelection,
                 supportedApps = state.allSupportedApps,
+                restoreStatus = state.accountLightStatus ?: state.accountLightImportError,
                 onToggleApp = viewModel::toggleOnboardingApp,
                 onToggleTopic = viewModel::toggleOnboardingTopic,
                 onSelectDuration = viewModel::setOnboardingDuration,
+                onRestoreProfile = viewModel::restoreDefaultAccountLightProfileFromOnboarding,
                 onComplete = viewModel::completeOnboarding,
             )
 
@@ -611,6 +618,7 @@ private fun MainRoute(
                 onExportAccountLightProfile = { accountLightExportPicker.launch(ACCOUNT_LIGHT_PROFILE_FILE_NAME) },
                 onExportAccountLightBackup = { accountLightExportPicker.launch(accountLightTimestampedBackupFileName()) },
                 onImportAccountLightProfile = { accountLightImportPicker.launch(arrayOf("application/json", "text/json", "*/*")) },
+                onImportDefaultAccountLightProfile = viewModel::previewDefaultAccountLightProfileImport,
                 onSelectAccountLightAutosave = { profileAutosavePicker.launch(null) },
                 onRetryAccountLightAutosave = { viewModel.retryAccountLightProfileAutosave() },
                 onClearAccountLightAutosave = {
@@ -908,14 +916,20 @@ private fun TabGlyphIcon(icon: TabGlyph, color: Color) {
 private fun OnboardingFlow(
     selection: OnboardingSelection,
     supportedApps: List<DistractingApp>,
+    restoreStatus: String?,
     onToggleApp: (DistractingApp) -> Unit,
     onToggleTopic: (TopicTag) -> Unit,
     onSelectDuration: (DurationBucket) -> Unit,
+    onRestoreProfile: () -> Unit,
     onComplete: () -> Unit,
 ) {
     var step by remember { mutableStateOf(0) }
     when (step) {
-        0 -> OnboardingWelcome(onNext = { step = 1 })
+        0 -> OnboardingWelcome(
+            restoreStatus = restoreStatus,
+            onRestoreProfile = onRestoreProfile,
+            onNext = { step = 1 },
+        )
         1 -> OnboardingApps(
             selection = selection,
             supportedApps = supportedApps,
@@ -943,7 +957,11 @@ private fun OnboardingFlow(
 }
 
 @Composable
-private fun OnboardingWelcome(onNext: () -> Unit) {
+private fun OnboardingWelcome(
+    restoreStatus: String?,
+    onRestoreProfile: () -> Unit,
+    onNext: () -> Unit,
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -979,6 +997,22 @@ private fun OnboardingWelcome(onNext: () -> Unit) {
             WelcomeValue("Return", "Back to your day.")
         }
         QaButton(text = "Begin", onClick = onNext, variant = QaButtonVariant.Primary, trailingIcon = QaIconKind.ArrowRight)
+        QaButton(
+            text = "Restore profile",
+            onClick = onRestoreProfile,
+            variant = QaButtonVariant.Ghost,
+            leadingIcon = QaIconKind.External,
+            modifier = Modifier.testTag("onboarding-restore-profile"),
+        )
+        restoreStatus?.takeIf(String::isNotBlank)?.let { status ->
+            MonoText(
+                text = status,
+                color = QualityAlternativeThemeTokens.colors.mutedText,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 8.dp).testTag("onboarding-restore-profile-status"),
+            )
+        }
     }
 }
 
@@ -1276,7 +1310,7 @@ private fun HomeTab(
             }
         }
         item {
-            SectionLabel("Your library", right = "${quantityLabel(totalItems, "item")} · $totalMins min")
+            SectionLabel("Your library", right = "${quantityLabel(totalItems, "item")} · ${durationLabel(totalMins)}")
             QaCard(padding = 0.dp) {
                 LibrarySummaryRow("Editorial picks", quantityLabel(editorialItems.size, "pick"), ContentSourceType.EDITORIAL)
                 HorizontalDivider(color = QualityAlternativeThemeTokens.colors.line)
@@ -1773,7 +1807,7 @@ private fun DocumentImportRow(candidate: DocumentImportCandidate) {
             modifier = Modifier.padding(top = 3.dp),
         )
         Text(
-            text = "${candidate.displayName} · ${candidate.durationMinutes} min · ${candidate.estimateSource.displayLabel()}",
+            text = "${candidate.displayName} · ${durationLabel(candidate.durationMinutes.toIntOrNull() ?: 0)} · ${candidate.estimateSource.displayLabel()}",
             style = MaterialTheme.typography.bodyMedium.copy(
                 fontSize = 12.sp,
                 lineHeight = 16.sp,
@@ -3325,11 +3359,6 @@ private fun MeditationTimerScreen(
     val totalMillis = (content.durationMinutes * 60_000L).coerceAtLeast(1L)
     var nowMillis by remember(content.id, startedAtMillis) { mutableStateOf(System.currentTimeMillis()) }
     var hasPlayedGong by remember(content.id, startedAtMillis) { mutableStateOf(false) }
-    val toneGenerator = remember { runCatching { ToneGenerator(AudioManager.STREAM_MUSIC, 85) }.getOrNull() }
-
-    DisposableEffect(toneGenerator) {
-        onDispose { toneGenerator?.release() }
-    }
 
     LaunchedEffect(content.id, startedAtMillis) {
         while (true) {
@@ -3344,7 +3373,7 @@ private fun MeditationTimerScreen(
 
     LaunchedEffect(isComplete) {
         if (isComplete && !hasPlayedGong) {
-            toneGenerator?.startTone(ToneGenerator.TONE_PROP_ACK, 900)
+            MeditationGong.play()
             hasPlayedGong = true
         }
     }
@@ -3385,7 +3414,7 @@ private fun MeditationTimerScreen(
                 testTagPrefix = "timer-meditation-duration",
             )
             BodyText(
-                text = "No feed. Just ${content.durationMinutes} minutes back.",
+                text = "No feed. Just ${durationLabel(content.durationMinutes)} back.",
                 color = QualityAlternativeThemeTokens.colors.mutedText,
                 textAlign = TextAlign.Center,
                 modifier = Modifier
@@ -3416,7 +3445,7 @@ private fun MeditationTimerScreen(
                     text = if (isComplete) {
                         "Reset complete. The gong marks the end - log it if it helped."
                     } else {
-                        "A gong will sound when the timer ends."
+                        "A calm gong will sound when the timer ends."
                     },
                     color = QualityAlternativeThemeTokens.colors.mutedText,
                     textAlign = TextAlign.Center,
@@ -3787,6 +3816,7 @@ private fun SettingsTab(
     onExportAccountLightProfile: () -> Unit,
     onExportAccountLightBackup: () -> Unit,
     onImportAccountLightProfile: () -> Unit,
+    onImportDefaultAccountLightProfile: () -> Unit,
     onSelectAccountLightAutosave: () -> Unit,
     onRetryAccountLightAutosave: () -> Unit,
     onClearAccountLightAutosave: () -> Unit,
@@ -3959,6 +3989,7 @@ private fun SettingsTab(
                 onExport = onExportAccountLightProfile,
                 onExportBackup = onExportAccountLightBackup,
                 onImport = onImportAccountLightProfile,
+                onImportDefault = onImportDefaultAccountLightProfile,
                 onSelectAutosave = onSelectAccountLightAutosave,
                 onRetryAutosave = onRetryAccountLightAutosave,
                 onClearAutosave = onClearAccountLightAutosave,
@@ -4083,6 +4114,7 @@ private fun AccountLightSettingsSection(
     onExport: () -> Unit,
     onExportBackup: () -> Unit,
     onImport: () -> Unit,
+    onImportDefault: () -> Unit,
     onSelectAutosave: () -> Unit,
     onRetryAutosave: () -> Unit,
     onClearAutosave: () -> Unit,
@@ -4146,6 +4178,17 @@ private fun AccountLightSettingsSection(
                     modifier = Modifier.weight(1f).testTag("settings-account-light-import"),
                 )
             }
+            QaButton(
+                text = if (state.isAccountLightImporting) "Checking backup" else "Restore default backup",
+                onClick = onImportDefault,
+                variant = QaButtonVariant.Ghost,
+                size = QaButtonSize.Small,
+                enabled = !state.isAccountLightImporting,
+                leadingIcon = QaIconKind.External,
+                modifier = Modifier
+                    .padding(top = 8.dp)
+                    .testTag("settings-account-light-import-default"),
+            )
             HorizontalDivider(
                 color = colors.line,
                 modifier = Modifier.padding(vertical = 12.dp),
@@ -4241,11 +4284,11 @@ private fun AccountLightAutosaveControls(
             )
         }
         if (configured && !usesLocalDefault) {
-            QaButton(
-                text = "Use app storage",
-                onClick = onClearAutosave,
-                variant = QaButtonVariant.Ghost,
-                size = QaButtonSize.Small,
+                QaButton(
+                    text = "Use default folder",
+                    onClick = onClearAutosave,
+                    variant = QaButtonVariant.Ghost,
+                    size = QaButtonSize.Small,
                 enabled = !state.isProfileAutosaving,
                 modifier = Modifier.testTag("settings-account-light-autosave-clear"),
             )
@@ -4848,7 +4891,7 @@ private fun ActiveDelayCard(
         )
         suggestion?.let { content ->
             QaButton(
-                text = "Read a ${content.durationMinutes} min alternative",
+                text = "Read a ${durationLabel(content.durationMinutes)} alternative",
                 onClick = onReadAlternative,
                 variant = QaButtonVariant.Outline,
                 size = QaButtonSize.Small,
@@ -4885,7 +4928,7 @@ private fun ContinueReadingCard(
         )
         ProgressLine(progress = progress.progressPercent)
         BodyText(
-            text = "${progress.progressPercent}% read · ${remainingMinutes(item.durationMinutes, progress.progressPercent)} min left",
+            text = "${progress.progressPercent}% read · ${durationLabel(remainingMinutes(item.durationMinutes, progress.progressPercent))} left",
             color = colors.mutedText,
             fontSize = 12.5.sp,
             modifier = Modifier.padding(top = 8.dp, bottom = 12.dp),
@@ -4926,7 +4969,7 @@ private fun ReadNowCard(
                     fontSize = 18.sp,
                     lineHeight = 21.sp,
                 )
-                MonoText("${quantityLabel(totalItems, "item")} · $totalMinutes min", modifier = Modifier.padding(top = 4.dp))
+                MonoText("${quantityLabel(totalItems, "item")} · ${durationLabel(totalMinutes)}", modifier = Modifier.padding(top = 4.dp))
             }
             QaButton(
                 text = "Library",
@@ -5066,7 +5109,7 @@ private fun LibraryItemCard(
             ) {
                 ProgressLine(progress = progress.progressPercent)
                 BodyText(
-                    text = "${progress.progressPercent}% read · ${remainingMinutes(item.durationMinutes, progress.progressPercent)} min left",
+                    text = "${progress.progressPercent}% read · ${durationLabel(remainingMinutes(item.durationMinutes, progress.progressPercent))} left",
                     color = QualityAlternativeThemeTokens.colors.mutedText,
                     fontSize = 12.5.sp,
                     modifier = Modifier.padding(top = 6.dp),
@@ -5211,7 +5254,7 @@ private fun ContentMetaRow(item: ContentItem, stacked: Boolean = false) {
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             QaIcon(kind = QaIconKind.Clock, color = QualityAlternativeThemeTokens.colors.faintText, size = 14.dp)
-            MonoText("${item.durationMinutes} min")
+            MonoText(durationLabel(item.durationMinutes))
         }
     }
 }
@@ -5228,7 +5271,7 @@ private fun BackupRow(
     val accessibilityLabel = if (continueProgress != null) {
         "${item.title}, ${continueProgress.label}"
     } else {
-        "${item.title}, ${item.durationMinutes} min"
+        "${item.title}, ${durationLabel(item.durationMinutes)}"
     }
     Row(
         modifier = modifier
@@ -5272,7 +5315,7 @@ private fun BackupRow(
                 )
             } else {
                 MonoText(
-                    text = "Try instead · ${item.durationMinutes} min",
+                    text = "Try instead · ${durationLabel(item.durationMinutes)}",
                     color = colors.accent,
                     modifier = Modifier.padding(bottom = 2.dp),
                     maxLines = 1,
@@ -5311,7 +5354,7 @@ private fun MeditationAlternativeCard(
         modifier = modifier
             .fillMaxWidth()
             .semantics {
-                contentDescription = "Calm reset, ${item.title}, ${item.durationMinutes} min"
+                contentDescription = "Calm reset, ${item.title}, ${durationLabel(item.durationMinutes)}"
             },
         shape = RoundedCornerShape(18.dp),
         color = colors.successSoft,
@@ -5380,7 +5423,7 @@ private data class ContinueProgressMeta(
     val progressPercent: Int,
     val remainingMinutes: Int,
 ) {
-    val label: String = "$progressPercent% read · $remainingMinutes min left"
+    val label: String = "$progressPercent% read · ${durationLabel(remainingMinutes)} left"
 }
 
 @Composable
@@ -7904,6 +7947,20 @@ private fun DurationBucket.prototypeMinutes(): Int {
 
 private fun DurationBucket.prototypeMinutesLabel(): String = "${prototypeMinutes()} min"
 
+private fun durationLabel(totalMinutes: Int): String {
+    val safeMinutes = totalMinutes.coerceAtLeast(0)
+    if (safeMinutes < 60) {
+        return "$safeMinutes min"
+    }
+    val hours = safeMinutes / 60
+    val minutes = safeMinutes % 60
+    return if (minutes == 0) {
+        "$hours hr"
+    } else {
+        "$hours hr $minutes min"
+    }
+}
+
 private fun ContentItem.isUserLink(): Boolean = sourceType == ContentSourceType.USER_LINK
 
 private fun ContentItem.isUserDocument(): Boolean = sourceType == ContentSourceType.USER_DOCUMENT
@@ -7912,10 +7969,10 @@ private fun ContentItem.isUserContent(): Boolean = isUserLink() || isUserDocumen
 
 private fun primaryActionLabel(item: ContentItem): String {
     return when {
-        item.usesMeditationTimer() -> "Start timer · ${item.durationMinutes} min"
-        item.isUserDocument() && item.usesExternalHandoff() -> "Open file · ${item.durationMinutes} min"
-        item.usesExternalHandoff() -> "Open link · ${item.durationMinutes} min"
-        else -> "Read this · ${item.durationMinutes} min"
+        item.usesMeditationTimer() -> "Start timer · ${durationLabel(item.durationMinutes)}"
+        item.isUserDocument() && item.usesExternalHandoff() -> "Open file · ${durationLabel(item.durationMinutes)}"
+        item.usesExternalHandoff() -> "Open link · ${durationLabel(item.durationMinutes)}"
+        else -> "Read this · ${durationLabel(item.durationMinutes)}"
     }
 }
 
@@ -7931,6 +7988,51 @@ private fun meditationTimeLabel(totalSeconds: Int): String {
     val minutes = totalSeconds / 60
     val seconds = totalSeconds % 60
     return "%d:%02d".format(Locale.US, minutes, seconds)
+}
+
+private object MeditationGong {
+    fun play() {
+        runCatching {
+            val sampleRate = 44_100
+            val durationSeconds = 2.4
+            val sampleCount = (sampleRate * durationSeconds).toInt()
+            val samples = ShortArray(sampleCount)
+            for (index in samples.indices) {
+                val t = index.toDouble() / sampleRate
+                val envelope = exp(-1.55 * t)
+                val tone = 0.72 * sin(2.0 * Math.PI * 220.0 * t) +
+                    0.28 * sin(2.0 * Math.PI * 330.0 * t) +
+                    0.16 * sin(2.0 * Math.PI * 440.0 * t)
+                samples[index] = (Short.MAX_VALUE * 0.62 * envelope * tone)
+                    .roundToInt()
+                    .coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt())
+                    .toShort()
+            }
+            val audioTrack = AudioTrack.Builder()
+                .setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build(),
+                )
+                .setAudioFormat(
+                    AudioFormat.Builder()
+                        .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                        .setSampleRate(sampleRate)
+                        .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                        .build(),
+                )
+                .setTransferMode(AudioTrack.MODE_STATIC)
+                .setBufferSizeInBytes(samples.size * Short.SIZE_BYTES)
+                .build()
+            audioTrack.write(samples, 0, samples.size)
+            audioTrack.play()
+            Thread {
+                Thread.sleep((durationSeconds * 1_000).toLong() + 200L)
+                runCatching { audioTrack.release() }
+            }.start()
+        }
+    }
 }
 
 private fun ContentItem.topicLine(): String {
@@ -8052,12 +8154,12 @@ private fun profileAutosaveStatusText(state: MainUiState): String {
     }
     return state.profileAutosaveLastSuccessfulAtMillis?.let { timestampMillis ->
         if (state.profileAutosaveUsesLocalDefault) {
-            "Local backup saved ${annotationUpdatedLabel(timestampMillis)}"
+            "Default backup saved ${annotationUpdatedLabel(timestampMillis)}"
         } else {
             "Last saved ${annotationUpdatedLabel(timestampMillis)}"
         }
     } ?: when {
-        state.profileAutosaveUsesLocalDefault -> "Stores the profile backup in app storage"
+        state.profileAutosaveUsesLocalDefault -> "Stores the profile backup in the default Downloads folder"
         !state.profileAutosaveUri.isNullOrBlank() -> "Ready to save profile backups"
         else -> "No profile backup destination selected"
     }
@@ -8135,7 +8237,7 @@ private fun DistractingApp.dotColor(): Color {
 }
 
 internal fun recentReplacementDurationLabel(entry: ReplacementHistoryEntry): String {
-    return "${entry.contentDurationMinutes} min"
+    return durationLabel(entry.contentDurationMinutes)
 }
 
 private fun List<AnalyticsEvent>.distinctProgressEventCount(type: AnalyticsEventType): Int {
@@ -8223,7 +8325,7 @@ private fun addSuccessMeta(saved: AddLinkConfirmation): String {
     val savedLabel = if (saved.savedCount > 1) "${saved.savedCount} files" else saved.host
     val skipped = if (saved.skippedCount > 0) " · ${saved.skippedCount} skipped" else ""
     val priority = if (saved.priorityMarked) " · priority" else ""
-    return "$savedLabel · ${saved.durationMinutes} min · ${saved.topicLabel}$priority$skipped"
+    return "$savedLabel · ${durationLabel(saved.durationMinutes)} · ${saved.topicLabel}$priority$skipped"
 }
 
 private fun launchExternalLink(

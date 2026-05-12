@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.qualityalternative.app.data.DocumentReadingTimeEstimatorTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-05-12T07:56:50.961Z" hostname="mac-studio.home" time="0.79">
+  <properties/>
+  <testcase name="markdownImportPathEstimatesShortNormalAndVeryLongText" classname="com.qualityalternative.app.data.DocumentReadingTimeEstimatorTest" time="0.087"/>
+  <testcase name="epubImportPathEstimatesShortNormalAndVeryLongExtractedText" classname="com.qualityalternative.app.data.DocumentReadingTimeEstimatorTest" time="0.701"/>
+  <testcase name="pdfAndUnsupportedImportPathsUseDefaultsWithoutExtraction" classname="com.qualityalternative.app.data.DocumentReadingTimeEstimatorTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

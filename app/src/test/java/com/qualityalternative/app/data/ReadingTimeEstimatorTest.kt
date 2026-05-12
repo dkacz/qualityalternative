@@ -5,18 +5,21 @@ import org.junit.Test
 
 class ReadingTimeEstimatorTest {
     @Test
-    fun estimateFromTextBoundsShortAndVeryLongDocumentsToSessionRange() {
+    fun estimateFromTextUsesFullDocumentTimeWithSafetyCap() {
         assertEquals(3, ReadingTimeEstimator.estimateFromText("one two three").minutes)
 
         val longText = List(10_000) { "word" }.joinToString(" ")
         val estimate = ReadingTimeEstimator.estimateFromText(longText)
 
-        assertEquals(20, estimate.minutes)
+        assertEquals(45, estimate.minutes)
         assertEquals(10_000, estimate.wordCount)
         assertEquals(ReadingTimeEstimateSource.EXTRACTED_TEXT, estimate.source)
 
         val normalText = List(1_125) { "word" }.joinToString(" ")
         assertEquals(5, ReadingTimeEstimator.estimateFromText(normalText).minutes)
+
+        val hugeText = List(220_000) { "word" }.joinToString(" ")
+        assertEquals(720, ReadingTimeEstimator.estimateFromText(hugeText).minutes)
     }
 
     @Test

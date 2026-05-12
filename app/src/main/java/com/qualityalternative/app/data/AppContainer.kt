@@ -38,9 +38,10 @@ class AppContainer(context: Context) {
     internal val appScope = CoroutineScope(appJob + Dispatchers.IO)
     private val database = QualityAlternativeDatabase.build(context)
     private val annotationSyncDirectory = File(context.filesDir, "annotation-sync").apply { mkdirs() }
-    private val profileBackupDirectory = File(context.filesDir, "profile-backup").apply { mkdirs() }
     val defaultAnnotationExportUri: String = Uri.fromFile(annotationSyncDirectory).toString()
-    val defaultProfileAutosaveUri: String = Uri.fromFile(profileBackupDirectory).toString()
+    val defaultProfileAutosaveUri: String = AndroidAccountLightProfileAutosaveWriter.DEFAULT_PROFILE_BACKUP_URI
+    val defaultProfileAutosaveDisplayName: String =
+        AndroidAccountLightProfileAutosaveWriter.DEFAULT_PROFILE_BACKUP_DISPLAY_NAME
 
     val analyticsTracker: AnalyticsTracker = RoomAnalyticsTracker(
         dao = database.analyticsEventDao(),

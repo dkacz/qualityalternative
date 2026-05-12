@@ -1,0 +1,25 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<testsuites tests="8" failures="0" errors="0" skipped="0" time="76.031" timestamp="2026-05-12T08:04:05" hostname="localhost">
+  <testsuite name="com.qualityalternative.app.MainActivityTest" tests="5" failures="0" errors="0" skipped="0" time="74.313" timestamp="2026-05-12T08:04:05" hostname="localhost">
+    <properties>
+      <property name="device" value="qaApi36(AVD) - 16" />
+      <property name="flavor" value="" />
+      <property name="project" value=":app" />
+    </properties>
+    <testcase name="meditationInterventionShowsCalmAlternativeWhenPrimaryIsReading" classname="com.qualityalternative.app.MainActivityTest" time="3.771" />
+    <testcase name="settingsDefaultBackupRestoreShowsPreviewBeforeReplace" classname="com.qualityalternative.app.MainActivityTest" time="3.179" />
+    <testcase name="longDocumentImportPreviewShowsMultiHourReadingTime" classname="com.qualityalternative.app.MainActivityTest" time="1.71" />
+    <testcase name="onboardingRestoreProfileLoadsDefaultBackupAfterCleanInstall" classname="com.qualityalternative.app.MainActivityTest" time="1.648" />
+    <testcase name="meditationAlternativeOpensTimerAndCompletesWithGong" classname="com.qualityalternative.app.MainActivityTest" time="64.005" />
+  </testsuite>
+  <testsuite name="com.qualityalternative.app.data.AndroidAccountLightProfileAutosaveWriterTest" tests="3" failures="0" errors="0" skipped="0" time="1.202" timestamp="2026-05-12T08:04:05" hostname="localhost">
+    <properties>
+      <property name="device" value="qaApi36(AVD) - 16" />
+      <property name="flavor" value="" />
+      <property name="project" value=":app" />
+    </properties>
+    <testcase name="writesAndRewritesProfileJsonThroughDocumentTreeUri" classname="com.qualityalternative.app.data.AndroidAccountLightProfileAutosaveWriterTest" time="0.027" />
+    <testcase name="readsNewestDefaultSharedProfileBackupWhenMediaStoreAddsCollisionSuffix" classname="com.qualityalternative.app.data.AndroidAccountLightProfileAutosaveWriterTest" time="1.141" />
+    <testcase name="writesAndReadsDefaultSharedProfileBackup" classname="com.qualityalternative.app.data.AndroidAccountLightProfileAutosaveWriterTest" time="0.034" />
+  </testsuite>
+</testsuites>
