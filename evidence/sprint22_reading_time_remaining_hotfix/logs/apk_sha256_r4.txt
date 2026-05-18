@@ -1,0 +1,2 @@
+4d48c7bb96a094af0b941fbe1a5cdea0d7be1d90dc849c0a68ee8b32ecd7d60e  evidence/sprint22_reading_time_remaining_hotfix/apk_r4/sprint22-reading-time-hotfix-debug.apk
+ecb5ee34455dd9a2acec8a34999136c2bf70dcc8c68c33a9a6187402f1418c43  evidence/sprint22_reading_time_remaining_hotfix/apk_r4/sprint22-reading-time-hotfix-release-debugsigned.apk

@@ -1,0 +1,14 @@
+Failure [DELETE_FAILED_INTERNAL_ERROR]
+Serving...
+All files should be loaded. Notifying the device.
+Performing Incremental Install
+Success
+Install command complete in 271 ms
+Starting: Intent { cmp=com.qualityalternative.app/.MainActivity }
+Status: ok
+LaunchState: COLD
+Activity: com.qualityalternative.app/.MainActivity
+TotalTime: 1012
+WaitTime: 1042
+Complete
+3477

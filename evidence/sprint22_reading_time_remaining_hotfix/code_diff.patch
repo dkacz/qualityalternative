@@ -1,0 +1,757 @@
+diff --git a/app/src/androidTest/java/com/qualityalternative/app/VisualQaScreenshotTest.kt b/app/src/androidTest/java/com/qualityalternative/app/VisualQaScreenshotTest.kt
+index 84baa0b..8e44101 100644
+--- a/app/src/androidTest/java/com/qualityalternative/app/VisualQaScreenshotTest.kt
++++ b/app/src/androidTest/java/com/qualityalternative/app/VisualQaScreenshotTest.kt
+@@ -30,6 +30,7 @@ import com.qualityalternative.app.domain.model.ContentPriority
+ import com.qualityalternative.app.domain.model.DurationBucket
+ import com.qualityalternative.app.domain.model.MEDITATION_TIMER_CONTENT_ID
+ import com.qualityalternative.app.domain.model.OnboardingSelection
++import com.qualityalternative.app.domain.model.ReadingProgress
+ import com.qualityalternative.app.domain.model.TopicTag
+ import com.qualityalternative.app.domain.model.UserDocumentDraft
+ import com.qualityalternative.app.domain.model.UserLinkDraft
+@@ -61,6 +62,7 @@ class VisualQaScreenshotTest {
+     private val sprint15Slice151ScreenshotDirName = "sprint15-slice15-1-epub-toc-${System.currentTimeMillis()}"
+     private val sprint15Slice152ScreenshotDirName = "sprint15-slice15-2-kindle-toc-${System.currentTimeMillis()}"
+     private val sprint20ScreenshotDirName = "sprint20-epub-loading-performance-${System.currentTimeMillis()}"
++    private val sprint22ScreenshotDirName = "sprint22-reading-time-remaining-${System.currentTimeMillis()}"
+     private lateinit var screenshotDir: File
+     private lateinit var legacyScreenshotDir: File
+     private lateinit var sprint10ScreenshotDir: File
+@@ -72,6 +74,7 @@ class VisualQaScreenshotTest {
+     private lateinit var sprint15Slice151ScreenshotDir: File
+     private lateinit var sprint15Slice152ScreenshotDir: File
+     private lateinit var sprint20ScreenshotDir: File
++    private lateinit var sprint22ScreenshotDir: File
+ 
+     @Before
+     fun resetAppState() {
+@@ -111,6 +114,9 @@ class VisualQaScreenshotTest {
+         sprint20ScreenshotDir = File("/sdcard/Download/qualityalternative/$sprint20ScreenshotDirName")
+         sprint20ScreenshotDir.deleteRecursively()
+         sprint20ScreenshotDir.mkdirs()
++        sprint22ScreenshotDir = File("/sdcard/Download/qualityalternative/$sprint22ScreenshotDirName")
++        sprint22ScreenshotDir.deleteRecursively()
++        sprint22ScreenshotDir.mkdirs()
+     }
+ 
+     @After
+@@ -770,6 +776,30 @@ class VisualQaScreenshotTest {
+         captureSprint12("26_reader_mid_dark")
+     }
+ 
++    @Test
++    fun captureSprint22ReadingTimeRemainingRepair() {
++        seedSprint22LegacyLongContinueDocument()
++        launchApp()
++        composeRule.waitUntil(timeoutMillis = 10_000) {
++            hasTag("home-continue-card") && hasNodeContaining("41% read")
++        }
++        captureSprint22("00_home_continue_before_repair_assertion")
++        composeRule.waitUntil(timeoutMillis = 15_000) {
++            hasTag("home-continue-card") &&
++                !hasNodeContaining("12 min left") &&
++                hasNodeContaining("1 hr 20 min left")
++        }
++        captureSprint22("01_home_continue_after_repair_wait")
++        var repairedDurationMinutes = 0
++        scenario?.onActivity { activity ->
++            repairedDurationMinutes = activity.mainViewModel.uiState.userDocuments.single().durationMinutes
++        }
++        assertTrue("Repaired duration should replace the legacy 20-minute estimate", repairedDurationMinutes > 20)
++        assertTrue("Legacy 20-minute estimate should not remain visible", !hasNodeContaining("12 min left"))
++        assertTrue("Expected corrected remaining-time label to be visible", hasNodeContaining("1 hr 20 min left"))
++        captureSprint22("02_home_continue_repaired_remaining_time")
++    }
++
+     @Test
+     fun captureSprint12FinalJourneyScreens() {
+         launchOnboardedApp()
+@@ -1335,6 +1365,10 @@ class VisualQaScreenshotTest {
+         captureTo(sprint20ScreenshotDir, name)
+     }
+ 
++    private fun captureSprint22(name: String) {
++        captureTo(sprint22ScreenshotDir, name)
++    }
++
+     private fun captureTo(directory: File, name: String) {
+         composeRule.waitForIdle()
+         InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+@@ -1960,6 +1994,56 @@ class VisualQaScreenshotTest {
+         item
+     }
+ 
++    private fun seedSprint22LegacyLongContinueDocument(): ContentItem = runBlocking {
++        val targetContext = InstrumentationRegistry.getInstrumentation().targetContext
++        val app = targetContext.applicationContext as QualityAlternativeApplication
++        val fixture = File(targetContext.filesDir, "visual-qa-fixtures/sprint22-long-legacy.md")
++        fixture.parentFile?.mkdirs()
++        val longBody = List(30_000) { index -> "word${index % 97}" }.joinToString(" ")
++        fixture.writeText(
++            """
++            # Long imported book
++
++            $longBody
++            """.trimIndent(),
++        )
++
++        app.appContainer.userDocumentRepository.observeReady().first { it }
++        val result = app.appContainer.userDocumentRepository.addDocument(
++            draft = UserDocumentDraft(
++                uri = Uri.fromFile(fixture).toString(),
++                displayName = "sprint22-long-legacy.md",
++                mimeType = "text/markdown",
++                title = "Long imported book",
++                durationMinutes = 20,
++                topicTags = setOf(TopicTag.ESSAYS, TopicTag.PSYCHOLOGY),
++            ),
++            nowMillis = 22_000L,
++        )
++        assertTrue("Expected Sprint 22 long fixture to be saved", result is AddUserDocumentResult.Added)
++        val item = (result as AddUserDocumentResult.Added).item
++        app.appContainer.readingProgressRepository.saveProgress(
++            ReadingProgress(
++                contentId = item.id,
++                progressPercent = 41,
++                lastVisibleParagraphIndex = 1,
++                lastVisibleTextOffset = 0,
++                paragraphCount = 2,
++                updatedAtMillis = 22_100L,
++                completedAtMillis = null,
++            ),
++        )
++        app.appContainer.settingsRepository.saveOnboardingSelection(
++            OnboardingSelection(
++                selectedAppPackages = setOf(FixtureTargetRegistry.fixtureDistractors.first().packageName),
++                preferredTopics = setOf(TopicTag.ESSAYS, TopicTag.PSYCHOLOGY),
++                preferredDurationBucket = DurationBucket.FOCUS,
++                selectedPackIds = emptySet(),
++            ),
++        )
++        item
++    }
++
+     private fun resetForDarkMeditationFixture() {
+         scenario?.close()
+         scenario = null
+diff --git a/app/src/main/java/com/qualityalternative/app/data/RoomUserDocumentRepository.kt b/app/src/main/java/com/qualityalternative/app/data/RoomUserDocumentRepository.kt
+index f92c6f4..bccce9f 100644
+--- a/app/src/main/java/com/qualityalternative/app/data/RoomUserDocumentRepository.kt
++++ b/app/src/main/java/com/qualityalternative/app/data/RoomUserDocumentRepository.kt
+@@ -150,6 +150,32 @@ class RoomUserDocumentRepository(
+         documents.value = documents.value.filterNot { item -> item.id == contentId }
+     }
+ 
++    override suspend fun updateEstimatedDuration(
++        contentId: String,
++        durationMinutes: Int,
++        nowMillis: Long,
++    ): ContentItem? = withContext(Dispatchers.IO) {
++        val safeDuration = durationMinutes.coerceIn(
++            ReadingTimeEstimator.MIN_SESSION_MINUTES,
++            ReadingTimeEstimator.MAX_DOCUMENT_MINUTES,
++        )
++        val existing = dao.findById(contentId) ?: return@withContext null
++        val updated = existing.copy(
++            durationMinutes = safeDuration,
++            updatedAtMillis = nowMillis,
++        )
++        if (existing.durationMinutes != safeDuration) {
++            dao.updateDurationMinutes(
++                id = contentId,
++                durationMinutes = safeDuration,
++                updatedAtMillis = nowMillis,
++            )
++        }
++        val item = updated.toContentItem()
++        documents.value = upsertUserDocumentForOptimisticState(documents.value, item)
++        item
++    }
++
+     override suspend fun importPortableDocuments(
+         documents: List<ContentItem>,
+         replaceExisting: Boolean,
+diff --git a/app/src/main/java/com/qualityalternative/app/data/local/UserDocumentDao.kt b/app/src/main/java/com/qualityalternative/app/data/local/UserDocumentDao.kt
+index 4740e53..5c2f000 100644
+--- a/app/src/main/java/com/qualityalternative/app/data/local/UserDocumentDao.kt
++++ b/app/src/main/java/com/qualityalternative/app/data/local/UserDocumentDao.kt
+@@ -14,12 +14,22 @@ interface UserDocumentDao {
+     @Query("SELECT * FROM user_documents WHERE uri = :uri LIMIT 1")
+     suspend fun findByUri(uri: String): UserDocumentEntity?
+ 
++    @Query("SELECT * FROM user_documents WHERE id = :id LIMIT 1")
++    suspend fun findById(id: String): UserDocumentEntity?
++
+     @Query("SELECT * FROM user_documents WHERE documentFingerprintSha256 = :sha256 LIMIT 1")
+     suspend fun findByDocumentFingerprintSha256(sha256: String): UserDocumentEntity?
+ 
+     @Insert(onConflict = OnConflictStrategy.REPLACE)
+     suspend fun insertOrReplace(document: UserDocumentEntity)
+ 
++    @Query("UPDATE user_documents SET durationMinutes = :durationMinutes, updatedAtMillis = :updatedAtMillis WHERE id = :id")
++    suspend fun updateDurationMinutes(
++        id: String,
++        durationMinutes: Int,
++        updatedAtMillis: Long,
++    )
++
+     @Query("UPDATE user_documents SET availability = :availability, updatedAtMillis = :updatedAtMillis WHERE id = :id")
+     suspend fun updateAvailability(
+         id: String,
+diff --git a/app/src/main/java/com/qualityalternative/app/domain/service/Contracts.kt b/app/src/main/java/com/qualityalternative/app/domain/service/Contracts.kt
+index 4f84754..70935d4 100644
+--- a/app/src/main/java/com/qualityalternative/app/domain/service/Contracts.kt
++++ b/app/src/main/java/com/qualityalternative/app/domain/service/Contracts.kt
+@@ -104,6 +104,12 @@ interface UserDocumentRepository {
+         nowMillis: Long = System.currentTimeMillis(),
+     ): Set<String> = documents.mapTo(mutableSetOf(), ContentItem::id)
+ 
++    suspend fun updateEstimatedDuration(
++        contentId: String,
++        durationMinutes: Int,
++        nowMillis: Long = System.currentTimeMillis(),
++    ): ContentItem? = null
++
+     fun contentBody(item: ContentItem): String = item.description
+ 
+     fun readerDocument(item: ContentItem): ReaderDocument = ReaderDocument.fromPlainText(contentBody(item))
+diff --git a/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt b/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
+index 5a3444f..10ac3f6 100644
+--- a/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
++++ b/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
+@@ -99,6 +99,7 @@ import kotlinx.coroutines.CoroutineScope
+ import kotlinx.coroutines.Dispatchers
+ import kotlinx.coroutines.cancel
+ import kotlinx.coroutines.delay
++import kotlinx.coroutines.flow.combine
+ import kotlinx.coroutines.flow.collect
+ import kotlinx.coroutines.flow.flowOf
+ import kotlinx.coroutines.launch
+@@ -320,6 +321,10 @@ class MainViewModel(
+     private var annotationDriveAccessToken: String? = null
+     private var documentImportPreparationRequestId = 0
+     private var readerOpenRequestId = 0
++    private val durationRepairAttemptedContentIds = mutableSetOf<String>()
++    private val durationRepairInFlightContentIds = mutableSetOf<String>()
++    private val durationRepairEventRecordedContentIds = mutableSetOf<String>()
++    private var legacyReadingTimeBackgroundRepairCycleStarted = false
+     private val readingAnnotationExportFormatter = ReadingAnnotationExportFormatter()
+ 
+     var uiState by mutableStateOf(
+@@ -363,6 +368,18 @@ class MainViewModel(
+                 uiState = uiState.copy(userDocuments = documents)
+             }
+         }
++        viewModelScope.launch {
++            combine(
++                userDocumentRepository.observeUserDocuments(),
++                readingProgressRepository.observeReadingProgress(),
++            ) { documents, progress -> documents to progress }
++                .collect { (documents, progress) ->
++                    scheduleLegacyReadingTimeEstimateRepairs(
++                        documents = documents,
++                        progress = progress,
++                    )
++                }
++        }
+         viewModelScope.launch {
+             analyticsTracker.observeEvents().collect { events ->
+                 uiState = uiState.copy(events = events)
+@@ -1324,6 +1341,11 @@ class MainViewModel(
+             if (requestId != readerOpenRequestId) {
+                 return@launch
+             }
++            val repairedContent = repairLegacyReadingTimeEstimateFromLoadedDocument(
++                content = content,
++                readerDocument = readerDocument,
++                nowMillis = startedAtMillis,
++            ) ?: content
+             val existingProgress = unfinishedProgressFor(content.id)
+             if (existingProgress != null) {
+                 recordEvent(
+@@ -1331,7 +1353,7 @@ class MainViewModel(
+                         type = AnalyticsEventType.MANUAL_CONTINUE_STARTED,
+                         timestampMillis = startedAtMillis,
+                         contentId = content.id,
+-                        metadata = content.analyticsMetadata() + existingProgress.analyticsMetadata() + mapOf(
++                        metadata = repairedContent.analyticsMetadata() + existingProgress.analyticsMetadata() + mapOf(
+                             "origin" to origin,
+                         ),
+                     ),
+@@ -1343,7 +1365,7 @@ class MainViewModel(
+                 currentOpenAnywayUnlockAvailableAtMillis = null,
+                 currentRecommendationSet = null,
+                 currentInterventionOrigin = null,
+-                currentContent = content,
++                currentContent = repairedContent,
+                 currentReaderDocument = readerDocument,
+                 currentContentBody = readerDocument.plainText,
+                 isReaderOpening = false,
+@@ -1352,7 +1374,7 @@ class MainViewModel(
+                 currentReaderStartSelector = startSelector,
+                 currentSessionId = null,
+                 currentSessionStartedAtMillis = startedAtMillis,
+-                screen = screenForReplacement(content),
++                screen = screenForReplacement(repairedContent),
+                 latestMessage = null,
+             )
+         }
+@@ -3266,6 +3288,11 @@ class MainViewModel(
+         if (requestId != readerOpenRequestId) {
+             return
+         }
++        val repairedContent = repairLegacyReadingTimeEstimateFromLoadedDocument(
++            content = content,
++            readerDocument = readerDocument,
++            nowMillis = startedAtMillis,
++        ) ?: content
+         val existingProgress = unfinishedProgressFor(content.id)
+         uiState = uiState.copy(
+             currentInterventionId = null,
+@@ -3273,7 +3300,7 @@ class MainViewModel(
+             currentOpenAnywayUnlockAvailableAtMillis = null,
+             currentRecommendationSet = null,
+             currentInterventionOrigin = null,
+-            currentContent = content,
++            currentContent = repairedContent,
+             currentReaderDocument = readerDocument,
+             currentContentBody = readerDocument.plainText,
+             isReaderOpening = false,
+@@ -3282,7 +3309,7 @@ class MainViewModel(
+             currentReaderStartSelector = null,
+             currentSessionId = sessionId,
+             currentSessionStartedAtMillis = startedAtMillis,
+-            screen = screenForReplacement(content),
++            screen = screenForReplacement(repairedContent),
+             latestMessage = null,
+         )
+     }
+@@ -3315,6 +3342,114 @@ class MainViewModel(
+         }
+     }
+ 
++    private fun scheduleLegacyReadingTimeEstimateRepairs(
++        documents: List<ContentItem>,
++        progress: List<ReadingProgress>,
++    ) {
++        if (legacyReadingTimeBackgroundRepairCycleStarted) {
++            return
++        }
++        val unfinishedProgressById = progress
++            .filter(ReadingProgress::isUnfinished)
++            .associateBy(ReadingProgress::contentId)
++        val candidates = documents
++            .asSequence()
++            .filter { item -> item.needsLegacyReadingTimeEstimateRepair(unfinishedProgressById[item.id]) }
++            .sortedByDescending { item -> unfinishedProgressById.getValue(item.id).updatedAtMillis }
++            .filter { item -> item.id !in durationRepairAttemptedContentIds }
++            .filter { item -> item.id !in durationRepairInFlightContentIds }
++            .take(MAX_BACKGROUND_READING_TIME_REPAIR_SCAN_COUNT)
++            .toList()
++        if (candidates.isEmpty()) {
++            return
++        }
++        legacyReadingTimeBackgroundRepairCycleStarted = true
++        durationRepairInFlightContentIds += candidates.map(ContentItem::id)
++        viewModelScope.launch {
++            var repairedCount = 0
++            try {
++                for (item in candidates) {
++                    if (repairedCount >= MAX_BACKGROUND_READING_TIME_REPAIR_COUNT) {
++                        break
++                    }
++                    if (!durationRepairAttemptedContentIds.add(item.id)) {
++                        continue
++                    }
++                    val estimate = try {
++                        withContext(documentWorkDispatcher) {
++                            ReadingTimeEstimator.estimateFromText(contentRepository.readerDocument(item).plainText)
++                        }
++                    } catch (error: Throwable) {
++                        if (error is CancellationException) throw error
++                        continue
++                    }
++                    val repaired = applyRecoveredReadingTimeEstimate(
++                        content = item,
++                        estimatedMinutes = estimate.minutes,
++                        nowMillis = nowProvider(),
++                        source = "background_continue_repair",
++                    )
++                    if (repaired != null) {
++                        repairedCount += 1
++                    }
++                }
++            } finally {
++                durationRepairInFlightContentIds.removeAll(candidates.map(ContentItem::id).toSet())
++            }
++        }
++    }
++
++    private suspend fun repairLegacyReadingTimeEstimateFromLoadedDocument(
++        content: ContentItem,
++        readerDocument: ReaderDocument,
++        nowMillis: Long,
++    ): ContentItem? {
++        if (!content.isLegacyReadingTimeEstimateCandidate()) {
++            return null
++        }
++        val estimate = ReadingTimeEstimator.estimateFromText(readerDocument.plainText)
++        return applyRecoveredReadingTimeEstimate(
++            content = content,
++            estimatedMinutes = estimate.minutes,
++            nowMillis = nowMillis,
++            source = "reader_open_repair",
++        )
++    }
++
++    private suspend fun applyRecoveredReadingTimeEstimate(
++        content: ContentItem,
++        estimatedMinutes: Int,
++        nowMillis: Long,
++        source: String,
++    ): ContentItem? {
++        if (estimatedMinutes <= content.durationMinutes) {
++            return null
++        }
++        val updated = userDocumentRepository.updateEstimatedDuration(
++            contentId = content.id,
++            durationMinutes = estimatedMinutes,
++            nowMillis = nowMillis,
++        ) ?: return null
++        if (!durationRepairEventRecordedContentIds.add(updated.id)) {
++            return updated
++        }
++        recordEventDurably(
++            AnalyticsEvent(
++                type = AnalyticsEventType.READING_TIME_ESTIMATE_APPLIED,
++                timestampMillis = nowMillis,
++                contentId = updated.id,
++                metadata = updated.analyticsMetadata() + mapOf(
++                    "estimateSource" to ReadingTimeEstimateSource.EXTRACTED_TEXT.name,
++                    "repairSource" to source,
++                    "previousDurationMinutes" to content.durationMinutes.toString(),
++                    "durationMinutes" to updated.durationMinutes.toString(),
++                ),
++            ),
++        )
++        autosaveAccountLightProfileAfterPortableMutation(nowMillis = nowMillis)
++        return updated
++    }
++
+     private suspend fun handleRepositoryBodyLoadFailure(
+         content: ContentItem,
+         sessionId: String?,
+@@ -3999,6 +4134,16 @@ private fun ReadingProgress.analyticsMetadata(): Map<String, String> {
+     )
+ }
+ 
++private fun ContentItem.needsLegacyReadingTimeEstimateRepair(progress: ReadingProgress?): Boolean {
++    return progress?.isUnfinished() == true && isLegacyReadingTimeEstimateCandidate()
++}
++
++private fun ContentItem.isLegacyReadingTimeEstimateCandidate(): Boolean {
++    return sourceType == ContentSourceType.USER_DOCUMENT &&
++        usesRepositoryBody() &&
++        durationMinutes <= ReadingTimeEstimator.MAX_SESSION_MINUTES
++}
++
+ private fun ContentItem.replaceIfMeditation(meditation: ContentItem): ContentItem {
+     return if (usesMeditationTimer()) meditation else this
+ }
+@@ -4135,6 +4280,8 @@ internal const val FORM_INTERVENTION_UNLOCK_DELAY_MILLIS = 5_000L
+ private const val MIN_SELECTED_DISTRACTING_APPS = 3
+ private const val MAX_READING_ANNOTATION_QUOTE_LENGTH = 1_200
+ private const val PROGRESS_HISTORY_WINDOW_DAYS = 31
++private const val MAX_BACKGROUND_READING_TIME_REPAIR_COUNT = 3
++private const val MAX_BACKGROUND_READING_TIME_REPAIR_SCAN_COUNT = 10
+ private const val FEEDBACK_FIT_NOT = "not"
+ private const val FEEDBACK_SCROLL_NO = "no"
+ 
+diff --git a/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt b/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
+index 41985fd..2152a4a 100644
+--- a/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
+@@ -9,6 +9,7 @@ import com.qualityalternative.app.data.CompositeContentRepository
+ import com.qualityalternative.app.data.InMemoryDelayGate
+ import com.qualityalternative.app.data.PreferencesDelayGate
+ import com.qualityalternative.app.data.ReadingTimeEstimateSource
++import com.qualityalternative.app.data.ReadingTimeEstimator
+ import com.qualityalternative.app.data.SupportedCatalog
+ import com.qualityalternative.app.domain.model.AppSettings
+ import com.qualityalternative.app.domain.model.AnalyticsEventType
+@@ -967,6 +968,244 @@ class MainViewModelTest {
+         assertEquals(null, completedEvent.sessionId)
+     }
+ 
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun unfinishedLegacyDocumentDurationIsRepairedBeforeContinueCardUsesRemainingTime() = runTest {
++        val longDocumentText = List(5_200) { "word" }.joinToString(" ")
++        val document = savedUserDocument(format = ContentFormat.MARKDOWN).copy(
++            title = "Long imported book",
++            description = longDocumentText,
++            durationMinutes = ReadingTimeEstimator.MAX_SESSION_MINUTES,
++        )
++        val userDocumentRepository = FakeUserDocumentRepository(initialDocuments = listOf(document))
++        val readingProgressRepository = FakeReadingProgressRepository(
++            initialProgress = listOf(
++                ReadingProgress(
++                    contentId = document.id,
++                    progressPercent = 41,
++                    lastVisibleParagraphIndex = 12,
++                    lastVisibleTextOffset = 0,
++                    paragraphCount = 80,
++                    updatedAtMillis = 5_000L,
++                    completedAtMillis = null,
++                ),
++            ),
++        )
++        val settingsRepository = FakeSettingsRepository(
++            initial = completedSettings(selectedAppPackages = setOf("com.instagram.android")).copy(
++                profileAutosaveUri = "content://tree/profile-folder",
++                profileAutosaveDisplayName = "QA profile",
++            ),
++        )
++        val profileWriter = RecordingAccountLightProfileAutosaveWriter()
++        val analyticsTracker = InMemoryAnalyticsTracker()
++        val viewModel = createViewModel(
++            contentRepository = FakeContentRepository(),
++            userDocumentRepository = userDocumentRepository,
++            readingProgressRepository = readingProgressRepository,
++            settingsRepository = settingsRepository,
++            analyticsTracker = analyticsTracker,
++            accountLightProfileAutosaveWriter = profileWriter,
++            nowProvider = { 6_000L },
++        )
++
++        advanceUntilIdle()
++
++        val repairedDocument = viewModel.uiState.userDocuments.single()
++        assertEquals(24, repairedDocument.durationMinutes)
++        assertEquals(24, userDocumentRepository.documents.value.single().durationMinutes)
++        assertTrue(
++            analyticsTracker.allEvents().any { event ->
++                event.type == AnalyticsEventType.READING_TIME_ESTIMATE_APPLIED &&
++                    event.contentId == document.id &&
++                    event.metadata["repairSource"] == "background_continue_repair" &&
++                    event.metadata["previousDurationMinutes"] == "20" &&
++                    event.metadata["durationMinutes"] == "24"
++            },
++        )
++        val profileWrite = profileWriter.writes.single()
++        assertEquals("content://tree/profile-folder", profileWrite.first)
++    }
++
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun openingLegacyDocumentRepairsDurationFromLoadedReaderText() = runTest {
++        val longDocumentText = List(7_000) { "word" }.joinToString(" ")
++        val document = savedUserDocument(format = ContentFormat.MARKDOWN).copy(
++            description = longDocumentText,
++            durationMinutes = ReadingTimeEstimator.MAX_SESSION_MINUTES,
++        )
++        val userDocumentRepository = FakeUserDocumentRepository(initialDocuments = listOf(document))
++        val viewModel = createViewModel(
++            contentRepository = FakeContentRepository(),
++            userDocumentRepository = userDocumentRepository,
++            nowProvider = { 7_000L },
++        )
++
++        advanceUntilIdle()
++        viewModel.openLibraryItem(document)
++        advanceUntilIdle()
++
++        assertEquals(MainScreen.Reader, viewModel.uiState.screen)
++        assertEquals(32, userDocumentRepository.documents.value.single().durationMinutes)
++        assertEquals(32, viewModel.uiState.currentContent?.durationMinutes)
++    }
++
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun openingAfterBackgroundDurationRepairDoesNotDuplicateRepairAnalyticsOrAutosave() = runTest {
++        val longDocumentText = List(7_000) { "word" }.joinToString(" ")
++        val staleDocument = savedUserDocument(format = ContentFormat.MARKDOWN).copy(
++            description = longDocumentText,
++            durationMinutes = ReadingTimeEstimator.MAX_SESSION_MINUTES,
++        )
++        val userDocumentRepository = FakeUserDocumentRepository(initialDocuments = listOf(staleDocument))
++        val readingProgressRepository = FakeReadingProgressRepository(
++            initialProgress = listOf(
++                ReadingProgress(
++                    contentId = staleDocument.id,
++                    progressPercent = 41,
++                    lastVisibleParagraphIndex = 12,
++                    lastVisibleTextOffset = 0,
++                    paragraphCount = 80,
++                    updatedAtMillis = 5_000L,
++                    completedAtMillis = null,
++                ),
++            ),
++        )
++        val settingsRepository = FakeSettingsRepository(
++            initial = completedSettings(selectedAppPackages = setOf("com.instagram.android")).copy(
++                profileAutosaveUri = "content://tree/profile-folder",
++                profileAutosaveDisplayName = "QA profile",
++            ),
++        )
++        val profileWriter = RecordingAccountLightProfileAutosaveWriter()
++        val analyticsTracker = InMemoryAnalyticsTracker()
++        val viewModel = createViewModel(
++            contentRepository = FakeContentRepository(),
++            userDocumentRepository = userDocumentRepository,
++            readingProgressRepository = readingProgressRepository,
++            settingsRepository = settingsRepository,
++            analyticsTracker = analyticsTracker,
++            accountLightProfileAutosaveWriter = profileWriter,
++            nowProvider = { 8_000L },
++        )
++
++        advanceUntilIdle()
++        assertEquals(32, userDocumentRepository.documents.value.single().durationMinutes)
++        assertEquals(1, profileWriter.writes.size)
++        assertEquals(
++            1,
++            analyticsTracker.allEvents().count { event -> event.type == AnalyticsEventType.READING_TIME_ESTIMATE_APPLIED },
++        )
++
++        viewModel.openLibraryItem(staleDocument)
++        advanceUntilIdle()
++
++        assertEquals(32, viewModel.uiState.currentContent?.durationMinutes)
++        assertEquals(1, profileWriter.writes.size)
++        assertEquals(
++            1,
++            analyticsTracker.allEvents().count { event -> event.type == AnalyticsEventType.READING_TIME_ESTIMATE_APPLIED },
++        )
++    }
++
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun backgroundRepairContinuesPastFailedNewestCandidatesWithinBoundedScan() = runTest {
++        val longDocumentText = List(5_200) { "word" }.joinToString(" ")
++        val staleDocuments = (1..4).map { index ->
++            savedUserDocument(format = ContentFormat.MARKDOWN).copy(
++                id = "user-document-$index",
++                title = "Long imported book $index",
++                description = longDocumentText,
++                durationMinutes = ReadingTimeEstimator.MAX_SESSION_MINUTES,
++            )
++        }
++        val userDocumentRepository = FakeUserDocumentRepository(initialDocuments = staleDocuments)
++        val readingProgressRepository = FakeReadingProgressRepository(
++            initialProgress = staleDocuments.mapIndexed { index, document ->
++                ReadingProgress(
++                    contentId = document.id,
++                    progressPercent = 41,
++                    lastVisibleParagraphIndex = 12,
++                    lastVisibleTextOffset = 0,
++                    paragraphCount = 80,
++                    updatedAtMillis = 10_000L - index,
++                    completedAtMillis = null,
++                )
++            },
++        )
++        createViewModel(
++            contentRepository = FakeContentRepository(
++                failingUserDocumentIds = staleDocuments.take(3).map(ContentItem::id).toSet(),
++            ),
++            userDocumentRepository = userDocumentRepository,
++            readingProgressRepository = readingProgressRepository,
++            nowProvider = { 9_000L },
++        )
++
++        advanceUntilIdle()
++
++        assertEquals(
++            listOf("user-document-4" to 24),
++            userDocumentRepository.updatedDurationRequests,
++        )
++        assertEquals(
++            listOf(20, 20, 20, 24),
++            userDocumentRepository.documents.value.sortedBy(ContentItem::id).map(ContentItem::durationMinutes),
++        )
++    }
++
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun backgroundRepairDoesNotCascadeBeyondSingleBoundedStartupCycle() = runTest {
++        val longDocumentText = List(5_200) { "word" }.joinToString(" ")
++        val staleDocuments = (1..12).map { index ->
++            savedUserDocument(format = ContentFormat.MARKDOWN).copy(
++                id = "user-document-${index.toString().padStart(2, '0')}",
++                title = "Long imported book $index",
++                description = longDocumentText,
++                durationMinutes = ReadingTimeEstimator.MAX_SESSION_MINUTES,
++            )
++        }
++        val userDocumentRepository = FakeUserDocumentRepository(initialDocuments = staleDocuments)
++        val readingProgressRepository = FakeReadingProgressRepository(
++            initialProgress = staleDocuments.mapIndexed { index, document ->
++                ReadingProgress(
++                    contentId = document.id,
++                    progressPercent = 41,
++                    lastVisibleParagraphIndex = 12,
++                    lastVisibleTextOffset = 0,
++                    paragraphCount = 80,
++                    updatedAtMillis = 20_000L - index,
++                    completedAtMillis = null,
++                )
++            },
++        )
++        createViewModel(
++            contentRepository = FakeContentRepository(),
++            userDocumentRepository = userDocumentRepository,
++            readingProgressRepository = readingProgressRepository,
++            nowProvider = { 9_500L },
++        )
++
++        advanceUntilIdle()
++
++        assertEquals(
++            listOf(
++                "user-document-01" to 24,
++                "user-document-02" to 24,
++                "user-document-03" to 24,
++            ),
++            userDocumentRepository.updatedDurationRequests,
++        )
++        assertEquals(
++            List(3) { 24 } + List(9) { 20 },
++            userDocumentRepository.documents.value.sortedBy(ContentItem::id).map(ContentItem::durationMinutes),
++        )
++    }
++
+     @Test
+     @OptIn(ExperimentalCoroutinesApi::class)
+     fun sameVisibleReaderProgressStillRefreshesDurableStoreForLifecycleStop() = runTest {
+@@ -5371,6 +5610,7 @@ class MainViewModelTest {
+         val markedUnavailableIds = mutableListOf<String>()
+         val deletedIds = mutableListOf<String>()
+         val addedDrafts = mutableListOf<UserDocumentDraft>()
++        val updatedDurationRequests = mutableListOf<Pair<String, Int>>()
+         private var nextId = 0
+ 
+         override fun userDocuments(): List<ContentItem> = documents.value
+@@ -5420,6 +5660,21 @@ class MainViewModelTest {
+             deletedIds += contentId
+             documents.value = documents.value.filterNot { item -> item.id == contentId }
+         }
++
++        override suspend fun updateEstimatedDuration(
++            contentId: String,
++            durationMinutes: Int,
++            nowMillis: Long,
++        ): ContentItem? {
++            updatedDurationRequests += contentId to durationMinutes
++            val updatedDocument = documents.value.firstOrNull { item -> item.id == contentId }
++                ?.copy(durationMinutes = durationMinutes)
++                ?: return null
++            documents.value = documents.value.map { item ->
++                if (item.id == contentId) updatedDocument else item
++            }
++            return updatedDocument
++        }
+     }
+ 
+     private class FakeInterceptionMonitor : InterceptionMonitor {

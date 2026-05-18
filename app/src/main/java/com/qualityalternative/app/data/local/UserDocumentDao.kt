@@ -14,11 +14,21 @@ interface UserDocumentDao {
     @Query("SELECT * FROM user_documents WHERE uri = :uri LIMIT 1")
     suspend fun findByUri(uri: String): UserDocumentEntity?
 
+    @Query("SELECT * FROM user_documents WHERE id = :id LIMIT 1")
+    suspend fun findById(id: String): UserDocumentEntity?
+
     @Query("SELECT * FROM user_documents WHERE documentFingerprintSha256 = :sha256 LIMIT 1")
     suspend fun findByDocumentFingerprintSha256(sha256: String): UserDocumentEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOrReplace(document: UserDocumentEntity)
+
+    @Query("UPDATE user_documents SET durationMinutes = :durationMinutes, updatedAtMillis = :updatedAtMillis WHERE id = :id")
+    suspend fun updateDurationMinutes(
+        id: String,
+        durationMinutes: Int,
+        updatedAtMillis: Long,
+    )
 
     @Query("UPDATE user_documents SET availability = :availability, updatedAtMillis = :updatedAtMillis WHERE id = :id")
     suspend fun updateAvailability(

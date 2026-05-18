@@ -30,6 +30,7 @@ import com.qualityalternative.app.domain.model.ContentPriority
 import com.qualityalternative.app.domain.model.DurationBucket
 import com.qualityalternative.app.domain.model.MEDITATION_TIMER_CONTENT_ID
 import com.qualityalternative.app.domain.model.OnboardingSelection
+import com.qualityalternative.app.domain.model.ReadingProgress
 import com.qualityalternative.app.domain.model.TopicTag
 import com.qualityalternative.app.domain.model.UserDocumentDraft
 import com.qualityalternative.app.domain.model.UserLinkDraft
@@ -61,6 +62,7 @@ class VisualQaScreenshotTest {
     private val sprint15Slice151ScreenshotDirName = "sprint15-slice15-1-epub-toc-${System.currentTimeMillis()}"
     private val sprint15Slice152ScreenshotDirName = "sprint15-slice15-2-kindle-toc-${System.currentTimeMillis()}"
     private val sprint20ScreenshotDirName = "sprint20-epub-loading-performance-${System.currentTimeMillis()}"
+    private val sprint22ScreenshotDirName = "sprint22-reading-time-remaining-${System.currentTimeMillis()}"
     private lateinit var screenshotDir: File
     private lateinit var legacyScreenshotDir: File
     private lateinit var sprint10ScreenshotDir: File
@@ -72,6 +74,7 @@ class VisualQaScreenshotTest {
     private lateinit var sprint15Slice151ScreenshotDir: File
     private lateinit var sprint15Slice152ScreenshotDir: File
     private lateinit var sprint20ScreenshotDir: File
+    private lateinit var sprint22ScreenshotDir: File
 
     @Before
     fun resetAppState() {
@@ -111,6 +114,9 @@ class VisualQaScreenshotTest {
         sprint20ScreenshotDir = File("/sdcard/Download/qualityalternative/$sprint20ScreenshotDirName")
         sprint20ScreenshotDir.deleteRecursively()
         sprint20ScreenshotDir.mkdirs()
+        sprint22ScreenshotDir = File("/sdcard/Download/qualityalternative/$sprint22ScreenshotDirName")
+        sprint22ScreenshotDir.deleteRecursively()
+        sprint22ScreenshotDir.mkdirs()
     }
 
     @After
@@ -771,6 +777,30 @@ class VisualQaScreenshotTest {
     }
 
     @Test
+    fun captureSprint22ReadingTimeRemainingRepair() {
+        seedSprint22LegacyLongContinueDocument()
+        launchApp()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasTag("home-continue-card") && hasNodeContaining("41% read")
+        }
+        captureSprint22("00_home_continue_before_repair_assertion")
+        composeRule.waitUntil(timeoutMillis = 15_000) {
+            hasTag("home-continue-card") &&
+                !hasNodeContaining("12 min left") &&
+                hasNodeContaining("1 hr 20 min left")
+        }
+        captureSprint22("01_home_continue_after_repair_wait")
+        var repairedDurationMinutes = 0
+        scenario?.onActivity { activity ->
+            repairedDurationMinutes = activity.mainViewModel.uiState.userDocuments.single().durationMinutes
+        }
+        assertTrue("Repaired duration should replace the legacy 20-minute estimate", repairedDurationMinutes > 20)
+        assertTrue("Legacy 20-minute estimate should not remain visible", !hasNodeContaining("12 min left"))
+        assertTrue("Expected corrected remaining-time label to be visible", hasNodeContaining("1 hr 20 min left"))
+        captureSprint22("02_home_continue_repaired_remaining_time")
+    }
+
+    @Test
     fun captureSprint12FinalJourneyScreens() {
         launchOnboardedApp()
         captureSprint12Final("01_home_light")
@@ -1333,6 +1363,10 @@ class VisualQaScreenshotTest {
 
     private fun captureSprint20(name: String) {
         captureTo(sprint20ScreenshotDir, name)
+    }
+
+    private fun captureSprint22(name: String) {
+        captureTo(sprint22ScreenshotDir, name)
     }
 
     private fun captureTo(directory: File, name: String) {
@@ -1949,6 +1983,56 @@ class VisualQaScreenshotTest {
         )
         assertTrue("Expected Sprint 12 continue fixture to be saved", result is AddUserDocumentResult.Added)
         val item = (result as AddUserDocumentResult.Added).item
+        app.appContainer.settingsRepository.saveOnboardingSelection(
+            OnboardingSelection(
+                selectedAppPackages = setOf(FixtureTargetRegistry.fixtureDistractors.first().packageName),
+                preferredTopics = setOf(TopicTag.ESSAYS, TopicTag.PSYCHOLOGY),
+                preferredDurationBucket = DurationBucket.FOCUS,
+                selectedPackIds = emptySet(),
+            ),
+        )
+        item
+    }
+
+    private fun seedSprint22LegacyLongContinueDocument(): ContentItem = runBlocking {
+        val targetContext = InstrumentationRegistry.getInstrumentation().targetContext
+        val app = targetContext.applicationContext as QualityAlternativeApplication
+        val fixture = File(targetContext.filesDir, "visual-qa-fixtures/sprint22-long-legacy.md")
+        fixture.parentFile?.mkdirs()
+        val longBody = List(30_000) { index -> "word${index % 97}" }.joinToString(" ")
+        fixture.writeText(
+            """
+            # Long imported book
+
+            $longBody
+            """.trimIndent(),
+        )
+
+        app.appContainer.userDocumentRepository.observeReady().first { it }
+        val result = app.appContainer.userDocumentRepository.addDocument(
+            draft = UserDocumentDraft(
+                uri = Uri.fromFile(fixture).toString(),
+                displayName = "sprint22-long-legacy.md",
+                mimeType = "text/markdown",
+                title = "Long imported book",
+                durationMinutes = 20,
+                topicTags = setOf(TopicTag.ESSAYS, TopicTag.PSYCHOLOGY),
+            ),
+            nowMillis = 22_000L,
+        )
+        assertTrue("Expected Sprint 22 long fixture to be saved", result is AddUserDocumentResult.Added)
+        val item = (result as AddUserDocumentResult.Added).item
+        app.appContainer.readingProgressRepository.saveProgress(
+            ReadingProgress(
+                contentId = item.id,
+                progressPercent = 41,
+                lastVisibleParagraphIndex = 1,
+                lastVisibleTextOffset = 0,
+                paragraphCount = 2,
+                updatedAtMillis = 22_100L,
+                completedAtMillis = null,
+            ),
+        )
         app.appContainer.settingsRepository.saveOnboardingSelection(
             OnboardingSelection(
                 selectedAppPackages = setOf(FixtureTargetRegistry.fixtureDistractors.first().packageName),

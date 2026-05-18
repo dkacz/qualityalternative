@@ -1,0 +1,8 @@
+Starting: Intent { cmp=com.qualityalternative.app/.MainActivity }
+Status: ok
+LaunchState: COLD
+Activity: com.qualityalternative.app/.MainActivity
+TotalTime: 1373
+WaitTime: 1382
+Complete
+3430

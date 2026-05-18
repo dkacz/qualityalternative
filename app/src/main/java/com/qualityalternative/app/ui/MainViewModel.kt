@@ -99,6 +99,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
@@ -320,6 +321,10 @@ class MainViewModel(
     private var annotationDriveAccessToken: String? = null
     private var documentImportPreparationRequestId = 0
     private var readerOpenRequestId = 0
+    private val durationRepairAttemptedContentIds = mutableSetOf<String>()
+    private val durationRepairInFlightContentIds = mutableSetOf<String>()
+    private val durationRepairEventRecordedContentIds = mutableSetOf<String>()
+    private var legacyReadingTimeBackgroundRepairCycleStarted = false
     private val readingAnnotationExportFormatter = ReadingAnnotationExportFormatter()
 
     var uiState by mutableStateOf(
@@ -362,6 +367,18 @@ class MainViewModel(
             userDocumentRepository.observeUserDocuments().collect { documents ->
                 uiState = uiState.copy(userDocuments = documents)
             }
+        }
+        viewModelScope.launch {
+            combine(
+                userDocumentRepository.observeUserDocuments(),
+                readingProgressRepository.observeReadingProgress(),
+            ) { documents, progress -> documents to progress }
+                .collect { (documents, progress) ->
+                    scheduleLegacyReadingTimeEstimateRepairs(
+                        documents = documents,
+                        progress = progress,
+                    )
+                }
         }
         viewModelScope.launch {
             analyticsTracker.observeEvents().collect { events ->
@@ -1324,6 +1341,11 @@ class MainViewModel(
             if (requestId != readerOpenRequestId) {
                 return@launch
             }
+            val repairedContent = repairLegacyReadingTimeEstimateFromLoadedDocument(
+                content = content,
+                readerDocument = readerDocument,
+                nowMillis = startedAtMillis,
+            ) ?: content
             val existingProgress = unfinishedProgressFor(content.id)
             if (existingProgress != null) {
                 recordEvent(
@@ -1331,7 +1353,7 @@ class MainViewModel(
                         type = AnalyticsEventType.MANUAL_CONTINUE_STARTED,
                         timestampMillis = startedAtMillis,
                         contentId = content.id,
-                        metadata = content.analyticsMetadata() + existingProgress.analyticsMetadata() + mapOf(
+                        metadata = repairedContent.analyticsMetadata() + existingProgress.analyticsMetadata() + mapOf(
                             "origin" to origin,
                         ),
                     ),
@@ -1343,7 +1365,7 @@ class MainViewModel(
                 currentOpenAnywayUnlockAvailableAtMillis = null,
                 currentRecommendationSet = null,
                 currentInterventionOrigin = null,
-                currentContent = content,
+                currentContent = repairedContent,
                 currentReaderDocument = readerDocument,
                 currentContentBody = readerDocument.plainText,
                 isReaderOpening = false,
@@ -1352,7 +1374,7 @@ class MainViewModel(
                 currentReaderStartSelector = startSelector,
                 currentSessionId = null,
                 currentSessionStartedAtMillis = startedAtMillis,
-                screen = screenForReplacement(content),
+                screen = screenForReplacement(repairedContent),
                 latestMessage = null,
             )
         }
@@ -3266,6 +3288,11 @@ class MainViewModel(
         if (requestId != readerOpenRequestId) {
             return
         }
+        val repairedContent = repairLegacyReadingTimeEstimateFromLoadedDocument(
+            content = content,
+            readerDocument = readerDocument,
+            nowMillis = startedAtMillis,
+        ) ?: content
         val existingProgress = unfinishedProgressFor(content.id)
         uiState = uiState.copy(
             currentInterventionId = null,
@@ -3273,7 +3300,7 @@ class MainViewModel(
             currentOpenAnywayUnlockAvailableAtMillis = null,
             currentRecommendationSet = null,
             currentInterventionOrigin = null,
-            currentContent = content,
+            currentContent = repairedContent,
             currentReaderDocument = readerDocument,
             currentContentBody = readerDocument.plainText,
             isReaderOpening = false,
@@ -3282,7 +3309,7 @@ class MainViewModel(
             currentReaderStartSelector = null,
             currentSessionId = sessionId,
             currentSessionStartedAtMillis = startedAtMillis,
-            screen = screenForReplacement(content),
+            screen = screenForReplacement(repairedContent),
             latestMessage = null,
         )
     }
@@ -3313,6 +3340,114 @@ class MainViewModel(
             )
             null
         }
+    }
+
+    private fun scheduleLegacyReadingTimeEstimateRepairs(
+        documents: List<ContentItem>,
+        progress: List<ReadingProgress>,
+    ) {
+        if (legacyReadingTimeBackgroundRepairCycleStarted) {
+            return
+        }
+        val unfinishedProgressById = progress
+            .filter(ReadingProgress::isUnfinished)
+            .associateBy(ReadingProgress::contentId)
+        val candidates = documents
+            .asSequence()
+            .filter { item -> item.needsLegacyReadingTimeEstimateRepair(unfinishedProgressById[item.id]) }
+            .sortedByDescending { item -> unfinishedProgressById.getValue(item.id).updatedAtMillis }
+            .filter { item -> item.id !in durationRepairAttemptedContentIds }
+            .filter { item -> item.id !in durationRepairInFlightContentIds }
+            .take(MAX_BACKGROUND_READING_TIME_REPAIR_SCAN_COUNT)
+            .toList()
+        if (candidates.isEmpty()) {
+            return
+        }
+        legacyReadingTimeBackgroundRepairCycleStarted = true
+        durationRepairInFlightContentIds += candidates.map(ContentItem::id)
+        viewModelScope.launch {
+            var repairedCount = 0
+            try {
+                for (item in candidates) {
+                    if (repairedCount >= MAX_BACKGROUND_READING_TIME_REPAIR_COUNT) {
+                        break
+                    }
+                    if (!durationRepairAttemptedContentIds.add(item.id)) {
+                        continue
+                    }
+                    val estimate = try {
+                        withContext(documentWorkDispatcher) {
+                            ReadingTimeEstimator.estimateFromText(contentRepository.readerDocument(item).plainText)
+                        }
+                    } catch (error: Throwable) {
+                        if (error is CancellationException) throw error
+                        continue
+                    }
+                    val repaired = applyRecoveredReadingTimeEstimate(
+                        content = item,
+                        estimatedMinutes = estimate.minutes,
+                        nowMillis = nowProvider(),
+                        source = "background_continue_repair",
+                    )
+                    if (repaired != null) {
+                        repairedCount += 1
+                    }
+                }
+            } finally {
+                durationRepairInFlightContentIds.removeAll(candidates.map(ContentItem::id).toSet())
+            }
+        }
+    }
+
+    private suspend fun repairLegacyReadingTimeEstimateFromLoadedDocument(
+        content: ContentItem,
+        readerDocument: ReaderDocument,
+        nowMillis: Long,
+    ): ContentItem? {
+        if (!content.isLegacyReadingTimeEstimateCandidate()) {
+            return null
+        }
+        val estimate = ReadingTimeEstimator.estimateFromText(readerDocument.plainText)
+        return applyRecoveredReadingTimeEstimate(
+            content = content,
+            estimatedMinutes = estimate.minutes,
+            nowMillis = nowMillis,
+            source = "reader_open_repair",
+        )
+    }
+
+    private suspend fun applyRecoveredReadingTimeEstimate(
+        content: ContentItem,
+        estimatedMinutes: Int,
+        nowMillis: Long,
+        source: String,
+    ): ContentItem? {
+        if (estimatedMinutes <= content.durationMinutes) {
+            return null
+        }
+        val updated = userDocumentRepository.updateEstimatedDuration(
+            contentId = content.id,
+            durationMinutes = estimatedMinutes,
+            nowMillis = nowMillis,
+        ) ?: return null
+        if (!durationRepairEventRecordedContentIds.add(updated.id)) {
+            return updated
+        }
+        recordEventDurably(
+            AnalyticsEvent(
+                type = AnalyticsEventType.READING_TIME_ESTIMATE_APPLIED,
+                timestampMillis = nowMillis,
+                contentId = updated.id,
+                metadata = updated.analyticsMetadata() + mapOf(
+                    "estimateSource" to ReadingTimeEstimateSource.EXTRACTED_TEXT.name,
+                    "repairSource" to source,
+                    "previousDurationMinutes" to content.durationMinutes.toString(),
+                    "durationMinutes" to updated.durationMinutes.toString(),
+                ),
+            ),
+        )
+        autosaveAccountLightProfileAfterPortableMutation(nowMillis = nowMillis)
+        return updated
     }
 
     private suspend fun handleRepositoryBodyLoadFailure(
@@ -3999,6 +4134,16 @@ private fun ReadingProgress.analyticsMetadata(): Map<String, String> {
     )
 }
 
+private fun ContentItem.needsLegacyReadingTimeEstimateRepair(progress: ReadingProgress?): Boolean {
+    return progress?.isUnfinished() == true && isLegacyReadingTimeEstimateCandidate()
+}
+
+private fun ContentItem.isLegacyReadingTimeEstimateCandidate(): Boolean {
+    return sourceType == ContentSourceType.USER_DOCUMENT &&
+        usesRepositoryBody() &&
+        durationMinutes <= ReadingTimeEstimator.MAX_SESSION_MINUTES
+}
+
 private fun ContentItem.replaceIfMeditation(meditation: ContentItem): ContentItem {
     return if (usesMeditationTimer()) meditation else this
 }
@@ -4135,6 +4280,8 @@ internal const val FORM_INTERVENTION_UNLOCK_DELAY_MILLIS = 5_000L
 private const val MIN_SELECTED_DISTRACTING_APPS = 3
 private const val MAX_READING_ANNOTATION_QUOTE_LENGTH = 1_200
 private const val PROGRESS_HISTORY_WINDOW_DAYS = 31
+private const val MAX_BACKGROUND_READING_TIME_REPAIR_COUNT = 3
+private const val MAX_BACKGROUND_READING_TIME_REPAIR_SCAN_COUNT = 10
 private const val FEEDBACK_FIT_NOT = "not"
 private const val FEEDBACK_SCROLL_NO = "no"
 

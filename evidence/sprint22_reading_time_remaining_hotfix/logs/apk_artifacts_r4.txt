@@ -1,0 +1,4 @@
+total 131720
+-rw-r--r--@ 1 omare  staff    37M May 18 08:36 sprint22-reading-time-hotfix-debug.apk
+-rw-r--r--@ 1 omare  staff    27M May 18 08:36 sprint22-reading-time-hotfix-release-debugsigned.apk
+-rw-r--r--@ 1 omare  staff   225K May 18 08:36 sprint22-reading-time-hotfix-release-debugsigned.apk.idsig

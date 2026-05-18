@@ -1,0 +1,8 @@
+ app/build.gradle.kts                               |   4 +-
+ .../app/VisualQaScreenshotTest.kt                  |  84 +++++++
+ .../app/data/RoomUserDocumentRepository.kt         |  26 +++
+ .../app/data/local/UserDocumentDao.kt              |  10 +
+ .../app/domain/service/Contracts.kt                |   6 +
+ .../com/qualityalternative/app/ui/MainViewModel.kt | 157 ++++++++++++-
+ .../qualityalternative/app/ui/MainViewModelTest.kt | 255 +++++++++++++++++++++
+ 7 files changed, 535 insertions(+), 7 deletions(-)

@@ -1,0 +1,10 @@
+## codex/sprint22-reading-time-remaining-hotfix
+ M app/build.gradle.kts
+ M app/src/androidTest/java/com/qualityalternative/app/VisualQaScreenshotTest.kt
+ M app/src/main/java/com/qualityalternative/app/data/RoomUserDocumentRepository.kt
+ M app/src/main/java/com/qualityalternative/app/data/local/UserDocumentDao.kt
+ M app/src/main/java/com/qualityalternative/app/domain/service/Contracts.kt
+ M app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
+ M app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
+?? docs/release-gate-logs/2026-05-18-sprint22-reading-time-remaining-hotfix/
+?? evidence/sprint22_reading_time_remaining_hotfix/

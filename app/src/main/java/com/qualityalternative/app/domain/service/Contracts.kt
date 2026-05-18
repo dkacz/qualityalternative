@@ -104,6 +104,12 @@ interface UserDocumentRepository {
         nowMillis: Long = System.currentTimeMillis(),
     ): Set<String> = documents.mapTo(mutableSetOf(), ContentItem::id)
 
+    suspend fun updateEstimatedDuration(
+        contentId: String,
+        durationMinutes: Int,
+        nowMillis: Long = System.currentTimeMillis(),
+    ): ContentItem? = null
+
     fun contentBody(item: ContentItem): String = item.description
 
     fun readerDocument(item: ContentItem): ReaderDocument = ReaderDocument.fromPlainText(contentBody(item))

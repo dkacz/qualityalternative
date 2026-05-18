@@ -150,6 +150,32 @@ class RoomUserDocumentRepository(
         documents.value = documents.value.filterNot { item -> item.id == contentId }
     }
 
+    override suspend fun updateEstimatedDuration(
+        contentId: String,
+        durationMinutes: Int,
+        nowMillis: Long,
+    ): ContentItem? = withContext(Dispatchers.IO) {
+        val safeDuration = durationMinutes.coerceIn(
+            ReadingTimeEstimator.MIN_SESSION_MINUTES,
+            ReadingTimeEstimator.MAX_DOCUMENT_MINUTES,
+        )
+        val existing = dao.findById(contentId) ?: return@withContext null
+        val updated = existing.copy(
+            durationMinutes = safeDuration,
+            updatedAtMillis = nowMillis,
+        )
+        if (existing.durationMinutes != safeDuration) {
+            dao.updateDurationMinutes(
+                id = contentId,
+                durationMinutes = safeDuration,
+                updatedAtMillis = nowMillis,
+            )
+        }
+        val item = updated.toContentItem()
+        documents.value = upsertUserDocumentForOptimisticState(documents.value, item)
+        item
+    }
+
     override suspend fun importPortableDocuments(
         documents: List<ContentItem>,
         replaceExisting: Boolean,

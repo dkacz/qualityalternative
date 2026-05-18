@@ -1,0 +1,7 @@
+ .../app/VisualQaScreenshotTest.kt                  |  84 +++++++++
+ .../app/data/RoomUserDocumentRepository.kt         |  26 +++
+ .../app/data/local/UserDocumentDao.kt              |  10 +
+ .../app/domain/service/Contracts.kt                |   6 +
+ .../com/qualityalternative/app/ui/MainViewModel.kt | 152 ++++++++++++++-
+ .../qualityalternative/app/ui/MainViewModelTest.kt | 206 +++++++++++++++++++++
+ 6 files changed, 479 insertions(+), 5 deletions(-)
