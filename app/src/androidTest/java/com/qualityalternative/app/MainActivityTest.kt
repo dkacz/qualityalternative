@@ -109,8 +109,8 @@ class MainActivityTest {
         "sprint17-cross-page-annotation-${System.currentTimeMillis()}"
     private val sprint17AnnotationSurfaceScreenshotDirName =
         "sprint17-annotation-surface-${System.currentTimeMillis()}"
-    private val sprint18ProgressHotfixScreenshotDirName =
-        "sprint18-progress-hotfix-${System.currentTimeMillis()}"
+    private val sprint23FooterProgressScreenshotDirName =
+        "sprint23-footer-progress-${System.currentTimeMillis()}"
     private val readerFormEvidenceScreenshotDirName =
         "sprint21-meditation-gong-${System.currentTimeMillis()}"
     private val sprint21ReadingTimeScreenshotDirName =
@@ -645,7 +645,8 @@ class MainActivityTest {
         val savedParagraphIndex = savedProgressParagraphIndexFor(document.id)
         assertTrue(savedPercent in 1..99)
         composeRule.waitUntil(timeoutMillis = 10_000) { hasNodeContaining("$savedPercent%") }
-        captureSprint18ProgressHotfixScreenshot("01_default_font_saved_progress")
+        assertReaderFooterProgressBarMatchesPercent(savedPercent)
+        captureSprint23FooterProgressScreenshot("01_default_font_saved_progress")
 
         scenario?.onActivity { activity -> activity.mainViewModel.openHome() }
         waitForHome()
@@ -655,9 +656,10 @@ class MainActivityTest {
         }
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
         composeRule.waitUntil(timeoutMillis = 10_000) { hasNodeContaining("$savedPercent%") }
+        assertReaderFooterProgressBarMatchesPercent(savedPercent)
         assertEquals(savedPercent, savedProgressPercentFor(document.id))
         assertEquals(savedParagraphIndex, savedProgressParagraphIndexFor(document.id))
-        captureSprint18ProgressHotfixScreenshot("02_large_font_restored_same_progress")
+        captureSprint23FooterProgressScreenshot("02_large_font_restored_same_progress")
     }
 
     @Test
@@ -3588,6 +3590,27 @@ class MainActivityTest {
             ?: 0
     }
 
+    private fun readerFooterProgressBarCurrent(): Float {
+        val config = composeRule.onNodeWithTag("reader-footer-progress-bar")
+            .fetchSemanticsNode()
+            .config
+        return config[SemanticsProperties.ProgressBarRangeInfo].current
+    }
+
+    private fun assertReaderFooterProgressBarMatchesPercent(expectedPercent: Int) {
+        val expectedFraction = expectedPercent / 100f
+        assertEquals(expectedFraction, readerFooterProgressBarCurrent(), 0.01f)
+        val trackWidth = nodeWidth("reader-footer-progress-bar")
+        val fillWidth = nodeWidth("reader-footer-progress-bar-fill")
+        assertTrue("Expected reader footer progress track to have measurable width.", trackWidth > 0f)
+        assertEquals(
+            "Expected rendered footer progress fill to match displayed $expectedPercent%.",
+            expectedFraction,
+            fillWidth / trackWidth,
+            0.03f,
+        )
+    }
+
     private data class ReaderPagePosition(
         val currentPage: Int,
         val totalPages: Int,
@@ -4683,8 +4706,8 @@ class MainActivityTest {
         assertTrue("Expected screenshot file for $name", output.exists() && output.length() > 0L)
     }
 
-    private fun captureSprint18ProgressHotfixScreenshot(name: String) {
-        val outputDir = File("/sdcard/Download/qualityalternative/$sprint18ProgressHotfixScreenshotDirName")
+    private fun captureSprint23FooterProgressScreenshot(name: String) {
+        val outputDir = File("/sdcard/Download/qualityalternative/$sprint23FooterProgressScreenshotDirName")
         assertTrue("Expected screenshot output directory for $name", outputDir.mkdirs() || outputDir.exists())
         composeRule.waitForIdle()
         Thread.sleep(300)

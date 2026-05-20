@@ -390,6 +390,13 @@ class ProgressSnapshotTest {
     }
 
     @Test
+    fun readerProgressFractionMatchesDisplayedPercentForFooterBar() {
+        assertEquals(0f, readerProgressFraction(-4), 0.0001f)
+        assertEquals(0.46f, readerProgressFraction(46), 0.0001f)
+        assertEquals(1f, readerProgressFraction(140), 0.0001f)
+    }
+
+    @Test
     fun readerProgressPercentUsesSourceBlockIdentityInsteadOfAssumingDenseIndexes() {
         val blocks = listOf(
             readerMarkdownBlock(rawBlock = "AAAAAA", sourceBlockIndex = 10),

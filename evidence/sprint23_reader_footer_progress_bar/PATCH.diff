@@ -1,0 +1,173 @@
+diff --git a/app/src/androidTest/java/com/qualityalternative/app/MainActivityTest.kt b/app/src/androidTest/java/com/qualityalternative/app/MainActivityTest.kt
+index 6ca12f1..1d61257 100644
+--- a/app/src/androidTest/java/com/qualityalternative/app/MainActivityTest.kt
++++ b/app/src/androidTest/java/com/qualityalternative/app/MainActivityTest.kt
+@@ -109,8 +109,8 @@ class MainActivityTest {
+         "sprint17-cross-page-annotation-${System.currentTimeMillis()}"
+     private val sprint17AnnotationSurfaceScreenshotDirName =
+         "sprint17-annotation-surface-${System.currentTimeMillis()}"
+-    private val sprint18ProgressHotfixScreenshotDirName =
+-        "sprint18-progress-hotfix-${System.currentTimeMillis()}"
++    private val sprint23FooterProgressScreenshotDirName =
++        "sprint23-footer-progress-${System.currentTimeMillis()}"
+     private val readerFormEvidenceScreenshotDirName =
+         "sprint21-meditation-gong-${System.currentTimeMillis()}"
+     private val sprint21ReadingTimeScreenshotDirName =
+@@ -645,7 +645,8 @@ class MainActivityTest {
+         val savedParagraphIndex = savedProgressParagraphIndexFor(document.id)
+         assertTrue(savedPercent in 1..99)
+         composeRule.waitUntil(timeoutMillis = 10_000) { hasNodeContaining("$savedPercent%") }
+-        captureSprint18ProgressHotfixScreenshot("01_default_font_saved_progress")
++        assertReaderFooterProgressBarMatchesPercent(savedPercent)
++        captureSprint23FooterProgressScreenshot("01_default_font_saved_progress")
+
+         scenario?.onActivity { activity -> activity.mainViewModel.openHome() }
+         waitForHome()
+@@ -655,9 +656,10 @@ class MainActivityTest {
+         }
+         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
+         composeRule.waitUntil(timeoutMillis = 10_000) { hasNodeContaining("$savedPercent%") }
++        assertReaderFooterProgressBarMatchesPercent(savedPercent)
+         assertEquals(savedPercent, savedProgressPercentFor(document.id))
+         assertEquals(savedParagraphIndex, savedProgressParagraphIndexFor(document.id))
+-        captureSprint18ProgressHotfixScreenshot("02_large_font_restored_same_progress")
++        captureSprint23FooterProgressScreenshot("02_large_font_restored_same_progress")
+     }
+
+     @Test
+@@ -3588,6 +3590,27 @@ class MainActivityTest {
+             ?: 0
+     }
+
++    private fun readerFooterProgressBarCurrent(): Float {
++        val config = composeRule.onNodeWithTag("reader-footer-progress-bar")
++            .fetchSemanticsNode()
++            .config
++        return config[SemanticsProperties.ProgressBarRangeInfo].current
++    }
++
++    private fun assertReaderFooterProgressBarMatchesPercent(expectedPercent: Int) {
++        val expectedFraction = expectedPercent / 100f
++        assertEquals(expectedFraction, readerFooterProgressBarCurrent(), 0.01f)
++        val trackWidth = nodeWidth("reader-footer-progress-bar")
++        val fillWidth = nodeWidth("reader-footer-progress-bar-fill")
++        assertTrue("Expected reader footer progress track to have measurable width.", trackWidth > 0f)
++        assertEquals(
++            "Expected rendered footer progress fill to match displayed $expectedPercent%.",
++            expectedFraction,
++            fillWidth / trackWidth,
++            0.03f,
++        )
++    }
++
+     private data class ReaderPagePosition(
+         val currentPage: Int,
+         val totalPages: Int,
+@@ -4683,8 +4706,8 @@ class MainActivityTest {
+         assertTrue("Expected screenshot file for $name", output.exists() && output.length() > 0L)
+     }
+
+-    private fun captureSprint18ProgressHotfixScreenshot(name: String) {
+-        val outputDir = File("/sdcard/Download/qualityalternative/$sprint18ProgressHotfixScreenshotDirName")
++    private fun captureSprint23FooterProgressScreenshot(name: String) {
++        val outputDir = File("/sdcard/Download/qualityalternative/$sprint23FooterProgressScreenshotDirName")
+         assertTrue("Expected screenshot output directory for $name", outputDir.mkdirs() || outputDir.exists())
+         composeRule.waitForIdle()
+         Thread.sleep(300)
+diff --git a/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt b/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
+index c7ac941..b29dfea 100644
+--- a/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
++++ b/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
+@@ -97,6 +97,8 @@ import androidx.compose.ui.platform.testTag
+ import androidx.compose.ui.semantics.contentDescription
+ import androidx.compose.ui.semantics.onClick
+ import androidx.compose.ui.semantics.onLongClick
++import androidx.compose.ui.semantics.ProgressBarRangeInfo
++import androidx.compose.ui.semantics.progressBarRangeInfo
+ import androidx.compose.ui.semantics.selected
+ import androidx.compose.ui.semantics.semantics
+ import androidx.compose.ui.text.AnnotatedString
+@@ -2875,7 +2877,9 @@ private fun ReaderMinimalFooter(
+         ProgressLine(
+             progress = progress,
+             modifier = Modifier
+-                .widthIn(min = 64.dp, max = 104.dp),
++                .width(READER_FOOTER_PROGRESS_TRACK_WIDTH_DP.dp)
++                .testTag("reader-footer-progress-bar"),
++            fillTestTag = "reader-footer-progress-bar-fill",
+         )
+         MonoText(
+             "${pageIndex + 1}/$pageCount · $progress%",
+@@ -6215,19 +6219,29 @@ private fun Dots(total: Int, active: Int) {
+ }
+
+ @Composable
+-private fun ProgressLine(progress: Int, modifier: Modifier = Modifier) {
++private fun ProgressLine(
++    progress: Int,
++    modifier: Modifier = Modifier,
++    fillTestTag: String? = null,
++) {
+     val colors = QualityAlternativeThemeTokens.colors
++    val progressFraction = readerProgressFraction(progress)
++    val fillModifier = Modifier
++        .fillMaxHeight()
++        .fillMaxWidth(progressFraction)
++        .background(colors.accent)
++        .then(if (fillTestTag != null) Modifier.testTag(fillTestTag) else Modifier)
+     Box(
+         modifier = modifier
+             .height(2.dp)
+             .clip(RoundedCornerShape(1.dp))
+-            .background(colors.line),
++            .background(colors.line)
++            .semantics {
++                progressBarRangeInfo = ProgressBarRangeInfo(progressFraction, 0f..1f)
++            },
+     ) {
+         Box(
+-            modifier = Modifier
+-                .fillMaxHeight()
+-                .fillMaxWidth((progress / 100f).coerceIn(0f, 1f))
+-                .background(colors.accent),
++            modifier = fillModifier,
+         )
+     }
+ }
+@@ -7250,6 +7264,10 @@ internal fun readerProgressPercentForPageIndex(pageIndex: Int, pageCount: Int):
+     return ((visiblePages * 100) / pageCount).coerceIn(1, 100)
+ }
+
++internal fun readerProgressFraction(progressPercent: Int): Float {
++    return progressPercent.coerceIn(0, 100) / 100f
++}
++
+ private fun ReaderMarkdownBlock.readerPageWeight(charsPerLine: Int = READER_BODY_CHARS_PER_LINE): Int {
+     val effectiveCharsPerLine = readerCharsPerLineForKind(kind = kind, bodyCharsPerLine = charsPerLine)
+     val lineWeight = text.text
+@@ -8454,6 +8472,7 @@ private const val READER_MAX_CHARS_PER_LINE = 74
+ private const val READER_CONTENT_SIDE_PADDING_DP = 28f
+ private const val READER_CONTENT_TOP_PADDING_DP = 18f
+ private const val READER_CONTENT_BOTTOM_PADDING_DP = 24f
++private const val READER_FOOTER_PROGRESS_TRACK_WIDTH_DP = 104f
+ private const val READER_HORIZONTAL_PADDING_DP = READER_CONTENT_SIDE_PADDING_DP * 2f
+ private const val READER_VERTICAL_PADDING_DP = READER_CONTENT_TOP_PADDING_DP + READER_CONTENT_BOTTOM_PADDING_DP
+ private const val READER_REFERENCE_TEXT_WIDTH_DP = 340f
+diff --git a/app/src/test/java/com/qualityalternative/app/ui/ProgressSnapshotTest.kt b/app/src/test/java/com/qualityalternative/app/ui/ProgressSnapshotTest.kt
+index 0b52abd..98a1b24 100644
+--- a/app/src/test/java/com/qualityalternative/app/ui/ProgressSnapshotTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/ui/ProgressSnapshotTest.kt
+@@ -389,6 +389,13 @@ class ProgressSnapshotTest {
+         assertEquals(57, readerProgressPercentForPageIndex(pageIndex = 3, pageCount = 7))
+     }
+
++    @Test
++    fun readerProgressFractionMatchesDisplayedPercentForFooterBar() {
++        assertEquals(0f, readerProgressFraction(-4), 0.0001f)
++        assertEquals(0.46f, readerProgressFraction(46), 0.0001f)
++        assertEquals(1f, readerProgressFraction(140), 0.0001f)
++    }
++
+     @Test
+     fun readerProgressPercentUsesSourceBlockIdentityInsteadOfAssumingDenseIndexes() {
+         val blocks = listOf(

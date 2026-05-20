@@ -97,6 +97,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.onLongClick
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
@@ -2875,7 +2877,9 @@ private fun ReaderMinimalFooter(
         ProgressLine(
             progress = progress,
             modifier = Modifier
-                .widthIn(min = 64.dp, max = 104.dp),
+                .width(READER_FOOTER_PROGRESS_TRACK_WIDTH_DP.dp)
+                .testTag("reader-footer-progress-bar"),
+            fillTestTag = "reader-footer-progress-bar-fill",
         )
         MonoText(
             "${pageIndex + 1}/$pageCount · $progress%",
@@ -6215,19 +6219,29 @@ private fun Dots(total: Int, active: Int) {
 }
 
 @Composable
-private fun ProgressLine(progress: Int, modifier: Modifier = Modifier) {
+private fun ProgressLine(
+    progress: Int,
+    modifier: Modifier = Modifier,
+    fillTestTag: String? = null,
+) {
     val colors = QualityAlternativeThemeTokens.colors
+    val progressFraction = readerProgressFraction(progress)
+    val fillModifier = Modifier
+        .fillMaxHeight()
+        .fillMaxWidth(progressFraction)
+        .background(colors.accent)
+        .then(if (fillTestTag != null) Modifier.testTag(fillTestTag) else Modifier)
     Box(
         modifier = modifier
             .height(2.dp)
             .clip(RoundedCornerShape(1.dp))
-            .background(colors.line),
+            .background(colors.line)
+            .semantics {
+                progressBarRangeInfo = ProgressBarRangeInfo(progressFraction, 0f..1f)
+            },
     ) {
         Box(
-            modifier = Modifier
-                .fillMaxHeight()
-                .fillMaxWidth((progress / 100f).coerceIn(0f, 1f))
-                .background(colors.accent),
+            modifier = fillModifier,
         )
     }
 }
@@ -7248,6 +7262,10 @@ internal fun readerProgressPercentForPageIndex(pageIndex: Int, pageCount: Int): 
     }
     val visiblePages = (pageIndex + 1).coerceIn(0, pageCount)
     return ((visiblePages * 100) / pageCount).coerceIn(1, 100)
+}
+
+internal fun readerProgressFraction(progressPercent: Int): Float {
+    return progressPercent.coerceIn(0, 100) / 100f
 }
 
 private fun ReaderMarkdownBlock.readerPageWeight(charsPerLine: Int = READER_BODY_CHARS_PER_LINE): Int {
@@ -8454,6 +8472,7 @@ private const val READER_MAX_CHARS_PER_LINE = 74
 private const val READER_CONTENT_SIDE_PADDING_DP = 28f
 private const val READER_CONTENT_TOP_PADDING_DP = 18f
 private const val READER_CONTENT_BOTTOM_PADDING_DP = 24f
+private const val READER_FOOTER_PROGRESS_TRACK_WIDTH_DP = 104f
 private const val READER_HORIZONTAL_PADDING_DP = READER_CONTENT_SIDE_PADDING_DP * 2f
 private const val READER_VERTICAL_PADDING_DP = READER_CONTENT_TOP_PADDING_DP + READER_CONTENT_BOTTOM_PADDING_DP
 private const val READER_REFERENCE_TEXT_WIDTH_DP = 340f
