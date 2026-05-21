@@ -1,0 +1,1983 @@
+diff --git a/PRD.md b/PRD.md
+index f29ef28..76cf280 100644
+--- a/PRD.md
++++ b/PRD.md
+@@ -99,6 +99,7 @@ When I reach for a distracting app out of habit, help me pause and give me one w
+ - Soft intervention shown when a selected app is opened.
+ - One primary replacement recommendation plus a short, bounded backup list.
+ - Three core actions in the intervention: start replacement now, delay the distracting app for 15 minutes, open anyway.
++- Optional bedtime protection may replace the default open-anyway behavior during a user-configured sleep window: replacement and meditation alternatives remain available, while opening the original distracting app requires a visible one-minute emergency breath.
+ - Replacement sources from:
+   - editorial starter packs curated by the product
+   - user-added links
+@@ -287,6 +288,7 @@ The intervention must provide three clear actions that map to the MVP value prop
+ - User can choose Pause 15 min, which creates a 15-minute delay window.
+ - User can choose Open anyway immediately in Soft intervention mode.
+ - User can choose Open anyway after a short, visible 5-second form intervention wait in Firm intervention mode.
++- When opt-in Bedtime protection is active, the intervention remains finite and calm, replacement alternatives stay available, Pause 15 min is hidden, and the original app can only be opened through a visible one-minute emergency unlock wait.
+ - When enabled, the wait is presented before unlock is available, not as an extra screen after the user chooses Open anyway.
+ - After Open anyway from a system intervention, repeated opens of the same distracting app are quiet for the user-configured unlock window.
+
+@@ -352,6 +354,7 @@ The system must allow the user to consciously postpone access to the distracting
+ - The app logs whether the user returned after the delay window ended.
+ - Settings include a configurable Open anyway unlock duration so the user can choose a longer quiet window without changing the 15-minute pause behavior.
+ - Settings include a working Soft/Firm intervention mode selector. Soft mode keeps Open anyway immediate; Firm mode adds the 5-second form-intervention pause before Open anyway becomes available.
++- Settings include opt-in Bedtime protection with a start and end time. Bedtime protection is not the default intervention mode and must preserve access to reading, meditation, and bounded backup alternatives.
+
+ ### FR10. Feedback Loop
+
+diff --git a/app/build.gradle.kts b/app/build.gradle.kts
+index cee5b3c..77b90b8 100644
+--- a/app/build.gradle.kts
++++ b/app/build.gradle.kts
+@@ -13,8 +13,8 @@ android {
+         applicationId = "com.qualityalternative.app"
+         minSdk = 29
+         targetSdk = 36
+-        versionCode = 26
+-        versionName = "0.11.10-alpha"
++        versionCode = 27
++        versionName = "0.11.11-alpha"
+         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+     }
+
+diff --git a/app/src/androidTest/java/com/qualityalternative/app/MainActivityTest.kt b/app/src/androidTest/java/com/qualityalternative/app/MainActivityTest.kt
+index 1d61257..f2e3391 100644
+--- a/app/src/androidTest/java/com/qualityalternative/app/MainActivityTest.kt
++++ b/app/src/androidTest/java/com/qualityalternative/app/MainActivityTest.kt
+@@ -111,6 +111,8 @@ class MainActivityTest {
+         "sprint17-annotation-surface-${System.currentTimeMillis()}"
+     private val sprint23FooterProgressScreenshotDirName =
+         "sprint23-footer-progress-${System.currentTimeMillis()}"
++    private val sprint24BedtimeScreenshotDirName =
++        "sprint24-bedtime-hard-ban-${System.currentTimeMillis()}"
+     private val readerFormEvidenceScreenshotDirName =
+         "sprint21-meditation-gong-${System.currentTimeMillis()}"
+     private val sprint21ReadingTimeScreenshotDirName =
+@@ -550,6 +552,54 @@ class MainActivityTest {
+         captureReaderFormEvidenceScreenshot("15_firm_mode_open_anyway_wait")
+     }
+
++    @Test
++    fun bedtimeModeShowsCalmHardBanWithAlternativesAndEmergencyWait() {
++        seedFixtureSelection()
++        launchApp()
++        waitForHome()
++
++        scenario?.onActivity { activity ->
++            activity.mainViewModel.openSettings()
++            activity.mainViewModel.selectInterventionMode(InterventionMode.SOFT)
++            activity.mainViewModel.setBedtimeSettings(enabled = true, startMinutes = 0, endMinutes = 0)
++        }
++        composeRule.waitUntil(timeoutMillis = 10_000) {
++            var enabled = false
++            var active = false
++            scenario?.onActivity { activity ->
++                enabled = activity.mainViewModel.uiState.bedtimeEnabled
++                active = activity.mainViewModel.uiState.isBedtimeActive
++            }
++            enabled && active
++        }
++        composeRule.onNodeWithTag("settings-list")
++            .performScrollToNode(hasTestTag("settings-bedtime-section"))
++        composeRule.onNodeWithTag("settings-bedtime-section")
++            .assertIsDisplayed()
++        composeRule.onNodeWithText("Sleep lock")
++            .assertIsDisplayed()
++        captureSprint24BedtimeScreenshot("01_settings_bedtime_enabled")
++
++        scenario?.onActivity { activity ->
++            activity.mainViewModel.triggerDebugIntervention(nowMillis = System.currentTimeMillis())
++        }
++        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("bedtime-emergency-unlock-wait") }
++        composeRule.onNodeWithText("Bedtime is protecting sleep", substring = true)
++            .assertIsDisplayed()
++        composeRule.onNodeWithText("QUIET ALTERNATIVES")
++            .assertIsDisplayed()
++        composeRule.onNodeWithTag("intervention-backup-list")
++            .assertIsDisplayed()
++        composeRule.onNodeWithTag("bedtime-emergency-unlock-wait")
++            .assertIsDisplayed()
++        composeRule.onNodeWithTag("bedtime-emergency-unlock-action")
++            .assertIsDisplayed()
++            .assertIsNotEnabled()
++        composeRule.onNodeWithText("Pause 15 min")
++            .assertDoesNotExist()
++        captureSprint24BedtimeScreenshot("02_intervention_bedtime_hard_ban_alternatives")
++    }
++
+     @Test
+     fun readerFontSizeSettingUsesAppLevelPreference() {
+         launchOnboardedApp()
+@@ -4716,6 +4766,16 @@ class MainActivityTest {
+         assertTrue("Expected screenshot file for $name", output.exists() && output.length() > 0L)
+     }
+
++    private fun captureSprint24BedtimeScreenshot(name: String) {
++        val outputDir = File("/sdcard/Download/qualityalternative/$sprint24BedtimeScreenshotDirName")
++        assertTrue("Expected screenshot output directory for $name", outputDir.mkdirs() || outputDir.exists())
++        composeRule.waitForIdle()
++        Thread.sleep(300)
++        val output = File(outputDir, "$name.png")
++        assertTrue("Expected screenshot capture for $name", UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).takeScreenshot(output))
++        assertTrue("Expected screenshot file for $name", output.exists() && output.length() > 0L)
++    }
++
+     private fun captureReaderFormEvidenceScreenshot(name: String) {
+         val outputDir = File("/sdcard/Download/qualityalternative/$readerFormEvidenceScreenshotDirName")
+         assertTrue("Expected screenshot output directory for $name", outputDir.mkdirs() || outputDir.exists())
+diff --git a/app/src/main/java/com/qualityalternative/app/data/AccountLightProfile.kt b/app/src/main/java/com/qualityalternative/app/data/AccountLightProfile.kt
+index db6d5ea..69da99e 100644
+--- a/app/src/main/java/com/qualityalternative/app/data/AccountLightProfile.kt
++++ b/app/src/main/java/com/qualityalternative/app/data/AccountLightProfile.kt
+@@ -8,6 +8,9 @@ import com.qualityalternative.app.domain.model.ContentItem
+ import com.qualityalternative.app.domain.model.ContentPriority
+ import com.qualityalternative.app.domain.model.ContentRightsMetadata
+ import com.qualityalternative.app.domain.model.ContentSourceType
++import com.qualityalternative.app.domain.model.DEFAULT_BEDTIME_ENABLED
++import com.qualityalternative.app.domain.model.DEFAULT_BEDTIME_END_MINUTES
++import com.qualityalternative.app.domain.model.DEFAULT_BEDTIME_START_MINUTES
+ import com.qualityalternative.app.domain.model.DEFAULT_INTERFACE_TEXT_SCALE
+ import com.qualityalternative.app.domain.model.DEFAULT_INTERVENTION_MODE
+ import com.qualityalternative.app.domain.model.DEFAULT_READER_FONT_SCALE
+@@ -15,9 +18,11 @@ import com.qualityalternative.app.domain.model.DistractingApp
+ import com.qualityalternative.app.domain.model.DurationBucket
+ import com.qualityalternative.app.domain.model.InterventionMode
+ import com.qualityalternative.app.domain.model.LocalProfileIdentity
++import com.qualityalternative.app.domain.model.MAX_BEDTIME_MINUTES
+ import com.qualityalternative.app.domain.model.MAX_INTERFACE_TEXT_SCALE
+ import com.qualityalternative.app.domain.model.MAX_OPEN_ANYWAY_UNLOCK_MINUTES
+ import com.qualityalternative.app.domain.model.MAX_READER_FONT_SCALE
++import com.qualityalternative.app.domain.model.MIN_BEDTIME_MINUTES
+ import com.qualityalternative.app.domain.model.MIN_INTERFACE_TEXT_SCALE
+ import com.qualityalternative.app.domain.model.MIN_OPEN_ANYWAY_UNLOCK_MINUTES
+ import com.qualityalternative.app.domain.model.MIN_READER_FONT_SCALE
+@@ -129,6 +134,9 @@ data class AccountLightSettings(
+     val priorityContentIds: List<String>,
+     val reactivatedCompletedContentIds: List<String>,
+     val openAnywayUnlockMinutes: Int,
++    val bedtimeEnabled: Boolean = DEFAULT_BEDTIME_ENABLED,
++    val bedtimeStartMinutes: Int = DEFAULT_BEDTIME_START_MINUTES,
++    val bedtimeEndMinutes: Int = DEFAULT_BEDTIME_END_MINUTES,
+ ) {
+     init {
+         require(selectedAppPackages.all { it.matches(PackageNameRegex) }) {
+@@ -160,6 +168,12 @@ data class AccountLightSettings(
+         require(openAnywayUnlockMinutes in MIN_OPEN_ANYWAY_UNLOCK_MINUTES..MAX_OPEN_ANYWAY_UNLOCK_MINUTES) {
+             "openAnywayUnlockMinutes is outside the portable range."
+         }
++        require(bedtimeStartMinutes in MIN_BEDTIME_MINUTES..MAX_BEDTIME_MINUTES) {
++            "bedtimeStartMinutes is outside the portable range."
++        }
++        require(bedtimeEndMinutes in MIN_BEDTIME_MINUTES..MAX_BEDTIME_MINUTES) {
++            "bedtimeEndMinutes is outside the portable range."
++        }
+     }
+ }
+
+@@ -1497,6 +1511,9 @@ private fun AccountLightSettings.toPortableAppSettings(supportedPackages: Set<St
+         priorityContentIds = priorityContentIds.toSet(),
+         reactivatedCompletedContentIds = reactivatedCompletedContentIds.toSet(),
+         openAnywayUnlockMinutes = openAnywayUnlockMinutes,
++        bedtimeEnabled = bedtimeEnabled,
++        bedtimeStartMinutes = bedtimeStartMinutes,
++        bedtimeEndMinutes = bedtimeEndMinutes,
+         readerFontScale = readerFontScale.takeIf { it in MIN_READER_FONT_SCALE..MAX_READER_FONT_SCALE }
+             ?: DEFAULT_READER_FONT_SCALE,
+         interfaceTextScale = interfaceTextScale.takeIf { it in MIN_INTERFACE_TEXT_SCALE..MAX_INTERFACE_TEXT_SCALE }
+@@ -1529,6 +1546,9 @@ private fun AppSettings.toAccountLightSettings(
+             omittedPortableUserContentIds = omittedPortableUserContentIds,
+         ),
+         openAnywayUnlockMinutes = openAnywayUnlockMinutes,
++        bedtimeEnabled = bedtimeEnabled,
++        bedtimeStartMinutes = bedtimeStartMinutes.coerceIn(MIN_BEDTIME_MINUTES, MAX_BEDTIME_MINUTES),
++        bedtimeEndMinutes = bedtimeEndMinutes.coerceIn(MIN_BEDTIME_MINUTES, MAX_BEDTIME_MINUTES),
+     )
+ }
+
+@@ -2159,7 +2179,13 @@ private val RequiredSettingsKeys = setOf(
+     "reactivatedCompletedContentIds",
+     "openAnywayUnlockMinutes",
+ )
+-private val AllowedSettingsKeys = RequiredSettingsKeys + setOf("interfaceTextScale", "interventionMode")
++private val AllowedSettingsKeys = RequiredSettingsKeys + setOf(
++    "interfaceTextScale",
++    "interventionMode",
++    "bedtimeEnabled",
++    "bedtimeStartMinutes",
++    "bedtimeEndMinutes",
++)
+ private val RequiredLibraryKeys = setOf("userLinks", "userDocuments")
+ private val RequiredUserLinkKeys = setOf(
+     "contentId",
+diff --git a/app/src/main/java/com/qualityalternative/app/data/PreferencesSettingsRepository.kt b/app/src/main/java/com/qualityalternative/app/data/PreferencesSettingsRepository.kt
+index e5e8fa7..4cca178 100644
+--- a/app/src/main/java/com/qualityalternative/app/data/PreferencesSettingsRepository.kt
++++ b/app/src/main/java/com/qualityalternative/app/data/PreferencesSettingsRepository.kt
+@@ -13,6 +13,9 @@ import androidx.datastore.preferences.core.stringSetPreferencesKey
+ import com.qualityalternative.app.domain.model.AppSettings
+ import com.qualityalternative.app.domain.model.AppThemeMode
+ import com.qualityalternative.app.domain.model.ContentPriority
++import com.qualityalternative.app.domain.model.DEFAULT_BEDTIME_ENABLED
++import com.qualityalternative.app.domain.model.DEFAULT_BEDTIME_END_MINUTES
++import com.qualityalternative.app.domain.model.DEFAULT_BEDTIME_START_MINUTES
+ import com.qualityalternative.app.domain.model.DEFAULT_MEDITATION_MINUTES
+ import com.qualityalternative.app.domain.model.DEFAULT_INTERFACE_TEXT_SCALE
+ import com.qualityalternative.app.domain.model.DEFAULT_INTERVENTION_MODE
+@@ -22,10 +25,12 @@ import com.qualityalternative.app.domain.model.DistractingApp
+ import com.qualityalternative.app.domain.model.DurationBucket
+ import com.qualityalternative.app.domain.model.InterventionMode
+ import com.qualityalternative.app.domain.model.LocalProfileIdentity
++import com.qualityalternative.app.domain.model.MAX_BEDTIME_MINUTES
+ import com.qualityalternative.app.domain.model.MAX_MEDITATION_MINUTES
+ import com.qualityalternative.app.domain.model.MAX_INTERFACE_TEXT_SCALE
+ import com.qualityalternative.app.domain.model.MAX_OPEN_ANYWAY_UNLOCK_MINUTES
+ import com.qualityalternative.app.domain.model.MAX_READER_FONT_SCALE
++import com.qualityalternative.app.domain.model.MIN_BEDTIME_MINUTES
+ import com.qualityalternative.app.domain.model.MIN_MEDITATION_MINUTES
+ import com.qualityalternative.app.domain.model.MIN_INTERFACE_TEXT_SCALE
+ import com.qualityalternative.app.domain.model.MIN_OPEN_ANYWAY_UNLOCK_MINUTES
+@@ -74,6 +79,13 @@ class PreferencesSettingsRepository(
+                     reactivatedCompletedContentIds = preferences[ReactivatedCompletedContentIds].orEmpty(),
+                     openAnywayUnlockMinutes = (preferences[OpenAnywayUnlockMinutes] ?: DEFAULT_OPEN_ANYWAY_UNLOCK_MINUTES)
+                         .coerceIn(MIN_OPEN_ANYWAY_UNLOCK_MINUTES, MAX_OPEN_ANYWAY_UNLOCK_MINUTES),
++                    bedtimeEnabled = preferences[BedtimeEnabled] ?: DEFAULT_BEDTIME_ENABLED,
++                    bedtimeStartMinutes = portableBedtimeMinutes(
++                        preferences[BedtimeStartMinutes] ?: DEFAULT_BEDTIME_START_MINUTES,
++                    ),
++                    bedtimeEndMinutes = portableBedtimeMinutes(
++                        preferences[BedtimeEndMinutes] ?: DEFAULT_BEDTIME_END_MINUTES,
++                    ),
+                     readerFontScale = portableReaderFontScale(
+                         preferences[ReaderFontScale] ?: DEFAULT_READER_FONT_SCALE,
+                     ),
+@@ -139,6 +151,9 @@ class PreferencesSettingsRepository(
+             preferences[ReactivatedCompletedContentIds] = settings.reactivatedCompletedContentIds
+             preferences[OpenAnywayUnlockMinutes] = settings.openAnywayUnlockMinutes
+                 .coerceIn(MIN_OPEN_ANYWAY_UNLOCK_MINUTES, MAX_OPEN_ANYWAY_UNLOCK_MINUTES)
++            preferences[BedtimeEnabled] = settings.bedtimeEnabled
++            preferences[BedtimeStartMinutes] = portableBedtimeMinutes(settings.bedtimeStartMinutes)
++            preferences[BedtimeEndMinutes] = portableBedtimeMinutes(settings.bedtimeEndMinutes)
+         }
+     }
+
+@@ -219,6 +234,14 @@ class PreferencesSettingsRepository(
+         }
+     }
+
++    override suspend fun saveBedtimeSettings(enabled: Boolean, startMinutes: Int, endMinutes: Int) {
++        dataStore.edit { preferences ->
++            preferences[BedtimeEnabled] = enabled
++            preferences[BedtimeStartMinutes] = portableBedtimeMinutes(startMinutes)
++            preferences[BedtimeEndMinutes] = portableBedtimeMinutes(endMinutes)
++        }
++    }
++
+     override suspend fun saveAnnotationExportDestination(uri: String, displayName: String) {
+         dataStore.edit { preferences ->
+             preferences[AnnotationExportUri] = uri
+@@ -351,6 +374,10 @@ class PreferencesSettingsRepository(
+             return (raw.coerceIn(MIN_INTERFACE_TEXT_SCALE, MAX_INTERFACE_TEXT_SCALE) * 100.0).roundToInt() / 100.0
+         }
+
++        fun portableBedtimeMinutes(raw: Int): Int {
++            return raw.coerceIn(MIN_BEDTIME_MINUTES, MAX_BEDTIME_MINUTES)
++        }
++
+         fun isValidLocalProfileId(raw: String): Boolean {
+             return Regex("^qa-local-[0-9a-fA-F-]{36}$").matches(raw)
+         }
+@@ -371,6 +398,9 @@ class PreferencesSettingsRepository(
+         val PriorityContentIds = stringSetPreferencesKey("priority_content_ids")
+         val ReactivatedCompletedContentIds = stringSetPreferencesKey("reactivated_completed_content_ids")
+         val OpenAnywayUnlockMinutes = intPreferencesKey("open_anyway_unlock_minutes")
++        val BedtimeEnabled = booleanPreferencesKey("bedtime_enabled")
++        val BedtimeStartMinutes = intPreferencesKey("bedtime_start_minutes")
++        val BedtimeEndMinutes = intPreferencesKey("bedtime_end_minutes")
+         val AnnotationExportUri = stringPreferencesKey("annotation_export_uri")
+         val AnnotationExportDisplayName = stringPreferencesKey("annotation_export_display_name")
+         val AnnotationExportLastSuccessfulAtMillis = longPreferencesKey("annotation_export_last_successful_at_millis")
+diff --git a/app/src/main/java/com/qualityalternative/app/domain/model/InterventionModels.kt b/app/src/main/java/com/qualityalternative/app/domain/model/InterventionModels.kt
+index 3ba0418..b965f85 100644
+--- a/app/src/main/java/com/qualityalternative/app/domain/model/InterventionModels.kt
++++ b/app/src/main/java/com/qualityalternative/app/domain/model/InterventionModels.kt
+@@ -39,6 +39,10 @@ enum class AnalyticsEventType {
+     FORM_INTERVENTION_UNLOCK_USED,
+     FORM_INTERVENTION_COMPLETED,
+     FORM_INTERVENTION_ABANDONED,
++    BEDTIME_INTERVENTION_SHOWN,
++    BEDTIME_UNLOCK_BLOCKED,
++    BEDTIME_UNLOCK_ENABLED,
++    BEDTIME_UNLOCK_USED,
+     READER_COMPLETED,
+     READER_SKIPPED,
+     FEEDBACK_SUBMITTED,
+diff --git a/app/src/main/java/com/qualityalternative/app/domain/model/UserModels.kt b/app/src/main/java/com/qualityalternative/app/domain/model/UserModels.kt
+index 134d11e..c59117f 100644
+--- a/app/src/main/java/com/qualityalternative/app/domain/model/UserModels.kt
++++ b/app/src/main/java/com/qualityalternative/app/domain/model/UserModels.kt
+@@ -1,5 +1,8 @@
+ package com.qualityalternative.app.domain.model
+
++import java.time.Instant
++import java.time.ZoneId
++
+ data class DistractingApp(
+     val packageName: String,
+     val displayName: String,
+@@ -22,6 +25,36 @@ const val MAX_OPEN_ANYWAY_UNLOCK_MINUTES = 240
+
+ val OpenAnywayUnlockMinuteOptions = listOf(15, 30, 60, 120)
+
++const val DEFAULT_BEDTIME_ENABLED = false
++const val DEFAULT_BEDTIME_START_MINUTES = 22 * 60 + 30
++const val DEFAULT_BEDTIME_END_MINUTES = 7 * 60
++const val MIN_BEDTIME_MINUTES = 0
++const val MAX_BEDTIME_MINUTES = 23 * 60 + 59
++const val BEDTIME_OPEN_ANYWAY_UNLOCK_DELAY_MILLIS = 60_000L
++
++val BedtimeStartMinuteOptions = listOf(21 * 60 + 30, 22 * 60, DEFAULT_BEDTIME_START_MINUTES, 23 * 60)
++val BedtimeEndMinuteOptions = listOf(6 * 60, 6 * 60 + 30, DEFAULT_BEDTIME_END_MINUTES, 7 * 60 + 30, 8 * 60)
++
++fun bedtimeWindowIsActive(
++    enabled: Boolean,
++    startMinutes: Int,
++    endMinutes: Int,
++    nowMillis: Long,
++    zoneId: ZoneId = ZoneId.systemDefault(),
++): Boolean {
++    if (!enabled) return false
++    val safeStart = startMinutes.coerceIn(MIN_BEDTIME_MINUTES, MAX_BEDTIME_MINUTES)
++    val safeEnd = endMinutes.coerceIn(MIN_BEDTIME_MINUTES, MAX_BEDTIME_MINUTES)
++    if (safeStart == safeEnd) return true
++    val now = Instant.ofEpochMilli(nowMillis).atZone(zoneId).toLocalTime()
++    val currentMinutes = now.hour * 60 + now.minute
++    return if (safeStart < safeEnd) {
++        currentMinutes in safeStart until safeEnd
++    } else {
++        currentMinutes >= safeStart || currentMinutes < safeEnd
++    }
++}
++
+ const val DEFAULT_READER_FONT_SCALE = 1.0
+ const val MIN_READER_FONT_SCALE = 0.80
+ const val MAX_READER_FONT_SCALE = 1.60
+@@ -62,6 +95,9 @@ data class AppSettings(
+     val priorityContentIds: Set<String> = emptySet(),
+     val reactivatedCompletedContentIds: Set<String> = emptySet(),
+     val openAnywayUnlockMinutes: Int = DEFAULT_OPEN_ANYWAY_UNLOCK_MINUTES,
++    val bedtimeEnabled: Boolean = DEFAULT_BEDTIME_ENABLED,
++    val bedtimeStartMinutes: Int = DEFAULT_BEDTIME_START_MINUTES,
++    val bedtimeEndMinutes: Int = DEFAULT_BEDTIME_END_MINUTES,
+     val readerFontScale: Double = DEFAULT_READER_FONT_SCALE,
+     val interfaceTextScale: Double = DEFAULT_INTERFACE_TEXT_SCALE,
+     val annotationExportUri: String? = null,
+diff --git a/app/src/main/java/com/qualityalternative/app/domain/service/Contracts.kt b/app/src/main/java/com/qualityalternative/app/domain/service/Contracts.kt
+index 70935d4..75b1511 100644
+--- a/app/src/main/java/com/qualityalternative/app/domain/service/Contracts.kt
++++ b/app/src/main/java/com/qualityalternative/app/domain/service/Contracts.kt
+@@ -136,6 +136,7 @@ interface SettingsRepository {
+     suspend fun savePriorityContentIds(contentIds: Set<String>)
+     suspend fun saveReactivatedCompletedContentIds(contentIds: Set<String>)
+     suspend fun saveOpenAnywayUnlockMinutes(minutes: Int)
++    suspend fun saveBedtimeSettings(enabled: Boolean, startMinutes: Int, endMinutes: Int) {}
+     suspend fun saveAnnotationExportDestination(uri: String, displayName: String)
+     suspend fun clearAnnotationExportDestination()
+     suspend fun saveAnnotationExportSuccess(timestampMillis: Long)
+diff --git a/app/src/main/java/com/qualityalternative/app/interception/ForegroundAppDetectionPolicy.kt b/app/src/main/java/com/qualityalternative/app/interception/ForegroundAppDetectionPolicy.kt
+index d035b7f..a0c9b8b 100644
+--- a/app/src/main/java/com/qualityalternative/app/interception/ForegroundAppDetectionPolicy.kt
++++ b/app/src/main/java/com/qualityalternative/app/interception/ForegroundAppDetectionPolicy.kt
+@@ -10,9 +10,11 @@ class ForegroundAppDetectionPolicy(
+         packageName: String,
+         selectedPackages: Set<String>,
+         nowMillis: Long,
++        bedtimeActive: Boolean = false,
+     ): Boolean {
+         val isDuplicate = lastSeenPackage == packageName &&
+-            nowMillis - lastSeenAtMillis < duplicateSuppressionMillis
++            nowMillis - lastSeenAtMillis < duplicateSuppressionMillis &&
++            !bedtimeActive
+
+         lastSeenPackage = packageName
+         lastSeenAtMillis = nowMillis
+diff --git a/app/src/main/java/com/qualityalternative/app/interception/InterceptionRuntimeGate.kt b/app/src/main/java/com/qualityalternative/app/interception/InterceptionRuntimeGate.kt
+index 0b142cd..d32096c 100644
+--- a/app/src/main/java/com/qualityalternative/app/interception/InterceptionRuntimeGate.kt
++++ b/app/src/main/java/com/qualityalternative/app/interception/InterceptionRuntimeGate.kt
+@@ -1,18 +1,30 @@
+ package com.qualityalternative.app.interception
+
+ object InterceptionRuntimeGate {
+-    private val suppressedPackages = mutableMapOf<String, Long>()
++    private val suppressedPackages = mutableMapOf<String, SuppressionWindow>()
+
+     @Synchronized
+-    fun shouldSuppress(targetAppPackage: String, nowMillis: Long): Boolean {
+-        suppressedPackages.entries.removeAll { (_, untilMillis) -> nowMillis >= untilMillis }
+-        val suppressedUntil = suppressedPackages[targetAppPackage] ?: return false
+-        return nowMillis < suppressedUntil
++    fun shouldSuppress(
++        targetAppPackage: String,
++        nowMillis: Long,
++        bedtimeActive: Boolean = false,
++    ): Boolean {
++        suppressedPackages.entries.removeAll { (_, window) -> nowMillis >= window.untilMillis }
++        val suppression = suppressedPackages[targetAppPackage] ?: return false
++        if (bedtimeActive && !suppression.allowedDuringBedtime) return false
++        return nowMillis < suppression.untilMillis
+     }
+
+     @Synchronized
+-    fun suppressPackage(targetAppPackage: String, untilMillis: Long) {
+-        suppressedPackages[targetAppPackage] = untilMillis
++    fun suppressPackage(
++        targetAppPackage: String,
++        untilMillis: Long,
++        allowedDuringBedtime: Boolean = false,
++    ) {
++        suppressedPackages[targetAppPackage] = SuppressionWindow(
++            untilMillis = untilMillis,
++            allowedDuringBedtime = allowedDuringBedtime,
++        )
+     }
+
+     @Synchronized
+@@ -20,3 +32,8 @@ object InterceptionRuntimeGate {
+         suppressedPackages.clear()
+     }
+ }
++
++private data class SuppressionWindow(
++    val untilMillis: Long,
++    val allowedDuringBedtime: Boolean,
++)
+diff --git a/app/src/main/java/com/qualityalternative/app/interception/QualityAlternativeAccessibilityService.kt b/app/src/main/java/com/qualityalternative/app/interception/QualityAlternativeAccessibilityService.kt
+index 08afcc6..199c3dd 100644
+--- a/app/src/main/java/com/qualityalternative/app/interception/QualityAlternativeAccessibilityService.kt
++++ b/app/src/main/java/com/qualityalternative/app/interception/QualityAlternativeAccessibilityService.kt
+@@ -6,6 +6,10 @@ import com.qualityalternative.app.MainActivity
+ import com.qualityalternative.app.QualityAlternativeApplication
+ import com.qualityalternative.app.domain.model.AnalyticsEvent
+ import com.qualityalternative.app.domain.model.AnalyticsEventType
++import com.qualityalternative.app.domain.model.DEFAULT_BEDTIME_ENABLED
++import com.qualityalternative.app.domain.model.DEFAULT_BEDTIME_END_MINUTES
++import com.qualityalternative.app.domain.model.DEFAULT_BEDTIME_START_MINUTES
++import com.qualityalternative.app.domain.model.bedtimeWindowIsActive
+ import kotlinx.coroutines.CoroutineScope
+ import kotlinx.coroutines.Dispatchers
+ import kotlinx.coroutines.SupervisorJob
+@@ -17,14 +21,19 @@ class QualityAlternativeAccessibilityService : AccessibilityService() {
+     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+     private val detectionPolicy = ForegroundAppDetectionPolicy()
+     @Volatile
+-    private var selectedPackages: Set<String> = emptySet()
++    private var interceptionSettings = InterceptionSettingsSnapshot()
+
+     override fun onServiceConnected() {
+         super.onServiceConnected()
+         val appContainer = (application as QualityAlternativeApplication).appContainer
+         serviceScope.launch {
+             appContainer.settingsRepository.observeAppSettings().collect { settings ->
+-                selectedPackages = settings.selectedAppPackages
++                interceptionSettings = InterceptionSettingsSnapshot(
++                    selectedPackages = settings.selectedAppPackages,
++                    bedtimeEnabled = settings.bedtimeEnabled,
++                    bedtimeStartMinutes = settings.bedtimeStartMinutes,
++                    bedtimeEndMinutes = settings.bedtimeEndMinutes,
++                )
+             }
+         }
+     }
+@@ -36,17 +45,30 @@ class QualityAlternativeAccessibilityService : AccessibilityService() {
+         val packageName = event.packageName?.toString()?.takeIf(String::isNotBlank) ?: return
+         val className = event.className?.toString()
+         val appContainer = (application as QualityAlternativeApplication).appContainer
++        val settings = interceptionSettings
+         val targetApp = InterceptionTargetResolver.resolve(
+             foregroundPackage = packageName,
+             foregroundClass = className,
+-            selectedPackages = selectedPackages,
++            selectedPackages = settings.selectedPackages,
+             appPackage = packageName(),
+         ) ?: return
+         val nowMillis = System.currentTimeMillis()
+-        if (!detectionPolicy.shouldLog(targetApp.packageName, selectedPackages, nowMillis)) {
++        val bedtimeActive = bedtimeWindowIsActive(
++            enabled = settings.bedtimeEnabled,
++            startMinutes = settings.bedtimeStartMinutes,
++            endMinutes = settings.bedtimeEndMinutes,
++            nowMillis = nowMillis,
++        )
++        if (InterceptionRuntimeGate.shouldSuppress(targetApp.packageName, nowMillis, bedtimeActive = bedtimeActive)) {
+             return
+         }
+-        if (InterceptionRuntimeGate.shouldSuppress(targetApp.packageName, nowMillis)) {
++        if (!detectionPolicy.shouldLog(
++                packageName = targetApp.packageName,
++                selectedPackages = settings.selectedPackages,
++                nowMillis = nowMillis,
++                bedtimeActive = bedtimeActive,
++            )
++        ) {
+             return
+         }
+
+@@ -87,3 +109,10 @@ class QualityAlternativeAccessibilityService : AccessibilityService() {
+
+     private fun packageName(): String = applicationContext.packageName
+ }
++
++private data class InterceptionSettingsSnapshot(
++    val selectedPackages: Set<String> = emptySet(),
++    val bedtimeEnabled: Boolean = DEFAULT_BEDTIME_ENABLED,
++    val bedtimeStartMinutes: Int = DEFAULT_BEDTIME_START_MINUTES,
++    val bedtimeEndMinutes: Int = DEFAULT_BEDTIME_END_MINUTES,
++)
+diff --git a/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt b/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
+index 10ac3f6..4315d93 100644
+--- a/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
++++ b/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
+@@ -23,11 +23,15 @@ import com.qualityalternative.app.domain.model.AnalyticsSemanticKeys
+ import com.qualityalternative.app.domain.model.AnalyticsEventType
+ import com.qualityalternative.app.domain.model.AppSettings
+ import com.qualityalternative.app.domain.model.AppThemeMode
++import com.qualityalternative.app.domain.model.BEDTIME_OPEN_ANYWAY_UNLOCK_DELAY_MILLIS
+ import com.qualityalternative.app.domain.model.ContentAvailability
+ import com.qualityalternative.app.domain.model.ContentFormat
+ import com.qualityalternative.app.domain.model.ContentItem
+ import com.qualityalternative.app.domain.model.ContentPriority
+ import com.qualityalternative.app.domain.model.ContentSourceType
++import com.qualityalternative.app.domain.model.DEFAULT_BEDTIME_ENABLED
++import com.qualityalternative.app.domain.model.DEFAULT_BEDTIME_END_MINUTES
++import com.qualityalternative.app.domain.model.DEFAULT_BEDTIME_START_MINUTES
+ import com.qualityalternative.app.domain.model.DEFAULT_INTERFACE_TEXT_SCALE
+ import com.qualityalternative.app.domain.model.DEFAULT_INTERVENTION_MODE
+ import com.qualityalternative.app.domain.model.DEFAULT_MEDITATION_MINUTES
+@@ -40,9 +44,11 @@ import com.qualityalternative.app.domain.model.DEFAULT_READER_FONT_SCALE
+ import com.qualityalternative.app.domain.model.InterventionMode
+ import com.qualityalternative.app.domain.model.MEDITATION_TIMER_CONTENT_ID
+ import com.qualityalternative.app.domain.model.MAX_INTERFACE_TEXT_SCALE
++import com.qualityalternative.app.domain.model.MAX_BEDTIME_MINUTES
+ import com.qualityalternative.app.domain.model.MAX_OPEN_ANYWAY_UNLOCK_MINUTES
+ import com.qualityalternative.app.domain.model.MAX_READER_FONT_SCALE
+ import com.qualityalternative.app.domain.model.MIN_INTERFACE_TEXT_SCALE
++import com.qualityalternative.app.domain.model.MIN_BEDTIME_MINUTES
+ import com.qualityalternative.app.domain.model.MIN_OPEN_ANYWAY_UNLOCK_MINUTES
+ import com.qualityalternative.app.domain.model.MIN_READER_FONT_SCALE
+ import com.qualityalternative.app.domain.model.OnboardingSelection
+@@ -66,6 +72,7 @@ import com.qualityalternative.app.domain.model.UserDocumentValidationError
+ import com.qualityalternative.app.domain.model.UserLinkDraft
+ import com.qualityalternative.app.domain.model.UserLinkValidationError
+ import com.qualityalternative.app.domain.model.UserPreferences
++import com.qualityalternative.app.domain.model.bedtimeWindowIsActive
+ import com.qualityalternative.app.domain.model.meditationTimerContentItem
+ import com.qualityalternative.app.domain.model.usesExternalHandoff
+ import com.qualityalternative.app.domain.model.usesMeditationTimer
+@@ -154,6 +161,11 @@ data class MainUiState(
+     val priorityContentIds: Set<String> = emptySet(),
+     val reactivatedCompletedContentIds: Set<String> = emptySet(),
+     val openAnywayUnlockMinutes: Int = DEFAULT_OPEN_ANYWAY_UNLOCK_MINUTES,
++    val bedtimeEnabled: Boolean = DEFAULT_BEDTIME_ENABLED,
++    val bedtimeStartMinutes: Int = DEFAULT_BEDTIME_START_MINUTES,
++    val bedtimeEndMinutes: Int = DEFAULT_BEDTIME_END_MINUTES,
++    val isBedtimeActive: Boolean = false,
++    val currentInterventionBedtimeEnforced: Boolean = false,
+     val annotationExportUri: String? = null,
+     val annotationExportDisplayName: String? = null,
+     val annotationExportUsesLocalDefault: Boolean = false,
+@@ -475,6 +487,7 @@ class MainViewModel(
+                 while (true) {
+                     delay(ACTIVE_DELAY_REFRESH_INTERVAL_MILLIS)
+                     refreshActiveDelayWindow()
++                    refreshBedtimeInterventionBoundary()
+                 }
+             }
+         }
+@@ -725,6 +738,36 @@ class MainViewModel(
+         }
+     }
+
++    fun setBedtimeSettings(
++        enabled: Boolean = uiState.bedtimeEnabled,
++        startMinutes: Int = uiState.bedtimeStartMinutes,
++        endMinutes: Int = uiState.bedtimeEndMinutes,
++    ) {
++        val safeStartMinutes = startMinutes.coerceIn(MIN_BEDTIME_MINUTES, MAX_BEDTIME_MINUTES)
++        val safeEndMinutes = endMinutes.coerceIn(MIN_BEDTIME_MINUTES, MAX_BEDTIME_MINUTES)
++        val activeNow = bedtimeWindowIsActive(
++            enabled = enabled,
++            startMinutes = safeStartMinutes,
++            endMinutes = safeEndMinutes,
++            nowMillis = nowProvider(),
++        )
++        uiState = uiState.copy(
++            bedtimeEnabled = enabled,
++            bedtimeStartMinutes = safeStartMinutes,
++            bedtimeEndMinutes = safeEndMinutes,
++            isBedtimeActive = activeNow,
++            latestMessage = null,
++        )
++        viewModelScope.launch {
++            settingsRepository.saveBedtimeSettings(
++                enabled = enabled,
++                startMinutes = safeStartMinutes,
++                endMinutes = safeEndMinutes,
++            )
++            autosaveAccountLightProfileAfterPortableMutation()
++        }
++    }
++
+     fun configureReadingAnnotationExport(
+         uri: String,
+         displayName: String,
+@@ -1365,6 +1408,7 @@ class MainViewModel(
+                 currentOpenAnywayUnlockAvailableAtMillis = null,
+                 currentRecommendationSet = null,
+                 currentInterventionOrigin = null,
++                currentInterventionBedtimeEnforced = false,
+                 currentContent = repairedContent,
+                 currentReaderDocument = readerDocument,
+                 currentContentBody = readerDocument.plainText,
+@@ -1691,9 +1735,19 @@ class MainViewModel(
+                 shownAtMillis = processingNowMillis,
+             )
+
++            val bedtimeActive = bedtimeWindowIsActive(
++                enabled = uiState.bedtimeEnabled,
++                startMinutes = uiState.bedtimeStartMinutes,
++                endMinutes = uiState.bedtimeEndMinutes,
++                nowMillis = processingNowMillis,
++            )
+             if (
+                 origin == InterventionOrigin.SYSTEM &&
+-                InterceptionRuntimeGate.shouldSuppress(targetApp.packageName, processingNowMillis)
++                InterceptionRuntimeGate.shouldSuppress(
++                    targetAppPackage = targetApp.packageName,
++                    nowMillis = processingNowMillis,
++                    bedtimeActive = bedtimeActive,
++                )
+             ) {
+                 uiState = uiState.copy(
+                     selectedTargetApp = targetApp,
+@@ -1704,41 +1758,45 @@ class MainViewModel(
+                     activeDelayWindow = null,
+                     activeDelaySuggestion = null,
+                     currentInterventionOrigin = null,
++                    currentInterventionBedtimeEnforced = false,
+                     latestMessage = "${targetApp.displayName} is still unlocked.",
+                     screen = MainScreen.Home,
+                 )
+                 return@launch
+             }
+
+-            val delayInspection = delayGate.inspectDelay(targetApp = targetApp, nowMillis = processingNowMillis)
+-            if (delayInspection.activeWindow != null) {
+-                recordDelayReturnDuringActiveWindow(targetApp = targetApp, nowMillis = processingNowMillis)
+-                val activeDelayWindow = delayGate.activeDelay(targetApp = targetApp, nowMillis = processingNowMillis)
+-                uiState = uiState.copy(
+-                    selectedTargetApp = targetApp,
+-                    activeDelayWindow = activeDelayWindow,
+-                    activeDelaySuggestion = activeDelaySuggestionFor(activeDelayWindow),
+-                    latestMessage = "${targetApp.displayName} is paused for 15 minutes.",
+-                    screen = MainScreen.Home,
+-                    currentOpenAnywayUnlockAvailableAtMillis = null,
+-                    currentInterventionOrigin = null,
+-                )
+-                return@launch
+-            }
++            if (!bedtimeActive) {
++                val delayInspection = delayGate.inspectDelay(targetApp = targetApp, nowMillis = processingNowMillis)
++                if (delayInspection.activeWindow != null) {
++                    recordDelayReturnDuringActiveWindow(targetApp = targetApp, nowMillis = processingNowMillis)
++                    val activeDelayWindow = delayGate.activeDelay(targetApp = targetApp, nowMillis = processingNowMillis)
++                    uiState = uiState.copy(
++                        selectedTargetApp = targetApp,
++                        activeDelayWindow = activeDelayWindow,
++                        activeDelaySuggestion = activeDelaySuggestionFor(activeDelayWindow),
++                        latestMessage = "${targetApp.displayName} is paused for 15 minutes.",
++                        screen = MainScreen.Home,
++                        currentOpenAnywayUnlockAvailableAtMillis = null,
++                        currentInterventionOrigin = null,
++                        currentInterventionBedtimeEnforced = false,
++                    )
++                    return@launch
++                }
+
+-            var delayReturnHandled = false
+-            delayInspection.expiredWindow?.let { expiredWindow ->
+-                delayReturnHandled = true
+-                recordDelayReturnAfterExpiry(expiredWindow = expiredWindow, nowMillis = processingNowMillis)
+-                delayGate.consumeExpiredDelay(
+-                    targetApp = targetApp,
+-                    delayId = expiredWindow.id,
+-                    nowMillis = processingNowMillis,
+-                )
+-            }
++                var delayReturnHandled = false
++                delayInspection.expiredWindow?.let { expiredWindow ->
++                    delayReturnHandled = true
++                    recordDelayReturnAfterExpiry(expiredWindow = expiredWindow, nowMillis = processingNowMillis)
++                    delayGate.consumeExpiredDelay(
++                        targetApp = targetApp,
++                        delayId = expiredWindow.id,
++                        nowMillis = processingNowMillis,
++                    )
++                }
+
+-            if (!delayReturnHandled) {
+-                recordReturnSignalIfNeeded(targetApp = targetApp, nowMillis = processingNowMillis)
++                if (!delayReturnHandled) {
++                    recordReturnSignalIfNeeded(targetApp = targetApp, nowMillis = processingNowMillis)
++                }
+             }
+
+             val interventionId = UUID.randomUUID().toString()
+@@ -1788,6 +1846,7 @@ class MainViewModel(
+                     activeDelayWindow = null,
+                     activeDelaySuggestion = null,
+                     currentInterventionOrigin = null,
++                    currentInterventionBedtimeEnforced = false,
+                     latestMessage = "No replacement inventory is available yet.",
+                     screen = MainScreen.Home,
+                 )
+@@ -1824,12 +1883,33 @@ class MainViewModel(
+                 )
+             }
+             val interventionMode = uiState.interventionMode
+-            val openAnywayAvailableAtMillis = if (interventionMode == InterventionMode.FIRM) {
+-                processingNowMillis + FORM_INTERVENTION_UNLOCK_DELAY_MILLIS
+-            } else {
+-                null
++            val openAnywayDelayMillis = when {
++                bedtimeActive -> BEDTIME_OPEN_ANYWAY_UNLOCK_DELAY_MILLIS
++                interventionMode == InterventionMode.FIRM -> FORM_INTERVENTION_UNLOCK_DELAY_MILLIS
++                else -> null
+             }
+-            if (interventionMode == InterventionMode.FIRM) {
++            val openAnywayAvailableAtMillis = openAnywayDelayMillis?.let { delayMillis ->
++                processingNowMillis + delayMillis
++            }
++            if (bedtimeActive) {
++                recordEvent(
++                    AnalyticsEvent(
++                        type = AnalyticsEventType.BEDTIME_INTERVENTION_SHOWN,
++                        timestampMillis = processingNowMillis,
++                        interventionId = interventionId,
++                        targetAppPackage = targetApp.packageName,
++                        primaryContentId = recommendationSet.primary.id,
++                        backupContentIds = backupIds,
++                        contentId = recommendationSet.primary.id,
++                        metadata = recommendationSet.analyticsMetadata() + mapOf(
++                            "interventionMode" to interventionMode.name,
++                            "bedtimeStartMinutes" to uiState.bedtimeStartMinutes.toString(),
++                            "bedtimeEndMinutes" to uiState.bedtimeEndMinutes.toString(),
++                            "openAnywayUnlockDelayMillis" to BEDTIME_OPEN_ANYWAY_UNLOCK_DELAY_MILLIS.toString(),
++                        ),
++                    ),
++                )
++            } else if (interventionMode == InterventionMode.FIRM) {
+                 recordEvent(
+                     AnalyticsEvent(
+                         type = AnalyticsEventType.FORM_INTERVENTION_SHOWN,
+@@ -1870,6 +1950,8 @@ class MainViewModel(
+                 currentOpenAnywayUnlockAvailableAtMillis = openAnywayAvailableAtMillis,
+                 currentRecommendationSet = recommendationSet,
+                 currentInterventionOrigin = origin,
++                isBedtimeActive = bedtimeActive,
++                currentInterventionBedtimeEnforced = bedtimeActive,
+                 activeDelayWindow = null,
+                 activeDelaySuggestion = null,
+                 latestMessage = null,
+@@ -1952,7 +2034,10 @@ class MainViewModel(
+         val targetApp = uiState.selectedTargetApp ?: return
+         val recommendationSet = uiState.currentRecommendationSet ?: return
+         val interventionId = uiState.currentInterventionId ?: return
+-        val nowMillis = System.currentTimeMillis()
++        val nowMillis = nowProvider()
++        if (ensureCurrentInterventionBedtimeEnforced(nowMillis = nowMillis) || uiState.currentInterventionBedtimeEnforced) {
++            return
++        }
+         viewModelScope.launch {
+             val window = delayGate.storeDelayDurably(
+                 targetApp = targetApp,
+@@ -1971,6 +2056,7 @@ class MainViewModel(
+                 currentOpenAnywayUnlockAvailableAtMillis = null,
+                 currentRecommendationSet = null,
+                 currentInterventionOrigin = null,
++                currentInterventionBedtimeEnforced = false,
+                 activeDelayWindow = window,
+                 activeDelaySuggestion = activeDelaySuggestionFor(window),
+                 latestMessage = "${targetApp.displayName} paused for 15 minutes.",
+@@ -1985,7 +2071,11 @@ class MainViewModel(
+         val availableAtMillis = uiState.currentOpenAnywayUnlockAvailableAtMillis ?: return
+         recordEvent(
+             AnalyticsEvent(
+-                type = AnalyticsEventType.FORM_INTERVENTION_UNLOCK_ENABLED,
++                type = if (uiState.currentInterventionBedtimeEnforced) {
++                    AnalyticsEventType.BEDTIME_UNLOCK_ENABLED
++                } else {
++                    AnalyticsEventType.FORM_INTERVENTION_UNLOCK_ENABLED
++                },
+                 timestampMillis = nowMillis,
+                 interventionId = interventionId,
+                 targetAppPackage = targetApp.packageName,
+@@ -2006,7 +2096,7 @@ class MainViewModel(
+         val targetApp = uiState.selectedTargetApp ?: return
+         val recommendationSet = uiState.currentRecommendationSet ?: return
+         val interventionId = uiState.currentInterventionId ?: return
+-        if (uiState.interventionMode == InterventionMode.FIRM) {
++        if (uiState.interventionMode == InterventionMode.FIRM && !uiState.currentInterventionBedtimeEnforced) {
+             recordEvent(
+                 AnalyticsEvent(
+                     type = AnalyticsEventType.FORM_INTERVENTION_ABANDONED,
+@@ -2030,6 +2120,7 @@ class MainViewModel(
+             currentOpenAnywayUnlockAvailableAtMillis = null,
+             currentRecommendationSet = null,
+             currentInterventionOrigin = null,
++            currentInterventionBedtimeEnforced = false,
+             latestMessage = null,
+         )
+     }
+@@ -2102,21 +2193,73 @@ class MainViewModel(
+                 currentOpenAnywayUnlockAvailableAtMillis = null,
+                 currentRecommendationSet = recommendationSet,
+                 currentInterventionOrigin = null,
++                currentInterventionBedtimeEnforced = false,
+             )
+             openReplacementSession(content = content, sessionId = sessionId, startedAtMillis = nowMillis)
+         }
+     }
+
++    private fun ensureCurrentInterventionBedtimeEnforced(nowMillis: Long): Boolean {
++        if (uiState.screen != MainScreen.Intervention) return false
++        if (uiState.currentInterventionBedtimeEnforced) return false
++        val targetApp = uiState.selectedTargetApp ?: return false
++        val recommendationSet = uiState.currentRecommendationSet ?: return false
++        val bedtimeActiveNow = bedtimeWindowIsActive(
++            enabled = uiState.bedtimeEnabled,
++            startMinutes = uiState.bedtimeStartMinutes,
++            endMinutes = uiState.bedtimeEndMinutes,
++            nowMillis = nowMillis,
++        )
++        if (!bedtimeActiveNow) return false
++        val bedtimeUnlockAvailableAtMillis = nowMillis + BEDTIME_OPEN_ANYWAY_UNLOCK_DELAY_MILLIS
++        recordEvent(
++            AnalyticsEvent(
++                type = AnalyticsEventType.BEDTIME_INTERVENTION_SHOWN,
++                timestampMillis = nowMillis,
++                interventionId = uiState.currentInterventionId,
++                targetAppPackage = targetApp.packageName,
++                primaryContentId = recommendationSet.primary.id,
++                backupContentIds = recommendationSet.backups.map(ContentItem::id),
++                contentId = recommendationSet.primary.id,
++                metadata = recommendationSet.analyticsMetadata() + mapOf(
++                    "interventionMode" to uiState.interventionMode.name,
++                    "bedtimeStartMinutes" to uiState.bedtimeStartMinutes.toString(),
++                    "bedtimeEndMinutes" to uiState.bedtimeEndMinutes.toString(),
++                    "openAnywayUnlockDelayMillis" to BEDTIME_OPEN_ANYWAY_UNLOCK_DELAY_MILLIS.toString(),
++                    "bedtimeActivatedAfterInterventionShown" to "true",
++                ),
++            ),
++        )
++        uiState = uiState.copy(
++            isBedtimeActive = true,
++            currentInterventionBedtimeEnforced = true,
++            currentOpenAnywayUnlockAvailableAtMillis = bedtimeUnlockAvailableAtMillis,
++            latestMessage = "Bedtime is active. Breathe for one minute before the emergency unlock.",
++        )
++        return true
++    }
++
++    fun refreshBedtimeInterventionBoundary(nowMillis: Long = nowProvider()) {
++        ensureCurrentInterventionBedtimeEnforced(nowMillis = nowMillis)
++    }
++
+     fun openAnyway(): Boolean {
+         val targetApp = uiState.selectedTargetApp ?: return false
+         val recommendationSet = uiState.currentRecommendationSet
+         val nowMillis = nowProvider()
++        if (ensureCurrentInterventionBedtimeEnforced(nowMillis = nowMillis)) {
++            return false
++        }
+         val openAnywayAvailableAtMillis = uiState.currentOpenAnywayUnlockAvailableAtMillis
+         val isFirmMode = uiState.interventionMode == InterventionMode.FIRM
+         if (openAnywayAvailableAtMillis != null && nowMillis < openAnywayAvailableAtMillis) {
+             recordEvent(
+                 AnalyticsEvent(
+-                    type = AnalyticsEventType.FORM_INTERVENTION_UNLOCK_BLOCKED,
++                    type = if (uiState.currentInterventionBedtimeEnforced) {
++                        AnalyticsEventType.BEDTIME_UNLOCK_BLOCKED
++                    } else {
++                        AnalyticsEventType.FORM_INTERVENTION_UNLOCK_BLOCKED
++                    },
+                     timestampMillis = nowMillis,
+                     interventionId = uiState.currentInterventionId,
+                     targetAppPackage = targetApp.packageName,
+@@ -2129,7 +2272,13 @@ class MainViewModel(
+                     ),
+                 ),
+             )
+-            uiState = uiState.copy(latestMessage = "Take five seconds before opening ${targetApp.displayName}.")
++            uiState = uiState.copy(
++                latestMessage = if (uiState.currentInterventionBedtimeEnforced) {
++                    "Breathe for one minute before the emergency unlock."
++                } else {
++                    "Take five seconds before opening ${targetApp.displayName}."
++                },
++            )
+             return false
+         }
+         val shouldExitToTarget = uiState.currentInterventionOrigin == InterventionOrigin.SYSTEM
+@@ -2148,11 +2297,33 @@ class MainViewModel(
+                     "interventionMode" to uiState.interventionMode.name,
+                     "openAnywayUnlockMinutes" to unlockMinutes.toString(),
+                     "openAnywayUnlockUntilMillis" to unlockUntilMillis.toString(),
+-                    "formUnlockWaitMillis" to if (isFirmMode) FORM_INTERVENTION_UNLOCK_DELAY_MILLIS.toString() else "0",
++                    "formUnlockWaitMillis" to when {
++                        uiState.currentInterventionBedtimeEnforced -> BEDTIME_OPEN_ANYWAY_UNLOCK_DELAY_MILLIS.toString()
++                        isFirmMode -> FORM_INTERVENTION_UNLOCK_DELAY_MILLIS.toString()
++                        else -> "0"
++                    },
++                    "bedtimeActive" to uiState.currentInterventionBedtimeEnforced.toString(),
+                 ),
+             ),
+         )
+-        if (isFirmMode) {
++        if (uiState.currentInterventionBedtimeEnforced) {
++            recordEvent(
++                AnalyticsEvent(
++                    type = AnalyticsEventType.BEDTIME_UNLOCK_USED,
++                    timestampMillis = nowMillis,
++                    interventionId = uiState.currentInterventionId,
++                    targetAppPackage = targetApp.packageName,
++                    primaryContentId = recommendationSet?.primary?.id,
++                    backupContentIds = recommendationSet?.backups.orEmpty().map(ContentItem::id),
++                    metadata = mapOf(
++                        "interventionMode" to uiState.interventionMode.name,
++                        "openAnywayUnlockAvailableAtMillis" to (openAnywayAvailableAtMillis?.toString() ?: "0"),
++                        "openAnywayUnlockUntilMillis" to unlockUntilMillis.toString(),
++                    ),
++                ),
++            )
++        }
++        if (isFirmMode && !uiState.currentInterventionBedtimeEnforced) {
+             recordEvent(
+                 AnalyticsEvent(
+                     type = AnalyticsEventType.FORM_INTERVENTION_UNLOCK_USED,
+@@ -2174,6 +2345,7 @@ class MainViewModel(
+             InterceptionRuntimeGate.suppressPackage(
+                 targetAppPackage = targetApp.packageName,
+                 untilMillis = unlockUntilMillis,
++                allowedDuringBedtime = uiState.currentInterventionBedtimeEnforced,
+             )
+         }
+         uiState = uiState.copy(
+@@ -2183,6 +2355,13 @@ class MainViewModel(
+             currentOpenAnywayUnlockAvailableAtMillis = null,
+             currentRecommendationSet = null,
+             currentInterventionOrigin = null,
++            currentInterventionBedtimeEnforced = false,
++            isBedtimeActive = bedtimeWindowIsActive(
++                enabled = uiState.bedtimeEnabled,
++                startMinutes = uiState.bedtimeStartMinutes,
++                endMinutes = uiState.bedtimeEndMinutes,
++                nowMillis = nowMillis,
++            ),
+             activeDelaySuggestion = null,
+             latestMessage = "${targetApp.displayName} unlocked for $unlockMinutes minutes.",
+         )
+@@ -2886,6 +3065,13 @@ class MainViewModel(
+         val effectiveProfileAutosaveDisplayName = settings.profileAutosaveDisplayName
+             ?.takeIf(String::isNotBlank)
+             ?: defaultProfileAutosaveDisplayName.takeIf { profileAutosaveUsesLocalDefault }
++        val settingsNowMillis = nowProvider()
++        val activeBedtimeNow = bedtimeWindowIsActive(
++            enabled = settings.bedtimeEnabled,
++            startMinutes = settings.bedtimeStartMinutes,
++            endMinutes = settings.bedtimeEndMinutes,
++            nowMillis = settingsNowMillis,
++        )
+
+         uiState = uiState.copy(
+             hasCompletedOnboarding = settings.hasCompletedOnboarding,
+@@ -2901,6 +3087,10 @@ class MainViewModel(
+             priorityContentIds = settings.priorityContentIds,
+             reactivatedCompletedContentIds = reactivatedCompletedContentIds,
+             openAnywayUnlockMinutes = settings.openAnywayUnlockMinutes,
++            bedtimeEnabled = settings.bedtimeEnabled,
++            bedtimeStartMinutes = settings.bedtimeStartMinutes.coerceIn(MIN_BEDTIME_MINUTES, MAX_BEDTIME_MINUTES),
++            bedtimeEndMinutes = settings.bedtimeEndMinutes.coerceIn(MIN_BEDTIME_MINUTES, MAX_BEDTIME_MINUTES),
++            isBedtimeActive = activeBedtimeNow,
+             annotationExportUri = effectiveAnnotationExportUri,
+             annotationExportDisplayName = effectiveAnnotationExportDisplayName,
+             annotationExportUsesLocalDefault = annotationExportUsesLocalDefault,
+@@ -2935,6 +3125,7 @@ class MainViewModel(
+                 else -> uiState.screen
+             },
+         )
++        ensureCurrentInterventionBedtimeEnforced(nowMillis = settingsNowMillis)
+         if (reactivatedCompletedContentIds != settings.reactivatedCompletedContentIds) {
+             viewModelScope.launch {
+                 settingsRepository.saveReactivatedCompletedContentIds(reactivatedCompletedContentIds)
+@@ -3300,6 +3491,7 @@ class MainViewModel(
+             currentOpenAnywayUnlockAvailableAtMillis = null,
+             currentRecommendationSet = null,
+             currentInterventionOrigin = null,
++            currentInterventionBedtimeEnforced = false,
+             currentContent = repairedContent,
+             currentReaderDocument = readerDocument,
+             currentContentBody = readerDocument.plainText,
+@@ -3693,6 +3885,7 @@ class MainViewModel(
+             isReaderOpening = false,
+             currentRecommendationSet = null,
+             currentInterventionOrigin = null,
++            currentInterventionBedtimeEnforced = false,
+             currentSessionId = null,
+             currentSessionStartedAtMillis = null,
+             currentReadingProgress = null,
+@@ -3761,7 +3954,7 @@ class MainViewModel(
+         val targetApp = uiState.selectedTargetApp ?: return
+         val recommendationSet = uiState.currentRecommendationSet ?: return
+         val interventionId = uiState.currentInterventionId ?: return
+-        if (uiState.interventionMode != InterventionMode.FIRM) return
++        if (uiState.interventionMode != InterventionMode.FIRM || uiState.currentInterventionBedtimeEnforced) return
+         recordEvent(
+             AnalyticsEvent(
+                 type = AnalyticsEventType.FORM_INTERVENTION_COMPLETED,
+diff --git a/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt b/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
+index b29dfea..0aa223c 100644
+--- a/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
++++ b/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
+@@ -129,11 +129,15 @@ import com.qualityalternative.app.data.UserDocumentValidator
+ import com.qualityalternative.app.domain.model.AnalyticsEvent
+ import com.qualityalternative.app.domain.model.AnalyticsEventType
+ import com.qualityalternative.app.domain.model.AppThemeMode
++import com.qualityalternative.app.domain.model.BedtimeEndMinuteOptions
++import com.qualityalternative.app.domain.model.BedtimeStartMinuteOptions
+ import com.qualityalternative.app.domain.model.ContentAvailability
+ import com.qualityalternative.app.domain.model.ContentFormat
+ import com.qualityalternative.app.domain.model.ContentItem
+ import com.qualityalternative.app.domain.model.ContentPriority
+ import com.qualityalternative.app.domain.model.ContentSourceType
++import com.qualityalternative.app.domain.model.DEFAULT_BEDTIME_END_MINUTES
++import com.qualityalternative.app.domain.model.DEFAULT_BEDTIME_START_MINUTES
+ import com.qualityalternative.app.domain.model.DelayWindow
+ import com.qualityalternative.app.domain.model.DistractingApp
+ import com.qualityalternative.app.domain.model.DurationBucket
+@@ -606,6 +610,7 @@ private fun MainRoute(
+                 onSelectInterfaceTextScale = viewModel::setInterfaceTextScale,
+                 onSelectContentPriority = viewModel::setContentPriority,
+                 onSelectOpenAnywayUnlock = viewModel::setOpenAnywayUnlockMinutes,
++                onSelectBedtimeSettings = viewModel::setBedtimeSettings,
+                 onSelectInterventionMode = viewModel::selectInterventionMode,
+                 onSelectTheme = viewModel::selectThemeMode,
+                 onRefreshReadiness = viewModel::refreshPermissionReadiness,
+@@ -1901,6 +1906,7 @@ private fun InterventionScreen(
+     val preferences = state.preferences ?: return
+     val colors = QualityAlternativeThemeTokens.colors
+     val primary = recommendationSet.primary
++    val isBedtime = state.currentInterventionBedtimeEnforced
+     val meditationAlternative = recommendationSet.backups.firstOrNull { item -> item.usesMeditationTimer() }
+     val backups = recommendationSet.backups.withIndex().filterNot { indexedBackup ->
+         indexedBackup.value.usesMeditationTimer()
+@@ -1909,11 +1915,19 @@ private fun InterventionScreen(
+     val primaryContinueProgress = continueProgressMetaFor(item = primary, progress = state.readingProgress)
+     val canAdjustMeditationBeforeStart = primary.usesMeditationTimer()
+     val backgroundBrush = Brush.verticalGradient(
+-        colors = listOf(
+-            colors.accentSoft,
+-            colors.background,
+-            colors.background,
+-        ),
++        colors = if (isBedtime) {
++            listOf(
++                colors.elevatedSurface,
++                colors.background,
++                colors.background,
++            )
++        } else {
++            listOf(
++                colors.accentSoft,
++                colors.background,
++                colors.background,
++            )
++        },
+     )
+     val openAnywayAvailableAtMillis = state.currentOpenAnywayUnlockAvailableAtMillis
+     var openAnywayNowMillis by remember(state.currentInterventionId, openAnywayAvailableAtMillis) {
+@@ -1961,7 +1975,11 @@ private fun InterventionScreen(
+         ) {
+             AppDot(app = targetApp, size = 26.dp)
+             BodyText(
+-                text = "You reached for ${targetApp.displayName}",
++                text = if (isBedtime) {
++                    "Bedtime is protecting sleep from ${targetApp.displayName}"
++                } else {
++                    "You reached for ${targetApp.displayName}"
++                },
+                 color = colors.mutedText,
+                 modifier = Modifier.weight(1f),
+                 fontSize = 13.5.sp,
+@@ -1974,7 +1992,7 @@ private fun InterventionScreen(
+             )
+         }
+         QaCard(
+-            borderColor = colors.lineStrong,
++            borderColor = if (isBedtime) colors.accent else colors.lineStrong,
+             padding = 13.dp,
+             modifier = Modifier.padding(bottom = 8.dp),
+         ) {
+@@ -2013,6 +2031,17 @@ private fun InterventionScreen(
+                         .testTag("intervention-primary-progress"),
+                 )
+             }
++            if (isBedtime) {
++                BodyText(
++                    text = "This is a full bedtime block. Pick a calm alternative, or wait through the emergency breath before opening the original app.",
++                    color = colors.mutedText,
++                    fontSize = 12.5.sp,
++                    lineHeight = 17.sp,
++                    modifier = Modifier
++                        .padding(top = 9.dp)
++                        .testTag("bedtime-intervention-copy"),
++                )
++            }
+         }
+         QaButton(
+             text = primaryActionLabel(primary),
+@@ -2047,7 +2076,10 @@ private fun InterventionScreen(
+                         .testTag("intervention-meditation-alternative"),
+                 )
+             }
+-            MonoText("Other options", modifier = Modifier.padding(bottom = 4.dp))
++            MonoText(
++                if (isBedtime) "Quiet alternatives" else "Other options",
++                modifier = Modifier.padding(bottom = 4.dp),
++            )
+             if (backups.isEmpty()) {
+                 BodyText(
+                     text = "No extra reading choices are available right now.",
+@@ -2083,9 +2115,10 @@ private fun InterventionScreen(
+         if (!canOpenAnyway) {
+             OpenAnywayUnlockStatus(
+                 remainingSeconds = openAnywayRemainingSeconds,
++                label = if (isBedtime) "Breathe before emergency unlock" else "Take five seconds",
+                 modifier = Modifier
+                     .padding(top = 4.dp, bottom = 2.dp)
+-                    .testTag("form-intervention-unlock-wait"),
++                    .testTag(if (isBedtime) "bedtime-emergency-unlock-wait" else "form-intervention-unlock-wait"),
+             )
+         }
+         Row(
+@@ -2094,20 +2127,29 @@ private fun InterventionScreen(
+                 .padding(top = 8.dp)
+                 .testTag("intervention-bottom-actions"),
+         ) {
++            if (!isBedtime) {
++                QaButton(
++                    text = "Pause 15 min",
++                    onClick = onDelay,
++                    variant = QaButtonVariant.Outline,
++                    modifier = Modifier.weight(1f),
++                    fullWidth = false,
++                    size = QaButtonSize.Compact,
++                    leadingIcon = QaIconKind.Pause,
++                )
++            }
+             QaButton(
+-                text = "Pause 15 min",
+-                onClick = onDelay,
+-                variant = QaButtonVariant.Outline,
+-                modifier = Modifier.weight(1f),
+-                fullWidth = false,
+-                size = QaButtonSize.Compact,
+-                leadingIcon = QaIconKind.Pause,
+-            )
+-            QaButton(
+-                text = if (canOpenAnyway) "Open ${targetApp.displayName}" else "Open in ${openAnywayRemainingSeconds}s",
++                text = when {
++                    isBedtime && canOpenAnyway -> "Emergency unlock"
++                    isBedtime -> "Breathe ${openAnywayRemainingSeconds}s"
++                    canOpenAnyway -> "Open ${targetApp.displayName}"
++                    else -> "Open in ${openAnywayRemainingSeconds}s"
++                },
+                 onClick = onOpenAnyway,
+                 variant = QaButtonVariant.Ghost,
+-                modifier = Modifier.weight(1f),
++                modifier = Modifier
++                    .weight(1f)
++                    .testTag(if (isBedtime) "bedtime-emergency-unlock-action" else "intervention-open-anyway-action"),
+                 enabled = canOpenAnyway,
+                 fullWidth = false,
+                 size = QaButtonSize.Compact,
+@@ -2120,6 +2162,7 @@ private fun InterventionScreen(
+ @Composable
+ private fun OpenAnywayUnlockStatus(
+     remainingSeconds: Int,
++    label: String = "Take five seconds",
+     modifier: Modifier = Modifier,
+ ) {
+     val colors = QualityAlternativeThemeTokens.colors
+@@ -2136,7 +2179,7 @@ private fun OpenAnywayUnlockStatus(
+         ) {
+             QaIcon(kind = QaIconKind.Clock, color = colors.mutedText, size = 15.dp)
+             BodyText(
+-                text = "Take five seconds",
++                text = label,
+                 color = colors.mutedText,
+                 fontSize = 12.5.sp,
+                 modifier = Modifier.weight(1f),
+@@ -3808,6 +3851,7 @@ private fun SettingsTab(
+     onSelectInterfaceTextScale: (Double) -> Unit,
+     onSelectContentPriority: (ContentPriority) -> Unit,
+     onSelectOpenAnywayUnlock: (Int) -> Unit,
++    onSelectBedtimeSettings: (Boolean, Int, Int) -> Unit,
+     onSelectInterventionMode: (InterventionMode) -> Unit,
+     onSelectTheme: (AppThemeMode) -> Unit,
+     onRefreshReadiness: () -> Unit,
+@@ -4043,6 +4087,12 @@ private fun SettingsTab(
+                 }
+             }
+         }
++        item {
++            BedtimeSettingsSection(
++                state = state,
++                onSelect = onSelectBedtimeSettings,
++            )
++        }
+         item {
+             SectionLabel("Meditation reset")
+             QaCard {
+@@ -4112,6 +4162,121 @@ private fun SettingsTab(
+     }
+ }
+
++@Composable
++private fun BedtimeSettingsSection(
++    state: MainUiState,
++    onSelect: (Boolean, Int, Int) -> Unit,
++) {
++    val colors = QualityAlternativeThemeTokens.colors
++    val startMinutes = state.bedtimeStartMinutes.takeIf { it in 0..1439 } ?: DEFAULT_BEDTIME_START_MINUTES
++    val endMinutes = state.bedtimeEndMinutes.takeIf { it in 0..1439 } ?: DEFAULT_BEDTIME_END_MINUTES
++    val scheduleText = if (startMinutes == endMinutes) {
++        "Schedule always active."
++    } else {
++        "Schedule ${startMinutes.bedtimeTimeLabel()} to ${endMinutes.bedtimeTimeLabel()}."
++    }
++    Column(modifier = Modifier.testTag("settings-bedtime-section")) {
++        SectionLabel(
++            text = "Bedtime",
++            right = when {
++                state.isBedtimeActive -> "Active"
++                state.bedtimeEnabled -> "Scheduled"
++                else -> "Off"
++            },
++        )
++        QaCard {
++            Row(
++                modifier = Modifier.fillMaxWidth(),
++                verticalAlignment = Alignment.CenterVertically,
++                horizontalArrangement = Arrangement.spacedBy(12.dp),
++            ) {
++                SourceBadge(sourceType = ContentSourceType.MEDITATION, icon = QaIconKind.Shield)
++                Column(modifier = Modifier.weight(1f)) {
++                    Text(
++                        text = "Sleep lock",
++                        style = MaterialTheme.typography.titleMedium,
++                        fontSize = 16.sp,
++                        lineHeight = 20.sp,
++                        color = colors.primaryText,
++                        fontWeight = FontWeight.SemiBold,
++                    )
++                    BodyText(
++                        text = "During this window, intercepted apps require a one-minute emergency breath before opening.",
++                        color = colors.mutedText,
++                        fontSize = 12.5.sp,
++                        lineHeight = 17.sp,
++                        modifier = Modifier.padding(top = 4.dp),
++                    )
++                }
++            }
++            FlowRow(
++                horizontalArrangement = Arrangement.spacedBy(6.dp),
++                verticalArrangement = Arrangement.spacedBy(6.dp),
++                modifier = Modifier.padding(top = 14.dp),
++            ) {
++                QaChip(
++                    text = "Off",
++                    selected = !state.bedtimeEnabled,
++                    onClick = { onSelect(false, startMinutes, endMinutes) },
++                    modifier = Modifier.testTag("bedtime-enabled-off"),
++                    centered = true,
++                    minHeight = 34.dp,
++                )
++                QaChip(
++                    text = "On",
++                    selected = state.bedtimeEnabled,
++                    onClick = { onSelect(true, startMinutes, endMinutes) },
++                    modifier = Modifier.testTag("bedtime-enabled-on"),
++                    accentSelected = true,
++                    centered = true,
++                    minHeight = 34.dp,
++                )
++            }
++            if (state.bedtimeEnabled) {
++                BodyText(
++                    text = "$scheduleText Alternatives stay available; the original app waits.",
++                    color = colors.mutedText,
++                    fontSize = 12.5.sp,
++                    lineHeight = 17.sp,
++                    modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
++                )
++                MonoText("Start", modifier = Modifier.padding(bottom = 5.dp))
++                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
++                    BedtimeStartMinuteOptions.forEach { minutes ->
++                        QaChip(
++                            text = minutes.bedtimeTimeLabel(),
++                            selected = startMinutes == minutes,
++                            onClick = { onSelect(true, minutes, endMinutes) },
++                            modifier = Modifier.testTag("bedtime-start-$minutes"),
++                            centered = true,
++                            minHeight = 32.dp,
++                            horizontalPadding = 11.dp,
++                            verticalPadding = 7.dp,
++                            fontSize = 11.5.sp,
++                        )
++                    }
++                }
++                MonoText("End", modifier = Modifier.padding(top = 10.dp, bottom = 5.dp))
++                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
++                    BedtimeEndMinuteOptions.forEach { minutes ->
++                        QaChip(
++                            text = minutes.bedtimeTimeLabel(),
++                            selected = endMinutes == minutes,
++                            onClick = { onSelect(true, startMinutes, minutes) },
++                            modifier = Modifier.testTag("bedtime-end-$minutes"),
++                            centered = true,
++                            minHeight = 32.dp,
++                            horizontalPadding = 11.dp,
++                            verticalPadding = 7.dp,
++                            fontSize = 11.5.sp,
++                        )
++                    }
++                }
++            }
++        }
++    }
++}
++
+ @Composable
+ private fun AccountLightSettingsSection(
+     state: MainUiState,
+@@ -7888,6 +8053,11 @@ private fun formatRelativeDay(timestampMillis: Long): String {
+     return formatter.format(Instant.ofEpochMilli(timestampMillis).atZone(ZoneId.systemDefault()))
+ }
+
++private fun Int.bedtimeTimeLabel(): String {
++    val safeMinutes = coerceIn(0, 23 * 60 + 59)
++    return "%02d:%02d".format(safeMinutes / 60, safeMinutes % 60)
++}
++
+ private fun TopicTag.displayName(): String {
+     return when (this) {
+         TopicTag.ATTENTION -> "Attention"
+diff --git a/app/src/test/java/com/qualityalternative/app/data/AccountLightProfileExporterTest.kt b/app/src/test/java/com/qualityalternative/app/data/AccountLightProfileExporterTest.kt
+index 73d9785..7a484ab 100644
+--- a/app/src/test/java/com/qualityalternative/app/data/AccountLightProfileExporterTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/data/AccountLightProfileExporterTest.kt
+@@ -56,6 +56,7 @@ class AccountLightProfileExporterTest {
+         repository.savePriorityContentIds(setOf("user-document-11111111-1111-4111-8111-111111111111"))
+         repository.saveReactivatedCompletedContentIds(setOf("editorial-deep-work"))
+         repository.saveOpenAnywayUnlockMinutes(120)
++        repository.saveBedtimeSettings(enabled = true, startMinutes = 23 * 60, endMinutes = 6 * 60 + 30)
+         repository.saveAnnotationExportDestination(
+             uri = "content://drive/raw-provider-id",
+             displayName = "qa-annotations.jsonld",
+@@ -111,6 +112,9 @@ class AccountLightProfileExporterTest {
+         assertEquals(listOf("user-document-11111111-1111-4111-8111-111111111111"), profile.settings.priorityContentIds)
+         assertEquals(listOf("editorial-deep-work"), profile.settings.reactivatedCompletedContentIds)
+         assertEquals(120, profile.settings.openAnywayUnlockMinutes)
++        assertEquals(true, profile.settings.bedtimeEnabled)
++        assertEquals(23 * 60, profile.settings.bedtimeStartMinutes)
++        assertEquals(6 * 60 + 30, profile.settings.bedtimeEndMinutes)
+
+         assertEquals(emptyList<AccountLightUserLink>(), profile.library.userLinks)
+         assertEquals(emptyList<AccountLightUserDocument>(), profile.library.userDocuments)
+diff --git a/app/src/test/java/com/qualityalternative/app/data/PreferencesSettingsRepositoryTest.kt b/app/src/test/java/com/qualityalternative/app/data/PreferencesSettingsRepositoryTest.kt
+index 62b7417..5a22a99 100644
+--- a/app/src/test/java/com/qualityalternative/app/data/PreferencesSettingsRepositoryTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/data/PreferencesSettingsRepositoryTest.kt
+@@ -203,6 +203,30 @@ class PreferencesSettingsRepositoryTest {
+         assertEquals(120, restored.openAnywayUnlockMinutes)
+     }
+
++    @Test
++    fun saveBedtimeSettings_persistsWithoutResettingOnboarding() = runBlocking {
++        val repository = PreferencesSettingsRepository(
++            dataStore = testDataStore(),
++            supportedApps = SupportedCatalog.distractingApps,
++        )
++        val selection = OnboardingSelection(
++            selectedAppPackages = SupportedCatalog.distractingApps.take(3).mapTo(mutableSetOf()) { it.packageName },
++            preferredTopics = setOf(TopicTag.PHILOSOPHY, TopicTag.SCIENCE, TopicTag.HISTORY),
++            preferredDurationBucket = DurationBucket.FOCUS,
++            selectedPackIds = setOf("science"),
++        )
++
++        repository.saveOnboardingSelection(selection)
++        repository.saveBedtimeSettings(enabled = true, startMinutes = 23 * 60, endMinutes = 6 * 60 + 30)
++
++        val restored = repository.observeAppSettings().first()
++        assertTrue(restored.hasCompletedOnboarding)
++        assertEquals(selection.selectedAppPackages, restored.selectedAppPackages)
++        assertEquals(true, restored.bedtimeEnabled)
++        assertEquals(23 * 60, restored.bedtimeStartMinutes)
++        assertEquals(6 * 60 + 30, restored.bedtimeEndMinutes)
++    }
++
+     @Test
+     fun ensureLocalProfileIdentity_createsAndReusesPortableProfileId() = runBlocking {
+         val repository = PreferencesSettingsRepository(
+diff --git a/app/src/test/java/com/qualityalternative/app/interception/ForegroundAppDetectionPolicyTest.kt b/app/src/test/java/com/qualityalternative/app/interception/ForegroundAppDetectionPolicyTest.kt
+index 65095f3..227f52a 100644
+--- a/app/src/test/java/com/qualityalternative/app/interception/ForegroundAppDetectionPolicyTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/interception/ForegroundAppDetectionPolicyTest.kt
+@@ -38,6 +38,50 @@ class ForegroundAppDetectionPolicyTest {
+         )
+     }
+
++    @Test
++    fun shouldLog_allowsSamePackageWhenForegroundEventCrossesIntoBedtime() {
++        val policy = ForegroundAppDetectionPolicy()
++
++        assertTrue(
++            policy.shouldLog(
++                packageName = "com.instagram.android",
++                selectedPackages = setOf("com.instagram.android"),
++                nowMillis = 1_000L,
++                bedtimeActive = false,
++            ),
++        )
++        assertTrue(
++            policy.shouldLog(
++                packageName = "com.instagram.android",
++                selectedPackages = setOf("com.instagram.android"),
++                nowMillis = 1_500L,
++                bedtimeActive = true,
++            ),
++        )
++    }
++
++    @Test
++    fun shouldLog_allowsSamePackageDuplicateDuringActiveBedtime() {
++        val policy = ForegroundAppDetectionPolicy()
++
++        assertTrue(
++            policy.shouldLog(
++                packageName = "com.instagram.android",
++                selectedPackages = setOf("com.instagram.android"),
++                nowMillis = 1_000L,
++                bedtimeActive = true,
++            ),
++        )
++        assertTrue(
++            policy.shouldLog(
++                packageName = "com.instagram.android",
++                selectedPackages = setOf("com.instagram.android"),
++                nowMillis = 1_500L,
++                bedtimeActive = true,
++            ),
++        )
++    }
++
+     @Test
+     fun shouldLog_allowsSamePackageAfterDifferentForegroundApp() {
+         val policy = ForegroundAppDetectionPolicy()
+diff --git a/app/src/test/java/com/qualityalternative/app/interception/InterceptionRuntimeGateTest.kt b/app/src/test/java/com/qualityalternative/app/interception/InterceptionRuntimeGateTest.kt
+index 998445f..2223268 100644
+--- a/app/src/test/java/com/qualityalternative/app/interception/InterceptionRuntimeGateTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/interception/InterceptionRuntimeGateTest.kt
+@@ -21,4 +21,44 @@ class InterceptionRuntimeGateTest {
+         assertTrue(InterceptionRuntimeGate.shouldSuppress("com.instagram.android", nowMillis = 4_000L))
+         assertFalse(InterceptionRuntimeGate.shouldSuppress("com.instagram.android", nowMillis = 5_000L))
+     }
++
++    @Test
++    fun shouldSuppress_ignoresNormalUnlockDuringBedtime() {
++        InterceptionRuntimeGate.suppressPackage(
++            targetAppPackage = "com.instagram.android",
++            untilMillis = 5_000L,
++        )
++
++        assertTrue(
++            InterceptionRuntimeGate.shouldSuppress(
++                targetAppPackage = "com.instagram.android",
++                nowMillis = 4_000L,
++                bedtimeActive = false,
++            ),
++        )
++        assertFalse(
++            InterceptionRuntimeGate.shouldSuppress(
++                targetAppPackage = "com.instagram.android",
++                nowMillis = 4_000L,
++                bedtimeActive = true,
++            ),
++        )
++    }
++
++    @Test
++    fun shouldSuppress_honorsBedtimeEmergencyUnlockDuringBedtime() {
++        InterceptionRuntimeGate.suppressPackage(
++            targetAppPackage = "com.instagram.android",
++            untilMillis = 5_000L,
++            allowedDuringBedtime = true,
++        )
++
++        assertTrue(
++            InterceptionRuntimeGate.shouldSuppress(
++                targetAppPackage = "com.instagram.android",
++                nowMillis = 4_000L,
++                bedtimeActive = true,
++            ),
++        )
++    }
+ }
+diff --git a/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt b/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
+index 2152a4a..043cafd 100644
+--- a/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
+@@ -13,6 +13,7 @@ import com.qualityalternative.app.data.ReadingTimeEstimator
+ import com.qualityalternative.app.data.SupportedCatalog
+ import com.qualityalternative.app.domain.model.AppSettings
+ import com.qualityalternative.app.domain.model.AnalyticsEventType
++import com.qualityalternative.app.domain.model.BEDTIME_OPEN_ANYWAY_UNLOCK_DELAY_MILLIS
+ import com.qualityalternative.app.domain.model.ContentAvailability
+ import com.qualityalternative.app.domain.model.AppThemeMode
+ import com.qualityalternative.app.domain.model.ContentFormat
+@@ -47,6 +48,7 @@ import com.qualityalternative.app.domain.model.UserLinkValidationError
+ import com.qualityalternative.app.domain.model.UserDocumentDraft
+ import com.qualityalternative.app.domain.model.UserDocumentValidationError
+ import com.qualityalternative.app.domain.model.UserPreferences
++import com.qualityalternative.app.domain.model.bedtimeWindowIsActive
+ import com.qualityalternative.app.domain.model.meditationTimerContentItem
+ import com.qualityalternative.app.domain.service.AccountLightProfileAutosaveWriter
+ import com.qualityalternative.app.domain.service.AccountLightProfileBackupReader
+@@ -73,6 +75,9 @@ import com.qualityalternative.app.interception.FixtureTargetRegistry
+ import com.qualityalternative.app.interception.InterceptionRuntimeGate
+ import java.io.ByteArrayInputStream
+ import java.io.File
++import java.time.LocalDate
++import java.time.LocalTime
++import java.time.ZoneId
+ import kotlinx.coroutines.CompletableDeferred
+ import kotlinx.coroutines.CoroutineDispatcher
+ import kotlinx.coroutines.CoroutineScope
+@@ -90,6 +95,7 @@ import kotlinx.coroutines.test.runTest
+ import org.junit.After
+ import org.junit.Assert.assertEquals
+ import org.junit.Assert.assertFalse
++import org.junit.Assert.assertNotEquals
+ import org.junit.Assert.assertNotNull
+ import org.junit.Assert.assertTrue
+ import org.junit.Rule
+@@ -4278,6 +4284,363 @@ class MainViewModelTest {
+         assertEquals("0", openAnyway.metadata["formUnlockWaitMillis"])
+     }
+
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun bedtimeModeKeepsAlternativesButRequiresOneMinuteEmergencyUnlock() = runTest {
++        val fixtureTarget = FixtureTargetRegistry.fixtureDistractors.first()
++        var nowMillis = 50_000L
++        val analyticsTracker = InMemoryAnalyticsTracker()
++        val viewModel = createViewModel(
++            settingsRepository = FakeSettingsRepository(
++                initial = completedSettings(selectedAppPackages = setOf(fixtureTarget.packageName))
++                    .copy(
++                        interventionMode = InterventionMode.SOFT,
++                        bedtimeEnabled = true,
++                        bedtimeStartMinutes = 0,
++                        bedtimeEndMinutes = 0,
++                    ),
++            ),
++            analyticsTracker = analyticsTracker,
++            nowProvider = { nowMillis },
++        )
++
++        advanceUntilIdle()
++        viewModel.requestSystemInterception(targetAppPackage = fixtureTarget.packageName, nowMillis = nowMillis)
++        advanceUntilIdle()
++
++        assertEquals(MainScreen.Intervention, viewModel.uiState.screen)
++        assertTrue(viewModel.uiState.isBedtimeActive)
++        assertTrue(viewModel.uiState.currentInterventionBedtimeEnforced)
++        assertNotNull(viewModel.uiState.currentRecommendationSet?.primary)
++        assertTrue(viewModel.uiState.currentRecommendationSet?.backups.orEmpty().isNotEmpty())
++        assertEquals(
++            50_000L + BEDTIME_OPEN_ANYWAY_UNLOCK_DELAY_MILLIS,
++            viewModel.uiState.currentOpenAnywayUnlockAvailableAtMillis,
++        )
++        assertTrue(analyticsTracker.allEvents().any { it.type == AnalyticsEventType.BEDTIME_INTERVENTION_SHOWN })
++        assertFalse(analyticsTracker.allEvents().any { it.type == AnalyticsEventType.FORM_INTERVENTION_SHOWN })
++
++        assertFalse(viewModel.openAnyway())
++        assertEquals(MainScreen.Intervention, viewModel.uiState.screen)
++        assertTrue(analyticsTracker.allEvents().any { it.type == AnalyticsEventType.BEDTIME_UNLOCK_BLOCKED })
++
++        nowMillis += BEDTIME_OPEN_ANYWAY_UNLOCK_DELAY_MILLIS
++        viewModel.recordFormInterventionUnlockAvailable(nowMillis = nowMillis)
++        assertTrue(viewModel.openAnyway())
++
++        val events = analyticsTracker.allEvents()
++        assertTrue(events.any { it.type == AnalyticsEventType.BEDTIME_UNLOCK_ENABLED })
++        assertTrue(events.any { it.type == AnalyticsEventType.BEDTIME_UNLOCK_USED })
++        assertFalse(events.any { it.type == AnalyticsEventType.FORM_INTERVENTION_UNLOCK_USED })
++        val openAnyway = events.first { it.type == AnalyticsEventType.OPEN_ANYWAY_SELECTED }
++        assertEquals("true", openAnyway.metadata["bedtimeActive"])
++        assertEquals(BEDTIME_OPEN_ANYWAY_UNLOCK_DELAY_MILLIS.toString(), openAnyway.metadata["formUnlockWaitMillis"])
++    }
++
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun bedtimeModeIgnoresPreExistingNormalOpenAnywaySuppression() = runTest {
++        val fixtureTarget = FixtureTargetRegistry.fixtureDistractors.first()
++        val nowMillis = 70_000L
++        val analyticsTracker = InMemoryAnalyticsTracker()
++        InterceptionRuntimeGate.suppressPackage(
++            targetAppPackage = fixtureTarget.packageName,
++            untilMillis = 200_000L,
++            allowedDuringBedtime = false,
++        )
++        val viewModel = createViewModel(
++            settingsRepository = FakeSettingsRepository(
++                initial = completedSettings(selectedAppPackages = setOf(fixtureTarget.packageName))
++                    .copy(
++                        interventionMode = InterventionMode.SOFT,
++                        bedtimeEnabled = true,
++                        bedtimeStartMinutes = 0,
++                        bedtimeEndMinutes = 0,
++                    ),
++            ),
++            analyticsTracker = analyticsTracker,
++            nowProvider = { nowMillis },
++        )
++
++        advanceUntilIdle()
++        viewModel.requestSystemInterception(targetAppPackage = fixtureTarget.packageName, nowMillis = nowMillis)
++        advanceUntilIdle()
++
++        assertEquals(MainScreen.Intervention, viewModel.uiState.screen)
++        assertTrue(viewModel.uiState.isBedtimeActive)
++        assertTrue(viewModel.uiState.currentInterventionBedtimeEnforced)
++        assertNotEquals("${fixtureTarget.displayName} is still unlocked.", viewModel.uiState.latestMessage)
++        assertEquals(
++            nowMillis + BEDTIME_OPEN_ANYWAY_UNLOCK_DELAY_MILLIS,
++            viewModel.uiState.currentOpenAnywayUnlockAvailableAtMillis,
++        )
++        assertTrue(analyticsTracker.allEvents().any { it.type == AnalyticsEventType.BEDTIME_INTERVENTION_SHOWN })
++    }
++
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun openAnywayRechecksBedtimeWhenNormalInterventionCrossesIntoBedtimeWindow() = runTest {
++        val fixtureTarget = FixtureTargetRegistry.fixtureDistractors.first()
++        val zoneId = ZoneId.systemDefault()
++        val localDate = LocalDate.of(2026, 5, 21)
++        val beforeBedtimeMillis = localDate
++            .atTime(LocalTime.of(21, 59))
++            .atZone(zoneId)
++            .toInstant()
++            .toEpochMilli()
++        val activeBedtimeMillis = localDate
++            .atTime(LocalTime.of(22, 1))
++            .atZone(zoneId)
++            .toInstant()
++            .toEpochMilli()
++
++        listOf(InterventionMode.SOFT, InterventionMode.FIRM).forEach { mode ->
++            InterceptionRuntimeGate.clearAll()
++            var nowMillis = beforeBedtimeMillis
++            val analyticsTracker = InMemoryAnalyticsTracker()
++            val viewModel = createViewModel(
++                settingsRepository = FakeSettingsRepository(
++                    initial = completedSettings(selectedAppPackages = setOf(fixtureTarget.packageName))
++                        .copy(
++                            interventionMode = mode,
++                            bedtimeEnabled = true,
++                            bedtimeStartMinutes = 22 * 60,
++                            bedtimeEndMinutes = 7 * 60,
++                        ),
++                ),
++                analyticsTracker = analyticsTracker,
++                nowProvider = { nowMillis },
++            )
++
++            advanceUntilIdle()
++            viewModel.requestSystemInterception(targetAppPackage = fixtureTarget.packageName, nowMillis = beforeBedtimeMillis)
++            advanceUntilIdle()
++            assertEquals(MainScreen.Intervention, viewModel.uiState.screen)
++            assertFalse(viewModel.uiState.isBedtimeActive)
++            assertFalse(viewModel.uiState.currentInterventionBedtimeEnforced)
++
++            nowMillis = activeBedtimeMillis
++            assertFalse(viewModel.openAnyway())
++            advanceUntilIdle()
++
++            assertEquals(MainScreen.Intervention, viewModel.uiState.screen)
++            assertTrue(viewModel.uiState.isBedtimeActive)
++            assertTrue(viewModel.uiState.currentInterventionBedtimeEnforced)
++            assertEquals(
++                activeBedtimeMillis + BEDTIME_OPEN_ANYWAY_UNLOCK_DELAY_MILLIS,
++                viewModel.uiState.currentOpenAnywayUnlockAvailableAtMillis,
++            )
++            assertFalse(
++                InterceptionRuntimeGate.shouldSuppress(
++                    targetAppPackage = fixtureTarget.packageName,
++                    nowMillis = activeBedtimeMillis,
++                    bedtimeActive = true,
++                ),
++            )
++            val events = analyticsTracker.allEvents()
++            assertTrue(events.any { it.type == AnalyticsEventType.BEDTIME_INTERVENTION_SHOWN })
++            assertFalse(events.any { it.type == AnalyticsEventType.OPEN_ANYWAY_SELECTED })
++        }
++    }
++
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun openAnywayRechecksBedtimeEvenAfterSettingsEmissionUpdatesGlobalBedtimeState() = runTest {
++        val fixtureTarget = FixtureTargetRegistry.fixtureDistractors.first()
++        val zoneId = ZoneId.systemDefault()
++        val localDate = LocalDate.of(2026, 5, 21)
++        val beforeBedtimeMillis = localDate
++            .atTime(LocalTime.of(21, 59))
++            .atZone(zoneId)
++            .toInstant()
++            .toEpochMilli()
++        val activeBedtimeMillis = localDate
++            .atTime(LocalTime.of(22, 1))
++            .atZone(zoneId)
++            .toInstant()
++            .toEpochMilli()
++
++        listOf(InterventionMode.SOFT, InterventionMode.FIRM).forEach { mode ->
++            InterceptionRuntimeGate.clearAll()
++            var nowMillis = beforeBedtimeMillis
++            val analyticsTracker = InMemoryAnalyticsTracker()
++            val viewModel = createViewModel(
++                settingsRepository = FakeSettingsRepository(
++                    initial = completedSettings(selectedAppPackages = setOf(fixtureTarget.packageName))
++                        .copy(
++                            interventionMode = mode,
++                            bedtimeEnabled = true,
++                            bedtimeStartMinutes = 22 * 60,
++                            bedtimeEndMinutes = 7 * 60,
++                        ),
++                ),
++                analyticsTracker = analyticsTracker,
++                nowProvider = { nowMillis },
++            )
++
++            advanceUntilIdle()
++            viewModel.requestSystemInterception(targetAppPackage = fixtureTarget.packageName, nowMillis = beforeBedtimeMillis)
++            advanceUntilIdle()
++            assertEquals(MainScreen.Intervention, viewModel.uiState.screen)
++            assertFalse(viewModel.uiState.isBedtimeActive)
++            assertFalse(viewModel.uiState.currentInterventionBedtimeEnforced)
++
++            nowMillis = activeBedtimeMillis
++            viewModel.setMeditationDurationMinutes(5)
++            advanceUntilIdle()
++            assertTrue(viewModel.uiState.isBedtimeActive)
++            assertTrue(viewModel.uiState.currentInterventionBedtimeEnforced)
++            assertEquals(
++                activeBedtimeMillis + BEDTIME_OPEN_ANYWAY_UNLOCK_DELAY_MILLIS,
++                viewModel.uiState.currentOpenAnywayUnlockAvailableAtMillis,
++            )
++
++            assertFalse(viewModel.openAnyway())
++            advanceUntilIdle()
++
++            assertEquals(MainScreen.Intervention, viewModel.uiState.screen)
++            assertTrue(viewModel.uiState.isBedtimeActive)
++            assertTrue(viewModel.uiState.currentInterventionBedtimeEnforced)
++            assertEquals(
++                activeBedtimeMillis + BEDTIME_OPEN_ANYWAY_UNLOCK_DELAY_MILLIS,
++                viewModel.uiState.currentOpenAnywayUnlockAvailableAtMillis,
++            )
++            assertFalse(
++                InterceptionRuntimeGate.shouldSuppress(
++                    targetAppPackage = fixtureTarget.packageName,
++                    nowMillis = activeBedtimeMillis,
++                    bedtimeActive = true,
++                ),
++            )
++            val events = analyticsTracker.allEvents()
++            assertTrue(events.any { it.type == AnalyticsEventType.BEDTIME_INTERVENTION_SHOWN })
++            assertFalse(events.any { it.type == AnalyticsEventType.OPEN_ANYWAY_SELECTED })
++        }
++    }
++
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun delayFor15MinutesIsNotAvailableAfterSettingsEmissionConvertsInterventionToBedtime() = runTest {
++        val fixtureTarget = FixtureTargetRegistry.fixtureDistractors.first()
++        val zoneId = ZoneId.systemDefault()
++        val localDate = LocalDate.of(2026, 5, 21)
++        val beforeBedtimeMillis = localDate
++            .atTime(LocalTime.of(21, 59))
++            .atZone(zoneId)
++            .toInstant()
++            .toEpochMilli()
++        val activeBedtimeMillis = localDate
++            .atTime(LocalTime.of(22, 1))
++            .atZone(zoneId)
++            .toInstant()
++            .toEpochMilli()
++        var nowMillis = beforeBedtimeMillis
++        val viewModel = createViewModel(
++            settingsRepository = FakeSettingsRepository(
++                initial = completedSettings(selectedAppPackages = setOf(fixtureTarget.packageName))
++                    .copy(
++                        bedtimeEnabled = true,
++                        bedtimeStartMinutes = 22 * 60,
++                        bedtimeEndMinutes = 7 * 60,
++                    ),
++            ),
++            nowProvider = { nowMillis },
++        )
++
++        advanceUntilIdle()
++        viewModel.requestSystemInterception(targetAppPackage = fixtureTarget.packageName, nowMillis = beforeBedtimeMillis)
++        advanceUntilIdle()
++        assertEquals(MainScreen.Intervention, viewModel.uiState.screen)
++        assertFalse(viewModel.uiState.currentInterventionBedtimeEnforced)
++
++        nowMillis = activeBedtimeMillis
++        viewModel.setMeditationDurationMinutes(5)
++        advanceUntilIdle()
++        assertTrue(viewModel.uiState.currentInterventionBedtimeEnforced)
++
++        viewModel.delayFor15Minutes()
++        advanceUntilIdle()
++
++        assertEquals(MainScreen.Intervention, viewModel.uiState.screen)
++        assertEquals(null, viewModel.uiState.activeDelayWindow)
++        assertEquals(
++            activeBedtimeMillis + BEDTIME_OPEN_ANYWAY_UNLOCK_DELAY_MILLIS,
++            viewModel.uiState.currentOpenAnywayUnlockAvailableAtMillis,
++        )
++    }
++
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun bedtimeBoundaryRefreshConvertsIdleNormalInterventionWithoutSettingsEmission() = runTest {
++        val fixtureTarget = FixtureTargetRegistry.fixtureDistractors.first()
++        val zoneId = ZoneId.systemDefault()
++        val localDate = LocalDate.of(2026, 5, 21)
++        val beforeBedtimeMillis = localDate
++            .atTime(LocalTime.of(21, 59))
++            .atZone(zoneId)
++            .toInstant()
++            .toEpochMilli()
++        val activeBedtimeMillis = localDate
++            .atTime(LocalTime.of(22, 1))
++            .atZone(zoneId)
++            .toInstant()
++            .toEpochMilli()
++        var nowMillis = beforeBedtimeMillis
++        val analyticsTracker = InMemoryAnalyticsTracker()
++        val viewModel = createViewModel(
++            settingsRepository = FakeSettingsRepository(
++                initial = completedSettings(selectedAppPackages = setOf(fixtureTarget.packageName))
++                    .copy(
++                        bedtimeEnabled = true,
++                        bedtimeStartMinutes = 22 * 60,
++                        bedtimeEndMinutes = 7 * 60,
++                    ),
++            ),
++            analyticsTracker = analyticsTracker,
++            nowProvider = { nowMillis },
++        )
++
++        advanceUntilIdle()
++        viewModel.requestSystemInterception(targetAppPackage = fixtureTarget.packageName, nowMillis = beforeBedtimeMillis)
++        advanceUntilIdle()
++
++        assertEquals(MainScreen.Intervention, viewModel.uiState.screen)
++        assertFalse(viewModel.uiState.currentInterventionBedtimeEnforced)
++
++        nowMillis = activeBedtimeMillis
++        viewModel.refreshBedtimeInterventionBoundary(nowMillis = activeBedtimeMillis)
++        advanceUntilIdle()
++
++        assertEquals(MainScreen.Intervention, viewModel.uiState.screen)
++        assertTrue(viewModel.uiState.isBedtimeActive)
++        assertTrue(viewModel.uiState.currentInterventionBedtimeEnforced)
++        assertEquals(
++            activeBedtimeMillis + BEDTIME_OPEN_ANYWAY_UNLOCK_DELAY_MILLIS,
++            viewModel.uiState.currentOpenAnywayUnlockAvailableAtMillis,
++        )
++        assertTrue(analyticsTracker.allEvents().any { it.type == AnalyticsEventType.BEDTIME_INTERVENTION_SHOWN })
++    }
++
++    @Test
++    fun bedtimeWindowIsActiveTreatsEqualStartEndAsAllDay() {
++        assertTrue(
++            bedtimeWindowIsActive(
++                enabled = true,
++                startMinutes = 0,
++                endMinutes = 0,
++                nowMillis = 123_000L,
++            ),
++        )
++        assertFalse(
++            bedtimeWindowIsActive(
++                enabled = false,
++                startMinutes = 0,
++                endMinutes = 0,
++                nowMillis = 123_000L,
++            ),
++        )
++    }
++
+     @Test
+     @OptIn(ExperimentalCoroutinesApi::class)
+     fun formInterventionAbandonmentRecordsAnalyticsAndClearsIntervention() = runTest {
+@@ -4783,6 +5146,9 @@ class MainViewModelTest {
+                 priorityContentIds = state.value.priorityContentIds,
+                 reactivatedCompletedContentIds = state.value.reactivatedCompletedContentIds,
+                 openAnywayUnlockMinutes = state.value.openAnywayUnlockMinutes,
++                bedtimeEnabled = state.value.bedtimeEnabled,
++                bedtimeStartMinutes = state.value.bedtimeStartMinutes,
++                bedtimeEndMinutes = state.value.bedtimeEndMinutes,
+                 readerFontScale = state.value.readerFontScale,
+                 interfaceTextScale = state.value.interfaceTextScale,
+                 annotationExportUri = state.value.annotationExportUri,
+@@ -4825,6 +5191,9 @@ class MainViewModelTest {
+                 priorityContentIds = settings.priorityContentIds,
+                 reactivatedCompletedContentIds = settings.reactivatedCompletedContentIds,
+                 openAnywayUnlockMinutes = settings.openAnywayUnlockMinutes,
++                bedtimeEnabled = settings.bedtimeEnabled,
++                bedtimeStartMinutes = settings.bedtimeStartMinutes,
++                bedtimeEndMinutes = settings.bedtimeEndMinutes,
+             )
+         }
+
+@@ -4872,6 +5241,14 @@ class MainViewModelTest {
+             state.value = state.value.copy(openAnywayUnlockMinutes = minutes)
+         }
+
++        override suspend fun saveBedtimeSettings(enabled: Boolean, startMinutes: Int, endMinutes: Int) {
++            state.value = state.value.copy(
++                bedtimeEnabled = enabled,
++                bedtimeStartMinutes = startMinutes,
++                bedtimeEndMinutes = endMinutes,
++            )
++        }
++
+         override suspend fun saveAnnotationExportDestination(uri: String, displayName: String) {
+             state.value = state.value.copy(
+                 annotationExportUri = uri,

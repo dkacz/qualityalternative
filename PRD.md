@@ -99,6 +99,7 @@ When I reach for a distracting app out of habit, help me pause and give me one w
 - Soft intervention shown when a selected app is opened.
 - One primary replacement recommendation plus a short, bounded backup list.
 - Three core actions in the intervention: start replacement now, delay the distracting app for 15 minutes, open anyway.
+- Optional bedtime protection may replace the default open-anyway behavior during a user-configured sleep window: replacement and meditation alternatives remain available, while opening the original distracting app requires a visible one-minute emergency breath.
 - Replacement sources from:
   - editorial starter packs curated by the product
   - user-added links
@@ -287,6 +288,7 @@ The intervention must provide three clear actions that map to the MVP value prop
 - User can choose Pause 15 min, which creates a 15-minute delay window.
 - User can choose Open anyway immediately in Soft intervention mode.
 - User can choose Open anyway after a short, visible 5-second form intervention wait in Firm intervention mode.
+- When opt-in Bedtime protection is active, the intervention remains finite and calm, replacement alternatives stay available, Pause 15 min is hidden, and the original app can only be opened through a visible one-minute emergency unlock wait.
 - When enabled, the wait is presented before unlock is available, not as an extra screen after the user chooses Open anyway.
 - After Open anyway from a system intervention, repeated opens of the same distracting app are quiet for the user-configured unlock window.
 
@@ -352,6 +354,7 @@ The system must allow the user to consciously postpone access to the distracting
 - The app logs whether the user returned after the delay window ended.
 - Settings include a configurable Open anyway unlock duration so the user can choose a longer quiet window without changing the 15-minute pause behavior.
 - Settings include a working Soft/Firm intervention mode selector. Soft mode keeps Open anyway immediate; Firm mode adds the 5-second form-intervention pause before Open anyway becomes available.
+- Settings include opt-in Bedtime protection with a start and end time. Bedtime protection is not the default intervention mode and must preserve access to reading, meditation, and bounded backup alternatives.
 
 ### FR10. Feedback Loop
 

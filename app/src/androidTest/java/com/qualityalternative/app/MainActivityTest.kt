@@ -111,6 +111,8 @@ class MainActivityTest {
         "sprint17-annotation-surface-${System.currentTimeMillis()}"
     private val sprint23FooterProgressScreenshotDirName =
         "sprint23-footer-progress-${System.currentTimeMillis()}"
+    private val sprint24BedtimeScreenshotDirName =
+        "sprint24-bedtime-hard-ban-${System.currentTimeMillis()}"
     private val readerFormEvidenceScreenshotDirName =
         "sprint21-meditation-gong-${System.currentTimeMillis()}"
     private val sprint21ReadingTimeScreenshotDirName =
@@ -548,6 +550,54 @@ class MainActivityTest {
             .assertIsDisplayed()
             .assertIsNotEnabled()
         captureReaderFormEvidenceScreenshot("15_firm_mode_open_anyway_wait")
+    }
+
+    @Test
+    fun bedtimeModeShowsCalmHardBanWithAlternativesAndEmergencyWait() {
+        seedFixtureSelection()
+        launchApp()
+        waitForHome()
+
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.openSettings()
+            activity.mainViewModel.selectInterventionMode(InterventionMode.SOFT)
+            activity.mainViewModel.setBedtimeSettings(enabled = true, startMinutes = 0, endMinutes = 0)
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            var enabled = false
+            var active = false
+            scenario?.onActivity { activity ->
+                enabled = activity.mainViewModel.uiState.bedtimeEnabled
+                active = activity.mainViewModel.uiState.isBedtimeActive
+            }
+            enabled && active
+        }
+        composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasTestTag("settings-bedtime-section"))
+        composeRule.onNodeWithTag("settings-bedtime-section")
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("Sleep lock")
+            .assertIsDisplayed()
+        captureSprint24BedtimeScreenshot("01_settings_bedtime_enabled")
+
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.triggerDebugIntervention(nowMillis = System.currentTimeMillis())
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("bedtime-emergency-unlock-wait") }
+        composeRule.onNodeWithText("Bedtime is protecting sleep", substring = true)
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("QUIET ALTERNATIVES")
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag("intervention-backup-list")
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag("bedtime-emergency-unlock-wait")
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag("bedtime-emergency-unlock-action")
+            .assertIsDisplayed()
+            .assertIsNotEnabled()
+        composeRule.onNodeWithText("Pause 15 min")
+            .assertDoesNotExist()
+        captureSprint24BedtimeScreenshot("02_intervention_bedtime_hard_ban_alternatives")
     }
 
     @Test
@@ -4708,6 +4758,16 @@ class MainActivityTest {
 
     private fun captureSprint23FooterProgressScreenshot(name: String) {
         val outputDir = File("/sdcard/Download/qualityalternative/$sprint23FooterProgressScreenshotDirName")
+        assertTrue("Expected screenshot output directory for $name", outputDir.mkdirs() || outputDir.exists())
+        composeRule.waitForIdle()
+        Thread.sleep(300)
+        val output = File(outputDir, "$name.png")
+        assertTrue("Expected screenshot capture for $name", UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).takeScreenshot(output))
+        assertTrue("Expected screenshot file for $name", output.exists() && output.length() > 0L)
+    }
+
+    private fun captureSprint24BedtimeScreenshot(name: String) {
+        val outputDir = File("/sdcard/Download/qualityalternative/$sprint24BedtimeScreenshotDirName")
         assertTrue("Expected screenshot output directory for $name", outputDir.mkdirs() || outputDir.exists())
         composeRule.waitForIdle()
         Thread.sleep(300)

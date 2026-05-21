@@ -136,6 +136,7 @@ interface SettingsRepository {
     suspend fun savePriorityContentIds(contentIds: Set<String>)
     suspend fun saveReactivatedCompletedContentIds(contentIds: Set<String>)
     suspend fun saveOpenAnywayUnlockMinutes(minutes: Int)
+    suspend fun saveBedtimeSettings(enabled: Boolean, startMinutes: Int, endMinutes: Int) {}
     suspend fun saveAnnotationExportDestination(uri: String, displayName: String)
     suspend fun clearAnnotationExportDestination()
     suspend fun saveAnnotationExportSuccess(timestampMillis: Long)

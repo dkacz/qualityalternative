@@ -204,6 +204,30 @@ class PreferencesSettingsRepositoryTest {
     }
 
     @Test
+    fun saveBedtimeSettings_persistsWithoutResettingOnboarding() = runBlocking {
+        val repository = PreferencesSettingsRepository(
+            dataStore = testDataStore(),
+            supportedApps = SupportedCatalog.distractingApps,
+        )
+        val selection = OnboardingSelection(
+            selectedAppPackages = SupportedCatalog.distractingApps.take(3).mapTo(mutableSetOf()) { it.packageName },
+            preferredTopics = setOf(TopicTag.PHILOSOPHY, TopicTag.SCIENCE, TopicTag.HISTORY),
+            preferredDurationBucket = DurationBucket.FOCUS,
+            selectedPackIds = setOf("science"),
+        )
+
+        repository.saveOnboardingSelection(selection)
+        repository.saveBedtimeSettings(enabled = true, startMinutes = 23 * 60, endMinutes = 6 * 60 + 30)
+
+        val restored = repository.observeAppSettings().first()
+        assertTrue(restored.hasCompletedOnboarding)
+        assertEquals(selection.selectedAppPackages, restored.selectedAppPackages)
+        assertEquals(true, restored.bedtimeEnabled)
+        assertEquals(23 * 60, restored.bedtimeStartMinutes)
+        assertEquals(6 * 60 + 30, restored.bedtimeEndMinutes)
+    }
+
+    @Test
     fun ensureLocalProfileIdentity_createsAndReusesPortableProfileId() = runBlocking {
         val repository = PreferencesSettingsRepository(
             dataStore = testDataStore(),

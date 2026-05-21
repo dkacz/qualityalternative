@@ -6,6 +6,10 @@ import com.qualityalternative.app.MainActivity
 import com.qualityalternative.app.QualityAlternativeApplication
 import com.qualityalternative.app.domain.model.AnalyticsEvent
 import com.qualityalternative.app.domain.model.AnalyticsEventType
+import com.qualityalternative.app.domain.model.DEFAULT_BEDTIME_ENABLED
+import com.qualityalternative.app.domain.model.DEFAULT_BEDTIME_END_MINUTES
+import com.qualityalternative.app.domain.model.DEFAULT_BEDTIME_START_MINUTES
+import com.qualityalternative.app.domain.model.bedtimeWindowIsActive
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -17,14 +21,19 @@ class QualityAlternativeAccessibilityService : AccessibilityService() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val detectionPolicy = ForegroundAppDetectionPolicy()
     @Volatile
-    private var selectedPackages: Set<String> = emptySet()
+    private var interceptionSettings = InterceptionSettingsSnapshot()
 
     override fun onServiceConnected() {
         super.onServiceConnected()
         val appContainer = (application as QualityAlternativeApplication).appContainer
         serviceScope.launch {
             appContainer.settingsRepository.observeAppSettings().collect { settings ->
-                selectedPackages = settings.selectedAppPackages
+                interceptionSettings = InterceptionSettingsSnapshot(
+                    selectedPackages = settings.selectedAppPackages,
+                    bedtimeEnabled = settings.bedtimeEnabled,
+                    bedtimeStartMinutes = settings.bedtimeStartMinutes,
+                    bedtimeEndMinutes = settings.bedtimeEndMinutes,
+                )
             }
         }
     }
@@ -36,17 +45,30 @@ class QualityAlternativeAccessibilityService : AccessibilityService() {
         val packageName = event.packageName?.toString()?.takeIf(String::isNotBlank) ?: return
         val className = event.className?.toString()
         val appContainer = (application as QualityAlternativeApplication).appContainer
+        val settings = interceptionSettings
         val targetApp = InterceptionTargetResolver.resolve(
             foregroundPackage = packageName,
             foregroundClass = className,
-            selectedPackages = selectedPackages,
+            selectedPackages = settings.selectedPackages,
             appPackage = packageName(),
         ) ?: return
         val nowMillis = System.currentTimeMillis()
-        if (!detectionPolicy.shouldLog(targetApp.packageName, selectedPackages, nowMillis)) {
+        val bedtimeActive = bedtimeWindowIsActive(
+            enabled = settings.bedtimeEnabled,
+            startMinutes = settings.bedtimeStartMinutes,
+            endMinutes = settings.bedtimeEndMinutes,
+            nowMillis = nowMillis,
+        )
+        if (InterceptionRuntimeGate.shouldSuppress(targetApp.packageName, nowMillis, bedtimeActive = bedtimeActive)) {
             return
         }
-        if (InterceptionRuntimeGate.shouldSuppress(targetApp.packageName, nowMillis)) {
+        if (!detectionPolicy.shouldLog(
+                packageName = targetApp.packageName,
+                selectedPackages = settings.selectedPackages,
+                nowMillis = nowMillis,
+                bedtimeActive = bedtimeActive,
+            )
+        ) {
             return
         }
 
@@ -87,3 +109,10 @@ class QualityAlternativeAccessibilityService : AccessibilityService() {
 
     private fun packageName(): String = applicationContext.packageName
 }
+
+private data class InterceptionSettingsSnapshot(
+    val selectedPackages: Set<String> = emptySet(),
+    val bedtimeEnabled: Boolean = DEFAULT_BEDTIME_ENABLED,
+    val bedtimeStartMinutes: Int = DEFAULT_BEDTIME_START_MINUTES,
+    val bedtimeEndMinutes: Int = DEFAULT_BEDTIME_END_MINUTES,
+)

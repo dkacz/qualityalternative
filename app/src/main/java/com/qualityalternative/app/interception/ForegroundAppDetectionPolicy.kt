@@ -10,9 +10,11 @@ class ForegroundAppDetectionPolicy(
         packageName: String,
         selectedPackages: Set<String>,
         nowMillis: Long,
+        bedtimeActive: Boolean = false,
     ): Boolean {
         val isDuplicate = lastSeenPackage == packageName &&
-            nowMillis - lastSeenAtMillis < duplicateSuppressionMillis
+            nowMillis - lastSeenAtMillis < duplicateSuppressionMillis &&
+            !bedtimeActive
 
         lastSeenPackage = packageName
         lastSeenAtMillis = nowMillis

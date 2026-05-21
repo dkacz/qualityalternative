@@ -8,6 +8,9 @@ import com.qualityalternative.app.domain.model.ContentItem
 import com.qualityalternative.app.domain.model.ContentPriority
 import com.qualityalternative.app.domain.model.ContentRightsMetadata
 import com.qualityalternative.app.domain.model.ContentSourceType
+import com.qualityalternative.app.domain.model.DEFAULT_BEDTIME_ENABLED
+import com.qualityalternative.app.domain.model.DEFAULT_BEDTIME_END_MINUTES
+import com.qualityalternative.app.domain.model.DEFAULT_BEDTIME_START_MINUTES
 import com.qualityalternative.app.domain.model.DEFAULT_INTERFACE_TEXT_SCALE
 import com.qualityalternative.app.domain.model.DEFAULT_INTERVENTION_MODE
 import com.qualityalternative.app.domain.model.DEFAULT_READER_FONT_SCALE
@@ -15,9 +18,11 @@ import com.qualityalternative.app.domain.model.DistractingApp
 import com.qualityalternative.app.domain.model.DurationBucket
 import com.qualityalternative.app.domain.model.InterventionMode
 import com.qualityalternative.app.domain.model.LocalProfileIdentity
+import com.qualityalternative.app.domain.model.MAX_BEDTIME_MINUTES
 import com.qualityalternative.app.domain.model.MAX_INTERFACE_TEXT_SCALE
 import com.qualityalternative.app.domain.model.MAX_OPEN_ANYWAY_UNLOCK_MINUTES
 import com.qualityalternative.app.domain.model.MAX_READER_FONT_SCALE
+import com.qualityalternative.app.domain.model.MIN_BEDTIME_MINUTES
 import com.qualityalternative.app.domain.model.MIN_INTERFACE_TEXT_SCALE
 import com.qualityalternative.app.domain.model.MIN_OPEN_ANYWAY_UNLOCK_MINUTES
 import com.qualityalternative.app.domain.model.MIN_READER_FONT_SCALE
@@ -129,6 +134,9 @@ data class AccountLightSettings(
     val priorityContentIds: List<String>,
     val reactivatedCompletedContentIds: List<String>,
     val openAnywayUnlockMinutes: Int,
+    val bedtimeEnabled: Boolean = DEFAULT_BEDTIME_ENABLED,
+    val bedtimeStartMinutes: Int = DEFAULT_BEDTIME_START_MINUTES,
+    val bedtimeEndMinutes: Int = DEFAULT_BEDTIME_END_MINUTES,
 ) {
     init {
         require(selectedAppPackages.all { it.matches(PackageNameRegex) }) {
@@ -159,6 +167,12 @@ data class AccountLightSettings(
         }
         require(openAnywayUnlockMinutes in MIN_OPEN_ANYWAY_UNLOCK_MINUTES..MAX_OPEN_ANYWAY_UNLOCK_MINUTES) {
             "openAnywayUnlockMinutes is outside the portable range."
+        }
+        require(bedtimeStartMinutes in MIN_BEDTIME_MINUTES..MAX_BEDTIME_MINUTES) {
+            "bedtimeStartMinutes is outside the portable range."
+        }
+        require(bedtimeEndMinutes in MIN_BEDTIME_MINUTES..MAX_BEDTIME_MINUTES) {
+            "bedtimeEndMinutes is outside the portable range."
         }
     }
 }
@@ -1497,6 +1511,9 @@ private fun AccountLightSettings.toPortableAppSettings(supportedPackages: Set<St
         priorityContentIds = priorityContentIds.toSet(),
         reactivatedCompletedContentIds = reactivatedCompletedContentIds.toSet(),
         openAnywayUnlockMinutes = openAnywayUnlockMinutes,
+        bedtimeEnabled = bedtimeEnabled,
+        bedtimeStartMinutes = bedtimeStartMinutes,
+        bedtimeEndMinutes = bedtimeEndMinutes,
         readerFontScale = readerFontScale.takeIf { it in MIN_READER_FONT_SCALE..MAX_READER_FONT_SCALE }
             ?: DEFAULT_READER_FONT_SCALE,
         interfaceTextScale = interfaceTextScale.takeIf { it in MIN_INTERFACE_TEXT_SCALE..MAX_INTERFACE_TEXT_SCALE }
@@ -1529,6 +1546,9 @@ private fun AppSettings.toAccountLightSettings(
             omittedPortableUserContentIds = omittedPortableUserContentIds,
         ),
         openAnywayUnlockMinutes = openAnywayUnlockMinutes,
+        bedtimeEnabled = bedtimeEnabled,
+        bedtimeStartMinutes = bedtimeStartMinutes.coerceIn(MIN_BEDTIME_MINUTES, MAX_BEDTIME_MINUTES),
+        bedtimeEndMinutes = bedtimeEndMinutes.coerceIn(MIN_BEDTIME_MINUTES, MAX_BEDTIME_MINUTES),
     )
 }
 
@@ -2159,7 +2179,13 @@ private val RequiredSettingsKeys = setOf(
     "reactivatedCompletedContentIds",
     "openAnywayUnlockMinutes",
 )
-private val AllowedSettingsKeys = RequiredSettingsKeys + setOf("interfaceTextScale", "interventionMode")
+private val AllowedSettingsKeys = RequiredSettingsKeys + setOf(
+    "interfaceTextScale",
+    "interventionMode",
+    "bedtimeEnabled",
+    "bedtimeStartMinutes",
+    "bedtimeEndMinutes",
+)
 private val RequiredLibraryKeys = setOf("userLinks", "userDocuments")
 private val RequiredUserLinkKeys = setOf(
     "contentId",

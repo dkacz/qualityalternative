@@ -13,6 +13,9 @@ import androidx.datastore.preferences.core.stringSetPreferencesKey
 import com.qualityalternative.app.domain.model.AppSettings
 import com.qualityalternative.app.domain.model.AppThemeMode
 import com.qualityalternative.app.domain.model.ContentPriority
+import com.qualityalternative.app.domain.model.DEFAULT_BEDTIME_ENABLED
+import com.qualityalternative.app.domain.model.DEFAULT_BEDTIME_END_MINUTES
+import com.qualityalternative.app.domain.model.DEFAULT_BEDTIME_START_MINUTES
 import com.qualityalternative.app.domain.model.DEFAULT_MEDITATION_MINUTES
 import com.qualityalternative.app.domain.model.DEFAULT_INTERFACE_TEXT_SCALE
 import com.qualityalternative.app.domain.model.DEFAULT_INTERVENTION_MODE
@@ -22,10 +25,12 @@ import com.qualityalternative.app.domain.model.DistractingApp
 import com.qualityalternative.app.domain.model.DurationBucket
 import com.qualityalternative.app.domain.model.InterventionMode
 import com.qualityalternative.app.domain.model.LocalProfileIdentity
+import com.qualityalternative.app.domain.model.MAX_BEDTIME_MINUTES
 import com.qualityalternative.app.domain.model.MAX_MEDITATION_MINUTES
 import com.qualityalternative.app.domain.model.MAX_INTERFACE_TEXT_SCALE
 import com.qualityalternative.app.domain.model.MAX_OPEN_ANYWAY_UNLOCK_MINUTES
 import com.qualityalternative.app.domain.model.MAX_READER_FONT_SCALE
+import com.qualityalternative.app.domain.model.MIN_BEDTIME_MINUTES
 import com.qualityalternative.app.domain.model.MIN_MEDITATION_MINUTES
 import com.qualityalternative.app.domain.model.MIN_INTERFACE_TEXT_SCALE
 import com.qualityalternative.app.domain.model.MIN_OPEN_ANYWAY_UNLOCK_MINUTES
@@ -74,6 +79,13 @@ class PreferencesSettingsRepository(
                     reactivatedCompletedContentIds = preferences[ReactivatedCompletedContentIds].orEmpty(),
                     openAnywayUnlockMinutes = (preferences[OpenAnywayUnlockMinutes] ?: DEFAULT_OPEN_ANYWAY_UNLOCK_MINUTES)
                         .coerceIn(MIN_OPEN_ANYWAY_UNLOCK_MINUTES, MAX_OPEN_ANYWAY_UNLOCK_MINUTES),
+                    bedtimeEnabled = preferences[BedtimeEnabled] ?: DEFAULT_BEDTIME_ENABLED,
+                    bedtimeStartMinutes = portableBedtimeMinutes(
+                        preferences[BedtimeStartMinutes] ?: DEFAULT_BEDTIME_START_MINUTES,
+                    ),
+                    bedtimeEndMinutes = portableBedtimeMinutes(
+                        preferences[BedtimeEndMinutes] ?: DEFAULT_BEDTIME_END_MINUTES,
+                    ),
                     readerFontScale = portableReaderFontScale(
                         preferences[ReaderFontScale] ?: DEFAULT_READER_FONT_SCALE,
                     ),
@@ -139,6 +151,9 @@ class PreferencesSettingsRepository(
             preferences[ReactivatedCompletedContentIds] = settings.reactivatedCompletedContentIds
             preferences[OpenAnywayUnlockMinutes] = settings.openAnywayUnlockMinutes
                 .coerceIn(MIN_OPEN_ANYWAY_UNLOCK_MINUTES, MAX_OPEN_ANYWAY_UNLOCK_MINUTES)
+            preferences[BedtimeEnabled] = settings.bedtimeEnabled
+            preferences[BedtimeStartMinutes] = portableBedtimeMinutes(settings.bedtimeStartMinutes)
+            preferences[BedtimeEndMinutes] = portableBedtimeMinutes(settings.bedtimeEndMinutes)
         }
     }
 
@@ -216,6 +231,14 @@ class PreferencesSettingsRepository(
         dataStore.edit { preferences ->
             preferences[OpenAnywayUnlockMinutes] =
                 minutes.coerceIn(MIN_OPEN_ANYWAY_UNLOCK_MINUTES, MAX_OPEN_ANYWAY_UNLOCK_MINUTES)
+        }
+    }
+
+    override suspend fun saveBedtimeSettings(enabled: Boolean, startMinutes: Int, endMinutes: Int) {
+        dataStore.edit { preferences ->
+            preferences[BedtimeEnabled] = enabled
+            preferences[BedtimeStartMinutes] = portableBedtimeMinutes(startMinutes)
+            preferences[BedtimeEndMinutes] = portableBedtimeMinutes(endMinutes)
         }
     }
 
@@ -351,6 +374,10 @@ class PreferencesSettingsRepository(
             return (raw.coerceIn(MIN_INTERFACE_TEXT_SCALE, MAX_INTERFACE_TEXT_SCALE) * 100.0).roundToInt() / 100.0
         }
 
+        fun portableBedtimeMinutes(raw: Int): Int {
+            return raw.coerceIn(MIN_BEDTIME_MINUTES, MAX_BEDTIME_MINUTES)
+        }
+
         fun isValidLocalProfileId(raw: String): Boolean {
             return Regex("^qa-local-[0-9a-fA-F-]{36}$").matches(raw)
         }
@@ -371,6 +398,9 @@ class PreferencesSettingsRepository(
         val PriorityContentIds = stringSetPreferencesKey("priority_content_ids")
         val ReactivatedCompletedContentIds = stringSetPreferencesKey("reactivated_completed_content_ids")
         val OpenAnywayUnlockMinutes = intPreferencesKey("open_anyway_unlock_minutes")
+        val BedtimeEnabled = booleanPreferencesKey("bedtime_enabled")
+        val BedtimeStartMinutes = intPreferencesKey("bedtime_start_minutes")
+        val BedtimeEndMinutes = intPreferencesKey("bedtime_end_minutes")
         val AnnotationExportUri = stringPreferencesKey("annotation_export_uri")
         val AnnotationExportDisplayName = stringPreferencesKey("annotation_export_display_name")
         val AnnotationExportLastSuccessfulAtMillis = longPreferencesKey("annotation_export_last_successful_at_millis")

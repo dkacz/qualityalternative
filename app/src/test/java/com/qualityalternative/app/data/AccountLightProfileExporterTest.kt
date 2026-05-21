@@ -56,6 +56,7 @@ class AccountLightProfileExporterTest {
         repository.savePriorityContentIds(setOf("user-document-11111111-1111-4111-8111-111111111111"))
         repository.saveReactivatedCompletedContentIds(setOf("editorial-deep-work"))
         repository.saveOpenAnywayUnlockMinutes(120)
+        repository.saveBedtimeSettings(enabled = true, startMinutes = 23 * 60, endMinutes = 6 * 60 + 30)
         repository.saveAnnotationExportDestination(
             uri = "content://drive/raw-provider-id",
             displayName = "qa-annotations.jsonld",
@@ -111,6 +112,9 @@ class AccountLightProfileExporterTest {
         assertEquals(listOf("user-document-11111111-1111-4111-8111-111111111111"), profile.settings.priorityContentIds)
         assertEquals(listOf("editorial-deep-work"), profile.settings.reactivatedCompletedContentIds)
         assertEquals(120, profile.settings.openAnywayUnlockMinutes)
+        assertEquals(true, profile.settings.bedtimeEnabled)
+        assertEquals(23 * 60, profile.settings.bedtimeStartMinutes)
+        assertEquals(6 * 60 + 30, profile.settings.bedtimeEndMinutes)
 
         assertEquals(emptyList<AccountLightUserLink>(), profile.library.userLinks)
         assertEquals(emptyList<AccountLightUserDocument>(), profile.library.userDocuments)

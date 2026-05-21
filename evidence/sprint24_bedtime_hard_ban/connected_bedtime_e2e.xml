@@ -1,0 +1,11 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<testsuites tests="1" failures="0" errors="0" skipped="0" time="5.121" timestamp="2026-05-21T05:44:46" hostname="localhost">
+  <testsuite name="com.qualityalternative.app.MainActivityTest" tests="1" failures="0" errors="0" skipped="0" time="4.42" timestamp="2026-05-21T05:44:46" hostname="localhost">
+    <properties>
+      <property name="device" value="qaApi36(AVD) - 16" />
+      <property name="flavor" value="" />
+      <property name="project" value=":app" />
+    </properties>
+    <testcase name="bedtimeModeShowsCalmHardBanWithAlternativesAndEmergencyWait" classname="com.qualityalternative.app.MainActivityTest" time="4.42" />
+  </testsuite>
+</testsuites>

@@ -1,5 +1,8 @@
 package com.qualityalternative.app.domain.model
 
+import java.time.Instant
+import java.time.ZoneId
+
 data class DistractingApp(
     val packageName: String,
     val displayName: String,
@@ -21,6 +24,36 @@ const val MIN_OPEN_ANYWAY_UNLOCK_MINUTES = 15
 const val MAX_OPEN_ANYWAY_UNLOCK_MINUTES = 240
 
 val OpenAnywayUnlockMinuteOptions = listOf(15, 30, 60, 120)
+
+const val DEFAULT_BEDTIME_ENABLED = false
+const val DEFAULT_BEDTIME_START_MINUTES = 22 * 60 + 30
+const val DEFAULT_BEDTIME_END_MINUTES = 7 * 60
+const val MIN_BEDTIME_MINUTES = 0
+const val MAX_BEDTIME_MINUTES = 23 * 60 + 59
+const val BEDTIME_OPEN_ANYWAY_UNLOCK_DELAY_MILLIS = 60_000L
+
+val BedtimeStartMinuteOptions = listOf(21 * 60 + 30, 22 * 60, DEFAULT_BEDTIME_START_MINUTES, 23 * 60)
+val BedtimeEndMinuteOptions = listOf(6 * 60, 6 * 60 + 30, DEFAULT_BEDTIME_END_MINUTES, 7 * 60 + 30, 8 * 60)
+
+fun bedtimeWindowIsActive(
+    enabled: Boolean,
+    startMinutes: Int,
+    endMinutes: Int,
+    nowMillis: Long,
+    zoneId: ZoneId = ZoneId.systemDefault(),
+): Boolean {
+    if (!enabled) return false
+    val safeStart = startMinutes.coerceIn(MIN_BEDTIME_MINUTES, MAX_BEDTIME_MINUTES)
+    val safeEnd = endMinutes.coerceIn(MIN_BEDTIME_MINUTES, MAX_BEDTIME_MINUTES)
+    if (safeStart == safeEnd) return true
+    val now = Instant.ofEpochMilli(nowMillis).atZone(zoneId).toLocalTime()
+    val currentMinutes = now.hour * 60 + now.minute
+    return if (safeStart < safeEnd) {
+        currentMinutes in safeStart until safeEnd
+    } else {
+        currentMinutes >= safeStart || currentMinutes < safeEnd
+    }
+}
 
 const val DEFAULT_READER_FONT_SCALE = 1.0
 const val MIN_READER_FONT_SCALE = 0.80
@@ -62,6 +95,9 @@ data class AppSettings(
     val priorityContentIds: Set<String> = emptySet(),
     val reactivatedCompletedContentIds: Set<String> = emptySet(),
     val openAnywayUnlockMinutes: Int = DEFAULT_OPEN_ANYWAY_UNLOCK_MINUTES,
+    val bedtimeEnabled: Boolean = DEFAULT_BEDTIME_ENABLED,
+    val bedtimeStartMinutes: Int = DEFAULT_BEDTIME_START_MINUTES,
+    val bedtimeEndMinutes: Int = DEFAULT_BEDTIME_END_MINUTES,
     val readerFontScale: Double = DEFAULT_READER_FONT_SCALE,
     val interfaceTextScale: Double = DEFAULT_INTERFACE_TEXT_SCALE,
     val annotationExportUri: String? = null,

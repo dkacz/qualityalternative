@@ -129,11 +129,15 @@ import com.qualityalternative.app.data.UserDocumentValidator
 import com.qualityalternative.app.domain.model.AnalyticsEvent
 import com.qualityalternative.app.domain.model.AnalyticsEventType
 import com.qualityalternative.app.domain.model.AppThemeMode
+import com.qualityalternative.app.domain.model.BedtimeEndMinuteOptions
+import com.qualityalternative.app.domain.model.BedtimeStartMinuteOptions
 import com.qualityalternative.app.domain.model.ContentAvailability
 import com.qualityalternative.app.domain.model.ContentFormat
 import com.qualityalternative.app.domain.model.ContentItem
 import com.qualityalternative.app.domain.model.ContentPriority
 import com.qualityalternative.app.domain.model.ContentSourceType
+import com.qualityalternative.app.domain.model.DEFAULT_BEDTIME_END_MINUTES
+import com.qualityalternative.app.domain.model.DEFAULT_BEDTIME_START_MINUTES
 import com.qualityalternative.app.domain.model.DelayWindow
 import com.qualityalternative.app.domain.model.DistractingApp
 import com.qualityalternative.app.domain.model.DurationBucket
@@ -606,6 +610,7 @@ private fun MainRoute(
                 onSelectInterfaceTextScale = viewModel::setInterfaceTextScale,
                 onSelectContentPriority = viewModel::setContentPriority,
                 onSelectOpenAnywayUnlock = viewModel::setOpenAnywayUnlockMinutes,
+                onSelectBedtimeSettings = viewModel::setBedtimeSettings,
                 onSelectInterventionMode = viewModel::selectInterventionMode,
                 onSelectTheme = viewModel::selectThemeMode,
                 onRefreshReadiness = viewModel::refreshPermissionReadiness,
@@ -1901,6 +1906,7 @@ private fun InterventionScreen(
     val preferences = state.preferences ?: return
     val colors = QualityAlternativeThemeTokens.colors
     val primary = recommendationSet.primary
+    val isBedtime = state.currentInterventionBedtimeEnforced
     val meditationAlternative = recommendationSet.backups.firstOrNull { item -> item.usesMeditationTimer() }
     val backups = recommendationSet.backups.withIndex().filterNot { indexedBackup ->
         indexedBackup.value.usesMeditationTimer()
@@ -1909,11 +1915,19 @@ private fun InterventionScreen(
     val primaryContinueProgress = continueProgressMetaFor(item = primary, progress = state.readingProgress)
     val canAdjustMeditationBeforeStart = primary.usesMeditationTimer()
     val backgroundBrush = Brush.verticalGradient(
-        colors = listOf(
-            colors.accentSoft,
-            colors.background,
-            colors.background,
-        ),
+        colors = if (isBedtime) {
+            listOf(
+                colors.elevatedSurface,
+                colors.background,
+                colors.background,
+            )
+        } else {
+            listOf(
+                colors.accentSoft,
+                colors.background,
+                colors.background,
+            )
+        },
     )
     val openAnywayAvailableAtMillis = state.currentOpenAnywayUnlockAvailableAtMillis
     var openAnywayNowMillis by remember(state.currentInterventionId, openAnywayAvailableAtMillis) {
@@ -1961,7 +1975,11 @@ private fun InterventionScreen(
         ) {
             AppDot(app = targetApp, size = 26.dp)
             BodyText(
-                text = "You reached for ${targetApp.displayName}",
+                text = if (isBedtime) {
+                    "Bedtime is protecting sleep from ${targetApp.displayName}"
+                } else {
+                    "You reached for ${targetApp.displayName}"
+                },
                 color = colors.mutedText,
                 modifier = Modifier.weight(1f),
                 fontSize = 13.5.sp,
@@ -1974,7 +1992,7 @@ private fun InterventionScreen(
             )
         }
         QaCard(
-            borderColor = colors.lineStrong,
+            borderColor = if (isBedtime) colors.accent else colors.lineStrong,
             padding = 13.dp,
             modifier = Modifier.padding(bottom = 8.dp),
         ) {
@@ -2013,6 +2031,17 @@ private fun InterventionScreen(
                         .testTag("intervention-primary-progress"),
                 )
             }
+            if (isBedtime) {
+                BodyText(
+                    text = "This is a full bedtime block. Pick a calm alternative, or wait through the emergency breath before opening the original app.",
+                    color = colors.mutedText,
+                    fontSize = 12.5.sp,
+                    lineHeight = 17.sp,
+                    modifier = Modifier
+                        .padding(top = 9.dp)
+                        .testTag("bedtime-intervention-copy"),
+                )
+            }
         }
         QaButton(
             text = primaryActionLabel(primary),
@@ -2047,7 +2076,10 @@ private fun InterventionScreen(
                         .testTag("intervention-meditation-alternative"),
                 )
             }
-            MonoText("Other options", modifier = Modifier.padding(bottom = 4.dp))
+            MonoText(
+                if (isBedtime) "Quiet alternatives" else "Other options",
+                modifier = Modifier.padding(bottom = 4.dp),
+            )
             if (backups.isEmpty()) {
                 BodyText(
                     text = "No extra reading choices are available right now.",
@@ -2083,9 +2115,10 @@ private fun InterventionScreen(
         if (!canOpenAnyway) {
             OpenAnywayUnlockStatus(
                 remainingSeconds = openAnywayRemainingSeconds,
+                label = if (isBedtime) "Breathe before emergency unlock" else "Take five seconds",
                 modifier = Modifier
                     .padding(top = 4.dp, bottom = 2.dp)
-                    .testTag("form-intervention-unlock-wait"),
+                    .testTag(if (isBedtime) "bedtime-emergency-unlock-wait" else "form-intervention-unlock-wait"),
             )
         }
         Row(
@@ -2094,20 +2127,29 @@ private fun InterventionScreen(
                 .padding(top = 8.dp)
                 .testTag("intervention-bottom-actions"),
         ) {
+            if (!isBedtime) {
+                QaButton(
+                    text = "Pause 15 min",
+                    onClick = onDelay,
+                    variant = QaButtonVariant.Outline,
+                    modifier = Modifier.weight(1f),
+                    fullWidth = false,
+                    size = QaButtonSize.Compact,
+                    leadingIcon = QaIconKind.Pause,
+                )
+            }
             QaButton(
-                text = "Pause 15 min",
-                onClick = onDelay,
-                variant = QaButtonVariant.Outline,
-                modifier = Modifier.weight(1f),
-                fullWidth = false,
-                size = QaButtonSize.Compact,
-                leadingIcon = QaIconKind.Pause,
-            )
-            QaButton(
-                text = if (canOpenAnyway) "Open ${targetApp.displayName}" else "Open in ${openAnywayRemainingSeconds}s",
+                text = when {
+                    isBedtime && canOpenAnyway -> "Emergency unlock"
+                    isBedtime -> "Breathe ${openAnywayRemainingSeconds}s"
+                    canOpenAnyway -> "Open ${targetApp.displayName}"
+                    else -> "Open in ${openAnywayRemainingSeconds}s"
+                },
                 onClick = onOpenAnyway,
                 variant = QaButtonVariant.Ghost,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag(if (isBedtime) "bedtime-emergency-unlock-action" else "intervention-open-anyway-action"),
                 enabled = canOpenAnyway,
                 fullWidth = false,
                 size = QaButtonSize.Compact,
@@ -2120,6 +2162,7 @@ private fun InterventionScreen(
 @Composable
 private fun OpenAnywayUnlockStatus(
     remainingSeconds: Int,
+    label: String = "Take five seconds",
     modifier: Modifier = Modifier,
 ) {
     val colors = QualityAlternativeThemeTokens.colors
@@ -2136,7 +2179,7 @@ private fun OpenAnywayUnlockStatus(
         ) {
             QaIcon(kind = QaIconKind.Clock, color = colors.mutedText, size = 15.dp)
             BodyText(
-                text = "Take five seconds",
+                text = label,
                 color = colors.mutedText,
                 fontSize = 12.5.sp,
                 modifier = Modifier.weight(1f),
@@ -3808,6 +3851,7 @@ private fun SettingsTab(
     onSelectInterfaceTextScale: (Double) -> Unit,
     onSelectContentPriority: (ContentPriority) -> Unit,
     onSelectOpenAnywayUnlock: (Int) -> Unit,
+    onSelectBedtimeSettings: (Boolean, Int, Int) -> Unit,
     onSelectInterventionMode: (InterventionMode) -> Unit,
     onSelectTheme: (AppThemeMode) -> Unit,
     onRefreshReadiness: () -> Unit,
@@ -4044,6 +4088,12 @@ private fun SettingsTab(
             }
         }
         item {
+            BedtimeSettingsSection(
+                state = state,
+                onSelect = onSelectBedtimeSettings,
+            )
+        }
+        item {
             SectionLabel("Meditation reset")
             QaCard {
                 BodyText(
@@ -4108,6 +4158,121 @@ private fun SettingsTab(
                 textAlign = TextAlign.Center,
                 preserveCase = true,
             )
+        }
+    }
+}
+
+@Composable
+private fun BedtimeSettingsSection(
+    state: MainUiState,
+    onSelect: (Boolean, Int, Int) -> Unit,
+) {
+    val colors = QualityAlternativeThemeTokens.colors
+    val startMinutes = state.bedtimeStartMinutes.takeIf { it in 0..1439 } ?: DEFAULT_BEDTIME_START_MINUTES
+    val endMinutes = state.bedtimeEndMinutes.takeIf { it in 0..1439 } ?: DEFAULT_BEDTIME_END_MINUTES
+    val scheduleText = if (startMinutes == endMinutes) {
+        "Schedule always active."
+    } else {
+        "Schedule ${startMinutes.bedtimeTimeLabel()} to ${endMinutes.bedtimeTimeLabel()}."
+    }
+    Column(modifier = Modifier.testTag("settings-bedtime-section")) {
+        SectionLabel(
+            text = "Bedtime",
+            right = when {
+                state.isBedtimeActive -> "Active"
+                state.bedtimeEnabled -> "Scheduled"
+                else -> "Off"
+            },
+        )
+        QaCard {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                SourceBadge(sourceType = ContentSourceType.MEDITATION, icon = QaIconKind.Shield)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Sleep lock",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontSize = 16.sp,
+                        lineHeight = 20.sp,
+                        color = colors.primaryText,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    BodyText(
+                        text = "During this window, intercepted apps require a one-minute emergency breath before opening.",
+                        color = colors.mutedText,
+                        fontSize = 12.5.sp,
+                        lineHeight = 17.sp,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
+            }
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.padding(top = 14.dp),
+            ) {
+                QaChip(
+                    text = "Off",
+                    selected = !state.bedtimeEnabled,
+                    onClick = { onSelect(false, startMinutes, endMinutes) },
+                    modifier = Modifier.testTag("bedtime-enabled-off"),
+                    centered = true,
+                    minHeight = 34.dp,
+                )
+                QaChip(
+                    text = "On",
+                    selected = state.bedtimeEnabled,
+                    onClick = { onSelect(true, startMinutes, endMinutes) },
+                    modifier = Modifier.testTag("bedtime-enabled-on"),
+                    accentSelected = true,
+                    centered = true,
+                    minHeight = 34.dp,
+                )
+            }
+            if (state.bedtimeEnabled) {
+                BodyText(
+                    text = "$scheduleText Alternatives stay available; the original app waits.",
+                    color = colors.mutedText,
+                    fontSize = 12.5.sp,
+                    lineHeight = 17.sp,
+                    modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
+                )
+                MonoText("Start", modifier = Modifier.padding(bottom = 5.dp))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    BedtimeStartMinuteOptions.forEach { minutes ->
+                        QaChip(
+                            text = minutes.bedtimeTimeLabel(),
+                            selected = startMinutes == minutes,
+                            onClick = { onSelect(true, minutes, endMinutes) },
+                            modifier = Modifier.testTag("bedtime-start-$minutes"),
+                            centered = true,
+                            minHeight = 32.dp,
+                            horizontalPadding = 11.dp,
+                            verticalPadding = 7.dp,
+                            fontSize = 11.5.sp,
+                        )
+                    }
+                }
+                MonoText("End", modifier = Modifier.padding(top = 10.dp, bottom = 5.dp))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    BedtimeEndMinuteOptions.forEach { minutes ->
+                        QaChip(
+                            text = minutes.bedtimeTimeLabel(),
+                            selected = endMinutes == minutes,
+                            onClick = { onSelect(true, startMinutes, minutes) },
+                            modifier = Modifier.testTag("bedtime-end-$minutes"),
+                            centered = true,
+                            minHeight = 32.dp,
+                            horizontalPadding = 11.dp,
+                            verticalPadding = 7.dp,
+                            fontSize = 11.5.sp,
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -7886,6 +8051,11 @@ private fun formatTimestamp(timestampMillis: Long): String {
 private fun formatRelativeDay(timestampMillis: Long): String {
     val formatter = DateTimeFormatter.ofPattern("EEE, h:mm a")
     return formatter.format(Instant.ofEpochMilli(timestampMillis).atZone(ZoneId.systemDefault()))
+}
+
+private fun Int.bedtimeTimeLabel(): String {
+    val safeMinutes = coerceIn(0, 23 * 60 + 59)
+    return "%02d:%02d".format(safeMinutes / 60, safeMinutes % 60)
 }
 
 private fun TopicTag.displayName(): String {

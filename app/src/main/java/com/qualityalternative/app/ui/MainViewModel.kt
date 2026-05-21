@@ -23,11 +23,15 @@ import com.qualityalternative.app.domain.model.AnalyticsSemanticKeys
 import com.qualityalternative.app.domain.model.AnalyticsEventType
 import com.qualityalternative.app.domain.model.AppSettings
 import com.qualityalternative.app.domain.model.AppThemeMode
+import com.qualityalternative.app.domain.model.BEDTIME_OPEN_ANYWAY_UNLOCK_DELAY_MILLIS
 import com.qualityalternative.app.domain.model.ContentAvailability
 import com.qualityalternative.app.domain.model.ContentFormat
 import com.qualityalternative.app.domain.model.ContentItem
 import com.qualityalternative.app.domain.model.ContentPriority
 import com.qualityalternative.app.domain.model.ContentSourceType
+import com.qualityalternative.app.domain.model.DEFAULT_BEDTIME_ENABLED
+import com.qualityalternative.app.domain.model.DEFAULT_BEDTIME_END_MINUTES
+import com.qualityalternative.app.domain.model.DEFAULT_BEDTIME_START_MINUTES
 import com.qualityalternative.app.domain.model.DEFAULT_INTERFACE_TEXT_SCALE
 import com.qualityalternative.app.domain.model.DEFAULT_INTERVENTION_MODE
 import com.qualityalternative.app.domain.model.DEFAULT_MEDITATION_MINUTES
@@ -40,9 +44,11 @@ import com.qualityalternative.app.domain.model.DEFAULT_READER_FONT_SCALE
 import com.qualityalternative.app.domain.model.InterventionMode
 import com.qualityalternative.app.domain.model.MEDITATION_TIMER_CONTENT_ID
 import com.qualityalternative.app.domain.model.MAX_INTERFACE_TEXT_SCALE
+import com.qualityalternative.app.domain.model.MAX_BEDTIME_MINUTES
 import com.qualityalternative.app.domain.model.MAX_OPEN_ANYWAY_UNLOCK_MINUTES
 import com.qualityalternative.app.domain.model.MAX_READER_FONT_SCALE
 import com.qualityalternative.app.domain.model.MIN_INTERFACE_TEXT_SCALE
+import com.qualityalternative.app.domain.model.MIN_BEDTIME_MINUTES
 import com.qualityalternative.app.domain.model.MIN_OPEN_ANYWAY_UNLOCK_MINUTES
 import com.qualityalternative.app.domain.model.MIN_READER_FONT_SCALE
 import com.qualityalternative.app.domain.model.OnboardingSelection
@@ -66,6 +72,7 @@ import com.qualityalternative.app.domain.model.UserDocumentValidationError
 import com.qualityalternative.app.domain.model.UserLinkDraft
 import com.qualityalternative.app.domain.model.UserLinkValidationError
 import com.qualityalternative.app.domain.model.UserPreferences
+import com.qualityalternative.app.domain.model.bedtimeWindowIsActive
 import com.qualityalternative.app.domain.model.meditationTimerContentItem
 import com.qualityalternative.app.domain.model.usesExternalHandoff
 import com.qualityalternative.app.domain.model.usesMeditationTimer
@@ -154,6 +161,11 @@ data class MainUiState(
     val priorityContentIds: Set<String> = emptySet(),
     val reactivatedCompletedContentIds: Set<String> = emptySet(),
     val openAnywayUnlockMinutes: Int = DEFAULT_OPEN_ANYWAY_UNLOCK_MINUTES,
+    val bedtimeEnabled: Boolean = DEFAULT_BEDTIME_ENABLED,
+    val bedtimeStartMinutes: Int = DEFAULT_BEDTIME_START_MINUTES,
+    val bedtimeEndMinutes: Int = DEFAULT_BEDTIME_END_MINUTES,
+    val isBedtimeActive: Boolean = false,
+    val currentInterventionBedtimeEnforced: Boolean = false,
     val annotationExportUri: String? = null,
     val annotationExportDisplayName: String? = null,
     val annotationExportUsesLocalDefault: Boolean = false,
@@ -475,6 +487,7 @@ class MainViewModel(
                 while (true) {
                     delay(ACTIVE_DELAY_REFRESH_INTERVAL_MILLIS)
                     refreshActiveDelayWindow()
+                    refreshBedtimeInterventionBoundary()
                 }
             }
         }
@@ -721,6 +734,36 @@ class MainViewModel(
         )
         viewModelScope.launch {
             settingsRepository.saveOpenAnywayUnlockMinutes(safeMinutes)
+            autosaveAccountLightProfileAfterPortableMutation()
+        }
+    }
+
+    fun setBedtimeSettings(
+        enabled: Boolean = uiState.bedtimeEnabled,
+        startMinutes: Int = uiState.bedtimeStartMinutes,
+        endMinutes: Int = uiState.bedtimeEndMinutes,
+    ) {
+        val safeStartMinutes = startMinutes.coerceIn(MIN_BEDTIME_MINUTES, MAX_BEDTIME_MINUTES)
+        val safeEndMinutes = endMinutes.coerceIn(MIN_BEDTIME_MINUTES, MAX_BEDTIME_MINUTES)
+        val activeNow = bedtimeWindowIsActive(
+            enabled = enabled,
+            startMinutes = safeStartMinutes,
+            endMinutes = safeEndMinutes,
+            nowMillis = nowProvider(),
+        )
+        uiState = uiState.copy(
+            bedtimeEnabled = enabled,
+            bedtimeStartMinutes = safeStartMinutes,
+            bedtimeEndMinutes = safeEndMinutes,
+            isBedtimeActive = activeNow,
+            latestMessage = null,
+        )
+        viewModelScope.launch {
+            settingsRepository.saveBedtimeSettings(
+                enabled = enabled,
+                startMinutes = safeStartMinutes,
+                endMinutes = safeEndMinutes,
+            )
             autosaveAccountLightProfileAfterPortableMutation()
         }
     }
@@ -1365,6 +1408,7 @@ class MainViewModel(
                 currentOpenAnywayUnlockAvailableAtMillis = null,
                 currentRecommendationSet = null,
                 currentInterventionOrigin = null,
+                currentInterventionBedtimeEnforced = false,
                 currentContent = repairedContent,
                 currentReaderDocument = readerDocument,
                 currentContentBody = readerDocument.plainText,
@@ -1691,9 +1735,19 @@ class MainViewModel(
                 shownAtMillis = processingNowMillis,
             )
 
+            val bedtimeActive = bedtimeWindowIsActive(
+                enabled = uiState.bedtimeEnabled,
+                startMinutes = uiState.bedtimeStartMinutes,
+                endMinutes = uiState.bedtimeEndMinutes,
+                nowMillis = processingNowMillis,
+            )
             if (
                 origin == InterventionOrigin.SYSTEM &&
-                InterceptionRuntimeGate.shouldSuppress(targetApp.packageName, processingNowMillis)
+                InterceptionRuntimeGate.shouldSuppress(
+                    targetAppPackage = targetApp.packageName,
+                    nowMillis = processingNowMillis,
+                    bedtimeActive = bedtimeActive,
+                )
             ) {
                 uiState = uiState.copy(
                     selectedTargetApp = targetApp,
@@ -1704,41 +1758,45 @@ class MainViewModel(
                     activeDelayWindow = null,
                     activeDelaySuggestion = null,
                     currentInterventionOrigin = null,
+                    currentInterventionBedtimeEnforced = false,
                     latestMessage = "${targetApp.displayName} is still unlocked.",
                     screen = MainScreen.Home,
                 )
                 return@launch
             }
 
-            val delayInspection = delayGate.inspectDelay(targetApp = targetApp, nowMillis = processingNowMillis)
-            if (delayInspection.activeWindow != null) {
-                recordDelayReturnDuringActiveWindow(targetApp = targetApp, nowMillis = processingNowMillis)
-                val activeDelayWindow = delayGate.activeDelay(targetApp = targetApp, nowMillis = processingNowMillis)
-                uiState = uiState.copy(
-                    selectedTargetApp = targetApp,
-                    activeDelayWindow = activeDelayWindow,
-                    activeDelaySuggestion = activeDelaySuggestionFor(activeDelayWindow),
-                    latestMessage = "${targetApp.displayName} is paused for 15 minutes.",
-                    screen = MainScreen.Home,
-                    currentOpenAnywayUnlockAvailableAtMillis = null,
-                    currentInterventionOrigin = null,
-                )
-                return@launch
-            }
+            if (!bedtimeActive) {
+                val delayInspection = delayGate.inspectDelay(targetApp = targetApp, nowMillis = processingNowMillis)
+                if (delayInspection.activeWindow != null) {
+                    recordDelayReturnDuringActiveWindow(targetApp = targetApp, nowMillis = processingNowMillis)
+                    val activeDelayWindow = delayGate.activeDelay(targetApp = targetApp, nowMillis = processingNowMillis)
+                    uiState = uiState.copy(
+                        selectedTargetApp = targetApp,
+                        activeDelayWindow = activeDelayWindow,
+                        activeDelaySuggestion = activeDelaySuggestionFor(activeDelayWindow),
+                        latestMessage = "${targetApp.displayName} is paused for 15 minutes.",
+                        screen = MainScreen.Home,
+                        currentOpenAnywayUnlockAvailableAtMillis = null,
+                        currentInterventionOrigin = null,
+                        currentInterventionBedtimeEnforced = false,
+                    )
+                    return@launch
+                }
 
-            var delayReturnHandled = false
-            delayInspection.expiredWindow?.let { expiredWindow ->
-                delayReturnHandled = true
-                recordDelayReturnAfterExpiry(expiredWindow = expiredWindow, nowMillis = processingNowMillis)
-                delayGate.consumeExpiredDelay(
-                    targetApp = targetApp,
-                    delayId = expiredWindow.id,
-                    nowMillis = processingNowMillis,
-                )
-            }
+                var delayReturnHandled = false
+                delayInspection.expiredWindow?.let { expiredWindow ->
+                    delayReturnHandled = true
+                    recordDelayReturnAfterExpiry(expiredWindow = expiredWindow, nowMillis = processingNowMillis)
+                    delayGate.consumeExpiredDelay(
+                        targetApp = targetApp,
+                        delayId = expiredWindow.id,
+                        nowMillis = processingNowMillis,
+                    )
+                }
 
-            if (!delayReturnHandled) {
-                recordReturnSignalIfNeeded(targetApp = targetApp, nowMillis = processingNowMillis)
+                if (!delayReturnHandled) {
+                    recordReturnSignalIfNeeded(targetApp = targetApp, nowMillis = processingNowMillis)
+                }
             }
 
             val interventionId = UUID.randomUUID().toString()
@@ -1788,6 +1846,7 @@ class MainViewModel(
                     activeDelayWindow = null,
                     activeDelaySuggestion = null,
                     currentInterventionOrigin = null,
+                    currentInterventionBedtimeEnforced = false,
                     latestMessage = "No replacement inventory is available yet.",
                     screen = MainScreen.Home,
                 )
@@ -1824,12 +1883,33 @@ class MainViewModel(
                 )
             }
             val interventionMode = uiState.interventionMode
-            val openAnywayAvailableAtMillis = if (interventionMode == InterventionMode.FIRM) {
-                processingNowMillis + FORM_INTERVENTION_UNLOCK_DELAY_MILLIS
-            } else {
-                null
+            val openAnywayDelayMillis = when {
+                bedtimeActive -> BEDTIME_OPEN_ANYWAY_UNLOCK_DELAY_MILLIS
+                interventionMode == InterventionMode.FIRM -> FORM_INTERVENTION_UNLOCK_DELAY_MILLIS
+                else -> null
             }
-            if (interventionMode == InterventionMode.FIRM) {
+            val openAnywayAvailableAtMillis = openAnywayDelayMillis?.let { delayMillis ->
+                processingNowMillis + delayMillis
+            }
+            if (bedtimeActive) {
+                recordEvent(
+                    AnalyticsEvent(
+                        type = AnalyticsEventType.BEDTIME_INTERVENTION_SHOWN,
+                        timestampMillis = processingNowMillis,
+                        interventionId = interventionId,
+                        targetAppPackage = targetApp.packageName,
+                        primaryContentId = recommendationSet.primary.id,
+                        backupContentIds = backupIds,
+                        contentId = recommendationSet.primary.id,
+                        metadata = recommendationSet.analyticsMetadata() + mapOf(
+                            "interventionMode" to interventionMode.name,
+                            "bedtimeStartMinutes" to uiState.bedtimeStartMinutes.toString(),
+                            "bedtimeEndMinutes" to uiState.bedtimeEndMinutes.toString(),
+                            "openAnywayUnlockDelayMillis" to BEDTIME_OPEN_ANYWAY_UNLOCK_DELAY_MILLIS.toString(),
+                        ),
+                    ),
+                )
+            } else if (interventionMode == InterventionMode.FIRM) {
                 recordEvent(
                     AnalyticsEvent(
                         type = AnalyticsEventType.FORM_INTERVENTION_SHOWN,
@@ -1870,6 +1950,8 @@ class MainViewModel(
                 currentOpenAnywayUnlockAvailableAtMillis = openAnywayAvailableAtMillis,
                 currentRecommendationSet = recommendationSet,
                 currentInterventionOrigin = origin,
+                isBedtimeActive = bedtimeActive,
+                currentInterventionBedtimeEnforced = bedtimeActive,
                 activeDelayWindow = null,
                 activeDelaySuggestion = null,
                 latestMessage = null,
@@ -1952,7 +2034,10 @@ class MainViewModel(
         val targetApp = uiState.selectedTargetApp ?: return
         val recommendationSet = uiState.currentRecommendationSet ?: return
         val interventionId = uiState.currentInterventionId ?: return
-        val nowMillis = System.currentTimeMillis()
+        val nowMillis = nowProvider()
+        if (ensureCurrentInterventionBedtimeEnforced(nowMillis = nowMillis) || uiState.currentInterventionBedtimeEnforced) {
+            return
+        }
         viewModelScope.launch {
             val window = delayGate.storeDelayDurably(
                 targetApp = targetApp,
@@ -1971,6 +2056,7 @@ class MainViewModel(
                 currentOpenAnywayUnlockAvailableAtMillis = null,
                 currentRecommendationSet = null,
                 currentInterventionOrigin = null,
+                currentInterventionBedtimeEnforced = false,
                 activeDelayWindow = window,
                 activeDelaySuggestion = activeDelaySuggestionFor(window),
                 latestMessage = "${targetApp.displayName} paused for 15 minutes.",
@@ -1985,7 +2071,11 @@ class MainViewModel(
         val availableAtMillis = uiState.currentOpenAnywayUnlockAvailableAtMillis ?: return
         recordEvent(
             AnalyticsEvent(
-                type = AnalyticsEventType.FORM_INTERVENTION_UNLOCK_ENABLED,
+                type = if (uiState.currentInterventionBedtimeEnforced) {
+                    AnalyticsEventType.BEDTIME_UNLOCK_ENABLED
+                } else {
+                    AnalyticsEventType.FORM_INTERVENTION_UNLOCK_ENABLED
+                },
                 timestampMillis = nowMillis,
                 interventionId = interventionId,
                 targetAppPackage = targetApp.packageName,
@@ -2006,7 +2096,7 @@ class MainViewModel(
         val targetApp = uiState.selectedTargetApp ?: return
         val recommendationSet = uiState.currentRecommendationSet ?: return
         val interventionId = uiState.currentInterventionId ?: return
-        if (uiState.interventionMode == InterventionMode.FIRM) {
+        if (uiState.interventionMode == InterventionMode.FIRM && !uiState.currentInterventionBedtimeEnforced) {
             recordEvent(
                 AnalyticsEvent(
                     type = AnalyticsEventType.FORM_INTERVENTION_ABANDONED,
@@ -2030,6 +2120,7 @@ class MainViewModel(
             currentOpenAnywayUnlockAvailableAtMillis = null,
             currentRecommendationSet = null,
             currentInterventionOrigin = null,
+            currentInterventionBedtimeEnforced = false,
             latestMessage = null,
         )
     }
@@ -2102,21 +2193,73 @@ class MainViewModel(
                 currentOpenAnywayUnlockAvailableAtMillis = null,
                 currentRecommendationSet = recommendationSet,
                 currentInterventionOrigin = null,
+                currentInterventionBedtimeEnforced = false,
             )
             openReplacementSession(content = content, sessionId = sessionId, startedAtMillis = nowMillis)
         }
+    }
+
+    private fun ensureCurrentInterventionBedtimeEnforced(nowMillis: Long): Boolean {
+        if (uiState.screen != MainScreen.Intervention) return false
+        if (uiState.currentInterventionBedtimeEnforced) return false
+        val targetApp = uiState.selectedTargetApp ?: return false
+        val recommendationSet = uiState.currentRecommendationSet ?: return false
+        val bedtimeActiveNow = bedtimeWindowIsActive(
+            enabled = uiState.bedtimeEnabled,
+            startMinutes = uiState.bedtimeStartMinutes,
+            endMinutes = uiState.bedtimeEndMinutes,
+            nowMillis = nowMillis,
+        )
+        if (!bedtimeActiveNow) return false
+        val bedtimeUnlockAvailableAtMillis = nowMillis + BEDTIME_OPEN_ANYWAY_UNLOCK_DELAY_MILLIS
+        recordEvent(
+            AnalyticsEvent(
+                type = AnalyticsEventType.BEDTIME_INTERVENTION_SHOWN,
+                timestampMillis = nowMillis,
+                interventionId = uiState.currentInterventionId,
+                targetAppPackage = targetApp.packageName,
+                primaryContentId = recommendationSet.primary.id,
+                backupContentIds = recommendationSet.backups.map(ContentItem::id),
+                contentId = recommendationSet.primary.id,
+                metadata = recommendationSet.analyticsMetadata() + mapOf(
+                    "interventionMode" to uiState.interventionMode.name,
+                    "bedtimeStartMinutes" to uiState.bedtimeStartMinutes.toString(),
+                    "bedtimeEndMinutes" to uiState.bedtimeEndMinutes.toString(),
+                    "openAnywayUnlockDelayMillis" to BEDTIME_OPEN_ANYWAY_UNLOCK_DELAY_MILLIS.toString(),
+                    "bedtimeActivatedAfterInterventionShown" to "true",
+                ),
+            ),
+        )
+        uiState = uiState.copy(
+            isBedtimeActive = true,
+            currentInterventionBedtimeEnforced = true,
+            currentOpenAnywayUnlockAvailableAtMillis = bedtimeUnlockAvailableAtMillis,
+            latestMessage = "Bedtime is active. Breathe for one minute before the emergency unlock.",
+        )
+        return true
+    }
+
+    fun refreshBedtimeInterventionBoundary(nowMillis: Long = nowProvider()) {
+        ensureCurrentInterventionBedtimeEnforced(nowMillis = nowMillis)
     }
 
     fun openAnyway(): Boolean {
         val targetApp = uiState.selectedTargetApp ?: return false
         val recommendationSet = uiState.currentRecommendationSet
         val nowMillis = nowProvider()
+        if (ensureCurrentInterventionBedtimeEnforced(nowMillis = nowMillis)) {
+            return false
+        }
         val openAnywayAvailableAtMillis = uiState.currentOpenAnywayUnlockAvailableAtMillis
         val isFirmMode = uiState.interventionMode == InterventionMode.FIRM
         if (openAnywayAvailableAtMillis != null && nowMillis < openAnywayAvailableAtMillis) {
             recordEvent(
                 AnalyticsEvent(
-                    type = AnalyticsEventType.FORM_INTERVENTION_UNLOCK_BLOCKED,
+                    type = if (uiState.currentInterventionBedtimeEnforced) {
+                        AnalyticsEventType.BEDTIME_UNLOCK_BLOCKED
+                    } else {
+                        AnalyticsEventType.FORM_INTERVENTION_UNLOCK_BLOCKED
+                    },
                     timestampMillis = nowMillis,
                     interventionId = uiState.currentInterventionId,
                     targetAppPackage = targetApp.packageName,
@@ -2129,7 +2272,13 @@ class MainViewModel(
                     ),
                 ),
             )
-            uiState = uiState.copy(latestMessage = "Take five seconds before opening ${targetApp.displayName}.")
+            uiState = uiState.copy(
+                latestMessage = if (uiState.currentInterventionBedtimeEnforced) {
+                    "Breathe for one minute before the emergency unlock."
+                } else {
+                    "Take five seconds before opening ${targetApp.displayName}."
+                },
+            )
             return false
         }
         val shouldExitToTarget = uiState.currentInterventionOrigin == InterventionOrigin.SYSTEM
@@ -2148,11 +2297,33 @@ class MainViewModel(
                     "interventionMode" to uiState.interventionMode.name,
                     "openAnywayUnlockMinutes" to unlockMinutes.toString(),
                     "openAnywayUnlockUntilMillis" to unlockUntilMillis.toString(),
-                    "formUnlockWaitMillis" to if (isFirmMode) FORM_INTERVENTION_UNLOCK_DELAY_MILLIS.toString() else "0",
+                    "formUnlockWaitMillis" to when {
+                        uiState.currentInterventionBedtimeEnforced -> BEDTIME_OPEN_ANYWAY_UNLOCK_DELAY_MILLIS.toString()
+                        isFirmMode -> FORM_INTERVENTION_UNLOCK_DELAY_MILLIS.toString()
+                        else -> "0"
+                    },
+                    "bedtimeActive" to uiState.currentInterventionBedtimeEnforced.toString(),
                 ),
             ),
         )
-        if (isFirmMode) {
+        if (uiState.currentInterventionBedtimeEnforced) {
+            recordEvent(
+                AnalyticsEvent(
+                    type = AnalyticsEventType.BEDTIME_UNLOCK_USED,
+                    timestampMillis = nowMillis,
+                    interventionId = uiState.currentInterventionId,
+                    targetAppPackage = targetApp.packageName,
+                    primaryContentId = recommendationSet?.primary?.id,
+                    backupContentIds = recommendationSet?.backups.orEmpty().map(ContentItem::id),
+                    metadata = mapOf(
+                        "interventionMode" to uiState.interventionMode.name,
+                        "openAnywayUnlockAvailableAtMillis" to (openAnywayAvailableAtMillis?.toString() ?: "0"),
+                        "openAnywayUnlockUntilMillis" to unlockUntilMillis.toString(),
+                    ),
+                ),
+            )
+        }
+        if (isFirmMode && !uiState.currentInterventionBedtimeEnforced) {
             recordEvent(
                 AnalyticsEvent(
                     type = AnalyticsEventType.FORM_INTERVENTION_UNLOCK_USED,
@@ -2174,6 +2345,7 @@ class MainViewModel(
             InterceptionRuntimeGate.suppressPackage(
                 targetAppPackage = targetApp.packageName,
                 untilMillis = unlockUntilMillis,
+                allowedDuringBedtime = uiState.currentInterventionBedtimeEnforced,
             )
         }
         uiState = uiState.copy(
@@ -2183,6 +2355,13 @@ class MainViewModel(
             currentOpenAnywayUnlockAvailableAtMillis = null,
             currentRecommendationSet = null,
             currentInterventionOrigin = null,
+            currentInterventionBedtimeEnforced = false,
+            isBedtimeActive = bedtimeWindowIsActive(
+                enabled = uiState.bedtimeEnabled,
+                startMinutes = uiState.bedtimeStartMinutes,
+                endMinutes = uiState.bedtimeEndMinutes,
+                nowMillis = nowMillis,
+            ),
             activeDelaySuggestion = null,
             latestMessage = "${targetApp.displayName} unlocked for $unlockMinutes minutes.",
         )
@@ -2886,6 +3065,13 @@ class MainViewModel(
         val effectiveProfileAutosaveDisplayName = settings.profileAutosaveDisplayName
             ?.takeIf(String::isNotBlank)
             ?: defaultProfileAutosaveDisplayName.takeIf { profileAutosaveUsesLocalDefault }
+        val settingsNowMillis = nowProvider()
+        val activeBedtimeNow = bedtimeWindowIsActive(
+            enabled = settings.bedtimeEnabled,
+            startMinutes = settings.bedtimeStartMinutes,
+            endMinutes = settings.bedtimeEndMinutes,
+            nowMillis = settingsNowMillis,
+        )
 
         uiState = uiState.copy(
             hasCompletedOnboarding = settings.hasCompletedOnboarding,
@@ -2901,6 +3087,10 @@ class MainViewModel(
             priorityContentIds = settings.priorityContentIds,
             reactivatedCompletedContentIds = reactivatedCompletedContentIds,
             openAnywayUnlockMinutes = settings.openAnywayUnlockMinutes,
+            bedtimeEnabled = settings.bedtimeEnabled,
+            bedtimeStartMinutes = settings.bedtimeStartMinutes.coerceIn(MIN_BEDTIME_MINUTES, MAX_BEDTIME_MINUTES),
+            bedtimeEndMinutes = settings.bedtimeEndMinutes.coerceIn(MIN_BEDTIME_MINUTES, MAX_BEDTIME_MINUTES),
+            isBedtimeActive = activeBedtimeNow,
             annotationExportUri = effectiveAnnotationExportUri,
             annotationExportDisplayName = effectiveAnnotationExportDisplayName,
             annotationExportUsesLocalDefault = annotationExportUsesLocalDefault,
@@ -2935,6 +3125,7 @@ class MainViewModel(
                 else -> uiState.screen
             },
         )
+        ensureCurrentInterventionBedtimeEnforced(nowMillis = settingsNowMillis)
         if (reactivatedCompletedContentIds != settings.reactivatedCompletedContentIds) {
             viewModelScope.launch {
                 settingsRepository.saveReactivatedCompletedContentIds(reactivatedCompletedContentIds)
@@ -3300,6 +3491,7 @@ class MainViewModel(
             currentOpenAnywayUnlockAvailableAtMillis = null,
             currentRecommendationSet = null,
             currentInterventionOrigin = null,
+            currentInterventionBedtimeEnforced = false,
             currentContent = repairedContent,
             currentReaderDocument = readerDocument,
             currentContentBody = readerDocument.plainText,
@@ -3693,6 +3885,7 @@ class MainViewModel(
             isReaderOpening = false,
             currentRecommendationSet = null,
             currentInterventionOrigin = null,
+            currentInterventionBedtimeEnforced = false,
             currentSessionId = null,
             currentSessionStartedAtMillis = null,
             currentReadingProgress = null,
@@ -3761,7 +3954,7 @@ class MainViewModel(
         val targetApp = uiState.selectedTargetApp ?: return
         val recommendationSet = uiState.currentRecommendationSet ?: return
         val interventionId = uiState.currentInterventionId ?: return
-        if (uiState.interventionMode != InterventionMode.FIRM) return
+        if (uiState.interventionMode != InterventionMode.FIRM || uiState.currentInterventionBedtimeEnforced) return
         recordEvent(
             AnalyticsEvent(
                 type = AnalyticsEventType.FORM_INTERVENTION_COMPLETED,

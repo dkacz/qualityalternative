@@ -13,6 +13,7 @@ import com.qualityalternative.app.data.ReadingTimeEstimator
 import com.qualityalternative.app.data.SupportedCatalog
 import com.qualityalternative.app.domain.model.AppSettings
 import com.qualityalternative.app.domain.model.AnalyticsEventType
+import com.qualityalternative.app.domain.model.BEDTIME_OPEN_ANYWAY_UNLOCK_DELAY_MILLIS
 import com.qualityalternative.app.domain.model.ContentAvailability
 import com.qualityalternative.app.domain.model.AppThemeMode
 import com.qualityalternative.app.domain.model.ContentFormat
@@ -47,6 +48,7 @@ import com.qualityalternative.app.domain.model.UserLinkValidationError
 import com.qualityalternative.app.domain.model.UserDocumentDraft
 import com.qualityalternative.app.domain.model.UserDocumentValidationError
 import com.qualityalternative.app.domain.model.UserPreferences
+import com.qualityalternative.app.domain.model.bedtimeWindowIsActive
 import com.qualityalternative.app.domain.model.meditationTimerContentItem
 import com.qualityalternative.app.domain.service.AccountLightProfileAutosaveWriter
 import com.qualityalternative.app.domain.service.AccountLightProfileBackupReader
@@ -73,6 +75,9 @@ import com.qualityalternative.app.interception.FixtureTargetRegistry
 import com.qualityalternative.app.interception.InterceptionRuntimeGate
 import java.io.ByteArrayInputStream
 import java.io.File
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.ZoneId
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -90,6 +95,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -4280,6 +4286,363 @@ class MainViewModelTest {
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
+    fun bedtimeModeKeepsAlternativesButRequiresOneMinuteEmergencyUnlock() = runTest {
+        val fixtureTarget = FixtureTargetRegistry.fixtureDistractors.first()
+        var nowMillis = 50_000L
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val viewModel = createViewModel(
+            settingsRepository = FakeSettingsRepository(
+                initial = completedSettings(selectedAppPackages = setOf(fixtureTarget.packageName))
+                    .copy(
+                        interventionMode = InterventionMode.SOFT,
+                        bedtimeEnabled = true,
+                        bedtimeStartMinutes = 0,
+                        bedtimeEndMinutes = 0,
+                    ),
+            ),
+            analyticsTracker = analyticsTracker,
+            nowProvider = { nowMillis },
+        )
+
+        advanceUntilIdle()
+        viewModel.requestSystemInterception(targetAppPackage = fixtureTarget.packageName, nowMillis = nowMillis)
+        advanceUntilIdle()
+
+        assertEquals(MainScreen.Intervention, viewModel.uiState.screen)
+        assertTrue(viewModel.uiState.isBedtimeActive)
+        assertTrue(viewModel.uiState.currentInterventionBedtimeEnforced)
+        assertNotNull(viewModel.uiState.currentRecommendationSet?.primary)
+        assertTrue(viewModel.uiState.currentRecommendationSet?.backups.orEmpty().isNotEmpty())
+        assertEquals(
+            50_000L + BEDTIME_OPEN_ANYWAY_UNLOCK_DELAY_MILLIS,
+            viewModel.uiState.currentOpenAnywayUnlockAvailableAtMillis,
+        )
+        assertTrue(analyticsTracker.allEvents().any { it.type == AnalyticsEventType.BEDTIME_INTERVENTION_SHOWN })
+        assertFalse(analyticsTracker.allEvents().any { it.type == AnalyticsEventType.FORM_INTERVENTION_SHOWN })
+
+        assertFalse(viewModel.openAnyway())
+        assertEquals(MainScreen.Intervention, viewModel.uiState.screen)
+        assertTrue(analyticsTracker.allEvents().any { it.type == AnalyticsEventType.BEDTIME_UNLOCK_BLOCKED })
+
+        nowMillis += BEDTIME_OPEN_ANYWAY_UNLOCK_DELAY_MILLIS
+        viewModel.recordFormInterventionUnlockAvailable(nowMillis = nowMillis)
+        assertTrue(viewModel.openAnyway())
+
+        val events = analyticsTracker.allEvents()
+        assertTrue(events.any { it.type == AnalyticsEventType.BEDTIME_UNLOCK_ENABLED })
+        assertTrue(events.any { it.type == AnalyticsEventType.BEDTIME_UNLOCK_USED })
+        assertFalse(events.any { it.type == AnalyticsEventType.FORM_INTERVENTION_UNLOCK_USED })
+        val openAnyway = events.first { it.type == AnalyticsEventType.OPEN_ANYWAY_SELECTED }
+        assertEquals("true", openAnyway.metadata["bedtimeActive"])
+        assertEquals(BEDTIME_OPEN_ANYWAY_UNLOCK_DELAY_MILLIS.toString(), openAnyway.metadata["formUnlockWaitMillis"])
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun bedtimeModeIgnoresPreExistingNormalOpenAnywaySuppression() = runTest {
+        val fixtureTarget = FixtureTargetRegistry.fixtureDistractors.first()
+        val nowMillis = 70_000L
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        InterceptionRuntimeGate.suppressPackage(
+            targetAppPackage = fixtureTarget.packageName,
+            untilMillis = 200_000L,
+            allowedDuringBedtime = false,
+        )
+        val viewModel = createViewModel(
+            settingsRepository = FakeSettingsRepository(
+                initial = completedSettings(selectedAppPackages = setOf(fixtureTarget.packageName))
+                    .copy(
+                        interventionMode = InterventionMode.SOFT,
+                        bedtimeEnabled = true,
+                        bedtimeStartMinutes = 0,
+                        bedtimeEndMinutes = 0,
+                    ),
+            ),
+            analyticsTracker = analyticsTracker,
+            nowProvider = { nowMillis },
+        )
+
+        advanceUntilIdle()
+        viewModel.requestSystemInterception(targetAppPackage = fixtureTarget.packageName, nowMillis = nowMillis)
+        advanceUntilIdle()
+
+        assertEquals(MainScreen.Intervention, viewModel.uiState.screen)
+        assertTrue(viewModel.uiState.isBedtimeActive)
+        assertTrue(viewModel.uiState.currentInterventionBedtimeEnforced)
+        assertNotEquals("${fixtureTarget.displayName} is still unlocked.", viewModel.uiState.latestMessage)
+        assertEquals(
+            nowMillis + BEDTIME_OPEN_ANYWAY_UNLOCK_DELAY_MILLIS,
+            viewModel.uiState.currentOpenAnywayUnlockAvailableAtMillis,
+        )
+        assertTrue(analyticsTracker.allEvents().any { it.type == AnalyticsEventType.BEDTIME_INTERVENTION_SHOWN })
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun openAnywayRechecksBedtimeWhenNormalInterventionCrossesIntoBedtimeWindow() = runTest {
+        val fixtureTarget = FixtureTargetRegistry.fixtureDistractors.first()
+        val zoneId = ZoneId.systemDefault()
+        val localDate = LocalDate.of(2026, 5, 21)
+        val beforeBedtimeMillis = localDate
+            .atTime(LocalTime.of(21, 59))
+            .atZone(zoneId)
+            .toInstant()
+            .toEpochMilli()
+        val activeBedtimeMillis = localDate
+            .atTime(LocalTime.of(22, 1))
+            .atZone(zoneId)
+            .toInstant()
+            .toEpochMilli()
+
+        listOf(InterventionMode.SOFT, InterventionMode.FIRM).forEach { mode ->
+            InterceptionRuntimeGate.clearAll()
+            var nowMillis = beforeBedtimeMillis
+            val analyticsTracker = InMemoryAnalyticsTracker()
+            val viewModel = createViewModel(
+                settingsRepository = FakeSettingsRepository(
+                    initial = completedSettings(selectedAppPackages = setOf(fixtureTarget.packageName))
+                        .copy(
+                            interventionMode = mode,
+                            bedtimeEnabled = true,
+                            bedtimeStartMinutes = 22 * 60,
+                            bedtimeEndMinutes = 7 * 60,
+                        ),
+                ),
+                analyticsTracker = analyticsTracker,
+                nowProvider = { nowMillis },
+            )
+
+            advanceUntilIdle()
+            viewModel.requestSystemInterception(targetAppPackage = fixtureTarget.packageName, nowMillis = beforeBedtimeMillis)
+            advanceUntilIdle()
+            assertEquals(MainScreen.Intervention, viewModel.uiState.screen)
+            assertFalse(viewModel.uiState.isBedtimeActive)
+            assertFalse(viewModel.uiState.currentInterventionBedtimeEnforced)
+
+            nowMillis = activeBedtimeMillis
+            assertFalse(viewModel.openAnyway())
+            advanceUntilIdle()
+
+            assertEquals(MainScreen.Intervention, viewModel.uiState.screen)
+            assertTrue(viewModel.uiState.isBedtimeActive)
+            assertTrue(viewModel.uiState.currentInterventionBedtimeEnforced)
+            assertEquals(
+                activeBedtimeMillis + BEDTIME_OPEN_ANYWAY_UNLOCK_DELAY_MILLIS,
+                viewModel.uiState.currentOpenAnywayUnlockAvailableAtMillis,
+            )
+            assertFalse(
+                InterceptionRuntimeGate.shouldSuppress(
+                    targetAppPackage = fixtureTarget.packageName,
+                    nowMillis = activeBedtimeMillis,
+                    bedtimeActive = true,
+                ),
+            )
+            val events = analyticsTracker.allEvents()
+            assertTrue(events.any { it.type == AnalyticsEventType.BEDTIME_INTERVENTION_SHOWN })
+            assertFalse(events.any { it.type == AnalyticsEventType.OPEN_ANYWAY_SELECTED })
+        }
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun openAnywayRechecksBedtimeEvenAfterSettingsEmissionUpdatesGlobalBedtimeState() = runTest {
+        val fixtureTarget = FixtureTargetRegistry.fixtureDistractors.first()
+        val zoneId = ZoneId.systemDefault()
+        val localDate = LocalDate.of(2026, 5, 21)
+        val beforeBedtimeMillis = localDate
+            .atTime(LocalTime.of(21, 59))
+            .atZone(zoneId)
+            .toInstant()
+            .toEpochMilli()
+        val activeBedtimeMillis = localDate
+            .atTime(LocalTime.of(22, 1))
+            .atZone(zoneId)
+            .toInstant()
+            .toEpochMilli()
+
+        listOf(InterventionMode.SOFT, InterventionMode.FIRM).forEach { mode ->
+            InterceptionRuntimeGate.clearAll()
+            var nowMillis = beforeBedtimeMillis
+            val analyticsTracker = InMemoryAnalyticsTracker()
+            val viewModel = createViewModel(
+                settingsRepository = FakeSettingsRepository(
+                    initial = completedSettings(selectedAppPackages = setOf(fixtureTarget.packageName))
+                        .copy(
+                            interventionMode = mode,
+                            bedtimeEnabled = true,
+                            bedtimeStartMinutes = 22 * 60,
+                            bedtimeEndMinutes = 7 * 60,
+                        ),
+                ),
+                analyticsTracker = analyticsTracker,
+                nowProvider = { nowMillis },
+            )
+
+            advanceUntilIdle()
+            viewModel.requestSystemInterception(targetAppPackage = fixtureTarget.packageName, nowMillis = beforeBedtimeMillis)
+            advanceUntilIdle()
+            assertEquals(MainScreen.Intervention, viewModel.uiState.screen)
+            assertFalse(viewModel.uiState.isBedtimeActive)
+            assertFalse(viewModel.uiState.currentInterventionBedtimeEnforced)
+
+            nowMillis = activeBedtimeMillis
+            viewModel.setMeditationDurationMinutes(5)
+            advanceUntilIdle()
+            assertTrue(viewModel.uiState.isBedtimeActive)
+            assertTrue(viewModel.uiState.currentInterventionBedtimeEnforced)
+            assertEquals(
+                activeBedtimeMillis + BEDTIME_OPEN_ANYWAY_UNLOCK_DELAY_MILLIS,
+                viewModel.uiState.currentOpenAnywayUnlockAvailableAtMillis,
+            )
+
+            assertFalse(viewModel.openAnyway())
+            advanceUntilIdle()
+
+            assertEquals(MainScreen.Intervention, viewModel.uiState.screen)
+            assertTrue(viewModel.uiState.isBedtimeActive)
+            assertTrue(viewModel.uiState.currentInterventionBedtimeEnforced)
+            assertEquals(
+                activeBedtimeMillis + BEDTIME_OPEN_ANYWAY_UNLOCK_DELAY_MILLIS,
+                viewModel.uiState.currentOpenAnywayUnlockAvailableAtMillis,
+            )
+            assertFalse(
+                InterceptionRuntimeGate.shouldSuppress(
+                    targetAppPackage = fixtureTarget.packageName,
+                    nowMillis = activeBedtimeMillis,
+                    bedtimeActive = true,
+                ),
+            )
+            val events = analyticsTracker.allEvents()
+            assertTrue(events.any { it.type == AnalyticsEventType.BEDTIME_INTERVENTION_SHOWN })
+            assertFalse(events.any { it.type == AnalyticsEventType.OPEN_ANYWAY_SELECTED })
+        }
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun delayFor15MinutesIsNotAvailableAfterSettingsEmissionConvertsInterventionToBedtime() = runTest {
+        val fixtureTarget = FixtureTargetRegistry.fixtureDistractors.first()
+        val zoneId = ZoneId.systemDefault()
+        val localDate = LocalDate.of(2026, 5, 21)
+        val beforeBedtimeMillis = localDate
+            .atTime(LocalTime.of(21, 59))
+            .atZone(zoneId)
+            .toInstant()
+            .toEpochMilli()
+        val activeBedtimeMillis = localDate
+            .atTime(LocalTime.of(22, 1))
+            .atZone(zoneId)
+            .toInstant()
+            .toEpochMilli()
+        var nowMillis = beforeBedtimeMillis
+        val viewModel = createViewModel(
+            settingsRepository = FakeSettingsRepository(
+                initial = completedSettings(selectedAppPackages = setOf(fixtureTarget.packageName))
+                    .copy(
+                        bedtimeEnabled = true,
+                        bedtimeStartMinutes = 22 * 60,
+                        bedtimeEndMinutes = 7 * 60,
+                    ),
+            ),
+            nowProvider = { nowMillis },
+        )
+
+        advanceUntilIdle()
+        viewModel.requestSystemInterception(targetAppPackage = fixtureTarget.packageName, nowMillis = beforeBedtimeMillis)
+        advanceUntilIdle()
+        assertEquals(MainScreen.Intervention, viewModel.uiState.screen)
+        assertFalse(viewModel.uiState.currentInterventionBedtimeEnforced)
+
+        nowMillis = activeBedtimeMillis
+        viewModel.setMeditationDurationMinutes(5)
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.currentInterventionBedtimeEnforced)
+
+        viewModel.delayFor15Minutes()
+        advanceUntilIdle()
+
+        assertEquals(MainScreen.Intervention, viewModel.uiState.screen)
+        assertEquals(null, viewModel.uiState.activeDelayWindow)
+        assertEquals(
+            activeBedtimeMillis + BEDTIME_OPEN_ANYWAY_UNLOCK_DELAY_MILLIS,
+            viewModel.uiState.currentOpenAnywayUnlockAvailableAtMillis,
+        )
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun bedtimeBoundaryRefreshConvertsIdleNormalInterventionWithoutSettingsEmission() = runTest {
+        val fixtureTarget = FixtureTargetRegistry.fixtureDistractors.first()
+        val zoneId = ZoneId.systemDefault()
+        val localDate = LocalDate.of(2026, 5, 21)
+        val beforeBedtimeMillis = localDate
+            .atTime(LocalTime.of(21, 59))
+            .atZone(zoneId)
+            .toInstant()
+            .toEpochMilli()
+        val activeBedtimeMillis = localDate
+            .atTime(LocalTime.of(22, 1))
+            .atZone(zoneId)
+            .toInstant()
+            .toEpochMilli()
+        var nowMillis = beforeBedtimeMillis
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val viewModel = createViewModel(
+            settingsRepository = FakeSettingsRepository(
+                initial = completedSettings(selectedAppPackages = setOf(fixtureTarget.packageName))
+                    .copy(
+                        bedtimeEnabled = true,
+                        bedtimeStartMinutes = 22 * 60,
+                        bedtimeEndMinutes = 7 * 60,
+                    ),
+            ),
+            analyticsTracker = analyticsTracker,
+            nowProvider = { nowMillis },
+        )
+
+        advanceUntilIdle()
+        viewModel.requestSystemInterception(targetAppPackage = fixtureTarget.packageName, nowMillis = beforeBedtimeMillis)
+        advanceUntilIdle()
+
+        assertEquals(MainScreen.Intervention, viewModel.uiState.screen)
+        assertFalse(viewModel.uiState.currentInterventionBedtimeEnforced)
+
+        nowMillis = activeBedtimeMillis
+        viewModel.refreshBedtimeInterventionBoundary(nowMillis = activeBedtimeMillis)
+        advanceUntilIdle()
+
+        assertEquals(MainScreen.Intervention, viewModel.uiState.screen)
+        assertTrue(viewModel.uiState.isBedtimeActive)
+        assertTrue(viewModel.uiState.currentInterventionBedtimeEnforced)
+        assertEquals(
+            activeBedtimeMillis + BEDTIME_OPEN_ANYWAY_UNLOCK_DELAY_MILLIS,
+            viewModel.uiState.currentOpenAnywayUnlockAvailableAtMillis,
+        )
+        assertTrue(analyticsTracker.allEvents().any { it.type == AnalyticsEventType.BEDTIME_INTERVENTION_SHOWN })
+    }
+
+    @Test
+    fun bedtimeWindowIsActiveTreatsEqualStartEndAsAllDay() {
+        assertTrue(
+            bedtimeWindowIsActive(
+                enabled = true,
+                startMinutes = 0,
+                endMinutes = 0,
+                nowMillis = 123_000L,
+            ),
+        )
+        assertFalse(
+            bedtimeWindowIsActive(
+                enabled = false,
+                startMinutes = 0,
+                endMinutes = 0,
+                nowMillis = 123_000L,
+            ),
+        )
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
     fun formInterventionAbandonmentRecordsAnalyticsAndClearsIntervention() = runTest {
         val fixtureTarget = FixtureTargetRegistry.fixtureDistractors.first()
         val analyticsTracker = InMemoryAnalyticsTracker()
@@ -4783,6 +5146,9 @@ class MainViewModelTest {
                 priorityContentIds = state.value.priorityContentIds,
                 reactivatedCompletedContentIds = state.value.reactivatedCompletedContentIds,
                 openAnywayUnlockMinutes = state.value.openAnywayUnlockMinutes,
+                bedtimeEnabled = state.value.bedtimeEnabled,
+                bedtimeStartMinutes = state.value.bedtimeStartMinutes,
+                bedtimeEndMinutes = state.value.bedtimeEndMinutes,
                 readerFontScale = state.value.readerFontScale,
                 interfaceTextScale = state.value.interfaceTextScale,
                 annotationExportUri = state.value.annotationExportUri,
@@ -4825,6 +5191,9 @@ class MainViewModelTest {
                 priorityContentIds = settings.priorityContentIds,
                 reactivatedCompletedContentIds = settings.reactivatedCompletedContentIds,
                 openAnywayUnlockMinutes = settings.openAnywayUnlockMinutes,
+                bedtimeEnabled = settings.bedtimeEnabled,
+                bedtimeStartMinutes = settings.bedtimeStartMinutes,
+                bedtimeEndMinutes = settings.bedtimeEndMinutes,
             )
         }
 
@@ -4870,6 +5239,14 @@ class MainViewModelTest {
 
         override suspend fun saveOpenAnywayUnlockMinutes(minutes: Int) {
             state.value = state.value.copy(openAnywayUnlockMinutes = minutes)
+        }
+
+        override suspend fun saveBedtimeSettings(enabled: Boolean, startMinutes: Int, endMinutes: Int) {
+            state.value = state.value.copy(
+                bedtimeEnabled = enabled,
+                bedtimeStartMinutes = startMinutes,
+                bedtimeEndMinutes = endMinutes,
+            )
         }
 
         override suspend fun saveAnnotationExportDestination(uri: String, displayName: String) {
