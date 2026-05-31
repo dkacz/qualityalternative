@@ -13,8 +13,8 @@ android {
         applicationId = "com.qualityalternative.app"
         minSdk = 29
         targetSdk = 36
-        versionCode = 27
-        versionName = "0.11.11-alpha"
+        versionCode = 28
+        versionName = "0.11.12-alpha"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

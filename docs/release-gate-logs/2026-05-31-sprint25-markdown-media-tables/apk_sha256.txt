@@ -1,0 +1,1 @@
+827238fd2965f4863161b17e54bf27831d84b3ddb6c0203e6a1e85fa14b99959  release_artifacts/quality-alternative-v0.11.12-markdown-media-tables-alpha-debug.apk

@@ -1,0 +1,2 @@
+  mCurrentFocus=null
+  mFocusedApp=ActivityRecord{162679418 u0 com.qualityalternative.app/.MainActivity t65}
