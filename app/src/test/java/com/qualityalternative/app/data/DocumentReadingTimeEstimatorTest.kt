@@ -18,6 +18,35 @@ class DocumentReadingTimeEstimatorTest {
     }
 
     @Test
+    fun markdownImportEstimateCountsImageAltTextInsteadOfEmbeddedBase64Payload() {
+        val estimate = DocumentReadingTimeEstimator.estimate(ContentFormat.MARKDOWN) {
+            ByteArrayInputStream("![Cover](data:image/png;base64,${"A".repeat(50_000)})".toByteArray())
+        }
+
+        assertEquals(3, estimate.minutes)
+        assertEquals(1, estimate.wordCount)
+        assertEquals(ReadingTimeEstimateSource.EXTRACTED_TEXT, estimate.source)
+    }
+
+    @Test
+    fun markdownImportEstimateUsesTableContentWithoutDelimiterNoise() {
+        val estimate = DocumentReadingTimeEstimator.estimate(ContentFormat.MARKDOWN) {
+            ByteArrayInputStream(
+                """
+                | Habit | Minutes |
+                | --- | ---: |
+                | Read | 20 |
+                | Walk | 10 |
+                """.trimIndent().toByteArray(),
+            )
+        }
+
+        assertEquals(3, estimate.minutes)
+        assertEquals(6, estimate.wordCount)
+        assertEquals(ReadingTimeEstimateSource.EXTRACTED_TEXT, estimate.source)
+    }
+
+    @Test
     fun epubImportPathEstimatesShortNormalAndVeryLongExtractedText() {
         assertDocumentEstimate(ContentFormat.EPUB, epubBytes(100), expectedMinutes = 3, expectedWords = 100)
         assertDocumentEstimate(ContentFormat.EPUB, epubBytes(1_125), expectedMinutes = 5, expectedWords = 1_125)

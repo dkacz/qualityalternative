@@ -8,15 +8,18 @@ import android.content.Intent
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioTrack
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.provider.Settings
+import android.util.Base64
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -24,6 +27,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -72,6 +76,7 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
@@ -83,12 +88,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
@@ -157,6 +165,9 @@ import com.qualityalternative.app.domain.model.PermissionStatus
 import com.qualityalternative.app.domain.model.ReadingAnnotation
 import com.qualityalternative.app.domain.model.ReadingAnnotationSelector
 import com.qualityalternative.app.domain.model.ReadingProgress
+import com.qualityalternative.app.domain.model.ReaderDocumentImage
+import com.qualityalternative.app.domain.model.ReaderDocumentTable
+import com.qualityalternative.app.domain.model.ReaderDocumentTableAlignment
 import com.qualityalternative.app.domain.model.ReaderTocEntry
 import com.qualityalternative.app.domain.model.ReplacementHistoryEntry
 import com.qualityalternative.app.domain.model.TopicTag
@@ -183,6 +194,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.io.File
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.exp
@@ -440,7 +452,10 @@ private fun MainRoute(
                     uris.map { uri -> context.documentImportCandidate(uri) }
                 }
             }.onSuccess { candidates ->
-                viewModel.prepareUserDocumentBatchImport(candidates = candidates, requestId = requestId)
+                viewModel.prepareUserDocumentBatchImport(
+                    candidates = candidates.withMarkdownImageAttachments(),
+                    requestId = requestId,
+                )
             }.onFailure {
                 viewModel.reportUserDocumentImportPreparationFailure(requestId = requestId)
             }
@@ -1683,7 +1698,7 @@ private fun AddDocumentScreen(
         ) {
             DisplayText("Import reading\nfiles.", fontSize = 30.sp, lineHeight = 33.sp)
             BodyText(
-                text = "Choose one or several PDF, Markdown, or EPUB files. Reading time is calculated automatically; unsupported files are skipped.",
+                text = "Choose PDF, Markdown, or EPUB files. You can include images referenced by Markdown; they attach to the Markdown reader.",
                 color = QualityAlternativeThemeTokens.colors.mutedText,
                 modifier = Modifier.padding(top = 6.dp, bottom = 16.dp),
             )
@@ -2253,6 +2268,8 @@ private fun ReaderScreen(
                     sourceHref = block.sourceHref,
                     sourceAnchor = block.anchor,
                     sourceBlockIndex = block.sourceBlockIndex,
+                    image = block.image,
+                    table = block.table,
                 )
             }
             ?: readerBlocksForDisplay(
@@ -2606,25 +2623,34 @@ private fun ReaderScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .pointerInput(canHandlePageTap, safeCurrentPageIndex, pages.lastIndex) {
-                            awaitEachGesture {
-                                val down = awaitFirstDown(requireUnconsumed = false)
-                                var movedBeyondTap = false
-                                val touchSlop = viewConfiguration.touchSlop
-                                while (true) {
-                                    val event = awaitPointerEvent()
-                                    val change = event.changes.firstOrNull { pointer -> pointer.id == down.id } ?: break
-                                    if ((change.position - down.position).getDistance() > touchSlop) {
-                                        movedBeyondTap = true
-                                    }
+	                    .pointerInput(canHandlePageTap, safeCurrentPageIndex, pages.lastIndex) {
+	                        awaitEachGesture {
+	                            val down = awaitFirstDown(requireUnconsumed = false)
+	                            var movedBeyondTap = false
+	                            var horizontalDragConsumedByChild = false
+	                            val touchSlop = viewConfiguration.touchSlop
+	                            while (true) {
+	                                val event = awaitPointerEvent()
+	                                val change = event.changes.firstOrNull { pointer -> pointer.id == down.id } ?: break
+	                                val eventDrag = change.position - change.previousPosition
+	                                if (
+	                                    change.isConsumed &&
+	                                    abs(eventDrag.x) > 0.5f &&
+	                                    abs(eventDrag.x) > abs(eventDrag.y) * 1.2f
+	                                ) {
+	                                    horizontalDragConsumedByChild = true
+	                                }
+	                                if ((change.position - down.position).getDistance() > touchSlop) {
+	                                    movedBeyondTap = true
+	                                }
                                     if (change.changedToUpIgnoreConsumed()) {
                                         val drag = change.position - down.position
                                         val isHorizontalPageSwipe =
                                             abs(drag.x) > touchSlop * 3 &&
                                                 abs(drag.x) > abs(drag.y) * 1.2f
                                         val isShortTap = change.uptimeMillis - down.uptimeMillis < viewConfiguration.longPressTimeoutMillis
-                                        if (canHandlePageTap) {
-                                            when {
+	                                    if (canHandlePageTap && !horizontalDragConsumedByChild) {
+	                                        when {
                                                 isHorizontalPageSwipe && drag.x < 0f && safeCurrentPageIndex < pages.lastIndex -> {
                                                     moveToPage(safeCurrentPageIndex + 1)
                                                 }
@@ -2977,14 +3003,34 @@ private fun ReaderAnnotatedBlock(
                 .fillMaxWidth()
                 .testTag("reader-annotation-rendered-block-$paragraphIndex"),
         ) {
-            ReaderMarkdownBlockText(
-                block = block,
-                highlightedText = highlightedText,
-                highlightRange = highlightRange,
-                readerFontScale = readerFontScale,
-                modifier = if (hasHighlight) Modifier.testTag("reader-annotation-highlight-$paragraphIndex") else Modifier,
-                onTextLayout = { layout -> textLayoutResult = layout },
-            )
+            when {
+                block.kind == ReaderMarkdownBlockKind.IMAGE && block.image != null -> {
+                    ReaderMarkdownImageBlock(
+                        block = block,
+                        readerFontScale = readerFontScale,
+                        modifier = if (hasHighlight) Modifier.testTag("reader-annotation-highlight-$paragraphIndex") else Modifier,
+                    )
+                }
+
+                block.kind == ReaderMarkdownBlockKind.TABLE && block.table != null -> {
+                    ReaderMarkdownTableBlock(
+                        block = block,
+                        readerFontScale = readerFontScale,
+                        modifier = if (hasHighlight) Modifier.testTag("reader-annotation-highlight-$paragraphIndex") else Modifier,
+                    )
+                }
+
+                else -> {
+                    ReaderMarkdownBlockText(
+                        block = block,
+                        highlightedText = highlightedText,
+                        highlightRange = highlightRange,
+                        readerFontScale = readerFontScale,
+                        modifier = if (hasHighlight) Modifier.testTag("reader-annotation-highlight-$paragraphIndex") else Modifier,
+                        onTextLayout = { layout -> textLayoutResult = layout },
+                    )
+                }
+            }
         }
     }
 }
@@ -3267,6 +3313,15 @@ private fun readerMarkdownTextStyle(
         )
 
         ReaderMarkdownBlockKind.QUOTE -> baseStyle.copy(fontStyle = FontStyle.Italic)
+        ReaderMarkdownBlockKind.IMAGE -> baseStyle.copy(
+            fontSize = (13f * scale).sp,
+            lineHeight = (17f * scale).sp,
+            fontStyle = FontStyle.Italic,
+        )
+        ReaderMarkdownBlockKind.TABLE -> baseStyle.copy(
+            fontSize = (13f * scale).sp,
+            lineHeight = (18f * scale).sp,
+        )
         ReaderMarkdownBlockKind.BODY,
         ReaderMarkdownBlockKind.LIST,
         -> baseStyle
@@ -3326,6 +3381,169 @@ private fun ReaderMarkdownBlockText(
             modifier = blockModifier.then(modifier),
             onTextLayout = onTextLayout,
         )
+    }
+}
+
+@Composable
+private fun ReaderMarkdownImageBlock(
+    block: ReaderMarkdownBlock,
+    readerFontScale: Double,
+    modifier: Modifier = Modifier,
+) {
+    val image = block.image ?: return
+    val colors = QualityAlternativeThemeTokens.colors
+    val context = LocalContext.current
+    val bitmap by produceState<ImageBitmap?>(initialValue = null, image.source) {
+        value = withContext(Dispatchers.IO) {
+            context.loadReaderMarkdownImage(image.source)
+        }
+    }
+    val caption = image.title
+        ?.takeIf(String::isNotBlank)
+        ?: image.altText.takeIf(String::isNotBlank)
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(bottom = READER_BODY_TEXT_BOTTOM_PADDING_DP.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        if (bitmap != null) {
+            Image(
+                bitmap = requireNotNull(bitmap),
+                contentDescription = image.altText.ifBlank { caption ?: "Markdown image" },
+                contentScale = ContentScale.Fit,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = READER_IMAGE_MIN_HEIGHT_DP.dp, max = READER_IMAGE_MAX_HEIGHT_DP.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(colors.elevatedSurface)
+                    .border(BorderStroke(1.dp, colors.line), RoundedCornerShape(14.dp))
+                    .testTag("reader-markdown-image"),
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(READER_IMAGE_PLACEHOLDER_HEIGHT_DP.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(colors.elevatedSurface)
+                    .border(BorderStroke(1.dp, colors.line), RoundedCornerShape(14.dp))
+                    .testTag("reader-markdown-image-placeholder"),
+                contentAlignment = Alignment.Center,
+            ) {
+                BodyText(
+                    text = caption ?: "Image unavailable",
+                    color = colors.mutedText,
+                    fontSize = 12.5.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 12.dp),
+                )
+            }
+        }
+        caption?.let { captionText ->
+            Text(
+                text = captionText,
+                style = readerMarkdownTextStyle(
+                    kind = ReaderMarkdownBlockKind.IMAGE,
+                    baseStyle = MaterialTheme.typography.bodyLarge.copy(fontFamily = QualityDisplayFontFamily),
+                    scale = readerFontScale.coerceIn(MIN_READER_FONT_SCALE, MAX_READER_FONT_SCALE).toFloat(),
+                ),
+                color = colors.mutedText,
+                modifier = Modifier.testTag("reader-markdown-image-caption"),
+            )
+        }
+    }
+}
+
+@Composable
+private fun ReaderMarkdownTableBlock(
+    block: ReaderMarkdownBlock,
+    readerFontScale: Double,
+    modifier: Modifier = Modifier,
+) {
+    val table = block.table ?: return
+    val colors = QualityAlternativeThemeTokens.colors
+    val scale = readerFontScale.coerceIn(MIN_READER_FONT_SCALE, MAX_READER_FONT_SCALE).toFloat()
+    val cellStyle = readerMarkdownTextStyle(
+        kind = ReaderMarkdownBlockKind.TABLE,
+        baseStyle = MaterialTheme.typography.bodyLarge.copy(fontFamily = QualityDisplayFontFamily),
+        scale = scale,
+    )
+    val columnCount = maxOf(table.headers.size, table.rows.maxOfOrNull { row -> row.size } ?: 0).coerceAtLeast(1)
+    val tableWidth = (columnCount * READER_TABLE_COLUMN_WIDTH_DP).coerceAtLeast(READER_TABLE_MIN_WIDTH_DP).dp
+    BoxWithConstraints(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(bottom = READER_BODY_TEXT_BOTTOM_PADDING_DP.dp),
+    ) {
+        val effectiveWidth = maxWidth.coerceAtLeast(tableWidth)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+        ) {
+            Column(
+                modifier = Modifier
+                    .width(effectiveWidth)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(colors.elevatedSurface)
+                    .border(BorderStroke(1.dp, colors.line), RoundedCornerShape(14.dp))
+                    .testTag("reader-markdown-table"),
+            ) {
+                ReaderMarkdownTableRow(
+                    cells = table.headers,
+                    alignments = table.alignments,
+                    columnCount = columnCount,
+                    style = cellStyle,
+                    textColor = colors.primaryText,
+                    isHeader = true,
+                )
+                table.rows.forEachIndexed { rowIndex, row ->
+                    HorizontalDivider(color = colors.line.copy(alpha = 0.72f), thickness = 1.dp)
+                    ReaderMarkdownTableRow(
+                        cells = row,
+                        alignments = table.alignments,
+                        columnCount = columnCount,
+                        style = cellStyle,
+                        textColor = colors.mutedText,
+                        isHeader = false,
+                        modifier = Modifier.testTag("reader-markdown-table-row-$rowIndex"),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReaderMarkdownTableRow(
+    cells: List<String>,
+    alignments: List<ReaderDocumentTableAlignment>,
+    columnCount: Int,
+    style: TextStyle,
+    textColor: Color,
+    isHeader: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    Row(modifier = modifier.fillMaxWidth()) {
+        repeat(columnCount) { columnIndex ->
+            val alignment = alignments.getOrNull(columnIndex) ?: ReaderDocumentTableAlignment.START
+            val textAlign = when (alignment) {
+                ReaderDocumentTableAlignment.START -> TextAlign.Start
+                ReaderDocumentTableAlignment.CENTER -> TextAlign.Center
+                ReaderDocumentTableAlignment.END -> TextAlign.End
+            }
+            Text(
+                text = parseInlineMarkdown(cells.getOrNull(columnIndex).orEmpty()),
+                style = style.copy(fontWeight = if (isHeader) FontWeight.SemiBold else style.fontWeight),
+                color = textColor,
+                textAlign = textAlign,
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = READER_TABLE_ROW_MIN_HEIGHT_DP.dp)
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+            )
+        }
     }
 }
 
@@ -6635,6 +6853,8 @@ internal enum class ReaderMarkdownBlockKind {
     QUOTE,
     LIST,
     CODE,
+    IMAGE,
+    TABLE,
 }
 
 internal data class ReaderMarkdownBlock(
@@ -6645,6 +6865,8 @@ internal data class ReaderMarkdownBlock(
     val sourceBlockIndex: Int = 0,
     val sourceTextStartOffset: Int = 0,
     val sourceFullText: String? = null,
+    val image: ReaderDocumentImage? = null,
+    val table: ReaderDocumentTable? = null,
 )
 
 internal data class ReaderBlockLayout(
@@ -7140,6 +7362,17 @@ private fun measuredReaderBlockHeightPx(
     val horizontalPaddingPx = with(density) {
         if (block.kind == ReaderMarkdownBlockKind.CODE) 24.dp.toPx().roundToInt() else 0
     }
+    if (block.kind == ReaderMarkdownBlockKind.TABLE && block.table != null) {
+        return measuredReaderTableHeightPx(
+            table = block.table,
+            textMeasurer = textMeasurer,
+            baseStyle = baseStyle,
+            scale = scale,
+            contentWidthPx = contentWidthPx,
+            density = density,
+            textDensity = textDensity,
+        )
+    }
     val measuredTextWidthPx = (contentWidthPx - horizontalPaddingPx).coerceAtLeast(1)
     val textLayout = textMeasurer.measure(
         text = block.text,
@@ -7151,9 +7384,11 @@ private fun measuredReaderBlockHeightPx(
         when (block.kind) {
             ReaderMarkdownBlockKind.CODE -> 6.dp.toPx()
             ReaderMarkdownBlockKind.HEADING -> READER_HEADING_TEXT_BOTTOM_PADDING_DP.dp.toPx()
+            ReaderMarkdownBlockKind.IMAGE -> READER_BODY_TEXT_BOTTOM_PADDING_DP.dp.toPx()
             ReaderMarkdownBlockKind.BODY,
             ReaderMarkdownBlockKind.LIST,
             ReaderMarkdownBlockKind.QUOTE,
+            ReaderMarkdownBlockKind.TABLE,
             -> READER_BODY_TEXT_BOTTOM_PADDING_DP.dp.toPx()
         }
     }
@@ -7164,9 +7399,58 @@ private fun measuredReaderBlockHeightPx(
             READER_BLOCK_OUTER_BOTTOM_PADDING_DP.dp.toPx()
         }
     }
-    return (textLayout.size.height + innerVerticalPaddingPx + measuredInterBlockSpacingPx)
+    val measuredMediaHeightPx = with(density) {
+        when (block.kind) {
+            ReaderMarkdownBlockKind.IMAGE -> READER_IMAGE_MEASURED_HEIGHT_DP.dp.toPx()
+            else -> 0f
+        }
+    }
+    return (textLayout.size.height + measuredMediaHeightPx + innerVerticalPaddingPx + measuredInterBlockSpacingPx)
         .roundToInt()
         .coerceAtLeast(1)
+}
+
+private fun measuredReaderTableHeightPx(
+    table: ReaderDocumentTable,
+    textMeasurer: TextMeasurer,
+    baseStyle: TextStyle,
+    scale: Float,
+    contentWidthPx: Int,
+    density: Density,
+    textDensity: Density,
+): Int {
+    val columnCount = maxOf(table.headers.size, table.rows.maxOfOrNull { row -> row.size } ?: 0).coerceAtLeast(1)
+    val tableMinWidthPx = with(density) { READER_TABLE_MIN_WIDTH_DP.dp.toPx() }
+    val tableConfiguredWidthPx = with(density) { (columnCount * READER_TABLE_COLUMN_WIDTH_DP).dp.toPx() }
+    val renderedTableWidthPx = maxOf(contentWidthPx.toFloat(), tableMinWidthPx, tableConfiguredWidthPx)
+    val cellHorizontalPaddingPx = with(density) { 20.dp.toPx() }
+    val cellVerticalPaddingPx = with(density) { 16.dp.toPx() }
+    val measuredCellWidthPx = ((renderedTableWidthPx / columnCount) - cellHorizontalPaddingPx)
+        .roundToInt()
+        .coerceAtLeast(1)
+    val minRowHeightPx = with(density) { READER_TABLE_ROW_MIN_HEIGHT_DP.dp.toPx() }.roundToInt()
+    val dividerHeightPx = with(density) { 1.dp.toPx() }.roundToInt().coerceAtLeast(1)
+    val style = readerMarkdownTextStyle(kind = ReaderMarkdownBlockKind.TABLE, baseStyle = baseStyle, scale = scale)
+
+    fun rowHeight(cells: List<String>): Int {
+        val measuredTextHeight = (0 until columnCount).maxOf { columnIndex ->
+            textMeasurer.measure(
+                text = AnnotatedString(cells.getOrNull(columnIndex).orEmpty()),
+                style = style,
+                constraints = Constraints(maxWidth = measuredCellWidthPx),
+                density = textDensity,
+            ).size.height
+        }
+        return (measuredTextHeight + cellVerticalPaddingPx.roundToInt()).coerceAtLeast(minRowHeightPx)
+    }
+
+    val rows = listOf(table.headers) + table.rows
+    val rowHeights = rows.sumOf(::rowHeight)
+    val dividerHeights = (rows.size - 1).coerceAtLeast(0) * dividerHeightPx
+    val outerSpacingPx = with(density) {
+        (READER_BODY_TEXT_BOTTOM_PADDING_DP + READER_BLOCK_OUTER_BOTTOM_PADDING_DP).dp.toPx().roundToInt()
+    }
+    return (rowHeights + dividerHeights + outerSpacingPx).coerceAtLeast(1)
 }
 
 internal fun adaptiveReaderPageWeight(
@@ -7443,6 +7727,9 @@ private fun ReaderMarkdownBlock.readerPageWeight(charsPerLine: Int = READER_BODY
         }
     return when (kind) {
         ReaderMarkdownBlockKind.HEADING -> lineWeight + 2
+        ReaderMarkdownBlockKind.IMAGE -> 9
+        ReaderMarkdownBlockKind.TABLE -> table?.tablePageWeight(charsPerLine = charsPerLine)
+            ?: ((table?.rows?.size ?: 0) + 1).coerceAtLeast(2) * 2
         ReaderMarkdownBlockKind.CODE,
         ReaderMarkdownBlockKind.LIST,
         ReaderMarkdownBlockKind.QUOTE,
@@ -7467,6 +7754,23 @@ private fun ReaderMarkdownBlock.readerPageCost(
         .toDouble()
     return when (kind) {
         ReaderMarkdownBlockKind.HEADING -> lineWeight + 2.0
+        ReaderMarkdownBlockKind.IMAGE -> {
+            val bodyLineHeightDp = READER_BODY_LINE_HEIGHT_DP * safeFontScale
+            (
+                (READER_IMAGE_MEASURED_HEIGHT_DP + READER_BODY_TEXT_BOTTOM_PADDING_DP + READER_BLOCK_OUTER_BOTTOM_PADDING_DP) /
+                    bodyLineHeightDp
+                ).toDouble()
+        }
+        ReaderMarkdownBlockKind.TABLE -> {
+            val bodyLineHeightDp = READER_BODY_LINE_HEIGHT_DP * safeFontScale
+            val weightedRows = table?.tablePageWeight(charsPerLine = charsPerLine)?.coerceAtLeast(2)
+                ?: (((table?.rows?.size ?: 0) + 1).coerceAtLeast(2) * 2)
+            (
+                ((weightedRows * bodyLineHeightDp) + READER_TABLE_VERTICAL_PADDING_DP + READER_BLOCK_OUTER_BOTTOM_PADDING_DP) /
+                    bodyLineHeightDp
+                ).toDouble()
+        }
+
         ReaderMarkdownBlockKind.CODE -> {
             val bodyLineHeightDp = READER_BODY_LINE_HEIGHT_DP * safeFontScale
             val codeLineHeightDp = READER_CODE_LINE_HEIGHT_DP * safeFontScale
@@ -7543,7 +7847,34 @@ private fun ReaderMarkdownBlock.splitForReaderPage(
         }
         return listOf(this)
     }
-    if (kind == ReaderMarkdownBlockKind.HEADING || blockWeight <= wholeBlockWeightAllowance) {
+    if (kind == ReaderMarkdownBlockKind.TABLE && table != null) {
+        val headerWeight = table.tableRowPageWeight(cells = table.headers, charsPerLine = charsPerLine)
+        val maxRowsPerChunkWeight = (safeMaxWeight - headerWeight).coerceAtLeast(2)
+        val rowChunks = table.rows.chunkedByTablePageWeight(
+            charsPerLine = charsPerLine,
+            maxChunkWeight = maxRowsPerChunkWeight,
+        )
+        if (rowChunks.size <= 1) {
+            return listOf(this)
+        }
+        val fullSourceText = sourceFullText ?: text.text
+        var searchStart = 0
+        return rowChunks.map { rowChunk ->
+            val chunkTable = table.copy(rows = rowChunk)
+            val chunkText = chunkTable.toReaderPlainText()
+            val localStart = fullSourceText.indexOf(chunkText, startIndex = searchStart)
+                .takeIf { index -> index >= 0 }
+                ?: searchStart
+            searchStart = localStart + chunkText.length
+            copy(
+                text = AnnotatedString(chunkText),
+                table = chunkTable,
+                sourceTextStartOffset = sourceTextStartOffset + localStart,
+                sourceFullText = fullSourceText,
+            )
+        }
+    }
+    if (kind == ReaderMarkdownBlockKind.IMAGE || kind == ReaderMarkdownBlockKind.HEADING || blockWeight <= wholeBlockWeightAllowance) {
         return listOf(this)
     }
     val targetChars = readerApproxCharsForWeight(
@@ -7607,10 +7938,75 @@ private fun readerCharsPerLineForKind(
         ReaderMarkdownBlockKind.HEADING -> (bodyCharsPerLine * 0.62f).roundToInt()
         ReaderMarkdownBlockKind.CODE -> (bodyCharsPerLine * 0.60f).roundToInt()
         ReaderMarkdownBlockKind.LIST -> (bodyCharsPerLine * 0.90f).roundToInt()
+        ReaderMarkdownBlockKind.IMAGE,
+        ReaderMarkdownBlockKind.TABLE,
         ReaderMarkdownBlockKind.QUOTE,
         ReaderMarkdownBlockKind.BODY,
         -> bodyCharsPerLine
     }.coerceIn(READER_MIN_CHARS_PER_LINE, READER_MAX_CHARS_PER_LINE)
+}
+
+private fun ReaderDocumentTable.toReaderPlainText(): String {
+    return (listOf(headers) + rows)
+        .joinToString("\n") { cells -> cells.joinToString("\t") }
+        .trim()
+}
+
+private fun ReaderDocumentTable.tablePageWeight(charsPerLine: Int): Int {
+    return tableRowPageWeight(cells = headers, charsPerLine = charsPerLine) +
+        rows.sumOf { row -> tableRowPageWeight(cells = row, charsPerLine = charsPerLine) }
+}
+
+private fun ReaderDocumentTable.tableRowPageWeight(
+    cells: List<String>,
+    charsPerLine: Int,
+): Int {
+    val columnCount = maxOf(headers.size, rows.maxOfOrNull { row -> row.size } ?: 0, cells.size, 1)
+    val charsPerCellLine = (charsPerLine / columnCount).coerceAtLeast(6)
+    val visualLines = cells.maxOfOrNull { cell ->
+        val visibleChars = cell.length.coerceAtLeast(1)
+        ((visibleChars + charsPerCellLine - 1) / charsPerCellLine).coerceAtLeast(1)
+    } ?: 1
+    return (visualLines * 2).coerceAtLeast(2)
+}
+
+private fun List<List<String>>.chunkedByTablePageWeight(
+    charsPerLine: Int,
+    maxChunkWeight: Int,
+): List<List<List<String>>> {
+    if (isEmpty()) {
+        return listOf(emptyList())
+    }
+    val chunks = mutableListOf<List<List<String>>>()
+    val current = mutableListOf<List<String>>()
+    var currentWeight = 0
+    forEach { row ->
+        val rowWeight = tableRowPageWeight(cells = row, charsPerLine = charsPerLine)
+        if (current.isNotEmpty() && currentWeight + rowWeight > maxChunkWeight) {
+            chunks += current.toList()
+            current.clear()
+            currentWeight = 0
+        }
+        current += row
+        currentWeight += rowWeight
+    }
+    if (current.isNotEmpty()) {
+        chunks += current.toList()
+    }
+    return chunks
+}
+
+private fun List<List<String>>.tableRowPageWeight(
+    cells: List<String>,
+    charsPerLine: Int,
+): Int {
+    val columnCount = maxOf(maxOfOrNull { row -> row.size } ?: 0, cells.size, 1)
+    val charsPerCellLine = (charsPerLine / columnCount).coerceAtLeast(6)
+    val visualLines = cells.maxOfOrNull { cell ->
+        val visibleChars = cell.length.coerceAtLeast(1)
+        ((visibleChars + charsPerCellLine - 1) / charsPerCellLine).coerceAtLeast(1)
+    } ?: 1
+    return (visualLines * 2).coerceAtLeast(2)
 }
 
 private fun AnnotatedString.splitCodeAnnotatedByRenderedWeight(
@@ -7808,8 +8204,30 @@ internal fun readerMarkdownBlock(
     sourceHref: String? = null,
     sourceAnchor: String? = null,
     sourceBlockIndex: Int = 0,
+    image: ReaderDocumentImage? = null,
+    table: ReaderDocumentTable? = null,
 ): ReaderMarkdownBlock {
     val block = rawBlock.trim()
+    if (image != null) {
+        return ReaderMarkdownBlock(
+            text = parseInlineMarkdown(block.ifBlank { image.title ?: image.altText.ifBlank { "Markdown image" } }),
+            kind = ReaderMarkdownBlockKind.IMAGE,
+            sourceHref = sourceHref,
+            sourceAnchor = sourceAnchor,
+            sourceBlockIndex = sourceBlockIndex,
+            image = image,
+        )
+    }
+    if (table != null) {
+        return ReaderMarkdownBlock(
+            text = AnnotatedString(block.ifBlank { table.toReaderPlainText() }),
+            kind = ReaderMarkdownBlockKind.TABLE,
+            sourceHref = sourceHref,
+            sourceAnchor = sourceAnchor,
+            sourceBlockIndex = sourceBlockIndex,
+            table = table,
+        )
+    }
     val fencedCode = Regex("""^```[A-Za-z0-9_-]*\n([\s\S]*?)\n?```$""")
         .matchEntire(block)
     if (fencedCode != null) {
@@ -8575,6 +8993,43 @@ private fun Context.documentImportCandidate(uri: Uri): DocumentImportCandidate {
     ) { contentResolver.openInputStream(uri) }
 }
 
+internal fun List<DocumentImportCandidate>.withMarkdownImageAttachments(): List<DocumentImportCandidate> {
+    val imageAttachmentUris = filter(DocumentImportCandidate::isMarkdownImageAttachmentCandidate)
+        .flatMap { candidate ->
+            candidate.markdownImageAttachmentKeys().map { key -> key to candidate.uri }
+        }
+        .distinctBy { (key, _) -> key }
+        .toMap()
+    return filterNot(DocumentImportCandidate::isMarkdownImageAttachmentCandidate)
+        .map { candidate ->
+            if (candidate.format == ContentFormat.MARKDOWN && imageAttachmentUris.isNotEmpty()) {
+                candidate.copy(imageAttachmentUris = imageAttachmentUris)
+            } else {
+                candidate
+            }
+        }
+}
+
+private fun DocumentImportCandidate.isMarkdownImageAttachmentCandidate(): Boolean {
+    val lowerName = displayName.lowercase(Locale.US)
+    return mimeType?.lowercase(Locale.US)?.startsWith("image/") == true ||
+        MarkdownImageAttachmentExtensions.any { extension -> lowerName.endsWith(extension) }
+}
+
+private fun DocumentImportCandidate.markdownImageAttachmentKeys(): Set<String> {
+    val display = displayName.trim()
+    val uriTail = uri.substringAfterLast('/').substringAfterLast('\\').trim()
+    return buildSet {
+        listOf(display, display.substringAfterLast('/'), display.substringAfterLast('\\'), uriTail).forEach { key ->
+            val cleaned = key.trim()
+            if (cleaned.isNotBlank()) {
+                add(cleaned)
+                add(cleaned.lowercase(Locale.US))
+            }
+        }
+    }
+}
+
 private fun Context.readUtf8Text(uri: Uri): String {
     return contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use { reader ->
         reader.readText()
@@ -8586,6 +9041,41 @@ private fun Context.writeUtf8Text(uri: Uri, text: String) {
     contentResolver.openOutputStream(uri)?.use { output ->
         output.write(bytes)
     } ?: error("Unable to write profile.")
+}
+
+private fun Context.loadReaderMarkdownImage(source: String): ImageBitmap? {
+    return runCatching {
+        val trimmed = source.trim()
+        if (trimmed.isBlank()) {
+            return@runCatching null
+        }
+        if (trimmed.startsWith("data:image/", ignoreCase = true)) {
+            val payload = trimmed.substringAfter(',', missingDelimiterValue = "")
+            val bytes = Base64.decode(payload, Base64.DEFAULT)
+            return@runCatching BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+        }
+        val parsedUri = runCatching { Uri.parse(trimmed) }.getOrNull()
+        when (parsedUri?.scheme) {
+            "content",
+            "android.resource",
+            -> contentResolver.openInputStream(parsedUri)?.use { input ->
+                BitmapFactory.decodeStream(input)?.asImageBitmap()
+            }
+
+            "file" -> parsedUri.path
+                ?.let(::File)
+                ?.takeIf { file -> file.isFile }
+                ?.inputStream()
+                ?.use { input -> BitmapFactory.decodeStream(input)?.asImageBitmap() }
+
+            null -> File(trimmed)
+                .takeIf { file -> file.isFile }
+                ?.inputStream()
+                ?.use { input -> BitmapFactory.decodeStream(input)?.asImageBitmap() }
+
+            else -> null
+        }
+    }.getOrNull()
 }
 
 private fun persistDocumentPermission(context: Context, uri: Uri) {
@@ -8651,6 +9141,14 @@ private const val READER_BODY_LINE_HEIGHT_DP = 27f
 private const val READER_CODE_LINE_HEIGHT_DP = 22f
 private const val READER_BODY_TEXT_BOTTOM_PADDING_DP = 7f
 private const val READER_HEADING_TEXT_BOTTOM_PADDING_DP = 10f
+private const val READER_IMAGE_MIN_HEIGHT_DP = 96f
+private const val READER_IMAGE_MAX_HEIGHT_DP = 320f
+private const val READER_IMAGE_PLACEHOLDER_HEIGHT_DP = 144f
+private const val READER_IMAGE_MEASURED_HEIGHT_DP = 220f
+private const val READER_TABLE_COLUMN_WIDTH_DP = 116f
+private const val READER_TABLE_MIN_WIDTH_DP = 280f
+private const val READER_TABLE_ROW_MIN_HEIGHT_DP = 38f
+private const val READER_TABLE_VERTICAL_PADDING_DP = 14f
 private const val READER_CODE_DEFAULT_TEXT_FIXED_VERTICAL_PADDING_DP = 10f
 private const val READER_CODE_LARGE_TEXT_FIXED_VERTICAL_PADDING_DP = 5f
 private const val READER_CODE_ONE_LINE_VISUAL_LINE_COST_FACTOR = 1.0f
@@ -8696,5 +9194,14 @@ private val USER_DOCUMENT_PICKER_MIME_TYPES = arrayOf(
     "text/markdown",
     "text/x-markdown",
     "text/plain",
+    "image/*",
     "application/octet-stream",
+)
+private val MarkdownImageAttachmentExtensions = setOf(
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".webp",
+    ".gif",
+    ".bmp",
 )

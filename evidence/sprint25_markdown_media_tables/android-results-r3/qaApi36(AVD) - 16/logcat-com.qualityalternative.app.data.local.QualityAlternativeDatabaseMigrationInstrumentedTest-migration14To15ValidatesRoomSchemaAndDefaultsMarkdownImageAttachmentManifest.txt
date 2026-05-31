@@ -1,0 +1,2 @@
+05-31 15:39:45.970  7614  7628 I TestRunner: started: migration14To15ValidatesRoomSchemaAndDefaultsMarkdownImageAttachmentManifest(com.qualityalternative.app.data.local.QualityAlternativeDatabaseMigrationInstrumentedTest)
+05-31 15:39:46.094  7614  7628 I TestRunner: finished: migration14To15ValidatesRoomSchemaAndDefaultsMarkdownImageAttachmentManifest(com.qualityalternative.app.data.local.QualityAlternativeDatabaseMigrationInstrumentedTest)

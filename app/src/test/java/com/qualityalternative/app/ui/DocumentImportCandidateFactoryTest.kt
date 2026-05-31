@@ -41,6 +41,25 @@ class DocumentImportCandidateFactoryTest {
         assertEquals(ReadingTimeEstimateSource.FALLBACK_DEFAULT, unsupported.estimateSource)
     }
 
+    @Test
+    fun markdownImageAttachmentsAreMappedToMarkdownCandidateAndFilteredFromStandaloneImports() {
+        val markdown = candidate("notes.md", "text/markdown", markdownBytes(200))
+        val image = candidate("cover.PNG", "image/png", ByteArray(0))
+        val epub = candidate("book.epub", "application/epub+zip", epubBytes(200))
+
+        val prepared = listOf(markdown, image, epub).withMarkdownImageAttachments()
+
+        assertEquals(listOf("notes.md", "book.epub"), prepared.map(DocumentImportCandidate::displayName))
+        assertEquals(
+            mapOf(
+                "cover.PNG" to "content://quality/cover.PNG",
+                "cover.png" to "content://quality/cover.PNG",
+            ),
+            prepared.first { it.displayName == "notes.md" }.imageAttachmentUris,
+        )
+        assertEquals(emptyMap<String, String>(), prepared.first { it.displayName == "book.epub" }.imageAttachmentUris)
+    }
+
     private fun assertCandidateEstimate(
         displayName: String,
         mimeType: String,

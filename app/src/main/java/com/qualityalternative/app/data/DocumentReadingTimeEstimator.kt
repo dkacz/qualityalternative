@@ -7,7 +7,7 @@ object DocumentReadingTimeEstimator {
     fun estimate(format: ContentFormat?, openInputStream: () -> InputStream?): ReadingTimeEstimate {
         return when (format) {
             ContentFormat.MARKDOWN -> estimateExtracted(openInputStream) { input ->
-                input.bufferedReader(Charsets.UTF_8).readText()
+                MarkdownReaderDocumentParser.parse(input.bufferedReader(Charsets.UTF_8).readText()).plainText
             }
 
             ContentFormat.EPUB -> estimateExtracted(openInputStream) { input ->

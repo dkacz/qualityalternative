@@ -1,0 +1,7 @@
+05-31 15:39:44.489  7614  7628 I TestRunner: started: addDocument_defaultIdsAreRandomUuidV4PerIndependentRecord(com.qualityalternative.app.data.RoomUserDocumentRepositoryTest)
+05-31 15:39:44.542  1086  1086 D InsetsController: hide(ime(), fromIme=false)
+05-31 15:39:44.542  1086  1086 I ImeTracker: com.google.android.apps.nexuslauncher:347c7365: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+05-31 15:39:44.561  1086  1086 D RecentsView: onTaskRemoved: 64, not handling task stack changes
+05-31 15:39:44.562  1086  1086 D RecentsView: onTaskRemoved: 64, not handling task stack changes
+05-31 15:39:44.701   946  1137 E FrameTracker: force finish cuj, time out: J<SPLASHSCREEN_EXIT_ANIM>
+05-31 15:39:44.845  7614  7628 I TestRunner: finished: addDocument_defaultIdsAreRandomUuidV4PerIndependentRecord(com.qualityalternative.app.data.RoomUserDocumentRepositoryTest)

@@ -1,0 +1,2 @@
+05-31 15:39:45.374  7614  7628 I TestRunner: started: migrationFromVersion5CreatesUserDocumentsTable(com.qualityalternative.app.data.RoomUserDocumentRepositoryTest)
+05-31 15:39:45.468  7614  7628 I TestRunner: finished: migrationFromVersion5CreatesUserDocumentsTable(com.qualityalternative.app.data.RoomUserDocumentRepositoryTest)

@@ -165,6 +165,7 @@ data class ContentItem(
     val addedAtMillis: Long? = null,
     val documentFingerprintSha256: String? = null,
     val documentFingerprintSizeBytes: Long? = null,
+    val imageAttachmentUris: Map<String, String> = emptyMap(),
 )
 
 fun ContentItem.usesExternalHandoff(): Boolean = rights.usesExternalHandoff
@@ -220,6 +221,7 @@ data class UserDocumentDraft(
     val description: String = "",
     val durationMinutes: Int,
     val topicTags: Set<TopicTag>,
+    val imageAttachmentUris: Map<String, String> = emptyMap(),
 )
 
 enum class UserDocumentValidationError {

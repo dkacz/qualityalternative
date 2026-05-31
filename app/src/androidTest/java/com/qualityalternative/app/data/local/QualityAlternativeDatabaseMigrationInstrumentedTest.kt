@@ -282,6 +282,72 @@ class QualityAlternativeDatabaseMigrationInstrumentedTest {
         }
     }
 
+    @Test
+    fun migration14To15ValidatesRoomSchemaAndDefaultsMarkdownImageAttachmentManifest() {
+        val databaseName = "qa-migration-14-15.db"
+        deleteDatabase(databaseName)
+        val legacy = helper.createDatabase(databaseName, 14)
+        legacy.execSQL(
+            """
+            INSERT INTO user_documents (
+                id,
+                uri,
+                displayName,
+                mimeType,
+                documentFormat,
+                title,
+                description,
+                durationMinutes,
+                topicTagsCsv,
+                availability,
+                createdAtMillis,
+                updatedAtMillis,
+                documentFingerprintSha256,
+                documentFingerprintSizeBytes
+            ) VALUES (
+                'user-document-1',
+                'content://provider/book.md',
+                'book.md',
+                'text/markdown',
+                'MARKDOWN',
+                'Book',
+                'Markdown book',
+                10,
+                'OTHER',
+                'AVAILABLE',
+                1000,
+                1200,
+                NULL,
+                NULL
+            )
+            """.trimIndent(),
+        )
+        legacy.close()
+
+        val migrated = helper.runMigrationsAndValidate(
+            databaseName,
+            15,
+            true,
+            QualityAlternativeDatabase.MIGRATION_14_15,
+        )
+        try {
+            assertTrue(userDocumentColumns(migrated).contains("imageAttachmentUrisJson"))
+            migrated.query(
+                """
+                SELECT imageAttachmentUrisJson
+                FROM user_documents
+                WHERE id = 'user-document-1'
+                """.trimIndent(),
+            ).use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals("{}", cursor.getString(0))
+            }
+        } finally {
+            migrated.close()
+            deleteDatabase(databaseName)
+        }
+    }
+
     private fun readingProgressColumns(db: SupportSQLiteDatabase): List<String> {
         return db.query("PRAGMA table_info(reading_progress)").use { cursor ->
             buildList {

@@ -146,4 +146,32 @@ class QualityAlternativeDatabaseMigrationTest {
             },
         )
     }
+
+    @Test
+    fun migration14To15AddsMarkdownImageAttachmentManifestColumn() {
+        val statements = mutableListOf<String>()
+        val db = Proxy.newProxyInstance(
+            SupportSQLiteDatabase::class.java.classLoader,
+            arrayOf(SupportSQLiteDatabase::class.java),
+        ) { _, method, args ->
+            if (method.name == "execSQL" && args?.firstOrNull() is String) {
+                statements += args.first() as String
+            }
+            when (method.returnType) {
+                java.lang.Boolean.TYPE -> false
+                java.lang.Integer.TYPE -> 0
+                java.lang.Long.TYPE -> 0L
+                else -> null
+            }
+        } as SupportSQLiteDatabase
+
+        QualityAlternativeDatabase.MIGRATION_14_15.migrate(db)
+
+        assertTrue(
+            statements.any {
+                it.contains("ALTER TABLE user_documents") &&
+                    it.contains("ADD COLUMN imageAttachmentUrisJson TEXT NOT NULL DEFAULT '{}'")
+            },
+        )
+    }
 }

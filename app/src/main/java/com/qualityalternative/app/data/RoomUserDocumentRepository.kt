@@ -18,6 +18,7 @@ import com.qualityalternative.app.domain.service.UserDocumentRepository
 import java.io.InputStream
 import java.security.MessageDigest
 import java.util.UUID
+import org.json.JSONObject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -110,6 +111,7 @@ class RoomUserDocumentRepository(
             addedAtMillis = createdAtMillis,
             documentFingerprintSha256 = fingerprintSha256,
             documentFingerprintSizeBytes = fingerprintSizeBytes,
+            imageAttachmentUris = draft.imageAttachmentUris.sanitizedImageAttachmentUris(),
         )
 
         dao.insertOrReplace(
@@ -234,7 +236,11 @@ class RoomUserDocumentRepository(
             val cacheKey = item.readerDocumentCacheKey(uri = uri)
             cachedReaderDocument(cacheKey)?.let { cached -> return cached }
             val structuredLoader = bodyLoader as? UserDocumentReaderDocumentLoader
-            val document = structuredLoader?.loadReaderDocument(uri = uri, format = item.format)
+            val document = structuredLoader?.loadReaderDocument(
+                uri = uri,
+                format = item.format,
+                imageAttachmentUris = item.imageAttachmentUris,
+            )
                 ?: ReaderDocument.fromPlainText(bodyLoader.loadBody(uri = uri, format = item.format))
             cacheReaderDocument(cacheKey = cacheKey, document = document)
             document
@@ -283,7 +289,11 @@ data class UserDocumentFingerprint(
 )
 
 interface UserDocumentReaderDocumentLoader : UserDocumentBodyLoader {
-    fun loadReaderDocument(uri: String, format: ContentFormat): ReaderDocument
+    fun loadReaderDocument(
+        uri: String,
+        format: ContentFormat,
+        imageAttachmentUris: Map<String, String> = emptyMap(),
+    ): ReaderDocument
 }
 
 class AndroidUserDocumentBodyLoader(
@@ -295,7 +305,11 @@ class AndroidUserDocumentBodyLoader(
         return loadReaderDocument(uri = uri, format = format).plainText
     }
 
-    override fun loadReaderDocument(uri: String, format: ContentFormat): ReaderDocument {
+    override fun loadReaderDocument(
+        uri: String,
+        format: ContentFormat,
+        imageAttachmentUris: Map<String, String>,
+    ): ReaderDocument {
         if (!format.usesPrivateReader()) {
             return ReaderDocument.fromPlainText("")
         }
@@ -303,7 +317,11 @@ class AndroidUserDocumentBodyLoader(
             val parsedUri = Uri.parse(uri)
             contentResolver.openInputStream(parsedUri)?.use { input ->
                 when (format) {
-                    ContentFormat.MARKDOWN -> ReaderDocument.fromPlainText(input.bufferedReader(Charsets.UTF_8).readText())
+                    ContentFormat.MARKDOWN -> MarkdownReaderDocumentParser.parse(
+                        markdown = input.bufferedReader(Charsets.UTF_8).readText(),
+                        baseUri = uri,
+                        imageAttachmentUris = imageAttachmentUris,
+                    )
                     ContentFormat.EPUB -> EpubTextExtractor.extractDocument(input)
                     else -> ReaderDocument.fromPlainText("")
                 }
@@ -373,6 +391,7 @@ private fun UserDocumentEntity.toContentItem(): ContentItem {
         addedAtMillis = createdAtMillis,
         documentFingerprintSha256 = documentFingerprintSha256,
         documentFingerprintSizeBytes = documentFingerprintSizeBytes,
+        imageAttachmentUris = imageAttachmentUrisJson.toImageAttachmentUris(),
     )
 }
 
@@ -400,6 +419,7 @@ private fun ContentItem.toEntity(
         updatedAtMillis = updatedAtMillis,
         documentFingerprintSha256 = documentFingerprintSha256,
         documentFingerprintSizeBytes = documentFingerprintSizeBytes,
+        imageAttachmentUrisJson = imageAttachmentUris.toImageAttachmentUrisJson(),
     )
 }
 
@@ -415,7 +435,43 @@ private fun ContentItem.readerDocumentCacheKey(uri: String): String {
         format.name,
         verifiedDocumentFingerprintSha256().orEmpty(),
         verifiedDocumentFingerprintSizeBytes()?.toString().orEmpty(),
+        imageAttachmentUris.toImageAttachmentUrisJson(),
     ).joinToString(separator = "|")
+}
+
+private fun Map<String, String>.toImageAttachmentUrisJson(): String {
+    return JSONObject(toSortedMap()).toString()
+}
+
+private fun String.toImageAttachmentUris(): Map<String, String> {
+    return runCatching {
+        val json = JSONObject(this)
+        buildMap {
+            val keys = json.keys()
+            while (keys.hasNext()) {
+                val key = keys.next().trim()
+                val value = json.optString(key).trim()
+                if (key.isNotBlank() && value.isNotBlank()) {
+                    put(key, value)
+                }
+            }
+        }
+    }.getOrDefault(emptyMap())
+}
+
+private fun Map<String, String>.sanitizedImageAttachmentUris(): Map<String, String> {
+    return entries
+        .mapNotNull { (rawKey, rawUri) ->
+            val key = rawKey.trim()
+            val uri = rawUri.trim()
+            if (key.isBlank() || uri.isBlank()) {
+                null
+            } else {
+                key to uri
+            }
+        }
+        .distinctBy { (key, _) -> key }
+        .toMap()
 }
 
 private fun ContentFormat.usesPrivateReader(): Boolean = this == ContentFormat.MARKDOWN || this == ContentFormat.EPUB

@@ -2894,6 +2894,7 @@ class MainViewModelTest {
                     format = ContentFormat.MARKDOWN,
                     estimateSource = ReadingTimeEstimateSource.EXTRACTED_TEXT,
                     estimatedWordCount = 800,
+                    imageAttachmentUris = mapOf("cover.png" to "content://quality/cover.png"),
                 ),
                 DocumentImportCandidate(
                     uri = "content://quality/book",
@@ -2933,8 +2934,16 @@ class MainViewModelTest {
         )
         advanceUntilIdle()
 
-        assertEquals(listOf("content://quality/notes", "content://quality/book"), retainedUris)
+        assertEquals(listOf("content://quality/notes", "content://quality/cover.png", "content://quality/book"), retainedUris)
         assertEquals(listOf("content://quality/notes", "content://quality/book"), userDocumentRepository.addedDrafts.map(UserDocumentDraft::uri))
+        assertEquals(
+            mapOf("cover.png" to "content://quality/cover.png"),
+            userDocumentRepository.addedDrafts.first { it.uri == "content://quality/notes" }.imageAttachmentUris,
+        )
+        assertEquals(
+            emptyMap<String, String>(),
+            userDocumentRepository.addedDrafts.first { it.uri == "content://quality/book" }.imageAttachmentUris,
+        )
         assertEquals(listOf(4, 20), userDocumentRepository.addedDrafts.map(UserDocumentDraft::durationMinutes))
         val savedIds = userDocumentRepository.documents.value.map(ContentItem::id).toSet()
         assertEquals(2, savedIds.size)

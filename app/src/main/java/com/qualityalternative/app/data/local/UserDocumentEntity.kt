@@ -26,4 +26,5 @@ data class UserDocumentEntity(
     val updatedAtMillis: Long,
     val documentFingerprintSha256: String?,
     val documentFingerprintSizeBytes: Long?,
+    val imageAttachmentUrisJson: String = "{}",
 )

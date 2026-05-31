@@ -1,0 +1,54 @@
+app/schemas/com.qualityalternative.app.data.local.QualityAlternativeDatabase/15.json
+app/src/main/java/com/qualityalternative/app/data/MarkdownReaderDocumentParser.kt
+app/src/test/java/com/qualityalternative/app/data/MarkdownReaderDocumentParserTest.kt
+docs/release-gate-logs/2026-05-31-sprint25-markdown-media-tables/BUNDLE_MANIFEST.md
+docs/release-gate-logs/2026-05-31-sprint25-markdown-media-tables/CHANGED_FILES.txt
+docs/release-gate-logs/2026-05-31-sprint25-markdown-media-tables/SPRINT25_GPT_PRO_REVIEW_PROMPT.md
+docs/release-gate-logs/2026-05-31-sprint25-markdown-media-tables/SPRINT25_GPT_PRO_REVIEW_PROMPT_R2.md
+docs/release-gate-logs/2026-05-31-sprint25-markdown-media-tables/SPRINT25_GPT_PRO_REVIEW_PROMPT_R3.md
+docs/release-gate-logs/2026-05-31-sprint25-markdown-media-tables/UNTRACKED_FILES.txt
+evidence/sprint25_markdown_media_tables/VALIDATION_SUMMARY.md
+evidence/sprint25_markdown_media_tables/android-results-r3/TEST-qaApi36(AVD) - 16-_app-.xml
+evidence/sprint25_markdown_media_tables/android-results-r3/qaApi36(AVD) - 16/aapt.1.ok.txt
+evidence/sprint25_markdown_media_tables/android-results-r3/qaApi36(AVD) - 16/aapt.2.ok.txt
+evidence/sprint25_markdown_media_tables/android-results-r3/qaApi36(AVD) - 16/cpuinfo
+evidence/sprint25_markdown_media_tables/android-results-r3/qaApi36(AVD) - 16/device-info.pb
+evidence/sprint25_markdown_media_tables/android-results-r3/qaApi36(AVD) - 16/logcat-com.qualityalternative.app.VisualQaScreenshotTest-captureSprint25MarkdownMediaAndTableScreens.txt
+evidence/sprint25_markdown_media_tables/android-results-r3/qaApi36(AVD) - 16/logcat-com.qualityalternative.app.VisualQaScreenshotTest-captureSprint25OrdinaryTextNavigationStillWorksAfterTableGestureGuard.txt
+evidence/sprint25_markdown_media_tables/android-results-r3/qaApi36(AVD) - 16/logcat-com.qualityalternative.app.VisualQaScreenshotTest-captureSprint25WideMarkdownTableHorizontalScrollDoesNotAdvanceReaderPage.txt
+evidence/sprint25_markdown_media_tables/android-results-r3/qaApi36(AVD) - 16/logcat-com.qualityalternative.app.data.RoomUserDocumentRepositoryTest-addDocument_defaultIdsAreRandomUuidV4PerIndependentRecord.txt
+evidence/sprint25_markdown_media_tables/android-results-r3/qaApi36(AVD) - 16/logcat-com.qualityalternative.app.data.RoomUserDocumentRepositoryTest-addEpubDocument_roundTripsAsPrivateReaderContent.txt
+evidence/sprint25_markdown_media_tables/android-results-r3/qaApi36(AVD) - 16/logcat-com.qualityalternative.app.data.RoomUserDocumentRepositoryTest-addMarkdownDocument_roundTripsAsPrivateReaderContent.txt
+evidence/sprint25_markdown_media_tables/android-results-r3/qaApi36(AVD) - 16/logcat-com.qualityalternative.app.data.RoomUserDocumentRepositoryTest-addPdfDocument_roundTripsAsExternalPrivateHandoffContent.txt
+evidence/sprint25_markdown_media_tables/android-results-r3/qaApi36(AVD) - 16/logcat-com.qualityalternative.app.data.RoomUserDocumentRepositoryTest-androidBodyLoaderReportsUnreadableMarkdownUri.txt
+evidence/sprint25_markdown_media_tables/android-results-r3/qaApi36(AVD) - 16/logcat-com.qualityalternative.app.data.RoomUserDocumentRepositoryTest-deleteDocument_removesPersistedDocumentAndReloadedState.txt
+evidence/sprint25_markdown_media_tables/android-results-r3/qaApi36(AVD) - 16/logcat-com.qualityalternative.app.data.RoomUserDocumentRepositoryTest-importPortableDocuments_mergeMapsVerifiedFingerprintCollisionToLocalDocument.txt
+evidence/sprint25_markdown_media_tables/android-results-r3/qaApi36(AVD) - 16/logcat-com.qualityalternative.app.data.RoomUserDocumentRepositoryTest-importPortableDocuments_mergeSkipsExistingAvailableDocumentCollision.txt
+evidence/sprint25_markdown_media_tables/android-results-r3/qaApi36(AVD) - 16/logcat-com.qualityalternative.app.data.RoomUserDocumentRepositoryTest-importPortableDocuments_throwsBeforeMutationWhenIdAndFingerprintMatchDifferentRows.txt
+evidence/sprint25_markdown_media_tables/android-results-r3/qaApi36(AVD) - 16/logcat-com.qualityalternative.app.data.RoomUserDocumentRepositoryTest-migrationFromVersion5CreatesUserDocumentsTable.txt
+evidence/sprint25_markdown_media_tables/android-results-r3/qaApi36(AVD) - 16/logcat-com.qualityalternative.app.data.local.QualityAlternativeDatabaseMigrationInstrumentedTest-migration12To13ValidatesRoomSchemaAndDefaultsReadingProgressOffset.txt
+evidence/sprint25_markdown_media_tables/android-results-r3/qaApi36(AVD) - 16/logcat-com.qualityalternative.app.data.local.QualityAlternativeDatabaseMigrationInstrumentedTest-migration13To14ValidatesRoomSchemaAndBackfillsAnnotationEndSourceBlock.txt
+evidence/sprint25_markdown_media_tables/android-results-r3/qaApi36(AVD) - 16/logcat-com.qualityalternative.app.data.local.QualityAlternativeDatabaseMigrationInstrumentedTest-migration14To15ValidatesRoomSchemaAndDefaultsMarkdownImageAttachmentManifest.txt
+evidence/sprint25_markdown_media_tables/android-results-r3/qaApi36(AVD) - 16/logcat-com.qualityalternative.app.data.local.QualityAlternativeDatabaseMigrationInstrumentedTest-migration8To12ValidatesRoomSchemaAndCreatesAnnotationColumnsOnce.txt
+evidence/sprint25_markdown_media_tables/android-results-r3/qaApi36(AVD) - 16/logcat-com.qualityalternative.app.data.local.QualityAlternativeDatabaseMigrationInstrumentedTest-migration9To12ValidatesRoomSchemaAndPreservesLegacyAnnotationRows.txt
+evidence/sprint25_markdown_media_tables/android-results-r3/qaApi36(AVD) - 16/meminfo
+evidence/sprint25_markdown_media_tables/android-results-r3/qaApi36(AVD) - 16/test-result.pb
+evidence/sprint25_markdown_media_tables/android-results-r3/qaApi36(AVD) - 16/test-result.textproto
+evidence/sprint25_markdown_media_tables/android-results-r3/test-result-exit-code.txt
+evidence/sprint25_markdown_media_tables/android-results-r3/test-result.pb
+evidence/sprint25_markdown_media_tables/pro_review_harvest/Adversarial_Release-Gate_Audit.md
+evidence/sprint25_markdown_media_tables/pro_review_harvest_r2/Adversarial_Audit_Sprint_25.md
+evidence/sprint25_markdown_media_tables/pro_review_harvest_r3/6a1c3b48-9e7c-83eb-8231-0637ac49971e.md
+evidence/sprint25_markdown_media_tables/pro_review_harvest_r3/GPT_PRO_REVIEW_R3.md
+evidence/sprint25_markdown_media_tables/screenshots-r3/REMOTE_SCREENSHOT_DIRS.txt
+evidence/sprint25_markdown_media_tables/screenshots-r3/contact_sheet_r3.png
+evidence/sprint25_markdown_media_tables/screenshots-r3/sprint25-markdown-media-tables-1780234735123/08_text_navigation_before_tap_light.png
+evidence/sprint25_markdown_media_tables/screenshots-r3/sprint25-markdown-media-tables-1780234735123/09_text_tap_advances_page_light.png
+evidence/sprint25_markdown_media_tables/screenshots-r3/sprint25-markdown-media-tables-1780234735123/10_text_swipe_advances_page_light.png
+evidence/sprint25_markdown_media_tables/screenshots-r3/sprint25-markdown-media-tables-1780234748974/06_wide_table_before_horizontal_scroll_light.png
+evidence/sprint25_markdown_media_tables/screenshots-r3/sprint25-markdown-media-tables-1780234748974/07_wide_table_after_horizontal_scroll_still_reader_light.png
+evidence/sprint25_markdown_media_tables/screenshots-r3/sprint25-markdown-media-tables-1780234757329/01_intervention_markdown_media_table_light.png
+evidence/sprint25_markdown_media_tables/screenshots-r3/sprint25-markdown-media-tables-1780234757329/02_reader_markdown_media_table_light.png
+evidence/sprint25_markdown_media_tables/screenshots-r3/sprint25-markdown-media-tables-1780234757329/03_reader_markdown_media_table_light_verified.png
+evidence/sprint25_markdown_media_tables/screenshots-r3/sprint25-markdown-media-tables-1780234757329/04_reader_markdown_media_table_dark.png
+evidence/sprint25_markdown_media_tables/screenshots-r3/sprint25-markdown-media-tables-1780234757329/05_reader_markdown_media_table_dark_verified.png

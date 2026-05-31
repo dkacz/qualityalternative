@@ -1,0 +1,47 @@
+05-31 15:39:43.923  7614  7628 I TestRunner: started: addEpubDocument_roundTripsAsPrivateReaderContent(com.qualityalternative.app.data.RoomUserDocumentRepositoryTest)
+05-31 15:39:43.924   684   992 W system_server: Long monitor contention with owner android.anim (731) at void com.android.server.wm.AbsAppSnapshotController.lambda$recordSnapshotInner$0(com.android.server.wm.WindowContainer, java.util.function.Consumer, android.window.TaskSnapshot)(AbsAppSnapshotController.java:208) waiters=4 in java.util.HashMap com.android.server.wm.AccessibilityWindowsPopulator.getWindowsTransformMatrix(java.util.List) for 427ms
+05-31 15:39:43.926   684  1197 W system_server: Long monitor contention with owner android.anim (731) at void com.android.server.wm.AbsAppSnapshotController.lambda$recordSnapshotInner$0(com.android.server.wm.WindowContainer, java.util.function.Consumer, android.window.TaskSnapshot)(AbsAppSnapshotController.java:208) waiters=6 in void com.android.server.wm.BLASTSyncEngine$SyncGroup$1CommitCallback.onCommitted(android.view.SurfaceControl$Transaction) for 284ms
+05-31 15:39:43.927   684   731 I Choreographer: Skipped 33 frames!  The application may be doing too much work on its main thread.
+05-31 15:39:43.950  7663  7663 D VRI[InstrumentationActivityInvoker$EmptyActivity]: visibilityChanged oldVisibility=true newVisibility=false
+05-31 15:39:43.954   684   730 W system_server: Long monitor contention with owner android.anim (731) at void com.android.server.wm.AbsAppSnapshotController.lambda$recordSnapshotInner$0(com.android.server.wm.WindowContainer, java.util.function.Consumer, android.window.TaskSnapshot)(AbsAppSnapshotController.java:208) waiters=0 in void com.android.server.wm.WindowManagerService$H.handleMessage(android.os.Message) for 596ms
+05-31 15:39:43.956   684  2107 W system_server: Long monitor contention with owner android.anim (731) at void com.android.server.wm.AbsAppSnapshotController.lambda$recordSnapshotInner$0(com.android.server.wm.WindowContainer, java.util.function.Consumer, android.window.TaskSnapshot)(AbsAppSnapshotController.java:208) waiters=7 in android.os.IBinder com.android.server.wm.WindowManagerService$LocalService.getFocusedWindowTokenFromWindowStates() for 275ms
+05-31 15:39:43.957   684   820 I ImeTracker: com.google.android.apps.nexuslauncher:347c7365: onRequestHide at ORIGIN_SERVER reason HIDE_UNSPECIFIED_WINDOW fromUser false
+05-31 15:39:43.958   684   684 W system_server: Long monitor contention with owner binder:684_20 (2107) at int com.android.server.accessibility.AccessibilityWindowManager.findFocusedWindowId(int)(AccessibilityWindowManager.java:2052) waiters=0 in void com.android.server.accessibility.AccessibilityManagerService$SendWindowStateChangedEventRunnable.run() for 277ms
+05-31 15:39:44.033  7614  7647 W alternative.app: JNI critical lock held for 36.585ms on Thread[33,tid=7647,Runnable,Thread*=0xb400006ec046df70,peer=0x21039d0,"arch_disk_io_0"]
+05-31 15:39:44.052  1502  1502 I GoogleInputMethodService: GoogleInputMethodService.onFinishInput():2043
+05-31 15:39:44.053  1502  1502 I Module  : DeviceLockedStatusModuleProvider$Module.updateDeviceLockedStatus():100 repeatCheckTimes = 0, locked = false
+05-31 15:39:44.054  1502  1502 I GoogleInputMethodService: GoogleInputMethodService.onStartInput():1293 onStartInput(EditorInfo{EditorInfo{packageName=com.google.android.apps.nexuslauncher, inputType=0, inputTypeString=NULL, enableLearning=false, autoCorrection=false, autoComplete=false, imeOptions=0, privateImeOptions=null, actionName=UNSPECIFIED, actionLabel=null, initialSelStart=-1, initialSelEnd=-1, initialCapsMode=0, label=null, fieldId=0, fieldName=null, extras=null, hintText=null, hintLocales=[]}}, false)
+05-31 15:39:44.054  1502  1502 I EmojiCompatManager: EmojiCompatManager.getEmojiCompatIfLoaded():343 EmojiCompat.init() was never called.
+05-31 15:39:44.054  1502  1502 I EmojiCompatManager: java.lang.IllegalStateException: EmojiCompat is not initialized. Please call EmojiCompat.init() first
+05-31 15:39:44.054  1502  1502 I EmojiCompatManager: 	at asx.p(PG:6)
+05-31 15:39:44.054  1502  1502 I EmojiCompatManager: 	at axb.b(PG:13)
+05-31 15:39:44.054  1502  1502 I EmojiCompatManager: 	at jnr.b(PG:2)
+05-31 15:39:44.054  1502  1502 I EmojiCompatManager: 	at jnr.c(PG:4)
+05-31 15:39:44.054  1502  1502 I EmojiCompatManager: 	at jnr.f(PG:3)
+05-31 15:39:44.054  1502  1502 I EmojiCompatManager: 	at jnx.c(PG:3)
+05-31 15:39:44.054  1502  1502 I EmojiCompatManager: 	at kif.cz(PG:47)
+05-31 15:39:44.054  1502  1502 I EmojiCompatManager: 	at lhl.run(PG:1025)
+05-31 15:39:44.054  1502  1502 I EmojiCompatManager: 	at jaf.execute(PG:12)
+05-31 15:39:44.054  1502  1502 I EmojiCompatManager: 	at nco.v(PG:13)
+05-31 15:39:44.054  1502  1502 I EmojiCompatManager: 	at lhn.m(PG:96)
+05-31 15:39:44.054  1502  1502 I EmojiCompatManager: 	at lhn.k(PG:25)
+05-31 15:39:44.054  1502  1502 I EmojiCompatManager: 	at kgn.onStartInput(PG:250)
+05-31 15:39:44.054  1502  1502 I EmojiCompatManager: 	at android.inputmethodservice.InputMethodService.doStartInput(InputMethodService.java:3521)
+05-31 15:39:44.054  1502  1502 I EmojiCompatManager: 	at android.inputmethodservice.InputMethodService$InputMethodImpl.startInput(InputMethodService.java:879)
+05-31 15:39:44.054  1502  1502 I EmojiCompatManager: 	at android.inputmethodservice.InputMethodService$InputMethodImpl.dispatchStartInput(InputMethodService.java:908)
+05-31 15:39:44.054  1502  1502 I EmojiCompatManager: 	at android.inputmethodservice.IInputMethodWrapper.executeMessage(IInputMethodWrapper.java:201)
+05-31 15:39:44.054  1502  1502 I EmojiCompatManager: 	at com.android.internal.os.HandlerCaller$MyHandler.handleMessage(HandlerCaller.java:44)
+05-31 15:39:44.054  1502  1502 I EmojiCompatManager: 	at android.os.Handler.dispatchMessage(Handler.java:110)
+05-31 15:39:44.054  1502  1502 I EmojiCompatManager: 	at android.os.Looper.loopOnce(Looper.java:248)
+05-31 15:39:44.054  1502  1502 I EmojiCompatManager: 	at android.os.Looper.loop(Looper.java:338)
+05-31 15:39:44.054  1502  1502 I EmojiCompatManager: 	at android.app.ActivityThread.main(ActivityThread.java:9067)
+05-31 15:39:44.054  1502  1502 I EmojiCompatManager: 	at java.lang.reflect.Method.invoke(Native Method)
+05-31 15:39:44.054  1502  1502 I EmojiCompatManager: 	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:593)
+05-31 15:39:44.054  1502  1502 I EmojiCompatManager: 	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:932)
+05-31 15:39:44.055  1502  1502 I Module  : DeviceLockedStatusModuleProvider$Module.updateDeviceLockedStatus():100 repeatCheckTimes = 1, locked = false
+05-31 15:39:44.076   684  1161 I ImeTracker: system_server:72429c36: onRequestHide at ORIGIN_SERVER reason IME_REQUESTED_CHANGED_LISTENER fromUser false
+05-31 15:39:44.086   684   730 I ImeTracker: system_server:72429c36: onCancelled at PHASE_SERVER_SHOULD_HIDE
+05-31 15:39:44.120   590  3849 W IPCThreadState: Sending oneway calls to frozen process.
+05-31 15:39:44.121   590  3849 W IPCThreadState: Sending oneway calls to frozen process.
+05-31 15:39:44.217   469  2323 I netd    : tetherGetStats() -> {[]} <0.60ms>
+05-31 15:39:44.249  7614  7628 I TestRunner: finished: addEpubDocument_roundTripsAsPrivateReaderContent(com.qualityalternative.app.data.RoomUserDocumentRepositoryTest)

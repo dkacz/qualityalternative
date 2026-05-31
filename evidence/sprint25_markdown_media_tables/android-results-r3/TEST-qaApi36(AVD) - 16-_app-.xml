@@ -1,0 +1,42 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<testsuites tests="18" failures="0" errors="0" skipped="0" time="52.74" timestamp="2026-05-31T13:39:47" hostname="localhost">
+  <testsuite name="com.qualityalternative.app.VisualQaScreenshotTest" tests="3" failures="0" errors="0" skipped="0" time="48.24" timestamp="2026-05-31T13:39:47" hostname="localhost">
+    <properties>
+      <property name="device" value="qaApi36(AVD) - 16" />
+      <property name="flavor" value="" />
+      <property name="project" value=":app" />
+    </properties>
+    <testcase name="captureSprint25OrdinaryTextNavigationStillWorksAfterTableGestureGuard" classname="com.qualityalternative.app.VisualQaScreenshotTest" time="13.89" />
+    <testcase name="captureSprint25WideMarkdownTableHorizontalScrollDoesNotAdvanceReaderPage" classname="com.qualityalternative.app.VisualQaScreenshotTest" time="8.328" />
+    <testcase name="captureSprint25MarkdownMediaAndTableScreens" classname="com.qualityalternative.app.VisualQaScreenshotTest" time="26.022" />
+  </testsuite>
+  <testsuite name="com.qualityalternative.app.data.RoomUserDocumentRepositoryTest" tests="10" failures="0" errors="0" skipped="0" time="1.758" timestamp="2026-05-31T13:39:47" hostname="localhost">
+    <properties>
+      <property name="device" value="qaApi36(AVD) - 16" />
+      <property name="flavor" value="" />
+      <property name="project" value=":app" />
+    </properties>
+    <testcase name="importPortableDocuments_throwsBeforeMutationWhenIdAndFingerprintMatchDifferentRows" classname="com.qualityalternative.app.data.RoomUserDocumentRepositoryTest" time="0.869" />
+    <testcase name="addEpubDocument_roundTripsAsPrivateReaderContent" classname="com.qualityalternative.app.data.RoomUserDocumentRepositoryTest" time="0.001" />
+    <testcase name="importPortableDocuments_mergeMapsVerifiedFingerprintCollisionToLocalDocument" classname="com.qualityalternative.app.data.RoomUserDocumentRepositoryTest" time="0.001" />
+    <testcase name="addDocument_defaultIdsAreRandomUuidV4PerIndependentRecord" classname="com.qualityalternative.app.data.RoomUserDocumentRepositoryTest" time="0.294" />
+    <testcase name="deleteDocument_removesPersistedDocumentAndReloadedState" classname="com.qualityalternative.app.data.RoomUserDocumentRepositoryTest" time="0.126" />
+    <testcase name="addPdfDocument_roundTripsAsExternalPrivateHandoffContent" classname="com.qualityalternative.app.data.RoomUserDocumentRepositoryTest" time="0.096" />
+    <testcase name="importPortableDocuments_mergeSkipsExistingAvailableDocumentCollision" classname="com.qualityalternative.app.data.RoomUserDocumentRepositoryTest" time="0.138" />
+    <testcase name="androidBodyLoaderReportsUnreadableMarkdownUri" classname="com.qualityalternative.app.data.RoomUserDocumentRepositoryTest" time="0.002" />
+    <testcase name="migrationFromVersion5CreatesUserDocumentsTable" classname="com.qualityalternative.app.data.RoomUserDocumentRepositoryTest" time="0.103" />
+    <testcase name="addMarkdownDocument_roundTripsAsPrivateReaderContent" classname="com.qualityalternative.app.data.RoomUserDocumentRepositoryTest" time="0.128" />
+  </testsuite>
+  <testsuite name="com.qualityalternative.app.data.local.QualityAlternativeDatabaseMigrationInstrumentedTest" tests="5" failures="0" errors="0" skipped="0" time="0.604" timestamp="2026-05-31T13:39:47" hostname="localhost">
+    <properties>
+      <property name="device" value="qaApi36(AVD) - 16" />
+      <property name="flavor" value="" />
+      <property name="project" value=":app" />
+    </properties>
+    <testcase name="migration12To13ValidatesRoomSchemaAndDefaultsReadingProgressOffset" classname="com.qualityalternative.app.data.local.QualityAlternativeDatabaseMigrationInstrumentedTest" time="0.154" />
+    <testcase name="migration8To12ValidatesRoomSchemaAndCreatesAnnotationColumnsOnce" classname="com.qualityalternative.app.data.local.QualityAlternativeDatabaseMigrationInstrumentedTest" time="0.095" />
+    <testcase name="migration13To14ValidatesRoomSchemaAndBackfillsAnnotationEndSourceBlock" classname="com.qualityalternative.app.data.local.QualityAlternativeDatabaseMigrationInstrumentedTest" time="0.102" />
+    <testcase name="migration14To15ValidatesRoomSchemaAndDefaultsMarkdownImageAttachmentManifest" classname="com.qualityalternative.app.data.local.QualityAlternativeDatabaseMigrationInstrumentedTest" time="0.127" />
+    <testcase name="migration9To12ValidatesRoomSchemaAndPreservesLegacyAnnotationRows" classname="com.qualityalternative.app.data.local.QualityAlternativeDatabaseMigrationInstrumentedTest" time="0.126" />
+  </testsuite>
+</testsuites>

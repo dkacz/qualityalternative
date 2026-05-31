@@ -1,0 +1,17 @@
+app/src/androidTest/java/com/qualityalternative/app/VisualQaScreenshotTest.kt
+app/src/androidTest/java/com/qualityalternative/app/data/RoomUserDocumentRepositoryTest.kt
+app/src/androidTest/java/com/qualityalternative/app/data/local/QualityAlternativeDatabaseMigrationInstrumentedTest.kt
+app/src/main/java/com/qualityalternative/app/data/DocumentReadingTimeEstimator.kt
+app/src/main/java/com/qualityalternative/app/data/RoomUserDocumentRepository.kt
+app/src/main/java/com/qualityalternative/app/data/local/QualityAlternativeDatabase.kt
+app/src/main/java/com/qualityalternative/app/data/local/UserDocumentEntity.kt
+app/src/main/java/com/qualityalternative/app/domain/model/ContentModels.kt
+app/src/main/java/com/qualityalternative/app/domain/model/ReaderDocumentModels.kt
+app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
+app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
+app/src/test/java/com/qualityalternative/app/data/DocumentReadingTimeEstimatorTest.kt
+app/src/test/java/com/qualityalternative/app/data/local/QualityAlternativeDatabaseMigrationTest.kt
+app/src/test/java/com/qualityalternative/app/ui/DocumentImportCandidateFactoryTest.kt
+app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
+app/src/test/java/com/qualityalternative/app/ui/ProgressSnapshotTest.kt
+docs/LANE_STATUS.md

@@ -226,6 +226,7 @@ data class DocumentImportCandidate(
     val format: ContentFormat? = null,
     val estimateSource: ReadingTimeEstimateSource = ReadingTimeEstimateSource.FALLBACK_DEFAULT,
     val estimatedWordCount: Int? = null,
+    val imageAttachmentUris: Map<String, String> = emptyMap(),
 )
 
 data class AddDocumentFormState(
@@ -1594,6 +1595,9 @@ class MainViewModel(
                         is AddUserDocumentResult.Added -> {
                             addedItems += result.item
                             runCatching { persistReadPermission(draft.uri) }
+                            draft.imageAttachmentUris.values.forEach { attachmentUri ->
+                                runCatching { persistReadPermission(attachmentUri) }
+                            }
                             recordReadingTimeEstimateApplied(
                                 item = result.item,
                                 draft = draft,
@@ -4637,6 +4641,7 @@ private fun DocumentImportCandidate.cleaned(): DocumentImportCandidate {
         title = cleanedTitle,
         durationMinutes = cleanedDuration,
         format = detectedFormat,
+        imageAttachmentUris = imageAttachmentUris.sanitizedImageAttachmentUris(),
     )
 }
 
@@ -4666,7 +4671,27 @@ private fun DocumentImportCandidate.toDraftOrNull(selectedTopics: Set<TopicTag>)
         title = title,
         durationMinutes = duration,
         topicTags = selectedTopics,
+        imageAttachmentUris = if (format == ContentFormat.MARKDOWN) {
+            imageAttachmentUris.sanitizedImageAttachmentUris()
+        } else {
+            emptyMap()
+        },
     )
+}
+
+private fun Map<String, String>.sanitizedImageAttachmentUris(): Map<String, String> {
+    return entries
+        .mapNotNull { (rawKey, rawUri) ->
+            val key = rawKey.trim()
+            val uri = rawUri.trim()
+            if (key.isBlank() || uri.isBlank()) {
+                null
+            } else {
+                key to uri
+            }
+        }
+        .distinctBy { (key, _) -> key }
+        .toMap()
 }
 
 private fun RecommendationSet.analyticsMetadata(): Map<String, String> {

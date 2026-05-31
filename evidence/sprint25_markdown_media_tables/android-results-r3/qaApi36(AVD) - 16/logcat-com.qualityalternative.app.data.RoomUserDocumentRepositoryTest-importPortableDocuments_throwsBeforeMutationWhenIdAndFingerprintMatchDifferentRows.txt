@@ -1,0 +1,26 @@
+05-31 15:39:43.350  7614  7628 I TestRunner: started: importPortableDocuments_throwsBeforeMutationWhenIdAndFingerprintMatchDifferentRows(com.qualityalternative.app.data.RoomUserDocumentRepositoryTest)
+05-31 15:39:43.354  1086  1086 D StatsLog: LAUNCHER_ONRESUME
+05-31 15:39:43.359  1086  1086 D RecentsView: onTaskRemoved: 63, not handling task stack changes
+05-31 15:39:43.359  1086  1086 D RecentsView: onTaskRemoved: 63, not handling task stack changes
+05-31 15:39:43.372  1255  7461 I NetworkScheduler.Stats: Task com.google.android.gms/com.google.android.gms.ipa.base.IpaGcmTaskService started execution. cause:9 exec_start_elapsed_seconds: 4629 [CONTEXT service_id=218 ]
+05-31 15:39:43.386  1644  1903 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+05-31 15:39:43.388  1255  7119 I NetworkScheduler.Stats: Task com.google.android.gms/com.google.android.gms.ipa.base.IpaGcmTaskService finished executing. cause:9 result: 1 elapsed_millis: 330 uptime_millis: 330 exec_start_elapsed_seconds: 4629 [CONTEXT service_id=218 ]
+05-31 15:39:43.388  1644  1903 I AiAiEcho: EchoTargets:
+05-31 15:39:43.388  1644  1903 I AiAiEcho: Filtered by AiAi flag check:
+05-31 15:39:43.388  1644  1903 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+05-31 15:39:43.388  1644  1903 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+05-31 15:39:43.470  1644  1903 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface home with targets# 0 (types=[])
+05-31 15:39:43.501  1086  1133 D QuickstepModelDelegate: notifyAppTargetEvent action=1 launchLocation=workspace/0/[-1,-1]/[1,1]
+05-31 15:39:43.656  1086  1086 I NotificationListener: Handling notification state refresh for android#0
+05-31 15:39:43.657  1086  1086 D SsBaseTemplateCard: No text view can be set up
+05-31 15:39:43.657  1086  1086 D SsBaseTemplateCard: Passed-in item info is null
+05-31 15:39:43.657  1086  1086 D SsBaseTemplateCard: Passed-in item info is null
+05-31 15:39:43.657  1086  1086 D SsBaseTemplateCard: Passed-in item info is null
+05-31 15:39:43.657  1086  1086 I SsBaseTemplateCard: Secondary card pane is null
+05-31 15:39:43.658  1086  1086 D StateManager: createAtomicAnimation - fromState: Background, toState: Normal, partial trace:
+05-31 15:39:43.658  1086  1086 D StateManager: 	at com.android.quickstep.util.WorkspaceRevealAnim.prepareToAnimate(go/retraceme 43e00d9cd0eb17b3d9dd30fc1741b1c71445c4c0f7c8c9b81300265c86c5b873:22)
+05-31 15:39:43.658  1086  1086 D StateManager: 	at com.android.quickstep.util.WorkspaceRevealAnim.<init>(go/retraceme 43e00d9cd0eb17b3d9dd30fc1741b1c71445c4c0f7c8c9b81300265c86c5b873:11)
+05-31 15:39:43.658  1086  1086 D StateManager: 	at com.android.launcher3.QuickstepTransitionManager.createWallpaperOpenAnimations(go/retraceme 43e00d9cd0eb17b3d9dd30fc1741b1c71445c4c0f7c8c9b81300265c86c5b873:339)
+05-31 15:39:43.664  1086  1086 D b/311077782: LauncherAnimationRunner.setAnimation
+05-31 15:39:43.671  1086  1086 D WorkspaceRevealAnim: onAnimationEnd: workspace alpha = 1.0
+05-31 15:39:43.908  7614  7628 I TestRunner: finished: importPortableDocuments_throwsBeforeMutationWhenIdAndFingerprintMatchDifferentRows(com.qualityalternative.app.data.RoomUserDocumentRepositoryTest)

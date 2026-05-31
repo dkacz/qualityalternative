@@ -59,6 +59,7 @@ class RoomUserDocumentRepositoryTest {
                     title = "Saved notes",
                     durationMinutes = 8,
                     topicTags = setOf(TopicTag.PSYCHOLOGY, TopicTag.SCIENCE),
+                    imageAttachmentUris = mapOf("cover.png" to "content://quality/cover"),
                 ),
                 nowMillis = 1_000L,
             )
@@ -77,6 +78,7 @@ class RoomUserDocumentRepositoryTest {
             assertEquals(ContentRightsClass.USER_PRIVATE, saved.rights.rightsClass)
             assertEquals(ContentRenderMode.USER_PRIVATE_READER, saved.rights.renderMode)
             assertEquals("content://quality/notes", saved.rights.sourceUrl)
+            assertEquals(mapOf("cover.png" to "content://quality/cover"), saved.imageAttachmentUris)
             assertEquals("Private **Markdown** body.", repository.contentBody(saved))
 
             val reloadedScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)

@@ -1,6 +1,6 @@
 # Lane Status
 
-Status timestamp: 2026-04-24
+Status timestamp: 2026-05-31
 
 This file is the repo-level index for active and recently completed execution lanes. It should point to the canonical branch, review lane, validation artifacts, and next gate for each lane.
 
@@ -10,6 +10,39 @@ This file is the repo-level index for active and recently completed execution la
 - Use the branch-specific sprint docs for detailed implementation notes.
 - Heartbeats should exist only while waiting for a current GPT Pro lane.
 - Do not infer lane status from untracked local files alone. For example, `ios/` can appear untracked on non-iOS branches; the canonical iOS implementation source is the pushed iOS branch listed below.
+
+## Sprint 25 Markdown Media And Tables
+
+Status: `gpt_pro_10_10_pass_release_prep`
+
+- Branch: `codex/sprint25-md-image-embeds`
+- Scope: Markdown reader import/rendering fixes for embedded images and Markdown tables.
+- Current implementation state:
+  - Added `ReaderDocumentImage` and image metadata on reader document blocks.
+  - Added `MarkdownReaderDocumentParser` for standalone Markdown images, inline-image alt text, `data:image/...` payloads, relative `file://` image resolution, and picked image attachment URI maps.
+  - Added Markdown image attachment URI persistence via `user_documents.imageAttachmentUrisJson` and migration `14 -> 15`.
+  - Updated the Android document picker to allow image files and attach picked images to Markdown documents instead of saving image files as separate library items.
+  - Updated reader UI to render image blocks from `content://`, `file://`, `android.resource://`, and `data:image/...`; placeholders appear when an image source cannot be opened.
+  - Added pipe Markdown table parsing with header/body rows and alignment metadata.
+  - Updated reader UI to render Markdown tables as structured rows and columns with header styling, cell alignment, and horizontal scrolling for wide tables.
+  - Updated reader pagination, progress snapshots, and reading-time estimates so image payloads and Markdown table delimiter syntax do not distort page fit or time estimates.
+  - Updated reader gesture handling so horizontally scrolling wide Markdown tables do not advance or complete reader pages.
+  - Narrowed the table gesture guard after GPT Pro R2 so ordinary text taps/swipes still advance reader pages.
+  - Updated table pagination measurement so wrapped cell text contributes to page fit and oversized tables split by visual row weight.
+- Validation status:
+  - Unit/instrumented tests have been added for parser, reading-time estimate, Room migration, document attachment persistence, reader image block pagination, reader table pagination, and Sprint 25 visual evidence.
+  - Passed with Homebrew JDK 17: `./gradlew :app:testDebugUnitTest :app:lintDebug`.
+  - Passed on emulator `qaApi36(AVD) - 16`: `VisualQaScreenshotTest#captureSprint25MarkdownMediaAndTableScreens`.
+  - Passed on emulator `qaApi36(AVD) - 16`: `VisualQaScreenshotTest#captureSprint25WideMarkdownTableHorizontalScrollDoesNotAdvanceReaderPage`.
+  - Passed on emulator `qaApi36(AVD) - 16`: `VisualQaScreenshotTest#captureSprint25OrdinaryTextNavigationStillWorksAfterTableGestureGuard`.
+  - Passed on emulator `qaApi36(AVD) - 16`: `RoomUserDocumentRepositoryTest`.
+  - Passed on emulator `qaApi36(AVD) - 16`: `QualityAlternativeDatabaseMigrationInstrumentedTest`.
+  - Visual evidence: `evidence/sprint25_markdown_media_tables/screenshots-r3/contact_sheet_r3.png`.
+  - R3 Android results: `evidence/sprint25_markdown_media_tables/android-results-r3/`.
+  - Passed: `git diff --check`.
+  - GPT Pro R3: `SCORE 10/10`, `VERDICT PASS`, `VISUAL REVIEW PASS`.
+- Next gate:
+  - Bump Android version, run final tests, build and verify the debug APK, then publish the GitHub release.
 
 ## Android Meditation / Content Priority Fix
 

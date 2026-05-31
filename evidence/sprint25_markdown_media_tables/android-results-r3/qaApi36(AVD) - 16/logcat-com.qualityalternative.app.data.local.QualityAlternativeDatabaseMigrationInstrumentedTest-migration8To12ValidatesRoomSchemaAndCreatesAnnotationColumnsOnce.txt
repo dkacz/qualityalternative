@@ -1,0 +1,2 @@
+05-31 15:39:45.748  7614  7628 I TestRunner: started: migration8To12ValidatesRoomSchemaAndCreatesAnnotationColumnsOnce(com.qualityalternative.app.data.local.QualityAlternativeDatabaseMigrationInstrumentedTest)
+05-31 15:39:45.859  7614  7628 I TestRunner: finished: migration8To12ValidatesRoomSchemaAndCreatesAnnotationColumnsOnce(com.qualityalternative.app.data.local.QualityAlternativeDatabaseMigrationInstrumentedTest)

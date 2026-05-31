@@ -1,0 +1,2 @@
+05-31 15:39:45.364  7614  7628 I TestRunner: started: androidBodyLoaderReportsUnreadableMarkdownUri(com.qualityalternative.app.data.RoomUserDocumentRepositoryTest)
+05-31 15:39:45.369  7614  7628 I TestRunner: finished: androidBodyLoaderReportsUnreadableMarkdownUri(com.qualityalternative.app.data.RoomUserDocumentRepositoryTest)

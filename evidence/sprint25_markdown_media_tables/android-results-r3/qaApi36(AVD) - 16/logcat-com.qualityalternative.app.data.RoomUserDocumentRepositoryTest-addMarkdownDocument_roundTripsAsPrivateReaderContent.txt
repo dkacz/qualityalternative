@@ -1,0 +1,2 @@
+05-31 15:39:45.475  7614  7628 I TestRunner: started: addMarkdownDocument_roundTripsAsPrivateReaderContent(com.qualityalternative.app.data.RoomUserDocumentRepositoryTest)
+05-31 15:39:45.600  7614  7628 I TestRunner: finished: addMarkdownDocument_roundTripsAsPrivateReaderContent(com.qualityalternative.app.data.RoomUserDocumentRepositoryTest)

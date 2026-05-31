@@ -8,6 +8,8 @@ import com.qualityalternative.app.domain.model.MEDITATION_TIMER_CONTENT_ID
 import com.qualityalternative.app.domain.model.RecommendationSource
 import com.qualityalternative.app.domain.model.ReadingAnnotation
 import com.qualityalternative.app.domain.model.ReadingAnnotationSelector
+import com.qualityalternative.app.domain.model.ReaderDocumentImage
+import com.qualityalternative.app.domain.model.ReaderDocumentTable
 import com.qualityalternative.app.domain.model.ReplacementHistoryEntry
 import com.qualityalternative.app.domain.model.TopicTag
 import java.time.LocalDate
@@ -367,6 +369,73 @@ class ProgressSnapshotTest {
         assertEquals(1, readerPageIndexForParagraph(pages = pages, paragraphIndex = 4))
         assertEquals(66, readerProgressPercentForParagraphIndex(paragraphIndex = 5, paragraphCount = 9))
         assertEquals(66, readerProgressPercentForPageIndex(pageIndex = 1, pageCount = 3))
+    }
+
+    @Test
+    fun readerMarkdownBlockKeepsMarkdownImagesAsMediaBlocks() {
+        val block = readerMarkdownBlock(
+            rawBlock = "Evening chart",
+            image = ReaderDocumentImage(
+                source = "content://quality/images/chart.png",
+                altText = "Calm chart",
+                title = "Evening chart",
+            ),
+        )
+
+        assertEquals(ReaderMarkdownBlockKind.IMAGE, block.kind)
+        assertEquals("Evening chart", block.text.text)
+        assertEquals("content://quality/images/chart.png", block.image?.source)
+        assertEquals(
+            listOf(ReaderPage(start = 0, endInclusive = 0)),
+            readerPagesForBlocks(blocks = listOf(block), maxPageWeight = 3),
+        )
+    }
+
+    @Test
+    fun readerMarkdownBlockKeepsMarkdownTablesAsTableBlocks() {
+        val block = readerMarkdownBlock(
+            rawBlock = "Habit\tMinutes\nRead\t20\nWalk\t10",
+            table = ReaderDocumentTable(
+                headers = listOf("Habit", "Minutes"),
+                rows = listOf(
+                    listOf("Read", "20"),
+                    listOf("Walk", "10"),
+                ),
+            ),
+        )
+
+        assertEquals(ReaderMarkdownBlockKind.TABLE, block.kind)
+        assertEquals(listOf("Habit", "Minutes"), block.table?.headers)
+        assertEquals(
+            listOf(ReaderPage(start = 0, endInclusive = 0)),
+            readerPagesForBlocks(blocks = listOf(block), maxPageWeight = 3),
+        )
+    }
+
+    @Test
+    fun splitOversizedReaderBlocksSplitsWrappedMarkdownTableRowsByVisualWeight() {
+        val longCell = "This table cell contains enough prose to wrap across multiple reader lines on a phone viewport."
+        val block = readerMarkdownBlock(
+            rawBlock = "Topic\tNotes\nFocus\t$longCell\nCalm\t$longCell\nPlan\t$longCell",
+            table = ReaderDocumentTable(
+                headers = listOf("Topic", "Notes"),
+                rows = listOf(
+                    listOf("Focus", longCell),
+                    listOf("Calm", longCell),
+                    listOf("Plan", longCell),
+                ),
+            ),
+        )
+
+        val layout = splitOversizedReaderBlocks(
+            blocks = listOf(block),
+            maxBlockWeight = 8,
+            charsPerLine = 32,
+        )
+
+        assertTrue("Expected wrapped table rows to split across reader blocks", layout.blocks.size > 1)
+        assertTrue(layout.blocks.all { it.kind == ReaderMarkdownBlockKind.TABLE })
+        assertTrue(layout.blocks.all { (it.table?.rows?.size ?: 0) <= 1 })
     }
 
     @Test

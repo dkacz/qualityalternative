@@ -1,6 +1,8 @@
 package com.qualityalternative.app
 
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Color
 import android.net.Uri
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
@@ -9,15 +11,18 @@ import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.swipeRight
 import androidx.compose.ui.test.swipeUp
 import androidx.test.core.app.ActivityScenario
@@ -63,6 +68,7 @@ class VisualQaScreenshotTest {
     private val sprint15Slice152ScreenshotDirName = "sprint15-slice15-2-kindle-toc-${System.currentTimeMillis()}"
     private val sprint20ScreenshotDirName = "sprint20-epub-loading-performance-${System.currentTimeMillis()}"
     private val sprint22ScreenshotDirName = "sprint22-reading-time-remaining-${System.currentTimeMillis()}"
+    private val sprint25ScreenshotDirName = "sprint25-markdown-media-tables-${System.currentTimeMillis()}"
     private lateinit var screenshotDir: File
     private lateinit var legacyScreenshotDir: File
     private lateinit var sprint10ScreenshotDir: File
@@ -75,6 +81,7 @@ class VisualQaScreenshotTest {
     private lateinit var sprint15Slice152ScreenshotDir: File
     private lateinit var sprint20ScreenshotDir: File
     private lateinit var sprint22ScreenshotDir: File
+    private lateinit var sprint25ScreenshotDir: File
 
     @Before
     fun resetAppState() {
@@ -117,6 +124,9 @@ class VisualQaScreenshotTest {
         sprint22ScreenshotDir = File("/sdcard/Download/qualityalternative/$sprint22ScreenshotDirName")
         sprint22ScreenshotDir.deleteRecursively()
         sprint22ScreenshotDir.mkdirs()
+        sprint25ScreenshotDir = File("/sdcard/Download/qualityalternative/$sprint25ScreenshotDirName")
+        sprint25ScreenshotDir.deleteRecursively()
+        sprint25ScreenshotDir.mkdirs()
     }
 
     @After
@@ -254,6 +264,89 @@ class VisualQaScreenshotTest {
         capture("18_meditation_timer_dark")
 
         captureLegacyContentDisplayScreens()
+    }
+
+    @Test
+    fun captureSprint25MarkdownMediaAndTableScreens() {
+        launchFreshAppThroughTopicVisualQa()
+        val lightContent = seedMarkdownMediaTableSelection()
+        launchFixtureSystemIntervention()
+        assertTrue("Expected Markdown media/table title in intervention", hasAnyNode("Markdown Media Table Notes"))
+        captureSprint25("01_intervention_markdown_media_table_light")
+
+        scenario?.onActivity { activity -> activity.mainViewModel.openLibraryItem(lightContent) }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
+        captureSprint25("02_reader_markdown_media_table_light")
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-markdown-image") }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-markdown-table") }
+        composeRule.onNodeWithText("Calm blue square").assertIsDisplayed()
+        composeRule.onNodeWithText("Read").assertIsDisplayed()
+        composeRule.onNodeWithText("20 min").assertIsDisplayed()
+        assertTrue("Raw Markdown image syntax should not be visible", !hasNodeContaining("![Calm blue square]"))
+        assertTrue("Raw Markdown table pipes should not be visible", !hasNodeContaining("| Signal |"))
+        assertTrue("Raw Markdown table delimiter should not be visible", !hasNodeContaining("---"))
+        captureSprint25("03_reader_markdown_media_table_light_verified")
+
+        scenario?.close()
+        scenario = null
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+        resetPersistentState()
+        launchOnboardedApp()
+        saveDarkTheme()
+        val darkContent = seedMarkdownMediaTableSelection(title = "Night Markdown Media Table Notes", nowMillis = 2_600L)
+        launchFixtureSystemIntervention()
+        assertTrue("Expected night Markdown media/table title in intervention", hasAnyNode("Night Markdown Media Table Notes"))
+        scenario?.onActivity { activity -> activity.mainViewModel.openLibraryItem(darkContent) }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
+        captureSprint25("04_reader_markdown_media_table_dark")
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-markdown-image") }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-markdown-table") }
+        captureSprint25("05_reader_markdown_media_table_dark_verified")
+    }
+
+    @Test
+    fun captureSprint25WideMarkdownTableHorizontalScrollDoesNotAdvanceReaderPage() {
+        launchOnboardedApp()
+        val content = seedWideMarkdownTableSelection()
+
+        scenario?.onActivity { activity -> activity.mainViewModel.openLibraryItem(content) }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-markdown-table") }
+        captureSprint25("06_wide_table_before_horizontal_scroll_light")
+
+        composeRule.onNodeWithTag("reader-markdown-table")
+            .performTouchInput { swipeLeft() }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("reader-screen").assertIsDisplayed()
+        composeRule.onNodeWithTag("reader-markdown-table").assertIsDisplayed()
+        captureSprint25("07_wide_table_after_horizontal_scroll_still_reader_light")
+    }
+
+    @Test
+    fun captureSprint25OrdinaryTextNavigationStillWorksAfterTableGestureGuard() {
+        launchOnboardedApp()
+        val content = seedPagedMarkdownNavigationSelection()
+
+        scenario?.onActivity { activity -> activity.mainViewModel.openLibraryItem(content) }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-annotation-rendered-block-0") }
+        composeRule.onNodeWithText("Navigation paragraph 01", substring = true).assertIsDisplayed()
+        captureSprint25("08_text_navigation_before_tap_light")
+
+        composeRule.onNodeWithTag("reader-annotation-rendered-block-0")
+            .performTouchInput { click() }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasNodeContaining("2/") }
+        captureSprint25("09_text_tap_advances_page_light")
+
+        composeRule.onNodeWithTag("reader-page-viewport")
+            .performTouchInput { swipeRight() }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasNodeContaining("1/") }
+
+        composeRule.onNodeWithTag("reader-annotation-rendered-block-0")
+            .performTouchInput { swipeLeft() }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasNodeContaining("2/") }
+        captureSprint25("10_text_swipe_advances_page_light")
     }
 
     @Test
@@ -1369,6 +1462,10 @@ class VisualQaScreenshotTest {
         captureTo(sprint22ScreenshotDir, name)
     }
 
+    private fun captureSprint25(name: String) {
+        captureTo(sprint25ScreenshotDir, name)
+    }
+
     private fun captureTo(directory: File, name: String) {
         composeRule.waitForIdle()
         InstrumentationRegistry.getInstrumentation().waitForIdleSync()
@@ -1958,6 +2055,141 @@ class VisualQaScreenshotTest {
         )
     }
 
+    private fun seedMarkdownMediaTableSelection(
+        title: String = "Markdown Media Table Notes",
+        fileName: String = "markdown-media-table-notes.md",
+        nowMillis: Long = 2_500L,
+    ): ContentItem = runBlocking {
+        val targetContext = InstrumentationRegistry.getInstrumentation().targetContext
+        val app = targetContext.applicationContext as QualityAlternativeApplication
+        val fixture = File(targetContext.filesDir, "visual-qa-fixtures/$fileName")
+        fixture.parentFile?.mkdirs()
+        val imageFile = File(fixture.parentFile, "calm-blue.png")
+        val bitmap = Bitmap.createBitmap(80, 80, Bitmap.Config.ARGB_8888)
+        bitmap.eraseColor(Color.rgb(70, 126, 178))
+        imageFile.outputStream().use { output ->
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, output)
+        }
+        bitmap.recycle()
+        fixture.writeText(
+            """
+            ![Calm blue square](calm-blue.png "Calm blue square")
+
+            | Signal | Response | Time |
+            |:-------|:--------:|-----:|
+            | Read   | Reader   | 20 min |
+            | Breathe | Pause   | 5 min |
+            """.trimIndent(),
+        )
+
+        app.appContainer.userDocumentRepository.observeReady().first { it }
+        val result = app.appContainer.userDocumentRepository.addDocument(
+            draft = UserDocumentDraft(
+                uri = Uri.fromFile(fixture).toString(),
+                displayName = fileName,
+                mimeType = "text/markdown",
+                title = title,
+                durationMinutes = 6,
+                topicTags = setOf(TopicTag.ESSAYS, TopicTag.PSYCHOLOGY),
+            ),
+            nowMillis = nowMillis,
+        )
+        assertTrue("Expected Markdown media/table fixture to be saved", result is AddUserDocumentResult.Added)
+        app.appContainer.settingsRepository.saveOnboardingSelection(
+            OnboardingSelection(
+                selectedAppPackages = setOf(FixtureTargetRegistry.fixtureDistractors.first().packageName),
+                preferredTopics = setOf(TopicTag.ESSAYS, TopicTag.PSYCHOLOGY),
+                preferredDurationBucket = DurationBucket.FOCUS,
+                selectedPackIds = emptySet(),
+            ),
+        )
+        (result as AddUserDocumentResult.Added).item
+    }
+
+    private fun seedWideMarkdownTableSelection(
+        title: String = "Wide Markdown Table Notes",
+        fileName: String = "wide-markdown-table-notes.md",
+        nowMillis: Long = 2_700L,
+    ): ContentItem = runBlocking {
+        val targetContext = InstrumentationRegistry.getInstrumentation().targetContext
+        val app = targetContext.applicationContext as QualityAlternativeApplication
+        val fixture = File(targetContext.filesDir, "visual-qa-fixtures/$fileName")
+        fixture.parentFile?.mkdirs()
+        fixture.writeText(
+            """
+            | First | Second | Third | Fourth | Fifth | Sixth |
+            |:------|:------:|:------|:-------|:------|------:|
+            | Start | Middle | Table | Scroll target | Hidden before drag | 60 min |
+            | Read  | Breathe | Note | Keep page | Reveal by swiping | 5 min |
+            """.trimIndent(),
+        )
+
+        app.appContainer.userDocumentRepository.observeReady().first { it }
+        val result = app.appContainer.userDocumentRepository.addDocument(
+            draft = UserDocumentDraft(
+                uri = Uri.fromFile(fixture).toString(),
+                displayName = fileName,
+                mimeType = "text/markdown",
+                title = title,
+                durationMinutes = 6,
+                topicTags = setOf(TopicTag.ESSAYS, TopicTag.PSYCHOLOGY),
+            ),
+            nowMillis = nowMillis,
+        )
+        assertTrue("Expected wide Markdown table fixture to be saved", result is AddUserDocumentResult.Added)
+        app.appContainer.settingsRepository.saveOnboardingSelection(
+            OnboardingSelection(
+                selectedAppPackages = setOf(FixtureTargetRegistry.fixtureDistractors.first().packageName),
+                preferredTopics = setOf(TopicTag.ESSAYS, TopicTag.PSYCHOLOGY),
+                preferredDurationBucket = DurationBucket.FOCUS,
+                selectedPackIds = emptySet(),
+            ),
+        )
+        (result as AddUserDocumentResult.Added).item
+    }
+
+    private fun seedPagedMarkdownNavigationSelection(
+        title: String = "Paged Markdown Navigation Notes",
+        fileName: String = "paged-markdown-navigation-notes.md",
+        nowMillis: Long = 2_800L,
+    ): ContentItem = runBlocking {
+        val targetContext = InstrumentationRegistry.getInstrumentation().targetContext
+        val app = targetContext.applicationContext as QualityAlternativeApplication
+        val fixture = File(targetContext.filesDir, "visual-qa-fixtures/$fileName")
+        fixture.parentFile?.mkdirs()
+        fixture.writeText(
+            (1..24).joinToString(separator = "\n\n") { index ->
+                val paragraphId = index.toString().padStart(2, '0')
+                "Navigation paragraph $paragraphId keeps normal text gestures active for Sprint 25. " +
+                    "This ordinary reader paragraph has enough words to make the Markdown document span " +
+                    "multiple pages without relying on images or tables. ".repeat(3)
+            },
+        )
+
+        app.appContainer.userDocumentRepository.observeReady().first { it }
+        val result = app.appContainer.userDocumentRepository.addDocument(
+            draft = UserDocumentDraft(
+                uri = Uri.fromFile(fixture).toString(),
+                displayName = fileName,
+                mimeType = "text/markdown",
+                title = title,
+                durationMinutes = 12,
+                topicTags = setOf(TopicTag.ESSAYS, TopicTag.PSYCHOLOGY),
+            ),
+            nowMillis = nowMillis,
+        )
+        assertTrue("Expected paged Markdown navigation fixture to be saved", result is AddUserDocumentResult.Added)
+        app.appContainer.settingsRepository.saveOnboardingSelection(
+            OnboardingSelection(
+                selectedAppPackages = setOf(FixtureTargetRegistry.fixtureDistractors.first().packageName),
+                preferredTopics = setOf(TopicTag.ESSAYS, TopicTag.PSYCHOLOGY),
+                preferredDurationBucket = DurationBucket.FOCUS,
+                selectedPackIds = emptySet(),
+            ),
+        )
+        (result as AddUserDocumentResult.Added).item
+    }
+
     private fun seedSprint12ContinueReadingDocument(
         fileName: String = "sprint12-continue.epub",
         title: String = "Continue Reading Fixture",
@@ -2340,6 +2572,10 @@ class VisualQaScreenshotTest {
     private fun hasNodeContaining(text: String): Boolean = runCatching {
         composeRule.onNodeWithText(text, substring = true, ignoreCase = true).fetchSemanticsNode()
         true
+    }.getOrDefault(false)
+
+    private fun hasAnyNode(text: String): Boolean = runCatching {
+        composeRule.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty()
     }.getOrDefault(false)
 
     private fun hasTag(tag: String): Boolean = runCatching {
