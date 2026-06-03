@@ -28,6 +28,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 
 private val Context.appSettingsDataStore by preferencesDataStore(name = "app_settings")
@@ -37,7 +38,10 @@ class AppContainer(context: Context) {
     private val appJob = SupervisorJob()
     internal val appScope = CoroutineScope(appJob + Dispatchers.IO)
     private val database = QualityAlternativeDatabase.build(context)
-    private val annotationSyncDirectory = File(context.filesDir, "annotation-sync").apply { mkdirs() }
+    // Uri.fromFile only needs the path, not an existing directory, so the blocking mkdirs is pushed to
+    // the IO appScope instead of running on the main thread during cold-start construction.
+    private val annotationSyncDirectory = File(context.filesDir, "annotation-sync")
+        .also { directory -> appScope.launch { directory.mkdirs() } }
     val defaultAnnotationExportUri: String = Uri.fromFile(annotationSyncDirectory).toString()
     val defaultProfileAutosaveUri: String = AndroidAccountLightProfileAutosaveWriter.DEFAULT_PROFILE_BACKUP_URI
     val defaultProfileAutosaveDisplayName: String =

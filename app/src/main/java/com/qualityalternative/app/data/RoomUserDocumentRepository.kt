@@ -190,30 +190,30 @@ class RoomUserDocumentRepository(
             replaceExisting = replaceExisting,
             secondaryKey = ContentItem::verifiedDocumentFingerprintSha256,
         )
-        if (replaceExisting) {
-            val retainedIds = documents.mapTo(mutableSetOf(), ContentItem::id)
-            if (retainedIds.isEmpty()) {
-                dao.deleteAll()
-            } else {
-                dao.deleteAllExcept(retainedIds)
-            }
+        val retainedIds = if (replaceExisting) {
+            documents.mapTo(mutableSetOf(), ContentItem::id)
+        } else {
+            emptySet()
         }
         val documentsToImport = importPlan.itemsToImport
-        documentsToImport.forEach { item ->
-            dao.insertOrReplace(
-                item.toEntity(
-                    uri = requireNotNull(item.rights.sourceUrl) {
-                        "Imported document content must provide a synthetic source reference."
-                    },
-                    displayName = item.sourceLabel.orEmpty().removeSuffix(" (missing)").ifBlank { item.title },
-                    mimeType = null,
-                    createdAtMillis = item.addedAtMillis ?: nowMillis,
-                    updatedAtMillis = nowMillis,
-                    documentFingerprintSha256 = item.verifiedDocumentFingerprintSha256(),
-                    documentFingerprintSizeBytes = item.verifiedDocumentFingerprintSizeBytes(),
-                ),
+        val entitiesToImport = documentsToImport.map { item ->
+            item.toEntity(
+                uri = requireNotNull(item.rights.sourceUrl) {
+                    "Imported document content must provide a synthetic source reference."
+                },
+                displayName = item.sourceLabel.orEmpty().removeSuffix(" (missing)").ifBlank { item.title },
+                mimeType = null,
+                createdAtMillis = item.addedAtMillis ?: nowMillis,
+                updatedAtMillis = nowMillis,
+                documentFingerprintSha256 = item.verifiedDocumentFingerprintSha256(),
+                documentFingerprintSizeBytes = item.verifiedDocumentFingerprintSizeBytes(),
             )
         }
+        dao.replacePortableDocuments(
+            replaceExisting = replaceExisting,
+            retainedIds = retainedIds,
+            documentsToImport = entitiesToImport,
+        )
         this.documents.value = mergeImportedUserContent(
             current = if (replaceExisting) emptyList() else existingDocuments,
             imported = documentsToImport,

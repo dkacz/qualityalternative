@@ -148,6 +148,34 @@ class QualityAlternativeDatabaseMigrationTest {
     }
 
     @Test
+    fun migration15To16AddsAnalyticsTimestampIndex() {
+        val statements = mutableListOf<String>()
+        val db = Proxy.newProxyInstance(
+            SupportSQLiteDatabase::class.java.classLoader,
+            arrayOf(SupportSQLiteDatabase::class.java),
+        ) { _, method, args ->
+            if (method.name == "execSQL" && args?.firstOrNull() is String) {
+                statements += args.first() as String
+            }
+            when (method.returnType) {
+                java.lang.Boolean.TYPE -> false
+                java.lang.Integer.TYPE -> 0
+                java.lang.Long.TYPE -> 0L
+                else -> null
+            }
+        } as SupportSQLiteDatabase
+
+        QualityAlternativeDatabase.MIGRATION_15_16.migrate(db)
+
+        assertTrue(
+            statements.any {
+                it.contains("index_analytics_events_timestampMillis") &&
+                    it.contains("analytics_events(timestampMillis)")
+            },
+        )
+    }
+
+    @Test
     fun migration14To15AddsMarkdownImageAttachmentManifestColumn() {
         val statements = mutableListOf<String>()
         val db = Proxy.newProxyInstance(

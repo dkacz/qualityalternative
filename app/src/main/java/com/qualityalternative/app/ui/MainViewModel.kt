@@ -104,12 +104,16 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 data class MainUiState(
@@ -191,6 +195,9 @@ data class MainUiState(
     val isManagingLibrary: Boolean = false,
     val selectedLibraryContentIds: Set<String> = emptySet(),
     val latestMessage: String? = null,
+    // Bumped by the ViewModel whenever a message is freshly set, so the snackbar effect re-fires even
+    // when the same text is shown twice in a row (keying on the text alone would swallow the repeat).
+    val latestMessageId: Long = 0L,
     val events: List<AnalyticsEvent> = emptyList(),
     val screen: MainScreen = MainScreen.Onboarding,
     val lastFeedback: SessionFeedback? = null,
@@ -334,13 +341,27 @@ class MainViewModel(
     private var annotationDriveAccessToken: String? = null
     private var documentImportPreparationRequestId = 0
     private var readerOpenRequestId = 0
+    // Single-flight for interventions: a newer trigger supersedes an older in-flight one so two rapid
+    // triggers cannot interleave their writes to the shared intervention state (latest wins).
+    private var interventionJob: Job? = null
     private val durationRepairAttemptedContentIds = mutableSetOf<String>()
     private val durationRepairInFlightContentIds = mutableSetOf<String>()
     private val durationRepairEventRecordedContentIds = mutableSetOf<String>()
     private var legacyReadingTimeBackgroundRepairCycleStarted = false
     private val readingAnnotationExportFormatter = ReadingAnnotationExportFormatter()
+    // Coalesces high-frequency profile autosave triggers (one per reading-progress save while
+    // scrolling). CONFLATED keeps only the latest pending request, so a burst settles into a single
+    // full-profile export+write instead of one per scroll. A write already in flight is never
+    // cancelled (the collector consumes one request at a time), so the backup file is never left
+    // half-written. The mutex serialises this path with the direct restore/merge autosave path.
+    private val profileAutosaveRequests = Channel<Long>(Channel.CONFLATED)
+    private val profileAutosaveMutex = Mutex()
+    // Serialises Drive syncs so a first sync persists the folder id before a second one reads it,
+    // preventing concurrent first-time syncs from each creating a duplicate Drive folder.
+    private val annotationDriveSyncMutex = Mutex()
 
-    var uiState by mutableStateOf(
+    private var latestMessageIdCounter = 0L
+    private val uiStateHolder = mutableStateOf(
         MainUiState(
             allSupportedApps = supportedApps,
             starterPacks = starterPacks,
@@ -355,9 +376,26 @@ class MainViewModel(
             permissionReadiness = interceptionMonitor.currentReadiness(),
         ),
     )
-        private set
+    var uiState: MainUiState
+        get() = uiStateHolder.value
+        private set(value) {
+            // Centralised so the ~100 call sites that copy(latestMessage = ...) need no change: when a
+            // message transitions onto a non-null text, stamp it with a fresh id so the snackbar shows
+            // even repeated identical text.
+            val previous = uiStateHolder.value
+            uiStateHolder.value = if (value.latestMessage != null && value.latestMessage != previous.latestMessage) {
+                value.copy(latestMessageId = ++latestMessageIdCounter)
+            } else {
+                value
+            }
+        }
 
     init {
+        viewModelScope.launch {
+            for (requestedAtMillis in profileAutosaveRequests) {
+                autosaveAccountLightProfileIfConfigured(nowMillis = requestedAtMillis)
+            }
+        }
         viewModelScope.launch {
             settingsRepository.observeAppSettings().collect { settings ->
                 settingsLoaded = true
@@ -1731,7 +1769,8 @@ class MainViewModel(
             return
         }
 
-        viewModelScope.launch {
+        interventionJob?.cancel()
+        interventionJob = viewModelScope.launch {
             maybeRecordInterceptionLatencyDegradation(
                 origin = origin,
                 targetApp = targetApp,
@@ -3603,7 +3642,11 @@ class MainViewModel(
         if (!content.isLegacyReadingTimeEstimateCandidate()) {
             return null
         }
-        val estimate = ReadingTimeEstimator.estimateFromText(readerDocument.plainText)
+        // Full-document word-count runs off the main thread (reader-open path is on Dispatchers.Main),
+        // mirroring the background repair above, to avoid a jank spike when opening a long document.
+        val estimate = withContext(documentWorkDispatcher) {
+            ReadingTimeEstimator.estimateFromText(readerDocument.plainText)
+        }
         return applyRecoveredReadingTimeEstimate(
             content = content,
             estimatedMinutes = estimate.minutes,
@@ -3742,8 +3785,10 @@ class MainViewModel(
         }
     }
 
-    private suspend fun autosaveAccountLightProfileAfterPortableMutation(nowMillis: Long = nowProvider()) {
-        autosaveAccountLightProfileIfConfigured(nowMillis = nowMillis)
+    private fun autosaveAccountLightProfileAfterPortableMutation(nowMillis: Long = nowProvider()) {
+        // Fire-and-forget: hand the request to the conflated collector so rapid successive mutations
+        // (notably reading-progress saves) coalesce into a single rewrite instead of one per call.
+        profileAutosaveRequests.trySend(nowMillis)
     }
 
     private suspend fun autosaveAccountLightProfileIfConfigured(nowMillis: Long): Boolean? {
@@ -3751,9 +3796,9 @@ class MainViewModel(
         return autosaveAccountLightProfileTo(uri = uri, nowMillis = nowMillis)
     }
 
-    private suspend fun autosaveAccountLightProfileTo(uri: String, nowMillis: Long): Boolean {
+    private suspend fun autosaveAccountLightProfileTo(uri: String, nowMillis: Long): Boolean = profileAutosaveMutex.withLock {
         uiState = uiState.copy(isProfileAutosaving = true)
-        return try {
+        try {
             val json = accountLightProfileExporter.exportSettingsOnlyProfileJson(nowMillis = nowMillis)
             accountLightProfileAutosaveWriter.writeProfileJson(
                 uri = uri,
@@ -3783,7 +3828,12 @@ class MainViewModel(
         }
     }
 
-    private suspend fun syncReadingAnnotationsToDriveIfConnected(nowMillis: Long): Boolean? {
+    private suspend fun syncReadingAnnotationsToDriveIfConnected(nowMillis: Long): Boolean? =
+        annotationDriveSyncMutex.withLock {
+            syncReadingAnnotationsToDriveIfConnectedLocked(nowMillis = nowMillis)
+        }
+
+    private suspend fun syncReadingAnnotationsToDriveIfConnectedLocked(nowMillis: Long): Boolean? {
         if (!uiState.annotationDriveSyncEnabled) {
             return null
         }

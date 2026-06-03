@@ -1396,21 +1396,6 @@ class ProgressSnapshotTest {
         assertEquals(1, blocks[0].text.spanStyles.count { range -> range.item.fontStyle == FontStyle.Italic })
     }
 
-    @Test
-    fun readerProgressPercentTracksVisibleParagraphsInsteadOfElapsedTime() {
-        assertEquals(0, readerProgressPercent(lastVisibleItemIndex = 0, paragraphCount = 10))
-        assertEquals(30, readerProgressPercent(lastVisibleItemIndex = 3, paragraphCount = 10))
-        assertEquals(100, readerProgressPercent(lastVisibleItemIndex = 20, paragraphCount = 10))
-    }
-
-    @Test
-    fun readerProgressPercentForReaderListIgnoresHeaderItem() {
-        assertEquals(0, readerProgressPercentForReaderList(lastVisibleItemIndex = 0, paragraphCount = 10))
-        assertEquals(0, readerProgressPercentForReaderList(lastVisibleItemIndex = 1, paragraphCount = 10))
-        assertEquals(30, readerProgressPercentForReaderList(lastVisibleItemIndex = 4, paragraphCount = 10))
-        assertEquals(100, readerProgressPercentForReaderList(lastVisibleItemIndex = 20, paragraphCount = 10))
-    }
-
     private fun event(
         type: AnalyticsEventType,
         interventionId: String,

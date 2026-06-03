@@ -348,6 +348,69 @@ class QualityAlternativeDatabaseMigrationInstrumentedTest {
         }
     }
 
+    @Test
+    fun migration15To16ValidatesRoomSchemaAndIndexesAnalyticsTimestamp() {
+        val databaseName = "qa-migration-15-16.db"
+        deleteDatabase(databaseName)
+        val legacy = helper.createDatabase(databaseName, 15)
+        legacy.execSQL(
+            """
+            INSERT INTO analytics_events (
+                type,
+                timestampMillis,
+                semanticKey,
+                interventionId,
+                sessionId,
+                targetAppPackage,
+                primaryContentId,
+                backupContentIdsCsv,
+                contentId,
+                metadataJson
+            ) VALUES (
+                'INTERVENTION_SHOWN',
+                1000,
+                'semantic-1',
+                NULL,
+                NULL,
+                NULL,
+                NULL,
+                '',
+                NULL,
+                '{}'
+            )
+            """.trimIndent(),
+        )
+        legacy.close()
+
+        val migrated = helper.runMigrationsAndValidate(
+            databaseName,
+            16,
+            true,
+            QualityAlternativeDatabase.MIGRATION_15_16,
+        )
+        try {
+            assertTrue(analyticsEventIndexNames(migrated).contains("index_analytics_events_timestampMillis"))
+            migrated.query("SELECT timestampMillis FROM analytics_events WHERE semanticKey = 'semantic-1'")
+                .use { cursor ->
+                    assertTrue(cursor.moveToFirst())
+                    assertEquals(1000, cursor.getInt(0))
+                }
+        } finally {
+            migrated.close()
+            deleteDatabase(databaseName)
+        }
+    }
+
+    private fun analyticsEventIndexNames(db: SupportSQLiteDatabase): List<String> {
+        return db.query("PRAGMA index_list(analytics_events)").use { cursor ->
+            buildList {
+                while (cursor.moveToNext()) {
+                    add(cursor.getString(cursor.getColumnIndexOrThrow("name")))
+                }
+            }
+        }
+    }
+
     private fun readingProgressColumns(db: SupportSQLiteDatabase): List<String> {
         return db.query("PRAGMA table_info(reading_progress)").use { cursor ->
             buildList {

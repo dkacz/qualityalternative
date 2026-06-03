@@ -11,14 +11,18 @@ import com.qualityalternative.app.domain.service.AccountLightProfileBackupReader
 import com.qualityalternative.app.domain.service.AccountLightProfileAutosaveWriter
 import java.io.File
 import java.io.OutputStreamWriter
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class AndroidAccountLightProfileAutosaveWriter(
     private val context: Context,
 ) : AccountLightProfileAutosaveWriter, AccountLightProfileBackupReader {
-    override suspend fun writeProfileJson(uri: String, fileName: String, json: String) {
+    // Blocking file/SAF/MediaStore I/O is moved off the caller's dispatcher (the ViewModel calls
+    // these from viewModelScope, i.e. the main thread) to avoid jank/ANR on profile autosave.
+    override suspend fun writeProfileJson(uri: String, fileName: String, json: String) = withContext(Dispatchers.IO) {
         if (uri == DEFAULT_PROFILE_BACKUP_URI) {
             writeDefaultProfileJson(fileName = fileName, json = json)
-            return
+            return@withContext
         }
         val parsedUri = Uri.parse(uri)
         if (parsedUri.scheme == "file") {
@@ -28,11 +32,11 @@ class AndroidAccountLightProfileAutosaveWriter(
             val outputFile = if (selected.isDirectory) File(selected, fileName) else selected
             outputFile.parentFile?.mkdirs()
             outputFile.writeText(json, Charsets.UTF_8)
-            return
+            return@withContext
         }
         if (DocumentsContract.isTreeUri(parsedUri)) {
             writeProfileJsonToTree(treeUri = parsedUri, fileName = fileName, json = json)
-            return
+            return@withContext
         }
         context.contentResolver.openOutputStream(parsedUri, "wt")
             ?.use { stream ->
@@ -43,20 +47,20 @@ class AndroidAccountLightProfileAutosaveWriter(
             ?: error("Could not write portable profile.")
     }
 
-    override suspend fun readProfileJson(uri: String, fileName: String): String? {
+    override suspend fun readProfileJson(uri: String, fileName: String): String? = withContext(Dispatchers.IO) {
         if (uri == DEFAULT_PROFILE_BACKUP_URI) {
-            return defaultProfileDocumentUri(fileName)
+            return@withContext defaultProfileDocumentUri(fileName)
                 ?.let { documentUri -> runCatching { readTextFromUri(documentUri) }.getOrNull() }
                 ?: readDefaultProfileJsonFromPublicDownloads(fileName)
         }
         val parsedUri = Uri.parse(uri)
         if (parsedUri.scheme == "file") {
-            val path = parsedUri.path?.takeIf(String::isNotBlank) ?: return null
+            val path = parsedUri.path?.takeIf(String::isNotBlank) ?: return@withContext null
             val selected = File(path)
             val inputFile = if (selected.isDirectory) File(selected, fileName) else selected
-            return inputFile.takeIf { it.isFile }?.readText(Charsets.UTF_8)
+            return@withContext inputFile.takeIf { it.isFile }?.readText(Charsets.UTF_8)
         }
-        return readTextFromUri(parsedUri)
+        readTextFromUri(parsedUri)
     }
 
     private fun writeDefaultProfileJson(fileName: String, json: String) {

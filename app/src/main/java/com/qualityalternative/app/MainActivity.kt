@@ -10,6 +10,7 @@ import androidx.activity.enableEdgeToEdge
 import com.qualityalternative.app.ui.MainViewModel
 import com.qualityalternative.app.ui.MainViewModelFactory
 import com.qualityalternative.app.ui.QualityAlternativeApp
+import java.util.UUID
 
 class MainActivity : ComponentActivity() {
     internal val mainViewModel: MainViewModel by viewModels {
@@ -45,6 +46,13 @@ class MainActivity : ComponentActivity() {
         if (intent?.action != ACTION_SYSTEM_INTERVENTION) {
             return
         }
+        // MainActivity is the exported launcher, so any app can send it an explicit intent with this
+        // action. The token is generated per process and only our own AccessibilityService (same
+        // process) can read it, so a forged external intent is rejected before triggering an
+        // intervention with an attacker-chosen package.
+        if (intent.getStringExtra(EXTRA_LAUNCH_TOKEN) != SYSTEM_INTERVENTION_TOKEN) {
+            return
+        }
         val targetAppPackage = intent.getStringExtra(EXTRA_TARGET_APP_PACKAGE) ?: return
         val triggeredAtMillis = intent.getLongExtra(
             EXTRA_TRIGGERED_AT_MILLIS,
@@ -61,6 +69,11 @@ class MainActivity : ComponentActivity() {
             "com.qualityalternative.app.action.SYSTEM_INTERVENTION"
         private const val EXTRA_TARGET_APP_PACKAGE = "extra_target_app_package"
         private const val EXTRA_TRIGGERED_AT_MILLIS = "extra_triggered_at_millis"
+        private const val EXTRA_LAUNCH_TOKEN = "extra_launch_token"
+
+        // Per-process secret shared only between in-process components (the AccessibilityService that
+        // builds the intent and this activity that consumes it). Not derivable by another app.
+        private val SYSTEM_INTERVENTION_TOKEN = UUID.randomUUID().toString()
 
         fun createSystemInterceptionIntent(
             context: Context,
@@ -71,6 +84,7 @@ class MainActivity : ComponentActivity() {
                 action = ACTION_SYSTEM_INTERVENTION
                 putExtra(EXTRA_TARGET_APP_PACKAGE, targetAppPackage)
                 putExtra(EXTRA_TRIGGERED_AT_MILLIS, triggeredAtMillis)
+                putExtra(EXTRA_LAUNCH_TOKEN, SYSTEM_INTERVENTION_TOKEN)
                 addFlags(
                     Intent.FLAG_ACTIVITY_NEW_TASK or
                         Intent.FLAG_ACTIVITY_SINGLE_TOP or

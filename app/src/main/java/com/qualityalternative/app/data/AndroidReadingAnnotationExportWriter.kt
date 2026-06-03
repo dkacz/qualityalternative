@@ -43,16 +43,21 @@ class AndroidReadingAnnotationExportWriter(
             if (!outputDir.exists()) {
                 outputDir.mkdirs()
             }
-            outputDir.listFiles { file ->
-                file.isFile &&
-                    file.name.startsWith(QUALITY_ALTERNATIVE_ANNOTATION_PREFIX) &&
-                    file.name.endsWith(QUALITY_ALTERNATIVE_ANNOTATION_SUFFIX)
-            }
-                .orEmpty()
-                .forEach(File::delete)
+            // Write the new files first, then prune only the stale ones (old QA annotation files no
+            // longer in this export). A crash mid-export then leaves the previous export intact rather
+            // than an emptied directory.
+            val newFileNames = files.mapTo(mutableSetOf(), ReadingAnnotationExportFile::fileName)
             files.forEach { file ->
                 File(outputDir, file.fileName).writeText(file.jsonLd)
             }
+            outputDir.listFiles { file ->
+                file.isFile &&
+                    file.name.startsWith(QUALITY_ALTERNATIVE_ANNOTATION_PREFIX) &&
+                    file.name.endsWith(QUALITY_ALTERNATIVE_ANNOTATION_SUFFIX) &&
+                    file.name !in newFileNames
+            }
+                .orEmpty()
+                .forEach(File::delete)
             val indexFile = if (selected.isDirectory) {
                 File(outputDir, QUALITY_ALTERNATIVE_ANNOTATION_INDEX)
             } else {

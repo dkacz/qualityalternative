@@ -9,6 +9,7 @@ import com.qualityalternative.app.domain.model.AnalyticsEventType
 import com.qualityalternative.app.domain.model.DEFAULT_BEDTIME_ENABLED
 import com.qualityalternative.app.domain.model.DEFAULT_BEDTIME_END_MINUTES
 import com.qualityalternative.app.domain.model.DEFAULT_BEDTIME_START_MINUTES
+import com.qualityalternative.app.domain.model.PermissionReadiness
 import com.qualityalternative.app.domain.model.bedtimeWindowIsActive
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -22,10 +23,19 @@ class QualityAlternativeAccessibilityService : AccessibilityService() {
     private val detectionPolicy = ForegroundAppDetectionPolicy()
     @Volatile
     private var interceptionSettings = InterceptionSettingsSnapshot()
+    // Permission readiness is read from Settings/ContentResolver (three reads). Caching it off the main
+    // thread keeps onAccessibilityEvent (which runs on the main thread, and in bedtime mode without
+    // duplicate suppression) free of that blocking I/O. Null means "not yet evaluated", which safely
+    // blocks an intervention until the first refresh lands.
+    @Volatile
+    private var cachedReadiness: PermissionReadiness? = null
 
     override fun onServiceConnected() {
         super.onServiceConnected()
         val appContainer = (application as QualityAlternativeApplication).appContainer
+        serviceScope.launch {
+            cachedReadiness = appContainer.interceptionMonitor.currentReadiness()
+        }
         serviceScope.launch {
             appContainer.settingsRepository.observeAppSettings().collect { settings ->
                 interceptionSettings = InterceptionSettingsSnapshot(
@@ -73,6 +83,9 @@ class QualityAlternativeAccessibilityService : AccessibilityService() {
         }
 
         serviceScope.launch {
+            // Refresh the readiness cache off the main thread as part of event processing, so the next
+            // event's synchronous gate sees a fresh snapshot without ever blocking the event callback.
+            cachedReadiness = appContainer.interceptionMonitor.currentReadiness()
             appContainer.analyticsTracker.recordDurably(
                 AnalyticsEvent(
                     type = AnalyticsEventType.TARGET_APP_FOREGROUND_DETECTED,
@@ -88,7 +101,7 @@ class QualityAlternativeAccessibilityService : AccessibilityService() {
             )
         }
 
-        if (!appContainer.interceptionMonitor.currentReadiness().interceptionReady) {
+        if (cachedReadiness?.interceptionReady != true) {
             return
         }
         startActivity(

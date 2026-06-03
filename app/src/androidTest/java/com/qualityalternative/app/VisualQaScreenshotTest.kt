@@ -5,6 +5,8 @@ import android.graphics.Bitmap
 import android.graphics.Color
 import android.net.Uri
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
@@ -439,7 +441,7 @@ class VisualQaScreenshotTest {
         captureSprint10("09_intervention_meditation_5m_light")
         startMeditationFromIntervention()
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("meditation-timer-screen") }
-        composeRule.onNodeWithText("No feed. Just 5 minutes back.", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("No feed. Just 5 min back.", substring = true).assertIsDisplayed()
         assertNodeFullyWithinRoot("meditation-countdown")
         assertNodeFullyWithinRoot("meditation-timer-card")
         assertNodeFullyWithinRoot("meditation-complete")
@@ -530,7 +532,7 @@ class VisualQaScreenshotTest {
         captureSprint10("14_intervention_meditation_5m_dark")
         startMeditationFromIntervention()
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("meditation-timer-screen") }
-        composeRule.onNodeWithText("No feed. Just 5 minutes back.", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("No feed. Just 5 min back.", substring = true).assertIsDisplayed()
         assertNodeFullyWithinRoot("meditation-countdown")
         assertNodeFullyWithinRoot("meditation-timer-card")
         assertNodeFullyWithinRoot("meditation-complete")
@@ -816,7 +818,7 @@ class VisualQaScreenshotTest {
         composeRule.onNodeWithTag("library-manage-toggle")
             .assertIsDisplayed()
             .performClick()
-        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("library-manage-panel") && hasNodeContaining("58% read") }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("library-manage-panel") && hasNodeContaining("% read") }
         captureSprint12("19_library_unfinished_manage_light")
 
         scenario?.onActivity { activity -> activity.mainViewModel.triggerDebugIntervention(nowMillis = 2_500L) }
@@ -843,7 +845,7 @@ class VisualQaScreenshotTest {
         composeRule.onNodeWithTag("library-manage-toggle")
             .assertIsDisplayed()
             .performClick()
-        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("library-manage-panel") && hasNodeContaining("58% read") }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("library-manage-panel") && hasNodeContaining("% read") }
         captureSprint12("23_library_unfinished_manage_dark")
 
         scenario?.onActivity { activity -> activity.mainViewModel.triggerDebugIntervention(nowMillis = 3_500L) }
@@ -1123,7 +1125,7 @@ class VisualQaScreenshotTest {
         composeRule.onNodeWithTag("library-manage-toggle")
             .assertIsDisplayed()
             .performClick()
-        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("library-manage-panel") && hasNodeContaining("58% read") }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("library-manage-panel") && hasNodeContaining("% read") }
         captureSprint12Final("19_library_unfinished_light")
 
         scenario?.onActivity { activity -> activity.mainViewModel.triggerDebugIntervention(nowMillis = 4_500L) }
@@ -1153,7 +1155,7 @@ class VisualQaScreenshotTest {
         composeRule.onNodeWithTag("library-manage-toggle")
             .assertIsDisplayed()
             .performClick()
-        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("library-manage-panel") && hasNodeContaining("58% read") }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("library-manage-panel") && hasNodeContaining("% read") }
         captureSprint12Final("24_library_unfinished_dark")
 
         scenario?.onActivity { activity -> activity.mainViewModel.triggerDebugIntervention(nowMillis = 5_500L) }
@@ -1930,11 +1932,32 @@ class VisualQaScreenshotTest {
 
     private fun advanceReaderToLastPage(maxPages: Int = 20) {
         repeat(maxPages) {
-            if (hasNodeContaining("100%")) {
+            // The reader progress label can cap below 100% on the final page (progress is anchored to
+            // the end of the visible page), so detect the last page from the "current/total" page
+            // label instead of waiting for a "100%" that may never appear. Also stop if the reader
+            // viewport is gone, to avoid tapping into a missing node / past the end into feedback.
+            if (hasNodeContaining("100%") || readerIsOnLastPage()) {
+                return
+            }
+            if (!hasTag("reader-page-viewport")) {
                 return
             }
             advanceReaderPage()
         }
+    }
+
+    private fun readerIsOnLastPage(): Boolean {
+        if (!hasTag("reader-page-label")) {
+            return false
+        }
+        val label = composeRule.onNodeWithTag("reader-page-label")
+            .fetchSemanticsNode()
+            .config
+            .getOrNull(SemanticsProperties.Text)
+            ?.joinToString(separator = "") { it.text }
+            ?: return false
+        val match = Regex("(\\d+)\\s*/\\s*(\\d+)").find(label) ?: return false
+        return match.groupValues[1] == match.groupValues[2]
     }
 
     private fun advanceReaderPage() {

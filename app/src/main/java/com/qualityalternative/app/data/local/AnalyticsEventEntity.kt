@@ -8,6 +8,7 @@ import androidx.room.PrimaryKey
     tableName = "analytics_events",
     indices = [
         Index(value = ["semanticKey"], unique = true),
+        Index(value = ["timestampMillis"]),
     ],
 )
 data class AnalyticsEventEntity(

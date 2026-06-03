@@ -23,7 +23,7 @@ class RoomAnalyticsTracker(
 
     init {
         scope.launch {
-            dao.observeAll()
+            dao.observeMostRecent(MAX_RETAINED_ANALYTICS_EVENTS)
                 .map { rows -> rows.map(AnalyticsEventEntity::toModel) }
                 .collect { loadedEvents ->
                     events.value = loadedEvents
@@ -34,12 +34,17 @@ class RoomAnalyticsTracker(
 
     override fun record(event: AnalyticsEvent) {
         scope.launch {
-            dao.insert(event.toEntity())
+            insertAndPrune(event)
         }
     }
 
     override suspend fun recordDurably(event: AnalyticsEvent) {
+        insertAndPrune(event)
+    }
+
+    private suspend fun insertAndPrune(event: AnalyticsEvent) {
         dao.insert(event.toEntity())
+        dao.pruneToMostRecent(MAX_RETAINED_ANALYTICS_EVENTS)
     }
 
     override fun allEvents(): List<AnalyticsEvent> = events.value
@@ -49,6 +54,13 @@ class RoomAnalyticsTracker(
     override fun isReady(): Boolean = ready.value
 
     override fun observeReady(): Flow<Boolean> = ready.asStateFlow()
+
+    private companion object {
+        // Generous ceiling that bounds historical growth (and the per-emission remap cost) while
+        // staying far above any realistic lifetime event count, so the Progress tab's lifetime
+        // counters are not truncated in practice. ~20k rows is well under a few MB of in-memory state.
+        const val MAX_RETAINED_ANALYTICS_EVENTS = 20_000
+    }
 }
 
 private fun AnalyticsEvent.toEntity(): AnalyticsEventEntity {

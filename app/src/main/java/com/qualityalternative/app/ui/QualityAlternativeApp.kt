@@ -223,7 +223,7 @@ fun QualityAlternativeApp(
             DebugVisualParityDensityScale(enabled = uiState.screen != MainScreen.Reader) {
                 val snackbarHostState = remember { SnackbarHostState() }
 
-                LaunchedEffect(uiState.latestMessage) {
+                LaunchedEffect(uiState.latestMessageId, uiState.latestMessage) {
                     val message = uiState.latestMessage
                     if (message == null) {
                         snackbarHostState.currentSnackbarData?.dismiss()
@@ -588,8 +588,11 @@ private fun MainRoute(
             onProgress = viewModel::openProgress,
             onSettings = viewModel::openSettings,
         ) {
+            val progressSnapshot = remember(state.historyEntries, state.events) {
+                progressSnapshot(state.historyEntries, state.events)
+            }
             ProgressTab(
-                snapshot = progressSnapshot(state.historyEntries, state.events),
+                snapshot = progressSnapshot,
                 annotationCount = state.readingAnnotations.size,
                 onOpenAnnotations = viewModel::openAnnotationLibrary,
             )
@@ -1179,7 +1182,7 @@ private fun OnboardingPermissions(
         QaCard(modifier = Modifier.padding(bottom = 18.dp)) {
             PermissionIntroRow("Display over other apps", "To show a single prompt on top, then step out of the way.")
         }
-        MonoText("Nothing leaves your phone.\nYou can revoke either one anytime.", lineHeight = 18.sp)
+        MonoText("Neither permission sends anything off your phone.\nYou can revoke either one anytime.", lineHeight = 18.sp)
     }
 }
 
@@ -1248,10 +1251,16 @@ private fun HomeTab(
     onStartDelayAlternative: () -> Unit,
     onContinueReading: (ContentItem) -> Unit,
 ) {
-    val selectedPacks = state.starterPacks.filter { it.id in state.preferences?.selectedPackIds.orEmpty() }
-    val editorialItems = selectedPacks.flatMap { it.items }
-    val allLibraryItems = editorialItems + state.userLinks + state.userDocuments
-    val topContinue = allLibraryItems.unfinishedSortedByProgress(state.readingProgress).firstOrNull()
+    val selectedPackIds = state.preferences?.selectedPackIds.orEmpty()
+    val editorialItems = remember(state.starterPacks, selectedPackIds) {
+        state.starterPacks.filter { it.id in selectedPackIds }.flatMap { it.items }
+    }
+    val allLibraryItems = remember(editorialItems, state.userLinks, state.userDocuments) {
+        editorialItems + state.userLinks + state.userDocuments
+    }
+    val topContinue = remember(allLibraryItems, state.readingProgress) {
+        allLibraryItems.unfinishedSortedByProgress(state.readingProgress).firstOrNull()
+    }
     val topContinueProgress = topContinue?.let { item -> state.readingProgress.unfinishedProgressFor(item.id) }
     val totalItems = editorialItems.size + state.userLinks.size + state.userDocuments.size
     val totalMins = editorialItems.sumOf(ContentItem::durationMinutes) +
@@ -2497,7 +2506,13 @@ private fun ReaderScreen(
         )
     }
     val persistVisibleReaderProgress by rememberUpdatedState {
-        persistReaderProgress(progressSourcePosition)
+        // Only persist reading progress once the reader has actually moved past the
+        // initial page (manual navigation) or when there is already saved progress to
+        // update. Merely opening a document and leaving must not create a spurious
+        // unfinished-progress record that resurfaces as a "continue reading" card.
+        if (hasManualReaderNavigation || restoredProgress != null) {
+            persistReaderProgress(progressSourcePosition)
+        }
     }
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner, content.id) {
@@ -3626,10 +3641,13 @@ private fun MeditationTimerScreen(
     var hasPlayedGong by remember(content.id, startedAtMillis) { mutableStateOf(false) }
 
     LaunchedEffect(content.id, startedAtMillis) {
-        while (true) {
+        // Stop ticking once the session has elapsed: past zero there is nothing left to count down, so
+        // the per-second recomposition would just spin while the screen stays open.
+        while (System.currentTimeMillis() - startedAtMillis < totalMillis) {
             nowMillis = System.currentTimeMillis()
             delay(1_000L)
         }
+        nowMillis = System.currentTimeMillis()
     }
 
     val remainingMillis = (totalMillis - (nowMillis - startedAtMillis)).coerceAtLeast(0L)
@@ -5851,10 +5869,10 @@ private fun continueProgressMetaFor(
     )
 }
 
-private fun ContentItem.remainingMinutesAfter(progressPercent: Int): Int {
-    val remainingPercent = (100 - progressPercent.coerceIn(1, 99)).coerceAtLeast(1)
-    return ((durationMinutes * remainingPercent) + 99) / 100
-}
+private fun ContentItem.remainingMinutesAfter(progressPercent: Int): Int =
+    // Single source of truth for the "X left" estimate, shared with the reader/list footers. For the
+    // unfinished range (1..99) this yields the same ceil(total * remainingFraction) as before.
+    remainingMinutes(totalMinutes = durationMinutes, progress = progressPercent)
 
 @Composable
 private fun AddLinkValidationLine(form: AddLinkFormState, host: String) {
@@ -8410,19 +8428,6 @@ private fun AnnotatedString.Builder.appendStyledMarkdown(text: String, style: Sp
     addStyle(style, start, length)
 }
 
-internal fun readerProgressPercent(lastVisibleItemIndex: Int, paragraphCount: Int): Int {
-    if (paragraphCount <= 0) {
-        return 100
-    }
-    val visibleParagraphs = lastVisibleItemIndex.coerceIn(0, paragraphCount)
-    return ((visibleParagraphs * 100) / paragraphCount).coerceIn(0, 100)
-}
-
-internal fun readerProgressPercentForReaderList(lastVisibleItemIndex: Int, paragraphCount: Int): Int {
-    val lastVisibleParagraphIndex = (lastVisibleItemIndex - READER_HEADER_ITEM_COUNT).coerceAtLeast(0)
-    return readerProgressPercent(lastVisibleItemIndex = lastVisibleParagraphIndex, paragraphCount = paragraphCount)
-}
-
 internal fun dayCountLabel(count: Int, singular: String): String {
     return quantityLabel(count = count, singular = singular)
 }
@@ -9122,7 +9127,6 @@ private fun releaseDocumentPermission(context: Context, uri: Uri) {
     }
 }
 
-private const val READER_HEADER_ITEM_COUNT = 1
 private const val READER_DEFAULT_PAGE_WEIGHT = 18
 private const val READER_MIN_PAGE_WEIGHT = 8
 private const val READER_MAX_PAGE_WEIGHT = 56

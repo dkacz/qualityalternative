@@ -19,6 +19,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.launch
 
 class PreferencesDelayGate(
@@ -62,12 +64,17 @@ class PreferencesDelayGate(
     }
 
     override suspend fun consumeExpiredDelay(targetApp: DistractingApp, delayId: String, nowMillis: Long): Boolean {
-        val current = windows.value[targetApp.packageName] ?: return false
-        if (current.id != delayId || current.isActive(nowMillis)) {
+        // updateAndGet retries on CAS contention, so the flag below reflects the winning attempt and no
+        // concurrent mutation from another thread is lost (the bug a plain value=value op had).
+        var consumed = false
+        val updated = windows.updateAndGet { current ->
+            val window = current[targetApp.packageName]
+            consumed = window != null && window.id == delayId && !window.isActive(nowMillis)
+            if (consumed) current - targetApp.packageName else current
+        }
+        if (!consumed) {
             return false
         }
-        val updated = windows.value - targetApp.packageName
-        windows.value = updated
         persistDurably(updated)
         return true
     }
@@ -90,8 +97,7 @@ class PreferencesDelayGate(
             primaryContentId = primaryContentId,
             backupContentIds = backupContentIds,
         )
-        val updated = windows.value + (targetApp.packageName to window)
-        windows.value = updated
+        val updated = windows.updateAndGet { current -> current + (targetApp.packageName to window) }
         persist(updated)
         return window
     }
@@ -114,8 +120,7 @@ class PreferencesDelayGate(
             primaryContentId = primaryContentId,
             backupContentIds = backupContentIds,
         )
-        val updated = windows.value + (targetApp.packageName to window)
-        windows.value = updated
+        val updated = windows.updateAndGet { current -> current + (targetApp.packageName to window) }
         persistDurably(updated)
         return window
     }
@@ -155,14 +160,20 @@ class PreferencesDelayGate(
     }
 
     private fun updateFirstReturnAttempt(targetApp: DistractingApp, nowMillis: Long): DelayWindow? {
-        val current = windows.value[targetApp.packageName] ?: return null
-        if (current.firstReturnAttemptAtMillis != null) {
-            return null
+        // The flag/result are assigned on every retry, so they mirror the winning CAS attempt.
+        var updatedWindow: DelayWindow? = null
+        windows.update { current ->
+            val existing = current[targetApp.packageName]
+            if (existing == null || existing.firstReturnAttemptAtMillis != null) {
+                updatedWindow = null
+                current
+            } else {
+                val updated = existing.copy(firstReturnAttemptAtMillis = nowMillis)
+                updatedWindow = updated
+                current + (targetApp.packageName to updated)
+            }
         }
-        val updated = current.copy(firstReturnAttemptAtMillis = nowMillis)
-        val updatedWindows = windows.value + (targetApp.packageName to updated)
-        windows.value = updatedWindows
-        return updated
+        return updatedWindow
     }
 
     override fun isReady(): Boolean = ready.value

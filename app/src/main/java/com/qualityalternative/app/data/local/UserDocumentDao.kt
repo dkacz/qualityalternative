@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -45,4 +46,22 @@ interface UserDocumentDao {
 
     @Query("DELETE FROM user_documents WHERE id NOT IN (:ids)")
     suspend fun deleteAllExcept(ids: Set<String>)
+
+    // Atomic delete-then-insert so an interrupted import cannot leave the table in a half-replaced
+    // state (some rows deleted, new rows not yet written). All statements run in one transaction.
+    @Transaction
+    suspend fun replacePortableDocuments(
+        replaceExisting: Boolean,
+        retainedIds: Set<String>,
+        documentsToImport: List<UserDocumentEntity>,
+    ) {
+        if (replaceExisting) {
+            if (retainedIds.isEmpty()) {
+                deleteAll()
+            } else {
+                deleteAllExcept(retainedIds)
+            }
+        }
+        documentsToImport.forEach { document -> insertOrReplace(document) }
+    }
 }

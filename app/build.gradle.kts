@@ -13,9 +13,12 @@ android {
         applicationId = "com.qualityalternative.app"
         minSdk = 29
         targetSdk = 36
-        versionCode = 28
-        versionName = "0.11.12-alpha"
+        versionCode = 29
+        versionName = "0.11.13-alpha"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // Run each instrumented test in its own process with cleared app data so heavy
+        // VisualQaScreenshotTest cases cannot leak state into later tests (see Test Orchestrator below).
+        testInstrumentationRunnerArguments["clearPackageData"] = "true"
     }
 
     buildTypes {
@@ -44,6 +47,7 @@ android {
 
     testOptions {
         animationsDisabled = true
+        execution = "ANDROIDX_TEST_ORCHESTRATOR"
     }
 
     packaging {
@@ -95,7 +99,9 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.room.testing)
     androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.uiautomator)
+    androidTestUtil(libs.androidx.test.orchestrator)
     androidTestImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.kotlinx.serialization.core)
     androidTestImplementation(libs.kotlinx.serialization.json)
