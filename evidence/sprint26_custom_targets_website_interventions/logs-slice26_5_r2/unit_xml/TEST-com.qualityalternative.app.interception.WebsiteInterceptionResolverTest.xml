@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.qualityalternative.app.interception.WebsiteInterceptionResolverTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-06-07T19:49:43.129Z" hostname="mac-studio.home" time="0.001">
+  <properties/>
+  <testcase name="resolve_prefersExactRuleAndHonorsApexFlag" classname="com.qualityalternative.app.interception.WebsiteInterceptionResolverTest" time="0.0"/>
+  <testcase name="resolve_matchesEnabledRulesWithoutDomainInAnalytics" classname="com.qualityalternative.app.interception.WebsiteInterceptionResolverTest" time="0.001"/>
+  <testcase name="resolve_ignoresDisabledRulesAndBoundarySpoofingHosts" classname="com.qualityalternative.app.interception.WebsiteInterceptionResolverTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

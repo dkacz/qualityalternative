@@ -1,0 +1,11 @@
+Sprint 26 Slice 26.5 R2 external live Chrome Bedtime service E2E
+Started: 2026-06-07T19:48:44Z
+Device: sdk_gphone64_arm64
+Android API: 36
+Android release: 16
+Chrome package: com.android.chrome
+    versionCode=694313732 minSdk=29 targetSdk=34
+    versionName=133.0.6943.137
+    versionCode=694313732 minSdk=26 targetSdk=34
+    versionName=133.0.6943.137
+Result: PASS - external shell launched Chrome on a matching verified host, the bound Quality Alternative AccessibilityService opened Bedtime Chrome website intervention, emergency unlock was shown, meditation remained visible, Pause 15 min was absent, and no raw host/URL appeared in the app UI dump.

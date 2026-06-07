@@ -13,7 +13,7 @@ This file is the repo-level index for active and recently completed execution la
 
 ## Sprint 26 Custom Targets And Website Interventions
 
-Status: `slice26_4_complete_10_10_pass_next_slice26_5`
+Status: `slice26_5_complete_10_10_pass_next_slice26_6`
 
 - Branch: `codex/sprint26-custom-targets-website-interventions`
 - Scope: plan and implement support for replacement-first interventions on eligible arbitrary installed apps plus supported-browser website/domain rules, while avoiding universal URL blocking claims.
@@ -68,6 +68,26 @@ Status: `slice26_4_complete_10_10_pass_next_slice26_5`
   - Slice 26.4 R3 heartbeat check at `2026-06-07T18:50:22Z`: exact-lane harvest found GPT Pro still thinking, so the heartbeat remains active and no R3 review output has been harvested yet.
   - Slice 26.4 R3 review returned `SCORE 10/10`, `VERDICT PASS`, `VISUAL REVIEW NOT APPLICABLE`; no blockers, bundle gaps, or package hygiene issues remain.
   - Slice 26.4 R3 heartbeat was deleted after successful harvest.
+  - Slice 26.4 was committed as `2ce73f8` (`Harden Sprint 26 analytics privacy boundary`).
+  - Slice 26.5 implements Bedtime/custom-target/website integration evidence. Production behavior was already shared through `triggerIntervention`; this slice adds targeted regression coverage and visual proof for supported Chrome website Bedtime.
+  - Slice 26.5 unit coverage proves website Bedtime uses the 60-second emergency unlock, keeps meditation/alternatives, blocks `delayFor15Minutes()`, keeps website unlock scoped to the website suppression key, and avoids raw host/URL analytics metadata.
+  - Slice 26.5 visual evidence proves Soft website, Firm website wait, and Bedtime `Chrome website` emergency-unlock states; the Bedtime screen hides `Pause 15 min`, keeps meditation/quiet alternatives, shows no raw domain, and shows the 60-second breath wait.
+  - Slice 26.5 validation passed: 443 debug unit tests, `lintDebug` with 0 errors, 1/1 connected screenshot E2E on `qaApi36`, `git diff --check`, and emulator shutdown proof.
+  - Slice 26.5 implementation/evidence was sent to GPT Pro at `https://chatgpt.com/c/6a25c47f-21d0-83eb-ace6-66cb604c351e`; harvest heartbeat `harvest-sprint-26-slice26-5-gpt-pro-review` writes to `evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_5_REVIEW.md`.
+  - Slice 26.5 R1 review returned `SCORE 8/10`, `VERDICT FAIL`, `VISUAL REVIEW PASS`; blocker was bundle/evidence completeness for verified-host launch provenance and missing source files (`MainActivity.kt`, `AndroidManifest.xml`, `AnalyticsPrivacyGuard.kt`) plus missing prior Slice 26.1 R4 artifacts.
+  - Slice 26.5 R1 heartbeat was deleted after successful harvest.
+  - Slice 26.5 R2 fixes the blocker with `MainActivityTest#forgedWebsiteInterceptionIntentWithoutLaunchTokenIsIgnored`, a repeatable all-day Bedtime website seed for external live-service E2E, and an external shell harness proving real Chrome -> bound `QualityAlternativeAccessibilityService` -> `Bedtime is protecting sleep from Chrome website`.
+  - Slice 26.5 R2 evidence path: `evidence/sprint26_custom_targets_website_interventions/SLICE26_5_EVIDENCE.md`.
+  - Slice 26.5 R2 visual contact sheet: `evidence/sprint26_custom_targets_website_interventions/visual_e2e_slice26_5_r2/sprint26_slice26_5_r2_bedtime_website_live_contact_sheet.png`.
+  - Slice 26.5 R2 live-service evidence: `evidence/sprint26_custom_targets_website_interventions/live_service_e2e_slice26_5_r2/`.
+  - Slice 26.5 R2 validation passed: 443 debug unit tests, `lintDebug` with 0 errors, connected tests 2/2 on `qaApi36`, external live-service E2E PASS, and `git diff --check` PASS.
+  - Slice 26.5 R2 clean review bundle was prepared for GPT Pro after removing inherited local-path leakage from the R1 review context. The exact active review URL is recorded locally after bundle export; harvest heartbeat `harvest-sprint-26-slice26-5-r2-gpt-pro-review` writes to `evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_5_R2_REVIEW.md`.
+  - Slice 26.5 R2 active GPT Pro review lane: `https://chatgpt.com/c/6a25ce86-3f54-83eb-8547-940e2d94ecf8`.
+  - Slice 26.5 R2 superseded pre-harvest lanes: `https://chatgpt.com/c/6a25cdcc-13a8-83ed-90e2-960e68535cab`, `https://chatgpt.com/c/6a25ce25-d3c0-83eb-8d1e-23288dd931ee`.
+  - Slice 26.5 R2 heartbeat check at `2026-06-07T20:10:22Z`: exact-lane harvest found GPT Pro still thinking with the stop button visible; no `SCORE`/`VERDICT` output was harvested and heartbeat `harvest-sprint-26-slice26-5-r2-gpt-pro-review` remains active.
+  - Slice 26.5 R2 heartbeat check at `2026-06-07T20:20:22Z`: exact-lane harvest and fresh-tab retry still found GPT Pro thinking with the stop button visible; no `SCORE`/`VERDICT` output was harvested and heartbeat `harvest-sprint-26-slice26-5-r2-gpt-pro-review` remains active.
+  - Slice 26.5 R2 review returned `SCORE 10/10`, `VERDICT PASS`, `VISUAL REVIEW PASS`; no blockers, bundle gaps, privacy issues, or package hygiene issues remain.
+  - Slice 26.5 R2 heartbeat was deleted after successful harvest.
   - Slice 26.1 GPT Pro R3 review returned `SCORE 8/10`, `VERDICT FAIL`, `VISUAL REVIEW PASS`.
   - Slice 26.1 GPT Pro R4 review returned `SCORE 10/10`, `VERDICT PASS`, `VISUAL REVIEW PASS`.
   - Slice 26.1 GPT Pro R4 heartbeat was deleted after successful harvest.
@@ -103,8 +123,8 @@ Status: `slice26_4_complete_10_10_pass_next_slice26_5`
   - Passed emulator visual E2E: `VisualQaScreenshotTest#captureSprint26CustomTargetSettingsScreens`
   - Passed `git diff --check`.
 - Next gate:
-  - Commit Slice 26.4 implementation/evidence.
-  - Continue to Slice 26.5 Bedtime and supported website target integration.
+  - Commit Slice 26.5 implementation/evidence.
+  - Continue to Slice 26.6 final E2E, final GPT Pro release review, and APK release.
 
 ### Current Slice 26.2 Validation
 

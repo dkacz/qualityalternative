@@ -231,6 +231,27 @@ class AccessibilityInterceptionTest {
         assertTrue("Website rule seed should complete", true)
     }
 
+    @Test
+    fun seedBedtimeWebsiteRuleSelectionForExternalLiveServiceE2e() {
+        val preserveState = InstrumentationRegistry.getArguments().getString("preserve_state") == "true"
+        preserveStateAfterTest = preserveState
+        chromeEvidenceDir.mkdirs()
+        seedWebsiteRuleSelection(bedtimeAllDay = true)
+        writeChromeEvidence(
+            """
+
+            External live Chrome Bedtime service E2E seed
+            Device model: ${deviceModel()}
+            Android API: ${androidApiLevel()}
+            Android release: ${androidRelease()}
+            Rule set: exact example.com
+            Bedtime: enabled all day
+            Preserve state for external shell harness: $preserveState
+            """.trimIndent(),
+        )
+        assertTrue("Bedtime website rule seed should complete", true)
+    }
+
     private fun seedFixtureSelection() = runBlocking {
         val repository = (targetContext.applicationContext as QualityAlternativeApplication)
             .appContainer
@@ -245,7 +266,7 @@ class AccessibilityInterceptionTest {
         )
     }
 
-    private fun seedWebsiteRuleSelection() = runBlocking {
+    private fun seedWebsiteRuleSelection(bedtimeAllDay: Boolean = false) = runBlocking {
         val repository = (targetContext.applicationContext as QualityAlternativeApplication)
             .appContainer
             .settingsRepository
@@ -270,6 +291,9 @@ class AccessibilityInterceptionTest {
                 ),
             ),
         )
+        if (bedtimeAllDay) {
+            repository.saveBedtimeSettings(enabled = true, startMinutes = 0, endMinutes = 0)
+        }
     }
 
     private fun chromeIsInstalled(): Boolean {

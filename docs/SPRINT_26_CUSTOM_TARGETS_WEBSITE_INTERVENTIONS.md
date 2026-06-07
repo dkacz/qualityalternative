@@ -286,6 +286,20 @@ Acceptance:
 - Ensure custom app and website targets respect opt-in Bedtime emergency-unlock behavior.
 - Preserve reading, meditation, and bounded alternatives.
 - Keep unavailable browser states truthful during Bedtime.
+- Implementation/evidence: `evidence/sprint26_custom_targets_website_interventions/SLICE26_5_EVIDENCE.md`.
+- R1 GPT Pro review lane: `https://chatgpt.com/c/6a25c47f-21d0-83eb-ace6-66cb604c351e`.
+- R1 GPT Pro review: `SCORE 8/10`, `VERDICT FAIL`, `VISUAL REVIEW PASS`.
+- R1 blocker: package/evidence gap for launch provenance; the bundle did not include enough source and live-service proof to disprove forged/non-verified website intents.
+- R2 fixes the R1 blocker with:
+  - `MainActivityTest#forgedWebsiteInterceptionIntentWithoutLaunchTokenIsIgnored`,
+  - external live Chrome AccessibilityService Bedtime website E2E evidence,
+  - `MainActivity.kt`, `AndroidManifest.xml`, `AnalyticsPrivacyGuard.kt`, and prior Slice 26.1 R4 artifacts in the review bundle,
+  - scrubbed lint artifacts for package hygiene.
+- R2 visual evidence: `evidence/sprint26_custom_targets_website_interventions/visual_e2e_slice26_5_r2/sprint26_slice26_5_r2_bedtime_website_live_contact_sheet.png`.
+- R2 validation: 443 debug unit tests passed, lint passed with 0 errors, connected tests passed 2/2 on `qaApi36`, external live-service E2E passed, and `git diff --check` passed.
+- R2 GPT Pro review lane: created after bundle export; the exact active URL is tracked in `docs/LANE_STATUS.md` after send.
+- R2 active GPT Pro lane after send: `https://chatgpt.com/c/6a25ce86-3f54-83eb-8547-940e2d94ecf8`.
+- R2 GPT Pro review: `SCORE 10/10`, `VERDICT PASS`, `VISUAL REVIEW PASS`; no blockers, bundle gaps, privacy issues, or package hygiene issues remain.
 
 Acceptance:
 

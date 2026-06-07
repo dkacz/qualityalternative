@@ -217,6 +217,29 @@ class MainActivityTest {
     }
 
     @Test
+    fun forgedWebsiteInterceptionIntentWithoutLaunchTokenIsIgnored() {
+        seedFixtureSelection()
+        val targetContext = InstrumentationRegistry.getInstrumentation().targetContext
+
+        launchApp(
+            Intent(targetContext, MainActivity::class.java).apply {
+                action = "com.qualityalternative.app.action.SYSTEM_INTERVENTION"
+                putExtra("extra_target_kind", "website")
+                putExtra("extra_target_app_package", "com.android.chrome")
+                putExtra("extra_browser_display_name", "Chrome")
+                putExtra("extra_website_rule_type", "EXACT_DOMAIN")
+                putExtra("extra_website_rule_includes_apex", false)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+            },
+        )
+
+        waitForHome()
+        composeRule.onNodeWithText("You reached for Chrome website").assertDoesNotExist()
+        composeRule.onNodeWithText("Bedtime is protecting sleep from Chrome website", substring = true)
+            .assertDoesNotExist()
+    }
+
+    @Test
     fun systemInterventionDelayActionIsClickableWithoutScrolling() {
         seedFixtureSelection()
         relaunchFixtureSystemIntervention()

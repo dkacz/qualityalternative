@@ -661,6 +661,34 @@ class VisualQaScreenshotTest {
         )
         composeRule.onNodeWithText("Open in", substring = true).assertIsDisplayed().assertIsNotEnabled()
         captureSprint26("24_website_chrome_verified_host_firm_wait_light")
+
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.setBedtimeSettings(enabled = true, startMinutes = 0, endMinutes = 0)
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            runBlocking {
+                val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication
+                app.appContainer.settingsRepository.observeAppSettings().first().bedtimeEnabled
+            }
+        }
+        scenario?.close()
+        scenario = null
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+        launchApp(
+            MainActivity.createWebsiteInterceptionIntent(
+                context = targetContext,
+                browserPackage = VerifiedBrowserHostAdapter.CHROME_PACKAGE,
+                browserDisplayName = "Chrome",
+                websiteRuleType = WebsiteRuleType.WILDCARD_SUBDOMAINS.name,
+                websiteRuleIncludesApex = true,
+            ),
+        )
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("bedtime-emergency-unlock-wait") }
+        composeRule.onNodeWithText("Bedtime is protecting sleep from Chrome website", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithTag("intervention-meditation-alternative").assertIsDisplayed()
+        composeRule.onNodeWithTag("bedtime-emergency-unlock-action").assertIsDisplayed().assertIsNotEnabled()
+        assertTrue("Bedtime website flow should hide Pause 15 min", !hasNode("Pause 15 min"))
+        captureSprint26("25_website_chrome_bedtime_emergency_unlock_light")
     }
 
     @Test

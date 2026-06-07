@@ -1,0 +1,19 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<testsuites tests="2" failures="0" errors="0" skipped="0" time="8.503" timestamp="2026-06-07T19:47:36" hostname="localhost">
+  <testsuite name="com.qualityalternative.app.MainActivityTest" tests="1" failures="0" errors="0" skipped="0" time="1.374" timestamp="2026-06-07T19:47:36" hostname="localhost">
+    <properties>
+      <property name="device" value="qaApi36(AVD) - 16" />
+      <property name="flavor" value="" />
+      <property name="project" value=":app" />
+    </properties>
+    <testcase name="forgedWebsiteInterceptionIntentWithoutLaunchTokenIsIgnored" classname="com.qualityalternative.app.MainActivityTest" time="1.374" />
+  </testsuite>
+  <testsuite name="com.qualityalternative.app.VisualQaScreenshotTest" tests="1" failures="0" errors="0" skipped="0" time="5.539" timestamp="2026-06-07T19:47:36" hostname="localhost">
+    <properties>
+      <property name="device" value="qaApi36(AVD) - 16" />
+      <property name="flavor" value="" />
+      <property name="project" value=":app" />
+    </properties>
+    <testcase name="captureSprint26ChromeWebsiteInterventionScreens" classname="com.qualityalternative.app.VisualQaScreenshotTest" time="5.539" />
+  </testsuite>
+</testsuites>

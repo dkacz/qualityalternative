@@ -1,0 +1,49 @@
+ACCESSIBILITY MANAGER (dumpsys accessibility)
+
+currentUserId=0
+hasMagnificationConnection=false
+Magnifier on display#0
+    MagnificationConfig[mode: 1, activated: false, scale: 1.0, centerX: 540.0, centerY: 1168.5]
+    Magnification region=SkRegion((0,0,1080,2337))
+    IdOfLastServiceToMagnify=-1
+    SupportWindowMagnification=true
+    WindowMagnificationConnectionState=DISCONNECTED
+User state[
+     attributes:{id=0, touchExplorationEnabled=false, serviceHandlesDoubleTap=false, requestMultiFingerGestures=false, requestTwoFingerPassthrough=false, sendMotionEventsEnabledfalse, displayMagnificationEnabled=false, autoclickEnabled=false, nonInteractiveUiTimeout=0, interactiveUiTimeout=0, installedServiceCount=6, magnificationModes={0=1}, magnificationCapabilities=3, audioDescriptionByDefaultEnabled=false, magnificationFollowTypingEnabled=true, alwaysOnMagnificationEnabled=true}
+     button mode: 1
+     shortcut key:{}
+     button:{}
+     button target:{null}
+     gesture:{}
+     qs shortcut targets:{}
+     a11y tiles in QS panel:{}
+     Bound services:{Service[label=Quality Alternative Foreground Detection, feedbackType[FEEDBACK_GENERIC], capabilities=1, eventTypes=[TYPE_WINDOW_STATE_CHANGED, TYPE_WINDOW_CONTENT_CHANGED], notificationTimeout=100, requestA11yBtn=false]}
+     Enabled services:{{com.qualityalternative.app/com.qualityalternative.app.interception.QualityAlternativeAccessibilityService}}
+     Binding services:{}
+     Crashed services:{}
+     Client list info:{
+          Client list callbacks: 10
+          Client list killed: false
+          Client list broadcasts count: -1
+          Registered clients:{
+[com.google.android.apps.nexuslauncher][com.google.android.googlequicksearchbox][com.google.android.as][com.google.android.apps.photos][com.google.android.inputmethod.latin][com.google.android.tts][com.qualityalternative.app][com.google.android.deskclock][com.android.chrome][com.google.android.apps.wellbeing]}]
+Global Info [ Top focused display Id = 0
+     Active Window Id = 84
+     Top Focused Window Id = 84
+     Accessibility Focused Window Id = -1 ]
+
+
+Window attributes:[{72=AccessibilityWindowAttributes{mAccessibilityWindowTitle=nullmLocales=[en_US]}, 73=AccessibilityWindowAttributes{mAccessibilityWindowTitle=nullmLocales=[en_US]}, 74=AccessibilityWindowAttributes{mAccessibilityWindowTitle=nullmLocales=[en_US]}, 75=AccessibilityWindowAttributes{mAccessibilityWindowTitle=nullmLocales=[en_US]}, 76=AccessibilityWindowAttributes{mAccessibilityWindowTitle=nullmLocales=[en_US]}, 77=AccessibilityWindowAttributes{mAccessibilityWindowTitle=nullmLocales=[en_US]}, 78=AccessibilityWindowAttributes{mAccessibilityWindowTitle=Navigation barmLocales=[en_US]}, 79=AccessibilityWindowAttributes{mAccessibilityWindowTitle=Navigation bar Edge PanelmLocales=[en_US]}, 80=AccessibilityWindowAttributes{mAccessibilityWindowTitle=HomemLocales=[en_US]}, 82=AccessibilityWindowAttributes{mAccessibilityWindowTitle=ChromemLocales=[en_US]}, 84=AccessibilityWindowAttributes{mAccessibilityWindowTitle=Quality AlternativemLocales=[en_US]}}]
+Global client list info:{
+    Client list callbacks: 8
+    Client list killed: false
+    Client list broadcasts count: -1
+    Registered clients:{
+[com.android.settings, com.android.localtransport, com.android.keychain, com.android.inputdevices, com.android.DeviceAsWebcam, com.android.providers.settings, com.android.server.telecom, com.android.location.fused, com.android.emulator.multidisplay, com.android.dynsystem, android][com.google.android.documentsui][com.android.systemui][com.google.android.googlequicksearchbox][com.google.android.gms][com.google.android.settings.intelligence][com.google.android.permissioncontroller][com.android.localtransport, com.android.settings, com.android.server.telecom, android, com.android.keychain, com.android.dynsystem, com.android.DeviceAsWebcam, com.android.emulator.multidisplay, com.android.providers.settings, com.android.location.fused, com.android.inputdevices]
+
+Proxy manager state:
+    Number of proxy connections: 0
+    Registered proxy connections:
+Accessibility Display Listener:
+    SystemUI uid: 10186
+    1 valid display: 0

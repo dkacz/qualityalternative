@@ -1,0 +1,138 @@
+diff --git a/app/src/androidTest/java/com/qualityalternative/app/VisualQaScreenshotTest.kt b/app/src/androidTest/java/com/qualityalternative/app/VisualQaScreenshotTest.kt
+index 056332a..631921d 100644
+--- a/app/src/androidTest/java/com/qualityalternative/app/VisualQaScreenshotTest.kt
++++ b/app/src/androidTest/java/com/qualityalternative/app/VisualQaScreenshotTest.kt
+@@ -661,6 +661,34 @@ class VisualQaScreenshotTest {
+         )
+         composeRule.onNodeWithText("Open in", substring = true).assertIsDisplayed().assertIsNotEnabled()
+         captureSprint26("24_website_chrome_verified_host_firm_wait_light")
++
++        scenario?.onActivity { activity ->
++            activity.mainViewModel.setBedtimeSettings(enabled = true, startMinutes = 0, endMinutes = 0)
++        }
++        composeRule.waitUntil(timeoutMillis = 10_000) {
++            runBlocking {
++                val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication
++                app.appContainer.settingsRepository.observeAppSettings().first().bedtimeEnabled
++            }
++        }
++        scenario?.close()
++        scenario = null
++        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
++        launchApp(
++            MainActivity.createWebsiteInterceptionIntent(
++                context = targetContext,
++                browserPackage = VerifiedBrowserHostAdapter.CHROME_PACKAGE,
++                browserDisplayName = "Chrome",
++                websiteRuleType = WebsiteRuleType.WILDCARD_SUBDOMAINS.name,
++                websiteRuleIncludesApex = true,
++            ),
++        )
++        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("bedtime-emergency-unlock-wait") }
++        composeRule.onNodeWithText("Bedtime is protecting sleep from Chrome website", substring = true).assertIsDisplayed()
++        composeRule.onNodeWithTag("intervention-meditation-alternative").assertIsDisplayed()
++        composeRule.onNodeWithTag("bedtime-emergency-unlock-action").assertIsDisplayed().assertIsNotEnabled()
++        assertTrue("Bedtime website flow should hide Pause 15 min", !hasNode("Pause 15 min"))
++        captureSprint26("25_website_chrome_bedtime_emergency_unlock_light")
+     }
+
+     @Test
+diff --git a/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt b/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
+index 978f99a..6e11e1a 100644
+--- a/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
+@@ -4872,6 +4872,94 @@ class MainViewModelTest {
+         assertEquals(WebsiteInterceptionResolver.TARGET_TYPE, openEvent.metadata["targetType"])
+     }
+
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun websiteBedtimeInterventionKeepsAlternativesAndUnlocksOnlyWebsiteKey() = runTest {
++        var nowMillis = 90_000L
++        val analyticsTracker = InMemoryAnalyticsTracker()
++        val viewModel = createViewModel(
++            settingsRepository = FakeSettingsRepository(
++                initial = completedSettings(selectedAppPackages = emptySet())
++                    .copy(
++                        interventionMode = InterventionMode.SOFT,
++                        bedtimeEnabled = true,
++                        bedtimeStartMinutes = 0,
++                        bedtimeEndMinutes = 0,
++                        openAnywayUnlockMinutes = 15,
++                    ),
++            ),
++            analyticsTracker = analyticsTracker,
++            nowProvider = { nowMillis },
++        )
++
++        advanceUntilIdle()
++        viewModel.requestSystemWebsiteInterception(
++            browserPackage = VerifiedBrowserHostAdapter.CHROME_PACKAGE,
++            browserDisplayName = "Chrome",
++            websiteRuleType = WebsiteRuleType.WILDCARD_SUBDOMAINS.name,
++            websiteRuleIncludesApex = true,
++            nowMillis = nowMillis,
++        )
++        advanceUntilIdle()
++
++        assertEquals(MainScreen.Intervention, viewModel.uiState.screen)
++        assertEquals("Chrome website", viewModel.uiState.selectedTargetApp?.displayName)
++        assertTrue(viewModel.uiState.isBedtimeActive)
++        assertTrue(viewModel.uiState.currentInterventionBedtimeEnforced)
++        assertEquals(WebsiteInterceptionResolver.TARGET_TYPE, viewModel.uiState.currentInterventionMetadata["targetType"])
++        assertEquals(
++            WebsiteInterceptionResolver.BROWSER_SUPPORT_VERIFIED_HOST,
++            viewModel.uiState.currentInterventionMetadata["browserSupportStatus"],
++        )
++        assertEquals(
++            nowMillis + BEDTIME_OPEN_ANYWAY_UNLOCK_DELAY_MILLIS,
++            viewModel.uiState.currentOpenAnywayUnlockAvailableAtMillis,
++        )
++        val recommendationSet = requireNotNull(viewModel.uiState.currentRecommendationSet)
++        val offeredContentIds = listOf(recommendationSet.primary.id) + recommendationSet.backups.map(ContentItem::id)
++        assertTrue(MEDITATION_TIMER_CONTENT_ID in offeredContentIds)
++        assertTrue(recommendationSet.backups.isNotEmpty())
++        assertFalse(analyticsTracker.allEvents().any { it.type == AnalyticsEventType.FORM_INTERVENTION_SHOWN })
++
++        viewModel.delayFor15Minutes()
++        advanceUntilIdle()
++
++        assertEquals(MainScreen.Intervention, viewModel.uiState.screen)
++        assertEquals(null, viewModel.uiState.activeDelayWindow)
++        assertFalse(viewModel.openAnyway())
++        assertTrue(analyticsTracker.allEvents().any { it.type == AnalyticsEventType.BEDTIME_UNLOCK_BLOCKED })
++
++        nowMillis += BEDTIME_OPEN_ANYWAY_UNLOCK_DELAY_MILLIS
++        viewModel.recordFormInterventionUnlockAvailable(nowMillis = nowMillis)
++        assertTrue(viewModel.openAnyway())
++        advanceUntilIdle()
++
++        assertTrue(
++            InterceptionRuntimeGate.shouldSuppress(
++                targetAppPackage = VerifiedBrowserHostAdapter.CHROME_PACKAGE,
++                targetKey = WebsiteInterceptionResolver.suppressionKeyFor(VerifiedBrowserHostAdapter.CHROME_PACKAGE),
++                nowMillis = nowMillis + 14 * 60_000L,
++                bedtimeActive = true,
++            ),
++        )
++        assertFalse(
++            InterceptionRuntimeGate.shouldSuppress(
++                targetAppPackage = VerifiedBrowserHostAdapter.CHROME_PACKAGE,
++                nowMillis = nowMillis + 14 * 60_000L,
++                bedtimeActive = true,
++            ),
++        )
++        val events = analyticsTracker.allEvents()
++        val bedtimeShown = events.first { it.type == AnalyticsEventType.BEDTIME_INTERVENTION_SHOWN }
++        assertEquals(WebsiteInterceptionResolver.TARGET_TYPE, bedtimeShown.metadata["targetType"])
++        assertEquals("true", events.first { it.type == AnalyticsEventType.OPEN_ANYWAY_SELECTED }.metadata["bedtimeActive"])
++        assertTrue(events.any { it.type == AnalyticsEventType.BEDTIME_UNLOCK_ENABLED })
++        assertTrue(events.any { it.type == AnalyticsEventType.BEDTIME_UNLOCK_USED })
++        val serializedMetadata = events.flatMap { event -> event.metadata.entries }.joinToString(" ")
++        assertFalse(serializedMetadata.contains("example"))
++        assertFalse(serializedMetadata.contains("https://"))
++    }
++
+     @Test
+     @OptIn(ExperimentalCoroutinesApi::class)
+     fun requestSystemInterception_recordsDegradedPerformanceWhenShownTooLate() = runTest {

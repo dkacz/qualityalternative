@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.qualityalternative.app.domain.model.ReaderDocumentModelsTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-06-07T19:49:43.105Z" hostname="mac-studio.home" time="0.0">
+  <properties/>
+  <testcase name="fromPlainTextKeepsStableSourceBlockIndexes" classname="com.qualityalternative.app.domain.model.ReaderDocumentModelsTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.qualityalternative.app.ui.GoogleDriveAuthorizationUiTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-06-07T19:49:43.913Z" hostname="mac-studio.home" time="0.003">
+  <properties/>
+  <testcase name="authorizationResultWithIntentIsParsedEvenWhenResultCodeIsNotOk" classname="com.qualityalternative.app.ui.GoogleDriveAuthorizationUiTest" time="0.0"/>
+  <testcase name="googleDriveDocumentTreeProviderIsRecognizedAsDriveConnectionFallback" classname="com.qualityalternative.app.ui.GoogleDriveAuthorizationUiTest" time="0.001"/>
+  <testcase name="apiExceptionMessagesDistinguishConfigurationAndServiceFailures" classname="com.qualityalternative.app.ui.GoogleDriveAuthorizationUiTest" time="0.002"/>
+  <testcase name="authorizationResultWithoutIntentDistinguishesCancelFromTechnicalFailure" classname="com.qualityalternative.app.ui.GoogleDriveAuthorizationUiTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

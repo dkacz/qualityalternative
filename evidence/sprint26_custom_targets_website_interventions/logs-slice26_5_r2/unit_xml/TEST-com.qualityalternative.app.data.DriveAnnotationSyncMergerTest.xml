@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.qualityalternative.app.data.DriveAnnotationSyncMergerTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-06-07T19:49:42.305Z" hostname="mac-studio.home" time="0.006">
+  <properties/>
+  <testcase name="indexMergeUnionsFilesAndPrefersLocalMetadataOnFileNameClash" classname="com.qualityalternative.app.data.DriveAnnotationSyncMergerTest" time="0.001"/>
+  <testcase name="annotationMergeKeepsRemoteWhenRemoteModifiedIsNewer" classname="com.qualityalternative.app.data.DriveAnnotationSyncMergerTest" time="0.004"/>
+  <testcase name="annotationMergeKeepsRemoteOnlyItemsAndPrefersNewerOnConflict" classname="com.qualityalternative.app.data.DriveAnnotationSyncMergerTest" time="0.001"/>
+  <testcase name="annotationMergeFallsBackToLocalWhenRemoteIsBlankOrUnparseable" classname="com.qualityalternative.app.data.DriveAnnotationSyncMergerTest" time="0.0"/>
+  <testcase name="annotationMergeKeepsLocalWhenTimestampsTie" classname="com.qualityalternative.app.data.DriveAnnotationSyncMergerTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

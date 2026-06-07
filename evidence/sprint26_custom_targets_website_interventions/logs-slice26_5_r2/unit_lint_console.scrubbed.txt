@@ -10,38 +10,37 @@ The current default is 'true'.
 > Task :app:packageDebugResources
 > Task :app:processDebugNavigationResources
 > Task :app:parseDebugLocalResources
-> Task :app:javaPreCompileDebug
 > Task :app:generateDebugRFile
-> Task :app:mapDebugSourceSetPaths
+> Task :app:javaPreCompileDebug
 > Task :app:checkDebugAarMetadata
+> Task :app:mapDebugSourceSetPaths
 > Task :app:compileDebugNavigationResources
 > Task :app:createDebugCompatibleScreenManifests
 > Task :app:extractDeepLinksDebug
 > Task :app:processDebugMainManifest
-> Task :app:processDebugManifest
-> Task :app:preDebugAndroidTestBuild SKIPPED
-> Task :app:extractProguardFiles
-> Task :app:preDebugUnitTestBuild UP-TO-DATE
 > Task :app:mergeDebugResources
-> Task :app:processDebugAndroidTestManifest
-> Task :app:generateDebugAndroidTestBuildConfig
-> Task :app:generateDebugAndroidTestResources
-> Task :app:packageDebugAndroidTestResources
-> Task :app:processDebugAndroidTestNavigationResources
+> Task :app:processDebugManifest
+> Task :app:preDebugUnitTestBuild UP-TO-DATE
+> Task :app:preDebugAndroidTestBuild SKIPPED
+> Task :app:javaPreCompileDebugUnitTest
+> Task :app:extractProguardFiles
 > Task :app:processDebugManifestForPackage
-> Task :app:parseDebugAndroidTestLocalResources
-> Task :app:generateDebugAndroidTestRFile
 > Task :app:processDebugResources
 > Task :app:kspDebugKotlin
 > Task :app:compileDebugKotlin
 > Task :app:compileDebugJavaWithJavac
+> Task :app:processDebugJavaRes
 > Task :app:generateDebugLintReportModel
 > Task :app:bundleDebugClassesToCompileJar
+> Task :app:bundleDebugClassesToRuntimeJar
 > Task :app:generateDebugAndroidTestLintModel
 > Task :app:generateDebugUnitTestLintModel
-> Task :app:kspDebugAndroidTestKotlin
-> Task :app:compileDebugAndroidTestKotlin
+> Task :app:kspDebugUnitTestKotlin
+> Task :app:compileDebugUnitTestKotlin
+> Task :app:compileDebugUnitTestJavaWithJavac NO-SOURCE
+> Task :app:processDebugUnitTestJavaRes
 > Task :app:lintAnalyzeDebugAndroidTest
+> Task :app:testDebugUnitTest
 > Task :app:lintAnalyzeDebugUnitTest
 > Task :app:lintAnalyzeDebug
 
@@ -50,6 +49,6 @@ Wrote HTML report to file://<repo>/app/build/reports/lint-results-debug.html
 
 > Task :app:lintDebug
 
-BUILD SUCCESSFUL in 22s
-39 actionable tasks: 39 executed
+BUILD SUCCESSFUL in 25s
+37 actionable tasks: 37 executed
 Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.3.1/userguide/configuration_cache_enabling.html
