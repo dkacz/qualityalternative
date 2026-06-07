@@ -1,0 +1,290 @@
+06-07 19:04:07.972  4152  4166 I TestRunner: started: chromeVerifiedHostAdapterRejectsSyntheticUnsupportedAndStaleStates(com.qualityalternative.app.AccessibilityInterceptionTest)
+06-07 19:04:07.983  1595  2084 I BugleRcsEngine: Processing an intent [CONTEXT log_prefix="(Sim)" thread_id=61 ]
+06-07 19:04:07.985  1595  2084 I BugleRcsEngine: SIM state LOADED [CONTEXT log_prefix="(Sim)" thread_id=61 ]
+06-07 19:04:08.026  4152  4166 I UiDevice: Creating a new instance, old instance exists: false
+06-07 19:04:08.029  4152  4166 I UiAutomation: Initialized for user 0 on display 0
+06-07 19:04:08.070  1527  1547 I AiAiEcho: Settings changed for uri: content://settings/secure/accessibility_enabled
+06-07 19:04:08.072  1527  1652 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+06-07 19:04:08.075  1527  1652 I AiAiEcho: EchoTargets:
+06-07 19:04:08.075  1527  1652 I AiAiEcho: Filtered by AiAi flag check:
+06-07 19:04:08.075  1527  1652 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+06-07 19:04:08.076  1527  1652 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+06-07 19:04:08.076  1527  1652 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+06-07 19:04:08.076  1527  1652 I AiAiEcho: EchoTargets:
+06-07 19:04:08.076  1527  1652 I AiAiEcho: Filtered by AiAi flag check:
+06-07 19:04:08.076  1527  1652 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+06-07 19:04:08.077  1527  1652 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+06-07 19:04:08.080  1527  1652 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface home with targets# 0 (types=[])
+06-07 19:04:08.081  1527  1652 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface lockscreen with targets# 0 (types=[])
+06-07 19:04:08.083  1095  1095 D SsBaseTemplateCard: No text view can be set up
+06-07 19:04:08.083  1095  1095 D SsBaseTemplateCard: Passed-in item info is null
+06-07 19:04:08.083  1095  1095 D SsBaseTemplateCard: Passed-in item info is null
+06-07 19:04:08.083  1095  1095 D SsBaseTemplateCard: Passed-in item info is null
+06-07 19:04:08.083  1095  1095 I SsBaseTemplateCard: Secondary card pane is null
+06-07 19:04:08.084  1595  2084 I BugleRcsEngine: SIM changed: false. current id: redacted-pii:sim_id[chars:20,last3:897]; stored id: redacted-pii:sim_id[chars:20,last3:897]; isFiDevice: false; subId: 1; slotIndex: 0 [CONTEXT log_prefix="(Sim)" thread_id=61 ]
+06-07 19:04:08.088   716   716 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:08.091   716   716 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:08.091   716   716 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:08.091   716   716 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:08.091   716   716 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:08.091   716   716 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:08.092   716   716 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:08.093   716   716 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:08.093   716   716 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:08.093   716   716 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:08.093   716   716 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:08.093   716   716 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:08.097   716   716 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:08.097   716   716 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:08.097   716   716 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:08.097   716   716 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:08.097   716   716 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:08.098   716   716 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:08.100  4152  4168 V UiAutomation: Init UiAutomation@4dc319f[id=2, displayId=0, flags=0]
+06-07 19:04:08.102  4152  4166 D UiDevice: Setting accessibility service flags: 65618
+06-07 19:04:08.106  1527  1809 I AiAiEcho: Settings changed for uri: content://settings/secure/accessibility_enabled
+06-07 19:04:08.107   716   716 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:08.108  1527  1652 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+06-07 19:04:08.108  1527  1652 I AiAiEcho: EchoTargets:
+06-07 19:04:08.108  1527  1652 I AiAiEcho: Filtered by AiAi flag check:
+06-07 19:04:08.108  1527  1652 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+06-07 19:04:08.109  1527  1652 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+06-07 19:04:08.110  1527  1652 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+06-07 19:04:08.110  1527  1652 I AiAiEcho: EchoTargets:
+06-07 19:04:08.110  1527  1652 I AiAiEcho: Filtered by AiAi flag check:
+06-07 19:04:08.110  1527  1652 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+06-07 19:04:08.110  1527  1652 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+06-07 19:04:08.111  1527  1652 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface home with targets# 0 (types=[])
+06-07 19:04:08.112  1527  1652 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface lockscreen with targets# 0 (types=[])
+06-07 19:04:08.112   716   716 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:08.112   716   716 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:08.112   716   716 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:08.113   716   716 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:08.113   716   716 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:08.114   716   716 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:08.116   716   716 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:08.117   716   716 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:08.117   716   716 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:08.117   716   716 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:08.119  1095  1095 D SsBaseTemplateCard: No text view can be set up
+06-07 19:04:08.119  1095  1095 D SsBaseTemplateCard: Passed-in item info is null
+06-07 19:04:08.119  1095  1095 D SsBaseTemplateCard: Passed-in item info is null
+06-07 19:04:08.119  1095  1095 D SsBaseTemplateCard: Passed-in item info is null
+06-07 19:04:08.119  1095  1095 I SsBaseTemplateCard: Secondary card pane is null
+06-07 19:04:08.119   716   716 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:08.123  1367  1403 D AccessibilitySourceService: enabled a11y services count 0
+06-07 19:04:08.123  1367  1403 D AccessibilitySourceService: a11y source sending 0 issue to sc
+06-07 19:04:08.123   716  1637 D SafetySourceDataValidat: No cert check requested for package com.google.android.permissioncontroller
+06-07 19:04:08.132   961   961 W PageIndicator: Total number of pages invalid: 0. Assuming 1 page.
+06-07 19:04:08.136   961   961 W PageIndicator: Total number of pages invalid: 0. Assuming 1 page.
+06-07 19:04:08.211  1595  2084 I BugleRcsEngine: Skipping writing to Msisdn because this is not main bugle process. [CONTEXT log_prefix="(Sim)" thread_id=61 ]
+06-07 19:04:08.218  1595  2084 I BugleRcsEngine: Updated SIM info: currentSimId: redacted-pii:sim_id[chars:20,last3:897]; imsi: redacted-pii:imsi[chars:15]; rawMsisdn: redacted-pii:phone_number[chars:12,last2:67]; formattedMsisdn: redacted-pii:phone_number[chars:12,last2:67]; mccmnc: redacted-pii:sim_operator[chars:6]; gid1: redacted-pii:sim_gid[chars:0]; isFiDevice: false; subId: 1; slotIndex: 0 [CONTEXT log_prefix="(Sim)" thread_id=61 ]
+06-07 19:04:08.232  1595  2084 I BugleRcsEngine: Handling SIM_LOADED in PhoneSimsStateUpdater. [CONTEXT log_prefix="(Sim)" thread_id=61 ]
+06-07 19:04:08.274  4152  4185 E ashmem  : Pinning is deprecated since Android Q. Please use trim or other methods.
+06-07 19:04:08.365  4152  4166 I alternative.app: AssetManager2(0xb40000785e046578) locale list changing from [] to [en-US]
+06-07 19:04:08.418  4152  4166 I alternative.app: AssetManager2(0xb40000785e044318) locale list changing from [] to [en-US]
+06-07 19:04:08.648  1275  2876 I NetworkScheduler.Stats: Task com.google.android.gms/com.google.android.gms.ipa.base.IpaGcmTaskService started execution. cause:9 exec_start_elapsed_seconds: 104 [CONTEXT service_id=218 ]
+06-07 19:04:08.703  4152  4188 W alternative.app: Long monitor contention with owner arch_disk_io_0 (4185) at java.lang.Object kotlin.SynchronizedLazyImpl.getValue()(LazyJVM.kt:81) waiters=0 in java.lang.Object kotlin.SynchronizedLazyImpl.getValue() for 439ms
+06-07 19:04:08.705  4152  4187 W alternative.app: Long monitor contention with owner arch_disk_io_0 (4185) at java.lang.Object kotlin.SynchronizedLazyImpl.getValue()(LazyJVM.kt:81) waiters=2 in java.lang.Object kotlin.SynchronizedLazyImpl.getValue() for 440ms
+06-07 19:04:08.760  1275  2098 I NetworkScheduler.Stats: Task com.google.android.gms/com.google.android.gms.ipa.base.IpaGcmTaskService finished executing. cause:9 result: 1 elapsed_millis: 239 uptime_millis: 239 exec_start_elapsed_seconds: 104 [CONTEXT service_id=218 ]
+06-07 19:04:08.917  4152  4166 I alternative.app: AssetManager2(0xb40000785e047e78) locale list changing from [] to [en-US]
+06-07 19:04:09.042  4152  4166 I alternative.app: AssetManager2(0xb40000785e03fe58) locale list changing from [] to [en-US]
+06-07 19:04:09.098  4152  4166 I alternative.app: AssetManager2(0xb40000785e0452b8) locale list changing from [] to [en-US]
+06-07 19:04:09.112   716   865 D WifiClientModeImpl[8634:wlan0]: updateLinkLayerStatsRssiSpeedFrequencyCapabilities rssi=-50 TxLinkspeed=1 freq=2447 RxLinkSpeed=2
+06-07 19:04:09.112   716   865 D WifiDataStall: tx tput in kbps: 11000
+06-07 19:04:09.112   716   865 D WifiDataStall: rx tput in kbps: 11000
+06-07 19:04:09.112   716   865 V WifiConfigManager: Updating scan detail cache freq=2447 BSSID=00:13:10:85:fe:01 RSSI=-50 for "AndroidWifi"NONE
+06-07 19:04:09.112   716   865 D WifiThroughputPredictor:  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+06-07 19:04:09.113   716   865 D WifiThroughputPredictor:  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 11
+06-07 19:04:09.113   716   865 D WifiThroughputPredictor:  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+06-07 19:04:09.113   716   865 D WifiThroughputPredictor:  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 11
+06-07 19:04:09.113   716   865 D WifiThroughputPredictor:  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+06-07 19:04:09.113   716   865 D WifiThroughputPredictor:  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 11
+06-07 19:04:09.113   716   865 D WifiThroughputPredictor:  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+06-07 19:04:09.113   716   865 D WifiThroughputPredictor:  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 11
+06-07 19:04:09.114   716   865 D WifiScoreCard: BSSID update SIGNAL_POLL ID: 273713110 SSID: "AndroidWifi", BSSID: 00:13:10:85:fe:01, MAC: 02:15:b2:00:00:00, IP: /10.0.2.16, Security type: 0, Supplicant state: COMPLETED, Wi-Fi standard: legacy, RSSI: -50, Link speed: 1Mbps, Tx Link speed: 1Mbps, Max Supported Tx Link speed: 11Mbps, Rx Link speed: 2Mbps, Max Supported Rx Link speed: 11Mbps, Frequency: 2447MHz, Net ID: 0, Metered hint: false, score: 60, isUsable: true, CarrierMerged: false, SubscriptionId: -1, IsPrimary: 1, Trusted: true, Restricted: false, Ephemeral: false, OEM paid: false, OEM private: false, OSU AP: false, FQDN: <none>, Provider friendly name: <none>, Requesting package name: <none>"AndroidWifi"openMLO Information: , Is TID-To-Link negotiation supported by the AP: false, AP MLD Address: <none>, AP MLO Link Id: <none>, AP MLO Affiliated links: <none>, Vendor Data: <none>
+06-07 19:04:09.114   716   865 D WifiScoreCard: txRate: 1 txSpeed: 1
+06-07 19:04:09.114   716   865 D WifiScoreCard: network update SIGNAL_POLL "AndroidWifi" ID: 732197599 RSSI -50 txSpeed -1
+06-07 19:04:09.115   716   865 D WifiClientModeImpl[8634:wlan0]:  ClientModeImpl$L2ConnectedState screen=on 1 0 "AndroidWifi" 00:13:10:85:fe:01 rssi=-50 f=2447 sc=60 link=1 tx=0.3, 0.0, 0.0 rx=0.0 bcn=0 [on:0 tx:0 rx:0 period:3007] from screen [on:0 period:-1559578725] score=60
+06-07 19:04:09.229   716   871 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET, states=14
+06-07 19:04:09.229   716   871 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET6, states=14
+06-07 19:04:09.229   716   871 D InetDiagMessage: Destroyed live tcp sockets for uids={10100} in 0ms
+06-07 19:04:09.342  4152  4166 I alternative.app: AssetManager2(0xb40000785e045c18) locale list changing from [] to [en-US]
+06-07 19:04:09.369   716   871 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET, states=14
+06-07 19:04:09.370   716   871 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET6, states=14
+06-07 19:04:09.370   716   871 D InetDiagMessage: Destroyed live tcp sockets for uids={10207} in 1ms
+06-07 19:04:09.404  4152  4166 I alternative.app: AssetManager2(0xb40000785e046898) locale list changing from [] to [en-US]
+06-07 19:04:09.437  4152  4166 I alternative.app: AssetManager2(0xb40000785e043cd8) locale list changing from [] to [en-US]
+06-07 19:04:09.466  1090  1313 D SatelliteController: iisInCarrierRoamingNbIotNtn: satellite is disabled
+06-07 19:04:09.487  4152  4166 I alternative.app: AssetManager2(0xb40000785e047b58) locale list changing from [] to [en-US]
+06-07 19:04:09.527  4152  4166 I alternative.app: AssetManager2(0xb40000785e048198) locale list changing from [] to [en-US]
+06-07 19:04:09.558  4152  4166 I alternative.app: AssetManager2(0xb40000785e0439b8) locale list changing from [] to [en-US]
+06-07 19:04:09.597  4152  4166 I alternative.app: AssetManager2(0xb40000785e04ad58) locale list changing from [] to [en-US]
+06-07 19:04:09.702  4152  4166 I alternative.app: AssetManager2(0xb40000785e04aa38) locale list changing from [] to [en-US]
+06-07 19:04:09.761  4152  4166 I alternative.app: AssetManager2(0xb40000785e0520f8) locale list changing from [] to [en-US]
+06-07 19:04:09.785  4152  4166 I alternative.app: AssetManager2(0xb40000785e0507f8) locale list changing from [] to [en-US]
+06-07 19:04:09.797  4152  4166 I alternative.app: AssetManager2(0xb40000785e051478) locale list changing from [] to [en-US]
+06-07 19:04:10.596  1571  1571 D BoundBrokerSvc: onUnbind: Intent { act=com.google.firebase.dynamiclinks.service.START xflg=0x4 pkg=com.google.android.gms }
+06-07 19:04:10.640  4152  4166 I alternative.app: AssetManager2(0xb40000785e04f858) locale list changing from [] to [en-US]
+06-07 19:04:10.747  4152  4166 D UiDevice: Pressing home button.
+06-07 19:04:10.825   716   865 V WifiDialogManager: Received action: android.intent.action.CLOSE_SYSTEM_DIALOGS
+06-07 19:04:10.825   716   865 V WifiDialogManager: ACTION_CLOSE_SYSTEM_DIALOGS received, cancelling all legacy dialogs.
+06-07 19:04:10.834   716   744 V GrammaticalInflectionUtils: AttributionSource: AttributionSource { uid = 10185, packageName = null, attributionTag = null, token = android.os.Binder@6a3310e, deviceId = 0, next = null } does not have READ_SYSTEM_GRAMMATICAL_GENDER permission.
+06-07 19:04:10.847   961   961 I vol.VolumeDialogImpl: mDialog.dismiss() reason: volume_controller from: com.android.systemui.volume.VolumeDialogImpl$7.onDismissRequested:3
+06-07 19:04:10.905   961  1641 D KeyguardService: setOccluded(false)
+06-07 19:04:10.907  1095  1095 W SplitSelectStateCtor: Missing session instanceIds
+06-07 19:04:10.907  1095  1095 D StatsLog: LAUNCHER_SPLIT_SELECTION_EXIT_INTERRUPTED
+06-07 19:04:10.908  1095  1095 D TFOManager: playPanelCloseAnimation() duration=200 traceTag=LauncherOverlay-hide isHomeButtonTap=true
+06-07 19:04:10.909  1095  1095 D TFOManager: Skipped creating panel close animation because -1 is invisible.
+06-07 19:04:10.909  1095  1095 D OverviewCommandHelper: clearing pending commands: []
+06-07 19:04:10.912  1095  1095 D StatsLog: LAUNCHER_ONRESUME
+06-07 19:04:10.915   534  1183 I BpBinder: onLastStrongRef automatically unlinking death recipients:
+06-07 19:04:10.916   716   746 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:10.916   716   746 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:10.916   716   746 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:10.916   716   746 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:10.916   716   746 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:10.916   716   746 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:10.916   716   746 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:10.916   716   746 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:10.916   716   746 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:10.916   716   746 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:10.916   716   746 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:10.916   716   746 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:10.917   716   746 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:10.917   716   746 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:10.917   716   746 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:10.917   716   746 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:10.917   716   746 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:10.917   716   746 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:10.918   716   746 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:10.918   716   746 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:10.918   716   746 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:10.918   716   746 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:10.918   716   746 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:10.918   716   746 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:10.918   716   746 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:10.918   716   746 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:10.918   716   746 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:10.918   716   746 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:10.919   716   746 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:10.919   716   746 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:10.919   716   746 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:10.919   716   746 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:10.919   716   746 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:10.919   716   746 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:10.919   716   746 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:10.919   716   746 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:10.919   716   746 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:10.919   716   746 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:10.919   716   746 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 19:04:10.924  1095  1153 D QuickstepModelDelegate: notifyAppTargetEvent action=1 launchLocation=workspace/0/[-1,-1]/[1,1]
+06-07 19:04:10.924  1095  1095 I NotificationListener: Handling notification state refresh for androidx.test.services#0
+06-07 19:04:10.933  1527  1652 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+06-07 19:04:10.934  1527  1652 I AiAiEcho: EchoTargets:
+06-07 19:04:10.934  1527  1652 I AiAiEcho: Filtered by AiAi flag check:
+06-07 19:04:10.934  1527  1652 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+06-07 19:04:10.934  1527  1652 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+06-07 19:04:10.936  1527  1652 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface home with targets# 0 (types=[])
+06-07 19:04:10.939   961  1641 D KeyguardViewMediator: setOccluded(false)
+06-07 19:04:10.940   961   961 D KeyguardViewMediator: handleSetOccluded(false)
+06-07 19:04:10.940   961   961 D KeyguardViewMediator: KeyguardViewMediator queue processing message: SET_OCCLUDED
+06-07 19:04:11.044  1095  1095 D SsBaseTemplateCard: No text view can be set up
+06-07 19:04:11.044  1095  1095 D SsBaseTemplateCard: Passed-in item info is null
+06-07 19:04:11.044  1095  1095 D SsBaseTemplateCard: Passed-in item info is null
+06-07 19:04:11.044  1095  1095 D SsBaseTemplateCard: Passed-in item info is null
+06-07 19:04:11.044  1095  1095 I SsBaseTemplateCard: Secondary card pane is null
+06-07 19:04:11.282  1571  1571 D BoundBrokerSvc: onUnbind: Intent { act=com.google.android.gms.chimera.container.moduleinstall.ModuleInstallService.START dat=chimera-action:/... xflg=0x4 cmp=com.google.android.gms/.chimera.GmsApiService }
+06-07 19:04:11.389  4152  4166 D UiDevice: Executing shell command: getprop ro.product.model
+06-07 19:04:11.420   948   948 D wpa_supplicant: nl80211: Drv Event 64 (NL80211_CMD_NOTIFY_CQM) received for wlan0
+06-07 19:04:11.421   948   948 D wpa_supplicant: nl80211: Beacon loss event
+06-07 19:04:11.421   948   948 D wpa_supplicant: wlan0: Event BEACON_LOSS (53) received
+06-07 19:04:11.421   948   948 I wpa_supplicant: wlan0: CTRL-EVENT-BEACON-LOSS
+06-07 19:04:11.497  4152  4166 D UiDevice: Executing shell command: getprop ro.build.version.sdk
+06-07 19:04:11.508  4152  4166 D UiDevice: Executing shell command: getprop ro.build.version.release
+06-07 19:04:11.544  1502  2206 W MediaProvider: isAppCloneUserPair for user 0: false
+06-07 19:04:11.545  1502  2206 W MediaProvider: isAppCloneUserPair for user 0: false
+06-07 19:04:11.683  1571  1571 D BoundBrokerSvc: onUnbind: Intent { act=com.google.android.gms.safebrowsing.SafeBrowsingService.START dat=chimera-action:/... xflg=0x4 cmp=com.google.android.gms/.chimera.GmsBoundBrokerService }
+06-07 19:04:11.685  1571  1571 D BoundBrokerSvc: onUnbind: Intent { act=com.google.android.gms.credential.manager.service.firstparty.START dat=chimera-action:/... xflg=0x4 cmp=com.google.android.gms/.chimera.GmsApiService }
+06-07 19:04:11.686  1571  1571 D BoundBrokerSvc: onUnbind: Intent { act=com.google.android.gms.languageprofile.service.START xflg=0x4 pkg=com.google.android.gms }
+06-07 19:04:11.687  1571  1571 D BoundBrokerSvc: onUnbind: Intent { act=com.google.android.gms.auth.key.retrieval.service.START dat=chimera-action:/... xflg=0x4 cmp=com.google.android.gms/.chimera.GmsApiService }
+06-07 19:04:11.690  1571  1571 D BoundBrokerSvc: onUnbind: Intent { act=com.google.android.gms.chromesync.service.firstparty.START dat=chimera-action:/... xflg=0x4 cmp=com.google.android.gms/.chimera.GmsApiService }
+06-07 19:04:11.706  1502  1651 V MediaProvider: Created relation b/w 1051 and com.qualityalternative.app::0
+06-07 19:04:11.706  4152  4166 D UiDevice: Taking screenshot (scale=1.000000, quality=90) and storing at /sdcard/Download/qualityalternative/sprint26-chrome-verified-host-1780851848127/04_unsupported_and_unreadable_negative_states.png.
+06-07 19:04:12.118   716   865 D WifiClientModeImpl[8634:wlan0]: updateLinkLayerStatsRssiSpeedFrequencyCapabilities rssi=-50 TxLinkspeed=1 freq=2447 RxLinkSpeed=2
+06-07 19:04:12.119   716   865 D WifiDataStall: tx tput in kbps: 11000
+06-07 19:04:12.119   716   865 D WifiDataStall: rx tput in kbps: 11000
+06-07 19:04:12.119   716   865 V WifiConfigManager: Updating scan detail cache freq=2447 BSSID=00:13:10:85:fe:01 RSSI=-50 for "AndroidWifi"NONE
+06-07 19:04:12.119   716   865 D WifiThroughputPredictor:  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+06-07 19:04:12.119   716   865 D WifiThroughputPredictor:  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 11
+06-07 19:04:12.119   716   865 D WifiThroughputPredictor:  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+06-07 19:04:12.119   716   865 D WifiThroughputPredictor:  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 11
+06-07 19:04:12.119   716   865 D WifiThroughputPredictor:  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+06-07 19:04:12.119   716   865 D WifiThroughputPredictor:  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 11
+06-07 19:04:12.119   716   865 D WifiThroughputPredictor:  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+06-07 19:04:12.119   716   865 D WifiThroughputPredictor:  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 11
+06-07 19:04:12.120   716   865 D WifiScoreCard: BSSID update SIGNAL_POLL ID: 273713110 SSID: "AndroidWifi", BSSID: 00:13:10:85:fe:01, MAC: 02:15:b2:00:00:00, IP: /10.0.2.16, Security type: 0, Supplicant state: COMPLETED, Wi-Fi standard: legacy, RSSI: -50, Link speed: 1Mbps, Tx Link speed: 1Mbps, Max Supported Tx Link speed: 11Mbps, Rx Link speed: 2Mbps, Max Supported Rx Link speed: 11Mbps, Frequency: 2447MHz, Net ID: 0, Metered hint: false, score: 60, isUsable: true, CarrierMerged: false, SubscriptionId: -1, IsPrimary: 1, Trusted: true, Restricted: false, Ephemeral: false, OEM paid: false, OEM private: false, OSU AP: false, FQDN: <none>, Provider friendly name: <none>, Requesting package name: <none>"AndroidWifi"openMLO Information: , Is TID-To-Link negotiation supported by the AP: false, AP MLD Address: <none>, AP MLO Link Id: <none>, AP MLO Affiliated links: <none>, Vendor Data: <none>
+06-07 19:04:12.120   716   865 D WifiScoreCard: txRate: 1 txSpeed: 1
+06-07 19:04:12.120   716   865 D WifiScoreCard: network update SIGNAL_POLL "AndroidWifi" ID: 732197599 RSSI -50 txSpeed -1
+06-07 19:04:12.120   716   865 D WifiClientModeImpl[8634:wlan0]:  ClientModeImpl$L2ConnectedState screen=on 1 0 "AndroidWifi" 00:13:10:85:fe:01 rssi=-50 f=2447 sc=60 link=1 tx=0.1, 0.0, 0.0 rx=0.0 bcn=0 [on:0 tx:0 rx:0 period:3005] from screen [on:0 period:-1559575720] score=60
+06-07 19:04:12.272  4152  4200 I EGL_emulation: Opening libGLESv1_CM_emulation.so
+06-07 19:04:12.272  4152  4200 I EGL_emulation: Opening libGLESv2_emulation.so
+06-07 19:04:12.280  4152  4200 W HWUI    : Failed to choose config with EGL_SWAP_BEHAVIOR_PRESERVED, retrying without...
+06-07 19:04:12.280  4152  4200 W HWUI    : Failed to initialize 101010-2 format, error = EGL_SUCCESS
+06-07 19:04:12.387  1502  4010 W MediaProvider: isAppCloneUserPair for user 0: false
+06-07 19:04:13.280  4152  4201 D ProfileInstaller: Installing profile for com.qualityalternative.app
+06-07 19:04:14.101  4152  4166 D UiDevice: Executing shell command: settings --user 0 delete secure enabled_accessibility_services
+06-07 19:04:14.168  4152  4166 D UiDevice: Executing shell command: settings --user 0 put secure accessibility_enabled 0
+06-07 19:04:14.192  1527  1547 I AiAiEcho: Settings changed for uri: content://settings/secure/accessibility_enabled
+06-07 19:04:14.193  1527  1652 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+06-07 19:04:14.193  1527  1652 I AiAiEcho: EchoTargets:
+06-07 19:04:14.193  1527  1652 I AiAiEcho: Filtered by AiAi flag check:
+06-07 19:04:14.193  1527  1652 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+06-07 19:04:14.193  4152  4166 D UiDevice: Pressing home button.
+06-07 19:04:14.194  1527  1652 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+06-07 19:04:14.194  1527  1652 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+06-07 19:04:14.195  1527  1652 I AiAiEcho: EchoTargets:
+06-07 19:04:14.195  1527  1652 I AiAiEcho: Filtered by AiAi flag check:
+06-07 19:04:14.195  1527  1652 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+06-07 19:04:14.195  1527  1652 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+06-07 19:04:14.196  1527  1652 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface home with targets# 0 (types=[])
+06-07 19:04:14.196  1527  1652 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface lockscreen with targets# 0 (types=[])
+06-07 19:04:14.197  1095  1095 D SsBaseTemplateCard: No text view can be set up
+06-07 19:04:14.197  1095  1095 D SsBaseTemplateCard: Passed-in item info is null
+06-07 19:04:14.197  1095  1095 D SsBaseTemplateCard: Passed-in item info is null
+06-07 19:04:14.197  1095  1095 D SsBaseTemplateCard: Passed-in item info is null
+06-07 19:04:14.197  1095  1095 I SsBaseTemplateCard: Secondary card pane is null
+06-07 19:04:14.199   961   961 W PageIndicator: Total number of pages invalid: 0. Assuming 1 page.
+06-07 19:04:14.214  1571  1571 D BoundBrokerSvc: onUnbind: Intent { act=com.google.android.gms.backup.GMS_MODULE_RESTORE dat=chimera-action:/... xflg=0x4 cmp=com.google.android.gms/.chimera.GmsInternalBoundBrokerService }
+06-07 19:04:14.227   716   865 V WifiDialogManager: Received action: android.intent.action.CLOSE_SYSTEM_DIALOGS
+06-07 19:04:14.227   716   865 V WifiDialogManager: ACTION_CLOSE_SYSTEM_DIALOGS received, cancelling all legacy dialogs.
+06-07 19:04:14.229   961   961 I vol.VolumeDialogImpl: mDialog.dismiss() reason: volume_controller from: com.android.systemui.volume.VolumeDialogImpl$7.onDismissRequested:3
+06-07 19:04:14.229   716   744 V GrammaticalInflectionUtils: AttributionSource: AttributionSource { uid = 10185, packageName = null, attributionTag = null, token = android.os.Binder@6a3310e, deviceId = 0, next = null } does not have READ_SYSTEM_GRAMMATICAL_GENDER permission.
+06-07 19:04:14.233   961  1416 D KeyguardService: setOccluded(false)
+06-07 19:04:14.233   961  1416 D KeyguardViewMediator: setOccluded(false)
+06-07 19:04:14.234   961   961 D KeyguardViewMediator: handleSetOccluded(false)
+06-07 19:04:14.234   961   961 D KeyguardViewMediator: KeyguardViewMediator queue processing message: SET_OCCLUDED
+06-07 19:04:14.237  1095  1095 W SplitSelectStateCtor: Missing session instanceIds
+06-07 19:04:14.237  1095  1095 D StatsLog: LAUNCHER_SPLIT_SELECTION_EXIT_INTERRUPTED
+06-07 19:04:14.237  1095  1095 D TFOManager: playPanelCloseAnimation() duration=200 traceTag=LauncherOverlay-hide isHomeButtonTap=true
+06-07 19:04:14.237  1095  1095 D TFOManager: Skipped creating panel close animation because -1 is invisible.
+06-07 19:04:14.237  1095  1095 D OverviewCommandHelper: clearing pending commands: []
+06-07 19:04:14.239  1095  1095 D StatsLog: LAUNCHER_ONRESUME
+06-07 19:04:14.242   534  1183 I BpBinder: onLastStrongRef automatically unlinking death recipients:
+06-07 19:04:14.246  1095  1095 I NotificationListener: Handling notification state refresh for androidx.test.services#0
+06-07 19:04:14.247  1527  1652 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+06-07 19:04:14.247  1527  1652 I AiAiEcho: EchoTargets:
+06-07 19:04:14.247  1527  1652 I AiAiEcho: Filtered by AiAi flag check:
+06-07 19:04:14.247  1527  1652 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+06-07 19:04:14.247  1527  1652 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+06-07 19:04:14.248  1095  1153 D QuickstepModelDelegate: notifyAppTargetEvent action=1 launchLocation=workspace/0/[-1,-1]/[1,1]
+06-07 19:04:14.253  1527  1652 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface home with targets# 0 (types=[])
+06-07 19:04:14.254  1095  1095 D SsBaseTemplateCard: No text view can be set up
+06-07 19:04:14.254  1095  1095 D SsBaseTemplateCard: Passed-in item info is null
+06-07 19:04:14.254  1095  1095 D SsBaseTemplateCard: Passed-in item info is null
+06-07 19:04:14.254  1095  1095 D SsBaseTemplateCard: Passed-in item info is null
+06-07 19:04:14.255  1095  1095 I SsBaseTemplateCard: Secondary card pane is null
+06-07 19:04:14.520   716   871 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET, states=14
+06-07 19:04:14.520   716   871 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET6, states=14
+06-07 19:04:14.520   716   871 D InetDiagMessage: Destroyed live tcp sockets for uids={10125} in 0ms
+06-07 19:04:14.721  4152  4166 I TestRunner: finished: chromeVerifiedHostAdapterRejectsSyntheticUnsupportedAndStaleStates(com.qualityalternative.app.AccessibilityInterceptionTest)

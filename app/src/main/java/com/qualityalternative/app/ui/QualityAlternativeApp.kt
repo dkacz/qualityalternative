@@ -5372,7 +5372,7 @@ private fun WebsiteRulesSettingsSection(
         SectionLabel("Website rules", right = "$enabledCount enabled")
         QaCard {
             BodyText(
-                text = "Save domains now. Browser interruption starts only when a verified current-host adapter is available; until then, use whole-browser app targets as the reliable fallback.",
+                text = "Chrome domain interruption is supported when the current Chrome host is readable through the verified-host adapter. Other browsers stay on whole-browser app-target fallback; full-path and universal URL blocking remain out of scope.",
                 color = colors.mutedText,
                 fontSize = 12.5.sp,
                 lineHeight = 17.sp,
@@ -5580,8 +5580,8 @@ private fun BrowserSupportMatrix(modifier: Modifier = Modifier) {
         MonoText("Browser support", modifier = Modifier.padding(bottom = 8.dp))
         BrowserSupportRow(
             title = "Chrome",
-            status = "Verified-host adapter next",
-            description = "Saved rules stay portable; website interruption activates after the Chrome current-host check passes the next slice.",
+            status = "Domain rules supported",
+            description = "Quality Alternative reads only the visible Chrome address-bar host through the verified-host adapter, then applies saved domain rules without paths or browsing history.",
             modifier = Modifier.testTag("settings-browser-support-chrome"),
         )
         HorizontalDivider(color = colors.line, modifier = Modifier.padding(vertical = 10.dp))

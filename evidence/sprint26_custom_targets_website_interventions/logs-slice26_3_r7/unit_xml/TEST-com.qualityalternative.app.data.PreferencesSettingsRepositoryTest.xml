@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.qualityalternative.app.data.PreferencesSettingsRepositoryTest" tests="23" skipped="0" failures="0" errors="0" timestamp="2026-06-07T17:02:01.464Z" hostname="mac-studio.home" time="0.042">
+  <properties/>
+  <testcase name="saveOnboardingSelection_persistsAndRestoresSettings" classname="com.qualityalternative.app.data.PreferencesSettingsRepositoryTest" time="0.002"/>
+  <testcase name="replacePortableSettings_persistsWebsiteRulesWithoutLocalBrowserState" classname="com.qualityalternative.app.data.PreferencesSettingsRepositoryTest" time="0.002"/>
+  <testcase name="supportedDistractingApps_includesEligibleCustomAppsAndExcludesUnsafeCandidates" classname="com.qualityalternative.app.data.PreferencesSettingsRepositoryTest" time="0.002"/>
+  <testcase name="saveReaderFontScale_persistsRoundedPortableValue" classname="com.qualityalternative.app.data.PreferencesSettingsRepositoryTest" time="0.001"/>
+  <testcase name="saveMeditationDuration_persistsWithoutResettingOnboarding" classname="com.qualityalternative.app.data.PreferencesSettingsRepositoryTest" time="0.002"/>
+  <testcase name="saveOpenAnywayUnlockMinutes_persistsWithoutResettingOnboarding" classname="com.qualityalternative.app.data.PreferencesSettingsRepositoryTest" time="0.002"/>
+  <testcase name="saveSettingsUpdates_persistWithoutResettingOnboarding" classname="com.qualityalternative.app.data.PreferencesSettingsRepositoryTest" time="0.002"/>
+  <testcase name="ensureLocalProfileIdentity_createsAndReusesPortableProfileId" classname="com.qualityalternative.app.data.PreferencesSettingsRepositoryTest" time="0.001"/>
+  <testcase name="saveAnnotationDriveSyncSettings_persistsConnectionStatusAndFailure" classname="com.qualityalternative.app.data.PreferencesSettingsRepositoryTest" time="0.003"/>
+  <testcase name="saveProfileAutosaveSettings_persistsStatusAndClearsFailureOnSuccess" classname="com.qualityalternative.app.data.PreferencesSettingsRepositoryTest" time="0.003"/>
+  <testcase name="saveReactivatedCompletedContentIds_persistsWithoutResettingOnboarding" classname="com.qualityalternative.app.data.PreferencesSettingsRepositoryTest" time="0.001"/>
+  <testcase name="saveInterventionMode_persistsWithoutResettingOnboarding" classname="com.qualityalternative.app.data.PreferencesSettingsRepositoryTest" time="0.002"/>
+  <testcase name="saveAnnotationExportSettings_persistsStatusAndClearsFailureOnSuccess" classname="com.qualityalternative.app.data.PreferencesSettingsRepositoryTest" time="0.004"/>
+  <testcase name="saveThemeMode_persistsWithoutResettingOnboarding" classname="com.qualityalternative.app.data.PreferencesSettingsRepositoryTest" time="0.001"/>
+  <testcase name="saveInterfaceTextScale_persistsRoundedPortableValue" classname="com.qualityalternative.app.data.PreferencesSettingsRepositoryTest" time="0.001"/>
+  <testcase name="observeAppSettings_ignoresMalformedWebsiteRuleRecords" classname="com.qualityalternative.app.data.PreferencesSettingsRepositoryTest" time="0.002"/>
+  <testcase name="saveInterfaceTextScale_clampsToPortableRange" classname="com.qualityalternative.app.data.PreferencesSettingsRepositoryTest" time="0.001"/>
+  <testcase name="saveBedtimeSettings_persistsWithoutResettingOnboarding" classname="com.qualityalternative.app.data.PreferencesSettingsRepositoryTest" time="0.002"/>
+  <testcase name="savePriorityContentIds_persistsWithoutResettingOnboarding" classname="com.qualityalternative.app.data.PreferencesSettingsRepositoryTest" time="0.001"/>
+  <testcase name="saveReaderFontScale_clampsToPortableRange" classname="com.qualityalternative.app.data.PreferencesSettingsRepositoryTest" time="0.002"/>
+  <testcase name="observeAppSettings_mapsLegacyInkThemeToDark" classname="com.qualityalternative.app.data.PreferencesSettingsRepositoryTest" time="0.001"/>
+  <testcase name="saveContentPriority_persistsWithoutResettingOnboarding" classname="com.qualityalternative.app.data.PreferencesSettingsRepositoryTest" time="0.001"/>
+  <testcase name="saveWebsiteRules_persistsAndRestoresNormalizedRules" classname="com.qualityalternative.app.data.PreferencesSettingsRepositoryTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

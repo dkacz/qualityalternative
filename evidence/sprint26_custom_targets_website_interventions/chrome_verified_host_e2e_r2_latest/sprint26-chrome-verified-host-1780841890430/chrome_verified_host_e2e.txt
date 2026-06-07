@@ -1,0 +1,11 @@
+            Chrome verified-host E2E
+            Chrome package: com.android.chrome
+            versionCode=694313732 minSdk=29 targetSdk=34
+versionName=133.0.6943.137
+versionCode=694313732 minSdk=26 targetSdk=34
+versionName=133.0.6943.137
+            Rule set: exact example.com
+            Non-match URL: https://example.org/
+            Typed without submit: example.com
+            Match URL after submit: https://example.com/
+Result: PASS - real Chrome verified-host adapter harness accepted only the loaded matching host.

@@ -1,0 +1,941 @@
+diff --git a/app/src/androidTest/java/com/qualityalternative/app/VisualQaScreenshotTest.kt b/app/src/androidTest/java/com/qualityalternative/app/VisualQaScreenshotTest.kt
+index a347f97..056332a 100644
+--- a/app/src/androidTest/java/com/qualityalternative/app/VisualQaScreenshotTest.kt
++++ b/app/src/androidTest/java/com/qualityalternative/app/VisualQaScreenshotTest.kt
+@@ -46,9 +46,11 @@ import com.qualityalternative.app.domain.model.ReadingProgress
+ import com.qualityalternative.app.domain.model.TopicTag
+ import com.qualityalternative.app.domain.model.UserDocumentDraft
+ import com.qualityalternative.app.domain.model.UserLinkDraft
++import com.qualityalternative.app.domain.model.WebsiteRuleType
+ import com.qualityalternative.app.domain.service.AddUserDocumentResult
+ import com.qualityalternative.app.domain.service.AddUserLinkResult
+ import com.qualityalternative.app.interception.FixtureTargetRegistry
++import com.qualityalternative.app.interception.VerifiedBrowserHostAdapter
+ import com.qualityalternative.app.data.ReadingTimeEstimateSource
+ import com.qualityalternative.app.ui.DocumentImportCandidate
+ import java.io.ByteArrayInputStream
+@@ -610,6 +612,57 @@ class VisualQaScreenshotTest {
+         captureSprint26("22_website_rules_browser_support_matrix_light")
+     }
+ 
++    @Test
++    fun captureSprint26ChromeWebsiteInterventionScreens() {
++        launchOnboardedApp()
++        scenario?.close()
++        scenario = null
++        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
++
++        val targetContext = InstrumentationRegistry.getInstrumentation().targetContext
++        launchApp(
++            MainActivity.createWebsiteInterceptionIntent(
++                context = targetContext,
++                browserPackage = VerifiedBrowserHostAdapter.CHROME_PACKAGE,
++                browserDisplayName = "Chrome",
++                websiteRuleType = WebsiteRuleType.EXACT_DOMAIN.name,
++                websiteRuleIncludesApex = false,
++            ),
++        )
++        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("intervention-screen") }
++        assertTrue(
++            "Expected Chrome website copy in intervention",
++            composeRule.onAllNodesWithText("Chrome website", substring = true).fetchSemanticsNodes().isNotEmpty(),
++        )
++        composeRule.onNodeWithText("Open Chrome website").assertIsDisplayed().assertIsEnabled()
++        assertTrue("Website soft mode should not show form-intervention wait", !hasTag("form-intervention-unlock-wait"))
++        captureSprint26("23_website_chrome_verified_host_soft_intervention_light")
++
++        scenario?.onActivity { activity ->
++            activity.mainViewModel.selectInterventionMode(InterventionMode.FIRM)
++        }
++        composeRule.waitForIdle()
++        scenario?.close()
++        scenario = null
++        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
++        launchApp(
++            MainActivity.createWebsiteInterceptionIntent(
++                context = targetContext,
++                browserPackage = VerifiedBrowserHostAdapter.CHROME_PACKAGE,
++                browserDisplayName = "Chrome",
++                websiteRuleType = WebsiteRuleType.WILDCARD_SUBDOMAINS.name,
++                websiteRuleIncludesApex = true,
++            ),
++        )
++        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("form-intervention-unlock-wait") }
++        assertTrue(
++            "Expected Chrome website copy in firm intervention",
++            composeRule.onAllNodesWithText("Chrome website", substring = true).fetchSemanticsNodes().isNotEmpty(),
++        )
++        composeRule.onNodeWithText("Open in", substring = true).assertIsDisplayed().assertIsNotEnabled()
++        captureSprint26("24_website_chrome_verified_host_firm_wait_light")
++    }
++
+     @Test
+     fun captureSprint10ReaderProgressStreakAndMeditationScreens() {
+         launchOnboardedApp()
+diff --git a/app/src/main/java/com/qualityalternative/app/MainActivity.kt b/app/src/main/java/com/qualityalternative/app/MainActivity.kt
+index 221f352..2324189 100644
+--- a/app/src/main/java/com/qualityalternative/app/MainActivity.kt
++++ b/app/src/main/java/com/qualityalternative/app/MainActivity.kt
+@@ -58,18 +58,34 @@ class MainActivity : ComponentActivity() {
+             EXTRA_TRIGGERED_AT_MILLIS,
+             System.currentTimeMillis(),
+         )
+-        mainViewModel.requestSystemInterception(
+-            targetAppPackage = targetAppPackage,
+-            nowMillis = triggeredAtMillis,
+-        )
++        when (intent.getStringExtra(EXTRA_TARGET_KIND)) {
++            TARGET_KIND_WEBSITE -> mainViewModel.requestSystemWebsiteInterception(
++                browserPackage = targetAppPackage,
++                browserDisplayName = intent.getStringExtra(EXTRA_BROWSER_DISPLAY_NAME) ?: "Browser",
++                websiteRuleType = intent.getStringExtra(EXTRA_WEBSITE_RULE_TYPE) ?: "",
++                websiteRuleIncludesApex = intent.getBooleanExtra(EXTRA_WEBSITE_RULE_INCLUDES_APEX, false),
++                nowMillis = triggeredAtMillis,
++            )
++
++            else -> mainViewModel.requestSystemInterception(
++                targetAppPackage = targetAppPackage,
++                nowMillis = triggeredAtMillis,
++            )
++        }
+     }
+ 
+     companion object {
+         private const val ACTION_SYSTEM_INTERVENTION =
+             "com.qualityalternative.app.action.SYSTEM_INTERVENTION"
++        private const val EXTRA_TARGET_KIND = "extra_target_kind"
+         private const val EXTRA_TARGET_APP_PACKAGE = "extra_target_app_package"
++        private const val EXTRA_BROWSER_DISPLAY_NAME = "extra_browser_display_name"
++        private const val EXTRA_WEBSITE_RULE_TYPE = "extra_website_rule_type"
++        private const val EXTRA_WEBSITE_RULE_INCLUDES_APEX = "extra_website_rule_includes_apex"
+         private const val EXTRA_TRIGGERED_AT_MILLIS = "extra_triggered_at_millis"
+         private const val EXTRA_LAUNCH_TOKEN = "extra_launch_token"
++        private const val TARGET_KIND_APP = "app"
++        private const val TARGET_KIND_WEBSITE = "website"
+ 
+         // Per-process secret shared only between in-process components (the AccessibilityService that
+         // builds the intent and this activity that consumes it). Not derivable by another app.
+@@ -82,6 +98,7 @@ class MainActivity : ComponentActivity() {
+         ): Intent {
+             return Intent(context, MainActivity::class.java).apply {
+                 action = ACTION_SYSTEM_INTERVENTION
++                putExtra(EXTRA_TARGET_KIND, TARGET_KIND_APP)
+                 putExtra(EXTRA_TARGET_APP_PACKAGE, targetAppPackage)
+                 putExtra(EXTRA_TRIGGERED_AT_MILLIS, triggeredAtMillis)
+                 putExtra(EXTRA_LAUNCH_TOKEN, SYSTEM_INTERVENTION_TOKEN)
+@@ -92,5 +109,30 @@ class MainActivity : ComponentActivity() {
+                 )
+             }
+         }
++
++        fun createWebsiteInterceptionIntent(
++            context: Context,
++            browserPackage: String,
++            browserDisplayName: String,
++            websiteRuleType: String,
++            websiteRuleIncludesApex: Boolean,
++            triggeredAtMillis: Long = System.currentTimeMillis(),
++        ): Intent {
++            return Intent(context, MainActivity::class.java).apply {
++                action = ACTION_SYSTEM_INTERVENTION
++                putExtra(EXTRA_TARGET_KIND, TARGET_KIND_WEBSITE)
++                putExtra(EXTRA_TARGET_APP_PACKAGE, browserPackage)
++                putExtra(EXTRA_BROWSER_DISPLAY_NAME, browserDisplayName)
++                putExtra(EXTRA_WEBSITE_RULE_TYPE, websiteRuleType)
++                putExtra(EXTRA_WEBSITE_RULE_INCLUDES_APEX, websiteRuleIncludesApex)
++                putExtra(EXTRA_TRIGGERED_AT_MILLIS, triggeredAtMillis)
++                putExtra(EXTRA_LAUNCH_TOKEN, SYSTEM_INTERVENTION_TOKEN)
++                addFlags(
++                    Intent.FLAG_ACTIVITY_NEW_TASK or
++                        Intent.FLAG_ACTIVITY_SINGLE_TOP or
++                        Intent.FLAG_ACTIVITY_CLEAR_TOP,
++                )
++            }
++        }
+     }
+ }
+diff --git a/app/src/main/java/com/qualityalternative/app/interception/InterceptionRuntimeGate.kt b/app/src/main/java/com/qualityalternative/app/interception/InterceptionRuntimeGate.kt
+index d32096c..c269f14 100644
+--- a/app/src/main/java/com/qualityalternative/app/interception/InterceptionRuntimeGate.kt
++++ b/app/src/main/java/com/qualityalternative/app/interception/InterceptionRuntimeGate.kt
+@@ -8,9 +8,10 @@ object InterceptionRuntimeGate {
+         targetAppPackage: String,
+         nowMillis: Long,
+         bedtimeActive: Boolean = false,
++        targetKey: String = targetAppPackage,
+     ): Boolean {
+         suppressedPackages.entries.removeAll { (_, window) -> nowMillis >= window.untilMillis }
+-        val suppression = suppressedPackages[targetAppPackage] ?: return false
++        val suppression = suppressedPackages[targetKey] ?: return false
+         if (bedtimeActive && !suppression.allowedDuringBedtime) return false
+         return nowMillis < suppression.untilMillis
+     }
+@@ -20,8 +21,9 @@ object InterceptionRuntimeGate {
+         targetAppPackage: String,
+         untilMillis: Long,
+         allowedDuringBedtime: Boolean = false,
++        targetKey: String = targetAppPackage,
+     ) {
+-        suppressedPackages[targetAppPackage] = SuppressionWindow(
++        suppressedPackages[targetKey] = SuppressionWindow(
+             untilMillis = untilMillis,
+             allowedDuringBedtime = allowedDuringBedtime,
+         )
+diff --git a/app/src/main/java/com/qualityalternative/app/interception/QualityAlternativeAccessibilityService.kt b/app/src/main/java/com/qualityalternative/app/interception/QualityAlternativeAccessibilityService.kt
+index 5bd9326..8b03a4b 100644
+--- a/app/src/main/java/com/qualityalternative/app/interception/QualityAlternativeAccessibilityService.kt
++++ b/app/src/main/java/com/qualityalternative/app/interception/QualityAlternativeAccessibilityService.kt
+@@ -1,9 +1,11 @@
+ package com.qualityalternative.app.interception
+ 
+ import android.accessibilityservice.AccessibilityService
++import android.content.Intent
+ import android.view.accessibility.AccessibilityEvent
+ import com.qualityalternative.app.MainActivity
+ import com.qualityalternative.app.QualityAlternativeApplication
++import com.qualityalternative.app.data.AppContainer
+ import com.qualityalternative.app.domain.model.AnalyticsEvent
+ import com.qualityalternative.app.domain.model.AnalyticsEventType
+ import com.qualityalternative.app.domain.model.DEFAULT_BEDTIME_ENABLED
+@@ -11,6 +13,7 @@ import com.qualityalternative.app.domain.model.DEFAULT_BEDTIME_END_MINUTES
+ import com.qualityalternative.app.domain.model.DEFAULT_BEDTIME_START_MINUTES
+ import com.qualityalternative.app.domain.model.DistractingApp
+ import com.qualityalternative.app.domain.model.PermissionReadiness
++import com.qualityalternative.app.domain.model.WebsiteRule
+ import com.qualityalternative.app.domain.model.bedtimeWindowIsActive
+ import kotlinx.coroutines.CoroutineScope
+ import kotlinx.coroutines.Dispatchers
+@@ -45,19 +48,59 @@ class QualityAlternativeAccessibilityService : AccessibilityService() {
+                     bedtimeEnabled = settings.bedtimeEnabled,
+                     bedtimeStartMinutes = settings.bedtimeStartMinutes,
+                     bedtimeEndMinutes = settings.bedtimeEndMinutes,
++                    websiteRules = settings.websiteRules,
+                 )
+             }
+         }
+     }
+ 
+     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+-        if (event?.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
++        event ?: return
++        if (event.eventType !in SupportedAccessibilityEventTypes) {
+             return
+         }
+         val packageName = event.packageName?.toString()?.takeIf(String::isNotBlank) ?: return
+         val className = event.className?.toString()
+         val appContainer = (application as QualityAlternativeApplication).appContainer
+         val settings = interceptionSettings
++        val nowMillis = System.currentTimeMillis()
++        val bedtimeActive = bedtimeWindowIsActive(
++            enabled = settings.bedtimeEnabled,
++            startMinutes = settings.bedtimeStartMinutes,
++            endMinutes = settings.bedtimeEndMinutes,
++            nowMillis = nowMillis,
++        )
++
++        val websiteTarget = resolveWebsiteTarget(
++            browserPackage = packageName,
++            settings = settings,
++        )
++        if (websiteTarget != null) {
++            processInterceptionTarget(
++                appContainer = appContainer,
++                targetApp = websiteTarget.targetApp,
++                targetKey = websiteTarget.suppressionKey,
++                detectionKeys = setOf(websiteTarget.suppressionKey),
++                nowMillis = nowMillis,
++                bedtimeActive = bedtimeActive,
++                analyticsMetadata = websiteTarget.analyticsMetadata + mapOf(
++                    "triggerSource" to "accessibility_service",
++                    "interceptionStage" to "sprint26_website_verified_host",
++                    "foregroundPackage" to packageName,
++                    "foregroundClass" to (className ?: ""),
++                ),
++                launchIntent = MainActivity.createWebsiteInterceptionIntent(
++                    context = this,
++                    browserPackage = packageName,
++                    browserDisplayName = ChromeBrowserDisplayName,
++                    websiteRuleType = websiteTarget.websiteRuleType.name,
++                    websiteRuleIncludesApex = websiteTarget.websiteRuleIncludesApex,
++                    triggeredAtMillis = nowMillis,
++                ),
++            )
++            return
++        }
++
+         val targetApp = InterceptionTargetResolver.resolve(
+             foregroundPackage = packageName,
+             foregroundClass = className,
+@@ -65,19 +108,70 @@ class QualityAlternativeAccessibilityService : AccessibilityService() {
+             knownTargets = settings.knownTargets,
+             appPackage = packageName(),
+         ) ?: return
+-        val nowMillis = System.currentTimeMillis()
+-        val bedtimeActive = bedtimeWindowIsActive(
+-            enabled = settings.bedtimeEnabled,
+-            startMinutes = settings.bedtimeStartMinutes,
+-            endMinutes = settings.bedtimeEndMinutes,
++        processInterceptionTarget(
++            appContainer = appContainer,
++            targetApp = targetApp,
++            targetKey = targetApp.packageName,
++            detectionKeys = settings.selectedPackages,
+             nowMillis = nowMillis,
++            bedtimeActive = bedtimeActive,
++            analyticsMetadata = mapOf(
++                "triggerSource" to "accessibility_service",
++                "interceptionStage" to "sprint3_live_surface",
++                "foregroundPackage" to packageName,
++                "foregroundClass" to (className ?: ""),
++            ),
++            launchIntent = MainActivity.createSystemInterceptionIntent(
++                context = this,
++                targetAppPackage = targetApp.packageName,
++                triggeredAtMillis = nowMillis,
++            ),
++        )
++    }
++
++    private fun resolveWebsiteTarget(
++        browserPackage: String,
++        settings: InterceptionSettingsSnapshot,
++    ): WebsiteInterceptionTarget? {
++        if (settings.websiteRules.none(WebsiteRule::enabled)) {
++            return null
++        }
++        val hostResult = VerifiedBrowserHostAdapter.readHostFromWindow(
++            browserPackage = browserPackage,
++            root = rootInActiveWindow,
++        )
++        val observedHost = (hostResult as? VerifiedBrowserHostResult.Verified)?.host ?: return null
++        return WebsiteInterceptionResolver.resolve(
++            browserPackage = browserPackage,
++            browserDisplayName = ChromeBrowserDisplayName,
++            observedHost = observedHost,
++            websiteRules = settings.websiteRules,
+         )
+-        if (InterceptionRuntimeGate.shouldSuppress(targetApp.packageName, nowMillis, bedtimeActive = bedtimeActive)) {
++    }
++
++    private fun processInterceptionTarget(
++        appContainer: AppContainer,
++        targetApp: DistractingApp,
++        targetKey: String,
++        detectionKeys: Set<String>,
++        nowMillis: Long,
++        bedtimeActive: Boolean,
++        analyticsMetadata: Map<String, String>,
++        launchIntent: Intent,
++    ) {
++        if (
++            InterceptionRuntimeGate.shouldSuppress(
++                targetAppPackage = targetApp.packageName,
++                targetKey = targetKey,
++                nowMillis = nowMillis,
++                bedtimeActive = bedtimeActive,
++            )
++        ) {
+             return
+         }
+         if (!detectionPolicy.shouldLog(
+-                packageName = targetApp.packageName,
+-                selectedPackages = settings.selectedPackages,
++                packageName = targetKey,
++                selectedPackages = detectionKeys,
+                 nowMillis = nowMillis,
+                 bedtimeActive = bedtimeActive,
+             )
+@@ -94,12 +188,7 @@ class QualityAlternativeAccessibilityService : AccessibilityService() {
+                     type = AnalyticsEventType.TARGET_APP_FOREGROUND_DETECTED,
+                     timestampMillis = nowMillis,
+                     targetAppPackage = targetApp.packageName,
+-                    metadata = mapOf(
+-                        "triggerSource" to "accessibility_service",
+-                        "interceptionStage" to "sprint3_live_surface",
+-                        "foregroundPackage" to packageName,
+-                        "foregroundClass" to (className ?: ""),
+-                    ),
++                    metadata = analyticsMetadata,
+                 ),
+             )
+         }
+@@ -107,13 +196,7 @@ class QualityAlternativeAccessibilityService : AccessibilityService() {
+         if (cachedReadiness?.interceptionReady != true) {
+             return
+         }
+-        startActivity(
+-            MainActivity.createSystemInterceptionIntent(
+-                context = this,
+-                targetAppPackage = targetApp.packageName,
+-                triggeredAtMillis = nowMillis,
+-            ),
+-        )
++        startActivity(launchIntent)
+     }
+ 
+     override fun onInterrupt() = Unit
+@@ -126,10 +209,18 @@ class QualityAlternativeAccessibilityService : AccessibilityService() {
+     private fun packageName(): String = applicationContext.packageName
+ }
+ 
++private val SupportedAccessibilityEventTypes = setOf(
++    AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED,
++    AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED,
++)
++
++private const val ChromeBrowserDisplayName = "Chrome"
++
+ private data class InterceptionSettingsSnapshot(
+     val selectedPackages: Set<String> = emptySet(),
+     val knownTargets: List<DistractingApp> = emptyList(),
+     val bedtimeEnabled: Boolean = DEFAULT_BEDTIME_ENABLED,
+     val bedtimeStartMinutes: Int = DEFAULT_BEDTIME_START_MINUTES,
+     val bedtimeEndMinutes: Int = DEFAULT_BEDTIME_END_MINUTES,
++    val websiteRules: List<WebsiteRule> = emptyList(),
+ )
+diff --git a/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt b/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
+index c1f6f0c..e5d5e2f 100644
+--- a/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
++++ b/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
+@@ -103,6 +103,7 @@ import com.qualityalternative.app.domain.service.SettingsRepository
+ import com.qualityalternative.app.domain.service.UserDocumentRepository
+ import com.qualityalternative.app.domain.service.UserLinkRepository
+ import com.qualityalternative.app.interception.InterceptionRuntimeGate
++import com.qualityalternative.app.interception.WebsiteInterceptionResolver
+ import java.io.InputStream
+ import java.util.UUID
+ import kotlinx.coroutines.CancellationException
+@@ -141,6 +142,8 @@ data class MainUiState(
+     val currentOpenAnywayUnlockAvailableAtMillis: Long? = null,
+     val currentRecommendationSet: RecommendationSet? = null,
+     val currentInterventionOrigin: InterventionOrigin? = null,
++    val currentInterventionMetadata: Map<String, String> = emptyMap(),
++    val currentInterventionSuppressionKey: String? = null,
+     val currentContent: ContentItem? = null,
+     val currentReaderDocument: ReaderDocument? = null,
+     val currentContentBody: String = "",
+@@ -1601,6 +1604,8 @@ class MainViewModel(
+                 currentOpenAnywayUnlockAvailableAtMillis = null,
+                 currentRecommendationSet = null,
+                 currentInterventionOrigin = null,
++                currentInterventionMetadata = emptyMap(),
++                currentInterventionSuppressionKey = null,
+                 currentInterventionBedtimeEnforced = false,
+                 currentContent = repairedContent,
+                 currentReaderDocument = readerDocument,
+@@ -1895,7 +1900,7 @@ class MainViewModel(
+         nowMillis: Long = nowProvider(),
+     ) {
+         if (uiState.isLoadingSettings) {
+-            pendingSystemInterception = PendingSystemInterception(
++            pendingSystemInterception = PendingSystemInterception.App(
+                 targetAppPackage = targetAppPackage,
+                 triggeredAtMillis = nowMillis,
+             )
+@@ -1911,11 +1916,52 @@ class MainViewModel(
+         )
+     }
+ 
++    fun requestSystemWebsiteInterception(
++        browserPackage: String,
++        browserDisplayName: String,
++        websiteRuleType: String,
++        websiteRuleIncludesApex: Boolean,
++        nowMillis: Long = nowProvider(),
++    ) {
++        if (uiState.isLoadingSettings) {
++            pendingSystemInterception = PendingSystemInterception.Website(
++                browserPackage = browserPackage,
++                browserDisplayName = browserDisplayName,
++                websiteRuleType = websiteRuleType,
++                websiteRuleIncludesApex = websiteRuleIncludesApex,
++                triggeredAtMillis = nowMillis,
++            )
++            return
++        }
++
++        val safeBrowserName = browserDisplayName.trim().takeIf(String::isNotBlank) ?: "Browser"
++        val targetApp = DistractingApp(
++            packageName = browserPackage,
++            displayName = "$safeBrowserName website",
++        )
++        triggerIntervention(
++            targetApp = targetApp,
++            origin = InterventionOrigin.SYSTEM,
++            triggeredAtMillis = nowMillis,
++            processingNowMillis = nowProvider(),
++            interventionMetadata = mapOf(
++                "targetType" to WebsiteInterceptionResolver.TARGET_TYPE,
++                "browserPackage" to browserPackage,
++                "browserSupportStatus" to WebsiteInterceptionResolver.BROWSER_SUPPORT_VERIFIED_HOST,
++                "websiteRuleType" to websiteRuleType,
++                "websiteRuleIncludesApex" to websiteRuleIncludesApex.toString(),
++            ),
++            suppressionKey = WebsiteInterceptionResolver.suppressionKeyFor(browserPackage),
++        )
++    }
++
+     fun triggerIntervention(
+         targetApp: DistractingApp,
+         origin: InterventionOrigin,
+         triggeredAtMillis: Long = nowProvider(),
+         processingNowMillis: Long = triggeredAtMillis,
++        interventionMetadata: Map<String, String> = emptyMap(),
++        suppressionKey: String = targetApp.packageName,
+     ) {
+         val preferences = uiState.preferences ?: return
+         if (uiState.isLoadingSettings) {
+@@ -1930,6 +1976,7 @@ class MainViewModel(
+                 targetApp = targetApp,
+                 triggeredAtMillis = triggeredAtMillis,
+                 shownAtMillis = processingNowMillis,
++                interventionMetadata = interventionMetadata,
+             )
+ 
+             val bedtimeActive = bedtimeWindowIsActive(
+@@ -1942,6 +1989,7 @@ class MainViewModel(
+                 origin == InterventionOrigin.SYSTEM &&
+                 InterceptionRuntimeGate.shouldSuppress(
+                     targetAppPackage = targetApp.packageName,
++                    targetKey = suppressionKey,
+                     nowMillis = processingNowMillis,
+                     bedtimeActive = bedtimeActive,
+                 )
+@@ -1955,6 +2003,8 @@ class MainViewModel(
+                     activeDelayWindow = null,
+                     activeDelaySuggestion = null,
+                     currentInterventionOrigin = null,
++                    currentInterventionMetadata = emptyMap(),
++                    currentInterventionSuppressionKey = null,
+                     currentInterventionBedtimeEnforced = false,
+                     latestMessage = "${targetApp.displayName} is still unlocked.",
+                     screen = MainScreen.Home,
+@@ -1975,6 +2025,8 @@ class MainViewModel(
+                         screen = MainScreen.Home,
+                         currentOpenAnywayUnlockAvailableAtMillis = null,
+                         currentInterventionOrigin = null,
++                        currentInterventionMetadata = emptyMap(),
++                        currentInterventionSuppressionKey = null,
+                         currentInterventionBedtimeEnforced = false,
+                     )
+                     return@launch
+@@ -2031,7 +2083,7 @@ class MainViewModel(
+                         timestampMillis = processingNowMillis,
+                         interventionId = interventionId,
+                         targetAppPackage = targetApp.packageName,
+-                        metadata = inventoryDiagnostics,
++                        metadata = interventionMetadata + inventoryDiagnostics,
+                     ),
+                 )
+                 uiState = uiState.copy(
+@@ -2043,6 +2095,8 @@ class MainViewModel(
+                     activeDelayWindow = null,
+                     activeDelaySuggestion = null,
+                     currentInterventionOrigin = null,
++                    currentInterventionMetadata = emptyMap(),
++                    currentInterventionSuppressionKey = null,
+                     currentInterventionBedtimeEnforced = false,
+                     latestMessage = "No replacement inventory is available yet.",
+                     screen = MainScreen.Home,
+@@ -2061,7 +2115,7 @@ class MainViewModel(
+                     primaryContentId = recommendationSet.primary.id,
+                     backupContentIds = backupIds,
+                     contentId = recommendationSet.primary.id,
+-                    metadata = recommendationSet.analyticsMetadata() + inventoryDiagnostics,
++                    metadata = interventionMetadata + recommendationSet.analyticsMetadata() + inventoryDiagnostics,
+                 ),
+             )
+ 
+@@ -2075,7 +2129,7 @@ class MainViewModel(
+                         primaryContentId = recommendationSet.primary.id,
+                         backupContentIds = backupIds,
+                         contentId = recommendationSet.primary.id,
+-                        metadata = recommendationSet.analyticsMetadata() + inventoryDiagnostics,
++                        metadata = interventionMetadata + recommendationSet.analyticsMetadata() + inventoryDiagnostics,
+                     ),
+                 )
+             }
+@@ -2098,7 +2152,7 @@ class MainViewModel(
+                         primaryContentId = recommendationSet.primary.id,
+                         backupContentIds = backupIds,
+                         contentId = recommendationSet.primary.id,
+-                        metadata = recommendationSet.analyticsMetadata() + mapOf(
++                        metadata = interventionMetadata + recommendationSet.analyticsMetadata() + mapOf(
+                             "interventionMode" to interventionMode.name,
+                             "bedtimeStartMinutes" to uiState.bedtimeStartMinutes.toString(),
+                             "bedtimeEndMinutes" to uiState.bedtimeEndMinutes.toString(),
+@@ -2116,7 +2170,7 @@ class MainViewModel(
+                         primaryContentId = recommendationSet.primary.id,
+                         backupContentIds = backupIds,
+                         contentId = recommendationSet.primary.id,
+-                        metadata = recommendationSet.analyticsMetadata() + mapOf(
++                        metadata = interventionMetadata + recommendationSet.analyticsMetadata() + mapOf(
+                             "interventionMode" to interventionMode.name,
+                             "openAnywayUnlockDelayMillis" to FORM_INTERVENTION_UNLOCK_DELAY_MILLIS.toString(),
+                         ),
+@@ -2133,7 +2187,7 @@ class MainViewModel(
+                         primaryContentId = recommendationSet.primary.id,
+                         backupContentIds = backupIds,
+                         contentId = recommendationSet.primary.id,
+-                        metadata = recommendationSet.primary.analyticsMetadata() + progress.analyticsMetadata() + mapOf(
++                        metadata = interventionMetadata + recommendationSet.primary.analyticsMetadata() + progress.analyticsMetadata() + mapOf(
+                             "unfinishedContentCount" to preferences.unfinishedContentIds.size.toString(),
+                         ),
+                     ),
+@@ -2147,6 +2201,8 @@ class MainViewModel(
+                 currentOpenAnywayUnlockAvailableAtMillis = openAnywayAvailableAtMillis,
+                 currentRecommendationSet = recommendationSet,
+                 currentInterventionOrigin = origin,
++                currentInterventionMetadata = interventionMetadata,
++                currentInterventionSuppressionKey = suppressionKey,
+                 isBedtimeActive = bedtimeActive,
+                 currentInterventionBedtimeEnforced = bedtimeActive,
+                 activeDelayWindow = null,
+@@ -2184,7 +2240,7 @@ class MainViewModel(
+                     primaryContentId = recommendationSet.primary.id,
+                     backupContentIds = recommendationSet.backups.map(ContentItem::id),
+                     contentId = recommendationSet.primary.id,
+-                    metadata = recommendationSet.primary.analyticsMetadata(),
++                    metadata = uiState.currentInterventionMetadata + recommendationSet.primary.analyticsMetadata(),
+                 ),
+             )
+             recordFormInterventionCompleted(action = "primary", nowMillis = nowMillis, contentId = recommendationSet.primary.id)
+@@ -2219,7 +2275,7 @@ class MainViewModel(
+                     primaryContentId = recommendationSet.primary.id,
+                     backupContentIds = recommendationSet.backups.map(ContentItem::id),
+                     contentId = content.id,
+-                    metadata = content.analyticsMetadata(),
++                    metadata = uiState.currentInterventionMetadata + content.analyticsMetadata(),
+                 ),
+             )
+             recordFormInterventionCompleted(action = "backup", nowMillis = nowMillis, contentId = content.id)
+@@ -2253,6 +2309,8 @@ class MainViewModel(
+                 currentOpenAnywayUnlockAvailableAtMillis = null,
+                 currentRecommendationSet = null,
+                 currentInterventionOrigin = null,
++                currentInterventionMetadata = emptyMap(),
++                currentInterventionSuppressionKey = null,
+                 currentInterventionBedtimeEnforced = false,
+                 activeDelayWindow = window,
+                 activeDelaySuggestion = activeDelaySuggestionFor(window),
+@@ -2278,7 +2336,7 @@ class MainViewModel(
+                 targetAppPackage = targetApp.packageName,
+                 primaryContentId = recommendationSet.primary.id,
+                 backupContentIds = recommendationSet.backups.map(ContentItem::id),
+-                metadata = mapOf(
++                metadata = uiState.currentInterventionMetadata + mapOf(
+                     "interventionMode" to uiState.interventionMode.name,
+                     "openAnywayUnlockAvailableAtMillis" to availableAtMillis.toString(),
+                     "elapsedMillis" to (nowMillis - (uiState.currentInterventionShownAtMillis ?: nowMillis))
+@@ -2302,7 +2360,7 @@ class MainViewModel(
+                     targetAppPackage = targetApp.packageName,
+                     primaryContentId = recommendationSet.primary.id,
+                     backupContentIds = recommendationSet.backups.map(ContentItem::id),
+-                    metadata = mapOf(
++                    metadata = uiState.currentInterventionMetadata + mapOf(
+                         "reason" to reason,
+                         "interventionMode" to uiState.interventionMode.name,
+                         "openAnywayUnlockAvailableAtMillis" to uiState.currentOpenAnywayUnlockAvailableAtMillis.orEmptyString(),
+@@ -2317,6 +2375,8 @@ class MainViewModel(
+             currentOpenAnywayUnlockAvailableAtMillis = null,
+             currentRecommendationSet = null,
+             currentInterventionOrigin = null,
++            currentInterventionMetadata = emptyMap(),
++            currentInterventionSuppressionKey = null,
+             currentInterventionBedtimeEnforced = false,
+             latestMessage = null,
+         )
+@@ -2390,6 +2450,8 @@ class MainViewModel(
+                 currentOpenAnywayUnlockAvailableAtMillis = null,
+                 currentRecommendationSet = recommendationSet,
+                 currentInterventionOrigin = null,
++                currentInterventionMetadata = emptyMap(),
++                currentInterventionSuppressionKey = null,
+                 currentInterventionBedtimeEnforced = false,
+             )
+             openReplacementSession(content = content, sessionId = sessionId, startedAtMillis = nowMillis)
+@@ -2418,7 +2480,7 @@ class MainViewModel(
+                 primaryContentId = recommendationSet.primary.id,
+                 backupContentIds = recommendationSet.backups.map(ContentItem::id),
+                 contentId = recommendationSet.primary.id,
+-                metadata = recommendationSet.analyticsMetadata() + mapOf(
++                metadata = uiState.currentInterventionMetadata + recommendationSet.analyticsMetadata() + mapOf(
+                     "interventionMode" to uiState.interventionMode.name,
+                     "bedtimeStartMinutes" to uiState.bedtimeStartMinutes.toString(),
+                     "bedtimeEndMinutes" to uiState.bedtimeEndMinutes.toString(),
+@@ -2462,7 +2524,7 @@ class MainViewModel(
+                     targetAppPackage = targetApp.packageName,
+                     primaryContentId = recommendationSet?.primary?.id,
+                     backupContentIds = recommendationSet?.backups.orEmpty().map(ContentItem::id),
+-                    metadata = mapOf(
++                    metadata = uiState.currentInterventionMetadata + mapOf(
+                         "interventionMode" to uiState.interventionMode.name,
+                         "openAnywayUnlockAvailableAtMillis" to openAnywayAvailableAtMillis.toString(),
+                         "remainingMillis" to (openAnywayAvailableAtMillis - nowMillis).toString(),
+@@ -2490,7 +2552,7 @@ class MainViewModel(
+                 targetAppPackage = targetApp.packageName,
+                 primaryContentId = recommendationSet?.primary?.id,
+                 backupContentIds = recommendationSet?.backups.orEmpty().map(ContentItem::id),
+-                metadata = mapOf(
++                metadata = uiState.currentInterventionMetadata + mapOf(
+                     "interventionMode" to uiState.interventionMode.name,
+                     "openAnywayUnlockMinutes" to unlockMinutes.toString(),
+                     "openAnywayUnlockUntilMillis" to unlockUntilMillis.toString(),
+@@ -2512,7 +2574,7 @@ class MainViewModel(
+                     targetAppPackage = targetApp.packageName,
+                     primaryContentId = recommendationSet?.primary?.id,
+                     backupContentIds = recommendationSet?.backups.orEmpty().map(ContentItem::id),
+-                    metadata = mapOf(
++                    metadata = uiState.currentInterventionMetadata + mapOf(
+                         "interventionMode" to uiState.interventionMode.name,
+                         "openAnywayUnlockAvailableAtMillis" to (openAnywayAvailableAtMillis?.toString() ?: "0"),
+                         "openAnywayUnlockUntilMillis" to unlockUntilMillis.toString(),
+@@ -2529,7 +2591,7 @@ class MainViewModel(
+                     targetAppPackage = targetApp.packageName,
+                     primaryContentId = recommendationSet?.primary?.id,
+                     backupContentIds = recommendationSet?.backups.orEmpty().map(ContentItem::id),
+-                    metadata = mapOf(
++                    metadata = uiState.currentInterventionMetadata + mapOf(
+                         "interventionMode" to uiState.interventionMode.name,
+                         "openAnywayUnlockAvailableAtMillis" to (openAnywayAvailableAtMillis?.toString() ?: "0"),
+                         "openAnywayUnlockUntilMillis" to unlockUntilMillis.toString(),
+@@ -2543,6 +2605,7 @@ class MainViewModel(
+                 targetAppPackage = targetApp.packageName,
+                 untilMillis = unlockUntilMillis,
+                 allowedDuringBedtime = uiState.currentInterventionBedtimeEnforced,
++                targetKey = uiState.currentInterventionSuppressionKey ?: targetApp.packageName,
+             )
+         }
+         uiState = uiState.copy(
+@@ -2552,6 +2615,8 @@ class MainViewModel(
+             currentOpenAnywayUnlockAvailableAtMillis = null,
+             currentRecommendationSet = null,
+             currentInterventionOrigin = null,
++            currentInterventionMetadata = emptyMap(),
++            currentInterventionSuppressionKey = null,
+             currentInterventionBedtimeEnforced = false,
+             isBedtimeActive = bedtimeWindowIsActive(
+                 enabled = uiState.bedtimeEnabled,
+@@ -3365,6 +3430,7 @@ class MainViewModel(
+         targetApp: DistractingApp,
+         triggeredAtMillis: Long,
+         shownAtMillis: Long,
++        interventionMetadata: Map<String, String> = emptyMap(),
+     ) {
+         if (origin != InterventionOrigin.SYSTEM) {
+             return
+@@ -3378,7 +3444,7 @@ class MainViewModel(
+                 type = AnalyticsEventType.INTERVENTION_DEGRADED_PERFORMANCE,
+                 timestampMillis = shownAtMillis,
+                 targetAppPackage = targetApp.packageName,
+-                metadata = mapOf(
++                metadata = interventionMetadata + mapOf(
+                     "triggeredAtMillis" to triggeredAtMillis.toString(),
+                     "shownAtMillis" to shownAtMillis.toString(),
+                     "interceptionDelayMillis" to delayMillis.toString(),
+@@ -3689,6 +3755,8 @@ class MainViewModel(
+             currentOpenAnywayUnlockAvailableAtMillis = null,
+             currentRecommendationSet = null,
+             currentInterventionOrigin = null,
++            currentInterventionMetadata = emptyMap(),
++            currentInterventionSuppressionKey = null,
+             currentInterventionBedtimeEnforced = false,
+             currentContent = repairedContent,
+             currentReaderDocument = readerDocument,
+@@ -4094,6 +4162,8 @@ class MainViewModel(
+             isReaderOpening = false,
+             currentRecommendationSet = null,
+             currentInterventionOrigin = null,
++            currentInterventionMetadata = emptyMap(),
++            currentInterventionSuppressionKey = null,
+             currentInterventionBedtimeEnforced = false,
+             currentSessionId = null,
+             currentSessionStartedAtMillis = null,
+@@ -4173,7 +4243,7 @@ class MainViewModel(
+                 primaryContentId = recommendationSet.primary.id,
+                 backupContentIds = recommendationSet.backups.map(ContentItem::id),
+                 contentId = contentId,
+-                metadata = mapOf(
++                metadata = uiState.currentInterventionMetadata + mapOf(
+                     "action" to action,
+                     "interventionMode" to uiState.interventionMode.name,
+                     "openAnywayUnlockAvailableAtMillis" to uiState.currentOpenAnywayUnlockAvailableAtMillis.orEmptyString(),
+@@ -4258,10 +4328,20 @@ class MainViewModel(
+         if (isReady) {
+             val pending = pendingSystemInterception ?: return
+             pendingSystemInterception = null
+-            requestSystemInterception(
+-                targetAppPackage = pending.targetAppPackage,
+-                nowMillis = pending.triggeredAtMillis,
+-            )
++            when (pending) {
++                is PendingSystemInterception.App -> requestSystemInterception(
++                    targetAppPackage = pending.targetAppPackage,
++                    nowMillis = pending.triggeredAtMillis,
++                )
++
++                is PendingSystemInterception.Website -> requestSystemWebsiteInterception(
++                    browserPackage = pending.browserPackage,
++                    browserDisplayName = pending.browserDisplayName,
++                    websiteRuleType = pending.websiteRuleType,
++                    websiteRuleIncludesApex = pending.websiteRuleIncludesApex,
++                    nowMillis = pending.triggeredAtMillis,
++                )
++            }
+         }
+     }
+ 
+@@ -4696,10 +4776,20 @@ private const val MAX_BACKGROUND_READING_TIME_REPAIR_SCAN_COUNT = 10
+ private const val FEEDBACK_FIT_NOT = "not"
+ private const val FEEDBACK_SCROLL_NO = "no"
+ 
+-private data class PendingSystemInterception(
+-    val targetAppPackage: String,
+-    val triggeredAtMillis: Long,
+-)
++private sealed class PendingSystemInterception {
++    data class App(
++        val targetAppPackage: String,
++        val triggeredAtMillis: Long,
++    ) : PendingSystemInterception()
++
++    data class Website(
++        val browserPackage: String,
++        val browserDisplayName: String,
++        val websiteRuleType: String,
++        val websiteRuleIncludesApex: Boolean,
++        val triggeredAtMillis: Long,
++    ) : PendingSystemInterception()
++}
+ 
+ private fun AddLinkFormState.toDraftOrNull(): UserLinkDraft? {
+     val duration = durationMinutes.toIntOrNull() ?: return null
+diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
+index 44641fd..34c1f90 100644
+--- a/app/src/main/res/values/strings.xml
++++ b/app/src/main/res/values/strings.xml
+@@ -1,5 +1,5 @@
+ <resources>
+     <string name="app_name">Quality Alternative</string>
+     <string name="accessibility_service_label">Quality Alternative Foreground Detection</string>
+-    <string name="accessibility_service_description">Detects when selected distracting apps reach the foreground so the app can prepare a mindful replacement flow.</string>
++    <string name="accessibility_service_description">Detects selected distracting apps and supported browser address bars so the app can prepare a mindful replacement flow.</string>
+ </resources>
+diff --git a/app/src/main/res/xml/quality_alternative_accessibility_service.xml b/app/src/main/res/xml/quality_alternative_accessibility_service.xml
+index 68c173c..6843d97 100644
+--- a/app/src/main/res/xml/quality_alternative_accessibility_service.xml
++++ b/app/src/main/res/xml/quality_alternative_accessibility_service.xml
+@@ -1,7 +1,8 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+-    android:accessibilityEventTypes="typeWindowStateChanged"
++    android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged"
+     android:accessibilityFeedbackType="feedbackGeneric"
+-    android:canRetrieveWindowContent="false"
++    android:accessibilityFlags="flagReportViewIds"
++    android:canRetrieveWindowContent="true"
+     android:description="@string/accessibility_service_description"
+     android:notificationTimeout="100" />
+diff --git a/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt b/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
+index 7e36240..de72bc0 100644
+--- a/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
+@@ -77,6 +77,8 @@ import com.qualityalternative.app.domain.service.UserDocumentRepository
+ import com.qualityalternative.app.domain.service.UserLinkRepository
+ import com.qualityalternative.app.interception.FixtureTargetRegistry
+ import com.qualityalternative.app.interception.InterceptionRuntimeGate
++import com.qualityalternative.app.interception.VerifiedBrowserHostAdapter
++import com.qualityalternative.app.interception.WebsiteInterceptionResolver
+ import java.io.ByteArrayInputStream
+ import java.io.File
+ import java.time.LocalDate
+@@ -4734,6 +4736,89 @@ class MainViewModelTest {
+         assertEquals(null, viewModel.uiState.currentInterventionOrigin)
+     }
+ 
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun requestSystemWebsiteInterception_opensInterventionWithoutSelectedBrowserAndKeepsDomainPrivate() = runTest {
++        val analyticsTracker = InMemoryAnalyticsTracker()
++        val viewModel = createViewModel(
++            settingsRepository = FakeSettingsRepository(
++                initial = completedSettings(selectedAppPackages = emptySet()),
++            ),
++            analyticsTracker = analyticsTracker,
++        )
++
++        advanceUntilIdle()
++        viewModel.requestSystemWebsiteInterception(
++            browserPackage = VerifiedBrowserHostAdapter.CHROME_PACKAGE,
++            browserDisplayName = "Chrome",
++            websiteRuleType = WebsiteRuleType.WILDCARD_SUBDOMAINS.name,
++            websiteRuleIncludesApex = false,
++            nowMillis = 5_000L,
++        )
++        advanceUntilIdle()
++
++        assertEquals(MainScreen.Intervention, viewModel.uiState.screen)
++        assertEquals(InterventionOrigin.SYSTEM, viewModel.uiState.currentInterventionOrigin)
++        assertEquals(VerifiedBrowserHostAdapter.CHROME_PACKAGE, viewModel.uiState.selectedTargetApp?.packageName)
++        assertEquals("Chrome website", viewModel.uiState.selectedTargetApp?.displayName)
++        assertEquals(WebsiteInterceptionResolver.TARGET_TYPE, viewModel.uiState.currentInterventionMetadata["targetType"])
++
++        val shownEvent = analyticsTracker.allEvents().first { it.type == AnalyticsEventType.INTERVENTION_SHOWN }
++        val serializedMetadata = shownEvent.metadata.entries.joinToString(" ")
++        assertEquals(WebsiteInterceptionResolver.TARGET_TYPE, shownEvent.metadata["targetType"])
++        assertEquals(WebsiteInterceptionResolver.BROWSER_SUPPORT_VERIFIED_HOST, shownEvent.metadata["browserSupportStatus"])
++        assertFalse(serializedMetadata.contains("example"))
++        assertFalse(serializedMetadata.contains("https://"))
++    }
++
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun websiteOpenAnywaySuppressesWebsiteKeyWithoutSuppressingWholeBrowserTarget() = runTest {
++        var nowMillis = 10_000L
++        val analyticsTracker = InMemoryAnalyticsTracker()
++        val viewModel = createViewModel(
++            settingsRepository = FakeSettingsRepository(
++                initial = completedSettings(selectedAppPackages = emptySet())
++                    .copy(
++                        interventionMode = InterventionMode.FIRM,
++                        openAnywayUnlockMinutes = 15,
++                    ),
++            ),
++            analyticsTracker = analyticsTracker,
++            nowProvider = { nowMillis },
++        )
++
++        advanceUntilIdle()
++        viewModel.requestSystemWebsiteInterception(
++            browserPackage = VerifiedBrowserHostAdapter.CHROME_PACKAGE,
++            browserDisplayName = "Chrome",
++            websiteRuleType = WebsiteRuleType.EXACT_DOMAIN.name,
++            websiteRuleIncludesApex = false,
++            nowMillis = nowMillis,
++        )
++        advanceUntilIdle()
++
++        nowMillis += FORM_INTERVENTION_UNLOCK_DELAY_MILLIS
++        assertTrue(viewModel.openAnyway())
++        advanceUntilIdle()
++
++        assertTrue(
++            InterceptionRuntimeGate.shouldSuppress(
++                targetAppPackage = VerifiedBrowserHostAdapter.CHROME_PACKAGE,
++                targetKey = WebsiteInterceptionResolver.suppressionKeyFor(VerifiedBrowserHostAdapter.CHROME_PACKAGE),
++                nowMillis = nowMillis + 14 * 60_000L,
++            ),
++        )
++        assertFalse(
++            InterceptionRuntimeGate.shouldSuppress(
++                targetAppPackage = VerifiedBrowserHostAdapter.CHROME_PACKAGE,
++                nowMillis = nowMillis + 14 * 60_000L,
++            ),
++        )
++        val openEvent = analyticsTracker.allEvents().first { it.type == AnalyticsEventType.OPEN_ANYWAY_SELECTED }
++        assertEquals(WebsiteInterceptionResolver.TARGET_TYPE, openEvent.metadata["targetType"])
++    }
++
+     @Test
+     @OptIn(ExperimentalCoroutinesApi::class)
+     fun requestSystemInterception_recordsDegradedPerformanceWhenShownTooLate() = runTest {

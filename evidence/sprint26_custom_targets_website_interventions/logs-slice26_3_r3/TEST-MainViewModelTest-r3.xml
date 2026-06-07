@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.qualityalternative.app.ui.MainViewModelTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-06-07T14:49:42.802Z" hostname="mac-studio.home" time="0.105">
+  <properties/>
+  <testcase name="saveUserLinkFromForm_persistsLinkAndRecordsAnalytics" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.078"/>
+  <testcase name="requestSystemWebsiteInterceptionWithExternalUrlRecommendationKeepsAnalyticsUrlPrivate" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.012"/>
+  <testcase name="requestSystemWebsiteInterception_opensInterventionWithoutSelectedBrowserAndKeepsDomainPrivate" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.006"/>
+  <testcase name="acceptingSharedLinkOnlyRoutesToExternalHandoffAndRecordsGenericOpen" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.005"/>
+  <testcase name="acceptingUserLinkRoutesToExternalHandoffAndRecordsFallbackOpen" classname="com.qualityalternative.app.ui.MainViewModelTest" time="0.004"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.qualityalternative.app.data.InstalledAppTargetEligibilityPolicyTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-06-07T17:02:01.444Z" hostname="mac-studio.home" time="0.001">
+  <properties/>
+  <testcase name="eligibilityFor_allowsOrdinaryLaunchablePackage" classname="com.qualityalternative.app.data.InstalledAppTargetEligibilityPolicyTest" time="0.0"/>
+  <testcase name="eligibilityFor_excludesSafetyCriticalPackageFamilies" classname="com.qualityalternative.app.data.InstalledAppTargetEligibilityPolicyTest" time="0.0"/>
+  <testcase name="eligibilityFor_excludesKnownOemSafetyAppsWithoutBlanketOemBlock" classname="com.qualityalternative.app.data.InstalledAppTargetEligibilityPolicyTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

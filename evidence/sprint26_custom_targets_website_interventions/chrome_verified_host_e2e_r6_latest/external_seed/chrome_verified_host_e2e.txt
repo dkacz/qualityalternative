@@ -1,0 +1,7 @@
+
+External live Chrome service E2E seed
+Device model: sdk_gphone64_arm64
+Android API: 36
+Android release: 16
+Rule set: exact example.com
+Preserve state for external shell harness: true

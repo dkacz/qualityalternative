@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.qualityalternative.app.data.UserDocumentValidatorTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-06-07T16:26:01.804Z" hostname="mac-studio.home" time="0.001">
+  <properties/>
+  <testcase name="detectFormat_acceptsPdfMarkdownAndEpubFromMimeOrExtension" classname="com.qualityalternative.app.data.UserDocumentValidatorTest" time="0.0"/>
+  <testcase name="validate_rejectsUnsupportedDocumentOrMissingMetadata" classname="com.qualityalternative.app.data.UserDocumentValidatorTest" time="0.001"/>
+  <testcase name="detectFormat_doesNotTreatPlainTextAsMarkdownWithoutMarkdownExtension" classname="com.qualityalternative.app.data.UserDocumentValidatorTest" time="0.0"/>
+  <testcase name="validate_acceptsPrivateMarkdownDocument" classname="com.qualityalternative.app.data.UserDocumentValidatorTest" time="0.0"/>
+  <testcase name="validate_doesNotRejectDocumentsForComputedLongReadingTime" classname="com.qualityalternative.app.data.UserDocumentValidatorTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

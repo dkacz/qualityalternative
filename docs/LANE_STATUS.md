@@ -13,7 +13,7 @@ This file is the repo-level index for active and recently completed execution la
 
 ## Sprint 26 Custom Targets And Website Interventions
 
-Status: `slice26_2_complete_ready_for_slice26_3`
+Status: `slice26_3_complete_10_10_pass_next_slice26_4`
 
 - Branch: `codex/sprint26-custom-targets-website-interventions`
 - Scope: plan and implement support for replacement-first interventions on eligible arbitrary installed apps plus supported-browser website/domain rules, while avoiding universal URL blocking claims.
@@ -40,6 +40,18 @@ Status: `slice26_2_complete_ready_for_slice26_3`
   - Website rules are normalized, reject local/private/public-IP/IPv6/all-numeric/ambiguous hosts, persist in DataStore, and round-trip through Portable Profile import/export without browser support state, URL observations, tokens, or local folders.
   - Settings exposes website rules as a separate target category with add, validation, pause, edit, delete, and a browser support matrix. Chrome current-host interception remains scoped to Slice 26.3.
   - Slice 26.2 R2 fixes the GPT Pro R1 blockers: all IP literals are rejected; typed `*.example.com` exposes the subdomain mode and apex toggle before save; apex inclusion defaults off; the website rule count says `enabled`; the review bundle includes `gradle/libs.versions.toml`; and Android test metadata is sanitized to remove absolute local paths.
+  - Slice 26.3 implements Chrome-first verified-host website intervention through whitelisted address-bar accessibility nodes only.
+  - Slice 26.3 keeps unsupported/unreadable browser states non-triggering, never reuses a prior host, and routes matching rules into the existing Soft/Firm intervention flow as `Chrome website`.
+  - Slice 26.3 uses privacy-safe analytics metadata (`targetType`, browser support status, rule type) without raw URL, host/domain, path/query, page title, URL-bar text, non-match observations, browsing history, or domain-derived hashes.
+  - Slice 26.3 R2 fixes the GPT Pro R1 blockers: Settings copy now marks Chrome domain rules as supported when readable; hidden/focused omnibox states are rejected; adapter depth covers the real Chrome toolbar; website Open Anyway suppression falls through to whole-browser Chrome app target evaluation; and real Chrome package/version plus URL-set evidence is recorded.
+  - Slice 26.3 R3 fixes the GPT Pro R2 blocker by removing raw `externalUrl` from shared content analytics metadata and adding a website-domain regression that proves a replacement link URL with host, path, and query does not appear in website intervention, accept, or fallback-open analytics metadata.
+  - Slice 26.3 R4 is a package/evidence completeness review after R3 returned PASS/PASS at 9/10; it adds full unit XML, standalone activity/analytics/repository/model source files, and a cleaned manifest for GPT Pro to re-score.
+  - Slice 26.3 R5 ships all `app/src` source/test files plus full unit/lint evidence to close the R4 package-completeness gap.
+  - Slice 26.3 R5 review returned `SCORE 9/10`, `VERDICT PASS`, `VISUAL REVIEW PASS`, with no release blockers but with evidence gaps for fresh connected evidence, live service E2E, negative unsupported/unreadable proof, device/API metadata, schemed Unicode URL coverage, and raw `git diff --check` output.
+  - Slice 26.3 R6 closes those gaps with fresh connected 4/4 evidence, live Chrome AccessibilityService-to-intervention proof, connected unsupported/unreadable negative evidence, device/API/Chrome version metadata, schemed Unicode host normalization coverage, and raw diff-check output.
+  - Slice 26.3 R6 review returned `SCORE 9/10`, `VERDICT FAIL`, `VISUAL REVIEW PASS`; GPT Pro's blocker was missing package-authenticated stale active-window/package-mismatch safety.
+  - Slice 26.3 R7 adds package identity to browser snapshots, requires the root and address-bar node package to match `com.android.chrome`, and reruns unit, connected, visual, and live-service evidence after the change.
+  - Slice 26.3 R7 review returned `SCORE 10/10`, `VERDICT PASS`, `VISUAL REVIEW PASS`; no blockers or release-blocking bundle gaps remain.
   - Slice 26.1 GPT Pro R3 review returned `SCORE 8/10`, `VERDICT FAIL`, `VISUAL REVIEW PASS`.
   - Slice 26.1 GPT Pro R4 review returned `SCORE 10/10`, `VERDICT PASS`, `VISUAL REVIEW PASS`.
   - Slice 26.1 GPT Pro R4 heartbeat was deleted after successful harvest.
@@ -75,9 +87,8 @@ Status: `slice26_2_complete_ready_for_slice26_3`
   - Passed emulator visual E2E: `VisualQaScreenshotTest#captureSprint26CustomTargetSettingsScreens`
   - Passed `git diff --check`.
 - Next gate:
-  - Run GPT Pro Slice 26.2 review with the current implementation/evidence bundle.
-  - If GPT Pro returns `SCORE 10/10`, `VERDICT PASS`, and `VISUAL REVIEW PASS`, commit Slice 26.2 and continue to Slice 26.3 Chrome verified-host adapter.
-  - If GPT Pro returns blockers, fix and rerun review.
+  - Commit Slice 26.3 implementation/evidence.
+  - Continue to Slice 26.4 privacy, analytics, and Portable Profile hardening.
 
 ### Current Slice 26.2 Validation
 
@@ -108,6 +119,104 @@ Status: `slice26_2_complete_ready_for_slice26_3`
 - GPT Pro Slice 26.2 R2 visual screenshot directory: `evidence/sprint26_custom_targets_website_interventions/visual_e2e_r2/sprint26-custom-targets-1780835556853/`
 - GPT Pro Slice 26.2 R2 visual contact sheet: `evidence/sprint26_custom_targets_website_interventions/visual_e2e_r2/sprint26_slice26_2_r2_website_rules_contact_sheet.png`
 - GPT Pro Slice 26.2 R2 bundle manifest: `evidence/sprint26_custom_targets_website_interventions/SLICE26_2_R2_REVIEW_BUNDLE_MANIFEST.md`
+
+### Current Slice 26.3 R2 Validation
+
+- Evidence summary: `evidence/sprint26_custom_targets_website_interventions/SLICE26_3_EVIDENCE.md`
+- R2 evidence summary: `evidence/sprint26_custom_targets_website_interventions/SLICE26_3_R2_EVIDENCE.md`
+- Review bundle manifest: `evidence/sprint26_custom_targets_website_interventions/SLICE26_3_REVIEW_BUNDLE_MANIFEST.md`
+- R2 review bundle manifest: `evidence/sprint26_custom_targets_website_interventions/SLICE26_3_R2_REVIEW_BUNDLE_MANIFEST.md`
+- R2 diff: `evidence/sprint26_custom_targets_website_interventions/SLICE26_3_R2_DIFF.patch`
+- GPT Pro Slice 26.3 lane: `https://chatgpt.com/c/6a257187-c76c-83eb-ab7a-c3b3e873fa85`
+- GPT Pro Slice 26.3 prompt: `evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_3_REVIEW_PROMPT.md`
+- GPT Pro Slice 26.3 R1 output: `evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_3_REVIEW.md`
+- GPT Pro Slice 26.3 R1 verdict: `SCORE 7/10`, `VERDICT FAIL`, `VISUAL REVIEW PASS`
+- GPT Pro Slice 26.3 R2 prompt: `evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_3_R2_REVIEW_PROMPT.md`
+- GPT Pro Slice 26.3 R2 bundle: `SPRINT26_SLICE26_3_R2_REVIEW_BUNDLE_20260607.zip`
+- GPT Pro Slice 26.3 R2 lane: `https://chatgpt.com/c/6a257f25-eefc-83ed-b502-a7c70b89ed71`
+- GPT Pro Slice 26.3 R2 output: `evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_3_R2_REVIEW.md`
+- GPT Pro Slice 26.3 R2 verdict: `SCORE 8/10`, `VERDICT FAIL`, `VISUAL REVIEW PASS`
+- GPT Pro Slice 26.3 R2 blocker: website-domain analytics could still include replacement `externalUrl` values through shared content metadata.
+- GPT Pro Slice 26.3 R2 heartbeat: deleted after successful harvest.
+- R3 evidence summary: `evidence/sprint26_custom_targets_website_interventions/SLICE26_3_R3_EVIDENCE.md`
+- R3 diff: `evidence/sprint26_custom_targets_website_interventions/SLICE26_3_R3_DIFF.patch`
+- R3 raw test evidence: `evidence/sprint26_custom_targets_website_interventions/logs-slice26_3_r3/`
+- GPT Pro Slice 26.3 R3 prompt: `evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_3_R3_REVIEW_PROMPT.md`
+- GPT Pro Slice 26.3 R3 bundle: `SPRINT26_SLICE26_3_R3_REVIEW_BUNDLE_20260607.zip`
+- GPT Pro Slice 26.3 R3 lane: `https://chatgpt.com/c/6a258670-aa7c-83eb-a4ec-a37abb91c04f`
+- GPT Pro Slice 26.3 R3 output: `evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_3_R3_REVIEW.md`
+- GPT Pro Slice 26.3 R3 verdict: `SCORE 9/10`, `VERDICT PASS`, `VISUAL REVIEW PASS`, blockers none.
+- GPT Pro Slice 26.3 R3 heartbeat: deleted after successful harvest.
+- R4 evidence summary: `evidence/sprint26_custom_targets_website_interventions/SLICE26_3_R4_EVIDENCE.md`
+- R4 diff: `evidence/sprint26_custom_targets_website_interventions/SLICE26_3_R4_DIFF.patch`
+- R4 raw test evidence: `evidence/sprint26_custom_targets_website_interventions/logs-slice26_3_r4/`
+- GPT Pro Slice 26.3 R4 prompt: `evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_3_R4_REVIEW_PROMPT.md`
+- GPT Pro Slice 26.3 R4 bundle: `SPRINT26_SLICE26_3_R4_REVIEW_BUNDLE_20260607.zip`
+- GPT Pro Slice 26.3 R4 lane: `https://chatgpt.com/c/6a258c5f-0fd8-83eb-b96b-434cb0c95945`
+- GPT Pro Slice 26.3 R4 output: `evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_3_R4_REVIEW.md`
+- GPT Pro Slice 26.3 R4 verdict: `SCORE 9/10`, `VERDICT PASS`, `VISUAL REVIEW PASS`, blockers none.
+- GPT Pro Slice 26.3 R4 heartbeat: deleted after successful harvest.
+- R5 evidence summary: `evidence/sprint26_custom_targets_website_interventions/SLICE26_3_R5_EVIDENCE.md`
+- R5 review bundle manifest: `evidence/sprint26_custom_targets_website_interventions/SLICE26_3_R5_REVIEW_BUNDLE_MANIFEST.md`
+- GPT Pro Slice 26.3 R5 prompt: `evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_3_R5_REVIEW_PROMPT.md`
+- GPT Pro Slice 26.3 R5 bundle: `SPRINT26_SLICE26_3_R5_REVIEW_BUNDLE_20260607.zip`
+- GPT Pro Slice 26.3 R5 lane: `https://chatgpt.com/c/6a259198-0f20-83eb-849d-4188836260c4`
+- GPT Pro Slice 26.3 R5 review output target: `evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_3_R5_REVIEW.md`
+- GPT Pro Slice 26.3 R5 verdict: `SCORE 9/10`, `VERDICT PASS`, `VISUAL REVIEW PASS`, blockers none.
+- GPT Pro Slice 26.3 R5 heartbeat: deleted after successful harvest.
+- R6 evidence summary: `evidence/sprint26_custom_targets_website_interventions/SLICE26_3_R6_EVIDENCE.md`
+- R6 review bundle manifest: `evidence/sprint26_custom_targets_website_interventions/SLICE26_3_R6_REVIEW_BUNDLE_MANIFEST.md`
+- R6 diff: `evidence/sprint26_custom_targets_website_interventions/SLICE26_3_R6_DIFF.patch`
+- GPT Pro Slice 26.3 R6 prompt: `evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_3_R6_REVIEW_PROMPT.md`
+- GPT Pro Slice 26.3 R6 bundle: `SPRINT26_SLICE26_3_R6_REVIEW_BUNDLE_20260607.zip`
+- GPT Pro Slice 26.3 R6 lane: `https://chatgpt.com/c/6a259ebf-7448-83eb-8027-d21674b45366`
+- GPT Pro Slice 26.3 R6 output target: `evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_3_R6_REVIEW.md`
+- GPT Pro Slice 26.3 R6 verdict: `SCORE 9/10`, `VERDICT FAIL`, `VISUAL REVIEW PASS`.
+- GPT Pro Slice 26.3 R6 heartbeat: deleted after successful harvest.
+- GPT Pro Slice 26.3 R6 heartbeat check `2026-06-07T16:49:22Z`: exact-lane harvest still showed ChatGPT thinking; final R6 harvest completed at the next heartbeat and the heartbeat was deleted.
+- R7 evidence summary: `evidence/sprint26_custom_targets_website_interventions/SLICE26_3_R7_EVIDENCE.md`
+- R7 review bundle manifest: `evidence/sprint26_custom_targets_website_interventions/SLICE26_3_R7_REVIEW_BUNDLE_MANIFEST.md`
+- R7 diff: `evidence/sprint26_custom_targets_website_interventions/SLICE26_3_R7_DIFF.patch`
+- GPT Pro Slice 26.3 R7 prompt: `evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_3_R7_REVIEW_PROMPT.md`
+- GPT Pro Slice 26.3 R7 bundle: `SPRINT26_SLICE26_3_R7_REVIEW_BUNDLE_20260607.zip`
+- GPT Pro Slice 26.3 R7 lane: `https://chatgpt.com/c/6a25a63b-ce44-83eb-8cdc-764669a47268`
+- GPT Pro Slice 26.3 R7 output: `evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_3_R7_REVIEW.md`
+- GPT Pro Slice 26.3 R7 verdict: `SCORE 10/10`, `VERDICT PASS`, `VISUAL REVIEW PASS`
+- GPT Pro Slice 26.3 R7 heartbeat: deleted after successful harvest.
+- GPT Pro Slice 26.3 R7 heartbeat check `2026-06-07T17:21:22Z`: exact-lane harvest still showed ChatGPT thinking; no completed `SCORE`/`VERDICT` response harvested yet, so the heartbeat remained active at that checkpoint.
+- GPT Pro Slice 26.3 R7 harvest `2026-06-07T17:31:22Z`: exact-lane harvest completed from `https://chatgpt.com/c/6a25a63b-ce44-83eb-8cdc-764669a47268`; output preserved at `evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_3_R7_REVIEW.md`; heartbeat deleted.
+- Visual screenshot directory: `evidence/sprint26_custom_targets_website_interventions/visual_e2e_slice26_3/sprint26-custom-targets-1780838366859/`
+- Visual contact sheet: `evidence/sprint26_custom_targets_website_interventions/visual_e2e_slice26_3/sprint26_slice26_3_chrome_website_intervention_contact_sheet.png`
+- R2 visual evidence: `evidence/sprint26_custom_targets_website_interventions/visual_e2e_slice26_3_r2/sprint26_slice26_3_r2_chrome_verified_host_contact_sheet.png`
+- R2 Chrome evidence: `evidence/sprint26_custom_targets_website_interventions/chrome_verified_host_e2e_r2_latest/`
+- R6 visual evidence: `evidence/sprint26_custom_targets_website_interventions/visual_e2e_slice26_3_r6/`
+- R6 Chrome/live-service evidence: `evidence/sprint26_custom_targets_website_interventions/chrome_verified_host_e2e_r6_latest/` and `evidence/sprint26_custom_targets_website_interventions/live_service_e2e_r6/`
+- R6 raw test evidence: `evidence/sprint26_custom_targets_website_interventions/logs-slice26_3_r6/`
+- Raw test evidence: `evidence/sprint26_custom_targets_website_interventions/logs-slice26_3_r2/`
+- Passed targeted unit tests:
+  - `VerifiedBrowserHostAdapterTest`
+  - `WebsiteInterceptionResolverTest`
+  - `AccessibilityInterceptionPlannerTest`
+  - `MainViewModelTest.requestSystemWebsiteInterception_opensInterventionWithoutSelectedBrowserAndKeepsDomainPrivate`
+  - `MainViewModelTest.websiteOpenAnywaySuppressesWebsiteKeyWithoutSuppressingWholeBrowserTarget`
+- Passed real Chrome adapter harness: `AccessibilityInterceptionTest#chromeVerifiedHostAdapterHarnessAcceptsOnlyLoadedMatchingHost` on `qaApi36(AVD) - 16`.
+- Passed emulator visual E2E:
+  - `VisualQaScreenshotTest#captureSprint26WebsiteRuleSettingsScreens`
+  - `VisualQaScreenshotTest#captureSprint26ChromeWebsiteInterventionScreens`
+- Passed `:app:lintDebug`.
+- R3 passed targeted unit regression for website-domain analytics URL privacy.
+- R3 passed `:app:lintDebug`.
+- R3 passed `git diff --check`.
+- R4 passed full `:app:testDebugUnitTest`.
+- R4 passed `:app:lintDebug`.
+- R6 passed full `:app:testDebugUnitTest` with 432 tests and no failures/errors/skips.
+- R6 passed `:app:lintDebug` with 0 errors.
+- R6 passed fresh connected Android tests 4/4, including Chrome loaded-host harness, unsupported/unreadable negative states, website Settings visuals, and website intervention visuals.
+- R6 passed external live-service Chrome E2E and `git diff --check`.
+- R7 passed full `:app:testDebugUnitTest` with 433 tests and no failures/errors/skips.
+- R7 passed `:app:lintDebug` with 0 errors.
+- R7 passed fresh connected Android tests 4/4, including package-mismatched stale snapshot negative evidence.
+- R7 passed external live-service Chrome E2E after the package-authentication change and `git diff --check`.
 
 ## Sprint 25 Markdown Media And Tables
 

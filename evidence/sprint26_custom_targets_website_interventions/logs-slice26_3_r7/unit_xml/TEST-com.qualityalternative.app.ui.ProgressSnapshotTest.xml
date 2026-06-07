@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.qualityalternative.app.ui.ProgressSnapshotTest" tests="45" skipped="0" failures="0" errors="0" timestamp="2026-06-07T17:02:02.774Z" hostname="mac-studio.home" time="0.04">
+  <properties/>
+  <testcase name="adaptiveReaderPageFitReturnsConsistentViewportBudget" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.0"/>
+  <testcase name="readerAnnotationSelectionEndCanMoveBeyondCurrentPage" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.004"/>
+  <testcase name="readerBlocksForDisplayDoesNotTreatIntrawordUnderscoresAsItalic" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.0"/>
+  <testcase name="readerProgressSourceIndexSurvivesAdaptiveResplitting" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.0"/>
+  <testcase name="readerParagraphsForDisplayDoesNotCapLongAssets" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.0"/>
+  <testcase name="progressSnapshotDoesNotCountMeditationAsCompletedReadOrReadingStreak" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.001"/>
+  <testcase name="adaptiveReaderPaginationSplitsOversizedShortLineCodeBlocksBeforePaging" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.0"/>
+  <testcase name="progressSnapshotShowsOnlyRecentSevenDayReplacements" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.001"/>
+  <testcase name="progressSnapshotCountsCurrentReadingStreakFromCompletedSessions" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.0"/>
+  <testcase name="splitReaderBlocksPreserveSourceOffsetsForCrossPageSelection" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.0"/>
+  <testcase name="adaptiveReaderPaginationPacksMoreBlocksOnTallViewport" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.001"/>
+  <testcase name="readerBlocksForDisplayPreservesIndentedNestedMarkdownListLines" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.0"/>
+  <testcase name="adaptiveReaderPaginationCostsCodeBlocksByRenderedPadding" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.004"/>
+  <testcase name="adaptiveReaderPaginationChargesBodyLikeBlocksForRenderedPadding" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.001"/>
+  <testcase name="readerSelectionRangesRefineWithinSingleSentence" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.0"/>
+  <testcase name="readerProgressPercentUsesSourceBlockIdentityInsteadOfAssumingDenseIndexes" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.0"/>
+  <testcase name="readerProgressFractionMatchesDisplayedPercentForFooterBar" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.0"/>
+  <testcase name="readerPagesKeepSplitSourceChunksContinuousAcrossAdjacentPages" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.001"/>
+  <testcase name="readerPagesSplitLongContentAndRestoreContainingParagraph" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.0"/>
+  <testcase name="readerMarkdownBlockKeepsMarkdownTablesAsTableBlocks" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.0"/>
+  <testcase name="readerAnnotationSelectionStartCanMoveBeforeCurrentPage" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.003"/>
+  <testcase name="adaptiveReaderPaginationCapsShortParagraphsByRenderedBlockHeight" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.0"/>
+  <testcase name="finiteReaderParagraphsReturnsOnlyRealParagraphs" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.0"/>
+  <testcase name="readerAnnotationMappingPrefersSourceSelectorOverStaleParagraphIndex" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.0"/>
+  <testcase name="adaptiveReaderPageWeightUsesViewportAndReaderFontScale" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.0"/>
+  <testcase name="readerPageBoundarySignatureChangesWhenSamePageCountBoundariesShift" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.001"/>
+  <testcase name="progressSnapshotLetsConvertedDayWinOverPartialDelayDay" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.0"/>
+  <testcase name="recentReplacementDurationLabelUsesPersistedDuration" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.0"/>
+  <testcase name="readerParagraphsForDisplayUsesFallbackWhenBodyIsBlank" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.0"/>
+  <testcase name="readerAnnotationSelectionStartPreservesEndAcrossManySourceBlocks" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.001"/>
+  <testcase name="readerLayoutSplitsLongSingleBlockBeforePagination" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.0"/>
+  <testcase name="measuredReaderPaginationUsesRenderedPixelBudgetAndHeadingBreaks" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.0"/>
+  <testcase name="splitOversizedReaderBlocksSplitsWrappedMarkdownTableRowsByVisualWeight" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.0"/>
+  <testcase name="adaptiveReaderPaginationCostsMultiLineCodeByFullRenderedLineHeight" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.003"/>
+  <testcase name="progressSnapshotCountsConstructiveOutcomesWithoutDuplicateDelayEvents" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.0"/>
+  <testcase name="readerProgressPercentUsesSourcePositionInsteadOfRepaginatedPageCount" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.0"/>
+  <testcase name="readerBlocksForDisplayPreservesBasicMarkdownFormatting" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.013"/>
+  <testcase name="dayLabelsUseSingularAndPluralCopy" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.001"/>
+  <testcase name="readerAnnotationSelectionStartCanMoveIntoPreviousSourceBlock" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.0"/>
+  <testcase name="progressSnapshotBuildsDynamicCalendarStripFromReplacementsAndDelays" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.0"/>
+  <testcase name="progressSnapshotKeepsDaysConvertedAlignedToTwentyOneDayStrip" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.0"/>
+  <testcase name="readerBlocksForDisplayPreservesThreeLevelMarkdownListDepth" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.0"/>
+  <testcase name="readerLayoutMapsSourceSelectorIntoSplitDisplayBlock" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.0"/>
+  <testcase name="adaptiveReaderPaginationPacksShortMultiLineCodeWithoutUnderfill" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.005"/>
+  <testcase name="readerMarkdownBlockKeepsMarkdownImagesAsMediaBlocks" classname="com.qualityalternative.app.ui.ProgressSnapshotTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,11 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<testsuites tests="1" failures="0" errors="0" skipped="0" time="23.604" timestamp="2026-06-07T14:18:33" hostname="localhost">
+  <testsuite name="com.qualityalternative.app.AccessibilityInterceptionTest" tests="1" failures="0" errors="0" skipped="0" time="22.517" timestamp="2026-06-07T14:18:33" hostname="localhost">
+    <properties>
+      <property name="device" value="qaApi36(AVD) - 16" />
+      <property name="flavor" value="" />
+      <property name="project" value=":app" />
+    </properties>
+    <testcase name="chromeVerifiedHostAdapterHarnessAcceptsOnlyLoadedMatchingHost" classname="com.qualityalternative.app.AccessibilityInterceptionTest" time="22.517" />
+  </testsuite>
+</testsuites>

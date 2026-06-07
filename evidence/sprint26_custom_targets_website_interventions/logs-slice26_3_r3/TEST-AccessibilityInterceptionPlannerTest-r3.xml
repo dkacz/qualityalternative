@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.qualityalternative.app.interception.AccessibilityInterceptionPlannerTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-06-07T14:49:42.744Z" hostname="mac-studio.home" time="0.032">
+  <properties/>
+  <testcase name="websiteSuppressionFallsThroughToSelectedChromeAppTarget" classname="com.qualityalternative.app.interception.AccessibilityInterceptionPlannerTest" time="0.03"/>
+  <testcase name="onlySuppressedWebsiteResultFallsThroughToAppTarget" classname="com.qualityalternative.app.interception.AccessibilityInterceptionPlannerTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -53,6 +53,7 @@ object WebsiteRuleNormalizer {
         if ("://" !in withoutWhitespace && "@" in withoutWhitespace) return null
         val candidate = if ("://" in withoutWhitespace) withoutWhitespace else "https://$withoutWhitespace"
         return runCatching { URI(candidate).host }.getOrNull()
+            ?: withoutWhitespace.withoutSchemeAuthorityHost()
             ?: withoutWhitespace
                 .takeUnless { ':' in it }
                 ?.substringBefore('/')
@@ -60,6 +61,19 @@ object WebsiteRuleNormalizer {
                 ?.substringBefore('#')
                 ?.substringBefore('@')
                 ?.takeIf(String::isNotBlank)
+    }
+
+    private fun String.withoutSchemeAuthorityHost(): String? {
+        if ("://" !in this) return null
+        val authority = substringAfter("://")
+            .substringBefore('/')
+            .substringBefore('?')
+            .substringBefore('#')
+            .substringAfterLast('@')
+            .takeIf(String::isNotBlank)
+            ?: return null
+        if (authority.startsWith("[")) return authority
+        return authority.substringBefore(':').takeIf(String::isNotBlank)
     }
 
     private fun normalizeHost(raw: String): String? {

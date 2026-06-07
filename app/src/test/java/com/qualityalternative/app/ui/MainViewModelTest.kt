@@ -77,6 +77,8 @@ import com.qualityalternative.app.domain.service.UserDocumentRepository
 import com.qualityalternative.app.domain.service.UserLinkRepository
 import com.qualityalternative.app.interception.FixtureTargetRegistry
 import com.qualityalternative.app.interception.InterceptionRuntimeGate
+import com.qualityalternative.app.interception.VerifiedBrowserHostAdapter
+import com.qualityalternative.app.interception.WebsiteInterceptionResolver
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.time.LocalDate
@@ -388,7 +390,7 @@ class MainViewModelTest {
         assertEquals(userLink.id, event.contentId)
         assertEquals("USER_LINK", event.metadata["sourceType"])
         assertEquals("NEEDS_FALLBACK", event.metadata["availability"])
-        assertEquals("https://example.com/essay", event.metadata["externalUrl"])
+        assertFalse(event.metadata.containsKey("externalUrl"))
     }
 
     @Test
@@ -430,7 +432,7 @@ class MainViewModelTest {
         assertEquals("EDITORIAL", event.metadata["sourceType"])
         assertEquals("LINK_ONLY", event.metadata["rightsClass"])
         assertEquals("EXTERNAL_HANDOFF", event.metadata["renderMode"])
-        assertEquals("https://longnow.org/ideas/the-big-here-and-long-now/", event.metadata["externalUrl"])
+        assertFalse(event.metadata.containsKey("externalUrl"))
     }
 
     @Test
@@ -2511,7 +2513,7 @@ class MainViewModelTest {
         assertEquals("USER_LINK", event.metadata["sourceType"])
         assertEquals("USER_PRIVATE", event.metadata["rightsClass"])
         assertEquals("EXTERNAL_HANDOFF", event.metadata["renderMode"])
-        assertEquals("https://example.com/essay", event.metadata["externalUrl"])
+        assertFalse(event.metadata.containsKey("externalUrl"))
 
         viewModel.finishAddLinkSuccess()
         assertEquals(MainScreen.Library, viewModel.uiState.screen)
@@ -4732,6 +4734,142 @@ class MainViewModelTest {
 
         assertEquals(MainScreen.Home, viewModel.uiState.screen)
         assertEquals(null, viewModel.uiState.currentInterventionOrigin)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun requestSystemWebsiteInterception_opensInterventionWithoutSelectedBrowserAndKeepsDomainPrivate() = runTest {
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val viewModel = createViewModel(
+            settingsRepository = FakeSettingsRepository(
+                initial = completedSettings(selectedAppPackages = emptySet()),
+            ),
+            analyticsTracker = analyticsTracker,
+        )
+
+        advanceUntilIdle()
+        viewModel.requestSystemWebsiteInterception(
+            browserPackage = VerifiedBrowserHostAdapter.CHROME_PACKAGE,
+            browserDisplayName = "Chrome",
+            websiteRuleType = WebsiteRuleType.WILDCARD_SUBDOMAINS.name,
+            websiteRuleIncludesApex = false,
+            nowMillis = 5_000L,
+        )
+        advanceUntilIdle()
+
+        assertEquals(MainScreen.Intervention, viewModel.uiState.screen)
+        assertEquals(InterventionOrigin.SYSTEM, viewModel.uiState.currentInterventionOrigin)
+        assertEquals(VerifiedBrowserHostAdapter.CHROME_PACKAGE, viewModel.uiState.selectedTargetApp?.packageName)
+        assertEquals("Chrome website", viewModel.uiState.selectedTargetApp?.displayName)
+        assertEquals(WebsiteInterceptionResolver.TARGET_TYPE, viewModel.uiState.currentInterventionMetadata["targetType"])
+
+        val shownEvent = analyticsTracker.allEvents().first { it.type == AnalyticsEventType.INTERVENTION_SHOWN }
+        val serializedMetadata = shownEvent.metadata.entries.joinToString(" ")
+        assertEquals(WebsiteInterceptionResolver.TARGET_TYPE, shownEvent.metadata["targetType"])
+        assertEquals(WebsiteInterceptionResolver.BROWSER_SUPPORT_VERIFIED_HOST, shownEvent.metadata["browserSupportStatus"])
+        assertFalse(serializedMetadata.contains("example"))
+        assertFalse(serializedMetadata.contains("https://"))
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun requestSystemWebsiteInterceptionWithExternalUrlRecommendationKeepsAnalyticsUrlPrivate() = runTest {
+        val privateUrl = "https://leaky.example.com/path/to/read?token=secret"
+        val userLink = savedUserLink(id = "private-user-link").copy(
+            externalUrl = privateUrl,
+            rights = ContentRightsMetadata.userPrivateExternal(sourceUrl = privateUrl),
+        )
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val viewModel = createViewModel(
+            contentRepository = FakeContentRepository(extraItems = listOf(userLink)),
+            recommendationEngine = FixedRecommendationEngine(
+                RecommendationSet(
+                    primary = userLink,
+                    backups = emptyList(),
+                    inventoryShortage = true,
+                    generatedAtMillis = 5_000L,
+                ),
+            ),
+            settingsRepository = FakeSettingsRepository(
+                initial = completedSettings(selectedAppPackages = emptySet()),
+            ),
+            analyticsTracker = analyticsTracker,
+        )
+
+        advanceUntilIdle()
+        viewModel.requestSystemWebsiteInterception(
+            browserPackage = VerifiedBrowserHostAdapter.CHROME_PACKAGE,
+            browserDisplayName = "Chrome",
+            websiteRuleType = WebsiteRuleType.EXACT_DOMAIN.name,
+            websiteRuleIncludesApex = false,
+            nowMillis = 5_000L,
+        )
+        advanceUntilIdle()
+        viewModel.acceptPrimary()
+        advanceUntilIdle()
+        assertEquals(privateUrl, viewModel.currentExternalLinkUrl())
+
+        viewModel.recordExternalLinkOpened(nowMillis = 6_000L)
+        advanceUntilIdle()
+
+        val websiteEvents = analyticsTracker.allEvents().filter { event ->
+            event.metadata["targetType"] == WebsiteInterceptionResolver.TARGET_TYPE ||
+                event.type == AnalyticsEventType.USER_LINK_FALLBACK_OPENED
+        }
+        val serializedMetadata = websiteEvents
+            .flatMap { event -> event.metadata.entries }
+            .joinToString(" ") { (key, value) -> "$key=$value" }
+        listOf(privateUrl, "https://", "leaky.example.com", "/path/to/read", "token=secret", "secret").forEach { fragment ->
+            assertFalse("Analytics metadata leaked URL fragment: $fragment", serializedMetadata.contains(fragment))
+        }
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun websiteOpenAnywaySuppressesWebsiteKeyWithoutSuppressingWholeBrowserTarget() = runTest {
+        var nowMillis = 10_000L
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val viewModel = createViewModel(
+            settingsRepository = FakeSettingsRepository(
+                initial = completedSettings(selectedAppPackages = emptySet())
+                    .copy(
+                        interventionMode = InterventionMode.FIRM,
+                        openAnywayUnlockMinutes = 15,
+                    ),
+            ),
+            analyticsTracker = analyticsTracker,
+            nowProvider = { nowMillis },
+        )
+
+        advanceUntilIdle()
+        viewModel.requestSystemWebsiteInterception(
+            browserPackage = VerifiedBrowserHostAdapter.CHROME_PACKAGE,
+            browserDisplayName = "Chrome",
+            websiteRuleType = WebsiteRuleType.EXACT_DOMAIN.name,
+            websiteRuleIncludesApex = false,
+            nowMillis = nowMillis,
+        )
+        advanceUntilIdle()
+
+        nowMillis += FORM_INTERVENTION_UNLOCK_DELAY_MILLIS
+        assertTrue(viewModel.openAnyway())
+        advanceUntilIdle()
+
+        assertTrue(
+            InterceptionRuntimeGate.shouldSuppress(
+                targetAppPackage = VerifiedBrowserHostAdapter.CHROME_PACKAGE,
+                targetKey = WebsiteInterceptionResolver.suppressionKeyFor(VerifiedBrowserHostAdapter.CHROME_PACKAGE),
+                nowMillis = nowMillis + 14 * 60_000L,
+            ),
+        )
+        assertFalse(
+            InterceptionRuntimeGate.shouldSuppress(
+                targetAppPackage = VerifiedBrowserHostAdapter.CHROME_PACKAGE,
+                nowMillis = nowMillis + 14 * 60_000L,
+            ),
+        )
+        val openEvent = analyticsTracker.allEvents().first { it.type == AnalyticsEventType.OPEN_ANYWAY_SELECTED }
+        assertEquals(WebsiteInterceptionResolver.TARGET_TYPE, openEvent.metadata["targetType"])
     }
 
     @Test

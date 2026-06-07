@@ -46,9 +46,11 @@ import com.qualityalternative.app.domain.model.ReadingProgress
 import com.qualityalternative.app.domain.model.TopicTag
 import com.qualityalternative.app.domain.model.UserDocumentDraft
 import com.qualityalternative.app.domain.model.UserLinkDraft
+import com.qualityalternative.app.domain.model.WebsiteRuleType
 import com.qualityalternative.app.domain.service.AddUserDocumentResult
 import com.qualityalternative.app.domain.service.AddUserLinkResult
 import com.qualityalternative.app.interception.FixtureTargetRegistry
+import com.qualityalternative.app.interception.VerifiedBrowserHostAdapter
 import com.qualityalternative.app.data.ReadingTimeEstimateSource
 import com.qualityalternative.app.ui.DocumentImportCandidate
 import java.io.ByteArrayInputStream
@@ -608,6 +610,57 @@ class VisualQaScreenshotTest {
         composeRule.onNodeWithTag("settings-browser-support-other").assertIsDisplayed()
         waitForTransientMessageToClear("Website rule deleted.")
         captureSprint26("22_website_rules_browser_support_matrix_light")
+    }
+
+    @Test
+    fun captureSprint26ChromeWebsiteInterventionScreens() {
+        launchOnboardedApp()
+        scenario?.close()
+        scenario = null
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+
+        val targetContext = InstrumentationRegistry.getInstrumentation().targetContext
+        launchApp(
+            MainActivity.createWebsiteInterceptionIntent(
+                context = targetContext,
+                browserPackage = VerifiedBrowserHostAdapter.CHROME_PACKAGE,
+                browserDisplayName = "Chrome",
+                websiteRuleType = WebsiteRuleType.EXACT_DOMAIN.name,
+                websiteRuleIncludesApex = false,
+            ),
+        )
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("intervention-screen") }
+        assertTrue(
+            "Expected Chrome website copy in intervention",
+            composeRule.onAllNodesWithText("Chrome website", substring = true).fetchSemanticsNodes().isNotEmpty(),
+        )
+        composeRule.onNodeWithText("Open Chrome website").assertIsDisplayed().assertIsEnabled()
+        assertTrue("Website soft mode should not show form-intervention wait", !hasTag("form-intervention-unlock-wait"))
+        captureSprint26("23_website_chrome_verified_host_soft_intervention_light")
+
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.selectInterventionMode(InterventionMode.FIRM)
+        }
+        composeRule.waitForIdle()
+        scenario?.close()
+        scenario = null
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+        launchApp(
+            MainActivity.createWebsiteInterceptionIntent(
+                context = targetContext,
+                browserPackage = VerifiedBrowserHostAdapter.CHROME_PACKAGE,
+                browserDisplayName = "Chrome",
+                websiteRuleType = WebsiteRuleType.WILDCARD_SUBDOMAINS.name,
+                websiteRuleIncludesApex = true,
+            ),
+        )
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("form-intervention-unlock-wait") }
+        assertTrue(
+            "Expected Chrome website copy in firm intervention",
+            composeRule.onAllNodesWithText("Chrome website", substring = true).fetchSemanticsNodes().isNotEmpty(),
+        )
+        composeRule.onNodeWithText("Open in", substring = true).assertIsDisplayed().assertIsNotEnabled()
+        captureSprint26("24_website_chrome_verified_host_firm_wait_light")
     }
 
     @Test

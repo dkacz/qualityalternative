@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.qualityalternative.app.data.CompositeContentRepositoryTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-06-07T15:17:24.599Z" hostname="mac-studio.home" time="0.035">
+  <properties/>
+  <testcase name="inventory_mergesEditorialAndAvailableUserLinksOnly" classname="com.qualityalternative.app.data.CompositeContentRepositoryTest" time="0.002"/>
+  <testcase name="readerDocument_delegatesStructuredUserDocumentWithoutBreakingPlainBodies" classname="com.qualityalternative.app.data.CompositeContentRepositoryTest" time="0.0"/>
+  <testcase name="observeReady_requiresEditorialAndUserLinksToBeReady" classname="com.qualityalternative.app.data.CompositeContentRepositoryTest" time="0.033"/>
+  <testcase name="contentBody_returnsEditorialBodyUserLinkFallbackAndUserDocumentBody" classname="com.qualityalternative.app.data.CompositeContentRepositoryTest" time="0.0"/>
+  <testcase name="isReady_requiresBothRepositoriesToBeReady" classname="com.qualityalternative.app.data.CompositeContentRepositoryTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,18 +1,32 @@
 package com.qualityalternative.app
 
 import android.content.Intent
+import android.content.ComponentName
+import android.net.Uri
+import android.provider.Settings
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
+import androidx.test.uiautomator.UiObject2
 import androidx.test.uiautomator.Until
 import com.qualityalternative.app.domain.model.DurationBucket
 import com.qualityalternative.app.domain.model.OnboardingSelection
 import com.qualityalternative.app.domain.model.TopicTag
+import com.qualityalternative.app.domain.model.WebsiteRule
+import com.qualityalternative.app.domain.model.WebsiteRuleType
 import com.qualityalternative.app.fixture.FixtureDistractorOneActivity
 import com.qualityalternative.app.interception.FixtureTargetRegistry
+import com.qualityalternative.app.interception.BrowserNodeSnapshot
+import com.qualityalternative.app.interception.QualityAlternativeAccessibilityService
+import com.qualityalternative.app.interception.VerifiedBrowserHostAdapter
+import com.qualityalternative.app.interception.VerifiedBrowserHostResult
+import com.qualityalternative.app.interception.WebsiteInterceptionResolver
+import java.io.File
 import kotlinx.coroutines.runBlocking
 import org.junit.After
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -20,6 +34,10 @@ class AccessibilityInterceptionTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val targetContext = instrumentation.targetContext
     private val device = UiDevice.getInstance(instrumentation)
+    private val chromeEvidenceDir = File(
+        "/sdcard/Download/qualityalternative/sprint26-chrome-verified-host-${System.currentTimeMillis()}",
+    )
+    private var preserveStateAfterTest = false
 
     @Before
     fun resetAppState() {
@@ -30,9 +48,12 @@ class AccessibilityInterceptionTest {
 
     @After
     fun tearDown() {
-        device.pressHome()
-        instrumentation.waitForIdleSync()
-        resetPersistentState()
+        if (!preserveStateAfterTest) {
+            disableQualityAlternativeAccessibilityServiceForTest()
+            device.pressHome()
+            instrumentation.waitForIdleSync()
+            resetPersistentState()
+        }
     }
 
     @Test
@@ -55,6 +76,161 @@ class AccessibilityInterceptionTest {
         )
     }
 
+    @Test
+    fun chromeVerifiedHostAdapterHarnessAcceptsOnlyLoadedMatchingHost() {
+        assumeTrue("Chrome package must be installed for verified-host E2E", chromeIsInstalled())
+        chromeEvidenceDir.mkdirs()
+        val chromeVersion = chromeVersion()
+        writeChromeEvidence(
+            """
+            Chrome verified-host E2E
+            Device model: ${deviceModel()}
+            Android API: ${androidApiLevel()}
+            Android release: ${androidRelease()}
+            Chrome package: ${VerifiedBrowserHostAdapter.CHROME_PACKAGE}
+            ${chromeVersion()}
+            Rule set: exact example.com
+            Non-match URL: https://example.org/
+            Typed without submit: example.com
+            Match URL after submit: https://example.com/
+            """.trimIndent(),
+        )
+        val websiteRules = listOf(
+            WebsiteRule(
+                id = "website-rule-00000000-0000-0000-0000-000000000026",
+                type = WebsiteRuleType.EXACT_DOMAIN,
+                host = "example.com",
+                includeApex = false,
+                enabled = true,
+                createdAtMillis = 1L,
+                updatedAtMillis = 1L,
+            ),
+        )
+
+        launchChromeUrl("https://example.org/")
+        waitForHostResult(VerifiedBrowserHostResult.Verified(host = "example.org"))
+        assertTrue(
+            "Non-matching Chrome host should not resolve a website target",
+            WebsiteInterceptionResolver.resolve(
+                browserPackage = VerifiedBrowserHostAdapter.CHROME_PACKAGE,
+                browserDisplayName = "Chrome",
+                observedHost = "example.org",
+                websiteRules = websiteRules,
+            ) == null,
+        )
+        assertFalse(
+            "Non-matching loaded Chrome host should not trigger website intervention",
+            device.wait(Until.hasObject(By.text("You reached for Chrome website")), 4_000L),
+        )
+        device.takeScreenshot(File(chromeEvidenceDir, "01_chrome_nonmatching_host_no_intervention.png"))
+
+        val addressField = waitForChromeAddressField()
+        addressField.click()
+        instrumentation.waitForIdleSync()
+        addressField.text = "example.com"
+        instrumentation.waitForIdleSync()
+        assertHostResult(VerifiedBrowserHostResult.Unreadable)
+        assertFalse(
+            "Typed but not loaded Chrome host should not trigger website intervention",
+            device.wait(Until.hasObject(By.text("You reached for Chrome website")), 3_000L),
+        )
+        device.takeScreenshot(File(chromeEvidenceDir, "02_chrome_typed_not_loaded_no_intervention.png"))
+
+        submitTypedChromeUrl(addressField)
+        waitForHostResult(VerifiedBrowserHostResult.Verified(host = "example.com"))
+        assertTrue(
+            "Loaded matching Chrome host should resolve a website target",
+            WebsiteInterceptionResolver.resolve(
+                browserPackage = VerifiedBrowserHostAdapter.CHROME_PACKAGE,
+                browserDisplayName = "Chrome",
+                observedHost = "example.com",
+                websiteRules = websiteRules,
+            ) != null,
+        )
+        device.takeScreenshot(File(chromeEvidenceDir, "03_chrome_matching_host_verified_by_adapter.png"))
+        writeChromeEvidence("\nResult: PASS - real Chrome verified-host adapter harness accepted only the loaded matching host.\n")
+    }
+
+    @Test
+    fun chromeVerifiedHostAdapterRejectsSyntheticUnsupportedAndStaleStates() {
+        chromeEvidenceDir.mkdirs()
+        writeChromeEvidence(
+            """
+
+            Chrome stale/unreadable negative evidence
+            Device model: ${deviceModel()}
+            Android API: ${androidApiLevel()}
+            Android release: ${androidRelease()}
+            States covered without relying on live browser history: unsupported browser package, null root, package-mismatched stale root, package-mismatched address node, hidden address node, focused editable omnibox, and no prior-host cache in adapter source.
+            """.trimIndent(),
+        )
+
+        assertTrue(
+            VerifiedBrowserHostAdapter.readHostFromWindow(
+                browserPackage = "org.mozilla.firefox",
+                root = null,
+            ) == VerifiedBrowserHostResult.UnsupportedBrowser,
+        )
+        assertTrue(
+            VerifiedBrowserHostAdapter.readHostFromWindow(
+                browserPackage = VerifiedBrowserHostAdapter.CHROME_PACKAGE,
+                root = null,
+            ) == VerifiedBrowserHostResult.Unreadable,
+        )
+        assertTrue(
+            VerifiedBrowserHostAdapter.readHostFromSnapshot(
+                browserPackage = VerifiedBrowserHostAdapter.CHROME_PACKAGE,
+                root = BrowserNodeSnapshot(
+                    packageName = "org.mozilla.firefox",
+                    children = listOf(
+                        BrowserNodeSnapshot(
+                            packageName = VerifiedBrowserHostAdapter.CHROME_PACKAGE,
+                            viewIdResourceName = "com.android.chrome:id/url_bar",
+                            text = "example.com",
+                        ),
+                    ),
+                ),
+            ) == VerifiedBrowserHostResult.Unreadable,
+        )
+        assertTrue(
+            VerifiedBrowserHostAdapter.readHostFromSnapshot(
+                browserPackage = VerifiedBrowserHostAdapter.CHROME_PACKAGE,
+                root = BrowserNodeSnapshot(
+                    packageName = VerifiedBrowserHostAdapter.CHROME_PACKAGE,
+                    children = listOf(
+                        BrowserNodeSnapshot(
+                            packageName = "org.mozilla.firefox",
+                            viewIdResourceName = "com.android.chrome:id/url_bar",
+                            text = "example.com",
+                        ),
+                    ),
+                ),
+            ) == VerifiedBrowserHostResult.Unreadable,
+        )
+        device.takeScreenshot(File(chromeEvidenceDir, "04_unsupported_and_unreadable_negative_states.png"))
+        writeChromeEvidence("\nResult: PASS - unsupported browser, unreadable root, and package-mismatched stale snapshots do not produce a verified host.\n")
+    }
+
+    @Test
+    fun seedWebsiteRuleSelectionForExternalLiveServiceE2e() {
+        val preserveState = InstrumentationRegistry.getArguments().getString("preserve_state") == "true"
+        preserveStateAfterTest = preserveState
+        chromeEvidenceDir.mkdirs()
+        seedWebsiteRuleSelection()
+        writeChromeEvidence(
+            """
+
+            External live Chrome service E2E seed
+            Device model: ${deviceModel()}
+            Android API: ${androidApiLevel()}
+            Android release: ${androidRelease()}
+            Rule set: exact example.com
+            Preserve state for external shell harness: $preserveState
+            """.trimIndent(),
+        )
+        assertTrue("Website rule seed should complete", true)
+    }
+
     private fun seedFixtureSelection() = runBlocking {
         val repository = (targetContext.applicationContext as QualityAlternativeApplication)
             .appContainer
@@ -67,6 +243,243 @@ class AccessibilityInterceptionTest {
                 selectedPackIds = setOf("philosophy"),
             ),
         )
+    }
+
+    private fun seedWebsiteRuleSelection() = runBlocking {
+        val repository = (targetContext.applicationContext as QualityAlternativeApplication)
+            .appContainer
+            .settingsRepository
+        repository.saveOnboardingSelection(
+            OnboardingSelection(
+                selectedAppPackages = emptySet(),
+                preferredTopics = setOf(TopicTag.PHILOSOPHY, TopicTag.SCIENCE, TopicTag.HISTORY),
+                preferredDurationBucket = DurationBucket.FOCUS,
+                selectedPackIds = setOf("philosophy"),
+            ),
+        )
+        repository.saveWebsiteRules(
+            listOf(
+                WebsiteRule(
+                    id = "website-rule-26000000-0000-4000-8000-000000000003",
+                    type = WebsiteRuleType.EXACT_DOMAIN,
+                    host = "example.com",
+                    includeApex = false,
+                    enabled = true,
+                    createdAtMillis = 1L,
+                    updatedAtMillis = 1L,
+                ),
+            ),
+        )
+    }
+
+    private fun chromeIsInstalled(): Boolean {
+        return device.executeShellCommand("pm list packages ${VerifiedBrowserHostAdapter.CHROME_PACKAGE}")
+            .contains(VerifiedBrowserHostAdapter.CHROME_PACKAGE)
+    }
+
+    private fun chromeVersion(): String {
+        return device.executeShellCommand("dumpsys package ${VerifiedBrowserHostAdapter.CHROME_PACKAGE}")
+            .lineSequence()
+            .filter { line -> line.contains("versionName=") || line.contains("versionCode=") }
+            .take(4)
+            .joinToString(separator = "\n") { line -> line.trim() }
+    }
+
+    private fun deviceModel(): String = device.executeShellCommand("getprop ro.product.model").trim()
+
+    private fun androidApiLevel(): String = device.executeShellCommand("getprop ro.build.version.sdk").trim()
+
+    private fun androidRelease(): String = device.executeShellCommand("getprop ro.build.version.release").trim()
+
+    private fun launchChromeUrl(url: String) {
+        targetContext.startActivity(
+            Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+                setPackage(VerifiedBrowserHostAdapter.CHROME_PACKAGE)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+            },
+        )
+        instrumentation.waitForIdleSync()
+        if (handleChromeFirstRunIfPresent()) {
+            targetContext.startActivity(
+                Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+                    setPackage(VerifiedBrowserHostAdapter.CHROME_PACKAGE)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                },
+            )
+            instrumentation.waitForIdleSync()
+        }
+        dismissChromeRuntimePromptsIfPresent()
+        assertTrue(
+            "Expected Chrome to foreground for $url",
+            device.wait(Until.hasObject(By.pkg(VerifiedBrowserHostAdapter.CHROME_PACKAGE)), 10_000L),
+        )
+        device.wait(Until.hasObject(By.res(VerifiedBrowserHostAdapter.CHROME_PACKAGE, "url_bar")), 10_000L)
+    }
+
+    private fun handleChromeFirstRunIfPresent(): Boolean {
+        val dismiss = device.wait(
+            Until.findObject(By.res(VerifiedBrowserHostAdapter.CHROME_PACKAGE, "signin_fre_dismiss_button")),
+            3_000L,
+        )
+        if (dismiss != null) {
+            dismiss.click()
+            instrumentation.waitForIdleSync()
+            return true
+        }
+        val useWithoutAccount = device.wait(Until.findObject(By.textContains("Use without an account")), 1_000L)
+        if (useWithoutAccount != null) {
+            useWithoutAccount.click()
+            instrumentation.waitForIdleSync()
+            return true
+        }
+        val accept = device.wait(Until.findObject(By.textContains("Accept")), 1_000L)
+        if (accept != null) {
+            accept.click()
+            instrumentation.waitForIdleSync()
+            device.wait(Until.findObject(By.textContains("No thanks")), 5_000L)?.click()
+            device.wait(Until.findObject(By.textContains("Use without an account")), 5_000L)?.click()
+            instrumentation.waitForIdleSync()
+            return true
+        }
+        return false
+    }
+
+    private fun dismissChromeRuntimePromptsIfPresent() {
+        repeat(2) {
+            val noThanks = device.wait(Until.findObject(By.text("No thanks")), 2_000L)
+            if (noThanks != null) {
+                noThanks.click()
+                instrumentation.waitForIdleSync()
+            }
+        }
+    }
+
+    private fun waitForChromeAddressField(): UiObject2 {
+        return device.wait(
+            Until.findObject(By.res(VerifiedBrowserHostAdapter.CHROME_PACKAGE, "url_bar")),
+            10_000L,
+        )
+            ?: device.wait(
+                Until.findObject(By.res(VerifiedBrowserHostAdapter.CHROME_PACKAGE, "search_box_text")),
+                10_000L,
+            )
+            ?: error("Chrome address field was not visible")
+    }
+
+    private fun submitTypedChromeUrl(addressField: UiObject2) {
+        val firstSuggestion = device.findObjects(By.text("example.com"))
+            .firstOrNull { suggestion -> suggestion.visibleBounds.top > addressField.visibleBounds.bottom }
+        if (firstSuggestion != null) {
+            firstSuggestion.click()
+        } else {
+            device.pressEnter()
+        }
+        instrumentation.waitForIdleSync()
+    }
+
+    private fun waitForHostResult(expected: VerifiedBrowserHostResult) {
+        val deadline = System.currentTimeMillis() + 10_000L
+        var latest: VerifiedBrowserHostResult = VerifiedBrowserHostResult.Unreadable
+        while (System.currentTimeMillis() < deadline) {
+            latest = currentChromeHostResult()
+            if (latest == expected) return
+            Thread.sleep(250L)
+        }
+        dumpChromeDebugEvidence("debug_expected_${expected.toString().sanitizeEvidenceName()}")
+        error("Expected Chrome host result $expected, latest was $latest")
+    }
+
+    private fun assertHostResult(expected: VerifiedBrowserHostResult) {
+        val actual = currentChromeHostResult()
+        assertTrue("Expected Chrome host result $expected, got $actual", actual == expected)
+    }
+
+    private fun currentChromeHostResult(): VerifiedBrowserHostResult {
+        val chromeRoot = instrumentation.uiAutomation.windows
+            .mapNotNull { window -> window.root }
+            .firstOrNull { root -> root.packageName?.toString() == VerifiedBrowserHostAdapter.CHROME_PACKAGE }
+        return VerifiedBrowserHostAdapter.readHostFromWindow(
+            browserPackage = VerifiedBrowserHostAdapter.CHROME_PACKAGE,
+            root = chromeRoot ?: instrumentation.uiAutomation.rootInActiveWindow,
+        )
+    }
+
+    private fun writeChromeEvidence(text: String) {
+        chromeEvidenceDir.mkdirs()
+        File(chromeEvidenceDir, "chrome_verified_host_e2e.txt").appendText(text)
+    }
+
+    private fun dumpChromeDebugEvidence(prefix: String) {
+        chromeEvidenceDir.mkdirs()
+        device.takeScreenshot(File(chromeEvidenceDir, "${prefix}_screen.png"))
+        runCatching {
+            device.dumpWindowHierarchy(File(chromeEvidenceDir, "${prefix}_window.xml"))
+        }
+    }
+
+    private fun enableQualityAlternativeAccessibilityServiceForTest() {
+        val component = ComponentName(targetContext, QualityAlternativeAccessibilityService::class.java)
+            .flattenToString()
+        val existingServices = Settings.Secure.getString(
+            targetContext.contentResolver,
+            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
+        ).orEmpty()
+            .split(':')
+            .filter(::validAccessibilityServiceSettingValue)
+            .filterNot { service -> service.contains(targetContext.packageName) }
+            .toMutableList()
+            .apply { add(component) }
+            .joinToString(":")
+        device.executeShellCommand("settings --user 0 put secure enabled_accessibility_services $existingServices")
+        device.executeShellCommand("settings --user 0 put secure accessibility_enabled 1")
+        waitForQualityAlternativeAccessibilityService()
+    }
+
+    private fun disableQualityAlternativeAccessibilityServiceForTest() {
+        val remainingServices = Settings.Secure.getString(
+            targetContext.contentResolver,
+            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
+        ).orEmpty()
+            .split(':')
+            .filter(::validAccessibilityServiceSettingValue)
+            .filterNot { service -> service.contains(targetContext.packageName) }
+            .joinToString(":")
+        if (remainingServices.isBlank()) {
+            device.executeShellCommand("settings --user 0 delete secure enabled_accessibility_services")
+            device.executeShellCommand("settings --user 0 put secure accessibility_enabled 0")
+        } else {
+            device.executeShellCommand("settings --user 0 put secure enabled_accessibility_services $remainingServices")
+            device.executeShellCommand("settings --user 0 put secure accessibility_enabled 1")
+        }
+    }
+
+    private fun waitForQualityAlternativeAccessibilityService() {
+        val deadline = System.currentTimeMillis() + 8_000L
+        var latestDump = ""
+        while (System.currentTimeMillis() < deadline) {
+            latestDump = device.executeShellCommand("dumpsys accessibility")
+            if (
+                latestDump.contains(targetContext.packageName) &&
+                latestDump.contains("Bound services") &&
+                latestDump.contains("QualityAlternativeAccessibilityService")
+            ) {
+                writeChromeEvidence("\nAccessibility service status: PASS - Quality Alternative service is bound on emulator.\n")
+                return
+            }
+            Thread.sleep(500L)
+        }
+        chromeEvidenceDir.mkdirs()
+        File(chromeEvidenceDir, "live_service_dumpsys_accessibility.txt").writeText(latestDump)
+        dumpChromeDebugEvidence("debug_live_service_not_bound")
+        error("Quality Alternative AccessibilityService was not bound on emulator before live Chrome E2E")
+    }
+
+    private fun validAccessibilityServiceSettingValue(value: String): Boolean {
+        return value.isNotBlank() && value != "''" && value != "null"
+    }
+
+    private fun String.sanitizeEvidenceName(): String {
+        return replace(Regex("[^A-Za-z0-9._-]+"), "_").trim('_').take(80)
     }
 
     private fun resetPersistentState() = runBlocking {

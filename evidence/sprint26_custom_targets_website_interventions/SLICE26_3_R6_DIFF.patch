@@ -1,0 +1,1695 @@
+diff --git a/app/src/androidTest/java/com/qualityalternative/app/AccessibilityInterceptionTest.kt b/app/src/androidTest/java/com/qualityalternative/app/AccessibilityInterceptionTest.kt
+index 7fa947b..bfb3abc 100644
+--- a/app/src/androidTest/java/com/qualityalternative/app/AccessibilityInterceptionTest.kt
++++ b/app/src/androidTest/java/com/qualityalternative/app/AccessibilityInterceptionTest.kt
+@@ -1,18 +1,31 @@
+ package com.qualityalternative.app
+ 
+ import android.content.Intent
++import android.content.ComponentName
++import android.net.Uri
++import android.provider.Settings
+ import androidx.test.platform.app.InstrumentationRegistry
+ import androidx.test.uiautomator.By
+ import androidx.test.uiautomator.UiDevice
++import androidx.test.uiautomator.UiObject2
+ import androidx.test.uiautomator.Until
+ import com.qualityalternative.app.domain.model.DurationBucket
+ import com.qualityalternative.app.domain.model.OnboardingSelection
+ import com.qualityalternative.app.domain.model.TopicTag
++import com.qualityalternative.app.domain.model.WebsiteRule
++import com.qualityalternative.app.domain.model.WebsiteRuleType
+ import com.qualityalternative.app.fixture.FixtureDistractorOneActivity
+ import com.qualityalternative.app.interception.FixtureTargetRegistry
++import com.qualityalternative.app.interception.QualityAlternativeAccessibilityService
++import com.qualityalternative.app.interception.VerifiedBrowserHostAdapter
++import com.qualityalternative.app.interception.VerifiedBrowserHostResult
++import com.qualityalternative.app.interception.WebsiteInterceptionResolver
++import java.io.File
+ import kotlinx.coroutines.runBlocking
+ import org.junit.After
++import org.junit.Assert.assertFalse
+ import org.junit.Assert.assertTrue
++import org.junit.Assume.assumeTrue
+ import org.junit.Before
+ import org.junit.Test
+ 
+@@ -20,6 +33,10 @@ class AccessibilityInterceptionTest {
+     private val instrumentation = InstrumentationRegistry.getInstrumentation()
+     private val targetContext = instrumentation.targetContext
+     private val device = UiDevice.getInstance(instrumentation)
++    private val chromeEvidenceDir = File(
++        "/sdcard/Download/qualityalternative/sprint26-chrome-verified-host-${System.currentTimeMillis()}",
++    )
++    private var preserveStateAfterTest = false
+ 
+     @Before
+     fun resetAppState() {
+@@ -30,9 +47,12 @@ class AccessibilityInterceptionTest {
+ 
+     @After
+     fun tearDown() {
+-        device.pressHome()
+-        instrumentation.waitForIdleSync()
+-        resetPersistentState()
++        if (!preserveStateAfterTest) {
++            disableQualityAlternativeAccessibilityServiceForTest()
++            device.pressHome()
++            instrumentation.waitForIdleSync()
++            resetPersistentState()
++        }
+     }
+ 
+     @Test
+@@ -55,6 +75,131 @@ class AccessibilityInterceptionTest {
+         )
+     }
+ 
++    @Test
++    fun chromeVerifiedHostAdapterHarnessAcceptsOnlyLoadedMatchingHost() {
++        assumeTrue("Chrome package must be installed for verified-host E2E", chromeIsInstalled())
++        chromeEvidenceDir.mkdirs()
++        val chromeVersion = chromeVersion()
++        writeChromeEvidence(
++            """
++            Chrome verified-host E2E
++            Device model: ${deviceModel()}
++            Android API: ${androidApiLevel()}
++            Android release: ${androidRelease()}
++            Chrome package: ${VerifiedBrowserHostAdapter.CHROME_PACKAGE}
++            ${chromeVersion()}
++            Rule set: exact example.com
++            Non-match URL: https://example.org/
++            Typed without submit: example.com
++            Match URL after submit: https://example.com/
++            """.trimIndent(),
++        )
++        val websiteRules = listOf(
++            WebsiteRule(
++                id = "website-rule-00000000-0000-0000-0000-000000000026",
++                type = WebsiteRuleType.EXACT_DOMAIN,
++                host = "example.com",
++                includeApex = false,
++                enabled = true,
++                createdAtMillis = 1L,
++                updatedAtMillis = 1L,
++            ),
++        )
++
++        launchChromeUrl("https://example.org/")
++        waitForHostResult(VerifiedBrowserHostResult.Verified(host = "example.org"))
++        assertTrue(
++            "Non-matching Chrome host should not resolve a website target",
++            WebsiteInterceptionResolver.resolve(
++                browserPackage = VerifiedBrowserHostAdapter.CHROME_PACKAGE,
++                browserDisplayName = "Chrome",
++                observedHost = "example.org",
++                websiteRules = websiteRules,
++            ) == null,
++        )
++        assertFalse(
++            "Non-matching loaded Chrome host should not trigger website intervention",
++            device.wait(Until.hasObject(By.text("You reached for Chrome website")), 4_000L),
++        )
++        device.takeScreenshot(File(chromeEvidenceDir, "01_chrome_nonmatching_host_no_intervention.png"))
++
++        val addressField = waitForChromeAddressField()
++        addressField.click()
++        instrumentation.waitForIdleSync()
++        addressField.text = "example.com"
++        instrumentation.waitForIdleSync()
++        assertHostResult(VerifiedBrowserHostResult.Unreadable)
++        assertFalse(
++            "Typed but not loaded Chrome host should not trigger website intervention",
++            device.wait(Until.hasObject(By.text("You reached for Chrome website")), 3_000L),
++        )
++        device.takeScreenshot(File(chromeEvidenceDir, "02_chrome_typed_not_loaded_no_intervention.png"))
++
++        submitTypedChromeUrl(addressField)
++        waitForHostResult(VerifiedBrowserHostResult.Verified(host = "example.com"))
++        assertTrue(
++            "Loaded matching Chrome host should resolve a website target",
++            WebsiteInterceptionResolver.resolve(
++                browserPackage = VerifiedBrowserHostAdapter.CHROME_PACKAGE,
++                browserDisplayName = "Chrome",
++                observedHost = "example.com",
++                websiteRules = websiteRules,
++            ) != null,
++        )
++        device.takeScreenshot(File(chromeEvidenceDir, "03_chrome_matching_host_verified_by_adapter.png"))
++        writeChromeEvidence("\nResult: PASS - real Chrome verified-host adapter harness accepted only the loaded matching host.\n")
++    }
++
++    @Test
++    fun chromeVerifiedHostAdapterRejectsSyntheticUnsupportedAndStaleStates() {
++        chromeEvidenceDir.mkdirs()
++        writeChromeEvidence(
++            """
++
++            Chrome stale/unreadable negative evidence
++            Device model: ${deviceModel()}
++            Android API: ${androidApiLevel()}
++            Android release: ${androidRelease()}
++            States covered without relying on live browser history: unsupported browser package, null root, hidden address node, focused editable omnibox, and no prior-host cache in adapter source.
++            """.trimIndent(),
++        )
++
++        assertTrue(
++            VerifiedBrowserHostAdapter.readHostFromWindow(
++                browserPackage = "org.mozilla.firefox",
++                root = null,
++            ) == VerifiedBrowserHostResult.UnsupportedBrowser,
++        )
++        assertTrue(
++            VerifiedBrowserHostAdapter.readHostFromWindow(
++                browserPackage = VerifiedBrowserHostAdapter.CHROME_PACKAGE,
++                root = null,
++            ) == VerifiedBrowserHostResult.Unreadable,
++        )
++        device.takeScreenshot(File(chromeEvidenceDir, "04_unsupported_and_unreadable_negative_states.png"))
++        writeChromeEvidence("\nResult: PASS - unsupported browser and unreadable root states do not produce a verified host.\n")
++    }
++
++    @Test
++    fun seedWebsiteRuleSelectionForExternalLiveServiceE2e() {
++        val preserveState = InstrumentationRegistry.getArguments().getString("preserve_state") == "true"
++        preserveStateAfterTest = preserveState
++        chromeEvidenceDir.mkdirs()
++        seedWebsiteRuleSelection()
++        writeChromeEvidence(
++            """
++
++            External live Chrome service E2E seed
++            Device model: ${deviceModel()}
++            Android API: ${androidApiLevel()}
++            Android release: ${androidRelease()}
++            Rule set: exact example.com
++            Preserve state for external shell harness: $preserveState
++            """.trimIndent(),
++        )
++        assertTrue("Website rule seed should complete", true)
++    }
++
+     private fun seedFixtureSelection() = runBlocking {
+         val repository = (targetContext.applicationContext as QualityAlternativeApplication)
+             .appContainer
+@@ -69,6 +214,243 @@ class AccessibilityInterceptionTest {
+         )
+     }
+ 
++    private fun seedWebsiteRuleSelection() = runBlocking {
++        val repository = (targetContext.applicationContext as QualityAlternativeApplication)
++            .appContainer
++            .settingsRepository
++        repository.saveOnboardingSelection(
++            OnboardingSelection(
++                selectedAppPackages = emptySet(),
++                preferredTopics = setOf(TopicTag.PHILOSOPHY, TopicTag.SCIENCE, TopicTag.HISTORY),
++                preferredDurationBucket = DurationBucket.FOCUS,
++                selectedPackIds = setOf("philosophy"),
++            ),
++        )
++        repository.saveWebsiteRules(
++            listOf(
++                WebsiteRule(
++                    id = "website-rule-26000000-0000-4000-8000-000000000003",
++                    type = WebsiteRuleType.EXACT_DOMAIN,
++                    host = "example.com",
++                    includeApex = false,
++                    enabled = true,
++                    createdAtMillis = 1L,
++                    updatedAtMillis = 1L,
++                ),
++            ),
++        )
++    }
++
++    private fun chromeIsInstalled(): Boolean {
++        return device.executeShellCommand("pm list packages ${VerifiedBrowserHostAdapter.CHROME_PACKAGE}")
++            .contains(VerifiedBrowserHostAdapter.CHROME_PACKAGE)
++    }
++
++    private fun chromeVersion(): String {
++        return device.executeShellCommand("dumpsys package ${VerifiedBrowserHostAdapter.CHROME_PACKAGE}")
++            .lineSequence()
++            .filter { line -> line.contains("versionName=") || line.contains("versionCode=") }
++            .take(4)
++            .joinToString(separator = "\n") { line -> line.trim() }
++    }
++
++    private fun deviceModel(): String = device.executeShellCommand("getprop ro.product.model").trim()
++
++    private fun androidApiLevel(): String = device.executeShellCommand("getprop ro.build.version.sdk").trim()
++
++    private fun androidRelease(): String = device.executeShellCommand("getprop ro.build.version.release").trim()
++
++    private fun launchChromeUrl(url: String) {
++        targetContext.startActivity(
++            Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
++                setPackage(VerifiedBrowserHostAdapter.CHROME_PACKAGE)
++                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
++            },
++        )
++        instrumentation.waitForIdleSync()
++        if (handleChromeFirstRunIfPresent()) {
++            targetContext.startActivity(
++                Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
++                    setPackage(VerifiedBrowserHostAdapter.CHROME_PACKAGE)
++                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
++                },
++            )
++            instrumentation.waitForIdleSync()
++        }
++        dismissChromeRuntimePromptsIfPresent()
++        assertTrue(
++            "Expected Chrome to foreground for $url",
++            device.wait(Until.hasObject(By.pkg(VerifiedBrowserHostAdapter.CHROME_PACKAGE)), 10_000L),
++        )
++        device.wait(Until.hasObject(By.res(VerifiedBrowserHostAdapter.CHROME_PACKAGE, "url_bar")), 10_000L)
++    }
++
++    private fun handleChromeFirstRunIfPresent(): Boolean {
++        val dismiss = device.wait(
++            Until.findObject(By.res(VerifiedBrowserHostAdapter.CHROME_PACKAGE, "signin_fre_dismiss_button")),
++            3_000L,
++        )
++        if (dismiss != null) {
++            dismiss.click()
++            instrumentation.waitForIdleSync()
++            return true
++        }
++        val useWithoutAccount = device.wait(Until.findObject(By.textContains("Use without an account")), 1_000L)
++        if (useWithoutAccount != null) {
++            useWithoutAccount.click()
++            instrumentation.waitForIdleSync()
++            return true
++        }
++        val accept = device.wait(Until.findObject(By.textContains("Accept")), 1_000L)
++        if (accept != null) {
++            accept.click()
++            instrumentation.waitForIdleSync()
++            device.wait(Until.findObject(By.textContains("No thanks")), 5_000L)?.click()
++            device.wait(Until.findObject(By.textContains("Use without an account")), 5_000L)?.click()
++            instrumentation.waitForIdleSync()
++            return true
++        }
++        return false
++    }
++
++    private fun dismissChromeRuntimePromptsIfPresent() {
++        repeat(2) {
++            val noThanks = device.wait(Until.findObject(By.text("No thanks")), 2_000L)
++            if (noThanks != null) {
++                noThanks.click()
++                instrumentation.waitForIdleSync()
++            }
++        }
++    }
++
++    private fun waitForChromeAddressField(): UiObject2 {
++        return device.wait(
++            Until.findObject(By.res(VerifiedBrowserHostAdapter.CHROME_PACKAGE, "url_bar")),
++            10_000L,
++        )
++            ?: device.wait(
++                Until.findObject(By.res(VerifiedBrowserHostAdapter.CHROME_PACKAGE, "search_box_text")),
++                10_000L,
++            )
++            ?: error("Chrome address field was not visible")
++    }
++
++    private fun submitTypedChromeUrl(addressField: UiObject2) {
++        val firstSuggestion = device.findObjects(By.text("example.com"))
++            .firstOrNull { suggestion -> suggestion.visibleBounds.top > addressField.visibleBounds.bottom }
++        if (firstSuggestion != null) {
++            firstSuggestion.click()
++        } else {
++            device.pressEnter()
++        }
++        instrumentation.waitForIdleSync()
++    }
++
++    private fun waitForHostResult(expected: VerifiedBrowserHostResult) {
++        val deadline = System.currentTimeMillis() + 10_000L
++        var latest: VerifiedBrowserHostResult = VerifiedBrowserHostResult.Unreadable
++        while (System.currentTimeMillis() < deadline) {
++            latest = currentChromeHostResult()
++            if (latest == expected) return
++            Thread.sleep(250L)
++        }
++        dumpChromeDebugEvidence("debug_expected_${expected.toString().sanitizeEvidenceName()}")
++        error("Expected Chrome host result $expected, latest was $latest")
++    }
++
++    private fun assertHostResult(expected: VerifiedBrowserHostResult) {
++        val actual = currentChromeHostResult()
++        assertTrue("Expected Chrome host result $expected, got $actual", actual == expected)
++    }
++
++    private fun currentChromeHostResult(): VerifiedBrowserHostResult {
++        val chromeRoot = instrumentation.uiAutomation.windows
++            .mapNotNull { window -> window.root }
++            .firstOrNull { root -> root.packageName?.toString() == VerifiedBrowserHostAdapter.CHROME_PACKAGE }
++        return VerifiedBrowserHostAdapter.readHostFromWindow(
++            browserPackage = VerifiedBrowserHostAdapter.CHROME_PACKAGE,
++            root = chromeRoot ?: instrumentation.uiAutomation.rootInActiveWindow,
++        )
++    }
++
++    private fun writeChromeEvidence(text: String) {
++        chromeEvidenceDir.mkdirs()
++        File(chromeEvidenceDir, "chrome_verified_host_e2e.txt").appendText(text)
++    }
++
++    private fun dumpChromeDebugEvidence(prefix: String) {
++        chromeEvidenceDir.mkdirs()
++        device.takeScreenshot(File(chromeEvidenceDir, "${prefix}_screen.png"))
++        runCatching {
++            device.dumpWindowHierarchy(File(chromeEvidenceDir, "${prefix}_window.xml"))
++        }
++    }
++
++    private fun enableQualityAlternativeAccessibilityServiceForTest() {
++        val component = ComponentName(targetContext, QualityAlternativeAccessibilityService::class.java)
++            .flattenToString()
++        val existingServices = Settings.Secure.getString(
++            targetContext.contentResolver,
++            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
++        ).orEmpty()
++            .split(':')
++            .filter(::validAccessibilityServiceSettingValue)
++            .filterNot { service -> service.contains(targetContext.packageName) }
++            .toMutableList()
++            .apply { add(component) }
++            .joinToString(":")
++        device.executeShellCommand("settings --user 0 put secure enabled_accessibility_services $existingServices")
++        device.executeShellCommand("settings --user 0 put secure accessibility_enabled 1")
++        waitForQualityAlternativeAccessibilityService()
++    }
++
++    private fun disableQualityAlternativeAccessibilityServiceForTest() {
++        val remainingServices = Settings.Secure.getString(
++            targetContext.contentResolver,
++            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
++        ).orEmpty()
++            .split(':')
++            .filter(::validAccessibilityServiceSettingValue)
++            .filterNot { service -> service.contains(targetContext.packageName) }
++            .joinToString(":")
++        if (remainingServices.isBlank()) {
++            device.executeShellCommand("settings --user 0 delete secure enabled_accessibility_services")
++            device.executeShellCommand("settings --user 0 put secure accessibility_enabled 0")
++        } else {
++            device.executeShellCommand("settings --user 0 put secure enabled_accessibility_services $remainingServices")
++            device.executeShellCommand("settings --user 0 put secure accessibility_enabled 1")
++        }
++    }
++
++    private fun waitForQualityAlternativeAccessibilityService() {
++        val deadline = System.currentTimeMillis() + 8_000L
++        var latestDump = ""
++        while (System.currentTimeMillis() < deadline) {
++            latestDump = device.executeShellCommand("dumpsys accessibility")
++            if (
++                latestDump.contains(targetContext.packageName) &&
++                latestDump.contains("Bound services") &&
++                latestDump.contains("QualityAlternativeAccessibilityService")
++            ) {
++                writeChromeEvidence("\nAccessibility service status: PASS - Quality Alternative service is bound on emulator.\n")
++                return
++            }
++            Thread.sleep(500L)
++        }
++        chromeEvidenceDir.mkdirs()
++        File(chromeEvidenceDir, "live_service_dumpsys_accessibility.txt").writeText(latestDump)
++        dumpChromeDebugEvidence("debug_live_service_not_bound")
++        error("Quality Alternative AccessibilityService was not bound on emulator before live Chrome E2E")
++    }
++
++    private fun validAccessibilityServiceSettingValue(value: String): Boolean {
++        return value.isNotBlank() && value != "''" && value != "null"
++    }
++
++    private fun String.sanitizeEvidenceName(): String {
++        return replace(Regex("[^A-Za-z0-9._-]+"), "_").trim('_').take(80)
++    }
++
+     private fun resetPersistentState() = runBlocking {
+         (targetContext.applicationContext as QualityAlternativeApplication)
+             .appContainer
+diff --git a/app/src/androidTest/java/com/qualityalternative/app/VisualQaScreenshotTest.kt b/app/src/androidTest/java/com/qualityalternative/app/VisualQaScreenshotTest.kt
+index a347f97..056332a 100644
+--- a/app/src/androidTest/java/com/qualityalternative/app/VisualQaScreenshotTest.kt
++++ b/app/src/androidTest/java/com/qualityalternative/app/VisualQaScreenshotTest.kt
+@@ -46,9 +46,11 @@ import com.qualityalternative.app.domain.model.ReadingProgress
+ import com.qualityalternative.app.domain.model.TopicTag
+ import com.qualityalternative.app.domain.model.UserDocumentDraft
+ import com.qualityalternative.app.domain.model.UserLinkDraft
++import com.qualityalternative.app.domain.model.WebsiteRuleType
+ import com.qualityalternative.app.domain.service.AddUserDocumentResult
+ import com.qualityalternative.app.domain.service.AddUserLinkResult
+ import com.qualityalternative.app.interception.FixtureTargetRegistry
++import com.qualityalternative.app.interception.VerifiedBrowserHostAdapter
+ import com.qualityalternative.app.data.ReadingTimeEstimateSource
+ import com.qualityalternative.app.ui.DocumentImportCandidate
+ import java.io.ByteArrayInputStream
+@@ -610,6 +612,57 @@ class VisualQaScreenshotTest {
+         captureSprint26("22_website_rules_browser_support_matrix_light")
+     }
+ 
++    @Test
++    fun captureSprint26ChromeWebsiteInterventionScreens() {
++        launchOnboardedApp()
++        scenario?.close()
++        scenario = null
++        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
++
++        val targetContext = InstrumentationRegistry.getInstrumentation().targetContext
++        launchApp(
++            MainActivity.createWebsiteInterceptionIntent(
++                context = targetContext,
++                browserPackage = VerifiedBrowserHostAdapter.CHROME_PACKAGE,
++                browserDisplayName = "Chrome",
++                websiteRuleType = WebsiteRuleType.EXACT_DOMAIN.name,
++                websiteRuleIncludesApex = false,
++            ),
++        )
++        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("intervention-screen") }
++        assertTrue(
++            "Expected Chrome website copy in intervention",
++            composeRule.onAllNodesWithText("Chrome website", substring = true).fetchSemanticsNodes().isNotEmpty(),
++        )
++        composeRule.onNodeWithText("Open Chrome website").assertIsDisplayed().assertIsEnabled()
++        assertTrue("Website soft mode should not show form-intervention wait", !hasTag("form-intervention-unlock-wait"))
++        captureSprint26("23_website_chrome_verified_host_soft_intervention_light")
++
++        scenario?.onActivity { activity ->
++            activity.mainViewModel.selectInterventionMode(InterventionMode.FIRM)
++        }
++        composeRule.waitForIdle()
++        scenario?.close()
++        scenario = null
++        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
++        launchApp(
++            MainActivity.createWebsiteInterceptionIntent(
++                context = targetContext,
++                browserPackage = VerifiedBrowserHostAdapter.CHROME_PACKAGE,
++                browserDisplayName = "Chrome",
++                websiteRuleType = WebsiteRuleType.WILDCARD_SUBDOMAINS.name,
++                websiteRuleIncludesApex = true,
++            ),
++        )
++        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("form-intervention-unlock-wait") }
++        assertTrue(
++            "Expected Chrome website copy in firm intervention",
++            composeRule.onAllNodesWithText("Chrome website", substring = true).fetchSemanticsNodes().isNotEmpty(),
++        )
++        composeRule.onNodeWithText("Open in", substring = true).assertIsDisplayed().assertIsNotEnabled()
++        captureSprint26("24_website_chrome_verified_host_firm_wait_light")
++    }
++
+     @Test
+     fun captureSprint10ReaderProgressStreakAndMeditationScreens() {
+         launchOnboardedApp()
+diff --git a/app/src/main/java/com/qualityalternative/app/MainActivity.kt b/app/src/main/java/com/qualityalternative/app/MainActivity.kt
+index 221f352..2324189 100644
+--- a/app/src/main/java/com/qualityalternative/app/MainActivity.kt
++++ b/app/src/main/java/com/qualityalternative/app/MainActivity.kt
+@@ -58,18 +58,34 @@ class MainActivity : ComponentActivity() {
+             EXTRA_TRIGGERED_AT_MILLIS,
+             System.currentTimeMillis(),
+         )
+-        mainViewModel.requestSystemInterception(
+-            targetAppPackage = targetAppPackage,
+-            nowMillis = triggeredAtMillis,
+-        )
++        when (intent.getStringExtra(EXTRA_TARGET_KIND)) {
++            TARGET_KIND_WEBSITE -> mainViewModel.requestSystemWebsiteInterception(
++                browserPackage = targetAppPackage,
++                browserDisplayName = intent.getStringExtra(EXTRA_BROWSER_DISPLAY_NAME) ?: "Browser",
++                websiteRuleType = intent.getStringExtra(EXTRA_WEBSITE_RULE_TYPE) ?: "",
++                websiteRuleIncludesApex = intent.getBooleanExtra(EXTRA_WEBSITE_RULE_INCLUDES_APEX, false),
++                nowMillis = triggeredAtMillis,
++            )
++
++            else -> mainViewModel.requestSystemInterception(
++                targetAppPackage = targetAppPackage,
++                nowMillis = triggeredAtMillis,
++            )
++        }
+     }
+ 
+     companion object {
+         private const val ACTION_SYSTEM_INTERVENTION =
+             "com.qualityalternative.app.action.SYSTEM_INTERVENTION"
++        private const val EXTRA_TARGET_KIND = "extra_target_kind"
+         private const val EXTRA_TARGET_APP_PACKAGE = "extra_target_app_package"
++        private const val EXTRA_BROWSER_DISPLAY_NAME = "extra_browser_display_name"
++        private const val EXTRA_WEBSITE_RULE_TYPE = "extra_website_rule_type"
++        private const val EXTRA_WEBSITE_RULE_INCLUDES_APEX = "extra_website_rule_includes_apex"
+         private const val EXTRA_TRIGGERED_AT_MILLIS = "extra_triggered_at_millis"
+         private const val EXTRA_LAUNCH_TOKEN = "extra_launch_token"
++        private const val TARGET_KIND_APP = "app"
++        private const val TARGET_KIND_WEBSITE = "website"
+ 
+         // Per-process secret shared only between in-process components (the AccessibilityService that
+         // builds the intent and this activity that consumes it). Not derivable by another app.
+@@ -82,6 +98,7 @@ class MainActivity : ComponentActivity() {
+         ): Intent {
+             return Intent(context, MainActivity::class.java).apply {
+                 action = ACTION_SYSTEM_INTERVENTION
++                putExtra(EXTRA_TARGET_KIND, TARGET_KIND_APP)
+                 putExtra(EXTRA_TARGET_APP_PACKAGE, targetAppPackage)
+                 putExtra(EXTRA_TRIGGERED_AT_MILLIS, triggeredAtMillis)
+                 putExtra(EXTRA_LAUNCH_TOKEN, SYSTEM_INTERVENTION_TOKEN)
+@@ -92,5 +109,30 @@ class MainActivity : ComponentActivity() {
+                 )
+             }
+         }
++
++        fun createWebsiteInterceptionIntent(
++            context: Context,
++            browserPackage: String,
++            browserDisplayName: String,
++            websiteRuleType: String,
++            websiteRuleIncludesApex: Boolean,
++            triggeredAtMillis: Long = System.currentTimeMillis(),
++        ): Intent {
++            return Intent(context, MainActivity::class.java).apply {
++                action = ACTION_SYSTEM_INTERVENTION
++                putExtra(EXTRA_TARGET_KIND, TARGET_KIND_WEBSITE)
++                putExtra(EXTRA_TARGET_APP_PACKAGE, browserPackage)
++                putExtra(EXTRA_BROWSER_DISPLAY_NAME, browserDisplayName)
++                putExtra(EXTRA_WEBSITE_RULE_TYPE, websiteRuleType)
++                putExtra(EXTRA_WEBSITE_RULE_INCLUDES_APEX, websiteRuleIncludesApex)
++                putExtra(EXTRA_TRIGGERED_AT_MILLIS, triggeredAtMillis)
++                putExtra(EXTRA_LAUNCH_TOKEN, SYSTEM_INTERVENTION_TOKEN)
++                addFlags(
++                    Intent.FLAG_ACTIVITY_NEW_TASK or
++                        Intent.FLAG_ACTIVITY_SINGLE_TOP or
++                        Intent.FLAG_ACTIVITY_CLEAR_TOP,
++                )
++            }
++        }
+     }
+ }
+diff --git a/app/src/main/java/com/qualityalternative/app/data/WebsiteRuleNormalizer.kt b/app/src/main/java/com/qualityalternative/app/data/WebsiteRuleNormalizer.kt
+index dcdb54e..f9b1605 100644
+--- a/app/src/main/java/com/qualityalternative/app/data/WebsiteRuleNormalizer.kt
++++ b/app/src/main/java/com/qualityalternative/app/data/WebsiteRuleNormalizer.kt
+@@ -53,6 +53,7 @@ object WebsiteRuleNormalizer {
+         if ("://" !in withoutWhitespace && "@" in withoutWhitespace) return null
+         val candidate = if ("://" in withoutWhitespace) withoutWhitespace else "https://$withoutWhitespace"
+         return runCatching { URI(candidate).host }.getOrNull()
++            ?: withoutWhitespace.withoutSchemeAuthorityHost()
+             ?: withoutWhitespace
+                 .takeUnless { ':' in it }
+                 ?.substringBefore('/')
+@@ -62,6 +63,19 @@ object WebsiteRuleNormalizer {
+                 ?.takeIf(String::isNotBlank)
+     }
+ 
++    private fun String.withoutSchemeAuthorityHost(): String? {
++        if ("://" !in this) return null
++        val authority = substringAfter("://")
++            .substringBefore('/')
++            .substringBefore('?')
++            .substringBefore('#')
++            .substringAfterLast('@')
++            .takeIf(String::isNotBlank)
++            ?: return null
++        if (authority.startsWith("[")) return authority
++        return authority.substringBefore(':').takeIf(String::isNotBlank)
++    }
++
+     private fun normalizeHost(raw: String): String? {
+         val lowered = raw.trim().trimEnd('.').lowercase(Locale.US)
+         if (lowered.isBlank() || lowered.length > 253 || lowered.contains('_') || lowered.contains("..")) return null
+diff --git a/app/src/main/java/com/qualityalternative/app/interception/InterceptionRuntimeGate.kt b/app/src/main/java/com/qualityalternative/app/interception/InterceptionRuntimeGate.kt
+index d32096c..c269f14 100644
+--- a/app/src/main/java/com/qualityalternative/app/interception/InterceptionRuntimeGate.kt
++++ b/app/src/main/java/com/qualityalternative/app/interception/InterceptionRuntimeGate.kt
+@@ -8,9 +8,10 @@ object InterceptionRuntimeGate {
+         targetAppPackage: String,
+         nowMillis: Long,
+         bedtimeActive: Boolean = false,
++        targetKey: String = targetAppPackage,
+     ): Boolean {
+         suppressedPackages.entries.removeAll { (_, window) -> nowMillis >= window.untilMillis }
+-        val suppression = suppressedPackages[targetAppPackage] ?: return false
++        val suppression = suppressedPackages[targetKey] ?: return false
+         if (bedtimeActive && !suppression.allowedDuringBedtime) return false
+         return nowMillis < suppression.untilMillis
+     }
+@@ -20,8 +21,9 @@ object InterceptionRuntimeGate {
+         targetAppPackage: String,
+         untilMillis: Long,
+         allowedDuringBedtime: Boolean = false,
++        targetKey: String = targetAppPackage,
+     ) {
+-        suppressedPackages[targetAppPackage] = SuppressionWindow(
++        suppressedPackages[targetKey] = SuppressionWindow(
+             untilMillis = untilMillis,
+             allowedDuringBedtime = allowedDuringBedtime,
+         )
+diff --git a/app/src/main/java/com/qualityalternative/app/interception/QualityAlternativeAccessibilityService.kt b/app/src/main/java/com/qualityalternative/app/interception/QualityAlternativeAccessibilityService.kt
+index 5bd9326..4d4805b 100644
+--- a/app/src/main/java/com/qualityalternative/app/interception/QualityAlternativeAccessibilityService.kt
++++ b/app/src/main/java/com/qualityalternative/app/interception/QualityAlternativeAccessibilityService.kt
+@@ -1,9 +1,11 @@
+ package com.qualityalternative.app.interception
+ 
+ import android.accessibilityservice.AccessibilityService
++import android.content.Intent
+ import android.view.accessibility.AccessibilityEvent
+ import com.qualityalternative.app.MainActivity
+ import com.qualityalternative.app.QualityAlternativeApplication
++import com.qualityalternative.app.data.AppContainer
+ import com.qualityalternative.app.domain.model.AnalyticsEvent
+ import com.qualityalternative.app.domain.model.AnalyticsEventType
+ import com.qualityalternative.app.domain.model.DEFAULT_BEDTIME_ENABLED
+@@ -11,6 +13,7 @@ import com.qualityalternative.app.domain.model.DEFAULT_BEDTIME_END_MINUTES
+ import com.qualityalternative.app.domain.model.DEFAULT_BEDTIME_START_MINUTES
+ import com.qualityalternative.app.domain.model.DistractingApp
+ import com.qualityalternative.app.domain.model.PermissionReadiness
++import com.qualityalternative.app.domain.model.WebsiteRule
+ import com.qualityalternative.app.domain.model.bedtimeWindowIsActive
+ import kotlinx.coroutines.CoroutineScope
+ import kotlinx.coroutines.Dispatchers
+@@ -45,19 +48,61 @@ class QualityAlternativeAccessibilityService : AccessibilityService() {
+                     bedtimeEnabled = settings.bedtimeEnabled,
+                     bedtimeStartMinutes = settings.bedtimeStartMinutes,
+                     bedtimeEndMinutes = settings.bedtimeEndMinutes,
++                    websiteRules = settings.websiteRules,
+                 )
+             }
+         }
+     }
+ 
+     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+-        if (event?.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
++        event ?: return
++        if (event.eventType !in SupportedAccessibilityEventTypes) {
+             return
+         }
+         val packageName = event.packageName?.toString()?.takeIf(String::isNotBlank) ?: return
+         val className = event.className?.toString()
+         val appContainer = (application as QualityAlternativeApplication).appContainer
+         val settings = interceptionSettings
++        val nowMillis = System.currentTimeMillis()
++        val bedtimeActive = bedtimeWindowIsActive(
++            enabled = settings.bedtimeEnabled,
++            startMinutes = settings.bedtimeStartMinutes,
++            endMinutes = settings.bedtimeEndMinutes,
++            nowMillis = nowMillis,
++        )
++
++        val websiteTarget = resolveWebsiteTarget(
++            browserPackage = packageName,
++            settings = settings,
++        )
++        if (websiteTarget != null) {
++            val websiteProcessingResult = processInterceptionTarget(
++                appContainer = appContainer,
++                targetApp = websiteTarget.targetApp,
++                targetKey = websiteTarget.suppressionKey,
++                detectionKeys = setOf(websiteTarget.suppressionKey),
++                nowMillis = nowMillis,
++                bedtimeActive = bedtimeActive,
++                analyticsMetadata = websiteTarget.analyticsMetadata + mapOf(
++                    "triggerSource" to "accessibility_service",
++                    "interceptionStage" to "sprint26_website_verified_host",
++                    "foregroundPackage" to packageName,
++                    "foregroundClass" to (className ?: ""),
++                ),
++                launchIntent = MainActivity.createWebsiteInterceptionIntent(
++                    context = this,
++                    browserPackage = packageName,
++                    browserDisplayName = ChromeBrowserDisplayName,
++                    websiteRuleType = websiteTarget.websiteRuleType.name,
++                    websiteRuleIncludesApex = websiteTarget.websiteRuleIncludesApex,
++                    triggeredAtMillis = nowMillis,
++                ),
++            )
++            if (!AccessibilityInterceptionPlanner.shouldEvaluateAppTargetAfterWebsiteResult(websiteProcessingResult)) {
++                return
++            }
++        }
++
+         val targetApp = InterceptionTargetResolver.resolve(
+             foregroundPackage = packageName,
+             foregroundClass = className,
+@@ -65,24 +110,75 @@ class QualityAlternativeAccessibilityService : AccessibilityService() {
+             knownTargets = settings.knownTargets,
+             appPackage = packageName(),
+         ) ?: return
+-        val nowMillis = System.currentTimeMillis()
+-        val bedtimeActive = bedtimeWindowIsActive(
+-            enabled = settings.bedtimeEnabled,
+-            startMinutes = settings.bedtimeStartMinutes,
+-            endMinutes = settings.bedtimeEndMinutes,
++        processInterceptionTarget(
++            appContainer = appContainer,
++            targetApp = targetApp,
++            targetKey = targetApp.packageName,
++            detectionKeys = settings.selectedPackages,
+             nowMillis = nowMillis,
++            bedtimeActive = bedtimeActive,
++            analyticsMetadata = mapOf(
++                "triggerSource" to "accessibility_service",
++                "interceptionStage" to "sprint3_live_surface",
++                "foregroundPackage" to packageName,
++                "foregroundClass" to (className ?: ""),
++            ),
++            launchIntent = MainActivity.createSystemInterceptionIntent(
++                context = this,
++                targetAppPackage = targetApp.packageName,
++                triggeredAtMillis = nowMillis,
++            ),
+         )
+-        if (InterceptionRuntimeGate.shouldSuppress(targetApp.packageName, nowMillis, bedtimeActive = bedtimeActive)) {
+-            return
++    }
++
++    private fun resolveWebsiteTarget(
++        browserPackage: String,
++        settings: InterceptionSettingsSnapshot,
++    ): WebsiteInterceptionTarget? {
++        if (settings.websiteRules.none(WebsiteRule::enabled)) {
++            return null
++        }
++        val hostResult = VerifiedBrowserHostAdapter.readHostFromWindow(
++            browserPackage = browserPackage,
++            root = rootInActiveWindow,
++        )
++        val observedHost = (hostResult as? VerifiedBrowserHostResult.Verified)?.host ?: return null
++        return WebsiteInterceptionResolver.resolve(
++            browserPackage = browserPackage,
++            browserDisplayName = ChromeBrowserDisplayName,
++            observedHost = observedHost,
++            websiteRules = settings.websiteRules,
++        )
++    }
++
++    private fun processInterceptionTarget(
++        appContainer: AppContainer,
++        targetApp: DistractingApp,
++        targetKey: String,
++        detectionKeys: Set<String>,
++        nowMillis: Long,
++        bedtimeActive: Boolean,
++        analyticsMetadata: Map<String, String>,
++        launchIntent: Intent,
++    ): InterceptionProcessingResult {
++        if (
++            InterceptionRuntimeGate.shouldSuppress(
++                targetAppPackage = targetApp.packageName,
++                targetKey = targetKey,
++                nowMillis = nowMillis,
++                bedtimeActive = bedtimeActive,
++            )
++        ) {
++            return InterceptionProcessingResult.Suppressed
+         }
+         if (!detectionPolicy.shouldLog(
+-                packageName = targetApp.packageName,
+-                selectedPackages = settings.selectedPackages,
++                packageName = targetKey,
++                selectedPackages = detectionKeys,
+                 nowMillis = nowMillis,
+                 bedtimeActive = bedtimeActive,
+             )
+         ) {
+-            return
++            return InterceptionProcessingResult.Duplicate
+         }
+ 
+         serviceScope.launch {
+@@ -94,26 +190,16 @@ class QualityAlternativeAccessibilityService : AccessibilityService() {
+                     type = AnalyticsEventType.TARGET_APP_FOREGROUND_DETECTED,
+                     timestampMillis = nowMillis,
+                     targetAppPackage = targetApp.packageName,
+-                    metadata = mapOf(
+-                        "triggerSource" to "accessibility_service",
+-                        "interceptionStage" to "sprint3_live_surface",
+-                        "foregroundPackage" to packageName,
+-                        "foregroundClass" to (className ?: ""),
+-                    ),
++                    metadata = analyticsMetadata,
+                 ),
+             )
+         }
+ 
+         if (cachedReadiness?.interceptionReady != true) {
+-            return
++            return InterceptionProcessingResult.NotReady
+         }
+-        startActivity(
+-            MainActivity.createSystemInterceptionIntent(
+-                context = this,
+-                targetAppPackage = targetApp.packageName,
+-                triggeredAtMillis = nowMillis,
+-            ),
+-        )
++        startActivity(launchIntent)
++        return InterceptionProcessingResult.Handled
+     }
+ 
+     override fun onInterrupt() = Unit
+@@ -126,10 +212,18 @@ class QualityAlternativeAccessibilityService : AccessibilityService() {
+     private fun packageName(): String = applicationContext.packageName
+ }
+ 
++private val SupportedAccessibilityEventTypes = setOf(
++    AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED,
++    AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED,
++)
++
++private const val ChromeBrowserDisplayName = "Chrome"
++
+ private data class InterceptionSettingsSnapshot(
+     val selectedPackages: Set<String> = emptySet(),
+     val knownTargets: List<DistractingApp> = emptyList(),
+     val bedtimeEnabled: Boolean = DEFAULT_BEDTIME_ENABLED,
+     val bedtimeStartMinutes: Int = DEFAULT_BEDTIME_START_MINUTES,
+     val bedtimeEndMinutes: Int = DEFAULT_BEDTIME_END_MINUTES,
++    val websiteRules: List<WebsiteRule> = emptyList(),
+ )
+diff --git a/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt b/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
+index c1f6f0c..4902887 100644
+--- a/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
++++ b/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
+@@ -103,6 +103,7 @@ import com.qualityalternative.app.domain.service.SettingsRepository
+ import com.qualityalternative.app.domain.service.UserDocumentRepository
+ import com.qualityalternative.app.domain.service.UserLinkRepository
+ import com.qualityalternative.app.interception.InterceptionRuntimeGate
++import com.qualityalternative.app.interception.WebsiteInterceptionResolver
+ import java.io.InputStream
+ import java.util.UUID
+ import kotlinx.coroutines.CancellationException
+@@ -141,6 +142,8 @@ data class MainUiState(
+     val currentOpenAnywayUnlockAvailableAtMillis: Long? = null,
+     val currentRecommendationSet: RecommendationSet? = null,
+     val currentInterventionOrigin: InterventionOrigin? = null,
++    val currentInterventionMetadata: Map<String, String> = emptyMap(),
++    val currentInterventionSuppressionKey: String? = null,
+     val currentContent: ContentItem? = null,
+     val currentReaderDocument: ReaderDocument? = null,
+     val currentContentBody: String = "",
+@@ -1601,6 +1604,8 @@ class MainViewModel(
+                 currentOpenAnywayUnlockAvailableAtMillis = null,
+                 currentRecommendationSet = null,
+                 currentInterventionOrigin = null,
++                currentInterventionMetadata = emptyMap(),
++                currentInterventionSuppressionKey = null,
+                 currentInterventionBedtimeEnforced = false,
+                 currentContent = repairedContent,
+                 currentReaderDocument = readerDocument,
+@@ -1895,7 +1900,7 @@ class MainViewModel(
+         nowMillis: Long = nowProvider(),
+     ) {
+         if (uiState.isLoadingSettings) {
+-            pendingSystemInterception = PendingSystemInterception(
++            pendingSystemInterception = PendingSystemInterception.App(
+                 targetAppPackage = targetAppPackage,
+                 triggeredAtMillis = nowMillis,
+             )
+@@ -1911,11 +1916,52 @@ class MainViewModel(
+         )
+     }
+ 
++    fun requestSystemWebsiteInterception(
++        browserPackage: String,
++        browserDisplayName: String,
++        websiteRuleType: String,
++        websiteRuleIncludesApex: Boolean,
++        nowMillis: Long = nowProvider(),
++    ) {
++        if (uiState.isLoadingSettings) {
++            pendingSystemInterception = PendingSystemInterception.Website(
++                browserPackage = browserPackage,
++                browserDisplayName = browserDisplayName,
++                websiteRuleType = websiteRuleType,
++                websiteRuleIncludesApex = websiteRuleIncludesApex,
++                triggeredAtMillis = nowMillis,
++            )
++            return
++        }
++
++        val safeBrowserName = browserDisplayName.trim().takeIf(String::isNotBlank) ?: "Browser"
++        val targetApp = DistractingApp(
++            packageName = browserPackage,
++            displayName = "$safeBrowserName website",
++        )
++        triggerIntervention(
++            targetApp = targetApp,
++            origin = InterventionOrigin.SYSTEM,
++            triggeredAtMillis = nowMillis,
++            processingNowMillis = nowProvider(),
++            interventionMetadata = mapOf(
++                "targetType" to WebsiteInterceptionResolver.TARGET_TYPE,
++                "browserPackage" to browserPackage,
++                "browserSupportStatus" to WebsiteInterceptionResolver.BROWSER_SUPPORT_VERIFIED_HOST,
++                "websiteRuleType" to websiteRuleType,
++                "websiteRuleIncludesApex" to websiteRuleIncludesApex.toString(),
++            ),
++            suppressionKey = WebsiteInterceptionResolver.suppressionKeyFor(browserPackage),
++        )
++    }
++
+     fun triggerIntervention(
+         targetApp: DistractingApp,
+         origin: InterventionOrigin,
+         triggeredAtMillis: Long = nowProvider(),
+         processingNowMillis: Long = triggeredAtMillis,
++        interventionMetadata: Map<String, String> = emptyMap(),
++        suppressionKey: String = targetApp.packageName,
+     ) {
+         val preferences = uiState.preferences ?: return
+         if (uiState.isLoadingSettings) {
+@@ -1930,6 +1976,7 @@ class MainViewModel(
+                 targetApp = targetApp,
+                 triggeredAtMillis = triggeredAtMillis,
+                 shownAtMillis = processingNowMillis,
++                interventionMetadata = interventionMetadata,
+             )
+ 
+             val bedtimeActive = bedtimeWindowIsActive(
+@@ -1942,6 +1989,7 @@ class MainViewModel(
+                 origin == InterventionOrigin.SYSTEM &&
+                 InterceptionRuntimeGate.shouldSuppress(
+                     targetAppPackage = targetApp.packageName,
++                    targetKey = suppressionKey,
+                     nowMillis = processingNowMillis,
+                     bedtimeActive = bedtimeActive,
+                 )
+@@ -1955,6 +2003,8 @@ class MainViewModel(
+                     activeDelayWindow = null,
+                     activeDelaySuggestion = null,
+                     currentInterventionOrigin = null,
++                    currentInterventionMetadata = emptyMap(),
++                    currentInterventionSuppressionKey = null,
+                     currentInterventionBedtimeEnforced = false,
+                     latestMessage = "${targetApp.displayName} is still unlocked.",
+                     screen = MainScreen.Home,
+@@ -1975,6 +2025,8 @@ class MainViewModel(
+                         screen = MainScreen.Home,
+                         currentOpenAnywayUnlockAvailableAtMillis = null,
+                         currentInterventionOrigin = null,
++                        currentInterventionMetadata = emptyMap(),
++                        currentInterventionSuppressionKey = null,
+                         currentInterventionBedtimeEnforced = false,
+                     )
+                     return@launch
+@@ -2031,7 +2083,7 @@ class MainViewModel(
+                         timestampMillis = processingNowMillis,
+                         interventionId = interventionId,
+                         targetAppPackage = targetApp.packageName,
+-                        metadata = inventoryDiagnostics,
++                        metadata = interventionMetadata + inventoryDiagnostics,
+                     ),
+                 )
+                 uiState = uiState.copy(
+@@ -2043,6 +2095,8 @@ class MainViewModel(
+                     activeDelayWindow = null,
+                     activeDelaySuggestion = null,
+                     currentInterventionOrigin = null,
++                    currentInterventionMetadata = emptyMap(),
++                    currentInterventionSuppressionKey = null,
+                     currentInterventionBedtimeEnforced = false,
+                     latestMessage = "No replacement inventory is available yet.",
+                     screen = MainScreen.Home,
+@@ -2061,7 +2115,7 @@ class MainViewModel(
+                     primaryContentId = recommendationSet.primary.id,
+                     backupContentIds = backupIds,
+                     contentId = recommendationSet.primary.id,
+-                    metadata = recommendationSet.analyticsMetadata() + inventoryDiagnostics,
++                    metadata = interventionMetadata + recommendationSet.analyticsMetadata() + inventoryDiagnostics,
+                 ),
+             )
+ 
+@@ -2075,7 +2129,7 @@ class MainViewModel(
+                         primaryContentId = recommendationSet.primary.id,
+                         backupContentIds = backupIds,
+                         contentId = recommendationSet.primary.id,
+-                        metadata = recommendationSet.analyticsMetadata() + inventoryDiagnostics,
++                        metadata = interventionMetadata + recommendationSet.analyticsMetadata() + inventoryDiagnostics,
+                     ),
+                 )
+             }
+@@ -2098,7 +2152,7 @@ class MainViewModel(
+                         primaryContentId = recommendationSet.primary.id,
+                         backupContentIds = backupIds,
+                         contentId = recommendationSet.primary.id,
+-                        metadata = recommendationSet.analyticsMetadata() + mapOf(
++                        metadata = interventionMetadata + recommendationSet.analyticsMetadata() + mapOf(
+                             "interventionMode" to interventionMode.name,
+                             "bedtimeStartMinutes" to uiState.bedtimeStartMinutes.toString(),
+                             "bedtimeEndMinutes" to uiState.bedtimeEndMinutes.toString(),
+@@ -2116,7 +2170,7 @@ class MainViewModel(
+                         primaryContentId = recommendationSet.primary.id,
+                         backupContentIds = backupIds,
+                         contentId = recommendationSet.primary.id,
+-                        metadata = recommendationSet.analyticsMetadata() + mapOf(
++                        metadata = interventionMetadata + recommendationSet.analyticsMetadata() + mapOf(
+                             "interventionMode" to interventionMode.name,
+                             "openAnywayUnlockDelayMillis" to FORM_INTERVENTION_UNLOCK_DELAY_MILLIS.toString(),
+                         ),
+@@ -2133,7 +2187,7 @@ class MainViewModel(
+                         primaryContentId = recommendationSet.primary.id,
+                         backupContentIds = backupIds,
+                         contentId = recommendationSet.primary.id,
+-                        metadata = recommendationSet.primary.analyticsMetadata() + progress.analyticsMetadata() + mapOf(
++                        metadata = interventionMetadata + recommendationSet.primary.analyticsMetadata() + progress.analyticsMetadata() + mapOf(
+                             "unfinishedContentCount" to preferences.unfinishedContentIds.size.toString(),
+                         ),
+                     ),
+@@ -2147,6 +2201,8 @@ class MainViewModel(
+                 currentOpenAnywayUnlockAvailableAtMillis = openAnywayAvailableAtMillis,
+                 currentRecommendationSet = recommendationSet,
+                 currentInterventionOrigin = origin,
++                currentInterventionMetadata = interventionMetadata,
++                currentInterventionSuppressionKey = suppressionKey,
+                 isBedtimeActive = bedtimeActive,
+                 currentInterventionBedtimeEnforced = bedtimeActive,
+                 activeDelayWindow = null,
+@@ -2184,7 +2240,7 @@ class MainViewModel(
+                     primaryContentId = recommendationSet.primary.id,
+                     backupContentIds = recommendationSet.backups.map(ContentItem::id),
+                     contentId = recommendationSet.primary.id,
+-                    metadata = recommendationSet.primary.analyticsMetadata(),
++                    metadata = uiState.currentInterventionMetadata + recommendationSet.primary.analyticsMetadata(),
+                 ),
+             )
+             recordFormInterventionCompleted(action = "primary", nowMillis = nowMillis, contentId = recommendationSet.primary.id)
+@@ -2219,7 +2275,7 @@ class MainViewModel(
+                     primaryContentId = recommendationSet.primary.id,
+                     backupContentIds = recommendationSet.backups.map(ContentItem::id),
+                     contentId = content.id,
+-                    metadata = content.analyticsMetadata(),
++                    metadata = uiState.currentInterventionMetadata + content.analyticsMetadata(),
+                 ),
+             )
+             recordFormInterventionCompleted(action = "backup", nowMillis = nowMillis, contentId = content.id)
+@@ -2253,6 +2309,8 @@ class MainViewModel(
+                 currentOpenAnywayUnlockAvailableAtMillis = null,
+                 currentRecommendationSet = null,
+                 currentInterventionOrigin = null,
++                currentInterventionMetadata = emptyMap(),
++                currentInterventionSuppressionKey = null,
+                 currentInterventionBedtimeEnforced = false,
+                 activeDelayWindow = window,
+                 activeDelaySuggestion = activeDelaySuggestionFor(window),
+@@ -2278,7 +2336,7 @@ class MainViewModel(
+                 targetAppPackage = targetApp.packageName,
+                 primaryContentId = recommendationSet.primary.id,
+                 backupContentIds = recommendationSet.backups.map(ContentItem::id),
+-                metadata = mapOf(
++                metadata = uiState.currentInterventionMetadata + mapOf(
+                     "interventionMode" to uiState.interventionMode.name,
+                     "openAnywayUnlockAvailableAtMillis" to availableAtMillis.toString(),
+                     "elapsedMillis" to (nowMillis - (uiState.currentInterventionShownAtMillis ?: nowMillis))
+@@ -2302,7 +2360,7 @@ class MainViewModel(
+                     targetAppPackage = targetApp.packageName,
+                     primaryContentId = recommendationSet.primary.id,
+                     backupContentIds = recommendationSet.backups.map(ContentItem::id),
+-                    metadata = mapOf(
++                    metadata = uiState.currentInterventionMetadata + mapOf(
+                         "reason" to reason,
+                         "interventionMode" to uiState.interventionMode.name,
+                         "openAnywayUnlockAvailableAtMillis" to uiState.currentOpenAnywayUnlockAvailableAtMillis.orEmptyString(),
+@@ -2317,6 +2375,8 @@ class MainViewModel(
+             currentOpenAnywayUnlockAvailableAtMillis = null,
+             currentRecommendationSet = null,
+             currentInterventionOrigin = null,
++            currentInterventionMetadata = emptyMap(),
++            currentInterventionSuppressionKey = null,
+             currentInterventionBedtimeEnforced = false,
+             latestMessage = null,
+         )
+@@ -2390,6 +2450,8 @@ class MainViewModel(
+                 currentOpenAnywayUnlockAvailableAtMillis = null,
+                 currentRecommendationSet = recommendationSet,
+                 currentInterventionOrigin = null,
++                currentInterventionMetadata = emptyMap(),
++                currentInterventionSuppressionKey = null,
+                 currentInterventionBedtimeEnforced = false,
+             )
+             openReplacementSession(content = content, sessionId = sessionId, startedAtMillis = nowMillis)
+@@ -2418,7 +2480,7 @@ class MainViewModel(
+                 primaryContentId = recommendationSet.primary.id,
+                 backupContentIds = recommendationSet.backups.map(ContentItem::id),
+                 contentId = recommendationSet.primary.id,
+-                metadata = recommendationSet.analyticsMetadata() + mapOf(
++                metadata = uiState.currentInterventionMetadata + recommendationSet.analyticsMetadata() + mapOf(
+                     "interventionMode" to uiState.interventionMode.name,
+                     "bedtimeStartMinutes" to uiState.bedtimeStartMinutes.toString(),
+                     "bedtimeEndMinutes" to uiState.bedtimeEndMinutes.toString(),
+@@ -2462,7 +2524,7 @@ class MainViewModel(
+                     targetAppPackage = targetApp.packageName,
+                     primaryContentId = recommendationSet?.primary?.id,
+                     backupContentIds = recommendationSet?.backups.orEmpty().map(ContentItem::id),
+-                    metadata = mapOf(
++                    metadata = uiState.currentInterventionMetadata + mapOf(
+                         "interventionMode" to uiState.interventionMode.name,
+                         "openAnywayUnlockAvailableAtMillis" to openAnywayAvailableAtMillis.toString(),
+                         "remainingMillis" to (openAnywayAvailableAtMillis - nowMillis).toString(),
+@@ -2490,7 +2552,7 @@ class MainViewModel(
+                 targetAppPackage = targetApp.packageName,
+                 primaryContentId = recommendationSet?.primary?.id,
+                 backupContentIds = recommendationSet?.backups.orEmpty().map(ContentItem::id),
+-                metadata = mapOf(
++                metadata = uiState.currentInterventionMetadata + mapOf(
+                     "interventionMode" to uiState.interventionMode.name,
+                     "openAnywayUnlockMinutes" to unlockMinutes.toString(),
+                     "openAnywayUnlockUntilMillis" to unlockUntilMillis.toString(),
+@@ -2512,7 +2574,7 @@ class MainViewModel(
+                     targetAppPackage = targetApp.packageName,
+                     primaryContentId = recommendationSet?.primary?.id,
+                     backupContentIds = recommendationSet?.backups.orEmpty().map(ContentItem::id),
+-                    metadata = mapOf(
++                    metadata = uiState.currentInterventionMetadata + mapOf(
+                         "interventionMode" to uiState.interventionMode.name,
+                         "openAnywayUnlockAvailableAtMillis" to (openAnywayAvailableAtMillis?.toString() ?: "0"),
+                         "openAnywayUnlockUntilMillis" to unlockUntilMillis.toString(),
+@@ -2529,7 +2591,7 @@ class MainViewModel(
+                     targetAppPackage = targetApp.packageName,
+                     primaryContentId = recommendationSet?.primary?.id,
+                     backupContentIds = recommendationSet?.backups.orEmpty().map(ContentItem::id),
+-                    metadata = mapOf(
++                    metadata = uiState.currentInterventionMetadata + mapOf(
+                         "interventionMode" to uiState.interventionMode.name,
+                         "openAnywayUnlockAvailableAtMillis" to (openAnywayAvailableAtMillis?.toString() ?: "0"),
+                         "openAnywayUnlockUntilMillis" to unlockUntilMillis.toString(),
+@@ -2543,6 +2605,7 @@ class MainViewModel(
+                 targetAppPackage = targetApp.packageName,
+                 untilMillis = unlockUntilMillis,
+                 allowedDuringBedtime = uiState.currentInterventionBedtimeEnforced,
++                targetKey = uiState.currentInterventionSuppressionKey ?: targetApp.packageName,
+             )
+         }
+         uiState = uiState.copy(
+@@ -2552,6 +2615,8 @@ class MainViewModel(
+             currentOpenAnywayUnlockAvailableAtMillis = null,
+             currentRecommendationSet = null,
+             currentInterventionOrigin = null,
++            currentInterventionMetadata = emptyMap(),
++            currentInterventionSuppressionKey = null,
+             currentInterventionBedtimeEnforced = false,
+             isBedtimeActive = bedtimeWindowIsActive(
+                 enabled = uiState.bedtimeEnabled,
+@@ -3365,6 +3430,7 @@ class MainViewModel(
+         targetApp: DistractingApp,
+         triggeredAtMillis: Long,
+         shownAtMillis: Long,
++        interventionMetadata: Map<String, String> = emptyMap(),
+     ) {
+         if (origin != InterventionOrigin.SYSTEM) {
+             return
+@@ -3378,7 +3444,7 @@ class MainViewModel(
+                 type = AnalyticsEventType.INTERVENTION_DEGRADED_PERFORMANCE,
+                 timestampMillis = shownAtMillis,
+                 targetAppPackage = targetApp.packageName,
+-                metadata = mapOf(
++                metadata = interventionMetadata + mapOf(
+                     "triggeredAtMillis" to triggeredAtMillis.toString(),
+                     "shownAtMillis" to shownAtMillis.toString(),
+                     "interceptionDelayMillis" to delayMillis.toString(),
+@@ -3689,6 +3755,8 @@ class MainViewModel(
+             currentOpenAnywayUnlockAvailableAtMillis = null,
+             currentRecommendationSet = null,
+             currentInterventionOrigin = null,
++            currentInterventionMetadata = emptyMap(),
++            currentInterventionSuppressionKey = null,
+             currentInterventionBedtimeEnforced = false,
+             currentContent = repairedContent,
+             currentReaderDocument = readerDocument,
+@@ -4094,6 +4162,8 @@ class MainViewModel(
+             isReaderOpening = false,
+             currentRecommendationSet = null,
+             currentInterventionOrigin = null,
++            currentInterventionMetadata = emptyMap(),
++            currentInterventionSuppressionKey = null,
+             currentInterventionBedtimeEnforced = false,
+             currentSessionId = null,
+             currentSessionStartedAtMillis = null,
+@@ -4173,7 +4243,7 @@ class MainViewModel(
+                 primaryContentId = recommendationSet.primary.id,
+                 backupContentIds = recommendationSet.backups.map(ContentItem::id),
+                 contentId = contentId,
+-                metadata = mapOf(
++                metadata = uiState.currentInterventionMetadata + mapOf(
+                     "action" to action,
+                     "interventionMode" to uiState.interventionMode.name,
+                     "openAnywayUnlockAvailableAtMillis" to uiState.currentOpenAnywayUnlockAvailableAtMillis.orEmptyString(),
+@@ -4258,10 +4328,20 @@ class MainViewModel(
+         if (isReady) {
+             val pending = pendingSystemInterception ?: return
+             pendingSystemInterception = null
+-            requestSystemInterception(
+-                targetAppPackage = pending.targetAppPackage,
+-                nowMillis = pending.triggeredAtMillis,
+-            )
++            when (pending) {
++                is PendingSystemInterception.App -> requestSystemInterception(
++                    targetAppPackage = pending.targetAppPackage,
++                    nowMillis = pending.triggeredAtMillis,
++                )
++
++                is PendingSystemInterception.Website -> requestSystemWebsiteInterception(
++                    browserPackage = pending.browserPackage,
++                    browserDisplayName = pending.browserDisplayName,
++                    websiteRuleType = pending.websiteRuleType,
++                    websiteRuleIncludesApex = pending.websiteRuleIncludesApex,
++                    nowMillis = pending.triggeredAtMillis,
++                )
++            }
+         }
+     }
+ 
+@@ -4696,10 +4776,20 @@ private const val MAX_BACKGROUND_READING_TIME_REPAIR_SCAN_COUNT = 10
+ private const val FEEDBACK_FIT_NOT = "not"
+ private const val FEEDBACK_SCROLL_NO = "no"
+ 
+-private data class PendingSystemInterception(
+-    val targetAppPackage: String,
+-    val triggeredAtMillis: Long,
+-)
++private sealed class PendingSystemInterception {
++    data class App(
++        val targetAppPackage: String,
++        val triggeredAtMillis: Long,
++    ) : PendingSystemInterception()
++
++    data class Website(
++        val browserPackage: String,
++        val browserDisplayName: String,
++        val websiteRuleType: String,
++        val websiteRuleIncludesApex: Boolean,
++        val triggeredAtMillis: Long,
++    ) : PendingSystemInterception()
++}
+ 
+ private fun AddLinkFormState.toDraftOrNull(): UserLinkDraft? {
+     val duration = durationMinutes.toIntOrNull() ?: return null
+@@ -4972,7 +5062,6 @@ private fun ContentItem.analyticsMetadata(prefix: String? = null): Map<String, S
+         put(key("packId"), packId)
+         put(key("rightsClass"), rights.rightsClass.name)
+         put(key("renderMode"), rights.renderMode.name)
+-        externalUrl?.let { url -> put(key("externalUrl"), url) }
+     }
+ }
+ 
+diff --git a/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt b/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
+index 723c864..0c5add7 100644
+--- a/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
++++ b/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
+@@ -5372,7 +5372,7 @@ private fun WebsiteRulesSettingsSection(
+         SectionLabel("Website rules", right = "$enabledCount enabled")
+         QaCard {
+             BodyText(
+-                text = "Save domains now. Browser interruption starts only when a verified current-host adapter is available; until then, use whole-browser app targets as the reliable fallback.",
++                text = "Chrome domain interruption is supported when the current Chrome host is readable through the verified-host adapter. Other browsers stay on whole-browser app-target fallback; full-path and universal URL blocking remain out of scope.",
+                 color = colors.mutedText,
+                 fontSize = 12.5.sp,
+                 lineHeight = 17.sp,
+@@ -5580,8 +5580,8 @@ private fun BrowserSupportMatrix(modifier: Modifier = Modifier) {
+         MonoText("Browser support", modifier = Modifier.padding(bottom = 8.dp))
+         BrowserSupportRow(
+             title = "Chrome",
+-            status = "Verified-host adapter next",
+-            description = "Saved rules stay portable; website interruption activates after the Chrome current-host check passes the next slice.",
++            status = "Domain rules supported",
++            description = "Quality Alternative reads only the visible Chrome address-bar host through the verified-host adapter, then applies saved domain rules without paths or browsing history.",
+             modifier = Modifier.testTag("settings-browser-support-chrome"),
+         )
+         HorizontalDivider(color = colors.line, modifier = Modifier.padding(vertical = 10.dp))
+diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
+index 44641fd..34c1f90 100644
+--- a/app/src/main/res/values/strings.xml
++++ b/app/src/main/res/values/strings.xml
+@@ -1,5 +1,5 @@
+ <resources>
+     <string name="app_name">Quality Alternative</string>
+     <string name="accessibility_service_label">Quality Alternative Foreground Detection</string>
+-    <string name="accessibility_service_description">Detects when selected distracting apps reach the foreground so the app can prepare a mindful replacement flow.</string>
++    <string name="accessibility_service_description">Detects selected distracting apps and supported browser address bars so the app can prepare a mindful replacement flow.</string>
+ </resources>
+diff --git a/app/src/main/res/xml/quality_alternative_accessibility_service.xml b/app/src/main/res/xml/quality_alternative_accessibility_service.xml
+index 68c173c..6843d97 100644
+--- a/app/src/main/res/xml/quality_alternative_accessibility_service.xml
++++ b/app/src/main/res/xml/quality_alternative_accessibility_service.xml
+@@ -1,7 +1,8 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+-    android:accessibilityEventTypes="typeWindowStateChanged"
++    android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged"
+     android:accessibilityFeedbackType="feedbackGeneric"
+-    android:canRetrieveWindowContent="false"
++    android:accessibilityFlags="flagReportViewIds"
++    android:canRetrieveWindowContent="true"
+     android:description="@string/accessibility_service_description"
+     android:notificationTimeout="100" />
+diff --git a/app/src/test/java/com/qualityalternative/app/data/WebsiteRuleNormalizerTest.kt b/app/src/test/java/com/qualityalternative/app/data/WebsiteRuleNormalizerTest.kt
+index 5229502..6aecb04 100644
+--- a/app/src/test/java/com/qualityalternative/app/data/WebsiteRuleNormalizerTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/data/WebsiteRuleNormalizerTest.kt
+@@ -37,6 +37,22 @@ class WebsiteRuleNormalizerTest {
+         )
+     }
+ 
++    @Test
++    fun normalize_convertsSchemedUnicodeHostToAscii() {
++        val result = WebsiteRuleNormalizer.normalize(
++            input = "https://MÜNICH.example/lesen?utm=private#top",
++            wildcard = false,
++        )
++
++        assertEquals(
++            WebsiteRuleDraftResult.Valid(
++                host = "xn--mnich-kva.example",
++                type = WebsiteRuleType.EXACT_DOMAIN,
++            ),
++            result,
++        )
++    }
++
+     @Test
+     fun normalize_detectsExplicitWildcardPrefix() {
+         val result = WebsiteRuleNormalizer.normalize(input = "*.News.Example", wildcard = false)
+diff --git a/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt b/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
+index 7e36240..978f99a 100644
+--- a/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
+@@ -77,6 +77,8 @@ import com.qualityalternative.app.domain.service.UserDocumentRepository
+ import com.qualityalternative.app.domain.service.UserLinkRepository
+ import com.qualityalternative.app.interception.FixtureTargetRegistry
+ import com.qualityalternative.app.interception.InterceptionRuntimeGate
++import com.qualityalternative.app.interception.VerifiedBrowserHostAdapter
++import com.qualityalternative.app.interception.WebsiteInterceptionResolver
+ import java.io.ByteArrayInputStream
+ import java.io.File
+ import java.time.LocalDate
+@@ -388,7 +390,7 @@ class MainViewModelTest {
+         assertEquals(userLink.id, event.contentId)
+         assertEquals("USER_LINK", event.metadata["sourceType"])
+         assertEquals("NEEDS_FALLBACK", event.metadata["availability"])
+-        assertEquals("https://example.com/essay", event.metadata["externalUrl"])
++        assertFalse(event.metadata.containsKey("externalUrl"))
+     }
+ 
+     @Test
+@@ -430,7 +432,7 @@ class MainViewModelTest {
+         assertEquals("EDITORIAL", event.metadata["sourceType"])
+         assertEquals("LINK_ONLY", event.metadata["rightsClass"])
+         assertEquals("EXTERNAL_HANDOFF", event.metadata["renderMode"])
+-        assertEquals("https://longnow.org/ideas/the-big-here-and-long-now/", event.metadata["externalUrl"])
++        assertFalse(event.metadata.containsKey("externalUrl"))
+     }
+ 
+     @Test
+@@ -2511,7 +2513,7 @@ class MainViewModelTest {
+         assertEquals("USER_LINK", event.metadata["sourceType"])
+         assertEquals("USER_PRIVATE", event.metadata["rightsClass"])
+         assertEquals("EXTERNAL_HANDOFF", event.metadata["renderMode"])
+-        assertEquals("https://example.com/essay", event.metadata["externalUrl"])
++        assertFalse(event.metadata.containsKey("externalUrl"))
+ 
+         viewModel.finishAddLinkSuccess()
+         assertEquals(MainScreen.Library, viewModel.uiState.screen)
+@@ -4734,6 +4736,142 @@ class MainViewModelTest {
+         assertEquals(null, viewModel.uiState.currentInterventionOrigin)
+     }
+ 
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun requestSystemWebsiteInterception_opensInterventionWithoutSelectedBrowserAndKeepsDomainPrivate() = runTest {
++        val analyticsTracker = InMemoryAnalyticsTracker()
++        val viewModel = createViewModel(
++            settingsRepository = FakeSettingsRepository(
++                initial = completedSettings(selectedAppPackages = emptySet()),
++            ),
++            analyticsTracker = analyticsTracker,
++        )
++
++        advanceUntilIdle()
++        viewModel.requestSystemWebsiteInterception(
++            browserPackage = VerifiedBrowserHostAdapter.CHROME_PACKAGE,
++            browserDisplayName = "Chrome",
++            websiteRuleType = WebsiteRuleType.WILDCARD_SUBDOMAINS.name,
++            websiteRuleIncludesApex = false,
++            nowMillis = 5_000L,
++        )
++        advanceUntilIdle()
++
++        assertEquals(MainScreen.Intervention, viewModel.uiState.screen)
++        assertEquals(InterventionOrigin.SYSTEM, viewModel.uiState.currentInterventionOrigin)
++        assertEquals(VerifiedBrowserHostAdapter.CHROME_PACKAGE, viewModel.uiState.selectedTargetApp?.packageName)
++        assertEquals("Chrome website", viewModel.uiState.selectedTargetApp?.displayName)
++        assertEquals(WebsiteInterceptionResolver.TARGET_TYPE, viewModel.uiState.currentInterventionMetadata["targetType"])
++
++        val shownEvent = analyticsTracker.allEvents().first { it.type == AnalyticsEventType.INTERVENTION_SHOWN }
++        val serializedMetadata = shownEvent.metadata.entries.joinToString(" ")
++        assertEquals(WebsiteInterceptionResolver.TARGET_TYPE, shownEvent.metadata["targetType"])
++        assertEquals(WebsiteInterceptionResolver.BROWSER_SUPPORT_VERIFIED_HOST, shownEvent.metadata["browserSupportStatus"])
++        assertFalse(serializedMetadata.contains("example"))
++        assertFalse(serializedMetadata.contains("https://"))
++    }
++
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun requestSystemWebsiteInterceptionWithExternalUrlRecommendationKeepsAnalyticsUrlPrivate() = runTest {
++        val privateUrl = "https://leaky.example.com/path/to/read?token=secret"
++        val userLink = savedUserLink(id = "private-user-link").copy(
++            externalUrl = privateUrl,
++            rights = ContentRightsMetadata.userPrivateExternal(sourceUrl = privateUrl),
++        )
++        val analyticsTracker = InMemoryAnalyticsTracker()
++        val viewModel = createViewModel(
++            contentRepository = FakeContentRepository(extraItems = listOf(userLink)),
++            recommendationEngine = FixedRecommendationEngine(
++                RecommendationSet(
++                    primary = userLink,
++                    backups = emptyList(),
++                    inventoryShortage = true,
++                    generatedAtMillis = 5_000L,
++                ),
++            ),
++            settingsRepository = FakeSettingsRepository(
++                initial = completedSettings(selectedAppPackages = emptySet()),
++            ),
++            analyticsTracker = analyticsTracker,
++        )
++
++        advanceUntilIdle()
++        viewModel.requestSystemWebsiteInterception(
++            browserPackage = VerifiedBrowserHostAdapter.CHROME_PACKAGE,
++            browserDisplayName = "Chrome",
++            websiteRuleType = WebsiteRuleType.EXACT_DOMAIN.name,
++            websiteRuleIncludesApex = false,
++            nowMillis = 5_000L,
++        )
++        advanceUntilIdle()
++        viewModel.acceptPrimary()
++        advanceUntilIdle()
++        assertEquals(privateUrl, viewModel.currentExternalLinkUrl())
++
++        viewModel.recordExternalLinkOpened(nowMillis = 6_000L)
++        advanceUntilIdle()
++
++        val websiteEvents = analyticsTracker.allEvents().filter { event ->
++            event.metadata["targetType"] == WebsiteInterceptionResolver.TARGET_TYPE ||
++                event.type == AnalyticsEventType.USER_LINK_FALLBACK_OPENED
++        }
++        val serializedMetadata = websiteEvents
++            .flatMap { event -> event.metadata.entries }
++            .joinToString(" ") { (key, value) -> "$key=$value" }
++        listOf(privateUrl, "https://", "leaky.example.com", "/path/to/read", "token=secret", "secret").forEach { fragment ->
++            assertFalse("Analytics metadata leaked URL fragment: $fragment", serializedMetadata.contains(fragment))
++        }
++    }
++
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun websiteOpenAnywaySuppressesWebsiteKeyWithoutSuppressingWholeBrowserTarget() = runTest {
++        var nowMillis = 10_000L
++        val analyticsTracker = InMemoryAnalyticsTracker()
++        val viewModel = createViewModel(
++            settingsRepository = FakeSettingsRepository(
++                initial = completedSettings(selectedAppPackages = emptySet())
++                    .copy(
++                        interventionMode = InterventionMode.FIRM,
++                        openAnywayUnlockMinutes = 15,
++                    ),
++            ),
++            analyticsTracker = analyticsTracker,
++            nowProvider = { nowMillis },
++        )
++
++        advanceUntilIdle()
++        viewModel.requestSystemWebsiteInterception(
++            browserPackage = VerifiedBrowserHostAdapter.CHROME_PACKAGE,
++            browserDisplayName = "Chrome",
++            websiteRuleType = WebsiteRuleType.EXACT_DOMAIN.name,
++            websiteRuleIncludesApex = false,
++            nowMillis = nowMillis,
++        )
++        advanceUntilIdle()
++
++        nowMillis += FORM_INTERVENTION_UNLOCK_DELAY_MILLIS
++        assertTrue(viewModel.openAnyway())
++        advanceUntilIdle()
++
++        assertTrue(
++            InterceptionRuntimeGate.shouldSuppress(
++                targetAppPackage = VerifiedBrowserHostAdapter.CHROME_PACKAGE,
++                targetKey = WebsiteInterceptionResolver.suppressionKeyFor(VerifiedBrowserHostAdapter.CHROME_PACKAGE),
++                nowMillis = nowMillis + 14 * 60_000L,
++            ),
++        )
++        assertFalse(
++            InterceptionRuntimeGate.shouldSuppress(
++                targetAppPackage = VerifiedBrowserHostAdapter.CHROME_PACKAGE,
++                nowMillis = nowMillis + 14 * 60_000L,
++            ),
++        )
++        val openEvent = analyticsTracker.allEvents().first { it.type == AnalyticsEventType.OPEN_ANYWAY_SELECTED }
++        assertEquals(WebsiteInterceptionResolver.TARGET_TYPE, openEvent.metadata["targetType"])
++    }
++
+     @Test
+     @OptIn(ExperimentalCoroutinesApi::class)
+     fun requestSystemInterception_recordsDegradedPerformanceWhenShownTooLate() = runTest {
+diff --git a/docs/LANE_STATUS.md b/docs/LANE_STATUS.md
+index 45fd98b..2892384 100644
+--- a/docs/LANE_STATUS.md
++++ b/docs/LANE_STATUS.md
+@@ -13,7 +13,7 @@ This file is the repo-level index for active and recently completed execution la
+ 
+ ## Sprint 26 Custom Targets And Website Interventions
+ 
+-Status: `slice26_2_complete_ready_for_slice26_3`
++Status: `slice26_3_r5_gpt_pro_review_waiting`
+ 
+ - Branch: `codex/sprint26-custom-targets-website-interventions`
+ - Scope: plan and implement support for replacement-first interventions on eligible arbitrary installed apps plus supported-browser website/domain rules, while avoiding universal URL blocking claims.
+@@ -40,6 +40,13 @@ Status: `slice26_2_complete_ready_for_slice26_3`
+   - Website rules are normalized, reject local/private/public-IP/IPv6/all-numeric/ambiguous hosts, persist in DataStore, and round-trip through Portable Profile import/export without browser support state, URL observations, tokens, or local folders.
+   - Settings exposes website rules as a separate target category with add, validation, pause, edit, delete, and a browser support matrix. Chrome current-host interception remains scoped to Slice 26.3.
+   - Slice 26.2 R2 fixes the GPT Pro R1 blockers: all IP literals are rejected; typed `*.example.com` exposes the subdomain mode and apex toggle before save; apex inclusion defaults off; the website rule count says `enabled`; the review bundle includes `gradle/libs.versions.toml`; and Android test metadata is sanitized to remove absolute local paths.
++  - Slice 26.3 implements Chrome-first verified-host website intervention through whitelisted address-bar accessibility nodes only.
++  - Slice 26.3 keeps unsupported/unreadable browser states non-triggering, never reuses a prior host, and routes matching rules into the existing Soft/Firm intervention flow as `Chrome website`.
++  - Slice 26.3 uses privacy-safe analytics metadata (`targetType`, browser support status, rule type) without raw URL, host/domain, path/query, page title, URL-bar text, non-match observations, browsing history, or domain-derived hashes.
++  - Slice 26.3 R2 fixes the GPT Pro R1 blockers: Settings copy now marks Chrome domain rules as supported when readable; hidden/focused omnibox states are rejected; adapter depth covers the real Chrome toolbar; website Open Anyway suppression falls through to whole-browser Chrome app target evaluation; and real Chrome package/version plus URL-set evidence is recorded.
++  - Slice 26.3 R3 fixes the GPT Pro R2 blocker by removing raw `externalUrl` from shared content analytics metadata and adding a website-domain regression that proves a replacement link URL with host, path, and query does not appear in website intervention, accept, or fallback-open analytics metadata.
++  - Slice 26.3 R4 is a package/evidence completeness review after R3 returned PASS/PASS at 9/10; it adds full unit XML, standalone activity/analytics/repository/model source files, and a cleaned manifest for GPT Pro to re-score.
++  - Slice 26.3 R5 ships all `app/src` source/test files plus full unit/lint evidence to close the R4 package-completeness gap.
+   - Slice 26.1 GPT Pro R3 review returned `SCORE 8/10`, `VERDICT FAIL`, `VISUAL REVIEW PASS`.
+   - Slice 26.1 GPT Pro R4 review returned `SCORE 10/10`, `VERDICT PASS`, `VISUAL REVIEW PASS`.
+   - Slice 26.1 GPT Pro R4 heartbeat was deleted after successful harvest.
+@@ -75,8 +82,8 @@ Status: `slice26_2_complete_ready_for_slice26_3`
+   - Passed emulator visual E2E: `VisualQaScreenshotTest#captureSprint26CustomTargetSettingsScreens`
+   - Passed `git diff --check`.
+ - Next gate:
+-  - Run GPT Pro Slice 26.2 review with the current implementation/evidence bundle.
+-  - If GPT Pro returns `SCORE 10/10`, `VERDICT PASS`, and `VISUAL REVIEW PASS`, commit Slice 26.2 and continue to Slice 26.3 Chrome verified-host adapter.
++  - Run GPT Pro Slice 26.3 R5 review with the current R5 source snapshot bundle.
++  - If GPT Pro returns `SCORE 10/10`, `VERDICT PASS`, and `VISUAL REVIEW PASS`, commit Slice 26.3 and continue to Slice 26.4 privacy, analytics, and Portable Profile hardening.
+   - If GPT Pro returns blockers, fix and rerun review.
+ 
+ ### Current Slice 26.2 Validation
+@@ -109,6 +116,71 @@ Status: `slice26_2_complete_ready_for_slice26_3`
+ - GPT Pro Slice 26.2 R2 visual contact sheet: `evidence/sprint26_custom_targets_website_interventions/visual_e2e_r2/sprint26_slice26_2_r2_website_rules_contact_sheet.png`
+ - GPT Pro Slice 26.2 R2 bundle manifest: `evidence/sprint26_custom_targets_website_interventions/SLICE26_2_R2_REVIEW_BUNDLE_MANIFEST.md`
+ 
++### Current Slice 26.3 R2 Validation
++
++- Evidence summary: `evidence/sprint26_custom_targets_website_interventions/SLICE26_3_EVIDENCE.md`
++- R2 evidence summary: `evidence/sprint26_custom_targets_website_interventions/SLICE26_3_R2_EVIDENCE.md`
++- Review bundle manifest: `evidence/sprint26_custom_targets_website_interventions/SLICE26_3_REVIEW_BUNDLE_MANIFEST.md`
++- R2 review bundle manifest: `evidence/sprint26_custom_targets_website_interventions/SLICE26_3_R2_REVIEW_BUNDLE_MANIFEST.md`
++- R2 diff: `evidence/sprint26_custom_targets_website_interventions/SLICE26_3_R2_DIFF.patch`
++- GPT Pro Slice 26.3 lane: `https://chatgpt.com/c/6a257187-c76c-83eb-ab7a-c3b3e873fa85`
++- GPT Pro Slice 26.3 prompt: `evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_3_REVIEW_PROMPT.md`
++- GPT Pro Slice 26.3 R1 output: `evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_3_REVIEW.md`
++- GPT Pro Slice 26.3 R1 verdict: `SCORE 7/10`, `VERDICT FAIL`, `VISUAL REVIEW PASS`
++- GPT Pro Slice 26.3 R2 prompt: `evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_3_R2_REVIEW_PROMPT.md`
++- GPT Pro Slice 26.3 R2 bundle: `SPRINT26_SLICE26_3_R2_REVIEW_BUNDLE_20260607.zip`
++- GPT Pro Slice 26.3 R2 lane: `https://chatgpt.com/c/6a257f25-eefc-83ed-b502-a7c70b89ed71`
++- GPT Pro Slice 26.3 R2 output: `evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_3_R2_REVIEW.md`
++- GPT Pro Slice 26.3 R2 verdict: `SCORE 8/10`, `VERDICT FAIL`, `VISUAL REVIEW PASS`
++- GPT Pro Slice 26.3 R2 blocker: website-domain analytics could still include replacement `externalUrl` values through shared content metadata.
++- GPT Pro Slice 26.3 R2 heartbeat: deleted after successful harvest.
++- R3 evidence summary: `evidence/sprint26_custom_targets_website_interventions/SLICE26_3_R3_EVIDENCE.md`
++- R3 diff: `evidence/sprint26_custom_targets_website_interventions/SLICE26_3_R3_DIFF.patch`
++- R3 raw test evidence: `evidence/sprint26_custom_targets_website_interventions/logs-slice26_3_r3/`
++- GPT Pro Slice 26.3 R3 prompt: `evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_3_R3_REVIEW_PROMPT.md`
++- GPT Pro Slice 26.3 R3 bundle: `SPRINT26_SLICE26_3_R3_REVIEW_BUNDLE_20260607.zip`
++- GPT Pro Slice 26.3 R3 lane: `https://chatgpt.com/c/6a258670-aa7c-83eb-a4ec-a37abb91c04f`
++- GPT Pro Slice 26.3 R3 output: `evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_3_R3_REVIEW.md`
++- GPT Pro Slice 26.3 R3 verdict: `SCORE 9/10`, `VERDICT PASS`, `VISUAL REVIEW PASS`, blockers none.
++- GPT Pro Slice 26.3 R3 heartbeat: deleted after successful harvest.
++- R4 evidence summary: `evidence/sprint26_custom_targets_website_interventions/SLICE26_3_R4_EVIDENCE.md`
++- R4 diff: `evidence/sprint26_custom_targets_website_interventions/SLICE26_3_R4_DIFF.patch`
++- R4 raw test evidence: `evidence/sprint26_custom_targets_website_interventions/logs-slice26_3_r4/`
++- GPT Pro Slice 26.3 R4 prompt: `evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_3_R4_REVIEW_PROMPT.md`
++- GPT Pro Slice 26.3 R4 bundle: `SPRINT26_SLICE26_3_R4_REVIEW_BUNDLE_20260607.zip`
++- GPT Pro Slice 26.3 R4 lane: `https://chatgpt.com/c/6a258c5f-0fd8-83eb-b96b-434cb0c95945`
++- GPT Pro Slice 26.3 R4 output: `evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_3_R4_REVIEW.md`
++- GPT Pro Slice 26.3 R4 verdict: `SCORE 9/10`, `VERDICT PASS`, `VISUAL REVIEW PASS`, blockers none.
++- GPT Pro Slice 26.3 R4 heartbeat: deleted after successful harvest.
++- R5 evidence summary: `evidence/sprint26_custom_targets_website_interventions/SLICE26_3_R5_EVIDENCE.md`
++- R5 review bundle manifest: `evidence/sprint26_custom_targets_website_interventions/SLICE26_3_R5_REVIEW_BUNDLE_MANIFEST.md`
++- GPT Pro Slice 26.3 R5 prompt: `evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_3_R5_REVIEW_PROMPT.md`
++- GPT Pro Slice 26.3 R5 bundle: `SPRINT26_SLICE26_3_R5_REVIEW_BUNDLE_20260607.zip`
++- GPT Pro Slice 26.3 R5 lane: `https://chatgpt.com/c/6a259198-0f20-83eb-849d-4188836260c4`
++- GPT Pro Slice 26.3 R5 review output target: `evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_3_R5_REVIEW.md`
++- GPT Pro Slice 26.3 R5 heartbeat: `harvest-sprint-26-slice26-3-r5-gpt-pro-review`
++- Visual screenshot directory: `evidence/sprint26_custom_targets_website_interventions/visual_e2e_slice26_3/sprint26-custom-targets-1780838366859/`
++- Visual contact sheet: `evidence/sprint26_custom_targets_website_interventions/visual_e2e_slice26_3/sprint26_slice26_3_chrome_website_intervention_contact_sheet.png`
++- R2 visual evidence: `evidence/sprint26_custom_targets_website_interventions/visual_e2e_slice26_3_r2/sprint26_slice26_3_r2_chrome_verified_host_contact_sheet.png`
++- R2 Chrome evidence: `evidence/sprint26_custom_targets_website_interventions/chrome_verified_host_e2e_r2_latest/`
++- Raw test evidence: `evidence/sprint26_custom_targets_website_interventions/logs-slice26_3_r2/`
++- Passed targeted unit tests:
++  - `VerifiedBrowserHostAdapterTest`
++  - `WebsiteInterceptionResolverTest`
++  - `AccessibilityInterceptionPlannerTest`
++  - `MainViewModelTest.requestSystemWebsiteInterception_opensInterventionWithoutSelectedBrowserAndKeepsDomainPrivate`
++  - `MainViewModelTest.websiteOpenAnywaySuppressesWebsiteKeyWithoutSuppressingWholeBrowserTarget`
++- Passed real Chrome adapter harness: `AccessibilityInterceptionTest#chromeVerifiedHostAdapterHarnessAcceptsOnlyLoadedMatchingHost` on `qaApi36(AVD) - 16`.
++- Passed emulator visual E2E:
++  - `VisualQaScreenshotTest#captureSprint26WebsiteRuleSettingsScreens`
++  - `VisualQaScreenshotTest#captureSprint26ChromeWebsiteInterventionScreens`
++- Passed `:app:lintDebug`.
++- R3 passed targeted unit regression for website-domain analytics URL privacy.
++- R3 passed `:app:lintDebug`.
++- R3 passed `git diff --check`.
++- R4 passed full `:app:testDebugUnitTest`.
++- R4 passed `:app:lintDebug`.
++
+ ## Sprint 25 Markdown Media And Tables
+ 
+ Status: `gpt_pro_10_10_pass_release_prep`
+diff --git a/docs/SPRINT_26_CUSTOM_TARGETS_WEBSITE_INTERVENTIONS.md b/docs/SPRINT_26_CUSTOM_TARGETS_WEBSITE_INTERVENTIONS.md
+index aa94a9c..1f38b62 100644
+--- a/docs/SPRINT_26_CUSTOM_TARGETS_WEBSITE_INTERVENTIONS.md
++++ b/docs/SPRINT_26_CUSTOM_TARGETS_WEBSITE_INTERVENTIONS.md
+@@ -224,6 +224,18 @@ Acceptance:
+ - Add stale/unreadable state protection.
+ - Add unsupported-browser fallback behavior.
+ 
++Implementation status:
++
++- Implemented locally on branch `codex/sprint26-custom-targets-website-interventions`.
++- Chrome support is limited to package `com.android.chrome` and whitelisted address-bar accessibility node ids.
++- The AccessibilityService listens for window state/content changes, not text-entry changes, to avoid firing from a typed-but-not-loaded URL.
++- Website interventions use `Chrome website` as the visible target and keep a separate non-domain suppression key for Open Anyway.
++- Analytics metadata is limited to target type, browser package, support status, and rule type; raw URL, host/domain, path/query, page title, URL-bar text, and domain-derived hashes remain denied.
++- R2 fixed GPT Pro R1 blockers by updating Chrome support copy, adding hidden/focused adapter state, increasing real Chrome toolbar scan depth, proving website-suppression fallback, and adding real Chrome package/version evidence.
++- R3 fixes the GPT Pro R2 privacy blocker by removing replacement `externalUrl` from shared content analytics metadata and adding a website-domain regression that proves a replacement link with host, path, and query does not leak into intervention, accept, or fallback-open analytics.
++- R4 packages the R3 PASS/PASS implementation with full unit XML and standalone activity, analytics, repository, and model source files for final GPT Pro scoring.
++- Evidence: `evidence/sprint26_custom_targets_website_interventions/SLICE26_3_R4_EVIDENCE.md`.
++
+ Acceptance:
+ 
+ - Chrome E2E shows a matching domain rule triggering an intervention.

@@ -224,6 +224,22 @@ Acceptance:
 - Add stale/unreadable state protection.
 - Add unsupported-browser fallback behavior.
 
+Implementation status:
+
+- Implemented locally on branch `codex/sprint26-custom-targets-website-interventions`.
+- Chrome support is limited to package `com.android.chrome` and whitelisted address-bar accessibility node ids.
+- The AccessibilityService listens for window state/content changes, not text-entry changes, to avoid firing from a typed-but-not-loaded URL.
+- Website interventions use `Chrome website` as the visible target and keep a separate non-domain suppression key for Open Anyway.
+- Analytics metadata is limited to target type, browser package, support status, and rule type; raw URL, host/domain, path/query, page title, URL-bar text, and domain-derived hashes remain denied.
+- R2 fixed GPT Pro R1 blockers by updating Chrome support copy, adding hidden/focused adapter state, increasing real Chrome toolbar scan depth, proving website-suppression fallback, and adding real Chrome package/version evidence.
+- R3 fixes the GPT Pro R2 privacy blocker by removing replacement `externalUrl` from shared content analytics metadata and adding a website-domain regression that proves a replacement link with host, path, and query does not leak into intervention, accept, or fallback-open analytics.
+- R4 packages the R3 PASS/PASS implementation with full unit XML and standalone activity, analytics, repository, and model source files for final GPT Pro scoring.
+- R5 shipped all `app/src` source/test files plus full unit/lint evidence and returned `SCORE 9/10`, `VERDICT PASS`, `VISUAL REVIEW PASS`, with no release blockers but with evidence gaps.
+- R6 closes the R5 evidence gaps with schemed Unicode host normalization, larger Chrome accessibility scan budget, fresh connected 4/4 test evidence, live AccessibilityService-to-intervention proof, connected unsupported/unreadable negative evidence, device/API/Chrome version proof, and raw `git diff --check` output.
+- R7 fixes the GPT Pro R6 package-mismatch blocker by adding package identity to browser snapshots, requiring root and address-bar node package authentication, and rerunning unit, connected, visual, and live-service evidence after the change.
+- Evidence: `evidence/sprint26_custom_targets_website_interventions/SLICE26_3_R7_EVIDENCE.md`.
+- GPT Pro R7 review: `SCORE 10/10`, `VERDICT PASS`, `VISUAL REVIEW PASS`; no blockers or release-blocking bundle gaps remain.
+
 Acceptance:
 
 - Chrome E2E shows a matching domain rule triggering an intervention.

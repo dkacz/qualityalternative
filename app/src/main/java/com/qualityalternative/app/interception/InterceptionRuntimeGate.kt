@@ -8,9 +8,10 @@ object InterceptionRuntimeGate {
         targetAppPackage: String,
         nowMillis: Long,
         bedtimeActive: Boolean = false,
+        targetKey: String = targetAppPackage,
     ): Boolean {
         suppressedPackages.entries.removeAll { (_, window) -> nowMillis >= window.untilMillis }
-        val suppression = suppressedPackages[targetAppPackage] ?: return false
+        val suppression = suppressedPackages[targetKey] ?: return false
         if (bedtimeActive && !suppression.allowedDuringBedtime) return false
         return nowMillis < suppression.untilMillis
     }
@@ -20,8 +21,9 @@ object InterceptionRuntimeGate {
         targetAppPackage: String,
         untilMillis: Long,
         allowedDuringBedtime: Boolean = false,
+        targetKey: String = targetAppPackage,
     ) {
-        suppressedPackages[targetAppPackage] = SuppressionWindow(
+        suppressedPackages[targetKey] = SuppressionWindow(
             untilMillis = untilMillis,
             allowedDuringBedtime = allowedDuringBedtime,
         )

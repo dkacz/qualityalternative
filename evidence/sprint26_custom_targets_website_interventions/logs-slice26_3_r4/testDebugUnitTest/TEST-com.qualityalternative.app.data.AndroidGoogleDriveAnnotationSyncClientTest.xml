@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.qualityalternative.app.data.AndroidGoogleDriveAnnotationSyncClientTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-06-07T15:17:24.515Z" hostname="mac-studio.home" time="0.079">
+  <properties/>
+  <testcase name="usesExistingFolderWhenFolderAlreadyExists" classname="com.qualityalternative.app.data.AndroidGoogleDriveAnnotationSyncClientTest" time="0.053"/>
+  <testcase name="createsFolderAndUploadsIndexAndAnnotationJsonLdWithBearerToken" classname="com.qualityalternative.app.data.AndroidGoogleDriveAnnotationSyncClientTest" time="0.007"/>
+  <testcase name="mergesRemoteIndexIntoExistingFileAndSendsIfMatchBeforeOverwriting" classname="com.qualityalternative.app.data.AndroidGoogleDriveAnnotationSyncClientTest" time="0.005"/>
+  <testcase name="retriesMergeWithoutIfMatchWhenDriveReportsPreconditionFailed" classname="com.qualityalternative.app.data.AndroidGoogleDriveAnnotationSyncClientTest" time="0.006"/>
+  <testcase name="driveHttpFailureIncludesStatusAndErrorBody" classname="com.qualityalternative.app.data.AndroidGoogleDriveAnnotationSyncClientTest" time="0.008"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

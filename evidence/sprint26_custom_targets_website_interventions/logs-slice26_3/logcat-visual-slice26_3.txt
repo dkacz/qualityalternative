@@ -1,0 +1,628 @@
+06-07 15:19:26.810  4666  4679 I TestRunner: started: captureSprint26ChromeWebsiteInterventionScreens(com.qualityalternative.app.VisualQaScreenshotTest)
+06-07 15:19:26.878  4666  4679 W FileTestStorage: Output properties is not supported.
+06-07 15:19:26.878  4666  4679 I Tracing : Tracer added: class androidx.test.platform.tracing.AndroidXTracer
+06-07 15:19:26.884  4666  4666 D EventInjectionStrategy: Creating injection strategy with input manager.
+06-07 15:19:26.885  4666  4666 I alternative.app: hiddenapi: Accessing hidden method Landroid/hardware/input/InputManager;->getInstance()Landroid/hardware/input/InputManager; (runtime_flags=0, domain=platform, api=unsupported) from Landroidx/test/espresso/base/InputManagerEventInjectionStrategy; (domain=app) using reflection: allowed
+06-07 15:19:26.887  4666  4666 I alternative.app: hiddenapi: Accessing hidden method Landroid/hardware/input/InputManager;->injectInputEvent(Landroid/view/InputEvent;I)Z (runtime_flags=0, domain=platform, api=unsupported) from Landroidx/test/espresso/base/InputManagerEventInjectionStrategy; (domain=app) using reflection: allowed
+06-07 15:19:26.887  4666  4666 I alternative.app: hiddenapi: Accessing hidden field Landroid/hardware/input/InputManager;->INJECT_INPUT_EVENT_MODE_WAIT_FOR_FINISH:I (runtime_flags=0, domain=platform, api=unsupported) from Landroidx/test/espresso/base/InputManagerEventInjectionStrategy; (domain=app) using reflection: allowed
+06-07 15:19:26.892  4666  4666 I alternative.app: hiddenapi: Accessing hidden method Landroid/os/MessageQueue;->next()Landroid/os/Message; (runtime_flags=0, domain=platform, api=unsupported) from Landroidx/test/espresso/base/Interrogator; (domain=app) using reflection: allowed
+06-07 15:19:26.892  4666  4666 I alternative.app: hiddenapi: Accessing hidden field Landroid/os/MessageQueue;->mMessages:Landroid/os/Message; (runtime_flags=0, domain=platform, api=unsupported) from Landroidx/test/espresso/base/Interrogator; (domain=app) using reflection: allowed
+06-07 15:19:26.892  4666  4666 I alternative.app: hiddenapi: Accessing hidden method Landroid/os/Message;->recycleUnchecked()V (runtime_flags=0, domain=platform, api=unsupported) from Landroidx/test/espresso/base/Interrogator; (domain=app) using reflection: allowed
+06-07 15:19:26.894  4666  4679 D IdlingRegistry: Registering idling resources: [androidx.compose.ui.test.EspressoLink@10016fa]
+06-07 15:19:26.933  4666  4695 E ashmem  : Pinning is deprecated since Android Q. Please use trim or other methods.
+06-07 15:19:26.949  4666  4679 I alternative.app: AssetManager2(0xb40000754f1d2c18) locale list changing from [] to [en-US]
+06-07 15:19:26.990  4666  4679 I alternative.app: AssetManager2(0xb40000754f1cc4f8) locale list changing from [] to [en-US]
+06-07 15:19:26.996  4666  4679 I alternative.app: AssetManager2(0xb40000754f1d28f8) locale list changing from [] to [en-US]
+06-07 15:19:27.000  4666  4679 I alternative.app: AssetManager2(0xb40000754f1d54b8) locale list changing from [] to [en-US]
+06-07 15:19:27.002  4666  4679 I alternative.app: AssetManager2(0xb40000754f1d25d8) locale list changing from [] to [en-US]
+06-07 15:19:27.020  4666  4679 I alternative.app: AssetManager2(0xb40000754f1d5e18) locale list changing from [] to [en-US]
+06-07 15:19:27.023  4666  4679 I alternative.app: AssetManager2(0xb40000754f1d1f98) locale list changing from [] to [en-US]
+06-07 15:19:27.024  4666  4679 I alternative.app: AssetManager2(0xb40000754f1d3898) locale list changing from [] to [en-US]
+06-07 15:19:27.026  4666  4679 I alternative.app: AssetManager2(0xb40000754f1d4518) locale list changing from [] to [en-US]
+06-07 15:19:27.028  4666  4679 I alternative.app: AssetManager2(0xb40000754f1d0cd8) locale list changing from [] to [en-US]
+06-07 15:19:27.029  4666  4679 I alternative.app: AssetManager2(0xb40000754f1d57d8) locale list changing from [] to [en-US]
+06-07 15:19:27.041  4666  4679 I alternative.app: AssetManager2(0xb40000754f1d0698) locale list changing from [] to [en-US]
+06-07 15:19:27.081  4666  4679 I alternative.app: AssetManager2(0xb40000754f1d9338) locale list changing from [] to [en-US]
+06-07 15:19:27.084  4666  4679 I alternative.app: AssetManager2(0xb40000754f1d8398) locale list changing from [] to [en-US]
+06-07 15:19:27.086  4666  4679 I alternative.app: AssetManager2(0xb40000754f1df0f8) locale list changing from [] to [en-US]
+06-07 15:19:27.087  4666  4679 I alternative.app: AssetManager2(0xb40000754f1d9978) locale list changing from [] to [en-US]
+06-07 15:19:27.091  4666  4679 I alternative.app: AssetManager2(0xb40000754f1dcb78) locale list changing from [] to [en-US]
+06-07 15:19:27.133  4666  4679 W Settings: Setting always_finish_activities has moved from android.provider.Settings.System to android.provider.Settings.Global, returning read-only value.
+06-07 15:19:27.145   682  1835 I system_server: AssetManager2(0xb40000754f1ef458) locale list changing from [] to [en-US]
+06-07 15:19:27.147   682  1835 V GrammaticalInflectionUtils: AttributionSource: AttributionSource { uid = 10221, packageName = null, attributionTag = null, token = android.os.Binder@9d97f39, deviceId = 0, next = null } does not have READ_SYSTEM_GRAMMATICAL_GENDER permission.
+06-07 15:19:27.161   528  1153 I BpBinder: onLastStrongRef automatically unlinking death recipients:
+06-07 15:19:27.162   924  1130 I ndroid.systemui: AssetManager2(0xb40000754f1eced8) locale list changing from [] to [en-US]
+06-07 15:19:27.171  1059  1059 W SplitSelectStateCtor: Missing session instanceIds
+06-07 15:19:27.171  1059  1059 D StatsLog: LAUNCHER_SPLIT_SELECTION_EXIT_INTERRUPTED
+06-07 15:19:27.172   924  1131 D SplashScreenView: Build android.window.SplashScreenView{daff55c V.E...... ......ID 0,0-0,0}
+06-07 15:19:27.172   924  1131 D SplashScreenView: Icon: view: null drawable: null size: 0
+06-07 15:19:27.172   924  1131 D SplashScreenView: Branding: view: android.view.View{1d5b065 G.ED..... ......I. 0,0-0,0 #1020541 android:id/splashscreen_branding_view} drawable: null size w: 0 h: 0
+06-07 15:19:27.191  4666  4666 I alternative.app: AssetManager2(0xb40000754f1d6a98) locale list changing from [] to [en-US]
+06-07 15:19:27.197   528   528 I BpBinder: onLastStrongRef automatically unlinking death recipients:
+06-07 15:19:27.209  4666  4666 D LifecycleMonitor: Lifecycle status change: com.qualityalternative.app.MainActivity@3959d3f in: PRE_ON_CREATE
+06-07 15:19:27.210  4666  4666 V ActivityScenario: Activity lifecycle changed event received but ignored because the reported transition was not ON_CREATE while the last known transition was PRE_ON_CREATE
+06-07 15:19:27.224  4666  4666 D CompatChangeReporter: Compat change id reported: 377864165; UID 10221; state: ENABLED
+06-07 15:19:27.227  4666  4666 D DesktopModeFlags: Toggle override initialized to: OVERRIDE_UNSET
+06-07 15:19:27.235  1059  1059 D VRI[NexusLauncherActivity]: visibilityChanged oldVisibility=true newVisibility=false
+06-07 15:19:27.245  4666  4666 D LifecycleMonitor: Lifecycle status change: com.qualityalternative.app.MainActivity@3959d3f in: CREATED
+06-07 15:19:27.246  4666  4666 V ActivityScenario: Update currentActivityStage to CREATED, currentActivity=com.qualityalternative.app.MainActivity@3959d3f
+06-07 15:19:27.247  1059  1059 D NexusLauncherModelDelegate: notifySmartspaceEvent: SmartspaceTargetEvent{mSmartspaceTarget=null, mSmartspaceActionId='null', mEventType=7}
+06-07 15:19:27.248  4666  4666 D LifecycleMonitor: Lifecycle status change: com.qualityalternative.app.MainActivity@3959d3f in: STARTED
+06-07 15:19:27.249  4666  4666 V ActivityScenario: Update currentActivityStage to STARTED, currentActivity=com.qualityalternative.app.MainActivity@3959d3f
+06-07 15:19:27.258  4666  4698 I EGL_emulation: Opening libGLESv1_CM_emulation.so
+06-07 15:19:27.259  4666  4698 I EGL_emulation: Opening libGLESv2_emulation.so
+06-07 15:19:27.265  4666  4698 W HWUI    : Failed to choose config with EGL_SWAP_BEHAVIOR_PRESERVED, retrying without...
+06-07 15:19:27.265  4666  4698 W HWUI    : Failed to initialize 101010-2 format, error = EGL_SUCCESS
+06-07 15:19:27.376  4666  4666 D LifecycleMonitor: Lifecycle status change: com.qualityalternative.app.MainActivity@3959d3f in: RESUMED
+06-07 15:19:27.376  4666  4666 V ActivityScenario: Update currentActivityStage to RESUMED, currentActivity=com.qualityalternative.app.MainActivity@3959d3f
+06-07 15:19:27.392  4666  4666 W HWUI    : Unknown dataspace 0
+06-07 15:19:27.511  4666  4666 I alternative.app: hiddenapi: Accessing hidden method Landroid/os/SystemProperties;->addChangeCallback(Ljava/lang/Runnable;)V (runtime_flags=0, domain=platform, api=unsupported) from Landroidx/compose/ui/platform/AndroidComposeView$Companion; (domain=app) using reflection: allowed
+06-07 15:19:27.523  4666  4670 I alternative.app: Compiler allocated 5111KB to compile void android.view.ViewRootImpl.performTraversals()
+06-07 15:19:27.660   528   573 W ServiceManagerCppClient: Permission failure: android.permission.ACCESS_SURFACE_FLINGER from uid=10221 pid=0
+06-07 15:19:27.660   528   573 D PermissionCache: checking android.permission.ACCESS_SURFACE_FLINGER for uid=10221 => denied (312 us)
+06-07 15:19:27.660   528  1153 W ServiceManagerCppClient: Permission failure: android.permission.ROTATE_SURFACE_FLINGER from uid=10221 pid=4666
+06-07 15:19:27.660   528  1153 D PermissionCache: checking android.permission.ROTATE_SURFACE_FLINGER for uid=10221 => denied (60 us)
+06-07 15:19:27.660   528   573 W ServiceManagerCppClient: Permission failure: android.permission.ROTATE_SURFACE_FLINGER from uid=10221 pid=0
+06-07 15:19:27.660   528   573 D PermissionCache: checking android.permission.ROTATE_SURFACE_FLINGER for uid=10221 => denied (245 us)
+06-07 15:19:27.660   528  1153 W ServiceManagerCppClient: Permission failure: android.permission.INTERNAL_SYSTEM_WINDOW from uid=10221 pid=4666
+06-07 15:19:27.660   528  1153 D PermissionCache: checking android.permission.INTERNAL_SYSTEM_WINDOW for uid=10221 => denied (356 us)
+06-07 15:19:27.661   528   573 W ServiceManagerCppClient: Permission failure: android.permission.INTERNAL_SYSTEM_WINDOW from uid=10221 pid=0
+06-07 15:19:27.661   528   573 D PermissionCache: checking android.permission.INTERNAL_SYSTEM_WINDOW for uid=10221 => denied (466 us)
+06-07 15:19:27.737   682  1591 W ServiceManagerCppClient: Permission failure: android.permission.ACCESS_SURFACE_FLINGER from uid=10221 pid=0
+06-07 15:19:27.737   682  1591 D PermissionCache: checking android.permission.ACCESS_SURFACE_FLINGER for uid=10221 => denied (78 us)
+06-07 15:19:27.737   682  1591 W ServiceManagerCppClient: Permission failure: android.permission.ROTATE_SURFACE_FLINGER from uid=10221 pid=0
+06-07 15:19:27.737   682  1591 D PermissionCache: checking android.permission.ROTATE_SURFACE_FLINGER for uid=10221 => denied (10 us)
+06-07 15:19:27.737   682  1591 W ServiceManagerCppClient: Permission failure: android.permission.INTERNAL_SYSTEM_WINDOW from uid=10221 pid=0
+06-07 15:19:27.737   682  1591 D PermissionCache: checking android.permission.INTERNAL_SYSTEM_WINDOW for uid=10221 => denied (4 us)
+06-07 15:19:27.743   682   709 I ActivityTaskManager: Displayed com.qualityalternative.app/.MainActivity for user 0: +600ms
+06-07 15:19:27.744  1059  1059 D BaseDepthController: setSurface:
+06-07 15:19:27.744  1059  1059 D BaseDepthController: 	mWaitingOnSurfaceValidity: false
+06-07 15:19:27.744  1059  1059 D BaseDepthController: 	mBaseSurface: null
+06-07 15:19:27.744  1059  1059 D BaseDepthController: mSurface is null and mCurrentBlur is: 0
+06-07 15:19:27.747  1059  1059 D StateManager: goToState - fromState: Normal, toState: Normal, partial trace:
+06-07 15:19:27.747  1059  1059 D StateManager: 	at com.android.launcher3.statemanager.StateManager.moveToRestState(go/retraceme 43e00d9cd0eb17b3d9dd30fc1741b1c71445c4c0f7c8c9b81300265c86c5b873:4)
+06-07 15:19:27.747  1059  1059 D StateManager: 	at com.android.launcher3.statemanager.StateManager.moveToRestState(go/retraceme 43e00d9cd0eb17b3d9dd30fc1741b1c71445c4c0f7c8c9b81300265c86c5b873:1)
+06-07 15:19:27.747  1059  1059 D StateManager: 	at com.android.launcher3.statemanager.StatefulActivity.onStop(go/retraceme 43e00d9cd0eb17b3d9dd30fc1741b1c71445c4c0f7c8c9b81300265c86c5b873:34)
+06-07 15:19:27.748  1059  1059 D StatsLog: LAUNCHER_ONSTOP
+06-07 15:19:27.751  1059  1059 D StatsLog: LAUNCHER_GOOGLE_SEARCH_RESTORE_LIST_SIZE_AFTER_ACTIVITY_RESTART
+06-07 15:19:27.769   682   799 I ImeTracker: com.qualityalternative.app:383fa25d: onRequestHide at ORIGIN_SERVER reason HIDE_UNSPECIFIED_WINDOW fromUser false
+06-07 15:19:27.771  4666  4666 D InsetsController: hide(ime(), fromIme=false)
+06-07 15:19:27.772  4666  4666 I ImeTracker: com.qualityalternative.app:383fa25d: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+06-07 15:19:27.778  1372  1372 I GoogleInputMethodService: GoogleInputMethodService.onFinishInput():2043
+06-07 15:19:27.780   682  1845 I ImeTracker: system_server:692f6b0f: onRequestHide at ORIGIN_SERVER reason IME_REQUESTED_CHANGED_LISTENER fromUser false
+06-07 15:19:27.781  1372  1372 I Module  : DeviceLockedStatusModuleProvider$Module.updateDeviceLockedStatus():100 repeatCheckTimes = 0, locked = false
+06-07 15:19:27.782  1372  1372 I GoogleInputMethodService: GoogleInputMethodService.onStartInput():1293 onStartInput(EditorInfo{EditorInfo{packageName=com.qualityalternative.app, inputType=0, inputTypeString=NULL, enableLearning=false, autoCorrection=false, autoComplete=false, imeOptions=0, privateImeOptions=null, actionName=UNSPECIFIED, actionLabel=null, initialSelStart=-1, initialSelEnd=-1, initialCapsMode=0, label=null, fieldId=0, fieldName=null, extras=null, hintText=null, hintLocales=[]}}, false)
+06-07 15:19:27.782  1372  1372 I EmojiCompatManager: EmojiCompatManager.getEmojiCompatIfLoaded():343 EmojiCompat.init() was never called.
+06-07 15:19:27.782  1372  1372 I EmojiCompatManager: java.lang.IllegalStateException: EmojiCompat is not initialized. Please call EmojiCompat.init() first
+06-07 15:19:27.782  1372  1372 I EmojiCompatManager: 	at asx.p(PG:6)
+06-07 15:19:27.782  1372  1372 I EmojiCompatManager: 	at axb.b(PG:13)
+06-07 15:19:27.782  1372  1372 I EmojiCompatManager: 	at jnr.b(PG:2)
+06-07 15:19:27.782  1372  1372 I EmojiCompatManager: 	at jnr.c(PG:4)
+06-07 15:19:27.782  1372  1372 I EmojiCompatManager: 	at jnr.f(PG:3)
+06-07 15:19:27.782  1372  1372 I EmojiCompatManager: 	at jnx.c(PG:3)
+06-07 15:19:27.782  1372  1372 I EmojiCompatManager: 	at kif.cz(PG:47)
+06-07 15:19:27.782  1372  1372 I EmojiCompatManager: 	at lhl.run(PG:1025)
+06-07 15:19:27.782  1372  1372 I EmojiCompatManager: 	at jaf.execute(PG:12)
+06-07 15:19:27.782  1372  1372 I EmojiCompatManager: 	at nco.v(PG:13)
+06-07 15:19:27.782  1372  1372 I EmojiCompatManager: 	at lhn.m(PG:96)
+06-07 15:19:27.782  1372  1372 I EmojiCompatManager: 	at lhn.k(PG:25)
+06-07 15:19:27.782  1372  1372 I EmojiCompatManager: 	at kgn.onStartInput(PG:250)
+06-07 15:19:27.782  1372  1372 I EmojiCompatManager: 	at android.inputmethodservice.InputMethodService.doStartInput(InputMethodService.java:3521)
+06-07 15:19:27.782  1372  1372 I EmojiCompatManager: 	at android.inputmethodservice.InputMethodService$InputMethodImpl.startInput(InputMethodService.java:879)
+06-07 15:19:27.782  1372  1372 I EmojiCompatManager: 	at android.inputmethodservice.InputMethodService$InputMethodImpl.dispatchStartInput(InputMethodService.java:908)
+06-07 15:19:27.782  1372  1372 I EmojiCompatManager: 	at android.inputmethodservice.IInputMethodWrapper.executeMessage(IInputMethodWrapper.java:201)
+06-07 15:19:27.782  1372  1372 I EmojiCompatManager: 	at com.android.internal.os.HandlerCaller$MyHandler.handleMessage(HandlerCaller.java:44)
+06-07 15:19:27.782  1372  1372 I EmojiCompatManager: 	at android.os.Handler.dispatchMessage(Handler.java:110)
+06-07 15:19:27.782  1372  1372 I EmojiCompatManager: 	at android.os.Looper.loopOnce(Looper.java:248)
+06-07 15:19:27.782  1372  1372 I EmojiCompatManager: 	at android.os.Looper.loop(Looper.java:338)
+06-07 15:19:27.782  1372  1372 I EmojiCompatManager: 	at android.app.ActivityThread.main(ActivityThread.java:9067)
+06-07 15:19:27.782  1372  1372 I EmojiCompatManager: 	at java.lang.reflect.Method.invoke(Native Method)
+06-07 15:19:27.782  1372  1372 I EmojiCompatManager: 	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:593)
+06-07 15:19:27.782  1372  1372 I EmojiCompatManager: 	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:932)
+06-07 15:19:27.783  1372  1372 I Module  : DeviceLockedStatusModuleProvider$Module.updateDeviceLockedStatus():100 repeatCheckTimes = 1, locked = false
+06-07 15:19:27.785   682   712 I ImeTracker: system_server:692f6b0f: onCancelled at PHASE_SERVER_SHOULD_HIDE
+06-07 15:19:27.786  1059  1068 W System  : A resource failed to call release.
+06-07 15:19:27.786  1059  1068 W System  : A resource failed to call release.
+06-07 15:19:27.786  1059  1068 W System  : A resource failed to call release.
+06-07 15:19:27.891  1236  2784 I FontLog : Received query Noto Color Emoji Compat, URI content://com.google.android.gms.fonts [CONTEXT service_id=132 ]
+06-07 15:19:27.897  1236  2784 I FontLog : Query [emojicompat-emoji-font] resolved to {Noto Color Emoji Compat, wdth 100.0, wght 400, ital 0.0, bestEffort false}, isVf false} [CONTEXT service_id=132 ]
+06-07 15:19:27.907  1236  2784 I FontLog : Fetch {Noto Color Emoji Compat, wdth 100.0, wght 400, ital 0.0, bestEffort false}, isVf false} end status Status{statusCode=SUCCESS, resolution=null} [CONTEXT service_id=132 ]
+06-07 15:19:27.911   465  2424 I netd    : tetherGetStats() -> {[]} <0.52ms>
+06-07 15:19:27.912  1236  2784 I FontLog : Pulling font file for id = 14, cache size = 9 [CONTEXT service_id=132 ]
+06-07 15:19:27.918  1236  2784 I FontLog : Pulling font file for id = 14, cache size = 9 [CONTEXT service_id=132 ]
+06-07 15:19:28.443  1601  1601 D BoundBrokerSvc: onBind: Intent { act=com.google.android.gms.auth.api.identity.service.authorization.START dat=chimera-action:/... xflg=0x4 cmp=com.google.android.gms/.chimera.GmsApiService }
+06-07 15:19:28.443  1601  1601 D BoundBrokerSvc: Loading bound service for intent: Intent { act=com.google.android.gms.auth.api.identity.service.authorization.START dat=chimera-action:/... xflg=0x4 cmp=com.google.android.gms/.chimera.GmsApiService }
+06-07 15:19:28.552   682  1845 I system_server: AssetManager2(0xb40000754f1eb5d8) locale list changing from [] to [en-US]
+06-07 15:19:28.553   682  1845 V GrammaticalInflectionUtils: AttributionSource: AttributionSource { uid = 10224, packageName = null, attributionTag = null, token = android.os.Binder@9d97f39, deviceId = 0, next = null } does not have READ_SYSTEM_GRAMMATICAL_GENDER permission.
+06-07 15:19:28.555   528  1153 I BpBinder: onLastStrongRef automatically unlinking death recipients:
+06-07 15:19:28.558   924  1130 I ndroid.systemui: AssetManager2(0xb40000754f2061f8) locale list changing from [] to [en-US]
+06-07 15:19:28.561   924  1131 D SplashScreenView: Build android.window.SplashScreenView{7ed01cb V.E...... ......ID 0,0-0,0}
+06-07 15:19:28.561   924  1131 D SplashScreenView: Icon: view: null drawable: null size: 0
+06-07 15:19:28.561   924  1131 D SplashScreenView: Branding: view: android.view.View{477cda8 G.ED..... ......I. 0,0-0,0 #1020541 android:id/splashscreen_branding_view} drawable: null size w: 0 h: 0
+06-07 15:19:28.561  4666  4666 D LifecycleMonitor: Lifecycle status change: com.qualityalternative.app.MainActivity@3959d3f in: PAUSED
+06-07 15:19:28.561  4666  4666 V ActivityScenario: Update currentActivityStage to PAUSED, currentActivity=com.qualityalternative.app.MainActivity@3959d3f
+06-07 15:19:28.564   528   528 I BpBinder: onLastStrongRef automatically unlinking death recipients:
+06-07 15:19:28.565   682   712 V GrammaticalInflectionUtils: AttributionSource: AttributionSource { uid = 10224, packageName = null, attributionTag = null, token = android.os.Binder@9d97f39, deviceId = 0, next = null } does not have READ_SYSTEM_GRAMMATICAL_GENDER permission.
+06-07 15:19:28.571   468   468 D Zygote  : Forked child process 4710
+06-07 15:19:28.584   924  1027 I ndroid.systemui: AssetManager2(0xb40000754f1e83d8) locale list changing from [] to [en-US]
+06-07 15:19:28.589  4710  4710 I native.app.test: Late-enabling -Xcheck:jni
+06-07 15:19:28.591   924  1027 I ndroid.systemui: AssetManager2(0xb40000754f202ff8) locale list changing from [] to [en-US]
+06-07 15:19:28.598   489   489 I RanchuHwc: logCompositionFallbackIfChanged: layer 48 CompositionType fallback from 3 to 1
+06-07 15:19:28.603  4666  4666 D VRI[MainActivity]: visibilityChanged oldVisibility=true newVisibility=false
+06-07 15:19:28.605  4710  4710 I native.app.test: Using CollectorTypeCMC GC.
+06-07 15:19:28.605  1446  3957 E DatabaseUtils: Writing exception to parcel
+06-07 15:19:28.605  1446  3957 E DatabaseUtils: java.lang.IllegalStateException: Failed to build unique file: /storage/emulated/0/Download/Quality Alternative/quality-alternative-profile.json owner_package_name=com.qualityalternative.app _display_name=quality-alternative-profile.json mime_type=application/json _data=/storage/emulated/0/Download/Quality Alternative/quality-alternative-profile.json is_download=1 relative_path=Download/Quality Alternative/
+06-07 15:19:28.605  1446  3957 E DatabaseUtils: 	at com.android.providers.media.MediaProvider.ensureFileColumns(MediaProvider.java:4894)
+06-07 15:19:28.605  1446  3957 E DatabaseUtils: 	at com.android.providers.media.MediaProvider.ensureUniqueFileColumns(MediaProvider.java:4596)
+06-07 15:19:28.605  1446  3957 E DatabaseUtils: 	at com.android.providers.media.MediaProvider.insertFile(MediaProvider.java:5395)
+06-07 15:19:28.605  1446  3957 E DatabaseUtils: 	at com.android.providers.media.MediaProvider.insertInternal(MediaProvider.java:6012)
+06-07 15:19:28.605  1446  3957 E DatabaseUtils: 	at com.android.providers.media.MediaProvider.insert(MediaProvider.java:5683)
+06-07 15:19:28.605  1446  3957 E DatabaseUtils: 	at android.content.ContentProvider$Transport.insert(ContentProvider.java:452)
+06-07 15:19:28.605  1446  3957 E DatabaseUtils: 	at android.content.ContentProviderNative.onTransact(ContentProviderNative.java:180)
+06-07 15:19:28.605  1446  3957 E DatabaseUtils: 	at android.os.Binder.execTransactInternal(Binder.java:1421)
+06-07 15:19:28.605  1446  3957 E DatabaseUtils: 	at android.os.Binder.execTransact(Binder.java:1365)
+06-07 15:19:28.608   535   564 I adbd    : jdwp connection from 4710
+06-07 15:19:28.609  1446  3957 W MediaProvider: isAppCloneUserPair for user 0: false
+06-07 15:19:28.612  4710  4710 D nativeloader: Load libframework-connectivity-tiramisu-jni.so using APEX ns com_android_tethering for caller /apex/com.android.tethering/javalib/framework-connectivity-t.jar: ok
+06-07 15:19:28.625  1446  1554 V MediaProvider: Created relation b/w 902 and com.qualityalternative.app::0
+06-07 15:19:28.633  1446  3957 I MediaProvider: Open with lower FS for /storage/emulated/0/Download/Quality Alternative/quality-alternative-profile (1780838368605).json. Uid: 10221
+06-07 15:19:28.667  4710  4710 D nativeloader: Configuring clns-9 for other apk /data/app/~~gKLT4jQ1Z8s_WYgOq2I77w==/com.qualityalternative.app.test-nD6Sia-lQbcqLfv5AHhiOA==/base.apk. target_sdk_version=36, uses_libraries=, library_path=/data/app/~~gKLT4jQ1Z8s_WYgOq2I77w==/com.qualityalternative.app.test-nD6Sia-lQbcqLfv5AHhiOA==/lib/arm64, permitted_path=/data:/mnt/expand:/data/user/0/com.qualityalternative.app.test
+06-07 15:19:28.672  4710  4710 I native.app.test: AssetManager2(0xb40000754f1d6a98) locale list changing from [] to [en-US]
+06-07 15:19:28.673  1236  2112 I UriTaskContentObserver: Throttling content uri change event for content://media/external/file/2032 [CONTEXT service_id=218 ]
+06-07 15:19:28.674  1236  4364 I NetworkScheduler.Stats: Task com.google.android.gms/com.google.android.gms.ipa.base.IpaGcmTaskService started execution. cause:9 exec_start_elapsed_seconds: 173 [CONTEXT service_id=218 ]
+06-07 15:19:28.680  4710  4710 V GraphicsEnvironment: Currently set values for:
+06-07 15:19:28.680  4710  4710 V GraphicsEnvironment:   angle_gl_driver_selection_pkgs=[]
+06-07 15:19:28.680  4710  4710 V GraphicsEnvironment:   angle_gl_driver_selection_values=[]
+06-07 15:19:28.680  4710  4710 V GraphicsEnvironment: com.qualityalternative.app.test is not listed in per-application setting
+06-07 15:19:28.680  4710  4710 V GraphicsEnvironment: ANGLE allowlist from config: com.dreamgames.royalmatch com.dts.freefiremax com.dxx.firenow com.gramgames.mergedragons com.ludo.king com.mojang.minecraftpe com.my.defense com.nintendo.zaka com.os.airforce com.playrix.fishdomdd.gplay io.teslatech.callbreak jp.konami.prospia net.peakgames.toonblast
+06-07 15:19:28.680  4710  4710 V GraphicsEnvironment: com.qualityalternative.app.test is not listed in ANGLE allowlist or settings, returning default
+06-07 15:19:28.680  4710  4710 V GraphicsEnvironment: Neither updatable production driver nor prerelease driver is supported.
+06-07 15:19:28.684  1236  4482 I NetworkScheduler.Stats: Task com.google.android.gms/com.google.android.gms.ipa.base.IpaGcmTaskService finished executing. cause:9 result: 1 elapsed_millis: 18 uptime_millis: 18 exec_start_elapsed_seconds: 173 [CONTEXT service_id=218 ]
+06-07 15:19:28.694  4710  4710 I native.app.test: AssetManager2(0xb40000754f1cbb98) locale list changing from [] to [en-US]
+06-07 15:19:28.696  4710  4710 E ashmem  : Pinning is deprecated since Android Q. Please use trim or other methods.
+06-07 15:19:28.705  4710  4710 D CompatChangeReporter: Compat change id reported: 377864165; UID 10224; state: ENABLED
+06-07 15:19:28.707  4710  4710 D DesktopModeFlags: Toggle override initialized to: OVERRIDE_UNSET
+06-07 15:19:28.715  4710  4726 I EGL_emulation: Opening libGLESv1_CM_emulation.so
+06-07 15:19:28.715  4710  4726 I EGL_emulation: Opening libGLESv2_emulation.so
+06-07 15:19:28.720  4710  4726 W HWUI    : Failed to choose config with EGL_SWAP_BEHAVIOR_PRESERVED, retrying without...
+06-07 15:19:28.721  4710  4726 W HWUI    : Failed to initialize 101010-2 format, error = EGL_SUCCESS
+06-07 15:19:28.729  4710  4710 W HWUI    : Unknown dataspace 0
+06-07 15:19:28.729  4666  4666 D LifecycleMonitor: Lifecycle status change: com.qualityalternative.app.MainActivity@3959d3f in: STOPPED
+06-07 15:19:28.729  4666  4666 V ActivityScenario: Update currentActivityStage to STOPPED, currentActivity=com.qualityalternative.app.MainActivity@3959d3f
+06-07 15:19:28.744   528   573 I BpBinder: onLastStrongRef automatically unlinking death recipients:
+06-07 15:19:28.753  4666  4666 W WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.app.Activity$$ExternalSyntheticLambda0@d5991b3
+06-07 15:19:28.753  4666  4666 D LifecycleMonitor: Lifecycle status change: com.qualityalternative.app.MainActivity@3959d3f in: DESTROYED
+06-07 15:19:28.754  4666  4666 V ActivityScenario: Update currentActivityStage to DESTROYED, currentActivity=null
+06-07 15:19:28.755   528  1126 W ServiceManagerCppClient: Permission failure: android.permission.ACCESS_SURFACE_FLINGER from uid=10224 pid=0
+06-07 15:19:28.755   528  1126 D PermissionCache: checking android.permission.ACCESS_SURFACE_FLINGER for uid=10224 => denied (271 us)
+06-07 15:19:28.755   528  1126 W ServiceManagerCppClient: Permission failure: android.permission.ROTATE_SURFACE_FLINGER from uid=10224 pid=0
+06-07 15:19:28.755   528  1126 D PermissionCache: checking android.permission.ROTATE_SURFACE_FLINGER for uid=10224 => denied (198 us)
+06-07 15:19:28.756   528   573 W ServiceManagerCppClient: Permission failure: android.permission.ACCESS_SURFACE_FLINGER from uid=10224 pid=4710
+06-07 15:19:28.756   528   573 D PermissionCache: checking android.permission.ACCESS_SURFACE_FLINGER for uid=10224 => denied (442 us)
+06-07 15:19:28.756   528  1126 W ServiceManagerCppClient: Permission failure: android.permission.INTERNAL_SYSTEM_WINDOW from uid=10224 pid=0
+06-07 15:19:28.756   528  1126 D PermissionCache: checking android.permission.INTERNAL_SYSTEM_WINDOW for uid=10224 => denied (213 us)
+06-07 15:19:28.756   528   573 W ServiceManagerCppClient: Permission failure: android.permission.INTERNAL_SYSTEM_WINDOW from uid=10224 pid=4710
+06-07 15:19:28.756   528   573 D PermissionCache: checking android.permission.INTERNAL_SYSTEM_WINDOW for uid=10224 => denied (244 us)
+06-07 15:19:28.760  4666  4666 D ViewRootImpl: Skipping stats log for color mode
+06-07 15:19:28.761   682  1591 I ImeTracker: system_server:46df1265: onRequestHide at ORIGIN_SERVER reason IME_REQUESTED_CHANGED_LISTENER fromUser false
+06-07 15:19:28.762   682   712 I ImeTracker: system_server:46df1265: onCancelled at PHASE_SERVER_SHOULD_HIDE
+06-07 15:19:28.764   528   528 I BpBinder: onLastStrongRef automatically unlinking death recipients:
+06-07 15:19:28.768  4666  4679 W Settings: Setting always_finish_activities has moved from android.provider.Settings.System to android.provider.Settings.Global, returning read-only value.
+06-07 15:19:28.769   682  1256 W ServiceManagerCppClient: Permission failure: android.permission.ACCESS_SURFACE_FLINGER from uid=10224 pid=0
+06-07 15:19:28.769   682  1256 D PermissionCache: checking android.permission.ACCESS_SURFACE_FLINGER for uid=10224 => denied (272 us)
+06-07 15:19:28.769   682  1256 W ServiceManagerCppClient: Permission failure: android.permission.ROTATE_SURFACE_FLINGER from uid=10224 pid=0
+06-07 15:19:28.769   682  1256 D PermissionCache: checking android.permission.ROTATE_SURFACE_FLINGER for uid=10224 => denied (53 us)
+06-07 15:19:28.769   682  1256 W ServiceManagerCppClient: Permission failure: android.permission.INTERNAL_SYSTEM_WINDOW from uid=10224 pid=0
+06-07 15:19:28.769   682  1256 D PermissionCache: checking android.permission.INTERNAL_SYSTEM_WINDOW for uid=10224 => denied (23 us)
+06-07 15:19:28.769  1059  1059 D RecentsView: onTaskRemoved: 14, not handling task stack changes
+06-07 15:19:28.771  1059  1059 D RecentsView: onTaskRemoved: 14, not handling task stack changes
+06-07 15:19:28.773   682  1835 V GrammaticalInflectionUtils: AttributionSource: AttributionSource { uid = 10221, packageName = null, attributionTag = null, token = android.os.Binder@9d97f39, deviceId = 0, next = null } does not have READ_SYSTEM_GRAMMATICAL_GENDER permission.
+06-07 15:19:28.778   924  1131 D SplashScreenView: Build android.window.SplashScreenView{cce29c6 V.E...... ......ID 0,0-0,0}
+06-07 15:19:28.778   924  1131 D SplashScreenView: Icon: view: null drawable: null size: 0
+06-07 15:19:28.778   924  1131 D SplashScreenView: Branding: view: android.view.View{9a64d87 G.ED..... ......I. 0,0-0,0 #1020541 android:id/splashscreen_branding_view} drawable: null size w: 0 h: 0
+06-07 15:19:28.785  4666  4666 D LifecycleMonitor: Lifecycle status change: com.qualityalternative.app.MainActivity@156af0b in: PRE_ON_CREATE
+06-07 15:19:28.785  4666  4666 V ActivityScenario: Activity lifecycle changed event received but ignored because the reported transition was not ON_CREATE while the last known transition was PRE_ON_CREATE
+06-07 15:19:28.792  4666  4666 D LifecycleMonitor: Lifecycle status change: com.qualityalternative.app.MainActivity@156af0b in: CREATED
+06-07 15:19:28.792  4666  4666 V ActivityScenario: Update currentActivityStage to CREATED, currentActivity=com.qualityalternative.app.MainActivity@156af0b
+06-07 15:19:28.792  4666  4666 D LifecycleMonitor: Lifecycle status change: com.qualityalternative.app.MainActivity@156af0b in: STARTED
+06-07 15:19:28.792  4666  4666 V ActivityScenario: Update currentActivityStage to STARTED, currentActivity=com.qualityalternative.app.MainActivity@156af0b
+06-07 15:19:28.793  4666  4666 D AutofillManager: Fill dialog is enabled:false, hints=[]
+06-07 15:19:28.793  4666  4666 D LifecycleMonitor: Lifecycle status change: com.qualityalternative.app.MainActivity@156af0b in: RESUMED
+06-07 15:19:28.793  4666  4666 V ActivityScenario: Update currentActivityStage to RESUMED, currentActivity=com.qualityalternative.app.MainActivity@156af0b
+06-07 15:19:28.815   489   489 I RanchuHwc: logCompositionFallbackIfChanged: layer 51 CompositionType fallback from 3 to 1
+06-07 15:19:28.817  4710  4710 D VRI[InstrumentationActivityInvoker$EmptyActivity]: visibilityChanged oldVisibility=true newVisibility=false
+06-07 15:19:28.872   682   709 I ActivityTaskManager: Displayed com.qualityalternative.app/.MainActivity for user 0: +99ms
+06-07 15:19:28.886  4710  4710 W WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.app.Activity$$ExternalSyntheticLambda0@76175a2
+06-07 15:19:28.887  4710  4710 D ViewRootImpl: Skipping stats log for color mode
+06-07 15:19:28.890  1059  1059 D RecentsView: onTaskRemoved: 15, not handling task stack changes
+06-07 15:19:28.890  1059  1059 D RecentsView: onTaskRemoved: 15, not handling task stack changes
+06-07 15:19:28.931   682   799 I ImeTracker: com.qualityalternative.app:6b41794b: onRequestHide at ORIGIN_SERVER reason HIDE_UNSPECIFIED_WINDOW fromUser false
+06-07 15:19:28.932  1372  1372 I GoogleInputMethodService: GoogleInputMethodService.onFinishInput():2043
+06-07 15:19:28.932  1372  1372 I Module  : DeviceLockedStatusModuleProvider$Module.updateDeviceLockedStatus():100 repeatCheckTimes = 0, locked = false
+06-07 15:19:28.932  1372  1372 I GoogleInputMethodService: GoogleInputMethodService.onStartInput():1293 onStartInput(EditorInfo{EditorInfo{packageName=com.qualityalternative.app, inputType=0, inputTypeString=NULL, enableLearning=false, autoCorrection=false, autoComplete=false, imeOptions=0, privateImeOptions=null, actionName=UNSPECIFIED, actionLabel=null, initialSelStart=-1, initialSelEnd=-1, initialCapsMode=0, label=null, fieldId=0, fieldName=null, extras=null, hintText=null, hintLocales=[]}}, false)
+06-07 15:19:28.932  1372  1372 I EmojiCompatManager: EmojiCompatManager.getEmojiCompatIfLoaded():343 EmojiCompat.init() was never called.
+06-07 15:19:28.932  1372  1372 I EmojiCompatManager: java.lang.IllegalStateException: EmojiCompat is not initialized. Please call EmojiCompat.init() first
+06-07 15:19:28.932  1372  1372 I EmojiCompatManager: 	at asx.p(PG:6)
+06-07 15:19:28.932  1372  1372 I EmojiCompatManager: 	at axb.b(PG:13)
+06-07 15:19:28.932  1372  1372 I EmojiCompatManager: 	at jnr.b(PG:2)
+06-07 15:19:28.932  1372  1372 I EmojiCompatManager: 	at jnr.c(PG:4)
+06-07 15:19:28.932  1372  1372 I EmojiCompatManager: 	at jnr.f(PG:3)
+06-07 15:19:28.932  1372  1372 I EmojiCompatManager: 	at jnx.c(PG:3)
+06-07 15:19:28.932  1372  1372 I EmojiCompatManager: 	at kif.cz(PG:47)
+06-07 15:19:28.932  1372  1372 I EmojiCompatManager: 	at lhl.run(PG:1025)
+06-07 15:19:28.932  1372  1372 I EmojiCompatManager: 	at jaf.execute(PG:12)
+06-07 15:19:28.932  1372  1372 I EmojiCompatManager: 	at nco.v(PG:13)
+06-07 15:19:28.932  1372  1372 I EmojiCompatManager: 	at lhn.m(PG:96)
+06-07 15:19:28.932  1372  1372 I EmojiCompatManager: 	at lhn.k(PG:25)
+06-07 15:19:28.932  1372  1372 I EmojiCompatManager: 	at kgn.onStartInput(PG:250)
+06-07 15:19:28.932  1372  1372 I EmojiCompatManager: 	at android.inputmethodservice.InputMethodService.doStartInput(InputMethodService.java:3521)
+06-07 15:19:28.932  1372  1372 I EmojiCompatManager: 	at android.inputmethodservice.InputMethodService$InputMethodImpl.startInput(InputMethodService.java:879)
+06-07 15:19:28.932  1372  1372 I EmojiCompatManager: 	at android.inputmethodservice.InputMethodService$InputMethodImpl.dispatchStartInput(InputMethodService.java:908)
+06-07 15:19:28.932  1372  1372 I EmojiCompatManager: 	at android.inputmethodservice.IInputMethodWrapper.executeMessage(IInputMethodWrapper.java:201)
+06-07 15:19:28.932  1372  1372 I EmojiCompatManager: 	at com.android.internal.os.HandlerCaller$MyHandler.handleMessage(HandlerCaller.java:44)
+06-07 15:19:28.932  1372  1372 I EmojiCompatManager: 	at android.os.Handler.dispatchMessage(Handler.java:110)
+06-07 15:19:28.932  1372  1372 I EmojiCompatManager: 	at android.os.Looper.loopOnce(Looper.java:248)
+06-07 15:19:28.932  1372  1372 I EmojiCompatManager: 	at android.os.Looper.loop(Looper.java:338)
+06-07 15:19:28.932  1372  1372 I EmojiCompatManager: 	at android.app.ActivityThread.main(ActivityThread.java:9067)
+06-07 15:19:28.932  1372  1372 I EmojiCompatManager: 	at java.lang.reflect.Method.invoke(Native Method)
+06-07 15:19:28.932  1372  1372 I EmojiCompatManager: 	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:593)
+06-07 15:19:28.932  1372  1372 I EmojiCompatManager: 	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:932)
+06-07 15:19:28.933  1372  1372 I Module  : DeviceLockedStatusModuleProvider$Module.updateDeviceLockedStatus():100 repeatCheckTimes = 1, locked = false
+06-07 15:19:28.933  4666  4666 D InsetsController: hide(ime(), fromIme=false)
+06-07 15:19:28.933  4666  4666 I ImeTracker: com.qualityalternative.app:6b41794b: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+06-07 15:19:28.934   682  1256 I ImeTracker: system_server:2af367b3: onRequestHide at ORIGIN_SERVER reason IME_REQUESTED_CHANGED_LISTENER fromUser false
+06-07 15:19:28.934   682   712 I ImeTracker: system_server:2af367b3: onCancelled at PHASE_SERVER_SHOULD_HIDE
+06-07 15:19:29.026  4710  4716 I native.app.test: Compiler allocated 5111KB to compile void android.view.ViewRootImpl.performTraversals()
+06-07 15:19:29.526  4666  4679 I UiDevice: Creating a new instance, old instance exists: false
+06-07 15:19:29.527  4666  4679 I UiAutomation: Initialized for user 0 on display 0
+06-07 15:19:29.536  1462  2011 I AiAiEcho: Settings changed for uri: content://settings/secure/accessibility_enabled
+06-07 15:19:29.539   682   682 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 15:19:29.539   682   682 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 15:19:29.539   682   682 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 15:19:29.539  4666  4736 V UiAutomation: Init UiAutomation@e0c53b1[id=2, displayId=0, flags=0]
+06-07 15:19:29.539   682   682 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 15:19:29.539   682   682 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 15:19:29.539   682   682 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 15:19:29.540   682   682 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 15:19:29.540   682   682 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 15:19:29.540   682   682 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 15:19:29.540   682   682 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 15:19:29.540   682   682 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 15:19:29.540   682   682 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 15:19:29.540   682   682 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 15:19:29.540   682   682 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 15:19:29.541  4666  4679 D UiDevice: Setting accessibility service flags: 65618
+06-07 15:19:29.541   682   682 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 15:19:29.544  1462  1743 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+06-07 15:19:29.545  1462  1743 I AiAiEcho: EchoTargets:
+06-07 15:19:29.545  1462  1743 I AiAiEcho: Filtered by AiAi flag check:
+06-07 15:19:29.545  1462  1743 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+06-07 15:19:29.545  1462  2441 I AiAiEcho: Settings changed for uri: content://settings/secure/accessibility_enabled
+06-07 15:19:29.547  1462  1743 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+06-07 15:19:29.548  1462  1743 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+06-07 15:19:29.548  1462  1743 I AiAiEcho: EchoTargets:
+06-07 15:19:29.548  1462  1743 I AiAiEcho: Filtered by AiAi flag check:
+06-07 15:19:29.548  1462  1743 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+06-07 15:19:29.548  1462  1743 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+06-07 15:19:29.548  1462  1743 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+06-07 15:19:29.548  1462  1743 I AiAiEcho: EchoTargets:
+06-07 15:19:29.548  1462  1743 I AiAiEcho: Filtered by AiAi flag check:
+06-07 15:19:29.548  1462  1743 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+06-07 15:19:29.549  1462  1743 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+06-07 15:19:29.549  1462  1743 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+06-07 15:19:29.549  1462  1743 I AiAiEcho: EchoTargets:
+06-07 15:19:29.549  1462  1743 I AiAiEcho: Filtered by AiAi flag check:
+06-07 15:19:29.549  1462  1743 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+06-07 15:19:29.549  1462  1743 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+06-07 15:19:29.550  1462  1743 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface lockscreen with targets# 0 (types=[])
+06-07 15:19:29.552   682   682 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 15:19:29.552   682   682 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 15:19:29.552   682   682 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 15:19:29.552   682   682 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 15:19:29.552   682   682 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 15:19:29.553   682   682 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 15:19:29.553   682   682 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 15:19:29.553  1462  1743 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface home with targets# 0 (types=[])
+06-07 15:19:29.553   682   682 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 15:19:29.553   682   682 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 15:19:29.553   682   682 W IPCThreadState: Sending oneway calls to frozen process.
+06-07 15:19:29.553  1462  1743 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface lockscreen with targets# 0 (types=[])
+06-07 15:19:29.553  1462  1743 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface home with targets# 0 (types=[])
+06-07 15:19:29.554  4666  4679 D UiDevice: Taking screenshot (scale=1.000000, quality=90) and storing at /sdcard/Download/qualityalternative/sprint26-custom-targets-1780838366859/23_website_chrome_verified_host_soft_intervention_light.png.
+06-07 15:19:29.555  3962  3992 I amtp    : NGA disabled due to not being eligible.
+06-07 15:19:29.555  1342  1436 D AccessibilitySourceService: enabled a11y services count 0
+06-07 15:19:29.555  1342  1436 D AccessibilitySourceService: a11y source sending 0 issue to sc
+06-07 15:19:29.556  1059  1059 D SsBaseTemplateCard: No text view can be set up
+06-07 15:19:29.556  1059  1059 D SsBaseTemplateCard: Passed-in item info is null
+06-07 15:19:29.556  1059  1059 D SsBaseTemplateCard: Passed-in item info is null
+06-07 15:19:29.556  1059  1059 D SsBaseTemplateCard: Passed-in item info is null
+06-07 15:19:29.556  1059  1059 I SsBaseTemplateCard: Secondary card pane is null
+06-07 15:19:29.556  1059  1059 D SsBaseTemplateCard: No text view can be set up
+06-07 15:19:29.556  1059  1059 D SsBaseTemplateCard: Passed-in item info is null
+06-07 15:19:29.556  1059  1059 D SsBaseTemplateCard: Passed-in item info is null
+06-07 15:19:29.556  1059  1059 D SsBaseTemplateCard: Passed-in item info is null
+06-07 15:19:29.556  1059  1059 I SsBaseTemplateCard: Secondary card pane is null
+06-07 15:19:29.557   924   924 W PageIndicator: Total number of pages invalid: 0. Assuming 1 page.
+06-07 15:19:29.557   924   924 W PageIndicator: Total number of pages invalid: 0. Assuming 1 page.
+06-07 15:19:29.558   682  1835 D SafetySourceDataValidat: No cert check requested for package com.google.android.permissioncontroller
+06-07 15:19:29.596  1446  2567 W MediaProvider: isAppCloneUserPair for user 0: false
+06-07 15:19:29.596  1446  2567 W MediaProvider: isAppCloneUserPair for user 0: false
+06-07 15:19:29.654   682   828 D WifiClientModeImpl[8978:wlan0]: updateLinkLayerStatsRssiSpeedFrequencyCapabilities rssi=-50 TxLinkspeed=1 freq=2447 RxLinkSpeed=2
+06-07 15:19:29.654   682   828 D WifiDataStall: tx tput in kbps: 11000
+06-07 15:19:29.654   682   828 D WifiDataStall: rx tput in kbps: 11000
+06-07 15:19:29.654   682   828 V WifiConfigManager: Updating scan detail cache freq=2447 BSSID=00:13:10:85:fe:01 RSSI=-50 for "AndroidWifi"NONE
+06-07 15:19:29.654   682   828 D WifiThroughputPredictor:  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+06-07 15:19:29.654   682   828 D WifiThroughputPredictor:  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 11
+06-07 15:19:29.654   682   828 D WifiThroughputPredictor:  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+06-07 15:19:29.654   682   828 D WifiThroughputPredictor:  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 11
+06-07 15:19:29.655   682   828 D WifiThroughputPredictor:  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+06-07 15:19:29.655   682   828 D WifiThroughputPredictor:  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 11
+06-07 15:19:29.655   682   828 D WifiThroughputPredictor:  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+06-07 15:19:29.655   682   828 D WifiThroughputPredictor:  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 11
+06-07 15:19:29.655   682   828 D WifiScoreCard: BSSID update SIGNAL_POLL ID: 273713110 SSID: "AndroidWifi", BSSID: 00:13:10:85:fe:01, MAC: 02:15:b2:00:00:00, IP: /10.0.2.16, Security type: 0, Supplicant state: COMPLETED, Wi-Fi standard: legacy, RSSI: -50, Link speed: 1Mbps, Tx Link speed: 1Mbps, Max Supported Tx Link speed: 11Mbps, Rx Link speed: 2Mbps, Max Supported Rx Link speed: 11Mbps, Frequency: 2447MHz, Net ID: 0, Metered hint: false, score: 60, isUsable: true, CarrierMerged: false, SubscriptionId: -1, IsPrimary: 1, Trusted: true, Restricted: false, Ephemeral: false, OEM paid: false, OEM private: false, OSU AP: false, FQDN: <none>, Provider friendly name: <none>, Requesting package name: <none>"AndroidWifi"openMLO Information: , Is TID-To-Link negotiation supported by the AP: false, AP MLD Address: <none>, AP MLO Link Id: <none>, AP MLO Affiliated links: <none>, Vendor Data: <none>
+06-07 15:19:29.655   682   828 D WifiScoreCard: txRate: 1 txSpeed: 1
+06-07 15:19:29.655   682   828 D WifiScoreCard: network update SIGNAL_POLL "AndroidWifi" ID: 732197599 RSSI -50 txSpeed -1
+06-07 15:19:29.655   682   828 D WifiClientModeImpl[8978:wlan0]:  ClientModeImpl$L2ConnectedState screen=on 1 0 "AndroidWifi" 00:13:10:85:fe:01 rssi=-50 f=2447 sc=60 link=1 tx=0.0, 0.0, 0.0 rx=0.0 bcn=0 [on:0 tx:0 rx:0 period:3001] from screen [on:0 period:-1573058185] score=60
+06-07 15:19:29.674  4666  4679 D UiDevice: Taking screenshot (scale=1.000000, quality=90) and storing at /sdcard/Download/qualityalternative/sprint26-custom-targets-1780838366859/23_website_chrome_verified_host_soft_intervention_light.png.
+06-07 15:19:29.761  4666  4679 D UiDevice: Taking screenshot (scale=1.000000, quality=90) and storing at /sdcard/Download/qualityalternative/sprint26-custom-targets-1780838366859/23_website_chrome_verified_host_soft_intervention_light.png.
+06-07 15:19:29.787  4666  4671 W alternative.app: Cleared Reference was only reachable from finalizer (only reported once)
+06-07 15:19:29.879  1446  3957 I MediaProvider: Open with lower FS for /storage/emulated/0/Download/Quality Alternative/quality-alternative-profile (1780838368605).json. Uid: 10221
+06-07 15:19:29.951   682  1256 V GrammaticalInflectionUtils: AttributionSource: AttributionSource { uid = 10224, packageName = null, attributionTag = null, token = android.os.Binder@9d97f39, deviceId = 0, next = null } does not have READ_SYSTEM_GRAMMATICAL_GENDER permission.
+06-07 15:19:29.953   528  1153 I BpBinder: onLastStrongRef automatically unlinking death recipients:
+06-07 15:19:29.954   924  1131 D SplashScreenView: Build android.window.SplashScreenView{b8249bd V.E...... ......ID 0,0-0,0}
+06-07 15:19:29.954   924  1131 D SplashScreenView: Icon: view: null drawable: null size: 0
+06-07 15:19:29.954   924  1131 D SplashScreenView: Branding: view: android.view.View{e1f2bb2 G.ED..... ......I. 0,0-0,0 #1020541 android:id/splashscreen_branding_view} drawable: null size w: 0 h: 0
+06-07 15:19:29.956  4666  4666 D LifecycleMonitor: Lifecycle status change: com.qualityalternative.app.MainActivity@156af0b in: PAUSED
+06-07 15:19:29.956  4666  4666 V ActivityScenario: Update currentActivityStage to PAUSED, currentActivity=com.qualityalternative.app.MainActivity@156af0b
+06-07 15:19:29.959  4710  4726 I EGL_emulation: Opening libGLESv1_CM_emulation.so
+06-07 15:19:29.959  4710  4726 I EGL_emulation: Opening libGLESv2_emulation.so
+06-07 15:19:29.963  4710  4726 W HWUI    : Failed to choose config with EGL_SWAP_BEHAVIOR_PRESERVED, retrying without...
+06-07 15:19:29.963  4710  4726 W HWUI    : Failed to initialize 101010-2 format, error = EGL_SUCCESS
+06-07 15:19:29.964   528   528 I BpBinder: onLastStrongRef automatically unlinking death recipients:
+06-07 15:19:29.966  4710  4710 D AutofillManager: Fill dialog is enabled:false, hints=[]
+06-07 15:19:29.979   465  2424 I netd    : tetherGetStats() -> {[]} <0.68ms>
+06-07 15:19:29.992   528  1153 I BpBinder: onLastStrongRef automatically unlinking death recipients:
+06-07 15:19:29.998   489   489 I RanchuHwc: logCompositionFallbackIfChanged: layer 54 CompositionType fallback from 3 to 1
+06-07 15:19:30.001  4666  4666 W WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=androidx.navigationevent.OnBackInvokedInput$createOnBackAnimationCallback$1@8934deb
+06-07 15:19:30.006  4666  4666 D LifecycleMonitor: Lifecycle status change: com.qualityalternative.app.MainActivity@156af0b in: STOPPED
+06-07 15:19:30.006  4666  4666 V ActivityScenario: Update currentActivityStage to STOPPED, currentActivity=com.qualityalternative.app.MainActivity@156af0b
+06-07 15:19:30.012  1059  1059 D ViewRootImpl: Skipping stats log for color mode
+06-07 15:19:30.012  1059  1059 D StatsLog: LAUNCHER_ONRESUME
+06-07 15:19:30.014  1059  1059 D NexusLauncherModelDelegate: notifySmartspaceEvent: SmartspaceTargetEvent{mSmartspaceTarget=null, mSmartspaceActionId='null', mEventType=6}
+06-07 15:19:30.016  1059  1116 D QuickstepModelDelegate: notifyAppTargetEvent action=1 launchLocation=workspace/0/[-1,-1]/[1,1]
+06-07 15:19:30.019  1059  1059 D BaseDepthController: setSurface:
+06-07 15:19:30.019  1059  1059 D BaseDepthController: 	mWaitingOnSurfaceValidity: false
+06-07 15:19:30.019  1059  1059 D BaseDepthController: 	mBaseSurface: Surface(name=com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity)/@0xb0a5849
+06-07 15:19:30.022  1462  1743 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+06-07 15:19:30.022  1462  1743 I AiAiEcho: EchoTargets:
+06-07 15:19:30.022  1462  1743 I AiAiEcho: Filtered by AiAi flag check:
+06-07 15:19:30.022  1462  1743 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+06-07 15:19:30.023  1462  1743 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+06-07 15:19:30.024  1462  1743 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface home with targets# 0 (types=[])
+06-07 15:19:30.027  1059  1059 D SsBaseTemplateCard: No text view can be set up
+06-07 15:19:30.027  1059  1059 D SsBaseTemplateCard: Passed-in item info is null
+06-07 15:19:30.027  1059  1059 D SsBaseTemplateCard: Passed-in item info is null
+06-07 15:19:30.027  1059  1059 D SsBaseTemplateCard: Passed-in item info is null
+06-07 15:19:30.027  1059  1059 I SsBaseTemplateCard: Secondary card pane is null
+06-07 15:19:30.033  1059  1059 D StateManager: createAtomicAnimation - fromState: Background, toState: Normal, partial trace:
+06-07 15:19:30.033  1059  1059 D StateManager: 	at com.android.quickstep.util.WorkspaceRevealAnim.prepareToAnimate(go/retraceme 43e00d9cd0eb17b3d9dd30fc1741b1c71445c4c0f7c8c9b81300265c86c5b873:22)
+06-07 15:19:30.033  1059  1059 D StateManager: 	at com.android.quickstep.util.WorkspaceRevealAnim.<init>(go/retraceme 43e00d9cd0eb17b3d9dd30fc1741b1c71445c4c0f7c8c9b81300265c86c5b873:11)
+06-07 15:19:30.033  1059  1059 D StateManager: 	at com.android.launcher3.QuickstepTransitionManager.createWallpaperOpenAnimations(go/retraceme 43e00d9cd0eb17b3d9dd30fc1741b1c71445c4c0f7c8c9b81300265c86c5b873:339)
+06-07 15:19:30.033  1059  1059 D b/311077782: LauncherAnimationRunner.setAnimation
+06-07 15:19:30.035  1059  1059 D WorkspaceRevealAnim: onAnimationEnd: workspace alpha = 1.0
+06-07 15:19:30.037  4666  4666 W WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.app.Activity$$ExternalSyntheticLambda0@ae474f5
+06-07 15:19:30.037  4666  4666 D LifecycleMonitor: Lifecycle status change: com.qualityalternative.app.MainActivity@156af0b in: DESTROYED
+06-07 15:19:30.037  4666  4666 V ActivityScenario: Update currentActivityStage to DESTROYED, currentActivity=null
+06-07 15:19:30.040  4666  4666 D ViewRootImpl: Skipping stats log for color mode
+06-07 15:19:30.040   682  1844 I ImeTracker: system_server:d89681d7: onRequestHide at ORIGIN_SERVER reason IME_REQUESTED_CHANGED_LISTENER fromUser false
+06-07 15:19:30.041   682   712 I ImeTracker: system_server:d89681d7: onCancelled at PHASE_SERVER_SHOULD_HIDE
+06-07 15:19:30.042  4666  4679 W Settings: Setting always_finish_activities has moved from android.provider.Settings.System to android.provider.Settings.Global, returning read-only value.
+06-07 15:19:30.046   682  1845 V GrammaticalInflectionUtils: AttributionSource: AttributionSource { uid = 10221, packageName = null, attributionTag = null, token = android.os.Binder@9d97f39, deviceId = 0, next = null } does not have READ_SYSTEM_GRAMMATICAL_GENDER permission.
+06-07 15:19:30.048  1059  1059 D RecentsView: onTaskRemoved: 16, not handling task stack changes
+06-07 15:19:30.049  1059  1059 D RecentsView: onTaskRemoved: 16, not handling task stack changes
+06-07 15:19:30.056   924  1131 D SplashScreenView: Build android.window.SplashScreenView{c7bbcc2 V.E...... ......ID 0,0-0,0}
+06-07 15:19:30.056   924  1131 D SplashScreenView: Icon: view: null drawable: null size: 0
+06-07 15:19:30.056   924  1131 D SplashScreenView: Branding: view: android.view.View{43eaad3 G.ED..... ......I. 0,0-0,0 #1020541 android:id/splashscreen_branding_view} drawable: null size w: 0 h: 0
+06-07 15:19:30.057   682   799 I ImeTracker: com.google.android.apps.nexuslauncher:270d48d2: onRequestHide at ORIGIN_SERVER reason HIDE_UNSPECIFIED_WINDOW fromUser false
+06-07 15:19:30.057  4710  4710 D VRI[InstrumentationActivityInvoker$EmptyActivity]: visibilityChanged oldVisibility=true newVisibility=false
+06-07 15:19:30.058  4710  4710 W WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.app.Activity$$ExternalSyntheticLambda0@bd7d4c
+06-07 15:19:30.058  1059  1059 D InsetsController: hide(ime(), fromIme=false)
+06-07 15:19:30.058  1059  1059 I ImeTracker: com.google.android.apps.nexuslauncher:270d48d2: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+06-07 15:19:30.059  1372  1372 I GoogleInputMethodService: GoogleInputMethodService.onFinishInput():2043
+06-07 15:19:30.060  1372  1372 I Module  : DeviceLockedStatusModuleProvider$Module.updateDeviceLockedStatus():100 repeatCheckTimes = 0, locked = false
+06-07 15:19:30.060  1372  1372 I GoogleInputMethodService: GoogleInputMethodService.onStartInput():1293 onStartInput(EditorInfo{EditorInfo{packageName=com.google.android.apps.nexuslauncher, inputType=0, inputTypeString=NULL, enableLearning=false, autoCorrection=false, autoComplete=false, imeOptions=0, privateImeOptions=null, actionName=UNSPECIFIED, actionLabel=null, initialSelStart=-1, initialSelEnd=-1, initialCapsMode=0, label=null, fieldId=0, fieldName=null, extras=null, hintText=null, hintLocales=[]}}, false)
+06-07 15:19:30.060  1372  1372 I EmojiCompatManager: EmojiCompatManager.getEmojiCompatIfLoaded():343 EmojiCompat.init() was never called.
+06-07 15:19:30.060  1372  1372 I EmojiCompatManager: java.lang.IllegalStateException: EmojiCompat is not initialized. Please call EmojiCompat.init() first
+06-07 15:19:30.060  1372  1372 I EmojiCompatManager: 	at asx.p(PG:6)
+06-07 15:19:30.060  1372  1372 I EmojiCompatManager: 	at axb.b(PG:13)
+06-07 15:19:30.060  1372  1372 I EmojiCompatManager: 	at jnr.b(PG:2)
+06-07 15:19:30.060  1372  1372 I EmojiCompatManager: 	at jnr.c(PG:4)
+06-07 15:19:30.060  1372  1372 I EmojiCompatManager: 	at jnr.f(PG:3)
+06-07 15:19:30.060  1372  1372 I EmojiCompatManager: 	at jnx.c(PG:3)
+06-07 15:19:30.060  1372  1372 I EmojiCompatManager: 	at kif.cz(PG:47)
+06-07 15:19:30.060  1372  1372 I EmojiCompatManager: 	at lhl.run(PG:1025)
+06-07 15:19:30.060  1372  1372 I EmojiCompatManager: 	at jaf.execute(PG:12)
+06-07 15:19:30.060  1372  1372 I EmojiCompatManager: 	at nco.v(PG:13)
+06-07 15:19:30.060  1372  1372 I EmojiCompatManager: 	at lhn.m(PG:96)
+06-07 15:19:30.060  1372  1372 I EmojiCompatManager: 	at lhn.k(PG:25)
+06-07 15:19:30.060  1372  1372 I EmojiCompatManager: 	at kgn.onStartInput(PG:250)
+06-07 15:19:30.060  1372  1372 I EmojiCompatManager: 	at android.inputmethodservice.InputMethodService.doStartInput(InputMethodService.java:3521)
+06-07 15:19:30.060  1372  1372 I EmojiCompatManager: 	at android.inputmethodservice.InputMethodService$InputMethodImpl.startInput(InputMethodService.java:879)
+06-07 15:19:30.060  1372  1372 I EmojiCompatManager: 	at android.inputmethodservice.InputMethodService$InputMethodImpl.dispatchStartInput(InputMethodService.java:908)
+06-07 15:19:30.060  1372  1372 I EmojiCompatManager: 	at android.inputmethodservice.IInputMethodWrapper.executeMessage(IInputMethodWrapper.java:201)
+06-07 15:19:30.060  1372  1372 I EmojiCompatManager: 	at com.android.internal.os.HandlerCaller$MyHandler.handleMessage(HandlerCaller.java:44)
+06-07 15:19:30.060  1372  1372 I EmojiCompatManager: 	at android.os.Handler.dispatchMessage(Handler.java:110)
+06-07 15:19:30.060  1372  1372 I EmojiCompatManager: 	at android.os.Looper.loopOnce(Looper.java:248)
+06-07 15:19:30.060  1372  1372 I EmojiCompatManager: 	at android.os.Looper.loop(Looper.java:338)
+06-07 15:19:30.060  1372  1372 I EmojiCompatManager: 	at android.app.ActivityThread.main(ActivityThread.java:9067)
+06-07 15:19:30.060  1372  1372 I EmojiCompatManager: 	at java.lang.reflect.Method.invoke(Native Method)
+06-07 15:19:30.060  1372  1372 I EmojiCompatManager: 	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:593)
+06-07 15:19:30.060  1372  1372 I EmojiCompatManager: 	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:932)
+06-07 15:19:30.060  1372  1372 I Module  : DeviceLockedStatusModuleProvider$Module.updateDeviceLockedStatus():100 repeatCheckTimes = 1, locked = false
+06-07 15:19:30.062   682  1844 I ImeTracker: system_server:5b6e2932: onRequestHide at ORIGIN_SERVER reason IME_REQUESTED_CHANGED_LISTENER fromUser false
+06-07 15:19:30.063   682   712 I ImeTracker: system_server:5b6e2932: onCancelled at PHASE_SERVER_SHOULD_HIDE
+06-07 15:19:30.064   528   528 I BpBinder: onLastStrongRef automatically unlinking death recipients:
+06-07 15:19:30.070   528  1153 I BpBinder: onLastStrongRef automatically unlinking death recipients:
+06-07 15:19:30.071  1059  1059 W SplitSelectStateCtor: Missing session instanceIds
+06-07 15:19:30.071  1059  1059 D StatsLog: LAUNCHER_SPLIT_SELECTION_EXIT_INTERRUPTED
+06-07 15:19:30.074  4710  4710 D ViewRootImpl: Skipping stats log for color mode
+06-07 15:19:30.080  4666  4666 D LifecycleMonitor: Lifecycle status change: com.qualityalternative.app.MainActivity@92cdb97 in: PRE_ON_CREATE
+06-07 15:19:30.080  4666  4666 V ActivityScenario: Activity lifecycle changed event received but ignored because the reported transition was not ON_CREATE while the last known transition was PRE_ON_CREATE
+06-07 15:19:30.090  4666  4666 D LifecycleMonitor: Lifecycle status change: com.qualityalternative.app.MainActivity@92cdb97 in: CREATED
+06-07 15:19:30.090  4666  4666 V ActivityScenario: Update currentActivityStage to CREATED, currentActivity=com.qualityalternative.app.MainActivity@92cdb97
+06-07 15:19:30.090  4666  4666 D LifecycleMonitor: Lifecycle status change: com.qualityalternative.app.MainActivity@92cdb97 in: STARTED
+06-07 15:19:30.090  4666  4666 V ActivityScenario: Update currentActivityStage to STARTED, currentActivity=com.qualityalternative.app.MainActivity@92cdb97
+06-07 15:19:30.090  4666  4666 D AutofillManager: Fill dialog is enabled:false, hints=[]
+06-07 15:19:30.091  4666  4666 D LifecycleMonitor: Lifecycle status change: com.qualityalternative.app.MainActivity@92cdb97 in: RESUMED
+06-07 15:19:30.091  4666  4666 V ActivityScenario: Update currentActivityStage to RESUMED, currentActivity=com.qualityalternative.app.MainActivity@92cdb97
+06-07 15:19:30.150  1059  1059 D VRI[NexusLauncherActivity]: visibilityChanged oldVisibility=true newVisibility=false
+06-07 15:19:30.164  1059  1059 D NexusLauncherModelDelegate: notifySmartspaceEvent: SmartspaceTargetEvent{mSmartspaceTarget=null, mSmartspaceActionId='null', mEventType=7}
+06-07 15:19:30.167  1059  1059 D RecentsView: onTaskRemoved: 17, not handling task stack changes
+06-07 15:19:30.167  1059  1059 D RecentsView: onTaskRemoved: 17, not handling task stack changes
+06-07 15:19:30.204   682   698 I system_server: NativeAlloc concurrent mark compact GC freed 18MB AllocSpace bytes, 64(1568KB) LOS objects, 43% free, 30MB/54MB, paused 499us,1.119ms total 132.362ms
+06-07 15:19:30.257   682   709 I ActivityTaskManager: Displayed com.qualityalternative.app/.MainActivity for user 0: +210ms
+06-07 15:19:30.260  1059  1059 D BaseDepthController: setSurface:
+06-07 15:19:30.260  1059  1059 D BaseDepthController: 	mWaitingOnSurfaceValidity: false
+06-07 15:19:30.260  1059  1059 D BaseDepthController: 	mBaseSurface: null
+06-07 15:19:30.260  1059  1059 D BaseDepthController: mSurface is null and mCurrentBlur is: 0
+06-07 15:19:30.261  1059  1059 D StateManager: goToState - fromState: Normal, toState: Normal, partial trace:
+06-07 15:19:30.261  1059  1059 D StateManager: 	at com.android.launcher3.statemanager.StateManager.moveToRestState(go/retraceme 43e00d9cd0eb17b3d9dd30fc1741b1c71445c4c0f7c8c9b81300265c86c5b873:4)
+06-07 15:19:30.261  1059  1059 D StateManager: 	at com.android.launcher3.statemanager.StateManager.moveToRestState(go/retraceme 43e00d9cd0eb17b3d9dd30fc1741b1c71445c4c0f7c8c9b81300265c86c5b873:1)
+06-07 15:19:30.261  1059  1059 D StateManager: 	at com.android.launcher3.statemanager.StatefulActivity.onStop(go/retraceme 43e00d9cd0eb17b3d9dd30fc1741b1c71445c4c0f7c8c9b81300265c86c5b873:34)
+06-07 15:19:30.262  1059  1059 D StatsLog: LAUNCHER_ONSTOP
+06-07 15:19:30.263  1059  1059 D StatsLog: LAUNCHER_GOOGLE_SEARCH_RESTORE_LIST_SIZE_AFTER_ACTIVITY_RESTART
+06-07 15:19:30.285   682   799 I ImeTracker: com.qualityalternative.app:c735d074: onRequestHide at ORIGIN_SERVER reason HIDE_UNSPECIFIED_WINDOW fromUser false
+06-07 15:19:30.286  4666  4666 D InsetsController: hide(ime(), fromIme=false)
+06-07 15:19:30.286  1372  1372 I GoogleInputMethodService: GoogleInputMethodService.onFinishInput():2043
+06-07 15:19:30.286  4666  4666 I ImeTracker: com.qualityalternative.app:c735d074: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+06-07 15:19:30.287  1372  1372 I Module  : DeviceLockedStatusModuleProvider$Module.updateDeviceLockedStatus():100 repeatCheckTimes = 0, locked = false
+06-07 15:19:30.287  1372  1372 I GoogleInputMethodService: GoogleInputMethodService.onStartInput():1293 onStartInput(EditorInfo{EditorInfo{packageName=com.qualityalternative.app, inputType=0, inputTypeString=NULL, enableLearning=false, autoCorrection=false, autoComplete=false, imeOptions=0, privateImeOptions=null, actionName=UNSPECIFIED, actionLabel=null, initialSelStart=-1, initialSelEnd=-1, initialCapsMode=0, label=null, fieldId=0, fieldName=null, extras=null, hintText=null, hintLocales=[]}}, false)
+06-07 15:19:30.287  1372  1372 I EmojiCompatManager: EmojiCompatManager.getEmojiCompatIfLoaded():343 EmojiCompat.init() was never called.
+06-07 15:19:30.287  1372  1372 I EmojiCompatManager: java.lang.IllegalStateException: EmojiCompat is not initialized. Please call EmojiCompat.init() first
+06-07 15:19:30.287  1372  1372 I EmojiCompatManager: 	at asx.p(PG:6)
+06-07 15:19:30.287  1372  1372 I EmojiCompatManager: 	at axb.b(PG:13)
+06-07 15:19:30.287  1372  1372 I EmojiCompatManager: 	at jnr.b(PG:2)
+06-07 15:19:30.287  1372  1372 I EmojiCompatManager: 	at jnr.c(PG:4)
+06-07 15:19:30.287  1372  1372 I EmojiCompatManager: 	at jnr.f(PG:3)
+06-07 15:19:30.287  1372  1372 I EmojiCompatManager: 	at jnx.c(PG:3)
+06-07 15:19:30.287  1372  1372 I EmojiCompatManager: 	at kif.cz(PG:47)
+06-07 15:19:30.287  1372  1372 I EmojiCompatManager: 	at lhl.run(PG:1025)
+06-07 15:19:30.287  1372  1372 I EmojiCompatManager: 	at jaf.execute(PG:12)
+06-07 15:19:30.287  1372  1372 I EmojiCompatManager: 	at nco.v(PG:13)
+06-07 15:19:30.287  1372  1372 I EmojiCompatManager: 	at lhn.m(PG:96)
+06-07 15:19:30.287  1372  1372 I EmojiCompatManager: 	at lhn.k(PG:25)
+06-07 15:19:30.287  1372  1372 I EmojiCompatManager: 	at kgn.onStartInput(PG:250)
+06-07 15:19:30.287  1372  1372 I EmojiCompatManager: 	at android.inputmethodservice.InputMethodService.doStartInput(InputMethodService.java:3521)
+06-07 15:19:30.287  1372  1372 I EmojiCompatManager: 	at android.inputmethodservice.InputMethodService$InputMethodImpl.startInput(InputMethodService.java:879)
+06-07 15:19:30.287  1372  1372 I EmojiCompatManager: 	at android.inputmethodservice.InputMethodService$InputMethodImpl.dispatchStartInput(InputMethodService.java:908)
+06-07 15:19:30.287  1372  1372 I EmojiCompatManager: 	at android.inputmethodservice.IInputMethodWrapper.executeMessage(IInputMethodWrapper.java:201)
+06-07 15:19:30.287  1372  1372 I EmojiCompatManager: 	at com.android.internal.os.HandlerCaller$MyHandler.handleMessage(HandlerCaller.java:44)
+06-07 15:19:30.287  1372  1372 I EmojiCompatManager: 	at android.os.Handler.dispatchMessage(Handler.java:110)
+06-07 15:19:30.287  1372  1372 I EmojiCompatManager: 	at android.os.Looper.loopOnce(Looper.java:248)
+06-07 15:19:30.287  1372  1372 I EmojiCompatManager: 	at android.os.Looper.loop(Looper.java:338)
+06-07 15:19:30.287  1372  1372 I EmojiCompatManager: 	at android.app.ActivityThread.main(ActivityThread.java:9067)
+06-07 15:19:30.287  1372  1372 I EmojiCompatManager: 	at java.lang.reflect.Method.invoke(Native Method)
+06-07 15:19:30.287  1372  1372 I EmojiCompatManager: 	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:593)
+06-07 15:19:30.287  1372  1372 I EmojiCompatManager: 	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:932)
+06-07 15:19:30.287  1372  1372 I Module  : DeviceLockedStatusModuleProvider$Module.updateDeviceLockedStatus():100 repeatCheckTimes = 1, locked = false
+06-07 15:19:30.290   682  1256 I ImeTracker: system_server:185a4336: onRequestHide at ORIGIN_SERVER reason IME_REQUESTED_CHANGED_LISTENER fromUser false
+06-07 15:19:30.290   682   712 I ImeTracker: system_server:185a4336: onCancelled at PHASE_SERVER_SHOULD_HIDE
+06-07 15:19:30.733  1028  1237 D SatelliteController: iisInCarrierRoamingNbIotNtn: satellite is disabled
+06-07 15:19:30.790  4666  4679 D UiDevice: Taking screenshot (scale=1.000000, quality=90) and storing at /sdcard/Download/qualityalternative/sprint26-custom-targets-1780838366859/24_website_chrome_verified_host_firm_wait_light.png.
+06-07 15:19:30.825  1446  2694 W MediaProvider: isAppCloneUserPair for user 0: false
+06-07 15:19:30.898  4666  4679 D UiDevice: Taking screenshot (scale=1.000000, quality=90) and storing at /sdcard/Download/qualityalternative/sprint26-custom-targets-1780838366859/24_website_chrome_verified_host_firm_wait_light.png.
+06-07 15:19:30.988  4666  4679 D UiDevice: Taking screenshot (scale=1.000000, quality=90) and storing at /sdcard/Download/qualityalternative/sprint26-custom-targets-1780838366859/24_website_chrome_verified_host_firm_wait_light.png.
+06-07 15:19:31.077   682  1835 V GrammaticalInflectionUtils: AttributionSource: AttributionSource { uid = 10224, packageName = null, attributionTag = null, token = android.os.Binder@9d97f39, deviceId = 0, next = null } does not have READ_SYSTEM_GRAMMATICAL_GENDER permission.
+06-07 15:19:31.080   528  1153 I BpBinder: onLastStrongRef automatically unlinking death recipients:
+06-07 15:19:31.083   924  1131 D SplashScreenView: Build android.window.SplashScreenView{74f23d5 V.E...... ......ID 0,0-0,0}
+06-07 15:19:31.083   924  1131 D SplashScreenView: Icon: view: null drawable: null size: 0
+06-07 15:19:31.083   924  1131 D SplashScreenView: Branding: view: android.view.View{55b57ea G.ED..... ......I. 0,0-0,0 #1020541 android:id/splashscreen_branding_view} drawable: null size w: 0 h: 0
+06-07 15:19:31.086  4666  4666 D LifecycleMonitor: Lifecycle status change: com.qualityalternative.app.MainActivity@92cdb97 in: PAUSED
+06-07 15:19:31.087  4666  4666 V ActivityScenario: Update currentActivityStage to PAUSED, currentActivity=com.qualityalternative.app.MainActivity@92cdb97
+06-07 15:19:31.089  4710  4726 I EGL_emulation: Opening libGLESv1_CM_emulation.so
+06-07 15:19:31.089  4710  4726 I EGL_emulation: Opening libGLESv2_emulation.so
+06-07 15:19:31.091  4710  4710 D AutofillManager: Fill dialog is enabled:false, hints=[]
+06-07 15:19:31.094  4710  4726 W HWUI    : Failed to choose config with EGL_SWAP_BEHAVIOR_PRESERVED, retrying without...
+06-07 15:19:31.094  4710  4726 W HWUI    : Failed to initialize 101010-2 format, error = EGL_SUCCESS
+06-07 15:19:31.097   528   528 I BpBinder: onLastStrongRef automatically unlinking death recipients:
+06-07 15:19:31.103   465  2424 I netd    : tetherGetStats() -> {[]} <0.27ms>
+06-07 15:19:31.128  1059  1059 D ViewRootImpl: Skipping stats log for color mode
+06-07 15:19:31.129  1059  1059 D StatsLog: LAUNCHER_ONRESUME
+06-07 15:19:31.131  1059  1059 D NexusLauncherModelDelegate: notifySmartspaceEvent: SmartspaceTargetEvent{mSmartspaceTarget=null, mSmartspaceActionId='null', mEventType=6}
+06-07 15:19:31.131  1059  1116 D QuickstepModelDelegate: notifyAppTargetEvent action=1 launchLocation=workspace/0/[-1,-1]/[1,1]
+06-07 15:19:31.135  1462  1743 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+06-07 15:19:31.135  1462  1743 I AiAiEcho: EchoTargets:
+06-07 15:19:31.135  1462  1743 I AiAiEcho: Filtered by AiAi flag check:
+06-07 15:19:31.135  1462  1743 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+06-07 15:19:31.135  1462  1743 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+06-07 15:19:31.135  1462  1743 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface home with targets# 0 (types=[])
+06-07 15:19:31.137  1059  1059 D BaseDepthController: setSurface:
+06-07 15:19:31.137  1059  1059 D BaseDepthController: 	mWaitingOnSurfaceValidity: false
+06-07 15:19:31.137  1059  1059 D BaseDepthController: 	mBaseSurface: Surface(name=com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity)/@0xb0a5849
+06-07 15:19:31.143  1059  1059 D SsBaseTemplateCard: No text view can be set up
+06-07 15:19:31.144  1059  1059 D SsBaseTemplateCard: Passed-in item info is null
+06-07 15:19:31.144  1059  1059 D SsBaseTemplateCard: Passed-in item info is null
+06-07 15:19:31.144  1059  1059 D SsBaseTemplateCard: Passed-in item info is null
+06-07 15:19:31.144  1059  1059 I SsBaseTemplateCard: Secondary card pane is null
+06-07 15:19:31.153  1059  1059 D StateManager: createAtomicAnimation - fromState: Background, toState: Normal, partial trace:
+06-07 15:19:31.153  1059  1059 D StateManager: 	at com.android.quickstep.util.ScalingWorkspaceRevealAnim.<init>(go/retraceme 43e00d9cd0eb17b3d9dd30fc1741b1c71445c4c0f7c8c9b81300265c86c5b873:39)
+06-07 15:19:31.153  1059  1059 D StateManager: 	at com.android.launcher3.QuickstepTransitionManager.createWallpaperOpenAnimations(go/retraceme 43e00d9cd0eb17b3d9dd30fc1741b1c71445c4c0f7c8c9b81300265c86c5b873:168)
+06-07 15:19:31.153  1059  1059 D StateManager: 	at com.android.launcher3.QuickstepTransitionManager$WallpaperOpenLauncherAnimationRunner.onAnimationStart(go/retraceme 43e00d9cd0eb17b3d9dd30fc1741b1c71445c4c0f7c8c9b81300265c86c5b873:17)
+06-07 15:19:31.153  1059  1059 D b/311077782: LauncherAnimationRunner.setAnimation
+06-07 15:19:31.154  1059  1059 D ScalingWorkspaceRevealAnim: alpha of workspace at the end of animation: 1.0
+06-07 15:19:31.167  4666  4666 D VRI[MainActivity]: visibilityChanged oldVisibility=true newVisibility=false
+06-07 15:19:31.171  4710  4710 W WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.app.Activity$$ExternalSyntheticLambda0@ffd414
+06-07 15:19:31.173  4710  4710 D ViewRootImpl: Skipping stats log for color mode
+06-07 15:19:31.177  1059  1059 D RecentsView: onTaskRemoved: 19, not handling task stack changes
+06-07 15:19:31.177  1059  1059 D RecentsView: onTaskRemoved: 19, not handling task stack changes
+06-07 15:19:31.190  4666  4666 W WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=androidx.navigationevent.OnBackInvokedInput$createOnBackAnimationCallback$1@14c60f9
+06-07 15:19:31.191  4666  4666 D LifecycleMonitor: Lifecycle status change: com.qualityalternative.app.MainActivity@92cdb97 in: STOPPED
+06-07 15:19:31.191  4666  4666 V ActivityScenario: Update currentActivityStage to STOPPED, currentActivity=com.qualityalternative.app.MainActivity@92cdb97
+06-07 15:19:31.201   682   799 I ImeTracker: com.google.android.apps.nexuslauncher:20085b39: onRequestHide at ORIGIN_SERVER reason HIDE_UNSPECIFIED_WINDOW fromUser false
+06-07 15:19:31.201  1059  1059 D InsetsController: hide(ime(), fromIme=false)
+06-07 15:19:31.201  1059  1059 I ImeTracker: com.google.android.apps.nexuslauncher:20085b39: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+06-07 15:19:31.212  1372  1372 I GoogleInputMethodService: GoogleInputMethodService.onFinishInput():2043
+06-07 15:19:31.213  1372  1372 I Module  : DeviceLockedStatusModuleProvider$Module.updateDeviceLockedStatus():100 repeatCheckTimes = 0, locked = false
+06-07 15:19:31.213  4666  4666 W WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.app.Activity$$ExternalSyntheticLambda0@2082e13
+06-07 15:19:31.213  4666  4666 D LifecycleMonitor: Lifecycle status change: com.qualityalternative.app.MainActivity@92cdb97 in: DESTROYED
+06-07 15:19:31.213   682   752 I ImeTracker: system_server:400db06f: onRequestHide at ORIGIN_SERVER reason IME_REQUESTED_CHANGED_LISTENER fromUser false
+06-07 15:19:31.213  4666  4666 V ActivityScenario: Update currentActivityStage to DESTROYED, currentActivity=null
+06-07 15:19:31.213  1372  1372 I GoogleInputMethodService: GoogleInputMethodService.onStartInput():1293 onStartInput(EditorInfo{EditorInfo{packageName=com.google.android.apps.nexuslauncher, inputType=0, inputTypeString=NULL, enableLearning=false, autoCorrection=false, autoComplete=false, imeOptions=0, privateImeOptions=null, actionName=UNSPECIFIED, actionLabel=null, initialSelStart=-1, initialSelEnd=-1, initialCapsMode=0, label=null, fieldId=0, fieldName=null, extras=null, hintText=null, hintLocales=[]}}, false)
+06-07 15:19:31.214   682   712 I ImeTracker: system_server:400db06f: onCancelled at PHASE_SERVER_SHOULD_HIDE
+06-07 15:19:31.217  1372  1372 I EmojiCompatManager: EmojiCompatManager.getEmojiCompatIfLoaded():343 EmojiCompat.init() was never called.
+06-07 15:19:31.217  1372  1372 I EmojiCompatManager: java.lang.IllegalStateException: EmojiCompat is not initialized. Please call EmojiCompat.init() first
+06-07 15:19:31.217  1372  1372 I EmojiCompatManager: 	at asx.p(PG:6)
+06-07 15:19:31.217  1372  1372 I EmojiCompatManager: 	at axb.b(PG:13)
+06-07 15:19:31.217  1372  1372 I EmojiCompatManager: 	at jnr.b(PG:2)
+06-07 15:19:31.217  1372  1372 I EmojiCompatManager: 	at jnr.c(PG:4)
+06-07 15:19:31.217  1372  1372 I EmojiCompatManager: 	at jnr.f(PG:3)
+06-07 15:19:31.217  1372  1372 I EmojiCompatManager: 	at jnx.c(PG:3)
+06-07 15:19:31.217  1372  1372 I EmojiCompatManager: 	at kif.cz(PG:47)
+06-07 15:19:31.217  1372  1372 I EmojiCompatManager: 	at lhl.run(PG:1025)
+06-07 15:19:31.217  1372  1372 I EmojiCompatManager: 	at jaf.execute(PG:12)
+06-07 15:19:31.217  1372  1372 I EmojiCompatManager: 	at nco.v(PG:13)
+06-07 15:19:31.217  1372  1372 I EmojiCompatManager: 	at lhn.m(PG:96)
+06-07 15:19:31.217  1372  1372 I EmojiCompatManager: 	at lhn.k(PG:25)
+06-07 15:19:31.217  1372  1372 I EmojiCompatManager: 	at kgn.onStartInput(PG:250)
+06-07 15:19:31.217  1372  1372 I EmojiCompatManager: 	at android.inputmethodservice.InputMethodService.doStartInput(InputMethodService.java:3521)
+06-07 15:19:31.217  1372  1372 I EmojiCompatManager: 	at android.inputmethodservice.InputMethodService$InputMethodImpl.startInput(InputMethodService.java:879)
+06-07 15:19:31.217  1372  1372 I EmojiCompatManager: 	at android.inputmethodservice.InputMethodService$InputMethodImpl.dispatchStartInput(InputMethodService.java:908)
+06-07 15:19:31.217  1372  1372 I EmojiCompatManager: 	at android.inputmethodservice.IInputMethodWrapper.executeMessage(IInputMethodWrapper.java:201)
+06-07 15:19:31.217  1372  1372 I EmojiCompatManager: 	at com.android.internal.os.HandlerCaller$MyHandler.handleMessage(HandlerCaller.java:44)
+06-07 15:19:31.217  1372  1372 I EmojiCompatManager: 	at android.os.Handler.dispatchMessage(Handler.java:110)
+06-07 15:19:31.217  1372  1372 I EmojiCompatManager: 	at android.os.Looper.loopOnce(Looper.java:248)
+06-07 15:19:31.217  1372  1372 I EmojiCompatManager: 	at android.os.Looper.loop(Looper.java:338)
+06-07 15:19:31.217  1372  1372 I EmojiCompatManager: 	at android.app.ActivityThread.main(ActivityThread.java:9067)
+06-07 15:19:31.217  1372  1372 I EmojiCompatManager: 	at java.lang.reflect.Method.invoke(Native Method)
+06-07 15:19:31.217  1372  1372 I EmojiCompatManager: 	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:593)
+06-07 15:19:31.217  1372  1372 I EmojiCompatManager: 	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:932)
+06-07 15:19:31.219  1372  1372 I Module  : DeviceLockedStatusModuleProvider$Module.updateDeviceLockedStatus():100 repeatCheckTimes = 1, locked = false
+06-07 15:19:31.220  4666  4666 D ViewRootImpl: Skipping stats log for color mode
+06-07 15:19:31.226   682   834 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET, states=14
+06-07 15:19:31.226   682   834 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET6, states=14
+06-07 15:19:31.226   682   834 D InetDiagMessage: Destroyed live tcp sockets for uids={10153} in 1ms
+06-07 15:19:31.227   682   834 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET, states=14
+06-07 15:19:31.227   682   834 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET6, states=14
+06-07 15:19:31.227   682   834 D InetDiagMessage: Destroyed live tcp sockets for uids={20153} in 0ms
+06-07 15:19:31.233  4666  4679 D IdlingRegistry: Unregistering idling resources: [androidx.compose.ui.test.EspressoLink@10016fa]
+06-07 15:19:31.234  4666  4679 I TestRunner: finished: captureSprint26ChromeWebsiteInterventionScreens(com.qualityalternative.app.VisualQaScreenshotTest)

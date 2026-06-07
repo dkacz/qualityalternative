@@ -1,0 +1,21 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<testsuites tests="4" failures="0" errors="0" skipped="0" time="180.418" timestamp="2026-06-07T16:30:17" hostname="localhost">
+  <testsuite name="com.qualityalternative.app.AccessibilityInterceptionTest" tests="2" failures="0" errors="0" skipped="0" time="34.519" timestamp="2026-06-07T16:30:17" hostname="localhost">
+    <properties>
+      <property name="device" value="qaApi36(AVD) - 16" />
+      <property name="flavor" value="" />
+      <property name="project" value=":app" />
+    </properties>
+    <testcase name="chromeVerifiedHostAdapterHarnessAcceptsOnlyLoadedMatchingHost" classname="com.qualityalternative.app.AccessibilityInterceptionTest" time="27.029" />
+    <testcase name="chromeVerifiedHostAdapterRejectsSyntheticUnsupportedAndStaleStates" classname="com.qualityalternative.app.AccessibilityInterceptionTest" time="7.49" />
+  </testsuite>
+  <testsuite name="com.qualityalternative.app.VisualQaScreenshotTest" tests="2" failures="0" errors="0" skipped="0" time="91.092" timestamp="2026-06-07T16:30:17" hostname="localhost">
+    <properties>
+      <property name="device" value="qaApi36(AVD) - 16" />
+      <property name="flavor" value="" />
+      <property name="project" value=":app" />
+    </properties>
+    <testcase name="captureSprint26WebsiteRuleSettingsScreens" classname="com.qualityalternative.app.VisualQaScreenshotTest" time="70.87" />
+    <testcase name="captureSprint26ChromeWebsiteInterventionScreens" classname="com.qualityalternative.app.VisualQaScreenshotTest" time="20.222" />
+  </testsuite>
+</testsuites>

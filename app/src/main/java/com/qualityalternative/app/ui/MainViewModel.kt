@@ -103,6 +103,7 @@ import com.qualityalternative.app.domain.service.SettingsRepository
 import com.qualityalternative.app.domain.service.UserDocumentRepository
 import com.qualityalternative.app.domain.service.UserLinkRepository
 import com.qualityalternative.app.interception.InterceptionRuntimeGate
+import com.qualityalternative.app.interception.WebsiteInterceptionResolver
 import java.io.InputStream
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
@@ -141,6 +142,8 @@ data class MainUiState(
     val currentOpenAnywayUnlockAvailableAtMillis: Long? = null,
     val currentRecommendationSet: RecommendationSet? = null,
     val currentInterventionOrigin: InterventionOrigin? = null,
+    val currentInterventionMetadata: Map<String, String> = emptyMap(),
+    val currentInterventionSuppressionKey: String? = null,
     val currentContent: ContentItem? = null,
     val currentReaderDocument: ReaderDocument? = null,
     val currentContentBody: String = "",
@@ -1601,6 +1604,8 @@ class MainViewModel(
                 currentOpenAnywayUnlockAvailableAtMillis = null,
                 currentRecommendationSet = null,
                 currentInterventionOrigin = null,
+                currentInterventionMetadata = emptyMap(),
+                currentInterventionSuppressionKey = null,
                 currentInterventionBedtimeEnforced = false,
                 currentContent = repairedContent,
                 currentReaderDocument = readerDocument,
@@ -1895,7 +1900,7 @@ class MainViewModel(
         nowMillis: Long = nowProvider(),
     ) {
         if (uiState.isLoadingSettings) {
-            pendingSystemInterception = PendingSystemInterception(
+            pendingSystemInterception = PendingSystemInterception.App(
                 targetAppPackage = targetAppPackage,
                 triggeredAtMillis = nowMillis,
             )
@@ -1911,11 +1916,52 @@ class MainViewModel(
         )
     }
 
+    fun requestSystemWebsiteInterception(
+        browserPackage: String,
+        browserDisplayName: String,
+        websiteRuleType: String,
+        websiteRuleIncludesApex: Boolean,
+        nowMillis: Long = nowProvider(),
+    ) {
+        if (uiState.isLoadingSettings) {
+            pendingSystemInterception = PendingSystemInterception.Website(
+                browserPackage = browserPackage,
+                browserDisplayName = browserDisplayName,
+                websiteRuleType = websiteRuleType,
+                websiteRuleIncludesApex = websiteRuleIncludesApex,
+                triggeredAtMillis = nowMillis,
+            )
+            return
+        }
+
+        val safeBrowserName = browserDisplayName.trim().takeIf(String::isNotBlank) ?: "Browser"
+        val targetApp = DistractingApp(
+            packageName = browserPackage,
+            displayName = "$safeBrowserName website",
+        )
+        triggerIntervention(
+            targetApp = targetApp,
+            origin = InterventionOrigin.SYSTEM,
+            triggeredAtMillis = nowMillis,
+            processingNowMillis = nowProvider(),
+            interventionMetadata = mapOf(
+                "targetType" to WebsiteInterceptionResolver.TARGET_TYPE,
+                "browserPackage" to browserPackage,
+                "browserSupportStatus" to WebsiteInterceptionResolver.BROWSER_SUPPORT_VERIFIED_HOST,
+                "websiteRuleType" to websiteRuleType,
+                "websiteRuleIncludesApex" to websiteRuleIncludesApex.toString(),
+            ),
+            suppressionKey = WebsiteInterceptionResolver.suppressionKeyFor(browserPackage),
+        )
+    }
+
     fun triggerIntervention(
         targetApp: DistractingApp,
         origin: InterventionOrigin,
         triggeredAtMillis: Long = nowProvider(),
         processingNowMillis: Long = triggeredAtMillis,
+        interventionMetadata: Map<String, String> = emptyMap(),
+        suppressionKey: String = targetApp.packageName,
     ) {
         val preferences = uiState.preferences ?: return
         if (uiState.isLoadingSettings) {
@@ -1930,6 +1976,7 @@ class MainViewModel(
                 targetApp = targetApp,
                 triggeredAtMillis = triggeredAtMillis,
                 shownAtMillis = processingNowMillis,
+                interventionMetadata = interventionMetadata,
             )
 
             val bedtimeActive = bedtimeWindowIsActive(
@@ -1942,6 +1989,7 @@ class MainViewModel(
                 origin == InterventionOrigin.SYSTEM &&
                 InterceptionRuntimeGate.shouldSuppress(
                     targetAppPackage = targetApp.packageName,
+                    targetKey = suppressionKey,
                     nowMillis = processingNowMillis,
                     bedtimeActive = bedtimeActive,
                 )
@@ -1955,6 +2003,8 @@ class MainViewModel(
                     activeDelayWindow = null,
                     activeDelaySuggestion = null,
                     currentInterventionOrigin = null,
+                    currentInterventionMetadata = emptyMap(),
+                    currentInterventionSuppressionKey = null,
                     currentInterventionBedtimeEnforced = false,
                     latestMessage = "${targetApp.displayName} is still unlocked.",
                     screen = MainScreen.Home,
@@ -1975,6 +2025,8 @@ class MainViewModel(
                         screen = MainScreen.Home,
                         currentOpenAnywayUnlockAvailableAtMillis = null,
                         currentInterventionOrigin = null,
+                        currentInterventionMetadata = emptyMap(),
+                        currentInterventionSuppressionKey = null,
                         currentInterventionBedtimeEnforced = false,
                     )
                     return@launch
@@ -2031,7 +2083,7 @@ class MainViewModel(
                         timestampMillis = processingNowMillis,
                         interventionId = interventionId,
                         targetAppPackage = targetApp.packageName,
-                        metadata = inventoryDiagnostics,
+                        metadata = interventionMetadata + inventoryDiagnostics,
                     ),
                 )
                 uiState = uiState.copy(
@@ -2043,6 +2095,8 @@ class MainViewModel(
                     activeDelayWindow = null,
                     activeDelaySuggestion = null,
                     currentInterventionOrigin = null,
+                    currentInterventionMetadata = emptyMap(),
+                    currentInterventionSuppressionKey = null,
                     currentInterventionBedtimeEnforced = false,
                     latestMessage = "No replacement inventory is available yet.",
                     screen = MainScreen.Home,
@@ -2061,7 +2115,7 @@ class MainViewModel(
                     primaryContentId = recommendationSet.primary.id,
                     backupContentIds = backupIds,
                     contentId = recommendationSet.primary.id,
-                    metadata = recommendationSet.analyticsMetadata() + inventoryDiagnostics,
+                    metadata = interventionMetadata + recommendationSet.analyticsMetadata() + inventoryDiagnostics,
                 ),
             )
 
@@ -2075,7 +2129,7 @@ class MainViewModel(
                         primaryContentId = recommendationSet.primary.id,
                         backupContentIds = backupIds,
                         contentId = recommendationSet.primary.id,
-                        metadata = recommendationSet.analyticsMetadata() + inventoryDiagnostics,
+                        metadata = interventionMetadata + recommendationSet.analyticsMetadata() + inventoryDiagnostics,
                     ),
                 )
             }
@@ -2098,7 +2152,7 @@ class MainViewModel(
                         primaryContentId = recommendationSet.primary.id,
                         backupContentIds = backupIds,
                         contentId = recommendationSet.primary.id,
-                        metadata = recommendationSet.analyticsMetadata() + mapOf(
+                        metadata = interventionMetadata + recommendationSet.analyticsMetadata() + mapOf(
                             "interventionMode" to interventionMode.name,
                             "bedtimeStartMinutes" to uiState.bedtimeStartMinutes.toString(),
                             "bedtimeEndMinutes" to uiState.bedtimeEndMinutes.toString(),
@@ -2116,7 +2170,7 @@ class MainViewModel(
                         primaryContentId = recommendationSet.primary.id,
                         backupContentIds = backupIds,
                         contentId = recommendationSet.primary.id,
-                        metadata = recommendationSet.analyticsMetadata() + mapOf(
+                        metadata = interventionMetadata + recommendationSet.analyticsMetadata() + mapOf(
                             "interventionMode" to interventionMode.name,
                             "openAnywayUnlockDelayMillis" to FORM_INTERVENTION_UNLOCK_DELAY_MILLIS.toString(),
                         ),
@@ -2133,7 +2187,7 @@ class MainViewModel(
                         primaryContentId = recommendationSet.primary.id,
                         backupContentIds = backupIds,
                         contentId = recommendationSet.primary.id,
-                        metadata = recommendationSet.primary.analyticsMetadata() + progress.analyticsMetadata() + mapOf(
+                        metadata = interventionMetadata + recommendationSet.primary.analyticsMetadata() + progress.analyticsMetadata() + mapOf(
                             "unfinishedContentCount" to preferences.unfinishedContentIds.size.toString(),
                         ),
                     ),
@@ -2147,6 +2201,8 @@ class MainViewModel(
                 currentOpenAnywayUnlockAvailableAtMillis = openAnywayAvailableAtMillis,
                 currentRecommendationSet = recommendationSet,
                 currentInterventionOrigin = origin,
+                currentInterventionMetadata = interventionMetadata,
+                currentInterventionSuppressionKey = suppressionKey,
                 isBedtimeActive = bedtimeActive,
                 currentInterventionBedtimeEnforced = bedtimeActive,
                 activeDelayWindow = null,
@@ -2184,7 +2240,7 @@ class MainViewModel(
                     primaryContentId = recommendationSet.primary.id,
                     backupContentIds = recommendationSet.backups.map(ContentItem::id),
                     contentId = recommendationSet.primary.id,
-                    metadata = recommendationSet.primary.analyticsMetadata(),
+                    metadata = uiState.currentInterventionMetadata + recommendationSet.primary.analyticsMetadata(),
                 ),
             )
             recordFormInterventionCompleted(action = "primary", nowMillis = nowMillis, contentId = recommendationSet.primary.id)
@@ -2219,7 +2275,7 @@ class MainViewModel(
                     primaryContentId = recommendationSet.primary.id,
                     backupContentIds = recommendationSet.backups.map(ContentItem::id),
                     contentId = content.id,
-                    metadata = content.analyticsMetadata(),
+                    metadata = uiState.currentInterventionMetadata + content.analyticsMetadata(),
                 ),
             )
             recordFormInterventionCompleted(action = "backup", nowMillis = nowMillis, contentId = content.id)
@@ -2253,6 +2309,8 @@ class MainViewModel(
                 currentOpenAnywayUnlockAvailableAtMillis = null,
                 currentRecommendationSet = null,
                 currentInterventionOrigin = null,
+                currentInterventionMetadata = emptyMap(),
+                currentInterventionSuppressionKey = null,
                 currentInterventionBedtimeEnforced = false,
                 activeDelayWindow = window,
                 activeDelaySuggestion = activeDelaySuggestionFor(window),
@@ -2278,7 +2336,7 @@ class MainViewModel(
                 targetAppPackage = targetApp.packageName,
                 primaryContentId = recommendationSet.primary.id,
                 backupContentIds = recommendationSet.backups.map(ContentItem::id),
-                metadata = mapOf(
+                metadata = uiState.currentInterventionMetadata + mapOf(
                     "interventionMode" to uiState.interventionMode.name,
                     "openAnywayUnlockAvailableAtMillis" to availableAtMillis.toString(),
                     "elapsedMillis" to (nowMillis - (uiState.currentInterventionShownAtMillis ?: nowMillis))
@@ -2302,7 +2360,7 @@ class MainViewModel(
                     targetAppPackage = targetApp.packageName,
                     primaryContentId = recommendationSet.primary.id,
                     backupContentIds = recommendationSet.backups.map(ContentItem::id),
-                    metadata = mapOf(
+                    metadata = uiState.currentInterventionMetadata + mapOf(
                         "reason" to reason,
                         "interventionMode" to uiState.interventionMode.name,
                         "openAnywayUnlockAvailableAtMillis" to uiState.currentOpenAnywayUnlockAvailableAtMillis.orEmptyString(),
@@ -2317,6 +2375,8 @@ class MainViewModel(
             currentOpenAnywayUnlockAvailableAtMillis = null,
             currentRecommendationSet = null,
             currentInterventionOrigin = null,
+            currentInterventionMetadata = emptyMap(),
+            currentInterventionSuppressionKey = null,
             currentInterventionBedtimeEnforced = false,
             latestMessage = null,
         )
@@ -2390,6 +2450,8 @@ class MainViewModel(
                 currentOpenAnywayUnlockAvailableAtMillis = null,
                 currentRecommendationSet = recommendationSet,
                 currentInterventionOrigin = null,
+                currentInterventionMetadata = emptyMap(),
+                currentInterventionSuppressionKey = null,
                 currentInterventionBedtimeEnforced = false,
             )
             openReplacementSession(content = content, sessionId = sessionId, startedAtMillis = nowMillis)
@@ -2418,7 +2480,7 @@ class MainViewModel(
                 primaryContentId = recommendationSet.primary.id,
                 backupContentIds = recommendationSet.backups.map(ContentItem::id),
                 contentId = recommendationSet.primary.id,
-                metadata = recommendationSet.analyticsMetadata() + mapOf(
+                metadata = uiState.currentInterventionMetadata + recommendationSet.analyticsMetadata() + mapOf(
                     "interventionMode" to uiState.interventionMode.name,
                     "bedtimeStartMinutes" to uiState.bedtimeStartMinutes.toString(),
                     "bedtimeEndMinutes" to uiState.bedtimeEndMinutes.toString(),
@@ -2462,7 +2524,7 @@ class MainViewModel(
                     targetAppPackage = targetApp.packageName,
                     primaryContentId = recommendationSet?.primary?.id,
                     backupContentIds = recommendationSet?.backups.orEmpty().map(ContentItem::id),
-                    metadata = mapOf(
+                    metadata = uiState.currentInterventionMetadata + mapOf(
                         "interventionMode" to uiState.interventionMode.name,
                         "openAnywayUnlockAvailableAtMillis" to openAnywayAvailableAtMillis.toString(),
                         "remainingMillis" to (openAnywayAvailableAtMillis - nowMillis).toString(),
@@ -2490,7 +2552,7 @@ class MainViewModel(
                 targetAppPackage = targetApp.packageName,
                 primaryContentId = recommendationSet?.primary?.id,
                 backupContentIds = recommendationSet?.backups.orEmpty().map(ContentItem::id),
-                metadata = mapOf(
+                metadata = uiState.currentInterventionMetadata + mapOf(
                     "interventionMode" to uiState.interventionMode.name,
                     "openAnywayUnlockMinutes" to unlockMinutes.toString(),
                     "openAnywayUnlockUntilMillis" to unlockUntilMillis.toString(),
@@ -2512,7 +2574,7 @@ class MainViewModel(
                     targetAppPackage = targetApp.packageName,
                     primaryContentId = recommendationSet?.primary?.id,
                     backupContentIds = recommendationSet?.backups.orEmpty().map(ContentItem::id),
-                    metadata = mapOf(
+                    metadata = uiState.currentInterventionMetadata + mapOf(
                         "interventionMode" to uiState.interventionMode.name,
                         "openAnywayUnlockAvailableAtMillis" to (openAnywayAvailableAtMillis?.toString() ?: "0"),
                         "openAnywayUnlockUntilMillis" to unlockUntilMillis.toString(),
@@ -2529,7 +2591,7 @@ class MainViewModel(
                     targetAppPackage = targetApp.packageName,
                     primaryContentId = recommendationSet?.primary?.id,
                     backupContentIds = recommendationSet?.backups.orEmpty().map(ContentItem::id),
-                    metadata = mapOf(
+                    metadata = uiState.currentInterventionMetadata + mapOf(
                         "interventionMode" to uiState.interventionMode.name,
                         "openAnywayUnlockAvailableAtMillis" to (openAnywayAvailableAtMillis?.toString() ?: "0"),
                         "openAnywayUnlockUntilMillis" to unlockUntilMillis.toString(),
@@ -2543,6 +2605,7 @@ class MainViewModel(
                 targetAppPackage = targetApp.packageName,
                 untilMillis = unlockUntilMillis,
                 allowedDuringBedtime = uiState.currentInterventionBedtimeEnforced,
+                targetKey = uiState.currentInterventionSuppressionKey ?: targetApp.packageName,
             )
         }
         uiState = uiState.copy(
@@ -2552,6 +2615,8 @@ class MainViewModel(
             currentOpenAnywayUnlockAvailableAtMillis = null,
             currentRecommendationSet = null,
             currentInterventionOrigin = null,
+            currentInterventionMetadata = emptyMap(),
+            currentInterventionSuppressionKey = null,
             currentInterventionBedtimeEnforced = false,
             isBedtimeActive = bedtimeWindowIsActive(
                 enabled = uiState.bedtimeEnabled,
@@ -3365,6 +3430,7 @@ class MainViewModel(
         targetApp: DistractingApp,
         triggeredAtMillis: Long,
         shownAtMillis: Long,
+        interventionMetadata: Map<String, String> = emptyMap(),
     ) {
         if (origin != InterventionOrigin.SYSTEM) {
             return
@@ -3378,7 +3444,7 @@ class MainViewModel(
                 type = AnalyticsEventType.INTERVENTION_DEGRADED_PERFORMANCE,
                 timestampMillis = shownAtMillis,
                 targetAppPackage = targetApp.packageName,
-                metadata = mapOf(
+                metadata = interventionMetadata + mapOf(
                     "triggeredAtMillis" to triggeredAtMillis.toString(),
                     "shownAtMillis" to shownAtMillis.toString(),
                     "interceptionDelayMillis" to delayMillis.toString(),
@@ -3689,6 +3755,8 @@ class MainViewModel(
             currentOpenAnywayUnlockAvailableAtMillis = null,
             currentRecommendationSet = null,
             currentInterventionOrigin = null,
+            currentInterventionMetadata = emptyMap(),
+            currentInterventionSuppressionKey = null,
             currentInterventionBedtimeEnforced = false,
             currentContent = repairedContent,
             currentReaderDocument = readerDocument,
@@ -4094,6 +4162,8 @@ class MainViewModel(
             isReaderOpening = false,
             currentRecommendationSet = null,
             currentInterventionOrigin = null,
+            currentInterventionMetadata = emptyMap(),
+            currentInterventionSuppressionKey = null,
             currentInterventionBedtimeEnforced = false,
             currentSessionId = null,
             currentSessionStartedAtMillis = null,
@@ -4173,7 +4243,7 @@ class MainViewModel(
                 primaryContentId = recommendationSet.primary.id,
                 backupContentIds = recommendationSet.backups.map(ContentItem::id),
                 contentId = contentId,
-                metadata = mapOf(
+                metadata = uiState.currentInterventionMetadata + mapOf(
                     "action" to action,
                     "interventionMode" to uiState.interventionMode.name,
                     "openAnywayUnlockAvailableAtMillis" to uiState.currentOpenAnywayUnlockAvailableAtMillis.orEmptyString(),
@@ -4258,10 +4328,20 @@ class MainViewModel(
         if (isReady) {
             val pending = pendingSystemInterception ?: return
             pendingSystemInterception = null
-            requestSystemInterception(
-                targetAppPackage = pending.targetAppPackage,
-                nowMillis = pending.triggeredAtMillis,
-            )
+            when (pending) {
+                is PendingSystemInterception.App -> requestSystemInterception(
+                    targetAppPackage = pending.targetAppPackage,
+                    nowMillis = pending.triggeredAtMillis,
+                )
+
+                is PendingSystemInterception.Website -> requestSystemWebsiteInterception(
+                    browserPackage = pending.browserPackage,
+                    browserDisplayName = pending.browserDisplayName,
+                    websiteRuleType = pending.websiteRuleType,
+                    websiteRuleIncludesApex = pending.websiteRuleIncludesApex,
+                    nowMillis = pending.triggeredAtMillis,
+                )
+            }
         }
     }
 
@@ -4696,10 +4776,20 @@ private const val MAX_BACKGROUND_READING_TIME_REPAIR_SCAN_COUNT = 10
 private const val FEEDBACK_FIT_NOT = "not"
 private const val FEEDBACK_SCROLL_NO = "no"
 
-private data class PendingSystemInterception(
-    val targetAppPackage: String,
-    val triggeredAtMillis: Long,
-)
+private sealed class PendingSystemInterception {
+    data class App(
+        val targetAppPackage: String,
+        val triggeredAtMillis: Long,
+    ) : PendingSystemInterception()
+
+    data class Website(
+        val browserPackage: String,
+        val browserDisplayName: String,
+        val websiteRuleType: String,
+        val websiteRuleIncludesApex: Boolean,
+        val triggeredAtMillis: Long,
+    ) : PendingSystemInterception()
+}
 
 private fun AddLinkFormState.toDraftOrNull(): UserLinkDraft? {
     val duration = durationMinutes.toIntOrNull() ?: return null
@@ -4972,7 +5062,6 @@ private fun ContentItem.analyticsMetadata(prefix: String? = null): Map<String, S
         put(key("packId"), packId)
         put(key("rightsClass"), rights.rightsClass.name)
         put(key("renderMode"), rights.renderMode.name)
-        externalUrl?.let { url -> put(key("externalUrl"), url) }
     }
 }
 

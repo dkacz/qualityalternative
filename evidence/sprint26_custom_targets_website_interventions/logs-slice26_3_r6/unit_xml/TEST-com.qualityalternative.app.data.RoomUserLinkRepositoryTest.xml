@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.qualityalternative.app.data.RoomUserLinkRepositoryTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-06-07T16:26:01.801Z" hostname="mac-studio.home" time="0.002">
+  <properties/>
+  <testcase name="portableImportPlanRetainsLocalIdOnlyMatchWithoutReplacingLocalUrl" classname="com.qualityalternative.app.data.RoomUserLinkRepositoryTest" time="0.0"/>
+  <testcase name="portableImportPlanThrowsWhenContentIdAndSecondaryKeyMatchDifferentRows" classname="com.qualityalternative.app.data.RoomUserLinkRepositoryTest" time="0.0"/>
+  <testcase name="portableImportPlanReturnsOnlyActuallyAcceptedContentIds" classname="com.qualityalternative.app.data.RoomUserLinkRepositoryTest" time="0.0"/>
+  <testcase name="optimisticUpsertPrependsNewLinksForNewestFirstUiState" classname="com.qualityalternative.app.data.RoomUserLinkRepositoryTest" time="0.0"/>
+  <testcase name="portableImportPlanMapsSecondaryOnlyMatchToLocalContentId" classname="com.qualityalternative.app.data.RoomUserLinkRepositoryTest" time="0.0"/>
+  <testcase name="portableImportPlanThrowsBeforeReplaceWhenContentIdAndSecondaryKeyMatchDifferentRows" classname="com.qualityalternative.app.data.RoomUserLinkRepositoryTest" time="0.0"/>
+  <testcase name="optimisticUpsertReplacesExistingLinkWithoutMovingItsPosition" classname="com.qualityalternative.app.data.RoomUserLinkRepositoryTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

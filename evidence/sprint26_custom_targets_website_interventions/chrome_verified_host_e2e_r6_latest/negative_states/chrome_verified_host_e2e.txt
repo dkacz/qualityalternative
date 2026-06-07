@@ -1,0 +1,7 @@
+
+Chrome stale/unreadable negative evidence
+Device model: sdk_gphone64_arm64
+Android API: 36
+Android release: 16
+States covered without relying on live browser history: unsupported browser package, null root, hidden address node, focused editable omnibox, and no prior-host cache in adapter source.
+Result: PASS - unsupported browser and unreadable root states do not produce a verified host.

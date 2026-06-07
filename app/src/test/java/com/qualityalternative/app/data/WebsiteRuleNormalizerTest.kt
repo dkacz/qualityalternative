@@ -38,6 +38,22 @@ class WebsiteRuleNormalizerTest {
     }
 
     @Test
+    fun normalize_convertsSchemedUnicodeHostToAscii() {
+        val result = WebsiteRuleNormalizer.normalize(
+            input = "https://MÜNICH.example/lesen?utm=private#top",
+            wildcard = false,
+        )
+
+        assertEquals(
+            WebsiteRuleDraftResult.Valid(
+                host = "xn--mnich-kva.example",
+                type = WebsiteRuleType.EXACT_DOMAIN,
+            ),
+            result,
+        )
+    }
+
+    @Test
     fun normalize_detectsExplicitWildcardPrefix() {
         val result = WebsiteRuleNormalizer.normalize(input = "*.News.Example", wildcard = false)
 
