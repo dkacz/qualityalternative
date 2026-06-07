@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.qualityalternative.app.data.InterceptionReadinessEvaluatorTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-06-07T21:16:46.120Z" hostname="mac-studio.home" time="0.001">
+  <properties/>
+  <testcase name="evaluate_marksAccessibilityReady_whenOnlyAccessibilityGranted" classname="com.qualityalternative.app.data.InterceptionReadinessEvaluatorTest" time="0.001"/>
+  <testcase name="evaluate_marksBothPermissionsMissing_whenNothingGranted" classname="com.qualityalternative.app.data.InterceptionReadinessEvaluatorTest" time="0.0"/>
+  <testcase name="evaluate_marksSystemInterceptionReady_whenBothPermissionsGranted" classname="com.qualityalternative.app.data.InterceptionReadinessEvaluatorTest" time="0.0"/>
+  <testcase name="evaluate_marksOverlayReady_whenOnlyOverlayGranted" classname="com.qualityalternative.app.data.InterceptionReadinessEvaluatorTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

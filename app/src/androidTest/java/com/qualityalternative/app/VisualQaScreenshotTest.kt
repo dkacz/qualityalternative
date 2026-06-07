@@ -3000,16 +3000,28 @@ class VisualQaScreenshotTest {
 
     private fun assertFiniteChoicesAboveBottomActions() {
         assertNodeFullyWithinRoot("intervention-bottom-actions")
-        if (hasTag("intervention-backup-list")) {
+        val hasMeditationAlternative = hasTag("intervention-meditation-alternative")
+        val hasBackupList = hasTag("intervention-backup-list")
+        val hasBackupAction = hasTag("intervention-backup-action-0")
+        val hasEmptyBackups = hasTag("intervention-empty-backups")
+
+        if (hasMeditationAlternative) {
+            assertNodeAboveBottomActions("intervention-meditation-alternative")
+        }
+        if (hasBackupList) {
             assertNodeAboveBottomActions("intervention-backup-list")
         }
-        if (hasTag("intervention-backup-action-0")) {
+        if (hasBackupAction) {
             assertNodeAboveBottomActions("intervention-backup-action-0")
         }
-        if (!hasTag("intervention-backup-action-0")) {
+        if (!hasBackupList && hasEmptyBackups) {
             composeRule.onNodeWithTag("intervention-empty-backups").assertIsDisplayed()
             assertNodeAboveBottomActions("intervention-empty-backups")
         }
+        assertTrue(
+            "Expected a finite intervention choice or empty state above bottom actions.",
+            hasMeditationAlternative || hasBackupList || hasBackupAction || hasEmptyBackups,
+        )
     }
 
     private fun assertNodeAboveBottomActions(tag: String) {

@@ -1,6 +1,6 @@
 # Lane Status
 
-Status timestamp: 2026-06-07
+Status timestamp: 2026-06-08
 
 This file is the repo-level index for active and recently completed execution lanes. It should point to the canonical branch, review lane, validation artifacts, and next gate for each lane.
 
@@ -13,7 +13,7 @@ This file is the repo-level index for active and recently completed execution la
 
 ## Sprint 26 Custom Targets And Website Interventions
 
-Status: `slice26_5_complete_10_10_pass_next_slice26_6`
+Status: `slice26_6_final_release_publishing_in_progress`
 
 - Branch: `codex/sprint26-custom-targets-website-interventions`
 - Scope: plan and implement support for replacement-first interventions on eligible arbitrary installed apps plus supported-browser website/domain rules, while avoiding universal URL blocking claims.
@@ -88,6 +88,26 @@ Status: `slice26_5_complete_10_10_pass_next_slice26_6`
   - Slice 26.5 R2 heartbeat check at `2026-06-07T20:20:22Z`: exact-lane harvest and fresh-tab retry still found GPT Pro thinking with the stop button visible; no `SCORE`/`VERDICT` output was harvested and heartbeat `harvest-sprint-26-slice26-5-r2-gpt-pro-review` remains active.
   - Slice 26.5 R2 review returned `SCORE 10/10`, `VERDICT PASS`, `VISUAL REVIEW PASS`; no blockers, bundle gaps, privacy issues, or package hygiene issues remain.
   - Slice 26.5 R2 heartbeat was deleted after successful harvest.
+  - Slice 26.5 was committed as `ee0d001` (`Complete Sprint 26 bedtime target integration`).
+  - Slice 26.6 release gate uses `v0.11.14-custom-targets-website-interventions-alpha`, `versionCode=30`, `versionName=0.11.14-alpha`.
+  - Slice 26.6 final validation passed after the R2 gate repair: `:app:testDebugUnitTest :app:lintDebug :app:assembleDebug` PASS; targeted connected rerun PASS; full connected Android test PASS (`136` tests, `0` failures, `0` errors, `0` skipped); APK badging/signature/install/launch evidence PASS.
+  - Slice 26.6 validation summary: `docs/release-gate-logs/2026-06-07-sprint26-custom-targets-website-interventions/VALIDATION_SUMMARY.md`.
+  - Slice 26.6 release notes: `docs/release-gate-logs/2026-06-07-sprint26-custom-targets-website-interventions/RELEASE_NOTES_v0.11.14-custom-targets-website-interventions-alpha.md`.
+  - Slice 26.6 review bundle: `SPRINT26_FINAL_RELEASE_REVIEW_BUNDLE_20260607.zip`.
+  - Slice 26.6 final GPT Pro review lane: `https://chatgpt.com/c/6a25e184-a30c-83eb-b346-199c70ed88b5`.
+  - Slice 26.6 final GPT Pro output path: `evidence/sprint26_custom_targets_website_interventions/GPT_PRO_FINAL_RELEASE_REVIEW.md`.
+  - Slice 26.6 final GPT Pro heartbeat: deleted after successful R1 harvest.
+  - Slice 26.6 final GPT Pro heartbeat check at `2026-06-07T21:34:23Z`: exact-lane harvest and fresh-tab retry found GPT Pro still thinking with the stop button visible; no `SCORE`/`VERDICT` output was harvested and the heartbeat remains active.
+  - Slice 26.6 final GPT Pro R1 review returned `SCORE 8/10`, `VERDICT REVISE`, `VISUAL REVIEW PASS`; blockers were release-note privacy wording that overclaimed local analytics sanitization, and bundle-hygiene inconsistency around retaining the superseded failed connected log on disk while excluding it from the review ZIP.
+  - Slice 26.6 R2 fixes the R1 blockers by narrowing the claim to remote/export analytics payloads, explicitly allowing device-local analytics rows to keep package-level fields needed for local behavior, aligning the validation summary and bundle manifest on the superseded failed connected run, adding verbose signature/status evidence, adding unit XML and full source/test trees to the R2 review bundle, and shipping scrubbed canonical logs in the bundle.
+  - Slice 26.6 R2 review bundle: `SPRINT26_FINAL_RELEASE_R2_REVIEW_BUNDLE_20260607.zip`.
+  - Slice 26.6 R2 GPT Pro lane: `https://chatgpt.com/c/6a25e7a6-74a4-83ed-a848-58c4e4eafa6e`.
+  - Slice 26.6 R2 GPT Pro output path: `evidence/sprint26_custom_targets_website_interventions/GPT_PRO_FINAL_RELEASE_R2_REVIEW.md`.
+  - Slice 26.6 R2 GPT Pro heartbeat: deleted after successful harvest.
+  - Slice 26.6 R2 heartbeat check at `2026-06-07T22:00:23Z`: exact-lane harvest saw GPT Pro still thinking with the stop button visible; the helper's first refresh/fresh-tab attempt hit a target-closed browser error, and an immediate explicit fresh-tab retry still showed GPT Pro thinking. No `SCORE`/`VERDICT` output was harvested at that checkpoint.
+  - Slice 26.6 R2 review returned `SCORE 10/10`, `VERDICT PASS`, `VISUAL REVIEW PASS`; blockers none, bundle gaps none, package hygiene PASS, release readiness PASS.
+  - Slice 26.6 R2 review confirmed the R1 blocker recheck: release notes now correctly scope privacy to remote/export analytics payloads while permitting device-local package-level fields needed for local behavior, and the validation summary/manifest now consistently treat the superseded failed connected run as retained on disk only and excluded from the R2 review ZIP.
+  - Release publishing target: commit Sprint 26 final release gate/version/APK evidence, tag `v0.11.14-custom-targets-website-interventions-alpha`, push branch and tag, and publish the GitHub release with `release_artifacts/quality-alternative-v0.11.14-custom-targets-website-interventions-alpha-debug.apk` plus its `.sha256`.
   - Slice 26.1 GPT Pro R3 review returned `SCORE 8/10`, `VERDICT FAIL`, `VISUAL REVIEW PASS`.
   - Slice 26.1 GPT Pro R4 review returned `SCORE 10/10`, `VERDICT PASS`, `VISUAL REVIEW PASS`.
   - Slice 26.1 GPT Pro R4 heartbeat was deleted after successful harvest.
@@ -123,8 +143,7 @@ Status: `slice26_5_complete_10_10_pass_next_slice26_6`
   - Passed emulator visual E2E: `VisualQaScreenshotTest#captureSprint26CustomTargetSettingsScreens`
   - Passed `git diff --check`.
 - Next gate:
-  - Commit Slice 26.5 implementation/evidence.
-  - Continue to Slice 26.6 final E2E, final GPT Pro release review, and APK release.
+  - Publish the verified debug APK release and record the commit/tag/release outcome.
 
 ### Current Slice 26.2 Validation
 

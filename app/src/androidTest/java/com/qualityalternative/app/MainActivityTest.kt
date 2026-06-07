@@ -161,6 +161,7 @@ class MainActivityTest {
     @Test
     fun systemInterceptionIntentShowsLiveInterventionForFixtureTarget() {
         seedFixtureSelection()
+        seedInterventionMode(InterventionMode.FIRM)
         relaunchFixtureSystemIntervention()
 
         composeRule.onNodeWithText("You reached for Fixture Feed One").assertIsDisplayed()
@@ -1800,7 +1801,7 @@ class MainActivityTest {
 
     @Test
     fun sprint19FormInterventionShowsFiveSecondUnlockBeforeOpenAnyway() {
-        launchFixtureSystemIntervention()
+        launchFixtureSystemIntervention(interventionMode = InterventionMode.FIRM)
 
         composeRule.onNodeWithTag("form-intervention-unlock-wait")
             .assertIsDisplayed()
@@ -4207,9 +4208,10 @@ class MainActivityTest {
         composeRule.onNodeWithText("Grant & finish").performClick()
     }
 
-    private fun launchFixtureSystemIntervention() {
+    private fun launchFixtureSystemIntervention(interventionMode: InterventionMode? = null) {
         launchOnboardedApp()
         seedFixtureSelection()
+        interventionMode?.let { mode -> seedInterventionMode(mode) }
         relaunchFixtureSystemIntervention()
     }
 
@@ -4884,6 +4886,13 @@ class MainActivityTest {
                 selectedPackIds = setOf("philosophy"),
             ),
         )
+    }
+
+    private fun seedInterventionMode(mode: InterventionMode) = runBlocking {
+        val repository = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication)
+            .appContainer
+            .settingsRepository
+        repository.saveInterventionMode(mode)
     }
 
     private fun seedMeditationFixtureSelection() = runBlocking {
