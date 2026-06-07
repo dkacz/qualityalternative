@@ -13,7 +13,7 @@ This file is the repo-level index for active and recently completed execution la
 
 ## Sprint 26 Custom Targets And Website Interventions
 
-Status: `slice26_6_final_release_publishing_in_progress`
+Status: `release_published`
 
 - Branch: `codex/sprint26-custom-targets-website-interventions`
 - Scope: plan and implement support for replacement-first interventions on eligible arbitrary installed apps plus supported-browser website/domain rules, while avoiding universal URL blocking claims.
@@ -107,7 +107,11 @@ Status: `slice26_6_final_release_publishing_in_progress`
   - Slice 26.6 R2 heartbeat check at `2026-06-07T22:00:23Z`: exact-lane harvest saw GPT Pro still thinking with the stop button visible; the helper's first refresh/fresh-tab attempt hit a target-closed browser error, and an immediate explicit fresh-tab retry still showed GPT Pro thinking. No `SCORE`/`VERDICT` output was harvested at that checkpoint.
   - Slice 26.6 R2 review returned `SCORE 10/10`, `VERDICT PASS`, `VISUAL REVIEW PASS`; blockers none, bundle gaps none, package hygiene PASS, release readiness PASS.
   - Slice 26.6 R2 review confirmed the R1 blocker recheck: release notes now correctly scope privacy to remote/export analytics payloads while permitting device-local package-level fields needed for local behavior, and the validation summary/manifest now consistently treat the superseded failed connected run as retained on disk only and excluded from the R2 review ZIP.
-  - Release publishing target: commit Sprint 26 final release gate/version/APK evidence, tag `v0.11.14-custom-targets-website-interventions-alpha`, push branch and tag, and publish the GitHub release with `release_artifacts/quality-alternative-v0.11.14-custom-targets-website-interventions-alpha-debug.apk` plus its `.sha256`.
+  - Release commit: `189ec67` (`Complete Sprint 26 final release gate`).
+  - Release tag: `v0.11.14-custom-targets-website-interventions-alpha`.
+  - Release URL: `https://github.com/dkacz/qualityalternative/releases/tag/v0.11.14-custom-targets-website-interventions-alpha`.
+  - Published assets: `quality-alternative-v0.11.14-custom-targets-website-interventions-alpha-debug.apk` and `quality-alternative-v0.11.14-custom-targets-website-interventions-alpha-debug.apk.sha256`.
+  - Integration method: committed on `codex/sprint26-custom-targets-website-interventions`, tagged the release commit, pushed branch and tag to `origin`, and published the GitHub release from the committed release notes.
   - Slice 26.1 GPT Pro R3 review returned `SCORE 8/10`, `VERDICT FAIL`, `VISUAL REVIEW PASS`.
   - Slice 26.1 GPT Pro R4 review returned `SCORE 10/10`, `VERDICT PASS`, `VISUAL REVIEW PASS`.
   - Slice 26.1 GPT Pro R4 heartbeat was deleted after successful harvest.
@@ -143,7 +147,7 @@ Status: `slice26_6_final_release_publishing_in_progress`
   - Passed emulator visual E2E: `VisualQaScreenshotTest#captureSprint26CustomTargetSettingsScreens`
   - Passed `git diff --check`.
 - Next gate:
-  - Publish the verified debug APK release and record the commit/tag/release outcome.
+  - None for Sprint 26; release is published.
 
 ### Current Slice 26.2 Validation
 
