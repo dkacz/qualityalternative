@@ -22,9 +22,12 @@ import com.qualityalternative.app.domain.model.ReadingProgress
 import com.qualityalternative.app.domain.model.ReadingAnnotation
 import com.qualityalternative.app.domain.model.ReadingAnnotationDraft
 import com.qualityalternative.app.domain.model.ReaderDocument
+import com.qualityalternative.app.domain.model.RemoteAnalyticsPayload
 import com.qualityalternative.app.domain.model.ReplacementHistoryEntry
 import com.qualityalternative.app.domain.model.ReturnToTargetSignal
 import com.qualityalternative.app.domain.model.SessionFeedback
+import com.qualityalternative.app.domain.model.toRemoteAnalyticsPayload
+import com.qualityalternative.app.domain.model.toRemoteSafeDebugSummary
 import com.qualityalternative.app.domain.model.UserLinkDraft
 import com.qualityalternative.app.domain.model.UserLinkValidationError
 import com.qualityalternative.app.domain.model.UserDocumentDraft
@@ -33,6 +36,7 @@ import com.qualityalternative.app.domain.model.UserPreferences
 import com.qualityalternative.app.domain.model.WebsiteRule
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 
 interface ContentRepository {
     fun starterPacks(): List<EditorialPack>
@@ -251,7 +255,16 @@ interface AnalyticsTracker {
         record(event)
     }
     fun allEvents(): List<AnalyticsEvent>
+    fun allRemoteSafePayloads(): List<RemoteAnalyticsPayload> {
+        return allEvents().map(AnalyticsEvent::toRemoteAnalyticsPayload)
+    }
     fun observeEvents(): Flow<List<AnalyticsEvent>> = flowOf(allEvents())
+    fun observeRemoteSafePayloads(): Flow<List<RemoteAnalyticsPayload>> {
+        return observeEvents().map { events -> events.map(AnalyticsEvent::toRemoteAnalyticsPayload) }
+    }
+    fun allRemoteSafeDebugSummaries(): List<String> {
+        return allRemoteSafePayloads().map(RemoteAnalyticsPayload::toRemoteSafeDebugSummary)
+    }
     fun isReady(): Boolean = true
     fun observeReady(): Flow<Boolean> = flowOf(isReady())
 }

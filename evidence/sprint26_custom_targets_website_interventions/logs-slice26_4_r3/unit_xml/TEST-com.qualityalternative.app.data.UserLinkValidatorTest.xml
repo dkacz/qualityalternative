@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.qualityalternative.app.data.UserLinkValidatorTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-06-07T18:38:26.196Z" hostname="mac-studio.home" time="0.0">
+  <properties/>
+  <testcase name="validate_rejectsNonWebSchemes" classname="com.qualityalternative.app.data.UserLinkValidatorTest" time="0.0"/>
+  <testcase name="validate_acceptsHttpAndHttpsLinksWithRequiredMetadata" classname="com.qualityalternative.app.data.UserLinkValidatorTest" time="0.0"/>
+  <testcase name="validate_rejectsWebUrlsWithoutHost" classname="com.qualityalternative.app.data.UserLinkValidatorTest" time="0.0"/>
+  <testcase name="validate_preservesEncodedPathQueryAndFragment" classname="com.qualityalternative.app.data.UserLinkValidatorTest" time="0.0"/>
+  <testcase name="validateUrl_reportsMissingHostForMalformedWebUrl" classname="com.qualityalternative.app.data.UserLinkValidatorTest" time="0.0"/>
+  <testcase name="validate_reportsAllMissingRequiredFields" classname="com.qualityalternative.app.data.UserLinkValidatorTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

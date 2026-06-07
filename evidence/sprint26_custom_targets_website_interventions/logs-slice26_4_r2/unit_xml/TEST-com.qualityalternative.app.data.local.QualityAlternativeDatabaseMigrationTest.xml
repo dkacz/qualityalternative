@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.qualityalternative.app.data.local.QualityAlternativeDatabaseMigrationTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-06-07T18:14:02.510Z" hostname="mac-studio.home" time="0.008">
+  <properties/>
+  <testcase name="migration9To10AddsAnnotationSelectorAndSourceColumns" classname="com.qualityalternative.app.data.local.QualityAlternativeDatabaseMigrationTest" time="0.007"/>
+  <testcase name="migration15To16AddsAnalyticsTimestampIndex" classname="com.qualityalternative.app.data.local.QualityAlternativeDatabaseMigrationTest" time="0.0"/>
+  <testcase name="migration12To13AddsReadingProgressSourceTextOffsetColumn" classname="com.qualityalternative.app.data.local.QualityAlternativeDatabaseMigrationTest" time="0.0"/>
+  <testcase name="migration11To12AddsUserDocumentFingerprintSizeColumn" classname="com.qualityalternative.app.data.local.QualityAlternativeDatabaseMigrationTest" time="0.0"/>
+  <testcase name="migration13To14AddsAnnotationEndSourceBlockColumnAndBackfillsIt" classname="com.qualityalternative.app.data.local.QualityAlternativeDatabaseMigrationTest" time="0.0"/>
+  <testcase name="migration10To11AddsUserDocumentFingerprintColumnAndIndex" classname="com.qualityalternative.app.data.local.QualityAlternativeDatabaseMigrationTest" time="0.0"/>
+  <testcase name="migration14To15AddsMarkdownImageAttachmentManifestColumn" classname="com.qualityalternative.app.data.local.QualityAlternativeDatabaseMigrationTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -179,6 +179,11 @@ class AccountLightProfileExporterTest {
         assertFalse(rawJson.contains("raw-drive-folder-id"))
         assertFalse(rawJson.contains("raw-profile-folder-id"))
         assertFalse(rawJson.contains("Drive write unavailable"))
+        assertFalse(rawJson.contains("browserPackage"))
+        assertFalse(rawJson.contains("browserSupportStatus"))
+        assertFalse(rawJson.contains("verified_host"))
+        assertFalse(rawJson.contains("observedHost"))
+        assertFalse(rawJson.contains("Chrome website"))
         assertFalse(rawJson.contains("token", ignoreCase = true))
         assertFalse(rawJson.contains("oauth", ignoreCase = true))
     }

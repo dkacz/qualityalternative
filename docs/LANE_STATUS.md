@@ -13,7 +13,7 @@ This file is the repo-level index for active and recently completed execution la
 
 ## Sprint 26 Custom Targets And Website Interventions
 
-Status: `slice26_3_complete_10_10_pass_next_slice26_4`
+Status: `slice26_4_complete_10_10_pass_next_slice26_5`
 
 - Branch: `codex/sprint26-custom-targets-website-interventions`
 - Scope: plan and implement support for replacement-first interventions on eligible arbitrary installed apps plus supported-browser website/domain rules, while avoiding universal URL blocking claims.
@@ -52,6 +52,22 @@ Status: `slice26_3_complete_10_10_pass_next_slice26_4`
   - Slice 26.3 R6 review returned `SCORE 9/10`, `VERDICT FAIL`, `VISUAL REVIEW PASS`; GPT Pro's blocker was missing package-authenticated stale active-window/package-mismatch safety.
   - Slice 26.3 R7 adds package identity to browser snapshots, requires the root and address-bar node package to match `com.android.chrome`, and reruns unit, connected, visual, and live-service evidence after the change.
   - Slice 26.3 R7 review returned `SCORE 10/10`, `VERDICT PASS`, `VISUAL REVIEW PASS`; no blockers or release-blocking bundle gaps remain.
+  - Slice 26.3 was committed as `8fdd20e` (`Complete Sprint 26 Chrome website interventions`).
+  - Slice 26.4 is in progress: adding remote analytics privacy guards, log-scrub checks, and Portable Profile import/export hardening for custom app and website rules.
+  - Slice 26.4 implementation/evidence was sent to GPT Pro at `https://chatgpt.com/c/6a25ae84-1310-83eb-a53a-1128d4a7edd1`; harvest heartbeat `harvest-sprint-26-slice26-4-gpt-pro-review` writes to `evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_4_REVIEW.md`.
+  - Slice 26.4 heartbeat check at `2026-06-07T17:57:22Z`: exact-lane harvest found GPT Pro still thinking, so the heartbeat remains active and no review output has been harvested yet.
+  - Slice 26.4 R1 review returned `SCORE 8/10`, `VERDICT FAIL`, `VISUAL REVIEW NOT APPLICABLE`; blockers were unknown `targetType` echoing to `targetClass`, missing host/IP/IDNA sanitizer cases, and metadata-only unsafe-field diagnostics.
+  - Slice 26.4 R1 heartbeat was deleted after successful harvest.
+  - Slice 26.4 R2 fixes the R1 blockers with fixed target-class mapping, known-only `targetType` metadata, expanded IP/host/IDNA/package/URL filtering, top-level unsafe-field diagnostics, and a remote-safe debug summary path.
+  - Slice 26.4 R2 implementation/evidence was sent to GPT Pro at `https://chatgpt.com/c/6a25b565-7d28-83ed-bc8a-de6a19da9613`; harvest heartbeat `harvest-sprint-26-slice26-4-r2-gpt-pro-review` writes to `evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_4_R2_REVIEW.md`.
+  - Slice 26.4 R2 heartbeat check at `2026-06-07T18:26:22Z`: exact-lane harvest found GPT Pro still thinking, so the heartbeat remains active and no R2 review output has been harvested yet.
+  - Slice 26.4 R2 review returned `SCORE 9/10`, `VERDICT FAIL`, `VISUAL REVIEW NOT APPLICABLE`; remaining blocker was punycode/IDNA host-like values with punycode TLDs and trailing-dot IPv4 literals.
+  - Slice 26.4 R2 heartbeat was deleted after successful harvest.
+  - Slice 26.4 R3 fixes the R2 blocker by canonicalizing host candidates before IP checks and rejecting DNS-style multi-label values including punycode labels/TLDs, plus regression coverage through payload conversion, scrubber, and top-level diagnostics.
+  - Slice 26.4 R3 implementation/evidence was sent to GPT Pro at `https://chatgpt.com/c/6a25bb13-7590-83ed-bbf4-8c84ac527bc0`; harvest heartbeat `harvest-sprint-26-slice26-4-r3-gpt-pro-review` writes to `evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_4_R3_REVIEW.md`.
+  - Slice 26.4 R3 heartbeat check at `2026-06-07T18:50:22Z`: exact-lane harvest found GPT Pro still thinking, so the heartbeat remains active and no R3 review output has been harvested yet.
+  - Slice 26.4 R3 review returned `SCORE 10/10`, `VERDICT PASS`, `VISUAL REVIEW NOT APPLICABLE`; no blockers, bundle gaps, or package hygiene issues remain.
+  - Slice 26.4 R3 heartbeat was deleted after successful harvest.
   - Slice 26.1 GPT Pro R3 review returned `SCORE 8/10`, `VERDICT FAIL`, `VISUAL REVIEW PASS`.
   - Slice 26.1 GPT Pro R4 review returned `SCORE 10/10`, `VERDICT PASS`, `VISUAL REVIEW PASS`.
   - Slice 26.1 GPT Pro R4 heartbeat was deleted after successful harvest.
@@ -87,8 +103,8 @@ Status: `slice26_3_complete_10_10_pass_next_slice26_4`
   - Passed emulator visual E2E: `VisualQaScreenshotTest#captureSprint26CustomTargetSettingsScreens`
   - Passed `git diff --check`.
 - Next gate:
-  - Commit Slice 26.3 implementation/evidence.
-  - Continue to Slice 26.4 privacy, analytics, and Portable Profile hardening.
+  - Commit Slice 26.4 implementation/evidence.
+  - Continue to Slice 26.5 Bedtime and supported website target integration.
 
 ### Current Slice 26.2 Validation
 

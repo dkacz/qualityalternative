@@ -257,6 +257,20 @@ Acceptance:
 - Enforce analytics allowlist and denylist for website and custom app targets.
 - Add log-scrubbing checks.
 - Complete Portable Profile behavior for imported app and website rules.
+- Implementation started after Slice 26.3 commit `8fdd20e`.
+- Add `AnalyticsPrivacyGuard` as the remote/export analytics boundary: local analytics may keep package data needed for device-local behavior, but exported/remote payloads must collapse targets to classes and drop packages, URLs, hosts, page titles, URL-bar text, paths, queries, and website rule ids.
+- Extend Portable Profile tests so website rules export without Chrome/browser support state and missing custom app warnings do not reveal private package names.
+- Evidence bundle: `evidence/sprint26_custom_targets_website_interventions/SPRINT26_SLICE26_4_REVIEW_BUNDLE_20260607.zip`.
+- GPT Pro review lane: `https://chatgpt.com/c/6a25ae84-1310-83eb-a53a-1128d4a7edd1`; heartbeat `harvest-sprint-26-slice26-4-gpt-pro-review`.
+- GPT Pro R1 review: `SCORE 8/10`, `VERDICT FAIL`, `VISUAL REVIEW NOT APPLICABLE`.
+- R2 fixes R1 blockers: unknown `targetType` cannot echo into `targetClass`, IP/port/trailing-dot/Unicode host variants are rejected, top-level remote fields are included in unsafe-field diagnostics, and remote-safe debug summaries use the scrubber.
+- R2 evidence: `evidence/sprint26_custom_targets_website_interventions/SLICE26_4_R2_EVIDENCE.md`.
+- GPT Pro R2 review lane: `https://chatgpt.com/c/6a25b565-7d28-83ed-bc8a-de6a19da9613`; heartbeat `harvest-sprint-26-slice26-4-r2-gpt-pro-review`.
+- GPT Pro R2 review: `SCORE 9/10`, `VERDICT FAIL`, `VISUAL REVIEW NOT APPLICABLE`.
+- R3 fixes R2 blocker: punycode/IDNA host-like values with punycode TLDs and trailing-dot IPv4 literals are rejected through payload conversion, scrubber, and top-level diagnostics.
+- R3 evidence: `evidence/sprint26_custom_targets_website_interventions/SLICE26_4_R3_EVIDENCE.md`.
+- GPT Pro R3 review lane: `https://chatgpt.com/c/6a25bb13-7590-83ed-bbf4-8c84ac527bc0`; heartbeat `harvest-sprint-26-slice26-4-r3-gpt-pro-review`.
+- GPT Pro R3 review: `SCORE 10/10`, `VERDICT PASS`, `VISUAL REVIEW NOT APPLICABLE`; no blockers, bundle gaps, or package hygiene issues remain.
 
 Acceptance:
 

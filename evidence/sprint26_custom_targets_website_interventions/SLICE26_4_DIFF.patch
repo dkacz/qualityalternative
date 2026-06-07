@@ -1,0 +1,462 @@
+diff --git a/app/src/main/java/com/qualityalternative/app/domain/model/AnalyticsPrivacyGuard.kt b/app/src/main/java/com/qualityalternative/app/domain/model/AnalyticsPrivacyGuard.kt
+new file mode 100644
+index 0000000..b06260f
+--- /dev/null
++++ b/app/src/main/java/com/qualityalternative/app/domain/model/AnalyticsPrivacyGuard.kt
+@@ -0,0 +1,184 @@
++package com.qualityalternative.app.domain.model
++
++data class RemoteAnalyticsPayload(
++    val type: AnalyticsEventType,
++    val timestampMillis: Long,
++    val semanticKey: String? = null,
++    val interventionId: String? = null,
++    val sessionId: String? = null,
++    val targetClass: String? = null,
++    val primaryContentId: String? = null,
++    val backupContentIds: List<String> = emptyList(),
++    val contentId: String? = null,
++    val metadata: Map<String, String> = emptyMap(),
++)
++
++object AnalyticsPrivacyGuard {
++    fun toRemotePayload(event: AnalyticsEvent): RemoteAnalyticsPayload {
++        return RemoteAnalyticsPayload(
++            type = event.type,
++            timestampMillis = event.timestampMillis,
++            semanticKey = event.semanticKey,
++            interventionId = event.interventionId,
++            sessionId = event.sessionId,
++            targetClass = event.remoteTargetClass(),
++            primaryContentId = event.primaryContentId,
++            backupContentIds = event.backupContentIds,
++            contentId = event.contentId,
++            metadata = event.metadata
++                .filterKeys(::isRemoteSafeKey)
++                .filterValues(::isRemoteSafeValue)
++                .toSortedMap(),
++        )
++    }
++
++    fun unsafeRemoteFields(payload: RemoteAnalyticsPayload): List<String> {
++        return buildList {
++            payload.metadata.forEach { (key, value) ->
++                if (!isRemoteSafeKey(key)) add("metadata.$key")
++                if (!isRemoteSafeValue(value)) add("metadata.$key.value")
++            }
++        }.distinct().sorted()
++    }
++
++    fun scrubDebugValue(value: String): String {
++        return if (isRemoteSafeValue(value)) value else Redacted
++    }
++
++    private fun AnalyticsEvent.remoteTargetClass(): String? {
++        return when (metadata["targetType"]) {
++            WebsiteDomainTargetType -> "supported_browser_website"
++            null -> targetAppPackage?.let { "app_target" }
++            else -> metadata["targetType"]
++        }
++    }
++
++    private fun isRemoteSafeKey(key: String): Boolean {
++        val lower = key.lowercase()
++        if (lower in SensitiveExactKeys) return false
++        return key.isAllowlistedRemoteMetadataKey() &&
++            SensitiveKeyTokens.none { token -> lower.contains(token) }
++    }
++
++    private fun isRemoteSafeValue(value: String): Boolean {
++        val trimmed = value.trim()
++        if (trimmed.isBlank()) return true
++        val lower = trimmed.lowercase()
++        if (trimmed.any { it == '/' || it == '\\' || it == '?' || it == '#' || it == '@' }) return false
++        if ("://" in lower || "content:" in lower || "file:" in lower) return false
++        if (PackageLikeRegex.matches(trimmed)) return false
++        if (HostLikeRegex.matches(lower)) return false
++        return true
++    }
++
++    private const val WebsiteDomainTargetType = "website_domain"
++    private const val Redacted = "[redacted]"
++
++    private val RemoteSafeMetadataKeys = setOf(
++        "action",
++        "availability",
++        "backupCount",
++        "bedtimeActive",
++        "bedtimeActivatedAfterInterventionShown",
++        "bedtimeEndMinutes",
++        "bedtimeStartMinutes",
++        "browserSupportStatus",
++        "completed",
++        "completedAtMillis",
++        "completedContentCount",
++        "delayId",
++        "displayNameSource",
++        "durationMinutes",
++        "eligibleEditorialCount",
++        "eligibleInventoryCount",
++        "eligibleMeditationCount",
++        "eligibleUserDocumentCount",
++        "eligibleUserLinkCount",
++        "elapsedMillis",
++        "estimateSource",
++        "failureReason",
++        "format",
++        "formUnlockWaitMillis",
++        "interventionMode",
++        "lastVisibleParagraphIndex",
++        "lastVisibleTextOffset",
++        "openAnywayUnlockAvailableAtMillis",
++        "openAnywayUnlockDelayMillis",
++        "openAnywayUnlockMinutes",
++        "openAnywayUnlockUntilMillis",
++        "origin",
++        "packId",
++        "paragraphCount",
++        "priorityContentCount",
++        "progressPercent",
++        "reason",
++        "remainingMillis",
++        "renderMode",
++        "rightsClass",
++        "selectedPackCount",
++        "selectedPackIds",
++        "sourceType",
++        "synced",
++        "targetType",
++        "triggerSource",
++        "unfinishedContentCount",
++        "unavailableUserDocumentCount",
++        "unavailableUserLinkCount",
++        "updatedAtMillis",
++        "websiteRuleIncludesApex",
++        "websiteRuleType",
++        "wordCount",
++    )
++
++    private val RemoteSafeContentMetadataSuffixes = setOf(
++        "availability",
++        "format",
++        "packId",
++        "renderMode",
++        "rightsClass",
++        "sourceType",
++    )
++
++    private val SensitiveExactKeys = setOf(
++        "browserpackage",
++        "foregroundpackage",
++        "foregroundclass",
++        "targetapppackage",
++        "websiteruleid",
++        "ruleid",
++        "rawurl",
++        "externalurl",
++        "urlbartext",
++        "pagetitle",
++    )
++
++    private val SensitiveKeyTokens = listOf(
++        "url",
++        "uri",
++        "host",
++        "domain",
++        "title",
++        "package",
++        "class",
++        "path",
++        "query",
++        "address",
++        "omnibox",
++    )
++
++    private val PackageLikeRegex = Regex("[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)+")
++    private val HostLikeRegex = Regex("([a-z0-9-]+\\.)+[a-z]{2,}")
++
++    private fun String.isAllowlistedRemoteMetadataKey(): Boolean {
++        if (this in RemoteSafeMetadataKeys) return true
++        return Regex("^(primary|backup[0-9]+)_([A-Za-z0-9]+)$").matchEntire(this)
++            ?.groupValues
++            ?.getOrNull(2)
++            ?.let(RemoteSafeContentMetadataSuffixes::contains)
++            ?: false
++    }
++}
++
++fun AnalyticsEvent.toRemoteAnalyticsPayload(): RemoteAnalyticsPayload {
++    return AnalyticsPrivacyGuard.toRemotePayload(this)
++}
+diff --git a/app/src/main/java/com/qualityalternative/app/domain/service/Contracts.kt b/app/src/main/java/com/qualityalternative/app/domain/service/Contracts.kt
+index 4037ef0..34f68be 100644
+--- a/app/src/main/java/com/qualityalternative/app/domain/service/Contracts.kt
++++ b/app/src/main/java/com/qualityalternative/app/domain/service/Contracts.kt
+@@ -22,9 +22,11 @@ import com.qualityalternative.app.domain.model.ReadingProgress
+ import com.qualityalternative.app.domain.model.ReadingAnnotation
+ import com.qualityalternative.app.domain.model.ReadingAnnotationDraft
+ import com.qualityalternative.app.domain.model.ReaderDocument
++import com.qualityalternative.app.domain.model.RemoteAnalyticsPayload
+ import com.qualityalternative.app.domain.model.ReplacementHistoryEntry
+ import com.qualityalternative.app.domain.model.ReturnToTargetSignal
+ import com.qualityalternative.app.domain.model.SessionFeedback
++import com.qualityalternative.app.domain.model.toRemoteAnalyticsPayload
+ import com.qualityalternative.app.domain.model.UserLinkDraft
+ import com.qualityalternative.app.domain.model.UserLinkValidationError
+ import com.qualityalternative.app.domain.model.UserDocumentDraft
+@@ -33,6 +35,7 @@ import com.qualityalternative.app.domain.model.UserPreferences
+ import com.qualityalternative.app.domain.model.WebsiteRule
+ import kotlinx.coroutines.flow.Flow
+ import kotlinx.coroutines.flow.flowOf
++import kotlinx.coroutines.flow.map
+ 
+ interface ContentRepository {
+     fun starterPacks(): List<EditorialPack>
+@@ -251,7 +254,13 @@ interface AnalyticsTracker {
+         record(event)
+     }
+     fun allEvents(): List<AnalyticsEvent>
++    fun allRemoteSafePayloads(): List<RemoteAnalyticsPayload> {
++        return allEvents().map(AnalyticsEvent::toRemoteAnalyticsPayload)
++    }
+     fun observeEvents(): Flow<List<AnalyticsEvent>> = flowOf(allEvents())
++    fun observeRemoteSafePayloads(): Flow<List<RemoteAnalyticsPayload>> {
++        return observeEvents().map { events -> events.map(AnalyticsEvent::toRemoteAnalyticsPayload) }
++    }
+     fun isReady(): Boolean = true
+     fun observeReady(): Flow<Boolean> = flowOf(isReady())
+ }
+diff --git a/app/src/test/java/com/qualityalternative/app/data/AccountLightProfileExporterTest.kt b/app/src/test/java/com/qualityalternative/app/data/AccountLightProfileExporterTest.kt
+index 651b2ce..fc885a5 100644
+--- a/app/src/test/java/com/qualityalternative/app/data/AccountLightProfileExporterTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/data/AccountLightProfileExporterTest.kt
+@@ -179,6 +179,11 @@ class AccountLightProfileExporterTest {
+         assertFalse(rawJson.contains("raw-drive-folder-id"))
+         assertFalse(rawJson.contains("raw-profile-folder-id"))
+         assertFalse(rawJson.contains("Drive write unavailable"))
++        assertFalse(rawJson.contains("browserPackage"))
++        assertFalse(rawJson.contains("browserSupportStatus"))
++        assertFalse(rawJson.contains("verified_host"))
++        assertFalse(rawJson.contains("observedHost"))
++        assertFalse(rawJson.contains("Chrome website"))
+         assertFalse(rawJson.contains("token", ignoreCase = true))
+         assertFalse(rawJson.contains("oauth", ignoreCase = true))
+     }
+diff --git a/app/src/test/java/com/qualityalternative/app/data/AccountLightProfileImporterTest.kt b/app/src/test/java/com/qualityalternative/app/data/AccountLightProfileImporterTest.kt
+index 99e1a8b..2253230 100644
+--- a/app/src/test/java/com/qualityalternative/app/data/AccountLightProfileImporterTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/data/AccountLightProfileImporterTest.kt
+@@ -39,6 +39,7 @@ import kotlinx.serialization.json.JsonPrimitive
+ import kotlinx.serialization.json.jsonArray
+ import kotlinx.serialization.json.jsonObject
+ import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
+ import org.junit.Assert.assertThrows
+ import org.junit.Assert.assertTrue
+ import org.junit.Test
+@@ -321,6 +322,28 @@ class AccountLightProfileImporterTest {
+         assertEquals(setOf(importedStandardPackage, customTarget.packageName), settings.selectedAppPackages)
+     }
+ 
++    @Test
++    fun validateImportProfileJson_doesNotExposeMissingCustomPackageInWarnings() = runBlocking {
++        val target = PreferencesSettingsRepository(
++            dataStore = testDataStore(),
++            supportedApps = SupportedCatalog.distractingApps,
++        )
++        val importer = AccountLightProfileImporter(settingsRepository = target)
++        val missingPackage = "com.private.distraction"
++        val plan = importer.validateImportProfileJson(
++            validProfileJson().withSelectedAppPackages(listOf(missingPackage)),
++        )
++
++        val renderedWarnings = plan.allWarnings.joinToString("\n") { warning ->
++            listOfNotNull(warning.code, warning.section, warning.message).joinToString(" ")
++        }
++
++        assertEquals(1, plan.preview.unsupportedAppCount)
++        assertFalse(renderedWarnings.contains(missingPackage))
++        importer.applyReplace(plan)
++        assertEquals(emptySet<String>(), target.observeAppSettings().first().selectedAppPackages)
++    }
++
+     @Test
+     fun validateImportProfileJson_rejectsContentIdTypeMismatchesBeforeMutation() = runBlocking {
+         val target = PreferencesSettingsRepository(
+diff --git a/app/src/test/java/com/qualityalternative/app/domain/model/AnalyticsPrivacyGuardTest.kt b/app/src/test/java/com/qualityalternative/app/domain/model/AnalyticsPrivacyGuardTest.kt
+new file mode 100644
+index 0000000..d424a2c
+--- /dev/null
++++ b/app/src/test/java/com/qualityalternative/app/domain/model/AnalyticsPrivacyGuardTest.kt
+@@ -0,0 +1,124 @@
++package com.qualityalternative.app.domain.model
++
++import com.qualityalternative.app.analytics.InMemoryAnalyticsTracker
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++class AnalyticsPrivacyGuardTest {
++    @Test
++    fun toRemotePayload_keepsWebsiteRuleClassButDropsUrlHostPackageAndRuleId() {
++        val event = AnalyticsEvent(
++            type = AnalyticsEventType.INTERVENTION_SHOWN,
++            timestampMillis = 10_000L,
++            interventionId = "intervention-1",
++            targetAppPackage = "com.android.chrome",
++            primaryContentId = "editorial-deep-work",
++            metadata = mapOf(
++                "targetType" to "website_domain",
++                "browserPackage" to "com.android.chrome",
++                "browserSupportStatus" to "verified_host",
++                "websiteRuleType" to WebsiteRuleType.EXACT_DOMAIN.name,
++                "websiteRuleIncludesApex" to "false",
++                "websiteRuleId" to "website-rule-11111111-1111-4111-8111-111111111111",
++                "foregroundPackage" to "com.android.chrome",
++                "foregroundClass" to "org.chromium.chrome.browser.ChromeTabbedActivity",
++                "rawUrl" to "https://news.example/private/path?token=abc",
++                "observedHost" to "news.example",
++                "pageTitle" to "Private article title",
++                "primary_sourceType" to ContentSourceType.EDITORIAL.name,
++            ),
++        )
++
++        val payload = event.toRemoteAnalyticsPayload()
++        val rendered = payload.renderForTest()
++
++        assertEquals("supported_browser_website", payload.targetClass)
++        assertEquals("website_domain", payload.metadata["targetType"])
++        assertEquals("verified_host", payload.metadata["browserSupportStatus"])
++        assertEquals(WebsiteRuleType.EXACT_DOMAIN.name, payload.metadata["websiteRuleType"])
++        assertEquals("false", payload.metadata["websiteRuleIncludesApex"])
++        assertEquals(ContentSourceType.EDITORIAL.name, payload.metadata["primary_sourceType"])
++        assertFalse(rendered.contains("com.android.chrome"))
++        assertFalse(rendered.contains("news.example"))
++        assertFalse(rendered.contains("https://"))
++        assertFalse(rendered.contains("Private article title"))
++        assertFalse(rendered.contains("website-rule-11111111"))
++        assertTrue(AnalyticsPrivacyGuard.unsafeRemoteFields(payload).isEmpty())
++    }
++
++    @Test
++    fun toRemotePayload_classifiesCustomAppTargetWithoutExportingPackageIdentity() {
++        val event = AnalyticsEvent(
++            type = AnalyticsEventType.TARGET_APP_FOREGROUND_DETECTED,
++            timestampMillis = 12_000L,
++            targetAppPackage = "com.example.deepwork",
++            metadata = mapOf(
++                "triggerSource" to "accessibility_service",
++                "interceptionStage" to "sprint26_custom_app",
++                "foregroundPackage" to "com.example.deepwork",
++                "foregroundClass" to "com.example.deepwork.MainActivity",
++                "targetType" to "custom_app",
++                "selectedPackCount" to "2",
++            ),
++        )
++
++        val payload = event.toRemoteAnalyticsPayload()
++        val rendered = payload.renderForTest()
++
++        assertEquals("custom_app", payload.targetClass)
++        assertEquals("accessibility_service", payload.metadata["triggerSource"])
++        assertEquals("2", payload.metadata["selectedPackCount"])
++        assertFalse(rendered.contains("com.example.deepwork"))
++        assertFalse(rendered.contains("MainActivity"))
++        assertTrue(AnalyticsPrivacyGuard.unsafeRemoteFields(payload).isEmpty())
++    }
++
++    @Test
++    fun scrubDebugValue_redactsUrlsHostsPackagesAndKeepsSafeCounters() {
++        assertEquals("[redacted]", AnalyticsPrivacyGuard.scrubDebugValue("https://example.com/private"))
++        assertEquals("[redacted]", AnalyticsPrivacyGuard.scrubDebugValue("example.com"))
++        assertEquals("[redacted]", AnalyticsPrivacyGuard.scrubDebugValue("com.example.deepwork"))
++        assertEquals("verified_host", AnalyticsPrivacyGuard.scrubDebugValue("verified_host"))
++        assertEquals("42", AnalyticsPrivacyGuard.scrubDebugValue("42"))
++    }
++
++    @Test
++    fun analyticsTracker_exposesRemoteSafePayloadsWithoutLocalPackageIdentity() {
++        val tracker = InMemoryAnalyticsTracker()
++        tracker.record(
++            AnalyticsEvent(
++                type = AnalyticsEventType.OPEN_ANYWAY_SELECTED,
++                timestampMillis = 13_000L,
++                targetAppPackage = "com.private.social",
++                metadata = mapOf(
++                    "targetType" to "custom_app",
++                    "foregroundPackage" to "com.private.social",
++                    "openAnywayUnlockMinutes" to "60",
++                ),
++            ),
++        )
++
++        val payload = tracker.allRemoteSafePayloads().single()
++        val rendered = payload.renderForTest()
++
++        assertEquals("custom_app", payload.targetClass)
++        assertEquals("60", payload.metadata["openAnywayUnlockMinutes"])
++        assertFalse(rendered.contains("com.private.social"))
++    }
++
++    private fun RemoteAnalyticsPayload.renderForTest(): String {
++        return listOf(
++            type.name,
++            semanticKey.orEmpty(),
++            interventionId.orEmpty(),
++            sessionId.orEmpty(),
++            targetClass.orEmpty(),
++            primaryContentId.orEmpty(),
++            backupContentIds.joinToString(","),
++            contentId.orEmpty(),
++            metadata.entries.joinToString(";") { (key, value) -> "$key=$value" },
++        ).joinToString("|")
++    }
++}
+diff --git a/docs/LANE_STATUS.md b/docs/LANE_STATUS.md
+index 23806c6..7057331 100644
+--- a/docs/LANE_STATUS.md
++++ b/docs/LANE_STATUS.md
+@@ -13,7 +13,7 @@ This file is the repo-level index for active and recently completed execution la
+ 
+ ## Sprint 26 Custom Targets And Website Interventions
+ 
+-Status: `slice26_3_complete_10_10_pass_next_slice26_4`
++Status: `slice26_4_privacy_profile_hardening_in_progress`
+ 
+ - Branch: `codex/sprint26-custom-targets-website-interventions`
+ - Scope: plan and implement support for replacement-first interventions on eligible arbitrary installed apps plus supported-browser website/domain rules, while avoiding universal URL blocking claims.
+@@ -52,6 +52,8 @@ Status: `slice26_3_complete_10_10_pass_next_slice26_4`
+   - Slice 26.3 R6 review returned `SCORE 9/10`, `VERDICT FAIL`, `VISUAL REVIEW PASS`; GPT Pro's blocker was missing package-authenticated stale active-window/package-mismatch safety.
+   - Slice 26.3 R7 adds package identity to browser snapshots, requires the root and address-bar node package to match `com.android.chrome`, and reruns unit, connected, visual, and live-service evidence after the change.
+   - Slice 26.3 R7 review returned `SCORE 10/10`, `VERDICT PASS`, `VISUAL REVIEW PASS`; no blockers or release-blocking bundle gaps remain.
++  - Slice 26.3 was committed as `8fdd20e` (`Complete Sprint 26 Chrome website interventions`).
++  - Slice 26.4 is in progress: adding remote analytics privacy guards, log-scrub checks, and Portable Profile import/export hardening for custom app and website rules.
+   - Slice 26.1 GPT Pro R3 review returned `SCORE 8/10`, `VERDICT FAIL`, `VISUAL REVIEW PASS`.
+   - Slice 26.1 GPT Pro R4 review returned `SCORE 10/10`, `VERDICT PASS`, `VISUAL REVIEW PASS`.
+   - Slice 26.1 GPT Pro R4 heartbeat was deleted after successful harvest.
+@@ -87,8 +89,8 @@ Status: `slice26_3_complete_10_10_pass_next_slice26_4`
+   - Passed emulator visual E2E: `VisualQaScreenshotTest#captureSprint26CustomTargetSettingsScreens`
+   - Passed `git diff --check`.
+ - Next gate:
+-  - Commit Slice 26.3 implementation/evidence.
+-  - Continue to Slice 26.4 privacy, analytics, and Portable Profile hardening.
++  - Finish Slice 26.4 privacy/profile implementation and targeted tests.
++  - Capture evidence and run GPT Pro Slice 26.4 review until `SCORE 10/10`, `VERDICT PASS`, and `VISUAL REVIEW PASS` or `NOT APPLICABLE` if no UI changed.
+ 
+ ### Current Slice 26.2 Validation
+ 
+diff --git a/docs/SPRINT_26_CUSTOM_TARGETS_WEBSITE_INTERVENTIONS.md b/docs/SPRINT_26_CUSTOM_TARGETS_WEBSITE_INTERVENTIONS.md
+index 1e0fc80..d748237 100644
+--- a/docs/SPRINT_26_CUSTOM_TARGETS_WEBSITE_INTERVENTIONS.md
++++ b/docs/SPRINT_26_CUSTOM_TARGETS_WEBSITE_INTERVENTIONS.md
+@@ -257,6 +257,9 @@ Acceptance:
+ - Enforce analytics allowlist and denylist for website and custom app targets.
+ - Add log-scrubbing checks.
+ - Complete Portable Profile behavior for imported app and website rules.
++- Implementation started after Slice 26.3 commit `8fdd20e`.
++- Add `AnalyticsPrivacyGuard` as the remote/export analytics boundary: local analytics may keep package data needed for device-local behavior, but exported/remote payloads must collapse targets to classes and drop packages, URLs, hosts, page titles, URL-bar text, paths, queries, and website rule ids.
++- Extend Portable Profile tests so website rules export without Chrome/browser support state and missing custom app warnings do not reveal private package names.
+ 
+ Acceptance:
+ 

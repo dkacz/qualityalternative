@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.qualityalternative.app.interception.VerifiedBrowserHostAdapterTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-06-07T17:41:53.714Z" hostname="mac-studio.home" time="0.003">
+  <properties/>
+  <testcase name="readHostFromSnapshot_rejectsPackageMismatchedChromeResourceNames" classname="com.qualityalternative.app.interception.VerifiedBrowserHostAdapterTest" time="0.002"/>
+  <testcase name="readHostFromSnapshot_rejectsUnsupportedBrowsers" classname="com.qualityalternative.app.interception.VerifiedBrowserHostAdapterTest" time="0.0"/>
+  <testcase name="readHostFromSnapshot_acceptsDeepChromeToolbarAddressBar" classname="com.qualityalternative.app.interception.VerifiedBrowserHostAdapterTest" time="0.0"/>
+  <testcase name="readHostFromSnapshot_ignoresTitleOrBodyWithoutVerifiedAddressNode" classname="com.qualityalternative.app.interception.VerifiedBrowserHostAdapterTest" time="0.0"/>
+  <testcase name="readHostFromSnapshot_rejectsSearchTextAndIpAddressBarText" classname="com.qualityalternative.app.interception.VerifiedBrowserHostAdapterTest" time="0.0"/>
+  <testcase name="readHostFromSnapshot_rejectsHiddenOrEditedAddressBarText" classname="com.qualityalternative.app.interception.VerifiedBrowserHostAdapterTest" time="0.001"/>
+  <testcase name="readHostFromSnapshot_acceptsOnlyChromeAddressBarText" classname="com.qualityalternative.app.interception.VerifiedBrowserHostAdapterTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

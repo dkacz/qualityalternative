@@ -39,6 +39,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -319,6 +320,28 @@ class AccountLightProfileImporterTest {
         val settings = target.observeAppSettings().first()
 
         assertEquals(setOf(importedStandardPackage, customTarget.packageName), settings.selectedAppPackages)
+    }
+
+    @Test
+    fun validateImportProfileJson_doesNotExposeMissingCustomPackageInWarnings() = runBlocking {
+        val target = PreferencesSettingsRepository(
+            dataStore = testDataStore(),
+            supportedApps = SupportedCatalog.distractingApps,
+        )
+        val importer = AccountLightProfileImporter(settingsRepository = target)
+        val missingPackage = "com.private.distraction"
+        val plan = importer.validateImportProfileJson(
+            validProfileJson().withSelectedAppPackages(listOf(missingPackage)),
+        )
+
+        val renderedWarnings = plan.allWarnings.joinToString("\n") { warning ->
+            listOfNotNull(warning.code, warning.section, warning.message).joinToString(" ")
+        }
+
+        assertEquals(1, plan.preview.unsupportedAppCount)
+        assertFalse(renderedWarnings.contains(missingPackage))
+        importer.applyReplace(plan)
+        assertEquals(emptySet<String>(), target.observeAppSettings().first().selectedAppPackages)
     }
 
     @Test

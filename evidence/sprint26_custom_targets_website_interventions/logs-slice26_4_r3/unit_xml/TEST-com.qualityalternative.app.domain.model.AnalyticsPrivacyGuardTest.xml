@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.qualityalternative.app.domain.model.AnalyticsPrivacyGuardTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-06-07T18:38:26.222Z" hostname="mac-studio.home" time="0.006">
+  <properties/>
+  <testcase name="toRemotePayload_doesNotEchoUnknownTargetTypeIntoRemoteTargetClass" classname="com.qualityalternative.app.domain.model.AnalyticsPrivacyGuardTest" time="0.002"/>
+  <testcase name="analyticsTracker_exposesRemoteSafePayloadsWithoutLocalPackageIdentity" classname="com.qualityalternative.app.domain.model.AnalyticsPrivacyGuardTest" time="0.0"/>
+  <testcase name="unsafeRemoteFields_checksTopLevelPayloadFields" classname="com.qualityalternative.app.domain.model.AnalyticsPrivacyGuardTest" time="0.0"/>
+  <testcase name="analyticsTracker_exposesRemoteSafeDebugSummariesThroughScrubber" classname="com.qualityalternative.app.domain.model.AnalyticsPrivacyGuardTest" time="0.001"/>
+  <testcase name="toRemotePayload_rejectsIpPortTrailingDotAndUnicodeHostMetadataValues" classname="com.qualityalternative.app.domain.model.AnalyticsPrivacyGuardTest" time="0.0"/>
+  <testcase name="scrubDebugValue_redactsUrlsHostsPackagesAndKeepsSafeCounters" classname="com.qualityalternative.app.domain.model.AnalyticsPrivacyGuardTest" time="0.0"/>
+  <testcase name="toRemotePayload_classifiesCustomAppTargetWithoutExportingPackageIdentity" classname="com.qualityalternative.app.domain.model.AnalyticsPrivacyGuardTest" time="0.0"/>
+  <testcase name="toRemotePayload_keepsWebsiteRuleClassButDropsUrlHostPackageAndRuleId" classname="com.qualityalternative.app.domain.model.AnalyticsPrivacyGuardTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
