@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.qualityalternative.app.interception.InterceptionTargetResolverTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-06-07T10:17:04.661Z" hostname="mac-studio.home" time="0.001">
+  <properties/>
+  <testcase name="resolve_returnsRealTargetWhenSelectedPackageMatchesForegroundPackage" classname="com.qualityalternative.app.interception.InterceptionTargetResolverTest" time="0.0"/>
+  <testcase name="resolve_returnsFixtureTargetWhenFixtureComponentMatchesOwnPackage" classname="com.qualityalternative.app.interception.InterceptionTargetResolverTest" time="0.0"/>
+  <testcase name="resolve_ignoresOwnPackageWhenForegroundComponentIsNotFixture" classname="com.qualityalternative.app.interception.InterceptionTargetResolverTest" time="0.0"/>
+  <testcase name="resolve_returnsCustomTargetWhenSelectedPackageMatchesKnownTarget" classname="com.qualityalternative.app.interception.InterceptionTargetResolverTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -7,7 +7,9 @@ import android.net.Uri
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasTestTag
@@ -19,9 +21,11 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
@@ -35,6 +39,7 @@ import com.qualityalternative.app.domain.model.ContentFormat
 import com.qualityalternative.app.domain.model.ContentItem
 import com.qualityalternative.app.domain.model.ContentPriority
 import com.qualityalternative.app.domain.model.DurationBucket
+import com.qualityalternative.app.domain.model.InterventionMode
 import com.qualityalternative.app.domain.model.MEDITATION_TIMER_CONTENT_ID
 import com.qualityalternative.app.domain.model.OnboardingSelection
 import com.qualityalternative.app.domain.model.ReadingProgress
@@ -71,6 +76,7 @@ class VisualQaScreenshotTest {
     private val sprint20ScreenshotDirName = "sprint20-epub-loading-performance-${System.currentTimeMillis()}"
     private val sprint22ScreenshotDirName = "sprint22-reading-time-remaining-${System.currentTimeMillis()}"
     private val sprint25ScreenshotDirName = "sprint25-markdown-media-tables-${System.currentTimeMillis()}"
+    private val sprint26ScreenshotDirName = "sprint26-custom-targets-${System.currentTimeMillis()}"
     private lateinit var screenshotDir: File
     private lateinit var legacyScreenshotDir: File
     private lateinit var sprint10ScreenshotDir: File
@@ -84,6 +90,7 @@ class VisualQaScreenshotTest {
     private lateinit var sprint20ScreenshotDir: File
     private lateinit var sprint22ScreenshotDir: File
     private lateinit var sprint25ScreenshotDir: File
+    private lateinit var sprint26ScreenshotDir: File
 
     @Before
     fun resetAppState() {
@@ -129,6 +136,9 @@ class VisualQaScreenshotTest {
         sprint25ScreenshotDir = File("/sdcard/Download/qualityalternative/$sprint25ScreenshotDirName")
         sprint25ScreenshotDir.deleteRecursively()
         sprint25ScreenshotDir.mkdirs()
+        sprint26ScreenshotDir = File("/sdcard/Download/qualityalternative/$sprint26ScreenshotDirName")
+        sprint26ScreenshotDir.deleteRecursively()
+        sprint26ScreenshotDir.mkdirs()
     }
 
     @After
@@ -349,6 +359,126 @@ class VisualQaScreenshotTest {
             .performTouchInput { swipeLeft() }
         composeRule.waitUntil(timeoutMillis = 10_000) { hasNodeContaining("2/") }
         captureSprint25("10_text_swipe_advances_page_light")
+    }
+
+    @Test
+    fun captureSprint26CustomTargetSettingsScreens() {
+        launchOnboardedApp()
+        openTab("tab-settings", "settings-list")
+        composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasTestTag("settings-custom-apps-section"))
+        composeRule.onNodeWithTag("settings-custom-app-search").assertIsDisplayed()
+        captureSprint26("01_custom_app_search_empty_light")
+
+        composeRule.onNodeWithTag("settings-custom-app-search").performTextInput("Quality")
+        composeRule.onNodeWithTag("settings-custom-app-search").performImeAction()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("settings-app-com.qualityalternative.app").assertIsDisplayed()
+        captureSprint26("02_custom_app_self_excluded_light")
+
+        val eligibleCandidate = runBlocking {
+            val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication
+            app.appContainer.settingsRepository.customTargetAppCandidates().firstOrNull { it.isEligible }
+        }
+        assertTrue("Expected at least one eligible launchable custom app on the visual QA device", eligibleCandidate != null)
+        val candidate = requireNotNull(eligibleCandidate)
+        composeRule.onNodeWithTag("settings-custom-app-search").performTextClearance()
+        composeRule.onNodeWithTag("settings-custom-app-search").performTextInput(candidate.app.packageName)
+        composeRule.onNodeWithTag("settings-custom-app-search").performImeAction()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("settings-app-${candidate.app.packageName}").assertIsDisplayed()
+        captureSprint26("03_custom_app_eligible_search_light")
+
+        composeRule.onNodeWithTag("settings-app-${candidate.app.packageName}").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            runBlocking {
+                val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication
+                candidate.app.packageName in app.appContainer.settingsRepository.observeAppSettings().first().selectedAppPackages
+            }
+        }
+        composeRule.onNodeWithTag("settings-app-${candidate.app.packageName}").assertIsSelected()
+        captureSprint26("04_custom_app_selected_light")
+
+        scenario?.close()
+        scenario = null
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+        launchOnboardedApp()
+        openTab("tab-settings", "settings-list")
+        composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasTestTag("settings-custom-apps-section"))
+        composeRule.onNodeWithTag("settings-custom-app-search").performTextInput(candidate.app.packageName)
+        composeRule.onNodeWithTag("settings-custom-app-search").performImeAction()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("settings-app-${candidate.app.packageName}").assertIsSelected()
+        captureSprint26("05_custom_app_persisted_after_restart_light")
+
+        composeRule.onNodeWithTag("settings-app-${candidate.app.packageName}").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            runBlocking {
+                val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication
+                candidate.app.packageName !in app.appContainer.settingsRepository.observeAppSettings().first().selectedAppPackages
+            }
+        }
+        composeRule.onNodeWithTag("settings-app-${candidate.app.packageName}").assertIsNotSelected()
+        captureSprint26("06_custom_app_removed_light")
+
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.requestSystemInterception(
+                targetAppPackage = candidate.app.packageName,
+                nowMillis = System.currentTimeMillis(),
+            )
+        }
+        composeRule.waitForIdle()
+        assertTrue("Unselected custom app should not trigger intervention", !hasTag("intervention-screen"))
+        captureSprint26("07_custom_app_unselected_no_intervention_light")
+
+        composeRule.onNodeWithTag("settings-app-${candidate.app.packageName}").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            runBlocking {
+                val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication
+                candidate.app.packageName in app.appContainer.settingsRepository.observeAppSettings().first().selectedAppPackages
+            }
+        }
+        composeRule.onNodeWithTag("settings-app-${candidate.app.packageName}").assertIsSelected()
+
+        scenario?.close()
+        scenario = null
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+        val targetContext = InstrumentationRegistry.getInstrumentation().targetContext
+        launchApp(
+            MainActivity.createSystemInterceptionIntent(
+                context = targetContext,
+                targetAppPackage = candidate.app.packageName,
+            ),
+        )
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("intervention-screen") }
+        composeRule.onNodeWithTag("intervention-primary-explanation").assertIsDisplayed()
+        assertTrue("Soft mode should not show form-intervention wait", !hasTag("form-intervention-unlock-wait"))
+        composeRule.onNodeWithText("Open ${candidate.app.displayName}").assertIsDisplayed().assertIsEnabled()
+        captureSprint26("08_custom_app_soft_intervention_light")
+
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.selectInterventionMode(InterventionMode.FIRM)
+            activity.mainViewModel.requestSystemInterception(
+                targetAppPackage = candidate.app.packageName,
+                nowMillis = System.currentTimeMillis(),
+            )
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("form-intervention-unlock-wait") }
+        composeRule.onNodeWithText("Open in", substring = true).assertIsDisplayed().assertIsNotEnabled()
+        captureSprint26("09_custom_app_firm_intervention_wait_light")
+
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.setBedtimeSettings(enabled = true, startMinutes = 0, endMinutes = 0)
+            activity.mainViewModel.requestSystemInterception(
+                targetAppPackage = candidate.app.packageName,
+                nowMillis = System.currentTimeMillis(),
+            )
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("bedtime-emergency-unlock-wait") }
+        composeRule.onNodeWithText("Bedtime is protecting sleep", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithTag("bedtime-emergency-unlock-action").assertIsDisplayed().assertIsNotEnabled()
+        captureSprint26("10_custom_app_bedtime_intervention_light")
     }
 
     @Test
@@ -1224,7 +1354,7 @@ class VisualQaScreenshotTest {
 
         scenario?.onActivity { activity -> activity.mainViewModel.openLibrary() }
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("library-list") }
-        composeRule.onNodeWithTag("library-item-$MEDITATION_TIMER_CONTENT_ID").assertDoesNotExist()
+        assertTrue("Meditation timer should not appear in the library", !hasTag("library-item-$MEDITATION_TIMER_CONTENT_ID"))
         captureSprint13("05_library_without_meditation_light")
 
         openTab("tab-settings", "settings-list")
@@ -1293,7 +1423,7 @@ class VisualQaScreenshotTest {
             )
         }
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("add-document-screen") }
-        composeRule.onNodeWithText("Estimated session").assertDoesNotExist()
+        assertTrue("Estimated session row should be hidden during auto-time import", !hasNode("Estimated session"))
         captureSprint15("01_auto_time_import_light")
 
         composeRule.onNodeWithTag("add-document-topic-SCIENCE")
@@ -1466,6 +1596,10 @@ class VisualQaScreenshotTest {
 
     private fun captureSprint25(name: String) {
         captureTo(sprint25ScreenshotDir, name)
+    }
+
+    private fun captureSprint26(name: String) {
+        captureTo(sprint26ScreenshotDir, name)
     }
 
     private fun captureTo(directory: File, name: String) {

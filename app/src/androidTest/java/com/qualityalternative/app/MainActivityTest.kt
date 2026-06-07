@@ -193,6 +193,30 @@ class MainActivityTest {
     }
 
     @Test
+    fun systemInterceptionIntentShowsLiveInterventionForSelectedCustomTarget() {
+        val candidate = seedFirstEligibleCustomTargetSelection()
+        scenario?.close()
+        scenario = null
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+        Thread.sleep(250)
+
+        val targetContext = InstrumentationRegistry.getInstrumentation().targetContext
+        launchApp(
+            MainActivity.createSystemInterceptionIntent(
+                context = targetContext,
+                targetAppPackage = candidate.packageName,
+            ),
+        )
+
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasNode("You reached for ${candidate.displayName}")
+        }
+        composeRule.onNodeWithText("You reached for ${candidate.displayName}").assertIsDisplayed()
+        composeRule.onNodeWithText("Read this", substring = true).assertIsDisplayed().assertIsEnabled()
+        composeRule.onNodeWithText("Open ${candidate.displayName}").assertIsDisplayed().assertIsEnabled()
+    }
+
+    @Test
     fun systemInterventionDelayActionIsClickableWithoutScrolling() {
         seedFixtureSelection()
         relaunchFixtureSystemIntervention()
@@ -517,14 +541,12 @@ class MainActivityTest {
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("settings-list") }
         composeRule.onNodeWithTag("settings-list")
             .performScrollToNode(hasTestTag("intervention-mode-FIRM"))
-        composeRule.onNodeWithTag("intervention-mode-FIRM")
-            .assertIsDisplayed()
-            .assertIsSelected()
         composeRule.onNodeWithTag("intervention-mode-SOFT")
             .assertIsDisplayed()
+            .assertIsSelected()
+        composeRule.onNodeWithTag("intervention-mode-FIRM")
+            .assertIsDisplayed()
             .assertIsNotSelected()
-            .performClick()
-        composeRule.waitUntil(timeoutMillis = 10_000) { currentInterventionMode() == InterventionMode.SOFT }
         composeRule.onNodeWithTag("intervention-mode-SOFT")
             .assertIsSelected()
         captureReaderFormEvidenceScreenshot("13_intervention_mode_soft_selected")
@@ -4867,6 +4889,24 @@ class MainActivityTest {
                 selectedPackIds = setOf("link-only-modern-v1"),
             ),
         )
+    }
+
+    private fun seedFirstEligibleCustomTargetSelection(): com.qualityalternative.app.domain.model.DistractingApp = runBlocking {
+        val repository = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication)
+            .appContainer
+            .settingsRepository
+        val candidate = repository.customTargetAppCandidates().firstOrNull { it.isEligible }?.app
+        assertTrue("Expected at least one eligible custom app target on the test device", candidate != null)
+        val customTarget = requireNotNull(candidate)
+        repository.saveOnboardingSelection(
+            OnboardingSelection(
+                selectedAppPackages = setOf(customTarget.packageName),
+                preferredTopics = setOf(TopicTag.PHILOSOPHY, TopicTag.SCIENCE, TopicTag.HISTORY),
+                preferredDurationBucket = DurationBucket.FOCUS,
+                selectedPackIds = setOf("philosophy"),
+            ),
+        )
+        customTarget
     }
 
     private fun resetPersistentState() = runBlocking {

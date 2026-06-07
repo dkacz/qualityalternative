@@ -9,6 +9,7 @@ import com.qualityalternative.app.domain.model.AnalyticsEventType
 import com.qualityalternative.app.domain.model.DEFAULT_BEDTIME_ENABLED
 import com.qualityalternative.app.domain.model.DEFAULT_BEDTIME_END_MINUTES
 import com.qualityalternative.app.domain.model.DEFAULT_BEDTIME_START_MINUTES
+import com.qualityalternative.app.domain.model.DistractingApp
 import com.qualityalternative.app.domain.model.PermissionReadiness
 import com.qualityalternative.app.domain.model.bedtimeWindowIsActive
 import kotlinx.coroutines.CoroutineScope
@@ -40,6 +41,7 @@ class QualityAlternativeAccessibilityService : AccessibilityService() {
             appContainer.settingsRepository.observeAppSettings().collect { settings ->
                 interceptionSettings = InterceptionSettingsSnapshot(
                     selectedPackages = settings.selectedAppPackages,
+                    knownTargets = appContainer.settingsRepository.supportedDistractingApps(),
                     bedtimeEnabled = settings.bedtimeEnabled,
                     bedtimeStartMinutes = settings.bedtimeStartMinutes,
                     bedtimeEndMinutes = settings.bedtimeEndMinutes,
@@ -60,6 +62,7 @@ class QualityAlternativeAccessibilityService : AccessibilityService() {
             foregroundPackage = packageName,
             foregroundClass = className,
             selectedPackages = settings.selectedPackages,
+            knownTargets = settings.knownTargets,
             appPackage = packageName(),
         ) ?: return
         val nowMillis = System.currentTimeMillis()
@@ -125,6 +128,7 @@ class QualityAlternativeAccessibilityService : AccessibilityService() {
 
 private data class InterceptionSettingsSnapshot(
     val selectedPackages: Set<String> = emptySet(),
+    val knownTargets: List<DistractingApp> = emptyList(),
     val bedtimeEnabled: Boolean = DEFAULT_BEDTIME_ENABLED,
     val bedtimeStartMinutes: Int = DEFAULT_BEDTIME_START_MINUTES,
     val bedtimeEndMinutes: Int = DEFAULT_BEDTIME_END_MINUTES,

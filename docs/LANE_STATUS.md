@@ -13,7 +13,7 @@ This file is the repo-level index for active and recently completed execution la
 
 ## Sprint 26 Custom Targets And Website Interventions
 
-Status: `plan_gpt_pro_10_10_pass_slice26_1_ready`
+Status: `slice26_1_complete_10_10_pass_slice26_2_next`
 
 - Branch: `codex/sprint26-custom-targets-website-interventions`
 - Scope: plan and implement support for replacement-first interventions on eligible arbitrary installed apps plus supported-browser website/domain rules, while avoiding universal URL blocking claims.
@@ -28,17 +28,52 @@ Status: `plan_gpt_pro_10_10_pass_slice26_1_ready`
 - Current plan review bundle: `evidence/sprint26_custom_targets_website_interventions/SPRINT26_PLAN_REVIEW_R2_BUNDLE_20260607.zip`
 - Current plan review prompt: `evidence/sprint26_custom_targets_website_interventions/GPT_PRO_PLAN_REVIEW_PROMPT_R2.md`
 - Current implementation state:
-  - Planning document created.
-  - R1 blockers harvested and old heartbeat deleted.
-  - PRD and sprint plan patched for custom app eligibility, supported-browser domain-only website interventions, browser support matrix, stale URL prevention, Portable Profile import behavior, analytics denylist, and visual/E2E evidence contract.
-  - No app code has been changed yet.
-  - R2 GPT Pro plan review passed.
-  - Slice 26.0 contract/plan gate is complete.
-  - Ready to start Slice 26.1 custom app target vertical.
+  - Slice 26.0 contract/plan gate is complete and committed.
+  - Slice 26.1 custom app target vertical is implemented locally.
+  - Android now enumerates launchable installed apps for custom target candidates and exposes unsafe packages as disabled rows with reasons.
+  - R2 fixed the GPT Pro R1 blockers: default mode is Soft, DocumentsUI/file-picker packages are excluded, eligibility policy has direct unit coverage, and the review bundle includes Portable Profile, MainActivity, analytics, Gradle, raw logs, and expanded visual evidence.
+  - R3 fixed the GPT Pro R2 blockers: the bundle included all `app/src`, Portable Profile all-missing app-target replace import stayed empty instead of selecting defaults, fresh `--rerun-tasks` unit reports included XML/test counts, and custom installed-app intervention was covered through `MainActivity.createSystemInterceptionIntent()`.
+  - R4 fixes the GPT Pro R3 blockers: the review bundle now includes complete Gradle wrapper files and `app/proguard-rules.pro`; Settings can rebuild from an empty completed target set by allowing additions below the minimum while still blocking below-minimum removals; and the OEM safety boundary has direct regression coverage.
+  - Settings separates standard suggestions from custom installed-app search/selection.
+  - Selected eligible custom app packages hydrate into settings, Portable Profile import/export, and the AccessibilityService resolver's known target list.
+  - Website/domain rules are not implemented yet and remain scoped to Slice 26.2+.
+  - Slice 26.1 GPT Pro R3 review returned `SCORE 8/10`, `VERDICT FAIL`, `VISUAL REVIEW PASS`.
+  - Slice 26.1 GPT Pro R4 review returned `SCORE 10/10`, `VERDICT PASS`, `VISUAL REVIEW PASS`.
+  - Slice 26.1 GPT Pro R4 heartbeat was deleted after successful harvest.
+- Current Slice 26.1 validation:
+  - Validation summary: `evidence/sprint26_custom_targets_website_interventions/SLICE26_1_VALIDATION.md`
+  - Visual contact sheet R2: `evidence/sprint26_custom_targets_website_interventions/screenshots-slice26_1_r2/CONTACT_SHEET.png`
+  - Raw logs R2: `evidence/sprint26_custom_targets_website_interventions/logs-slice26_1_r2/`
+  - GPT Pro Slice 26.1 lane: `https://chatgpt.com/c/6a2533e7-1718-83eb-a8a6-d55ddc6da463`
+  - GPT Pro Slice 26.1 prompt: `evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_1_REVIEW_PROMPT.md`
+  - GPT Pro Slice 26.1 bundle: `evidence/sprint26_custom_targets_website_interventions/SPRINT26_SLICE26_1_REVIEW_BUNDLE_20260607.zip`
+  - GPT Pro Slice 26.1 R1 output: `evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_1_REVIEW.md`
+  - GPT Pro Slice 26.1 R1 verdict: `SCORE 6/10`, `VERDICT FAIL`, `VISUAL REVIEW FAIL`
+  - GPT Pro Slice 26.1 R2 lane: `https://chatgpt.com/c/6a253e58-239c-83ed-93df-5a24aad638fd`
+  - GPT Pro Slice 26.1 R2 prompt: `evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_1_R2_REVIEW_PROMPT.md`
+  - GPT Pro Slice 26.1 R2 bundle: `evidence/sprint26_custom_targets_website_interventions/SPRINT26_SLICE26_1_R2_REVIEW_BUNDLE_20260607.zip`
+  - GPT Pro Slice 26.1 R2 output: `evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_1_R2_REVIEW.md`
+  - GPT Pro Slice 26.1 R2 verdict: `SCORE 5/10`, `VERDICT FAIL`, `VISUAL REVIEW PASS`
+  - GPT Pro Slice 26.1 R3 lane: `https://chatgpt.com/c/6a2546ce-9c3c-83eb-bb3e-732e636f8484`
+  - GPT Pro Slice 26.1 R3 prompt: `evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_1_R3_REVIEW_PROMPT.md`
+  - GPT Pro Slice 26.1 R3 bundle: `evidence/sprint26_custom_targets_website_interventions/SPRINT26_SLICE26_1_R3_REVIEW_BUNDLE_20260607.zip`
+  - GPT Pro Slice 26.1 R3 output: `evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_1_R3_REVIEW.md`
+  - GPT Pro Slice 26.1 R3 verdict: `SCORE 8/10`, `VERDICT FAIL`, `VISUAL REVIEW PASS`
+  - GPT Pro Slice 26.1 R4 lane: `https://chatgpt.com/c/6a254f10-4c34-83eb-a943-148dde4a4efd`
+  - GPT Pro Slice 26.1 R4 prompt: `evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_1_R4_REVIEW_PROMPT.md`
+  - GPT Pro Slice 26.1 R4 bundle: `evidence/sprint26_custom_targets_website_interventions/SPRINT26_SLICE26_1_R4_REVIEW_BUNDLE_20260607.zip`
+  - GPT Pro Slice 26.1 R4 output: `evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_1_R4_REVIEW.md`
+  - GPT Pro Slice 26.1 R4 verdict: `SCORE 10/10`, `VERDICT PASS`, `VISUAL REVIEW PASS`
+  - GPT Pro Slice 26.1 R4 heartbeat: deleted after successful harvest.
+  - R4 validation summary: `evidence/sprint26_custom_targets_website_interventions/SLICE26_1_R4_VALIDATION.md`
+  - Visual contact sheet R4: `evidence/sprint26_custom_targets_website_interventions/screenshots-slice26_1_r4/CONTACT_SHEET.png`
+  - Raw logs R4: `evidence/sprint26_custom_targets_website_interventions/logs-slice26_1_r4/`
+  - Passed targeted unit tests and lint for resolver, settings repository, ViewModel hydration, and Portable Profile import/export.
+  - Passed emulator visual E2E: `VisualQaScreenshotTest#captureSprint26CustomTargetSettingsScreens`
+  - Passed `git diff --check`.
 - Next gate:
-  - Commit Slice 26.0 contract/plan artifacts.
-  - Create the execution goal.
-  - Implement Slice 26.1 custom app target vertical with automated tests, visual evidence, and GPT Pro review until `10/10 PASS`.
+  - Commit Slice 26.1 implementation/evidence.
+  - Continue to Slice 26.2 website rule model and Settings UI.
 
 ## Sprint 25 Markdown Media And Tables
 

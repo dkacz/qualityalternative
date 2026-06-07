@@ -21,6 +21,7 @@ import com.qualityalternative.app.domain.model.DEFAULT_INTERFACE_TEXT_SCALE
 import com.qualityalternative.app.domain.model.DEFAULT_INTERVENTION_MODE
 import com.qualityalternative.app.domain.model.DEFAULT_OPEN_ANYWAY_UNLOCK_MINUTES
 import com.qualityalternative.app.domain.model.DEFAULT_READER_FONT_SCALE
+import com.qualityalternative.app.domain.model.CustomTargetAppCandidate
 import com.qualityalternative.app.domain.model.DistractingApp
 import com.qualityalternative.app.domain.model.DurationBucket
 import com.qualityalternative.app.domain.model.InterventionMode
@@ -48,6 +49,7 @@ import kotlinx.coroutines.flow.map
 class PreferencesSettingsRepository(
     private val dataStore: DataStore<Preferences>,
     private val supportedApps: List<DistractingApp> = SupportedCatalog.distractingApps,
+    private val customTargetCandidatesProvider: () -> List<CustomTargetAppCandidate> = { emptyList() },
 ) : SettingsRepository {
     override fun observeAppSettings(): Flow<AppSettings> {
         return dataStore.data
@@ -108,7 +110,20 @@ class PreferencesSettingsRepository(
             }
     }
 
-    override fun supportedDistractingApps(): List<DistractingApp> = supportedApps
+    override fun supportedDistractingApps(): List<DistractingApp> {
+        return (supportedApps + customTargetAppCandidates().filter(CustomTargetAppCandidate::isEligible).map { it.app })
+            .distinctBy(DistractingApp::packageName)
+    }
+
+    override fun customTargetAppCandidates(): List<CustomTargetAppCandidate> {
+        return customTargetCandidatesProvider()
+            .distinctBy { candidate -> candidate.app.packageName }
+            .sortedWith(
+                compareBy<CustomTargetAppCandidate> { !it.isEligible }
+                    .thenBy { it.app.displayName.lowercase() }
+                    .thenBy { it.app.packageName },
+            )
+    }
 
     override suspend fun ensureLocalProfileIdentity(nowMillis: Long): LocalProfileIdentity {
         var identity: LocalProfileIdentity? = null

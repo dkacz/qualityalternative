@@ -4,6 +4,7 @@ import com.qualityalternative.app.domain.model.AnalyticsEvent
 import com.qualityalternative.app.domain.model.AppSettings
 import com.qualityalternative.app.domain.model.AppThemeMode
 import com.qualityalternative.app.domain.model.ContentItem
+import com.qualityalternative.app.domain.model.CustomTargetAppCandidate
 import com.qualityalternative.app.domain.model.ContentPriority
 import com.qualityalternative.app.domain.model.DelayInspection
 import com.qualityalternative.app.domain.model.DelayWindow
@@ -122,6 +123,7 @@ interface UserDocumentRepository {
 interface SettingsRepository {
     fun observeAppSettings(): Flow<AppSettings>
     fun supportedDistractingApps(): List<DistractingApp>
+    fun customTargetAppCandidates(): List<CustomTargetAppCandidate> = emptyList()
     suspend fun ensureLocalProfileIdentity(nowMillis: Long = System.currentTimeMillis()): LocalProfileIdentity
     suspend fun replacePortableSettings(settings: AppSettings, profileIdentity: LocalProfileIdentity? = null)
     suspend fun saveOnboardingSelection(selection: OnboardingSelection)

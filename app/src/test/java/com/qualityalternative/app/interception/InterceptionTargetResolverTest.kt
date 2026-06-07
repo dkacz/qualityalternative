@@ -3,6 +3,7 @@ package com.qualityalternative.app.interception
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
+import com.qualityalternative.app.domain.model.DistractingApp
 
 class InterceptionTargetResolverTest {
     @Test
@@ -39,5 +40,23 @@ class InterceptionTargetResolverTest {
         )
 
         assertNull(resolved)
+    }
+
+    @Test
+    fun resolve_returnsCustomTargetWhenSelectedPackageMatchesKnownTarget() {
+        val customTarget = DistractingApp(
+            packageName = "com.example.deepwork",
+            displayName = "Deep Work Trap",
+        )
+
+        val resolved = InterceptionTargetResolver.resolve(
+            foregroundPackage = customTarget.packageName,
+            foregroundClass = "com.example.deepwork.MainActivity",
+            selectedPackages = setOf(customTarget.packageName),
+            knownTargets = listOf(customTarget),
+            appPackage = "com.qualityalternative.app",
+        )
+
+        assertEquals(customTarget, resolved)
     }
 }

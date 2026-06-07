@@ -21,6 +21,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -100,6 +102,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
@@ -117,6 +120,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -133,6 +137,7 @@ import com.qualityalternative.app.data.ACCOUNT_LIGHT_PROFILE_FILE_NAME
 import com.qualityalternative.app.data.accountLightTimestampedBackupFileName
 import com.qualityalternative.app.BuildConfig
 import com.qualityalternative.app.data.ReadingTimeEstimateSource
+import com.qualityalternative.app.data.SupportedCatalog
 import com.qualityalternative.app.data.UserDocumentValidator
 import com.qualityalternative.app.domain.model.AnalyticsEvent
 import com.qualityalternative.app.domain.model.AnalyticsEventType
@@ -144,6 +149,7 @@ import com.qualityalternative.app.domain.model.ContentFormat
 import com.qualityalternative.app.domain.model.ContentItem
 import com.qualityalternative.app.domain.model.ContentPriority
 import com.qualityalternative.app.domain.model.ContentSourceType
+import com.qualityalternative.app.domain.model.CustomTargetAppCandidate
 import com.qualityalternative.app.domain.model.DEFAULT_BEDTIME_END_MINUTES
 import com.qualityalternative.app.domain.model.DEFAULT_BEDTIME_START_MINUTES
 import com.qualityalternative.app.domain.model.DelayWindow
@@ -1063,6 +1069,8 @@ private fun OnboardingApps(
     onBack: () -> Unit,
     onNext: () -> Unit,
 ) {
+    val standardPackages = remember { SupportedCatalog.distractingApps.mapTo(mutableSetOf(), DistractingApp::packageName) }
+    val suggestedApps = supportedApps.filter { app -> app.packageName in standardPackages }
     StepScreen(
         step = 1,
         onBack = onBack,
@@ -1083,7 +1091,7 @@ private fun OnboardingApps(
             modifier = Modifier.padding(top = 10.dp, bottom = 22.dp),
         )
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            supportedApps.forEach { app ->
+            suggestedApps.forEach { app ->
                 AppSelectionRow(
                     app = app,
                     selected = app.packageName in selection.selectedAppPackages,
@@ -4161,19 +4169,34 @@ private fun SettingsTab(
                 SectionLabel("Apps to interrupt", right = "${quantityLabel(state.availableTargetApps.size, "app")} active")
                 QaCard {
                     BodyText(
-                        text = "Checked apps trigger the replacement prompt. The Home screen only chooses which checked app to preview.",
+                        text = "Checked apps trigger the replacement prompt. Standard suggestions stay separate from apps you add yourself.",
                         color = colors.mutedText,
                         modifier = Modifier.padding(bottom = 12.dp),
                     )
+                    val standardPackages = remember { SupportedCatalog.distractingApps.mapTo(mutableSetOf(), DistractingApp::packageName) }
+                    val selectedPackages = state.availableTargetApps.mapTo(mutableSetOf(), DistractingApp::packageName)
+                    val standardApps = state.allSupportedApps.filter { app -> app.packageName in standardPackages }
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        state.allSupportedApps.forEach { app ->
+                        BodyText(
+                            text = "Standard suggestions",
+                            color = colors.mutedText,
+                            fontSize = 12.5.sp,
+                            modifier = Modifier.testTag("settings-standard-apps-label"),
+                        )
+                        standardApps.forEach { app ->
                             AppSelectionRow(
                                 app = app,
-                                selected = state.availableTargetApps.any { it.packageName == app.packageName },
+                                selected = app.packageName in selectedPackages,
                                 onClick = { onToggleApp(app) },
                             )
                         }
                     }
+                    CustomTargetAppPicker(
+                        candidates = state.customTargetAppCandidates,
+                        selectedPackages = selectedPackages,
+                        onToggleApp = onToggleApp,
+                        modifier = Modifier.padding(top = 18.dp),
+                    )
                     BodyText(
                         text = "Keep at least 3 selected for the alpha.",
                         color = colors.mutedText,
@@ -5171,6 +5194,8 @@ private fun AppSelectionRow(
     app: DistractingApp,
     selected: Boolean,
     onClick: () -> Unit,
+    enabled: Boolean = true,
+    supportingText: String? = null,
 ) {
     val colors = QualityAlternativeThemeTokens.colors
     Row(
@@ -5178,25 +5203,35 @@ private fun AppSelectionRow(
             .fillMaxWidth()
             .testTag("settings-app-${app.packageName}")
             .semantics { this.selected = selected }
+            .alpha(if (enabled) 1f else 0.62f)
             .clip(RoundedCornerShape(10.dp))
             .border(
                 BorderStroke(1.dp, if (selected) colors.primaryText else colors.line),
                 RoundedCornerShape(10.dp),
             )
             .background(if (selected) colors.elevatedSurface else Color.Transparent)
-            .clickable(onClick = onClick)
+            .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         AppDot(app = app)
-        Text(
-            text = app.displayName,
-            modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium,
-            color = colors.primaryText,
-        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = app.displayName,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+                color = colors.primaryText,
+            )
+            Text(
+                text = supportingText ?: app.packageName,
+                style = MaterialTheme.typography.bodySmall,
+                fontSize = 11.sp,
+                color = colors.mutedText,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
         Box(
             modifier = Modifier
                 .size(22.dp)
@@ -5206,6 +5241,82 @@ private fun AppSelectionRow(
             contentAlignment = Alignment.Center,
         ) {
             if (selected) QaIcon(kind = QaIconKind.Check, color = colors.background, size = 14.dp)
+        }
+    }
+}
+
+@Composable
+private fun CustomTargetAppPicker(
+    candidates: List<CustomTargetAppCandidate>,
+    selectedPackages: Set<String>,
+    onToggleApp: (DistractingApp) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = QualityAlternativeThemeTokens.colors
+    val focusManager = LocalFocusManager.current
+    var query by remember { mutableStateOf("") }
+    val normalizedQuery = query.trim().lowercase()
+    val visibleCandidates = remember(candidates, normalizedQuery) {
+        candidates
+            .filter { candidate ->
+                normalizedQuery.isBlank() ||
+                    candidate.app.displayName.lowercase().contains(normalizedQuery) ||
+                    candidate.app.packageName.lowercase().contains(normalizedQuery)
+            }
+            .take(10)
+    }
+    Column(modifier = modifier.testTag("settings-custom-apps-section")) {
+        BodyText(
+            text = "Add another app",
+            color = colors.mutedText,
+            fontSize = 12.5.sp,
+            modifier = Modifier.testTag("settings-custom-apps-label"),
+        )
+        BasicTextField(
+            value = query,
+            onValueChange = { query = it },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+            textStyle = MaterialTheme.typography.bodyMedium.copy(color = colors.primaryText),
+            modifier = Modifier
+                .padding(top = 8.dp, bottom = 10.dp)
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .border(BorderStroke(1.dp, colors.line), RoundedCornerShape(10.dp))
+                .background(colors.background)
+                .padding(horizontal = 14.dp, vertical = 12.dp)
+                .testTag("settings-custom-app-search"),
+            decorationBox = { innerTextField ->
+                if (query.isBlank()) {
+                    Text(
+                        text = "Search installed apps",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colors.mutedText,
+                    )
+                }
+                innerTextField()
+            },
+        )
+        if (visibleCandidates.isEmpty()) {
+            BodyText(
+                text = "No matching installed apps. System, emergency, setup, and launcher apps are kept out of the target list for safety.",
+                color = colors.mutedText,
+                fontSize = 12.5.sp,
+                modifier = Modifier.testTag("settings-custom-apps-empty"),
+            )
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                visibleCandidates.forEach { candidate ->
+                    AppSelectionRow(
+                        app = candidate.app,
+                        selected = candidate.app.packageName in selectedPackages,
+                        enabled = candidate.isEligible,
+                        supportingText = candidate.exclusionReason ?: candidate.app.packageName,
+                        onClick = { onToggleApp(candidate.app) },
+                    )
+                }
+            }
         }
     }
 }

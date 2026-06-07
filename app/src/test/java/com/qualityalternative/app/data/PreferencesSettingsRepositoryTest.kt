@@ -7,6 +7,9 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.qualityalternative.app.domain.model.AppThemeMode
 import com.qualityalternative.app.domain.model.ContentPriority
+import com.qualityalternative.app.domain.model.CustomTargetAppCandidate
+import com.qualityalternative.app.domain.model.CustomTargetAppEligibility
+import com.qualityalternative.app.domain.model.DistractingApp
 import com.qualityalternative.app.domain.model.DurationBucket
 import com.qualityalternative.app.domain.model.InterventionMode
 import com.qualityalternative.app.domain.model.OnboardingSelection
@@ -84,7 +87,7 @@ class PreferencesSettingsRepositoryTest {
         )
 
         repository.saveOnboardingSelection(selection)
-        assertEquals(InterventionMode.FIRM, repository.observeAppSettings().first().interventionMode)
+        assertEquals(InterventionMode.SOFT, repository.observeAppSettings().first().interventionMode)
         repository.saveInterventionMode(InterventionMode.SOFT)
 
         val restored = repository.observeAppSettings().first()
@@ -457,6 +460,52 @@ class PreferencesSettingsRepositoryTest {
         assertEquals(updatedPackages, restored.selectedAppPackages)
         assertEquals(DurationBucket.DEEP, restored.preferredDurationBucket)
         assertEquals(selection.preferredTopics, restored.preferredTopics)
+    }
+
+    @Test
+    fun supportedDistractingApps_includesEligibleCustomAppsAndExcludesUnsafeCandidates() = runBlocking {
+        val customApp = DistractingApp(
+            packageName = "com.example.deepwork",
+            displayName = "Deep Work Trap",
+        )
+        val excludedApp = DistractingApp(
+            packageName = "com.android.settings",
+            displayName = "Settings",
+        )
+        val repository = PreferencesSettingsRepository(
+            dataStore = testDataStore(),
+            supportedApps = SupportedCatalog.distractingApps,
+            customTargetCandidatesProvider = {
+                listOf(
+                    CustomTargetAppCandidate(
+                        app = customApp,
+                        eligibility = CustomTargetAppEligibility.ELIGIBLE,
+                    ),
+                    CustomTargetAppCandidate(
+                        app = excludedApp,
+                        eligibility = CustomTargetAppEligibility.EXCLUDED_SETTINGS_OR_PERMISSION,
+                        exclusionReason = "Settings and permission screens stay available.",
+                    ),
+                )
+            },
+        )
+
+        repository.saveSelectedAppPackages(
+            setOf(
+                SupportedCatalog.distractingApps.first().packageName,
+                customApp.packageName,
+            ),
+        )
+
+        val supportedPackages = repository.supportedDistractingApps().mapTo(mutableSetOf(), DistractingApp::packageName)
+        val restored = repository.observeAppSettings().first()
+
+        assertTrue(customApp.packageName in supportedPackages)
+        assertFalse(excludedApp.packageName in supportedPackages)
+        assertEquals(
+            setOf(SupportedCatalog.distractingApps.first().packageName, customApp.packageName),
+            restored.selectedAppPackages,
+        )
     }
 
     private fun testDataStore(): DataStore<Preferences> {

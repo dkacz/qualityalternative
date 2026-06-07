@@ -23,6 +23,8 @@ import com.qualityalternative.app.domain.model.ContentRenderMode
 import com.qualityalternative.app.domain.model.ContentRightsClass
 import com.qualityalternative.app.domain.model.ContentRightsMetadata
 import com.qualityalternative.app.domain.model.ContentSourceType
+import com.qualityalternative.app.domain.model.CustomTargetAppCandidate
+import com.qualityalternative.app.domain.model.CustomTargetAppEligibility
 import com.qualityalternative.app.domain.model.DistractingApp
 import com.qualityalternative.app.domain.model.DurationBucket
 import com.qualityalternative.app.domain.model.EditorialPack
@@ -3733,6 +3735,37 @@ class MainViewModelTest {
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
+    fun settingsHydrationRestoresSelectedCustomTargetApp() = runTest {
+        val customTarget = DistractingApp(
+            packageName = "com.example.deepwork",
+            displayName = "Deep Work Trap",
+        )
+        val selectedPackages = setOf(
+            SupportedCatalog.distractingApps[0].packageName,
+            SupportedCatalog.distractingApps[1].packageName,
+            customTarget.packageName,
+        )
+        val settingsRepository = FakeSettingsRepository(
+            initial = completedSettings(selectedAppPackages = selectedPackages),
+            supportedApps = SupportedCatalog.distractingApps + customTarget,
+            customCandidates = listOf(
+                CustomTargetAppCandidate(
+                    app = customTarget,
+                    eligibility = CustomTargetAppEligibility.ELIGIBLE,
+                ),
+            ),
+        )
+        val viewModel = createViewModel(settingsRepository = settingsRepository)
+
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.hasCompletedOnboarding)
+        assertTrue(viewModel.uiState.availableTargetApps.any { it.packageName == customTarget.packageName })
+        assertTrue(viewModel.uiState.customTargetAppCandidates.any { it.app.packageName == customTarget.packageName })
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
     fun startActiveDelayAlternativeRefusesExpiredDelayWindow() = runTest {
         var nowMillis = System.currentTimeMillis()
         val analyticsTracker = InMemoryAnalyticsTracker()
@@ -4134,7 +4167,8 @@ class MainViewModelTest {
         var nowMillis = 5_000L
         val viewModel = createViewModel(
             settingsRepository = FakeSettingsRepository(
-                initial = completedSettings(selectedAppPackages = setOf(fixtureTarget.packageName)),
+                initial = completedSettings(selectedAppPackages = setOf(fixtureTarget.packageName))
+                    .copy(interventionMode = InterventionMode.FIRM),
             ),
             nowProvider = { nowMillis },
         )
@@ -4169,7 +4203,10 @@ class MainViewModelTest {
         val viewModel = createViewModel(
             settingsRepository = FakeSettingsRepository(
                 initial = completedSettings(selectedAppPackages = setOf(fixtureTarget.packageName))
-                    .copy(openAnywayUnlockMinutes = 120),
+                    .copy(
+                        openAnywayUnlockMinutes = 120,
+                        interventionMode = InterventionMode.FIRM,
+                    ),
             ),
             analyticsTracker = analyticsTracker,
             nowProvider = { nowMillis },
@@ -4217,7 +4254,8 @@ class MainViewModelTest {
         val analyticsTracker = InMemoryAnalyticsTracker()
         val viewModel = createViewModel(
             settingsRepository = FakeSettingsRepository(
-                initial = completedSettings(selectedAppPackages = setOf(fixtureTarget.packageName)),
+                initial = completedSettings(selectedAppPackages = setOf(fixtureTarget.packageName))
+                    .copy(interventionMode = InterventionMode.FIRM),
             ),
             analyticsTracker = analyticsTracker,
             nowProvider = { nowMillis },
@@ -4255,13 +4293,13 @@ class MainViewModelTest {
         val viewModel = createViewModel(settingsRepository = settingsRepository)
 
         advanceUntilIdle()
-        assertEquals(InterventionMode.FIRM, viewModel.uiState.interventionMode)
+        assertEquals(InterventionMode.SOFT, viewModel.uiState.interventionMode)
 
-        viewModel.selectInterventionMode(InterventionMode.SOFT)
+        viewModel.selectInterventionMode(InterventionMode.FIRM)
         advanceUntilIdle()
 
-        assertEquals(InterventionMode.SOFT, viewModel.uiState.interventionMode)
-        assertEquals(InterventionMode.SOFT, settingsRepository.state.value.interventionMode)
+        assertEquals(InterventionMode.FIRM, viewModel.uiState.interventionMode)
+        assertEquals(InterventionMode.FIRM, settingsRepository.state.value.interventionMode)
     }
 
     @Test
@@ -4657,7 +4695,8 @@ class MainViewModelTest {
         val analyticsTracker = InMemoryAnalyticsTracker()
         val viewModel = createViewModel(
             settingsRepository = FakeSettingsRepository(
-                initial = completedSettings(selectedAppPackages = setOf(fixtureTarget.packageName)),
+                initial = completedSettings(selectedAppPackages = setOf(fixtureTarget.packageName))
+                    .copy(interventionMode = InterventionMode.FIRM),
             ),
             analyticsTracker = analyticsTracker,
             nowProvider = { 30_000L },
@@ -5056,6 +5095,64 @@ class MainViewModelTest {
         assertEquals(60, targetSettingsRepository.state.value.openAnywayUnlockMinutes)
     }
 
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun accountLightReplaceImportWithAllMissingAppTargetsDoesNotSelectDefaults() = runTest {
+        val customTarget = DistractingApp(
+            packageName = "com.example.deepwork",
+            displayName = "Deep Work Trap",
+        )
+        val importedSettingsRepository = FakeSettingsRepository(
+            initial = completedSettings(selectedAppPackages = setOf("com.future.reader", "com.future.social")),
+        )
+        val targetSettingsRepository = FakeSettingsRepository(
+            initial = completedSettings(selectedAppPackages = setOf("com.google.android.youtube")),
+            supportedApps = SupportedCatalog.distractingApps + customTarget,
+            customCandidates = listOf(
+                CustomTargetAppCandidate(
+                    app = customTarget,
+                    eligibility = CustomTargetAppEligibility.ELIGIBLE,
+                ),
+            ),
+        )
+        val viewModel = createViewModel(settingsRepository = targetSettingsRepository)
+        val rawJson = AccountLightProfileExporter(
+            settingsRepository = importedSettingsRepository,
+            appVersionName = "0.8.1-alpha",
+            appVersionCode = 13,
+        ).exportSettingsOnlyProfileJson(nowMillis = 20_000L)
+        advanceUntilIdle()
+
+        viewModel.previewAccountLightImport(rawJson)
+        viewModel.requestAccountLightReplaceConfirmation()
+        viewModel.confirmAccountLightReplaceImport()
+        advanceUntilIdle()
+
+        assertTrue(targetSettingsRepository.state.value.hasCompletedOnboarding)
+        assertEquals(emptySet<String>(), targetSettingsRepository.state.value.selectedAppPackages)
+        assertEquals(emptyList<DistractingApp>(), viewModel.uiState.preferences?.selectedApps)
+        assertEquals(emptyList<DistractingApp>(), viewModel.uiState.availableTargetApps)
+        assertEquals(null, viewModel.uiState.selectedTargetApp)
+        assertEquals("Imported profile replaced local portable settings and library.", viewModel.uiState.accountLightStatus)
+
+        val standardTarget = SupportedCatalog.distractingApps.first()
+        viewModel.toggleSettingsApp(standardTarget)
+        advanceUntilIdle()
+
+        assertEquals(setOf(standardTarget.packageName), targetSettingsRepository.state.value.selectedAppPackages)
+        assertEquals(listOf(standardTarget.packageName), viewModel.uiState.availableTargetApps.map { it.packageName })
+        assertEquals(standardTarget.packageName, viewModel.uiState.selectedTargetApp?.packageName)
+
+        viewModel.toggleSettingsApp(customTarget)
+        advanceUntilIdle()
+
+        assertEquals(
+            setOf(standardTarget.packageName, customTarget.packageName),
+            targetSettingsRepository.state.value.selectedAppPackages,
+        )
+        assertTrue(viewModel.uiState.availableTargetApps.any { it.packageName == customTarget.packageName })
+    }
+
     private fun completedSettings(selectedAppPackages: Set<String>): AppSettings {
         return AppSettings(
             hasCompletedOnboarding = true,
@@ -5134,12 +5231,16 @@ class MainViewModelTest {
             preferredDurationBucket = DurationBucket.FOCUS,
             selectedPackIds = emptySet(),
         ),
+        private val supportedApps: List<DistractingApp> = SupportedCatalog.distractingApps,
+        private val customCandidates: List<CustomTargetAppCandidate> = emptyList(),
     ) : SettingsRepository {
         val state = MutableStateFlow(initial)
 
         override fun observeAppSettings(): Flow<AppSettings> = state
 
-        override fun supportedDistractingApps(): List<DistractingApp> = SupportedCatalog.distractingApps
+        override fun supportedDistractingApps(): List<DistractingApp> = supportedApps
+
+        override fun customTargetAppCandidates(): List<CustomTargetAppCandidate> = customCandidates
 
         override suspend fun saveOnboardingSelection(selection: OnboardingSelection) {
             state.value = AppSettings(

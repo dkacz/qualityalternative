@@ -8,6 +8,27 @@ data class DistractingApp(
     val displayName: String,
 )
 
+enum class CustomTargetAppEligibility {
+    ELIGIBLE,
+    EXCLUDED_SELF,
+    EXCLUDED_LAUNCHER,
+    EXCLUDED_SETTINGS_OR_PERMISSION,
+    EXCLUDED_PHONE_OR_EMERGENCY,
+    EXCLUDED_INSTALLER,
+    EXCLUDED_DOCUMENTS_OR_FILE_PICKER,
+    EXCLUDED_SYSTEM_CRITICAL,
+    EXCLUDED_NOT_LAUNCHABLE,
+}
+
+data class CustomTargetAppCandidate(
+    val app: DistractingApp,
+    val eligibility: CustomTargetAppEligibility,
+    val exclusionReason: String? = null,
+) {
+    val isEligible: Boolean
+        get() = eligibility == CustomTargetAppEligibility.ELIGIBLE
+}
+
 data class UserPreferences(
     val selectedApps: List<DistractingApp>,
     val preferredTopics: Set<TopicTag>,
@@ -67,7 +88,7 @@ enum class InterventionMode {
     FIRM,
 }
 
-val DEFAULT_INTERVENTION_MODE = InterventionMode.FIRM
+val DEFAULT_INTERVENTION_MODE = InterventionMode.SOFT
 
 enum class AppThemeMode {
     LIGHT,

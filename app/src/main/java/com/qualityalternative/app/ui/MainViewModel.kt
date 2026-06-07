@@ -29,6 +29,7 @@ import com.qualityalternative.app.domain.model.ContentFormat
 import com.qualityalternative.app.domain.model.ContentItem
 import com.qualityalternative.app.domain.model.ContentPriority
 import com.qualityalternative.app.domain.model.ContentSourceType
+import com.qualityalternative.app.domain.model.CustomTargetAppCandidate
 import com.qualityalternative.app.domain.model.DEFAULT_BEDTIME_ENABLED
 import com.qualityalternative.app.domain.model.DEFAULT_BEDTIME_END_MINUTES
 import com.qualityalternative.app.domain.model.DEFAULT_BEDTIME_START_MINUTES
@@ -120,6 +121,7 @@ data class MainUiState(
     val isLoadingSettings: Boolean = true,
     val hasCompletedOnboarding: Boolean = false,
     val allSupportedApps: List<DistractingApp> = emptyList(),
+    val customTargetAppCandidates: List<CustomTargetAppCandidate> = emptyList(),
     val availableTargetApps: List<DistractingApp> = emptyList(),
     val onboardingSelection: OnboardingSelection = OnboardingSelection(
         selectedAppPackages = emptySet(),
@@ -324,6 +326,7 @@ class MainViewModel(
     private val nowProvider: () -> Long = System::currentTimeMillis,
 ) : ViewModel() {
     private val supportedApps = settingsRepository.supportedDistractingApps()
+    private val customTargetAppCandidates = settingsRepository.customTargetAppCandidates()
     private val starterPacks = contentRepository.starterPacks()
     private val defaultSelectedPackIds = defaultStarterPackIds(starterPacks)
     private var settingsLoaded = false
@@ -364,6 +367,7 @@ class MainViewModel(
     private val uiStateHolder = mutableStateOf(
         MainUiState(
             allSupportedApps = supportedApps,
+            customTargetAppCandidates = customTargetAppCandidates,
             starterPacks = starterPacks,
             onboardingSelection = defaultOnboardingSelection(
                 supportedApps = supportedApps,
@@ -580,10 +584,13 @@ class MainViewModel(
     fun toggleSettingsApp(app: DistractingApp) {
         val preferences = uiState.preferences ?: return
         val selectedPackages = preferences.selectedApps.mapTo(mutableSetOf(), DistractingApp::packageName)
-        if (!selectedPackages.add(app.packageName)) {
+        val isRemoving = app.packageName in selectedPackages
+        if (isRemoving) {
             selectedPackages.remove(app.packageName)
+        } else {
+            selectedPackages.add(app.packageName)
         }
-        if (selectedPackages.size < MIN_SELECTED_DISTRACTING_APPS) {
+        if (isRemoving && selectedPackages.size < MIN_SELECTED_DISTRACTING_APPS) {
             uiState = uiState.copy(latestMessage = "Keep at least 3 apps selected for the alpha.")
             return
         }
@@ -4313,8 +4320,17 @@ private fun AppSettings.toUserPreferences(
     supportedApps: List<DistractingApp>,
     fallbackPackIds: Set<String>,
 ): UserPreferences {
-    val selectedApps = selectedAppPackages.mapNotNull(SupportedCatalog::findByPackage)
-        .ifEmpty { supportedApps.take(3) }
+    val supportedByPackage = supportedApps.associateBy(DistractingApp::packageName)
+    val selectedApps = selectedAppPackages.mapNotNull { packageName ->
+        supportedByPackage[packageName] ?: SupportedCatalog.findByPackage(packageName)
+    }
+        .ifEmpty {
+            if (hasCompletedOnboarding) {
+                emptyList()
+            } else {
+                supportedApps.take(3)
+            }
+        }
     val selectedTopics = preferredTopics.ifEmpty { defaultPrototypeTopics() }
     val packs = selectedPackIds.ifEmpty { fallbackPackIds }
     return UserPreferences(

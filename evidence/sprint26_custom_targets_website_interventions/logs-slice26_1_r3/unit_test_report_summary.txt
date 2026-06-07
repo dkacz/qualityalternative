@@ -1,0 +1,7 @@
+com.qualityalternative.app.data.AccountLightProfileExporterTest: tests=10 failures=0 errors=0 skipped=0
+com.qualityalternative.app.data.AccountLightProfileImporterTest: tests=23 failures=0 errors=0 skipped=0
+com.qualityalternative.app.data.InstalledAppTargetEligibilityPolicyTest: tests=2 failures=0 errors=0 skipped=0
+com.qualityalternative.app.data.PreferencesSettingsRepositoryTest: tests=20 failures=0 errors=0 skipped=0
+com.qualityalternative.app.interception.InterceptionTargetResolverTest: tests=4 failures=0 errors=0 skipped=0
+com.qualityalternative.app.ui.MainViewModelTest: tests=135 failures=0 errors=0 skipped=0
+TOTAL: tests=194 failures=0 errors=0 skipped=0

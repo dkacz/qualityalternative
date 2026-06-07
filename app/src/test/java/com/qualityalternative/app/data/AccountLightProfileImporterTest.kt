@@ -10,6 +10,9 @@ import com.qualityalternative.app.domain.model.ContentItem
 import com.qualityalternative.app.domain.model.ContentPriority
 import com.qualityalternative.app.domain.model.ContentRightsMetadata
 import com.qualityalternative.app.domain.model.ContentSourceType
+import com.qualityalternative.app.domain.model.CustomTargetAppCandidate
+import com.qualityalternative.app.domain.model.CustomTargetAppEligibility
+import com.qualityalternative.app.domain.model.DistractingApp
 import com.qualityalternative.app.domain.model.DurationBucket
 import com.qualityalternative.app.domain.model.OnboardingSelection
 import com.qualityalternative.app.domain.model.ReadingProgress
@@ -168,6 +171,64 @@ class AccountLightProfileImporterTest {
         val settings = target.observeAppSettings().first()
 
         assertEquals(setOf("com.instagram.android"), settings.selectedAppPackages)
+    }
+
+    @Test
+    fun validateImportProfileJson_keepsAllMissingAppTargetsInactiveOnReplace() = runBlocking {
+        val target = PreferencesSettingsRepository(
+            dataStore = testDataStore(),
+            supportedApps = SupportedCatalog.distractingApps,
+        )
+        val importer = AccountLightProfileImporter(settingsRepository = target)
+        val plan = importer.validateImportProfileJson(
+            validProfileJson().withSelectedAppPackages(
+                listOf("com.future.reader", "com.future.social"),
+            ),
+        )
+
+        assertEquals(2, plan.preview.unsupportedAppCount)
+        assertTrue(plan.allWarnings.any { it.code == "UNSUPPORTED_LOCAL_APP_PACKAGE" })
+
+        importer.applyReplace(plan)
+        val settings = target.observeAppSettings().first()
+
+        assertTrue(settings.hasCompletedOnboarding)
+        assertEquals(emptySet<String>(), settings.selectedAppPackages)
+    }
+
+    @Test
+    fun validateImportProfileJson_activatesEligibleCustomAppAndKeepsMissingPackageInactiveOnReplace() = runBlocking {
+        val customTarget = DistractingApp(
+            packageName = "com.example.deepwork",
+            displayName = "Deep Work Trap",
+        )
+        val target = PreferencesSettingsRepository(
+            dataStore = testDataStore(),
+            supportedApps = SupportedCatalog.distractingApps,
+            customTargetCandidatesProvider = {
+                listOf(
+                    CustomTargetAppCandidate(
+                        app = customTarget,
+                        eligibility = CustomTargetAppEligibility.ELIGIBLE,
+                    ),
+                )
+            },
+        )
+        val importer = AccountLightProfileImporter(settingsRepository = target)
+        val importedStandardPackage = SupportedCatalog.distractingApps.first().packageName
+        val plan = importer.validateImportProfileJson(
+            validProfileJson().withSelectedAppPackages(
+                listOf(importedStandardPackage, customTarget.packageName, "com.future.reader"),
+            ),
+        )
+
+        assertEquals(1, plan.preview.unsupportedAppCount)
+        assertTrue(plan.allWarnings.any { it.code == "UNSUPPORTED_LOCAL_APP_PACKAGE" })
+
+        importer.applyReplace(plan)
+        val settings = target.observeAppSettings().first()
+
+        assertEquals(setOf(importedStandardPackage, customTarget.packageName), settings.selectedAppPackages)
     }
 
     @Test

@@ -8,8 +8,10 @@ object InterceptionTargetResolver {
         foregroundPackage: String,
         foregroundClass: String?,
         selectedPackages: Set<String>,
+        knownTargets: List<DistractingApp> = emptyList(),
         appPackage: String,
     ): DistractingApp? {
+        val targetByPackage = knownTargets.associateBy(DistractingApp::packageName)
         return when {
             foregroundPackage == appPackage -> {
                 FixtureTargetRegistry.findByComponent(foregroundClass)
@@ -17,7 +19,8 @@ object InterceptionTargetResolver {
             }
 
             foregroundPackage in selectedPackages -> {
-                SupportedCatalog.findByPackage(foregroundPackage)
+                targetByPackage[foregroundPackage]
+                    ?: SupportedCatalog.findByPackage(foregroundPackage)
             }
 
             else -> null

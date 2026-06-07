@@ -1,0 +1,11 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<testsuites tests="1" failures="0" errors="0" skipped="0" time="12.063" timestamp="2026-06-07T10:54:55" hostname="localhost">
+  <testsuite name="com.qualityalternative.app.VisualQaScreenshotTest" tests="1" failures="0" errors="0" skipped="0" time="11.118" timestamp="2026-06-07T10:54:55" hostname="localhost">
+    <properties>
+      <property name="device" value="qaTall(AVD) - 16" />
+      <property name="flavor" value="" />
+      <property name="project" value=":app" />
+    </properties>
+    <testcase name="captureSprint26CustomTargetSettingsScreens" classname="com.qualityalternative.app.VisualQaScreenshotTest" time="11.118" />
+  </testsuite>
+</testsuites>

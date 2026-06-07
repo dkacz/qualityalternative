@@ -10,6 +10,9 @@ import com.qualityalternative.app.domain.model.ContentItem
 import com.qualityalternative.app.domain.model.ContentPriority
 import com.qualityalternative.app.domain.model.ContentRightsMetadata
 import com.qualityalternative.app.domain.model.ContentSourceType
+import com.qualityalternative.app.domain.model.CustomTargetAppCandidate
+import com.qualityalternative.app.domain.model.CustomTargetAppEligibility
+import com.qualityalternative.app.domain.model.DistractingApp
 import com.qualityalternative.app.domain.model.DurationBucket
 import com.qualityalternative.app.domain.model.InterventionMode
 import com.qualityalternative.app.domain.model.OnboardingSelection
@@ -168,6 +171,44 @@ class AccountLightProfileExporterTest {
         val profile = AccountLightProfileCodec().decode(exporter.exportSettingsOnlyProfileJson(nowMillis = 20_000L))
 
         assertEquals(listOf("public-domain-expansion-v2", "starter_pack"), profile.settings.selectedPackIds)
+    }
+
+    @Test
+    fun exportSettingsOnlyProfileJson_includesSelectedEligibleCustomAppPackage() = runBlocking {
+        val customTarget = DistractingApp(
+            packageName = "com.example.deepwork",
+            displayName = "Deep Work Trap",
+        )
+        val repository = PreferencesSettingsRepository(
+            dataStore = testDataStore(),
+            supportedApps = SupportedCatalog.distractingApps,
+            customTargetCandidatesProvider = {
+                listOf(
+                    CustomTargetAppCandidate(
+                        app = customTarget,
+                        eligibility = CustomTargetAppEligibility.ELIGIBLE,
+                    ),
+                )
+            },
+        )
+        val selectedPackages = setOf(SupportedCatalog.distractingApps.first().packageName, customTarget.packageName)
+        repository.saveOnboardingSelection(
+            OnboardingSelection(
+                selectedAppPackages = selectedPackages,
+                preferredTopics = setOf(TopicTag.SCIENCE, TopicTag.PHILOSOPHY, TopicTag.HISTORY),
+                preferredDurationBucket = DurationBucket.FOCUS,
+                selectedPackIds = setOf("starter_pack"),
+            ),
+        )
+        val exporter = AccountLightProfileExporter(
+            settingsRepository = repository,
+            appVersionName = "0.8.1-alpha",
+            appVersionCode = 13,
+        )
+
+        val profile = AccountLightProfileCodec().decode(exporter.exportSettingsOnlyProfileJson(nowMillis = 20_000L))
+
+        assertEquals(selectedPackages.sorted(), profile.settings.selectedAppPackages)
     }
 
     @Test

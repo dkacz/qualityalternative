@@ -1,0 +1,11 @@
+Sprint 26 Slice 26.1 R4 connected Android evidence
+
+- MainActivityTest#systemInterceptionIntentShowsLiveInterventionForSelectedCustomTarget: PASS (custom_intent_path_connected.log)
+- VisualQaScreenshotTest#captureSprint26CustomTargetSettingsScreens: PASS (visual_connected_r4.log)
+
+Screenshots:
+- evidence/sprint26_custom_targets_website_interventions/screenshots-slice26_1_r4/CONTACT_SHEET.png
+- 10 individual R4 PNGs under screenshots-slice26_1_r4/sprint26-custom-targets-1780829672518/
+
+Emulator cleanup:
+- qaTall/emulator-5554 was killed after screenshot extraction.

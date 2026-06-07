@@ -90,6 +90,7 @@ class AppContainer(context: Context) {
     )
     val settingsRepository: SettingsRepository = PreferencesSettingsRepository(
         dataStore = context.appSettingsDataStore,
+        customTargetCandidatesProvider = AndroidInstalledAppTargetCatalog(context = context)::candidates,
     )
     val accountLightProfileExporter: AccountLightProfileExporter = AccountLightProfileExporter(
         settingsRepository = settingsRepository,
