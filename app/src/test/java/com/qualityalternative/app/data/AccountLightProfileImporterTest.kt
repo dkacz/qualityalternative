@@ -19,6 +19,7 @@ import com.qualityalternative.app.domain.model.ReadingProgress
 import com.qualityalternative.app.domain.model.TopicTag
 import com.qualityalternative.app.domain.model.UserDocumentDraft
 import com.qualityalternative.app.domain.model.UserLinkDraft
+import com.qualityalternative.app.domain.model.WebsiteRuleType
 import com.qualityalternative.app.domain.service.AddUserDocumentResult
 import com.qualityalternative.app.domain.service.AddUserLinkResult
 import com.qualityalternative.app.domain.service.ReadingProgressRepository
@@ -145,6 +146,95 @@ class AccountLightProfileImporterTest {
         assertEquals("local-folder", settings.annotationExportDisplayName)
         assertTrue(identity.profileId.startsWith("qa-local-11111111"))
         assertEquals(10_000L, identity.createdAtMillis)
+    }
+
+    @Test
+    fun applyReplace_restoresPortableWebsiteRules() = runBlocking {
+        val target = PreferencesSettingsRepository(
+            dataStore = testDataStore(),
+            supportedApps = SupportedCatalog.distractingApps,
+        )
+        val importer = AccountLightProfileImporter(settingsRepository = target)
+        val plan = importer.validateImportProfileJson(
+            validProfileJson().withWebsiteRules(
+                listOf(
+                    JsonObject(
+                        mapOf(
+                            "id" to JsonPrimitive("website-rule-11111111-1111-4111-8111-111111111111"),
+                            "ruleType" to JsonPrimitive(WebsiteRuleType.EXACT_DOMAIN.name),
+                            "host" to JsonPrimitive("example.com"),
+                            "enabled" to JsonPrimitive(true),
+                            "includeApex" to JsonPrimitive(false),
+                        ),
+                    ),
+                    JsonObject(
+                        mapOf(
+                            "id" to JsonPrimitive("website-rule-22222222-2222-4222-8222-222222222222"),
+                            "ruleType" to JsonPrimitive(WebsiteRuleType.WILDCARD_SUBDOMAINS.name),
+                            "host" to JsonPrimitive("news.example"),
+                            "enabled" to JsonPrimitive(false),
+                            "includeApex" to JsonPrimitive(true),
+                        ),
+                    ),
+                ),
+            ),
+        )
+
+        importer.applyReplace(plan)
+
+        val restored = target.observeAppSettings().first().websiteRules
+        assertEquals(2, restored.size)
+        assertEquals("example.com", restored[0].host)
+        assertEquals(WebsiteRuleType.EXACT_DOMAIN, restored[0].type)
+        assertEquals("news.example", restored[1].host)
+        assertEquals(WebsiteRuleType.WILDCARD_SUBDOMAINS, restored[1].type)
+        assertEquals(true, restored[1].includeApex)
+        assertEquals(false, restored[1].enabled)
+    }
+
+    @Test
+    fun validateImportProfileJson_rejectsUnsafeWebsiteRules() {
+        val repository = PreferencesSettingsRepository(
+            dataStore = testDataStore(),
+            supportedApps = SupportedCatalog.distractingApps,
+        )
+        val importer = AccountLightProfileImporter(settingsRepository = repository)
+
+        listOf(
+            JsonObject(
+                mapOf(
+                    "id" to JsonPrimitive("website-rule-11111111-1111-4111-8111-111111111111"),
+                    "ruleType" to JsonPrimitive(WebsiteRuleType.EXACT_DOMAIN.name),
+                    "host" to JsonPrimitive("192.168.1.7"),
+                ),
+            ),
+            JsonObject(
+                mapOf(
+                    "id" to JsonPrimitive("website-rule-44444444-4444-4444-8444-444444444444"),
+                    "ruleType" to JsonPrimitive(WebsiteRuleType.EXACT_DOMAIN.name),
+                    "host" to JsonPrimitive("8.8.8.8"),
+                ),
+            ),
+            JsonObject(
+                mapOf(
+                    "id" to JsonPrimitive("website-rule-22222222-2222-4222-8222-222222222222"),
+                    "ruleType" to JsonPrimitive(WebsiteRuleType.EXACT_DOMAIN.name),
+                    "host" to JsonPrimitive("example.com/path"),
+                ),
+            ),
+            JsonObject(
+                mapOf(
+                    "id" to JsonPrimitive("website-rule-33333333-3333-4333-8333-333333333333"),
+                    "ruleType" to JsonPrimitive(WebsiteRuleType.EXACT_DOMAIN.name),
+                    "host" to JsonPrimitive("example.com"),
+                    "includeApex" to JsonPrimitive(true),
+                ),
+            ),
+        ).forEach { unsafeRule ->
+            assertThrows(AccountLightImportException::class.java) {
+                importer.validateImportProfileJson(validProfileJson().withWebsiteRules(listOf(unsafeRule)))
+            }
+        }
     }
 
     @Test
@@ -1073,6 +1163,18 @@ class AccountLightProfileImporterTest {
             root + (
                 "settings" to JsonObject(
                     settings + ("selectedPackIds" to JsonArray(packIds.map(::JsonPrimitive))),
+                )
+                ),
+        ).toString()
+    }
+
+    private fun String.withWebsiteRules(rules: List<JsonObject>): String {
+        val root = Json.parseToJsonElement(this).jsonObject
+        val settings = root.getValue("settings").jsonObject
+        return JsonObject(
+            root + (
+                "settings" to JsonObject(
+                    settings + ("websiteRules" to JsonArray(rules)),
                 )
                 ),
         ).toString()

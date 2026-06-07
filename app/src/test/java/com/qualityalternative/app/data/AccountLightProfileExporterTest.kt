@@ -20,6 +20,8 @@ import com.qualityalternative.app.domain.model.ReadingProgress
 import com.qualityalternative.app.domain.model.TopicTag
 import com.qualityalternative.app.domain.model.UserDocumentDraft
 import com.qualityalternative.app.domain.model.UserLinkDraft
+import com.qualityalternative.app.domain.model.WebsiteRule
+import com.qualityalternative.app.domain.model.WebsiteRuleType
 import com.qualityalternative.app.domain.service.AddUserDocumentResult
 import com.qualityalternative.app.domain.service.AddUserLinkResult
 import com.qualityalternative.app.domain.service.ReadingProgressRepository
@@ -60,6 +62,27 @@ class AccountLightProfileExporterTest {
         repository.saveReactivatedCompletedContentIds(setOf("editorial-deep-work"))
         repository.saveOpenAnywayUnlockMinutes(120)
         repository.saveBedtimeSettings(enabled = true, startMinutes = 23 * 60, endMinutes = 6 * 60 + 30)
+        repository.saveWebsiteRules(
+            listOf(
+                WebsiteRule(
+                    id = "website-rule-11111111-1111-4111-8111-111111111111",
+                    type = WebsiteRuleType.EXACT_DOMAIN,
+                    host = "example.com",
+                    enabled = true,
+                    createdAtMillis = 1_000L,
+                    updatedAtMillis = 2_000L,
+                ),
+                WebsiteRule(
+                    id = "website-rule-22222222-2222-4222-8222-222222222222",
+                    type = WebsiteRuleType.WILDCARD_SUBDOMAINS,
+                    host = "news.example",
+                    includeApex = true,
+                    enabled = false,
+                    createdAtMillis = 3_000L,
+                    updatedAtMillis = 4_000L,
+                ),
+            ),
+        )
         repository.saveAnnotationExportDestination(
             uri = "content://drive/raw-provider-id",
             displayName = "qa-annotations.jsonld",
@@ -118,6 +141,25 @@ class AccountLightProfileExporterTest {
         assertEquals(true, profile.settings.bedtimeEnabled)
         assertEquals(23 * 60, profile.settings.bedtimeStartMinutes)
         assertEquals(6 * 60 + 30, profile.settings.bedtimeEndMinutes)
+        assertEquals(
+            listOf(
+                AccountLightWebsiteRule(
+                    id = "website-rule-11111111-1111-4111-8111-111111111111",
+                    ruleType = "EXACT_DOMAIN",
+                    host = "example.com",
+                    enabled = true,
+                    includeApex = false,
+                ),
+                AccountLightWebsiteRule(
+                    id = "website-rule-22222222-2222-4222-8222-222222222222",
+                    ruleType = "WILDCARD_SUBDOMAINS",
+                    host = "news.example",
+                    enabled = false,
+                    includeApex = true,
+                ),
+            ),
+            profile.settings.websiteRules,
+        )
 
         assertEquals(emptyList<AccountLightUserLink>(), profile.library.userLinks)
         assertEquals(emptyList<AccountLightUserDocument>(), profile.library.userDocuments)

@@ -29,6 +29,27 @@ data class CustomTargetAppCandidate(
         get() = eligibility == CustomTargetAppEligibility.ELIGIBLE
 }
 
+enum class WebsiteRuleType {
+    EXACT_DOMAIN,
+    WILDCARD_SUBDOMAINS,
+}
+
+data class WebsiteRule(
+    val id: String,
+    val type: WebsiteRuleType,
+    val host: String,
+    val includeApex: Boolean = false,
+    val enabled: Boolean = true,
+    val createdAtMillis: Long,
+    val updatedAtMillis: Long,
+) {
+    val displayPattern: String
+        get() = when (type) {
+            WebsiteRuleType.EXACT_DOMAIN -> host
+            WebsiteRuleType.WILDCARD_SUBDOMAINS -> if (includeApex) "*.$host + $host" else "*.$host"
+        }
+}
+
 data class UserPreferences(
     val selectedApps: List<DistractingApp>,
     val preferredTopics: Set<TopicTag>,
@@ -133,6 +154,7 @@ data class AppSettings(
     val profileAutosaveDisplayName: String? = null,
     val profileAutosaveLastSuccessfulAtMillis: Long? = null,
     val profileAutosaveLastError: String? = null,
+    val websiteRules: List<WebsiteRule> = emptyList(),
 )
 
 data class LocalProfileIdentity(

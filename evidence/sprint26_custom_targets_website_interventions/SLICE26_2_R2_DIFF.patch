@@ -1,0 +1,2383 @@
+diff --git a/app/src/androidTest/java/com/qualityalternative/app/VisualQaScreenshotTest.kt b/app/src/androidTest/java/com/qualityalternative/app/VisualQaScreenshotTest.kt
+index db59b77..a347f97 100644
+--- a/app/src/androidTest/java/com/qualityalternative/app/VisualQaScreenshotTest.kt
++++ b/app/src/androidTest/java/com/qualityalternative/app/VisualQaScreenshotTest.kt
+@@ -481,6 +481,135 @@ class VisualQaScreenshotTest {
+         captureSprint26("10_custom_app_bedtime_intervention_light")
+     }
+ 
++    @Test
++    fun captureSprint26WebsiteRuleSettingsScreens() {
++        launchOnboardedApp()
++        openTab("tab-settings", "settings-list")
++        composeRule.onNodeWithTag("settings-list")
++            .performScrollToNode(hasTestTag("settings-website-rules-section"))
++        composeRule.onNodeWithTag("settings-website-rule-input").assertIsDisplayed()
++        composeRule.onNodeWithText("No website rules yet.").assertIsDisplayed()
++        captureSprint26("11_website_rules_empty_light")
++
++        composeRule.onNodeWithTag("settings-website-rule-input").performTextInput("192.168.1.5")
++        composeRule.onNodeWithTag("settings-website-rule-save").performClick()
++        composeRule.onNodeWithTag("settings-website-rule-error").assertIsDisplayed()
++        captureSprint26("12_website_rules_private_ip_rejected_light")
++
++        composeRule.onNodeWithTag("settings-website-rule-input").performTextClearance()
++        composeRule.onNodeWithTag("settings-website-rule-input").performTextInput("8.8.8.8")
++        composeRule.onNodeWithTag("settings-website-rule-save").performClick()
++        composeRule.onNodeWithTag("settings-website-rule-error").assertIsDisplayed()
++        captureSprint26("13_website_rules_public_ip_rejected_light")
++
++        composeRule.onNodeWithTag("settings-website-rule-input").performTextClearance()
++        composeRule.onNodeWithTag("settings-website-rule-input").performTextInput("HTTPS://Example.COM:443/deep/read")
++        composeRule.onNodeWithTag("settings-website-rule-save").performClick()
++        composeRule.waitUntil(timeoutMillis = 10_000) {
++            runBlocking {
++                val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication
++                app.appContainer.settingsRepository.observeAppSettings().first().websiteRules.any { it.host == "example.com" }
++            }
++        }
++        composeRule.onNodeWithText("example.com").assertIsDisplayed()
++        waitForTransientMessageToClear("Website rule saved.")
++        captureSprint26("14_website_rules_exact_saved_light")
++
++        composeRule.onNodeWithTag("settings-website-rule-input").performTextInput("*.News.Example")
++        composeRule.onNodeWithTag("settings-website-rule-include-apex").assertIsDisplayed()
++        UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).pressBack()
++        composeRule.waitForIdle()
++        captureSprint26("15_website_rules_typed_wildcard_toggle_visible_light")
++        composeRule.onNodeWithTag("settings-website-rule-save").performClick()
++        composeRule.waitUntil(timeoutMillis = 10_000) {
++            runBlocking {
++                val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication
++                app.appContainer.settingsRepository.observeAppSettings().first().websiteRules.any { rule ->
++                    rule.host == "news.example" && !rule.includeApex
++                }
++            }
++        }
++        composeRule.onNodeWithText("*.news.example").assertIsDisplayed()
++        waitForTransientMessageToClear("Website rule saved.")
++        captureSprint26("16_website_rules_typed_wildcard_subdomain_only_light")
++
++        val newsRuleId = runBlocking {
++            val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication
++            app.appContainer.settingsRepository.observeAppSettings().first().websiteRules.first { it.host == "news.example" }.id
++        }
++        composeRule.onNodeWithTag("settings-website-rule-edit-$newsRuleId").performClick()
++        composeRule.onNodeWithTag("settings-website-rule-include-apex").assertIsDisplayed()
++        composeRule.onNodeWithTag("settings-website-rule-include-apex").performClick()
++        composeRule.onNodeWithTag("settings-website-rule-save").performClick()
++        composeRule.waitUntil(timeoutMillis = 10_000) {
++            runBlocking {
++                val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication
++                app.appContainer.settingsRepository.observeAppSettings().first().websiteRules.any { rule ->
++                    rule.id == newsRuleId && rule.includeApex
++                }
++            }
++        }
++        composeRule.onNodeWithText("*.news.example + news.example").assertIsDisplayed()
++        waitForTransientMessageToClear("Website rule updated.")
++        captureSprint26("17_website_rules_visible_apex_toggle_saved_light")
++
++        val exactRuleId = runBlocking {
++            val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication
++            app.appContainer.settingsRepository.observeAppSettings().first().websiteRules.first { it.host == "example.com" }.id
++        }
++        composeRule.onNodeWithTag("settings-website-rule-toggle-$exactRuleId").performClick()
++        composeRule.waitUntil(timeoutMillis = 10_000) {
++            runBlocking {
++                val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication
++                app.appContainer.settingsRepository.observeAppSettings().first().websiteRules.first { it.id == exactRuleId }.enabled.not()
++            }
++        }
++        waitForTransientMessageToClear("Website rule updated.")
++        captureSprint26("18_website_rules_exact_paused_light")
++
++        composeRule.onNodeWithTag("settings-website-rule-edit-$exactRuleId").performClick()
++        composeRule.onNodeWithTag("settings-website-rule-input").assertIsDisplayed()
++        composeRule.onNodeWithTag("settings-website-rule-input").performTextClearance()
++        composeRule.onNodeWithTag("settings-website-rule-input").performTextInput("example.org")
++        composeRule.onNodeWithTag("settings-website-rule-cancel").performClick()
++        composeRule.onNodeWithText("example.com").assertIsDisplayed()
++        captureSprint26("19_website_rules_edit_cancel_keeps_original_light")
++
++        composeRule.onNodeWithTag("settings-website-rule-edit-$exactRuleId").performClick()
++        composeRule.onNodeWithTag("settings-website-rule-input").assertIsDisplayed()
++        composeRule.onNodeWithTag("settings-website-rule-input").performTextClearance()
++        composeRule.onNodeWithTag("settings-website-rule-input").performTextInput("example.org")
++        composeRule.onNodeWithTag("settings-website-rule-save").performClick()
++        composeRule.waitUntil(timeoutMillis = 10_000) {
++            runBlocking {
++                val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication
++                app.appContainer.settingsRepository.observeAppSettings().first().websiteRules.any { rule ->
++                    rule.id == exactRuleId && rule.host == "example.org"
++                }
++            }
++        }
++        composeRule.onNodeWithText("example.org").assertIsDisplayed()
++        waitForTransientMessageToClear("Website rule updated.")
++        captureSprint26("20_website_rules_edit_saved_light")
++
++        composeRule.onNodeWithTag("settings-website-rule-delete-$exactRuleId").performClick()
++        composeRule.waitUntil(timeoutMillis = 10_000) {
++            runBlocking {
++                val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication
++                app.appContainer.settingsRepository.observeAppSettings().first().websiteRules.none { it.id == exactRuleId }
++            }
++        }
++        waitForTransientMessageToClear("Website rule deleted.")
++        captureSprint26("21_website_rules_delete_keeps_wildcard_light")
++
++        composeRule.onNodeWithTag("settings-list")
++            .performScrollToNode(hasTestTag("settings-browser-support-matrix"))
++        composeRule.onNodeWithTag("settings-browser-support-chrome").assertIsDisplayed()
++        composeRule.onNodeWithTag("settings-browser-support-other").assertIsDisplayed()
++        waitForTransientMessageToClear("Website rule deleted.")
++        captureSprint26("22_website_rules_browser_support_matrix_light")
++    }
++
+     @Test
+     fun captureSprint10ReaderProgressStreakAndMeditationScreens() {
+         launchOnboardedApp()
+@@ -1608,7 +1737,15 @@ class VisualQaScreenshotTest {
+         Thread.sleep(350)
+         val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+         val file = File(directory, "$name.png")
+-        assertTrue("Could not capture $name into ${file.absolutePath}", device.takeScreenshot(file))
++        var captured = false
++        repeat(3) { attempt ->
++            captured = device.takeScreenshot(file) && file.length() > 10_000L
++            if (!captured) {
++                file.delete()
++                Thread.sleep(500L + (attempt * 250L))
++            }
++        }
++        assertTrue("Could not capture non-empty $name into ${file.absolutePath}", captured)
+     }
+ 
+     private fun captureLegacyContentDisplayScreens() {
+@@ -2726,6 +2863,10 @@ class VisualQaScreenshotTest {
+         true
+     }.getOrDefault(false)
+ 
++    private fun waitForTransientMessageToClear(text: String) {
++        composeRule.waitUntil(timeoutMillis = 15_000) { !hasNode(text) }
++    }
++
+     private fun hasNodeContaining(text: String): Boolean = runCatching {
+         composeRule.onNodeWithText(text, substring = true, ignoreCase = true).fetchSemanticsNode()
+         true
+diff --git a/app/src/main/java/com/qualityalternative/app/data/AccountLightProfile.kt b/app/src/main/java/com/qualityalternative/app/data/AccountLightProfile.kt
+index 69da99e..30a3148 100644
+--- a/app/src/main/java/com/qualityalternative/app/data/AccountLightProfile.kt
++++ b/app/src/main/java/com/qualityalternative/app/data/AccountLightProfile.kt
+@@ -28,6 +28,8 @@ import com.qualityalternative.app.domain.model.MIN_OPEN_ANYWAY_UNLOCK_MINUTES
+ import com.qualityalternative.app.domain.model.MIN_READER_FONT_SCALE
+ import com.qualityalternative.app.domain.model.ReadingProgress
+ import com.qualityalternative.app.domain.model.TopicTag
++import com.qualityalternative.app.domain.model.WebsiteRule
++import com.qualityalternative.app.domain.model.WebsiteRuleType
+ import com.qualityalternative.app.domain.service.ReadingProgressRepository
+ import com.qualityalternative.app.domain.service.SettingsRepository
+ import com.qualityalternative.app.domain.service.UserDocumentRepository
+@@ -137,6 +139,7 @@ data class AccountLightSettings(
+     val bedtimeEnabled: Boolean = DEFAULT_BEDTIME_ENABLED,
+     val bedtimeStartMinutes: Int = DEFAULT_BEDTIME_START_MINUTES,
+     val bedtimeEndMinutes: Int = DEFAULT_BEDTIME_END_MINUTES,
++    val websiteRules: List<AccountLightWebsiteRule> = emptyList(),
+ ) {
+     init {
+         require(selectedAppPackages.all { it.matches(PackageNameRegex) }) {
+@@ -174,6 +177,39 @@ data class AccountLightSettings(
+         require(bedtimeEndMinutes in MIN_BEDTIME_MINUTES..MAX_BEDTIME_MINUTES) {
+             "bedtimeEndMinutes is outside the portable range."
+         }
++        require(websiteRules.distinctBy(AccountLightWebsiteRule::id).size == websiteRules.size) {
++            "websiteRules contains duplicate ids."
++        }
++    }
++}
++
++@Serializable
++data class AccountLightWebsiteRule(
++    val id: String,
++    val ruleType: String,
++    val host: String,
++    val enabled: Boolean = true,
++    val includeApex: Boolean = false,
++) {
++    init {
++        require(id.matches(WebsiteRulePortableIdRegex)) { "websiteRules contains an invalid id." }
++        require(ruleType in WebsiteRuleType.entries.map(WebsiteRuleType::name)) {
++            "websiteRules contains an invalid ruleType."
++        }
++        val normalized = WebsiteRuleNormalizer.normalize(
++            input = host,
++            wildcard = ruleType == WebsiteRuleType.WILDCARD_SUBDOMAINS.name,
++        )
++        require(
++            normalized is WebsiteRuleDraftResult.Valid &&
++                normalized.host == host &&
++                normalized.type.name == ruleType,
++        ) {
++            "websiteRules contains an invalid host."
++        }
++        require(!includeApex || ruleType == WebsiteRuleType.WILDCARD_SUBDOMAINS.name) {
++            "websiteRules includeApex requires a wildcard rule."
++        }
+     }
+ }
+ 
+@@ -1518,6 +1554,17 @@ private fun AccountLightSettings.toPortableAppSettings(supportedPackages: Set<St
+             ?: DEFAULT_READER_FONT_SCALE,
+         interfaceTextScale = interfaceTextScale.takeIf { it in MIN_INTERFACE_TEXT_SCALE..MAX_INTERFACE_TEXT_SCALE }
+             ?: DEFAULT_INTERFACE_TEXT_SCALE,
++        websiteRules = websiteRules.map { rule ->
++            WebsiteRule(
++                id = rule.id,
++                type = WebsiteRuleType.valueOf(rule.ruleType),
++                host = rule.host,
++                includeApex = rule.includeApex,
++                enabled = rule.enabled,
++                createdAtMillis = 0L,
++                updatedAtMillis = 0L,
++            )
++        },
+     )
+ }
+ 
+@@ -1549,6 +1596,17 @@ private fun AppSettings.toAccountLightSettings(
+         bedtimeEnabled = bedtimeEnabled,
+         bedtimeStartMinutes = bedtimeStartMinutes.coerceIn(MIN_BEDTIME_MINUTES, MAX_BEDTIME_MINUTES),
+         bedtimeEndMinutes = bedtimeEndMinutes.coerceIn(MIN_BEDTIME_MINUTES, MAX_BEDTIME_MINUTES),
++        websiteRules = websiteRules
++            .sortedWith(compareBy<WebsiteRule> { it.host }.thenBy { it.type.name }.thenBy { it.id })
++            .map { rule ->
++                AccountLightWebsiteRule(
++                    id = rule.id,
++                    ruleType = rule.type.name,
++                    host = rule.host,
++                    enabled = rule.enabled,
++                    includeApex = rule.includeApex,
++                )
++            },
+     )
+ }
+ 
+@@ -2122,6 +2180,7 @@ private val ContentIdRegex = Regex(
+         "|^(editorial|meditation)-[a-z0-9][a-z0-9._-]{2,120}$",
+ )
+ private val PackageNameRegex = Regex("^[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z0-9_]+)+$")
++private val WebsiteRulePortableIdRegex = Regex("^website-rule-[0-9a-fA-F-]{36}$")
+ private val PortablePackIdRegex = Regex("^[a-z0-9][a-z0-9_-]{0,79}$")
+ private val PortableMimeTypeRegex = Regex("^[A-Za-z0-9!#$&^_.+-]+/[A-Za-z0-9!#$&^_.+-]+$")
+ private val PortableDisplayNamePunctuation = setOf(' ', '.', '_', '-', '(', ')')
+@@ -2185,6 +2244,7 @@ private val AllowedSettingsKeys = RequiredSettingsKeys + setOf(
+     "bedtimeEnabled",
+     "bedtimeStartMinutes",
+     "bedtimeEndMinutes",
++    "websiteRules",
+ )
+ private val RequiredLibraryKeys = setOf("userLinks", "userDocuments")
+ private val RequiredUserLinkKeys = setOf(
+diff --git a/app/src/main/java/com/qualityalternative/app/data/PreferencesSettingsRepository.kt b/app/src/main/java/com/qualityalternative/app/data/PreferencesSettingsRepository.kt
+index 461b429..2102683 100644
+--- a/app/src/main/java/com/qualityalternative/app/data/PreferencesSettingsRepository.kt
++++ b/app/src/main/java/com/qualityalternative/app/data/PreferencesSettingsRepository.kt
+@@ -38,6 +38,8 @@ import com.qualityalternative.app.domain.model.MIN_OPEN_ANYWAY_UNLOCK_MINUTES
+ import com.qualityalternative.app.domain.model.MIN_READER_FONT_SCALE
+ import com.qualityalternative.app.domain.model.OnboardingSelection
+ import com.qualityalternative.app.domain.model.TopicTag
++import com.qualityalternative.app.domain.model.WebsiteRule
++import com.qualityalternative.app.domain.model.WebsiteRuleType
+ import com.qualityalternative.app.domain.service.SettingsRepository
+ import java.io.IOException
+ import java.util.UUID
+@@ -106,6 +108,8 @@ class PreferencesSettingsRepository(
+                     profileAutosaveDisplayName = preferences[ProfileAutosaveDisplayName],
+                     profileAutosaveLastSuccessfulAtMillis = preferences[ProfileAutosaveLastSuccessfulAtMillis],
+                     profileAutosaveLastError = preferences[ProfileAutosaveLastError],
++                    websiteRules = preferences[WebsiteRules].orEmpty().mapNotNull(::decodeWebsiteRule)
++                        .sortedWith(compareBy<WebsiteRule> { it.createdAtMillis }.thenBy { it.host }.thenBy { it.id }),
+                 )
+             }
+     }
+@@ -169,6 +173,7 @@ class PreferencesSettingsRepository(
+             preferences[BedtimeEnabled] = settings.bedtimeEnabled
+             preferences[BedtimeStartMinutes] = portableBedtimeMinutes(settings.bedtimeStartMinutes)
+             preferences[BedtimeEndMinutes] = portableBedtimeMinutes(settings.bedtimeEndMinutes)
++            preferences[WebsiteRules] = settings.websiteRules.mapTo(mutableSetOf(), ::encodeWebsiteRule)
+         }
+     }
+ 
+@@ -257,6 +262,14 @@ class PreferencesSettingsRepository(
+         }
+     }
+ 
++    override suspend fun saveWebsiteRules(rules: List<WebsiteRule>) {
++        dataStore.edit { preferences ->
++            preferences[WebsiteRules] = rules
++                .distinctBy(WebsiteRule::id)
++                .mapTo(mutableSetOf(), ::encodeWebsiteRule)
++        }
++    }
++
+     override suspend fun saveAnnotationExportDestination(uri: String, displayName: String) {
+         dataStore.edit { preferences ->
+             preferences[AnnotationExportUri] = uri
+@@ -397,6 +410,40 @@ class PreferencesSettingsRepository(
+             return Regex("^qa-local-[0-9a-fA-F-]{36}$").matches(raw)
+         }
+ 
++        fun encodeWebsiteRule(rule: WebsiteRule): String {
++            return listOf(
++                rule.id,
++                rule.type.name,
++                rule.host,
++                rule.includeApex.toString(),
++                rule.enabled.toString(),
++                rule.createdAtMillis.coerceAtLeast(0L).toString(),
++                rule.updatedAtMillis.coerceAtLeast(0L).toString(),
++            ).joinToString(WebsiteRuleDelimiter)
++        }
++
++        fun decodeWebsiteRule(raw: String): WebsiteRule? {
++            val parts = raw.split(WebsiteRuleDelimiter)
++            if (parts.size != 7) return null
++            val type = runCatching { WebsiteRuleType.valueOf(parts[1]) }.getOrNull() ?: return null
++            val normalized = WebsiteRuleNormalizer.normalize(
++                input = parts[2],
++                wildcard = type == WebsiteRuleType.WILDCARD_SUBDOMAINS,
++            ) as? WebsiteRuleDraftResult.Valid ?: return null
++            if (normalized.type != type || normalized.host != parts[2]) return null
++            val createdAtMillis = parts[5].toLongOrNull()?.coerceAtLeast(0L) ?: return null
++            val updatedAtMillis = parts[6].toLongOrNull()?.coerceAtLeast(createdAtMillis) ?: return null
++            return WebsiteRule(
++                id = parts[0].takeIf { it.matches(WebsiteRuleIdRegex) } ?: return null,
++                type = type,
++                host = normalized.host,
++                includeApex = type == WebsiteRuleType.WILDCARD_SUBDOMAINS && (parts[3].toBooleanStrictOrNull() ?: false),
++                enabled = parts[4].toBooleanStrictOrNull() ?: true,
++                createdAtMillis = createdAtMillis,
++                updatedAtMillis = updatedAtMillis,
++            )
++        }
++
+         val LocalProfileId = stringPreferencesKey("local_profile_id")
+         val LocalProfileCreatedAtMillis = longPreferencesKey("local_profile_created_at_millis")
+         val HasCompletedOnboarding = booleanPreferencesKey("has_completed_onboarding")
+@@ -428,5 +475,8 @@ class PreferencesSettingsRepository(
+         val ProfileAutosaveDisplayName = stringPreferencesKey("profile_autosave_display_name")
+         val ProfileAutosaveLastSuccessfulAtMillis = longPreferencesKey("profile_autosave_last_successful_at_millis")
+         val ProfileAutosaveLastError = stringPreferencesKey("profile_autosave_last_error")
++        val WebsiteRules = stringSetPreferencesKey("website_rules_v1")
++        const val WebsiteRuleDelimiter = "\u001F"
++        val WebsiteRuleIdRegex = Regex("^website-rule-[0-9a-fA-F-]{36}$")
+     }
+ }
+diff --git a/app/src/main/java/com/qualityalternative/app/domain/model/UserModels.kt b/app/src/main/java/com/qualityalternative/app/domain/model/UserModels.kt
+index 91108a8..67cad16 100644
+--- a/app/src/main/java/com/qualityalternative/app/domain/model/UserModels.kt
++++ b/app/src/main/java/com/qualityalternative/app/domain/model/UserModels.kt
+@@ -29,6 +29,27 @@ data class CustomTargetAppCandidate(
+         get() = eligibility == CustomTargetAppEligibility.ELIGIBLE
+ }
+ 
++enum class WebsiteRuleType {
++    EXACT_DOMAIN,
++    WILDCARD_SUBDOMAINS,
++}
++
++data class WebsiteRule(
++    val id: String,
++    val type: WebsiteRuleType,
++    val host: String,
++    val includeApex: Boolean = false,
++    val enabled: Boolean = true,
++    val createdAtMillis: Long,
++    val updatedAtMillis: Long,
++) {
++    val displayPattern: String
++        get() = when (type) {
++            WebsiteRuleType.EXACT_DOMAIN -> host
++            WebsiteRuleType.WILDCARD_SUBDOMAINS -> if (includeApex) "*.$host + $host" else "*.$host"
++        }
++}
++
+ data class UserPreferences(
+     val selectedApps: List<DistractingApp>,
+     val preferredTopics: Set<TopicTag>,
+@@ -133,6 +154,7 @@ data class AppSettings(
+     val profileAutosaveDisplayName: String? = null,
+     val profileAutosaveLastSuccessfulAtMillis: Long? = null,
+     val profileAutosaveLastError: String? = null,
++    val websiteRules: List<WebsiteRule> = emptyList(),
+ )
+ 
+ data class LocalProfileIdentity(
+diff --git a/app/src/main/java/com/qualityalternative/app/domain/service/Contracts.kt b/app/src/main/java/com/qualityalternative/app/domain/service/Contracts.kt
+index 2dc1558..4037ef0 100644
+--- a/app/src/main/java/com/qualityalternative/app/domain/service/Contracts.kt
++++ b/app/src/main/java/com/qualityalternative/app/domain/service/Contracts.kt
+@@ -30,6 +30,7 @@ import com.qualityalternative.app.domain.model.UserLinkValidationError
+ import com.qualityalternative.app.domain.model.UserDocumentDraft
+ import com.qualityalternative.app.domain.model.UserDocumentValidationError
+ import com.qualityalternative.app.domain.model.UserPreferences
++import com.qualityalternative.app.domain.model.WebsiteRule
+ import kotlinx.coroutines.flow.Flow
+ import kotlinx.coroutines.flow.flowOf
+ 
+@@ -139,6 +140,7 @@ interface SettingsRepository {
+     suspend fun saveReactivatedCompletedContentIds(contentIds: Set<String>)
+     suspend fun saveOpenAnywayUnlockMinutes(minutes: Int)
+     suspend fun saveBedtimeSettings(enabled: Boolean, startMinutes: Int, endMinutes: Int) {}
++    suspend fun saveWebsiteRules(rules: List<WebsiteRule>) {}
+     suspend fun saveAnnotationExportDestination(uri: String, displayName: String)
+     suspend fun clearAnnotationExportDestination()
+     suspend fun saveAnnotationExportSuccess(timestampMillis: Long)
+diff --git a/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt b/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
+index d57af57..c1f6f0c 100644
+--- a/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
++++ b/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
+@@ -18,6 +18,8 @@ import com.qualityalternative.app.data.ReadingTimeEstimator
+ import com.qualityalternative.app.data.SupportedCatalog
+ import com.qualityalternative.app.data.UserDocumentValidator
+ import com.qualityalternative.app.data.UserLinkValidator
++import com.qualityalternative.app.data.WebsiteRuleDraftResult
++import com.qualityalternative.app.data.WebsiteRuleNormalizer
+ import com.qualityalternative.app.domain.model.AnalyticsEvent
+ import com.qualityalternative.app.domain.model.AnalyticsSemanticKeys
+ import com.qualityalternative.app.domain.model.AnalyticsEventType
+@@ -73,6 +75,8 @@ import com.qualityalternative.app.domain.model.UserDocumentValidationError
+ import com.qualityalternative.app.domain.model.UserLinkDraft
+ import com.qualityalternative.app.domain.model.UserLinkValidationError
+ import com.qualityalternative.app.domain.model.UserPreferences
++import com.qualityalternative.app.domain.model.WebsiteRule
++import com.qualityalternative.app.domain.model.WebsiteRuleType
+ import com.qualityalternative.app.domain.model.bedtimeWindowIsActive
+ import com.qualityalternative.app.domain.model.meditationTimerContentItem
+ import com.qualityalternative.app.domain.model.usesExternalHandoff
+@@ -186,6 +190,12 @@ data class MainUiState(
+     val profileAutosaveUsesLocalDefault: Boolean = false,
+     val profileAutosaveLastSuccessfulAtMillis: Long? = null,
+     val profileAutosaveLastError: String? = null,
++    val websiteRules: List<WebsiteRule> = emptyList(),
++    val websiteRuleDraftText: String = "",
++    val websiteRuleDraftWildcard: Boolean = false,
++    val websiteRuleDraftIncludeApex: Boolean = false,
++    val websiteRuleDraftEditingId: String? = null,
++    val websiteRuleDraftError: String? = null,
+     val isProfileAutosaving: Boolean = false,
+     val isAnnotationDriveSyncing: Boolean = false,
+     val isAccountLightExporting: Boolean = false,
+@@ -618,6 +628,143 @@ class MainViewModel(
+         }
+     }
+ 
++    fun updateWebsiteRuleDraftText(value: String) {
++        val explicitWildcard = value.trim().startsWith("*.")
++        uiState = uiState.copy(
++            websiteRuleDraftText = value,
++            websiteRuleDraftWildcard = uiState.websiteRuleDraftWildcard || explicitWildcard,
++            websiteRuleDraftError = null,
++            latestMessage = null,
++        )
++    }
++
++    fun setWebsiteRuleDraftWildcard(enabled: Boolean) {
++        uiState = uiState.copy(
++            websiteRuleDraftWildcard = enabled,
++            websiteRuleDraftIncludeApex = if (enabled) uiState.websiteRuleDraftIncludeApex else false,
++            websiteRuleDraftError = null,
++            latestMessage = null,
++        )
++    }
++
++    fun setWebsiteRuleDraftIncludeApex(enabled: Boolean) {
++        uiState = uiState.copy(
++            websiteRuleDraftIncludeApex = enabled,
++            websiteRuleDraftError = null,
++            latestMessage = null,
++        )
++    }
++
++    fun beginEditWebsiteRule(rule: WebsiteRule) {
++        uiState = uiState.copy(
++            websiteRuleDraftText = rule.host,
++            websiteRuleDraftWildcard = rule.type == WebsiteRuleType.WILDCARD_SUBDOMAINS,
++            websiteRuleDraftIncludeApex = rule.includeApex,
++            websiteRuleDraftEditingId = rule.id,
++            websiteRuleDraftError = null,
++            latestMessage = null,
++        )
++    }
++
++    fun cancelWebsiteRuleEdit() {
++        uiState = uiState.copy(
++            websiteRuleDraftText = "",
++            websiteRuleDraftWildcard = false,
++            websiteRuleDraftIncludeApex = false,
++            websiteRuleDraftEditingId = null,
++            websiteRuleDraftError = null,
++            latestMessage = null,
++        )
++    }
++
++    fun saveWebsiteRuleDraft(nowMillis: Long = nowProvider()) {
++        val result = WebsiteRuleNormalizer.normalize(
++            input = uiState.websiteRuleDraftText,
++            wildcard = uiState.websiteRuleDraftWildcard,
++        )
++        if (result is WebsiteRuleDraftResult.Invalid) {
++            uiState = uiState.copy(websiteRuleDraftError = result.message, latestMessage = null)
++            return
++        }
++        val valid = result as WebsiteRuleDraftResult.Valid
++        val editingId = uiState.websiteRuleDraftEditingId
++        val includeApex = valid.type == WebsiteRuleType.WILDCARD_SUBDOMAINS && uiState.websiteRuleDraftIncludeApex
++        val duplicate = uiState.websiteRules.any { rule ->
++            rule.id != editingId &&
++                rule.type == valid.type &&
++                rule.host == valid.host &&
++                rule.includeApex == includeApex
++        }
++        if (duplicate) {
++            uiState = uiState.copy(websiteRuleDraftError = "This website rule already exists.", latestMessage = null)
++            return
++        }
++
++        val updatedRule = uiState.websiteRules.firstOrNull { it.id == editingId }?.copy(
++            type = valid.type,
++            host = valid.host,
++            includeApex = includeApex,
++            updatedAtMillis = nowMillis.coerceAtLeast(0L),
++        ) ?: WebsiteRule(
++            id = "website-rule-${UUID.randomUUID()}",
++            type = valid.type,
++            host = valid.host,
++            includeApex = includeApex,
++            enabled = true,
++            createdAtMillis = nowMillis.coerceAtLeast(0L),
++            updatedAtMillis = nowMillis.coerceAtLeast(0L),
++        )
++        val updatedRules = if (editingId == null) {
++            uiState.websiteRules + updatedRule
++        } else {
++            uiState.websiteRules.map { rule -> if (rule.id == editingId) updatedRule else rule }
++        }.sortedWith(compareBy<WebsiteRule> { it.host }.thenBy { it.type.name }.thenBy { it.id })
++
++        persistWebsiteRules(
++            rules = updatedRules,
++            message = if (editingId == null) "Website rule saved." else "Website rule updated.",
++            nowMillis = nowMillis,
++        )
++        clearWebsiteRuleDraft(clearMessage = false)
++    }
++
++    fun toggleWebsiteRuleEnabled(ruleId: String, nowMillis: Long = nowProvider()) {
++        val updatedRules = uiState.websiteRules.map { rule ->
++            if (rule.id == ruleId) {
++                rule.copy(enabled = !rule.enabled, updatedAtMillis = nowMillis.coerceAtLeast(0L))
++            } else {
++                rule
++            }
++        }
++        persistWebsiteRules(rules = updatedRules, message = "Website rule updated.", nowMillis = nowMillis)
++    }
++
++    fun deleteWebsiteRule(ruleId: String, nowMillis: Long = nowProvider()) {
++        val wasEditing = uiState.websiteRuleDraftEditingId == ruleId
++        val updatedRules = uiState.websiteRules.filterNot { it.id == ruleId }
++        persistWebsiteRules(rules = updatedRules, message = "Website rule deleted.", nowMillis = nowMillis)
++        if (wasEditing) clearWebsiteRuleDraft(clearMessage = false)
++    }
++
++    private fun clearWebsiteRuleDraft(clearMessage: Boolean) {
++        uiState = uiState.copy(
++            websiteRuleDraftText = "",
++            websiteRuleDraftWildcard = false,
++            websiteRuleDraftIncludeApex = false,
++            websiteRuleDraftEditingId = null,
++            websiteRuleDraftError = null,
++            latestMessage = if (clearMessage) null else uiState.latestMessage,
++        )
++    }
++
++    private fun persistWebsiteRules(rules: List<WebsiteRule>, message: String, nowMillis: Long) {
++        uiState = uiState.copy(websiteRules = rules, latestMessage = message)
++        viewModelScope.launch {
++            settingsRepository.saveWebsiteRules(rules)
++            autosaveAccountLightProfileAfterPortableMutation(nowMillis = nowMillis)
++        }
++    }
++
+     fun setPreferredDuration(durationBucket: DurationBucket) {
+         val preferences = uiState.preferences
+         uiState = uiState.copy(
+@@ -3155,6 +3302,7 @@ class MainViewModel(
+             profileAutosaveUsesLocalDefault = profileAutosaveUsesLocalDefault,
+             profileAutosaveLastSuccessfulAtMillis = settings.profileAutosaveLastSuccessfulAtMillis,
+             profileAutosaveLastError = settings.profileAutosaveLastError,
++            websiteRules = settings.websiteRules,
+             onboardingSelection = settings.toOnboardingSelection(
+                 supportedApps = supportedApps,
+                 starterPacks = starterPacks,
+diff --git a/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt b/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
+index 29f15c2..723c864 100644
+--- a/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
++++ b/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
+@@ -179,6 +179,8 @@ import com.qualityalternative.app.domain.model.ReplacementHistoryEntry
+ import com.qualityalternative.app.domain.model.TopicTag
+ import com.qualityalternative.app.domain.model.UserDocumentValidationError
+ import com.qualityalternative.app.domain.model.UserLinkValidationError
++import com.qualityalternative.app.domain.model.WebsiteRule
++import com.qualityalternative.app.domain.model.WebsiteRuleType
+ import com.qualityalternative.app.domain.model.usesExternalHandoff
+ import com.qualityalternative.app.domain.model.usesMeditationTimer
+ import com.qualityalternative.app.domain.model.usesRepositoryBody
+@@ -628,6 +630,14 @@ private fun MainRoute(
+             SettingsTab(
+                 state = state,
+                 onToggleApp = viewModel::toggleSettingsApp,
++                onWebsiteRuleTextChange = viewModel::updateWebsiteRuleDraftText,
++                onWebsiteRuleWildcardChange = viewModel::setWebsiteRuleDraftWildcard,
++                onWebsiteRuleIncludeApexChange = viewModel::setWebsiteRuleDraftIncludeApex,
++                onSaveWebsiteRule = { viewModel.saveWebsiteRuleDraft() },
++                onEditWebsiteRule = viewModel::beginEditWebsiteRule,
++                onToggleWebsiteRuleEnabled = { ruleId -> viewModel.toggleWebsiteRuleEnabled(ruleId) },
++                onDeleteWebsiteRule = { ruleId -> viewModel.deleteWebsiteRule(ruleId) },
++                onCancelWebsiteRuleEdit = viewModel::cancelWebsiteRuleEdit,
+                 onSelectDuration = viewModel::setPreferredDuration,
+                 onSelectMeditationDuration = viewModel::setMeditationDurationMinutes,
+                 onSelectReaderFontScale = viewModel::setReaderFontScale,
+@@ -4089,6 +4099,14 @@ private fun AnnotationLibraryRow(
+ private fun SettingsTab(
+     state: MainUiState,
+     onToggleApp: (DistractingApp) -> Unit,
++    onWebsiteRuleTextChange: (String) -> Unit,
++    onWebsiteRuleWildcardChange: (Boolean) -> Unit,
++    onWebsiteRuleIncludeApexChange: (Boolean) -> Unit,
++    onSaveWebsiteRule: () -> Unit,
++    onEditWebsiteRule: (WebsiteRule) -> Unit,
++    onToggleWebsiteRuleEnabled: (String) -> Unit,
++    onDeleteWebsiteRule: (String) -> Unit,
++    onCancelWebsiteRuleEdit: () -> Unit,
+     onSelectDuration: (DurationBucket) -> Unit,
+     onSelectMeditationDuration: (Int) -> Unit,
+     onSelectReaderFontScale: (Double) -> Unit,
+@@ -4206,6 +4224,19 @@ private fun SettingsTab(
+                 }
+             }
+         }
++        item {
++            WebsiteRulesSettingsSection(
++                state = state,
++                onTextChange = onWebsiteRuleTextChange,
++                onWildcardChange = onWebsiteRuleWildcardChange,
++                onIncludeApexChange = onWebsiteRuleIncludeApexChange,
++                onSave = onSaveWebsiteRule,
++                onEdit = onEditWebsiteRule,
++                onToggleEnabled = onToggleWebsiteRuleEnabled,
++                onDelete = onDeleteWebsiteRule,
++                onCancelEdit = onCancelWebsiteRuleEdit,
++            )
++        }
+         item {
+             SectionLabel("Content priority")
+             QaCard {
+@@ -5321,6 +5352,294 @@ private fun CustomTargetAppPicker(
+     }
+ }
+ 
++@Composable
++private fun WebsiteRulesSettingsSection(
++    state: MainUiState,
++    onTextChange: (String) -> Unit,
++    onWildcardChange: (Boolean) -> Unit,
++    onIncludeApexChange: (Boolean) -> Unit,
++    onSave: () -> Unit,
++    onEdit: (WebsiteRule) -> Unit,
++    onToggleEnabled: (String) -> Unit,
++    onDelete: (String) -> Unit,
++    onCancelEdit: () -> Unit,
++) {
++    val colors = QualityAlternativeThemeTokens.colors
++    val focusManager = LocalFocusManager.current
++    val enabledCount = state.websiteRules.count(WebsiteRule::enabled)
++    val draftWildcardEffective = state.websiteRuleDraftWildcard || state.websiteRuleDraftText.trim().startsWith("*.")
++    Column(modifier = Modifier.testTag("settings-website-rules-section")) {
++        SectionLabel("Website rules", right = "$enabledCount enabled")
++        QaCard {
++            BodyText(
++                text = "Save domains now. Browser interruption starts only when a verified current-host adapter is available; until then, use whole-browser app targets as the reliable fallback.",
++                color = colors.mutedText,
++                fontSize = 12.5.sp,
++                lineHeight = 17.sp,
++                modifier = Modifier.padding(bottom = 12.dp),
++            )
++            QaTextField(
++                value = state.websiteRuleDraftText,
++                onValueChange = onTextChange,
++                placeholder = "example.com or *.example.com",
++                isError = state.websiteRuleDraftError != null,
++                modifier = Modifier.testTag("settings-website-rule-input"),
++            )
++            if (state.websiteRuleDraftError != null) {
++                BodyText(
++                    text = state.websiteRuleDraftError,
++                    color = colors.accent,
++                    fontSize = 12.5.sp,
++                    lineHeight = 17.sp,
++                    modifier = Modifier
++                        .padding(top = 7.dp)
++                        .testTag("settings-website-rule-error"),
++                )
++            }
++            FlowRow(
++                horizontalArrangement = Arrangement.spacedBy(6.dp),
++                verticalArrangement = Arrangement.spacedBy(6.dp),
++                modifier = Modifier.padding(top = 12.dp),
++            ) {
++                QaChip(
++                    text = "Exact",
++                    selected = !draftWildcardEffective,
++                    onClick = { onWildcardChange(false) },
++                    modifier = Modifier.testTag("settings-website-rule-mode-exact"),
++                    minHeight = 32.dp,
++                    horizontalPadding = 12.dp,
++                    verticalPadding = 7.dp,
++                    fontSize = 11.5.sp,
++                )
++                QaChip(
++                    text = "Subdomains",
++                    selected = draftWildcardEffective,
++                    onClick = { onWildcardChange(true) },
++                    modifier = Modifier.testTag("settings-website-rule-mode-wildcard"),
++                    minHeight = 32.dp,
++                    horizontalPadding = 12.dp,
++                    verticalPadding = 7.dp,
++                    fontSize = 11.5.sp,
++                )
++                if (draftWildcardEffective) {
++                    QaChip(
++                        text = "Include main domain",
++                        selected = state.websiteRuleDraftIncludeApex,
++                        onClick = { onIncludeApexChange(!state.websiteRuleDraftIncludeApex) },
++                        modifier = Modifier.testTag("settings-website-rule-include-apex"),
++                        minHeight = 32.dp,
++                        horizontalPadding = 12.dp,
++                        verticalPadding = 7.dp,
++                        fontSize = 11.5.sp,
++                    )
++                }
++            }
++            Row(
++                modifier = Modifier.padding(top = 12.dp),
++                horizontalArrangement = Arrangement.spacedBy(8.dp),
++            ) {
++                QaButton(
++                    text = if (state.websiteRuleDraftEditingId == null) "Add rule" else "Save changes",
++                    onClick = {
++                        focusManager.clearFocus()
++                        onSave()
++                    },
++                    variant = QaButtonVariant.Primary,
++                    size = QaButtonSize.Small,
++                    modifier = Modifier
++                        .weight(1f)
++                        .testTag("settings-website-rule-save"),
++                )
++                if (state.websiteRuleDraftEditingId != null) {
++                    QaButton(
++                        text = "Cancel",
++                        onClick = {
++                            focusManager.clearFocus()
++                            onCancelEdit()
++                        },
++                        variant = QaButtonVariant.Ghost,
++                        size = QaButtonSize.Small,
++                        modifier = Modifier
++                            .weight(1f)
++                            .testTag("settings-website-rule-cancel"),
++                    )
++                }
++            }
++            HorizontalDivider(color = colors.line, modifier = Modifier.padding(vertical = 14.dp))
++            if (state.websiteRules.isEmpty()) {
++                BodyText(
++                    text = "No website rules yet.",
++                    color = colors.mutedText,
++                    fontSize = 12.5.sp,
++                    modifier = Modifier.testTag("settings-website-rules-empty"),
++                )
++            } else {
++                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
++                    state.websiteRules.forEach { rule ->
++                        WebsiteRuleRow(
++                            rule = rule,
++                            onEdit = { onEdit(rule) },
++                            onToggleEnabled = { onToggleEnabled(rule.id) },
++                            onDelete = { onDelete(rule.id) },
++                        )
++                    }
++                }
++            }
++        }
++        BrowserSupportMatrix(modifier = Modifier.padding(top = 10.dp))
++    }
++}
++
++@Composable
++private fun WebsiteRuleRow(
++    rule: WebsiteRule,
++    onEdit: () -> Unit,
++    onToggleEnabled: () -> Unit,
++    onDelete: () -> Unit,
++) {
++    val colors = QualityAlternativeThemeTokens.colors
++    Column(
++        modifier = Modifier
++            .fillMaxWidth()
++            .testTag("settings-website-rule-row-${rule.id}")
++            .clip(RoundedCornerShape(10.dp))
++            .border(BorderStroke(1.dp, if (rule.enabled) colors.lineStrong else colors.line), RoundedCornerShape(10.dp))
++            .background(if (rule.enabled) colors.background else Color.Transparent)
++            .padding(horizontal = 12.dp, vertical = 11.dp),
++    ) {
++        Row(
++            modifier = Modifier.fillMaxWidth(),
++            verticalAlignment = Alignment.Top,
++            horizontalArrangement = Arrangement.spacedBy(10.dp),
++        ) {
++            Box(
++                modifier = Modifier
++                    .padding(top = 2.dp)
++                    .size(22.dp)
++                    .clip(RoundedCornerShape(6.dp))
++                    .border(BorderStroke(1.5.dp, if (rule.enabled) colors.primaryText else colors.lineStrong), RoundedCornerShape(6.dp))
++                    .background(if (rule.enabled) colors.primaryText else Color.Transparent)
++                    .clickable(onClick = onToggleEnabled)
++                    .testTag("settings-website-rule-toggle-${rule.id}"),
++                contentAlignment = Alignment.Center,
++            ) {
++                if (rule.enabled) QaIcon(kind = QaIconKind.Check, color = colors.background, size = 14.dp)
++            }
++            Column(modifier = Modifier.weight(1f)) {
++                Text(
++                    text = rule.displayPattern,
++                    style = MaterialTheme.typography.bodyMedium,
++                    fontWeight = FontWeight.Medium,
++                    color = colors.primaryText,
++                    maxLines = 2,
++                    overflow = TextOverflow.Ellipsis,
++                )
++                BodyText(
++                    text = "${if (rule.type == WebsiteRuleType.EXACT_DOMAIN) "Exact domain" else "Wildcard subdomains"} · ${if (rule.enabled) "Enabled" else "Paused"}",
++                    color = colors.mutedText,
++                    fontSize = 11.5.sp,
++                    lineHeight = 15.sp,
++                    modifier = Modifier.padding(top = 2.dp),
++                )
++            }
++        }
++        Row(
++            modifier = Modifier
++                .fillMaxWidth()
++                .padding(top = 9.dp),
++            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
++        ) {
++            QaButton(
++                text = "Edit",
++                onClick = onEdit,
++                variant = QaButtonVariant.Ghost,
++                size = QaButtonSize.Compact,
++                fullWidth = false,
++                modifier = Modifier.testTag("settings-website-rule-edit-${rule.id}"),
++            )
++            QaButton(
++                text = "Delete",
++                onClick = onDelete,
++                variant = QaButtonVariant.Ghost,
++                size = QaButtonSize.Compact,
++                fullWidth = false,
++                modifier = Modifier.testTag("settings-website-rule-delete-${rule.id}"),
++            )
++        }
++    }
++}
++
++@Composable
++private fun BrowserSupportMatrix(modifier: Modifier = Modifier) {
++    val colors = QualityAlternativeThemeTokens.colors
++    QaCard(
++        modifier = modifier.testTag("settings-browser-support-matrix"),
++        padding = 16.dp,
++        background = colors.background,
++    ) {
++        MonoText("Browser support", modifier = Modifier.padding(bottom = 8.dp))
++        BrowserSupportRow(
++            title = "Chrome",
++            status = "Verified-host adapter next",
++            description = "Saved rules stay portable; website interruption activates after the Chrome current-host check passes the next slice.",
++            modifier = Modifier.testTag("settings-browser-support-chrome"),
++        )
++        HorizontalDivider(color = colors.line, modifier = Modifier.padding(vertical = 10.dp))
++        BrowserSupportRow(
++            title = "Other browsers",
++            status = "Use app target fallback",
++            description = "Whole-browser app targets remain the reliable interruption path until a browser-specific host adapter is proven.",
++            modifier = Modifier.testTag("settings-browser-support-other"),
++        )
++    }
++}
++
++@Composable
++private fun BrowserSupportRow(
++    title: String,
++    status: String,
++    description: String,
++    modifier: Modifier = Modifier,
++) {
++    val colors = QualityAlternativeThemeTokens.colors
++    Row(
++        modifier = modifier.fillMaxWidth(),
++        verticalAlignment = Alignment.Top,
++        horizontalArrangement = Arrangement.spacedBy(10.dp),
++    ) {
++        Box(
++            modifier = Modifier
++                .padding(top = 4.dp)
++                .size(8.dp)
++                .clip(CircleShape)
++                .background(colors.accent),
++        )
++        Column(modifier = Modifier.weight(1f)) {
++            Row(
++                modifier = Modifier.fillMaxWidth(),
++                horizontalArrangement = Arrangement.spacedBy(8.dp),
++                verticalAlignment = Alignment.CenterVertically,
++            ) {
++                Text(
++                    text = title,
++                    style = MaterialTheme.typography.bodyMedium,
++                    fontWeight = FontWeight.SemiBold,
++                    color = colors.primaryText,
++                    modifier = Modifier.weight(1f),
++                )
++                MonoText(status, color = colors.mutedText)
++            }
++            BodyText(
++                text = description,
++                color = colors.mutedText,
++                fontSize = 12.sp,
++                lineHeight = 16.sp,
++                modifier = Modifier.padding(top = 3.dp),
++            )
++        }
++    }
++}
++
+ @Composable
+ private fun DurationOption(
+     bucket: DurationBucket,
+diff --git a/app/src/test/java/com/qualityalternative/app/data/AccountLightProfileExporterTest.kt b/app/src/test/java/com/qualityalternative/app/data/AccountLightProfileExporterTest.kt
+index b600b0e..651b2ce 100644
+--- a/app/src/test/java/com/qualityalternative/app/data/AccountLightProfileExporterTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/data/AccountLightProfileExporterTest.kt
+@@ -20,6 +20,8 @@ import com.qualityalternative.app.domain.model.ReadingProgress
+ import com.qualityalternative.app.domain.model.TopicTag
+ import com.qualityalternative.app.domain.model.UserDocumentDraft
+ import com.qualityalternative.app.domain.model.UserLinkDraft
++import com.qualityalternative.app.domain.model.WebsiteRule
++import com.qualityalternative.app.domain.model.WebsiteRuleType
+ import com.qualityalternative.app.domain.service.AddUserDocumentResult
+ import com.qualityalternative.app.domain.service.AddUserLinkResult
+ import com.qualityalternative.app.domain.service.ReadingProgressRepository
+@@ -60,6 +62,27 @@ class AccountLightProfileExporterTest {
+         repository.saveReactivatedCompletedContentIds(setOf("editorial-deep-work"))
+         repository.saveOpenAnywayUnlockMinutes(120)
+         repository.saveBedtimeSettings(enabled = true, startMinutes = 23 * 60, endMinutes = 6 * 60 + 30)
++        repository.saveWebsiteRules(
++            listOf(
++                WebsiteRule(
++                    id = "website-rule-11111111-1111-4111-8111-111111111111",
++                    type = WebsiteRuleType.EXACT_DOMAIN,
++                    host = "example.com",
++                    enabled = true,
++                    createdAtMillis = 1_000L,
++                    updatedAtMillis = 2_000L,
++                ),
++                WebsiteRule(
++                    id = "website-rule-22222222-2222-4222-8222-222222222222",
++                    type = WebsiteRuleType.WILDCARD_SUBDOMAINS,
++                    host = "news.example",
++                    includeApex = true,
++                    enabled = false,
++                    createdAtMillis = 3_000L,
++                    updatedAtMillis = 4_000L,
++                ),
++            ),
++        )
+         repository.saveAnnotationExportDestination(
+             uri = "content://drive/raw-provider-id",
+             displayName = "qa-annotations.jsonld",
+@@ -118,6 +141,25 @@ class AccountLightProfileExporterTest {
+         assertEquals(true, profile.settings.bedtimeEnabled)
+         assertEquals(23 * 60, profile.settings.bedtimeStartMinutes)
+         assertEquals(6 * 60 + 30, profile.settings.bedtimeEndMinutes)
++        assertEquals(
++            listOf(
++                AccountLightWebsiteRule(
++                    id = "website-rule-11111111-1111-4111-8111-111111111111",
++                    ruleType = "EXACT_DOMAIN",
++                    host = "example.com",
++                    enabled = true,
++                    includeApex = false,
++                ),
++                AccountLightWebsiteRule(
++                    id = "website-rule-22222222-2222-4222-8222-222222222222",
++                    ruleType = "WILDCARD_SUBDOMAINS",
++                    host = "news.example",
++                    enabled = false,
++                    includeApex = true,
++                ),
++            ),
++            profile.settings.websiteRules,
++        )
+ 
+         assertEquals(emptyList<AccountLightUserLink>(), profile.library.userLinks)
+         assertEquals(emptyList<AccountLightUserDocument>(), profile.library.userDocuments)
+diff --git a/app/src/test/java/com/qualityalternative/app/data/AccountLightProfileImporterTest.kt b/app/src/test/java/com/qualityalternative/app/data/AccountLightProfileImporterTest.kt
+index ff88bb0..99e1a8b 100644
+--- a/app/src/test/java/com/qualityalternative/app/data/AccountLightProfileImporterTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/data/AccountLightProfileImporterTest.kt
+@@ -19,6 +19,7 @@ import com.qualityalternative.app.domain.model.ReadingProgress
+ import com.qualityalternative.app.domain.model.TopicTag
+ import com.qualityalternative.app.domain.model.UserDocumentDraft
+ import com.qualityalternative.app.domain.model.UserLinkDraft
++import com.qualityalternative.app.domain.model.WebsiteRuleType
+ import com.qualityalternative.app.domain.service.AddUserDocumentResult
+ import com.qualityalternative.app.domain.service.AddUserLinkResult
+ import com.qualityalternative.app.domain.service.ReadingProgressRepository
+@@ -147,6 +148,95 @@ class AccountLightProfileImporterTest {
+         assertEquals(10_000L, identity.createdAtMillis)
+     }
+ 
++    @Test
++    fun applyReplace_restoresPortableWebsiteRules() = runBlocking {
++        val target = PreferencesSettingsRepository(
++            dataStore = testDataStore(),
++            supportedApps = SupportedCatalog.distractingApps,
++        )
++        val importer = AccountLightProfileImporter(settingsRepository = target)
++        val plan = importer.validateImportProfileJson(
++            validProfileJson().withWebsiteRules(
++                listOf(
++                    JsonObject(
++                        mapOf(
++                            "id" to JsonPrimitive("website-rule-11111111-1111-4111-8111-111111111111"),
++                            "ruleType" to JsonPrimitive(WebsiteRuleType.EXACT_DOMAIN.name),
++                            "host" to JsonPrimitive("example.com"),
++                            "enabled" to JsonPrimitive(true),
++                            "includeApex" to JsonPrimitive(false),
++                        ),
++                    ),
++                    JsonObject(
++                        mapOf(
++                            "id" to JsonPrimitive("website-rule-22222222-2222-4222-8222-222222222222"),
++                            "ruleType" to JsonPrimitive(WebsiteRuleType.WILDCARD_SUBDOMAINS.name),
++                            "host" to JsonPrimitive("news.example"),
++                            "enabled" to JsonPrimitive(false),
++                            "includeApex" to JsonPrimitive(true),
++                        ),
++                    ),
++                ),
++            ),
++        )
++
++        importer.applyReplace(plan)
++
++        val restored = target.observeAppSettings().first().websiteRules
++        assertEquals(2, restored.size)
++        assertEquals("example.com", restored[0].host)
++        assertEquals(WebsiteRuleType.EXACT_DOMAIN, restored[0].type)
++        assertEquals("news.example", restored[1].host)
++        assertEquals(WebsiteRuleType.WILDCARD_SUBDOMAINS, restored[1].type)
++        assertEquals(true, restored[1].includeApex)
++        assertEquals(false, restored[1].enabled)
++    }
++
++    @Test
++    fun validateImportProfileJson_rejectsUnsafeWebsiteRules() {
++        val repository = PreferencesSettingsRepository(
++            dataStore = testDataStore(),
++            supportedApps = SupportedCatalog.distractingApps,
++        )
++        val importer = AccountLightProfileImporter(settingsRepository = repository)
++
++        listOf(
++            JsonObject(
++                mapOf(
++                    "id" to JsonPrimitive("website-rule-11111111-1111-4111-8111-111111111111"),
++                    "ruleType" to JsonPrimitive(WebsiteRuleType.EXACT_DOMAIN.name),
++                    "host" to JsonPrimitive("192.168.1.7"),
++                ),
++            ),
++            JsonObject(
++                mapOf(
++                    "id" to JsonPrimitive("website-rule-44444444-4444-4444-8444-444444444444"),
++                    "ruleType" to JsonPrimitive(WebsiteRuleType.EXACT_DOMAIN.name),
++                    "host" to JsonPrimitive("8.8.8.8"),
++                ),
++            ),
++            JsonObject(
++                mapOf(
++                    "id" to JsonPrimitive("website-rule-22222222-2222-4222-8222-222222222222"),
++                    "ruleType" to JsonPrimitive(WebsiteRuleType.EXACT_DOMAIN.name),
++                    "host" to JsonPrimitive("example.com/path"),
++                ),
++            ),
++            JsonObject(
++                mapOf(
++                    "id" to JsonPrimitive("website-rule-33333333-3333-4333-8333-333333333333"),
++                    "ruleType" to JsonPrimitive(WebsiteRuleType.EXACT_DOMAIN.name),
++                    "host" to JsonPrimitive("example.com"),
++                    "includeApex" to JsonPrimitive(true),
++                ),
++            ),
++        ).forEach { unsafeRule ->
++            assertThrows(AccountLightImportException::class.java) {
++                importer.validateImportProfileJson(validProfileJson().withWebsiteRules(listOf(unsafeRule)))
++            }
++        }
++    }
++
+     @Test
+     fun validateImportProfileJson_warnsAndKeepsUnsupportedAppsInactiveOnReplace() = runBlocking {
+         val target = PreferencesSettingsRepository(
+@@ -1078,6 +1168,18 @@ class AccountLightProfileImporterTest {
+         ).toString()
+     }
+ 
++    private fun String.withWebsiteRules(rules: List<JsonObject>): String {
++        val root = Json.parseToJsonElement(this).jsonObject
++        val settings = root.getValue("settings").jsonObject
++        return JsonObject(
++            root + (
++                "settings" to JsonObject(
++                    settings + ("websiteRules" to JsonArray(rules)),
++                )
++                ),
++        ).toString()
++    }
++
+     private fun String.withSchemaVersion(schemaVersion: JsonElement): String {
+         val root = Json.parseToJsonElement(this).jsonObject
+         return JsonObject(root + ("schemaVersion" to schemaVersion)).toString()
+diff --git a/app/src/test/java/com/qualityalternative/app/data/PreferencesSettingsRepositoryTest.kt b/app/src/test/java/com/qualityalternative/app/data/PreferencesSettingsRepositoryTest.kt
+index c86ce89..22c439f 100644
+--- a/app/src/test/java/com/qualityalternative/app/data/PreferencesSettingsRepositoryTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/data/PreferencesSettingsRepositoryTest.kt
+@@ -4,7 +4,9 @@ import androidx.datastore.core.DataStore
+ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+ import androidx.datastore.preferences.core.Preferences
+ import androidx.datastore.preferences.core.edit
++import androidx.datastore.preferences.core.stringSetPreferencesKey
+ import androidx.datastore.preferences.core.stringPreferencesKey
++import com.qualityalternative.app.domain.model.AppSettings
+ import com.qualityalternative.app.domain.model.AppThemeMode
+ import com.qualityalternative.app.domain.model.ContentPriority
+ import com.qualityalternative.app.domain.model.CustomTargetAppCandidate
+@@ -14,6 +16,8 @@ import com.qualityalternative.app.domain.model.DurationBucket
+ import com.qualityalternative.app.domain.model.InterventionMode
+ import com.qualityalternative.app.domain.model.OnboardingSelection
+ import com.qualityalternative.app.domain.model.TopicTag
++import com.qualityalternative.app.domain.model.WebsiteRule
++import com.qualityalternative.app.domain.model.WebsiteRuleType
+ import java.io.File
+ import kotlinx.coroutines.flow.first
+ import kotlinx.coroutines.runBlocking
+@@ -462,6 +466,103 @@ class PreferencesSettingsRepositoryTest {
+         assertEquals(selection.preferredTopics, restored.preferredTopics)
+     }
+ 
++    @Test
++    fun saveWebsiteRules_persistsAndRestoresNormalizedRules() = runBlocking {
++        val repository = PreferencesSettingsRepository(
++            dataStore = testDataStore(),
++            supportedApps = SupportedCatalog.distractingApps,
++        )
++        val exactRule = WebsiteRule(
++            id = "website-rule-11111111-1111-4111-8111-111111111111",
++            type = WebsiteRuleType.EXACT_DOMAIN,
++            host = "example.com",
++            enabled = true,
++            createdAtMillis = 100L,
++            updatedAtMillis = 110L,
++        )
++        val wildcardRule = WebsiteRule(
++            id = "website-rule-22222222-2222-4222-8222-222222222222",
++            type = WebsiteRuleType.WILDCARD_SUBDOMAINS,
++            host = "news.example",
++            includeApex = true,
++            enabled = false,
++            createdAtMillis = 120L,
++            updatedAtMillis = 130L,
++        )
++
++        repository.saveWebsiteRules(listOf(wildcardRule, exactRule))
++
++        val restored = repository.observeAppSettings().first()
++        assertEquals(listOf(exactRule, wildcardRule), restored.websiteRules)
++    }
++
++    @Test
++    fun replacePortableSettings_persistsWebsiteRulesWithoutLocalBrowserState() = runBlocking {
++        val repository = PreferencesSettingsRepository(
++            dataStore = testDataStore(),
++            supportedApps = SupportedCatalog.distractingApps,
++        )
++        val rule = WebsiteRule(
++            id = "website-rule-33333333-3333-4333-8333-333333333333",
++            type = WebsiteRuleType.WILDCARD_SUBDOMAINS,
++            host = "portable.example",
++            includeApex = true,
++            enabled = true,
++            createdAtMillis = 0L,
++            updatedAtMillis = 0L,
++        )
++
++        repository.replacePortableSettings(
++            settings = AppSettings(
++                hasCompletedOnboarding = true,
++                selectedAppPackages = SupportedCatalog.distractingApps.take(3).mapTo(mutableSetOf()) { it.packageName },
++                preferredTopics = setOf(TopicTag.PHILOSOPHY, TopicTag.SCIENCE, TopicTag.HISTORY),
++                preferredDurationBucket = DurationBucket.FOCUS,
++                selectedPackIds = setOf("starter_pack"),
++                websiteRules = listOf(rule),
++            ),
++            profileIdentity = null,
++        )
++
++        val restored = repository.observeAppSettings().first()
++        assertEquals(listOf(rule), restored.websiteRules)
++        assertFalse(restored.annotationDriveSyncEnabled)
++        assertEquals(null, restored.annotationDriveFolderId)
++    }
++
++    @Test
++    fun observeAppSettings_ignoresMalformedWebsiteRuleRecords() = runBlocking {
++        val dataStore = testDataStore()
++        val repository = PreferencesSettingsRepository(
++            dataStore = dataStore,
++            supportedApps = SupportedCatalog.distractingApps,
++        )
++        val privateIpRule = listOf(
++            "website-rule-44444444-4444-4444-8444-444444444444",
++            WebsiteRuleType.EXACT_DOMAIN.name,
++            "192.168.1.7",
++            "false",
++            "true",
++            "100",
++            "100",
++        ).joinToString("\u001F")
++        val publicIpRule = listOf(
++            "website-rule-55555555-5555-4555-8555-555555555555",
++            WebsiteRuleType.EXACT_DOMAIN.name,
++            "8.8.8.8",
++            "false",
++            "true",
++            "100",
++            "100",
++        ).joinToString("\u001F")
++
++        dataStore.edit { preferences ->
++            preferences[stringSetPreferencesKey("website_rules_v1")] = setOf(privateIpRule, publicIpRule)
++        }
++
++        assertEquals(emptyList<WebsiteRule>(), repository.observeAppSettings().first().websiteRules)
++    }
++
+     @Test
+     fun supportedDistractingApps_includesEligibleCustomAppsAndExcludesUnsafeCandidates() = runBlocking {
+         val customApp = DistractingApp(
+diff --git a/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt b/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
+index c1019bc..7e36240 100644
+--- a/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
+@@ -50,6 +50,8 @@ import com.qualityalternative.app.domain.model.UserLinkValidationError
+ import com.qualityalternative.app.domain.model.UserDocumentDraft
+ import com.qualityalternative.app.domain.model.UserDocumentValidationError
+ import com.qualityalternative.app.domain.model.UserPreferences
++import com.qualityalternative.app.domain.model.WebsiteRule
++import com.qualityalternative.app.domain.model.WebsiteRuleType
+ import com.qualityalternative.app.domain.model.bedtimeWindowIsActive
+ import com.qualityalternative.app.domain.model.meditationTimerContentItem
+ import com.qualityalternative.app.domain.service.AccountLightProfileAutosaveWriter
+@@ -5153,6 +5155,131 @@ class MainViewModelTest {
+         assertTrue(viewModel.uiState.availableTargetApps.any { it.packageName == customTarget.packageName })
+     }
+ 
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun saveWebsiteRuleDraft_addsExactRuleWithNormalizedHost() = runTest {
++        val settingsRepository = FakeSettingsRepository(initial = completedSettings(selectedAppPackages = setOf("com.instagram.android")))
++        val viewModel = createViewModel(settingsRepository = settingsRepository, nowProvider = { 12_000L })
++        advanceUntilIdle()
++
++        viewModel.updateWebsiteRuleDraftText("HTTPS://Example.COM:443/deep/read")
++        viewModel.saveWebsiteRuleDraft()
++        advanceUntilIdle()
++
++        val rule = settingsRepository.state.value.websiteRules.single()
++        assertTrue(rule.id.startsWith("website-rule-"))
++        assertEquals(WebsiteRuleType.EXACT_DOMAIN, rule.type)
++        assertEquals("example.com", rule.host)
++        assertEquals(false, rule.includeApex)
++        assertEquals(true, rule.enabled)
++        assertEquals(12_000L, rule.createdAtMillis)
++        assertEquals(12_000L, rule.updatedAtMillis)
++        assertEquals("", viewModel.uiState.websiteRuleDraftText)
++        assertEquals("Website rule saved.", viewModel.uiState.latestMessage)
++    }
++
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun saveWebsiteRuleDraft_rejectsDuplicateAndPrivateHosts() = runTest {
++        val settingsRepository = FakeSettingsRepository(initial = completedSettings(selectedAppPackages = setOf("com.instagram.android")))
++        val viewModel = createViewModel(settingsRepository = settingsRepository)
++        advanceUntilIdle()
++
++        viewModel.updateWebsiteRuleDraftText("example.com")
++        viewModel.saveWebsiteRuleDraft()
++        advanceUntilIdle()
++        viewModel.updateWebsiteRuleDraftText("https://example.com/path")
++        viewModel.saveWebsiteRuleDraft()
++
++        assertEquals("This website rule already exists.", viewModel.uiState.websiteRuleDraftError)
++        assertEquals(1, settingsRepository.state.value.websiteRules.size)
++
++        viewModel.updateWebsiteRuleDraftText("192.168.1.5")
++        viewModel.saveWebsiteRuleDraft()
++
++        assertEquals("Private, local, and IP hosts are not website rules.", viewModel.uiState.websiteRuleDraftError)
++        assertEquals(1, settingsRepository.state.value.websiteRules.size)
++
++        viewModel.updateWebsiteRuleDraftText("8.8.8.8")
++        viewModel.saveWebsiteRuleDraft()
++
++        assertEquals("Private, local, and IP hosts are not website rules.", viewModel.uiState.websiteRuleDraftError)
++        assertEquals(1, settingsRepository.state.value.websiteRules.size)
++    }
++
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun saveWebsiteRuleDraft_typedWildcardRequiresExplicitApexChoice() = runTest {
++        val settingsRepository = FakeSettingsRepository(initial = completedSettings(selectedAppPackages = setOf("com.instagram.android")))
++        val viewModel = createViewModel(settingsRepository = settingsRepository, nowProvider = { 13_000L })
++        advanceUntilIdle()
++
++        viewModel.updateWebsiteRuleDraftText("*.News.Example")
++        viewModel.saveWebsiteRuleDraft()
++        advanceUntilIdle()
++
++        val subdomainOnly = settingsRepository.state.value.websiteRules.single()
++        assertEquals(WebsiteRuleType.WILDCARD_SUBDOMAINS, subdomainOnly.type)
++        assertEquals("news.example", subdomainOnly.host)
++        assertEquals(false, subdomainOnly.includeApex)
++
++        viewModel.updateWebsiteRuleDraftText("*.Other.Example")
++        viewModel.setWebsiteRuleDraftIncludeApex(true)
++        viewModel.saveWebsiteRuleDraft()
++        advanceUntilIdle()
++
++        val includeApex = settingsRepository.state.value.websiteRules.single { it.host == "other.example" }
++        assertEquals(WebsiteRuleType.WILDCARD_SUBDOMAINS, includeApex.type)
++        assertEquals(true, includeApex.includeApex)
++    }
++
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun editToggleAndDeleteWebsiteRule_updatesRepository() = runTest {
++        val originalRule = WebsiteRule(
++            id = "website-rule-11111111-1111-4111-8111-111111111111",
++            type = WebsiteRuleType.EXACT_DOMAIN,
++            host = "example.com",
++            includeApex = false,
++            enabled = true,
++            createdAtMillis = 1_000L,
++            updatedAtMillis = 1_000L,
++        )
++        val settingsRepository = FakeSettingsRepository(
++            initial = completedSettings(selectedAppPackages = setOf("com.instagram.android")).copy(
++                websiteRules = listOf(originalRule),
++            ),
++        )
++        val viewModel = createViewModel(settingsRepository = settingsRepository, nowProvider = { 9_000L })
++        advanceUntilIdle()
++
++        viewModel.beginEditWebsiteRule(originalRule)
++        viewModel.setWebsiteRuleDraftWildcard(true)
++        viewModel.setWebsiteRuleDraftIncludeApex(true)
++        viewModel.saveWebsiteRuleDraft()
++        advanceUntilIdle()
++
++        val edited = settingsRepository.state.value.websiteRules.single()
++        assertEquals(WebsiteRuleType.WILDCARD_SUBDOMAINS, edited.type)
++        assertEquals("example.com", edited.host)
++        assertEquals(true, edited.includeApex)
++        assertEquals(1_000L, edited.createdAtMillis)
++        assertEquals(9_000L, edited.updatedAtMillis)
++        assertEquals("Website rule updated.", viewModel.uiState.latestMessage)
++
++        viewModel.toggleWebsiteRuleEnabled(originalRule.id)
++        advanceUntilIdle()
++
++        assertEquals(false, settingsRepository.state.value.websiteRules.single().enabled)
++
++        viewModel.deleteWebsiteRule(originalRule.id)
++        advanceUntilIdle()
++
++        assertEquals(emptyList<WebsiteRule>(), settingsRepository.state.value.websiteRules)
++        assertEquals(emptyList<WebsiteRule>(), viewModel.uiState.websiteRules)
++        assertEquals("Website rule deleted.", viewModel.uiState.latestMessage)
++    }
++
+     private fun completedSettings(selectedAppPackages: Set<String>): AppSettings {
+         return AppSettings(
+             hasCompletedOnboarding = true,
+@@ -5273,6 +5400,7 @@ class MainViewModelTest {
+                 profileAutosaveDisplayName = state.value.profileAutosaveDisplayName,
+                 profileAutosaveLastSuccessfulAtMillis = state.value.profileAutosaveLastSuccessfulAtMillis,
+                 profileAutosaveLastError = state.value.profileAutosaveLastError,
++                websiteRules = state.value.websiteRules,
+             )
+         }
+ 
+@@ -5304,6 +5432,7 @@ class MainViewModelTest {
+                 bedtimeEnabled = settings.bedtimeEnabled,
+                 bedtimeStartMinutes = settings.bedtimeStartMinutes,
+                 bedtimeEndMinutes = settings.bedtimeEndMinutes,
++                websiteRules = settings.websiteRules,
+             )
+         }
+ 
+@@ -5359,6 +5488,10 @@ class MainViewModelTest {
+             )
+         }
+ 
++        override suspend fun saveWebsiteRules(rules: List<WebsiteRule>) {
++            state.value = state.value.copy(websiteRules = rules)
++        }
++
+         override suspend fun saveAnnotationExportDestination(uri: String, displayName: String) {
+             state.value = state.value.copy(
+                 annotationExportUri = uri,
+diff --git a/docs/LANE_STATUS.md b/docs/LANE_STATUS.md
+index e04ce97..ca01237 100644
+--- a/docs/LANE_STATUS.md
++++ b/docs/LANE_STATUS.md
+@@ -13,7 +13,7 @@ This file is the repo-level index for active and recently completed execution la
+ 
+ ## Sprint 26 Custom Targets And Website Interventions
+ 
+-Status: `slice26_1_complete_10_10_pass_slice26_2_next`
++Status: `slice26_2_r2_ready_for_gpt_pro_review`
+ 
+ - Branch: `codex/sprint26-custom-targets-website-interventions`
+ - Scope: plan and implement support for replacement-first interventions on eligible arbitrary installed apps plus supported-browser website/domain rules, while avoiding universal URL blocking claims.
+@@ -36,7 +36,10 @@ Status: `slice26_1_complete_10_10_pass_slice26_2_next`
+   - R4 fixes the GPT Pro R3 blockers: the review bundle now includes complete Gradle wrapper files and `app/proguard-rules.pro`; Settings can rebuild from an empty completed target set by allowing additions below the minimum while still blocking below-minimum removals; and the OEM safety boundary has direct regression coverage.
+   - Settings separates standard suggestions from custom installed-app search/selection.
+   - Selected eligible custom app packages hydrate into settings, Portable Profile import/export, and the AccessibilityService resolver's known target list.
+-  - Website/domain rules are not implemented yet and remain scoped to Slice 26.2+.
++  - Slice 26.2 implements the website rule model and Settings UI for exact-domain and wildcard-subdomain rules.
++  - Website rules are normalized, reject local/private/public-IP/IPv6/all-numeric/ambiguous hosts, persist in DataStore, and round-trip through Portable Profile import/export without browser support state, URL observations, tokens, or local folders.
++  - Settings exposes website rules as a separate target category with add, validation, pause, edit, delete, and a browser support matrix. Chrome current-host interception remains scoped to Slice 26.3.
++  - Slice 26.2 R2 fixes the GPT Pro R1 blockers: all IP literals are rejected; typed `*.example.com` exposes the subdomain mode and apex toggle before save; apex inclusion defaults off; the website rule count says `enabled`; the review bundle includes `gradle/libs.versions.toml`; and Android test metadata is sanitized to remove absolute local paths.
+   - Slice 26.1 GPT Pro R3 review returned `SCORE 8/10`, `VERDICT FAIL`, `VISUAL REVIEW PASS`.
+   - Slice 26.1 GPT Pro R4 review returned `SCORE 10/10`, `VERDICT PASS`, `VISUAL REVIEW PASS`.
+   - Slice 26.1 GPT Pro R4 heartbeat was deleted after successful harvest.
+@@ -72,8 +75,35 @@ Status: `slice26_1_complete_10_10_pass_slice26_2_next`
+   - Passed emulator visual E2E: `VisualQaScreenshotTest#captureSprint26CustomTargetSettingsScreens`
+   - Passed `git diff --check`.
+ - Next gate:
+-  - Commit Slice 26.1 implementation/evidence.
+-  - Continue to Slice 26.2 website rule model and Settings UI.
++  - Run GPT Pro Slice 26.2 review with the current implementation/evidence bundle.
++  - If GPT Pro returns `SCORE 10/10`, `VERDICT PASS`, and `VISUAL REVIEW PASS`, commit Slice 26.2 and continue to Slice 26.3 Chrome verified-host adapter.
++  - If GPT Pro returns blockers, fix and rerun review.
++
++### Current Slice 26.2 Validation
++
++- Validation summary: `evidence/sprint26_custom_targets_website_interventions/SLICE26_2_EVIDENCE.md`
++- Visual screenshot directory: `evidence/sprint26_custom_targets_website_interventions/visual_e2e/sprint26-custom-targets-1780833001182/`
++- Visual contact sheet: `evidence/sprint26_custom_targets_website_interventions/visual_e2e/sprint26_slice26_2_website_rules_contact_sheet.png`
++- Passed targeted unit tests:
++  - `WebsiteRuleNormalizerTest`
++  - `PreferencesSettingsRepositoryTest`
++  - `AccountLightProfileExporterTest`
++  - `AccountLightProfileImporterTest`
++  - `MainViewModelTest`
++- Passed emulator visual E2E: `VisualQaScreenshotTest#captureSprint26WebsiteRuleSettingsScreens`
++- Passed `:app:lintDebug`
++- GPT Pro Slice 26.2 lane: `https://chatgpt.com/c/6a255d01-cb24-83eb-b76b-33fcd656b7e7`
++- GPT Pro Slice 26.2 prompt: `evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_2_REVIEW_PROMPT.md`
++- GPT Pro Slice 26.2 bundle: `evidence/sprint26_custom_targets_website_interventions/SPRINT26_SLICE26_2_REVIEW_BUNDLE_20260607.zip`
++- GPT Pro Slice 26.2 R1 output: `evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_2_REVIEW.md`
++- GPT Pro Slice 26.2 R1 verdict: `SCORE 7/10`, `VERDICT FAIL`, `VISUAL REVIEW PASS`
++- GPT Pro Slice 26.2 R1 heartbeat: deleted after successful harvest.
++- GPT Pro Slice 26.2 R2 evidence: `evidence/sprint26_custom_targets_website_interventions/SLICE26_2_R2_EVIDENCE.md`
++- GPT Pro Slice 26.2 R2 prompt: `evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_2_R2_REVIEW_PROMPT.md`
++- GPT Pro Slice 26.2 R2 bundle: `evidence/sprint26_custom_targets_website_interventions/SPRINT26_SLICE26_2_R2_REVIEW_BUNDLE_20260607.zip`
++- GPT Pro Slice 26.2 R2 visual screenshot directory: `evidence/sprint26_custom_targets_website_interventions/visual_e2e_r2/sprint26-custom-targets-1780835556853/`
++- GPT Pro Slice 26.2 R2 visual contact sheet: `evidence/sprint26_custom_targets_website_interventions/visual_e2e_r2/sprint26_slice26_2_r2_website_rules_contact_sheet.png`
++- GPT Pro Slice 26.2 R2 bundle manifest: `evidence/sprint26_custom_targets_website_interventions/SLICE26_2_R2_REVIEW_BUNDLE_MANIFEST.md`
+ 
+ ## Sprint 25 Markdown Media And Tables
+diff --git a/app/src/main/java/com/qualityalternative/app/data/WebsiteRuleNormalizer.kt b/app/src/main/java/com/qualityalternative/app/data/WebsiteRuleNormalizer.kt
+new file mode 100644
+index 0000000..dcdb54e
+--- /dev/null
++++ b/app/src/main/java/com/qualityalternative/app/data/WebsiteRuleNormalizer.kt
+@@ -0,0 +1,107 @@
++package com.qualityalternative.app.data
++
++import com.qualityalternative.app.domain.model.WebsiteRule
++import com.qualityalternative.app.domain.model.WebsiteRuleType
++import java.net.IDN
++import java.net.URI
++import java.util.Locale
++
++object WebsiteRuleNormalizer {
++    fun normalize(input: String, wildcard: Boolean): WebsiteRuleDraftResult {
++        val trimmed = input.trim()
++        if (trimmed.isBlank()) return WebsiteRuleDraftResult.Invalid("Enter a domain.")
++
++        val explicitWildcard = trimmed.startsWith("*.")
++        val rawHost = rawHostFrom(trimmed.removePrefix("*."))
++            ?: return WebsiteRuleDraftResult.Invalid("Enter a valid domain, not a search or path-only value.")
++        if (isIpLiteralOrNumericHost(rawHost)) {
++            return WebsiteRuleDraftResult.Invalid("Private, local, and IP hosts are not website rules.")
++        }
++        val normalized = normalizeHost(rawHost)
++            ?: return WebsiteRuleDraftResult.Invalid("Enter a valid public domain.")
++
++        if (isPrivateOrAmbiguousHost(normalized)) {
++            return WebsiteRuleDraftResult.Invalid("Private, local, and IP hosts are not website rules.")
++        }
++        if (normalized.count { it == '.' } < 1) {
++            return WebsiteRuleDraftResult.Invalid("Use a full domain such as example.com.")
++        }
++
++        return WebsiteRuleDraftResult.Valid(
++            host = normalized,
++            type = if (wildcard || explicitWildcard) WebsiteRuleType.WILDCARD_SUBDOMAINS else WebsiteRuleType.EXACT_DOMAIN,
++        )
++    }
++
++    fun normalizeObservedHost(input: String): String? {
++        return normalizeHost(rawHostFrom(input) ?: input.trim())
++    }
++
++    fun matches(rule: WebsiteRule, observedHost: String): Boolean {
++        val host = normalizeObservedHost(observedHost) ?: return false
++        return when (rule.type) {
++            WebsiteRuleType.EXACT_DOMAIN -> host == rule.host
++            WebsiteRuleType.WILDCARD_SUBDOMAINS -> {
++                host.endsWith(".${rule.host}") || (rule.includeApex && host == rule.host)
++            }
++        }
++    }
++
++    private fun rawHostFrom(input: String): String? {
++        val withoutWhitespace = input.trim()
++        if (withoutWhitespace.any(Char::isWhitespace)) return null
++        if ("://" !in withoutWhitespace && "@" in withoutWhitespace) return null
++        val candidate = if ("://" in withoutWhitespace) withoutWhitespace else "https://$withoutWhitespace"
++        return runCatching { URI(candidate).host }.getOrNull()
++            ?: withoutWhitespace
++                .takeUnless { ':' in it }
++                ?.substringBefore('/')
++                ?.substringBefore('?')
++                ?.substringBefore('#')
++                ?.substringBefore('@')
++                ?.takeIf(String::isNotBlank)
++    }
++
++    private fun normalizeHost(raw: String): String? {
++        val lowered = raw.trim().trimEnd('.').lowercase(Locale.US)
++        if (lowered.isBlank() || lowered.length > 253 || lowered.contains('_') || lowered.contains("..")) return null
++        if (lowered.startsWith("-") || lowered.endsWith("-")) return null
++        if (lowered.contains(':')) return null
++        val labels = lowered.split('.')
++        if (labels.any { label -> label.isBlank() || label.length > 63 || label.startsWith("-") || label.endsWith("-") }) {
++            return null
++        }
++        return runCatching {
++            labels.joinToString(".") { label ->
++                IDN.toASCII(label, IDN.USE_STD3_ASCII_RULES).lowercase(Locale.US)
++            }
++        }.getOrNull()?.takeIf { ascii ->
++            ascii.all { char -> char.isLetterOrDigit() || char == '-' || char == '.' }
++        }
++    }
++
++    private fun isPrivateOrAmbiguousHost(host: String): Boolean {
++        if (host == "localhost" || host.endsWith(".local")) return true
++        val parts = host.split('.')
++        if (parts.all { part -> part.all(Char::isDigit) }) return true
++        return false
++    }
++
++    private fun isIpLiteralOrNumericHost(rawHost: String): Boolean {
++        val host = rawHost.trim().trim('[', ']').trimEnd('.').lowercase(Locale.US)
++        if (':' in host) return true
++        val labels = host.split('.')
++        return labels.isNotEmpty() && labels.all { label ->
++            label.isNotBlank() && label.all(Char::isDigit)
++        }
++    }
++}
++
++sealed class WebsiteRuleDraftResult {
++    data class Valid(
++        val host: String,
++        val type: WebsiteRuleType,
++    ) : WebsiteRuleDraftResult()
++
++    data class Invalid(val message: String) : WebsiteRuleDraftResult()
++}
+diff --git a/app/src/test/java/com/qualityalternative/app/data/WebsiteRuleNormalizerTest.kt b/app/src/test/java/com/qualityalternative/app/data/WebsiteRuleNormalizerTest.kt
+new file mode 100644
+index 0000000..5229502
+--- /dev/null
++++ b/app/src/test/java/com/qualityalternative/app/data/WebsiteRuleNormalizerTest.kt
+@@ -0,0 +1,114 @@
++package com.qualityalternative.app.data
++
++import com.qualityalternative.app.domain.model.WebsiteRule
++import com.qualityalternative.app.domain.model.WebsiteRuleType
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++class WebsiteRuleNormalizerTest {
++    @Test
++    fun normalize_stripsSchemePathPortAndTrailingDot() {
++        val result = WebsiteRuleNormalizer.normalize(
++            input = "HTTPS://Example.COM:443/articles/today?utm=1#top.",
++            wildcard = false,
++        )
++
++        assertEquals(
++            WebsiteRuleDraftResult.Valid(
++                host = "example.com",
++                type = WebsiteRuleType.EXACT_DOMAIN,
++            ),
++            result,
++        )
++    }
++
++    @Test
++    fun normalize_convertsUnicodeDomainsToAscii() {
++        val result = WebsiteRuleNormalizer.normalize(input = "MÜNICH.example", wildcard = false)
++
++        assertEquals(
++            WebsiteRuleDraftResult.Valid(
++                host = "xn--mnich-kva.example",
++                type = WebsiteRuleType.EXACT_DOMAIN,
++            ),
++            result,
++        )
++    }
++
++    @Test
++    fun normalize_detectsExplicitWildcardPrefix() {
++        val result = WebsiteRuleNormalizer.normalize(input = "*.News.Example", wildcard = false)
++
++        assertEquals(
++            WebsiteRuleDraftResult.Valid(
++                host = "news.example",
++                type = WebsiteRuleType.WILDCARD_SUBDOMAINS,
++            ),
++            result,
++        )
++    }
++
++    @Test
++    fun normalize_rejectsLocalPrivateIpAndAmbiguousHosts() {
++        listOf(
++            "localhost",
++            "printer.local",
++            "192.168.1.20",
++            "10.0.0.1",
++            "172.16.4.2",
++            "8.8.8.8",
++            "1.1.1.1",
++            "999.1.1.1",
++            "1.2.3",
++            "[2001:db8::1]",
++            "https://[2001:db8::1]/",
++            "social",
++            "bad_domain.example",
++            "example..com",
++            "reader@example.com",
++            "news.example:bad-port",
++            "what is example.com",
++        ).forEach { input ->
++            assertTrue(
++                "$input should be invalid",
++                WebsiteRuleNormalizer.normalize(input, wildcard = false) is WebsiteRuleDraftResult.Invalid,
++            )
++        }
++    }
++
++    @Test
++    fun matches_exactDomainOnlyMatchesThatDomain() {
++        val rule = WebsiteRule(
++            id = "website-rule-11111111-1111-4111-8111-111111111111",
++            type = WebsiteRuleType.EXACT_DOMAIN,
++            host = "example.com",
++            createdAtMillis = 1_000L,
++            updatedAtMillis = 1_000L,
++        )
++
++        assertTrue(WebsiteRuleNormalizer.matches(rule, "https://example.com/path"))
++        assertFalse(WebsiteRuleNormalizer.matches(rule, "www.example.com"))
++        assertFalse(WebsiteRuleNormalizer.matches(rule, "notexample.com"))
++        assertFalse(WebsiteRuleNormalizer.matches(rule, "example.com.evil.example"))
++    }
++
++    @Test
++    fun matches_wildcardSubdomainsCanOptionallyIncludeApex() {
++        val subdomainOnly = WebsiteRule(
++            id = "website-rule-22222222-2222-4222-8222-222222222222",
++            type = WebsiteRuleType.WILDCARD_SUBDOMAINS,
++            host = "example.com",
++            includeApex = false,
++            createdAtMillis = 1_000L,
++            updatedAtMillis = 1_000L,
++        )
++        val includeApex = subdomainOnly.copy(includeApex = true)
++
++        assertTrue(WebsiteRuleNormalizer.matches(subdomainOnly, "m.example.com"))
++        assertTrue(WebsiteRuleNormalizer.matches(subdomainOnly, "deep.m.example.com"))
++        assertFalse(WebsiteRuleNormalizer.matches(subdomainOnly, "example.com"))
++        assertTrue(WebsiteRuleNormalizer.matches(includeApex, "example.com"))
++    }
++}
+diff --git a/evidence/sprint26_custom_targets_website_interventions/SLICE26_2_EVIDENCE.md b/evidence/sprint26_custom_targets_website_interventions/SLICE26_2_EVIDENCE.md
+new file mode 100644
+index 0000000..de699a8
+--- /dev/null
++++ b/evidence/sprint26_custom_targets_website_interventions/SLICE26_2_EVIDENCE.md
+@@ -0,0 +1,32 @@
++# Sprint 26 Slice 26.2 Evidence - Website Rule Model And Settings UI
++
++## Scope
++
++- Added a portable website-rule model for exact-domain and wildcard-subdomain rules.
++- Added Settings UI for adding, validating, pausing, editing, and deleting website rules.
++- Added a browser support matrix that explicitly states Chrome current-host interception is deferred to the next slice and whole-browser app targets remain the fallback.
++- Kept stored/exported data limited to user-authored domain rules. No browser history, observed URLs, folder IDs, tokens, or local support state are exported.
++
++## Automated Checks
++
++- `:app:testDebugUnitTest --tests com.qualityalternative.app.data.WebsiteRuleNormalizerTest --tests com.qualityalternative.app.data.PreferencesSettingsRepositoryTest --tests com.qualityalternative.app.data.AccountLightProfileExporterTest --tests com.qualityalternative.app.data.AccountLightProfileImporterTest --tests com.qualityalternative.app.ui.MainViewModelTest` - PASS
++- `:app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.qualityalternative.app.VisualQaScreenshotTest#captureSprint26WebsiteRuleSettingsScreens` - PASS on `qaApi36(AVD) - 16`
++- `:app:lintDebug` - PASS
++
++## Visual Evidence
++
++- Final screenshot directory: `evidence/sprint26_custom_targets_website_interventions/visual_e2e/sprint26-custom-targets-1780833001182/`
++- Contact sheet: `evidence/sprint26_custom_targets_website_interventions/visual_e2e/sprint26_slice26_2_website_rules_contact_sheet.png`
++- Covered states:
++  - empty website rules
++  - private IP rejection
++  - exact-domain rule saved
++  - wildcard-subdomain rule with apex included
++  - paused rule state
++  - edit flow
++  - delete flow
++  - browser support matrix
++
++## Emulator Hygiene
++
++- `qaApi36` was shut down after the visual E2E run.
+diff --git a/evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_2_REVIEW_PROMPT.md b/evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_2_REVIEW_PROMPT.md
+new file mode 100644
+index 0000000..9a98466
+--- /dev/null
++++ b/evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_2_REVIEW_PROMPT.md
+@@ -0,0 +1,93 @@
++You are doing a fresh-from-scratch adversarial implementation audit of Sprint 26 Slice 26.2.
++
++Use only the attached bundle as the audit base. If a claim cannot be proven from shipped files, label it `BUNDLE GAP`.
++
++Read these files first, in order:
++
++1. `PRD.md`
++2. `docs/SPRINT_26_CUSTOM_TARGETS_WEBSITE_INTERVENTIONS.md`
++3. `docs/LANE_STATUS.md`
++4. `evidence/sprint26_custom_targets_website_interventions/SLICE26_2_EVIDENCE.md`
++5. `evidence/sprint26_custom_targets_website_interventions/SLICE26_2_REVIEW_BUNDLE_MANIFEST.md`
++6. `evidence/sprint26_custom_targets_website_interventions/SLICE26_2_DIFF.patch`
++
++Then deep-review only this scope:
++
++Sprint 26 Slice 26.2 Website Rule Model And Settings UI:
++
++- user-authored website rules can be added in Settings,
++- exact-domain and wildcard-subdomain rules normalize predictably,
++- invalid, private, local, ambiguous, path-only, IP, and unsafe host inputs are rejected,
++- wildcard rules can optionally include the apex domain,
++- website rules can be paused, edited, and deleted,
++- website rules persist through `PreferencesSettingsRepository`,
++- website rules export/import through Portable Profile without leaking browser history, observed URLs, local support state, folders, or tokens,
++- Settings communicates the browser support boundary honestly:
++  - Chrome current-host verification/interception is deferred to Slice 26.3,
++  - non-supported browsers remain whole-browser app targets for now,
++  - this slice must NOT claim universal URL blocking.
++
++Do not penalize Slice 26.2 for not implementing the Chrome verified-host adapter or live browser URL interception. Those are explicitly deferred to Slice 26.3. Do penalize any code, UI, or documentation that falsely implies URL blocking is already active for all browsers.
++
++Actively audit these risk areas:
++
++1. Website rule model correctness
++   - exact and wildcard normalization are deterministic and user-visible domains remain readable,
++   - path/query/port/scheme inputs do not create misleading stored rules,
++   - private/local/IP domains are rejected,
++   - wildcard matching does not accidentally overmatch unrelated hosts,
++   - IDN handling is safe and test-covered.
++
++2. Settings UI completeness
++   - add/edit/save/cancel/delete/pause flows are visible and usable,
++   - validation errors are visible,
++   - domain text is not squeezed by action buttons,
++   - keyboard/snackbar/transient overlays do not pollute final screenshot evidence,
++   - browser support matrix is explicit and not buried.
++
++3. Portable Profile and privacy
++   - exported profile contains only user-authored website rules,
++   - imported invalid rules are rejected or sanitized,
++   - no browser history, observed current URL, profile path, token, folder ID, or local support state is exported,
++   - existing custom app target profile behavior remains intact.
++
++4. Test and evidence quality
++   - targeted unit tests cover model, persistence, profile export/import, and ViewModel actions,
++   - visual E2E screenshot test proves the user-facing website rule flow,
++   - screenshot capture helper rejects empty/zero-byte files,
++   - final contact sheet is the one reviewers should inspect,
++   - lint and Android connected-test evidence are present.
++
++Scoring:
++
++- Give `SCORE: 10/10` only if Slice 26.2 is release-ready for this scope, visual review passes, browser-support claims are honest, and no material bundle gaps remain.
++- If anything blocks release, use a score below 10 and list the tightest required fixes.
++
++Required output format, with these exact markers:
++
++SCORE: X/10
++
++VERDICT: PASS or FAIL
++
++VISUAL REVIEW: PASS or FAIL
++
++BLOCKERS:
++- If none, write `None`.
++
++RISK / REQUIRED FIXES:
++- If none, write `None`.
++
++WEBSITE RULE MODEL:
++
++SETTINGS UI:
++
++PORTABLE PROFILE / PRIVACY:
++
++BROWSER SUPPORT CLAIMS:
++
++TEST / EVIDENCE:
++
++BUNDLE GAPS:
++- If none, write `None`.
++
++PACKAGE HYGIENE:
+diff --git a/evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_2_REVIEW.md b/evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_2_REVIEW.md
+new file mode 100644
+index 0000000..cf8e9e1
+--- /dev/null
++++ b/evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_2_REVIEW.md
+@@ -0,0 +1,127 @@
++SCORE: 7/10
++
++VERDICT: FAIL
++
++VISUAL REVIEW: PASS
++
++BLOCKERS:
++
++Public IPv4 literals are not rejected. WebsiteRuleNormalizer.isPrivateOrAmbiguousHost() rejects only private/link-local/loopback IPv4 ranges, so public IPv4 hosts such as 8.8.8.8 or 1.1.1.1 would normalize as valid website rules. This violates the Slice 26.2 requirement that IP hosts be rejected, and it affects Settings entry, repository restoration, and Portable Profile import because all three rely on the same normalizer.
++
++Explicit wildcard input can create an apex-including wildcard rule without exposing the apex choice. The UI placeholder accepts *.example.com, and the normalizer treats a leading *. as wildcard even when the “Exact” chip remains selected. Since websiteRuleDraftIncludeApex defaults to true and the “Include main domain” chip is only visible when the wildcard chip is selected, a user can save *.example.com + example.com without seeing or choosing the apex option.
++
++The review bundle is not fresh-build reproducible as shipped. build.gradle.kts and app/build.gradle.kts use version-catalog aliases, but gradle/libs.versions.toml is absent from the bundle. BUNDLE GAP: the shipped files do not prove that a fresh reviewer can run the Gradle validation commands from the bundle alone.
++
++RISK / REQUIRED FIXES:
++
++Reject all IP literals, not only private IPv4 ranges. Add tests for public IPv4, malformed dotted numeric hosts, IPv6 literals, URI bracketed IPv6 hosts, repository decode, ViewModel save, and Portable Profile import.
++
++Make wildcard apex inclusion explicit and deterministic. The safest fix is to default includeApex to false, show the apex control whenever the input is or will be treated as a wildcard, and add ViewModel and visual tests for the *.example.com typed-input path.
++
++Add negative tests for unsafe or ambiguous host forms such as user-info syntax, path-only inputs, search-like text, and port/scheme/path combinations that could otherwise create misleading stored rules.
++
++Rename the website-rule count from “active” to “enabled” or equivalent while live browser URL interception is deferred, because “active” can be read as implying current enforcement.
++
++Include the missing Gradle version catalog and rerun the documented validation from the exact shipped bundle.
++
++Scrub absolute local paths from evidence metadata. The connected-test textproto references local macOS paths and external artifacts not shipped in the bundle.
++
++WEBSITE RULE MODEL:
++
++Exact-domain matching is correctly constrained to equality, so example.com does not match www.example.com, notexample.com, or example.com.evil.
++
++Wildcard-subdomain matching uses host.endsWith(".${rule.host}") and optional apex equality, which avoids substring overmatch against unrelated hosts.
++
++Normalization is mostly deterministic: scheme, port, path, query, fragment, case, trailing dots, and IDN input are handled in the normalizer and covered by unit tests for representative cases.
++
++IDN handling is present through IDN.toASCII(..., USE_STD3_ASCII_RULES) and is tested with MÜNICH.example becoming xn--mnich-kva.example; broader IDN edge-case coverage remains advisable.
++
++Invalid local/private examples are covered for localhost, .local, 192.168.1.20, 10.0.0.1, and 172.16.4.2.
++
++The material correctness failure is IP rejection: public IPv4 literals are accepted because the code only flags selected private ranges as invalid.
++
++The rule matcher itself does not inspect enabled; this is acceptable for Slice 26.2 only because live verified-host interception is deferred, but Slice 26.3 must ensure disabled rules are filtered before any enforcement decision.
++
++SETTINGS UI:
++
++Source inspection shows visible add, edit, save, cancel, delete, and pause/resume flows in WebsiteRulesSettingsSection.
++
++Validation errors are user-visible through the website-rule error text, and the visual evidence includes a rejected private-IP entry.
++
++Rule rows give the domain text its own weighted column and place edit/delete controls below the metadata, so the contact sheet does not show domain text being squeezed by action buttons.
++
++The final screenshot evidence is clean: no keyboard, snackbar, or transient overlay pollutes the captured final states.
++
++Browser support messaging is visible near the website-rule section and in the browser support matrix rather than being buried.
++
++The visual sheet proves empty state, invalid private-IP validation, exact-domain save, wildcard with apex, pause, edit, delete, and browser support matrix.
++
++The UI has a release-relevant apex bug: a typed *.domain can become an apex-including wildcard rule while the apex toggle remains hidden.
++
++PORTABLE PROFILE / PRIVACY:
++
++Exported website rules are limited to portable user-authored fields: id, ruleType, host, enabled, and includeApex.
++
++The exported website-rule profile format does not include created/updated timestamps, observed browser URLs, browser history, support-state flags, profile paths, local folder IDs, or tokens in the inspected website-rule mapping.
++
++Tests assert that settings-only export does not contain content://, raw Drive folder IDs, raw profile folder IDs, token, or oauth.
++
++Replace import restores website rules through the portable profile path and rejects malformed examples for private IP, path-bearing host, and includeApex on exact-domain rules.
++
++Existing custom app target profile behavior appears preserved in the tested exporter/importer paths.
++
++The same public-IP normalizer defect affects Portable Profile import: a malicious or malformed portable profile containing a public IPv4 “website rule” would not be rejected by the current validation.
++
++BROWSER SUPPORT CLAIMS:
++
++PASS for honesty of scope. The PRD, sprint document, lane status, evidence, and Settings UI consistently state that Chrome verified-current-host support is deferred to Slice 26.3.
++
++The UI states that website interruption activates only after a verified current-host adapter is available.
++
++Non-supported browsers are described as requiring whole-browser app targets for now.
++
++No inspected Slice 26.2 source or evidence claims universal URL blocking or all-browser URL interception.
++
++Minor wording risk remains in the “active” count for website rules, because enabled stored rules are not yet browser-enforced website interventions.
++
++TEST / EVIDENCE:
++
++Unit evidence is present for model, repository persistence, Portable Profile export/import, and ViewModel actions. The included HTML report shows 202 debug unit tests with 0 failures.
++
++WebsiteRuleNormalizerTest covers scheme/path/port stripping, trailing-dot behavior, IDN conversion, explicit wildcard prefix normalization, local/private rejection, exact matching, wildcard matching, optional apex matching, and non-overmatch examples.
++
++PreferencesSettingsRepositoryTest covers persistence/restoration of website rules and malformed stored-record rejection.
++
++AccountLightProfileExporterTest and AccountLightProfileImporterTest cover website-rule export/import and several privacy exclusions.
++
++MainViewModelTest covers add, duplicate rejection, private-host rejection, edit, toggle pause, and delete.
++
++The connected visual E2E evidence is present and passes for VisualQaScreenshotTest#captureSprint26WebsiteRuleSettingsScreens.
++
++The screenshot capture helper rejects empty or undersized screenshot files by requiring a successful screenshot and a file larger than 10,000 bytes, with retries.
++
++The contact sheet is suitable as the final reviewer artifact and matches the evidence document.
++
++Lint evidence is present and the task is reported as passing, but the HTML report still contains warnings and hints; these are package-hygiene issues rather than Slice 26.2 functional blockers.
++
++Test coverage gaps remain for public IP rejection, explicit wildcard input with hidden apex toggle, user-info host forms, broader unsafe host inputs, and visual proof of cancel behavior.
++
++BUNDLE GAPS:
++
++BUNDLE GAP: gradle/libs.versions.toml is missing, so the bundle does not prove fresh-from-scratch Gradle build/test reproducibility.
++
++BUNDLE GAP: connected-test metadata references local-path artifacts such as device-info, meminfo, cpuinfo, and test-results log files that are not all shipped in the bundle, although the pass XML and logcat evidence are present.
++
++BUNDLE GAP: the bundle proves the visual states listed in the contact sheet, but it does not visually prove the cancel flow.
++
++PACKAGE HYGIENE:
++
++The bundle includes source, tests, documentation, patch, visual evidence, unit-test reports, connected-test evidence, lint report, Gradle wrapper files, and manifest documentation.
++
++The missing version catalog is a material packaging defect because the Gradle files depend on libs.* and plugin aliases.
++
++Evidence metadata contains absolute local paths including a local username and repository path; these should be scrubbed or converted to relative paths before review distribution.
++
++Lint passes but is not clean: the report contains warnings and hints that should be triaged or explicitly baselined.
++
++The package is adequate for static review and visual audit, but not adequate for an independently reproducible fresh-from-scratch validation run.
+\ No newline at end of file
+diff --git a/evidence/sprint26_custom_targets_website_interventions/SLICE26_2_REVIEW_BUNDLE_MANIFEST.md b/evidence/sprint26_custom_targets_website_interventions/SLICE26_2_REVIEW_BUNDLE_MANIFEST.md
+new file mode 100644
+index 0000000..0907db9
+--- /dev/null
++++ b/evidence/sprint26_custom_targets_website_interventions/SLICE26_2_REVIEW_BUNDLE_MANIFEST.md
+@@ -0,0 +1,32 @@
++# Sprint 26 Slice 26.2 Review Bundle Manifest
++
++## Review Scope
++
++Sprint 26 Slice 26.2 covers the website rule model and Settings UI. It does not claim active per-domain browser interception yet. Chrome verified-host matching is explicitly deferred to Slice 26.3.
++
++## Included
++
++- `PRD.md`
++- `docs/SPRINT_26_CUSTOM_TARGETS_WEBSITE_INTERVENTIONS.md`
++- `docs/LANE_STATUS.md`
++- Slice 26.2 source and test files under `app/src/...`
++- `SLICE26_2_DIFF.patch`
++- `SLICE26_2_EVIDENCE.md`
++- `GPT_PRO_SLICE26_2_REVIEW_PROMPT.md`
++- final visual screenshots and contact sheet for `VisualQaScreenshotTest#captureSprint26WebsiteRuleSettingsScreens`
++- unit-test HTML reports for the targeted test classes
++- Android connected-test result XML/logcat for the visual E2E
++- `lint-results-debug.html`
++
++## Excluded
++
++- Superseded Slice 26.1 review bundles and old GPT Pro outputs, because they were already harvested and are not needed to audit Slice 26.2.
++- Full `docs/` tree, because it includes large unrelated historical artifacts. The canonical Sprint 26 plan and lane tracker are included directly.
++- Release APK artifacts, because this is a slice review before the Sprint 26 release gate.
++
++## Current Local Validation
++
++- Targeted unit tests: PASS
++- `VisualQaScreenshotTest#captureSprint26WebsiteRuleSettingsScreens`: PASS on `qaApi36(AVD) - 16`
++- `:app:lintDebug`: PASS
++- Emulator was shut down after visual evidence capture.
+diff --git a/evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_2_R2_REVIEW_PROMPT.md b/evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_2_R2_REVIEW_PROMPT.md
+new file mode 100644
+index 0000000..db90f32
+--- /dev/null
++++ b/evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_2_R2_REVIEW_PROMPT.md
+@@ -0,0 +1,97 @@
++You are doing a fresh-from-scratch adversarial blocker-fix audit of Sprint 26 Slice 26.2 R2.
++
++Use only the attached bundle as the audit base. If a claim cannot be proven from shipped files, label it `BUNDLE GAP`.
++
++Read these files first, in order:
++
++1. `PRD.md`
++2. `docs/SPRINT_26_CUSTOM_TARGETS_WEBSITE_INTERVENTIONS.md`
++3. `docs/LANE_STATUS.md`
++4. `evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_2_REVIEW.md`
++5. `evidence/sprint26_custom_targets_website_interventions/SLICE26_2_R2_EVIDENCE.md`
++6. `evidence/sprint26_custom_targets_website_interventions/SLICE26_2_R2_REVIEW_BUNDLE_MANIFEST.md`
++7. `evidence/sprint26_custom_targets_website_interventions/SLICE26_2_R2_DIFF.patch`
++
++Review only this scope:
++
++Sprint 26 Slice 26.2 Website Rule Model And Settings UI R2:
++
++- user-authored website rules can be added in Settings,
++- exact-domain and wildcard-subdomain rules normalize predictably,
++- invalid, private, local, ambiguous, path-only, IP, and unsafe host inputs are rejected,
++- wildcard rules can optionally include the apex domain only through a visible explicit choice,
++- website rules can be paused, edited, canceled, and deleted,
++- website rules persist through `PreferencesSettingsRepository`,
++- website rules export/import through Portable Profile without leaking browser history, observed URLs, local support state, folders, or tokens,
++- Settings communicates the browser support boundary honestly:
++  - Chrome current-host verification/interception is deferred to Slice 26.3,
++  - non-supported browsers remain whole-browser app targets for now,
++  - this slice must NOT claim universal URL blocking.
++
++Do not penalize Slice 26.2 for not implementing the Chrome verified-host adapter or live browser URL interception. Those are explicitly deferred to Slice 26.3. Do penalize any code, UI, or documentation that falsely implies URL blocking is already active for all browsers.
++
++Actively recheck R1 blockers:
++
++1. Public IP rejection
++   - Verify public IPv4 literals such as `8.8.8.8` and `1.1.1.1` are rejected.
++   - Verify malformed all-numeric hosts and IPv6 literals are rejected.
++   - Verify Settings save, DataStore hydration, and Portable Profile import all use the fixed validation.
++
++2. Explicit wildcard apex behavior
++   - Verify typed `*.example.com` cannot silently create an apex-including rule.
++   - Verify apex inclusion defaults off.
++   - Verify the apex control is visible before save whenever the typed input is treated as wildcard.
++   - Verify tests and visual evidence cover the typed wildcard path.
++
++3. Build-reproducible bundle
++   - Verify `gradle/libs.versions.toml`, wrapper files, Gradle files, and relevant source/tests are included.
++
++4. Browser-support wording
++   - Verify website-rule count says enabled/stored rather than active/enforced.
++   - Verify UI/docs do not imply live website enforcement before Slice 26.3.
++
++5. Evidence and package hygiene
++   - Verify final R2 contact sheet has no keyboard/snackbar/transient overlays.
++   - Verify public-IP rejection, typed wildcard visible apex toggle, subdomain-only save, visible apex save, cancel edit, and browser support matrix are visible.
++   - Verify Android test metadata in the bundle is sanitized and does not contain absolute local macOS paths.
++
++Scoring:
++
++- Give `SCORE: 10/10` only if Slice 26.2 R2 is release-ready for this scope, R1 blockers are closed, visual review passes, browser-support claims are honest, and no material bundle gaps remain.
++- If anything blocks release, use a score below 10 and list the tightest required fixes.
++
++Required output format, with these exact markers:
++
++SCORE: X/10
++
++VERDICT: PASS or FAIL
++
++VISUAL REVIEW: PASS or FAIL
++
++BLOCKERS:
++- If none, write `None`.
++
++R1 BLOCKER RECHECK:
++- Public IP rejection:
++- Explicit wildcard apex behavior:
++- Build-reproducible bundle:
++- Browser-support wording:
++- Evidence/package hygiene:
++
++RISK / REQUIRED FIXES:
++- If none, write `None`.
++
++WEBSITE RULE MODEL:
++
++SETTINGS UI:
++
++PORTABLE PROFILE / PRIVACY:
++
++BROWSER SUPPORT CLAIMS:
++
++TEST / EVIDENCE:
++
++BUNDLE GAPS:
++- If none, write `None`.
++
++PACKAGE HYGIENE:
+diff --git a/evidence/sprint26_custom_targets_website_interventions/SLICE26_2_R2_EVIDENCE.md b/evidence/sprint26_custom_targets_website_interventions/SLICE26_2_R2_EVIDENCE.md
+new file mode 100644
+index 0000000..1ff4b4e
+--- /dev/null
++++ b/evidence/sprint26_custom_targets_website_interventions/SLICE26_2_R2_EVIDENCE.md
+@@ -0,0 +1,71 @@
++# Sprint 26 Slice 26.2 R2 Evidence - Website Rule Model And Settings UI
++
++## R1 GPT Pro Result
++
++- R1 review: `evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_2_REVIEW.md`
++- R1 verdict: `SCORE 7/10`, `VERDICT FAIL`, `VISUAL REVIEW PASS`
++- R1 blockers fixed in R2:
++  - all IP literals and all-numeric host forms are rejected, including public IPv4 and IPv6 inputs,
++  - typed `*.example.com` now becomes an explicit subdomain rule with the apex toggle visible before save,
++  - wildcard apex inclusion defaults to off and is saved only after the visible `Include main domain` toggle is selected,
++  - website-rule count now says `enabled` instead of `active`,
++  - R2 bundle includes `gradle/libs.versions.toml`,
++  - R2 bundle uses sanitized Android test metadata without absolute local macOS paths.
++
++## Automated Checks
++
++- `:app:testDebugUnitTest --tests com.qualityalternative.app.data.WebsiteRuleNormalizerTest --tests com.qualityalternative.app.data.PreferencesSettingsRepositoryTest --tests com.qualityalternative.app.data.AccountLightProfileExporterTest --tests com.qualityalternative.app.data.AccountLightProfileImporterTest --tests com.qualityalternative.app.ui.MainViewModelTest` - PASS
++- `:app:lintDebug` - PASS
++- `:app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.qualityalternative.app.VisualQaScreenshotTest#captureSprint26WebsiteRuleSettingsScreens` - PASS on `qaApi36(AVD) - 16`
++- `git diff --check` - PASS
++
++## New / Updated Test Coverage
++
++- `WebsiteRuleNormalizerTest`
++  - rejects public IPv4 literals (`8.8.8.8`, `1.1.1.1`),
++  - rejects malformed all-numeric hosts (`999.1.1.1`, `1.2.3`),
++  - rejects IPv6 literals, including bracketed URI form,
++  - rejects bare user-info/email-like input and search-like text.
++- `PreferencesSettingsRepositoryTest`
++  - ignores stored public-IP website rules during DataStore hydration.
++- `AccountLightProfileImporterTest`
++  - rejects public-IP website rules during Portable Profile validation.
++- `MainViewModelTest`
++  - rejects public-IP input through Settings draft save,
++  - proves typed `*.News.Example` saves as wildcard subdomains with `includeApex=false`,
++  - proves apex inclusion is saved only after `setWebsiteRuleDraftIncludeApex(true)`.
++- `VisualQaScreenshotTest#captureSprint26WebsiteRuleSettingsScreens`
++  - captures public IP rejection,
++  - captures typed wildcard with visible `Include main domain` toggle before save,
++  - captures subdomain-only wildcard save,
++  - captures visible apex toggle save,
++  - captures cancel edit preserving the original rule.
++
++## Visual Evidence
++
++- Final R2 screenshot directory: `evidence/sprint26_custom_targets_website_interventions/visual_e2e_r2/sprint26-custom-targets-1780835556853/`
++- Final R2 contact sheet: `evidence/sprint26_custom_targets_website_interventions/visual_e2e_r2/sprint26_slice26_2_r2_website_rules_contact_sheet.png`
++- Covered states:
++  - empty website rules,
++  - private IP rejection,
++  - public IP rejection,
++  - exact-domain rule saved,
++  - typed wildcard with visible apex toggle,
++  - typed wildcard saved as subdomain-only,
++  - visible apex toggle saved,
++  - paused exact rule,
++  - edit cancel keeps original rule,
++  - edit save,
++  - delete keeps wildcard rule,
++  - browser support matrix.
++
++## Package Hygiene
++
++- R2 bundle includes `gradle/libs.versions.toml` plus Gradle wrapper files and app Gradle files.
++- R2 bundle includes sanitized Android test metadata: `SLICE26_2_R2_ANDROID_TEST_RESULT_SANITIZED.textproto`.
++- R2 bundle does not include the original unsanitized Android `test-result.textproto`.
++- Release APK artifacts remain excluded because this is still a slice review before the Sprint 26 release gate.
++
++## Emulator Hygiene
++
++- `qaApi36` was shut down after the final visual E2E run.
+diff --git a/evidence/sprint26_custom_targets_website_interventions/SLICE26_2_R2_REVIEW_BUNDLE_MANIFEST.md b/evidence/sprint26_custom_targets_website_interventions/SLICE26_2_R2_REVIEW_BUNDLE_MANIFEST.md
+new file mode 100644
+index 0000000..44e26e6
+--- /dev/null
++++ b/evidence/sprint26_custom_targets_website_interventions/SLICE26_2_R2_REVIEW_BUNDLE_MANIFEST.md
+@@ -0,0 +1,36 @@
++# Sprint 26 Slice 26.2 R2 Review Bundle Manifest
++
++## Review Scope
++
++Sprint 26 Slice 26.2 R2 is a blocker-fix review for the website rule model and Settings UI. It still does not claim active per-domain browser interception. Chrome verified-host matching remains explicitly deferred to Slice 26.3.
++
++## Included
++
++- `PRD.md`
++- `docs/SPRINT_26_CUSTOM_TARGETS_WEBSITE_INTERVENTIONS.md`
++- `docs/LANE_STATUS.md`
++- R1 review output: `GPT_PRO_SLICE26_2_REVIEW.md`
++- R2 prompt: `GPT_PRO_SLICE26_2_R2_REVIEW_PROMPT.md`
++- R2 evidence: `SLICE26_2_R2_EVIDENCE.md`
++- R2 diff patch: `SLICE26_2_R2_DIFF.patch`
++- Slice 26.2 source and test files under `app/src/...`
++- Gradle wrapper, app Gradle files, and `gradle/libs.versions.toml`
++- final R2 visual screenshots and R2 contact sheet for `VisualQaScreenshotTest#captureSprint26WebsiteRuleSettingsScreens`
++- unit-test HTML reports for the targeted test classes
++- Android connected-test XML/logcat plus sanitized textproto metadata
++- `lint-results-debug.html`
++
++## Excluded
++
++- Superseded Slice 26.1 bundles and old GPT Pro outputs, because Slice 26.1 has already passed and is committed.
++- R1 visual screenshot directory, because R2 visual evidence supersedes it for the fixed blockers.
++- Unsanitized Android `test-result.textproto`, because it contains absolute local macOS paths. The sanitized equivalent is included.
++- Full release APK artifacts, because this is a slice review before the Sprint 26 release gate.
++
++## Current Local Validation
++
++- Targeted unit tests: PASS
++- `VisualQaScreenshotTest#captureSprint26WebsiteRuleSettingsScreens`: PASS on `qaApi36(AVD) - 16`
++- `:app:lintDebug`: PASS
++- `git diff --check`: PASS
++- Emulator was shut down after visual evidence capture.
+diff --git a/evidence/sprint26_custom_targets_website_interventions/SLICE26_2_R2_ANDROID_TEST_RESULT_SANITIZED.textproto b/evidence/sprint26_custom_targets_website_interventions/SLICE26_2_R2_ANDROID_TEST_RESULT_SANITIZED.textproto
+new file mode 100644
+index 0000000..34a1107
+--- /dev/null
++++ b/evidence/sprint26_custom_targets_website_interventions/SLICE26_2_R2_ANDROID_TEST_RESULT_SANITIZED.textproto
+@@ -0,0 +1,77 @@
++# proto-message: google.testing.platform.proto.api.core.TestSuiteResult
++# 2026-06-07T12:34:05.037013Z:
++test_suite_meta_data {
++  scheduled_test_case_count: 1
++  device {
++    id: "emulator-5554"
++    friendly_name: "primary"
++  }
++}
++test_status: PASSED
++test_result {
++  test_case {
++    test_class: "VisualQaScreenshotTest"
++    test_package: "com.qualityalternative.app"
++    test_method: "captureSprint26WebsiteRuleSettingsScreens"
++    start_time {
++      seconds: 1780835557
++      nanos: 24000000
++    }
++    end_time {
++      seconds: 1780835639
++      nanos: 484000000
++    }
++    device {
++      id: "emulator-5554"
++      friendly_name: "primary"
++    }
++  }
++  test_status: PASSED
++  output_artifact {
++    label {
++      label: "logcat"
++      namespace: "android"
++    }
++    source_path {
++      path: "app/build/outputs/androidTest-results/connected/debug/qaApi36(AVD) - 16/logcat-com.qualityalternative.app.VisualQaScreenshotTest-captureSprint26WebsiteRuleSettingsScreens.txt"
++    }
++  }
++  output_artifact {
++    label {
++      label: "device-info"
++      namespace: "android"
++    }
++    source_path {
++      path: "app/build/outputs/androidTest-results/connected/debug/qaApi36(AVD) - 16/device-info.pb"
++    }
++  }
++  output_artifact {
++    label {
++      label: "device-info.meminfo"
++      namespace: "android"
++    }
++    source_path {
++      path: "app/build/outputs/androidTest-results/connected/debug/qaApi36(AVD) - 16/meminfo"
++    }
++  }
++  output_artifact {
++    label {
++      label: "device-info.cpuinfo"
++      namespace: "android"
++    }
++    source_path {
++      path: "app/build/outputs/androidTest-results/connected/debug/qaApi36(AVD) - 16/cpuinfo"
++    }
++  }
++}
++output_artifact {
++  label {
++    label: "test-results.log"
++    namespace: "com.google.testing.platform.runtime.android.driver.AndroidInstrumentationDriver"
++  }
++  source_path {
++    path: "app/build/outputs/androidTest-results/connected/debug/qaApi36(AVD) - 16/testlog/test-results.log"
++  }
++  type: TEST_DATA
++  mime_type: "text/plain"
++}

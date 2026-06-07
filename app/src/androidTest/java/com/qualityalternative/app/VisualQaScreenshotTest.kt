@@ -482,6 +482,135 @@ class VisualQaScreenshotTest {
     }
 
     @Test
+    fun captureSprint26WebsiteRuleSettingsScreens() {
+        launchOnboardedApp()
+        openTab("tab-settings", "settings-list")
+        composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasTestTag("settings-website-rules-section"))
+        composeRule.onNodeWithTag("settings-website-rule-input").assertIsDisplayed()
+        composeRule.onNodeWithText("No website rules yet.").assertIsDisplayed()
+        captureSprint26("11_website_rules_empty_light")
+
+        composeRule.onNodeWithTag("settings-website-rule-input").performTextInput("192.168.1.5")
+        composeRule.onNodeWithTag("settings-website-rule-save").performClick()
+        composeRule.onNodeWithTag("settings-website-rule-error").assertIsDisplayed()
+        captureSprint26("12_website_rules_private_ip_rejected_light")
+
+        composeRule.onNodeWithTag("settings-website-rule-input").performTextClearance()
+        composeRule.onNodeWithTag("settings-website-rule-input").performTextInput("8.8.8.8")
+        composeRule.onNodeWithTag("settings-website-rule-save").performClick()
+        composeRule.onNodeWithTag("settings-website-rule-error").assertIsDisplayed()
+        captureSprint26("13_website_rules_public_ip_rejected_light")
+
+        composeRule.onNodeWithTag("settings-website-rule-input").performTextClearance()
+        composeRule.onNodeWithTag("settings-website-rule-input").performTextInput("HTTPS://Example.COM:443/deep/read")
+        composeRule.onNodeWithTag("settings-website-rule-save").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            runBlocking {
+                val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication
+                app.appContainer.settingsRepository.observeAppSettings().first().websiteRules.any { it.host == "example.com" }
+            }
+        }
+        composeRule.onNodeWithText("example.com").assertIsDisplayed()
+        waitForTransientMessageToClear("Website rule saved.")
+        captureSprint26("14_website_rules_exact_saved_light")
+
+        composeRule.onNodeWithTag("settings-website-rule-input").performTextInput("*.News.Example")
+        composeRule.onNodeWithTag("settings-website-rule-include-apex").assertIsDisplayed()
+        UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).pressBack()
+        composeRule.waitForIdle()
+        captureSprint26("15_website_rules_typed_wildcard_toggle_visible_light")
+        composeRule.onNodeWithTag("settings-website-rule-save").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            runBlocking {
+                val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication
+                app.appContainer.settingsRepository.observeAppSettings().first().websiteRules.any { rule ->
+                    rule.host == "news.example" && !rule.includeApex
+                }
+            }
+        }
+        composeRule.onNodeWithText("*.news.example").assertIsDisplayed()
+        waitForTransientMessageToClear("Website rule saved.")
+        captureSprint26("16_website_rules_typed_wildcard_subdomain_only_light")
+
+        val newsRuleId = runBlocking {
+            val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication
+            app.appContainer.settingsRepository.observeAppSettings().first().websiteRules.first { it.host == "news.example" }.id
+        }
+        composeRule.onNodeWithTag("settings-website-rule-edit-$newsRuleId").performClick()
+        composeRule.onNodeWithTag("settings-website-rule-include-apex").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings-website-rule-include-apex").performClick()
+        composeRule.onNodeWithTag("settings-website-rule-save").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            runBlocking {
+                val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication
+                app.appContainer.settingsRepository.observeAppSettings().first().websiteRules.any { rule ->
+                    rule.id == newsRuleId && rule.includeApex
+                }
+            }
+        }
+        composeRule.onNodeWithText("*.news.example + news.example").assertIsDisplayed()
+        waitForTransientMessageToClear("Website rule updated.")
+        captureSprint26("17_website_rules_visible_apex_toggle_saved_light")
+
+        val exactRuleId = runBlocking {
+            val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication
+            app.appContainer.settingsRepository.observeAppSettings().first().websiteRules.first { it.host == "example.com" }.id
+        }
+        composeRule.onNodeWithTag("settings-website-rule-toggle-$exactRuleId").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            runBlocking {
+                val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication
+                app.appContainer.settingsRepository.observeAppSettings().first().websiteRules.first { it.id == exactRuleId }.enabled.not()
+            }
+        }
+        waitForTransientMessageToClear("Website rule updated.")
+        captureSprint26("18_website_rules_exact_paused_light")
+
+        composeRule.onNodeWithTag("settings-website-rule-edit-$exactRuleId").performClick()
+        composeRule.onNodeWithTag("settings-website-rule-input").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings-website-rule-input").performTextClearance()
+        composeRule.onNodeWithTag("settings-website-rule-input").performTextInput("example.org")
+        composeRule.onNodeWithTag("settings-website-rule-cancel").performClick()
+        composeRule.onNodeWithText("example.com").assertIsDisplayed()
+        captureSprint26("19_website_rules_edit_cancel_keeps_original_light")
+
+        composeRule.onNodeWithTag("settings-website-rule-edit-$exactRuleId").performClick()
+        composeRule.onNodeWithTag("settings-website-rule-input").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings-website-rule-input").performTextClearance()
+        composeRule.onNodeWithTag("settings-website-rule-input").performTextInput("example.org")
+        composeRule.onNodeWithTag("settings-website-rule-save").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            runBlocking {
+                val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication
+                app.appContainer.settingsRepository.observeAppSettings().first().websiteRules.any { rule ->
+                    rule.id == exactRuleId && rule.host == "example.org"
+                }
+            }
+        }
+        composeRule.onNodeWithText("example.org").assertIsDisplayed()
+        waitForTransientMessageToClear("Website rule updated.")
+        captureSprint26("20_website_rules_edit_saved_light")
+
+        composeRule.onNodeWithTag("settings-website-rule-delete-$exactRuleId").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            runBlocking {
+                val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication
+                app.appContainer.settingsRepository.observeAppSettings().first().websiteRules.none { it.id == exactRuleId }
+            }
+        }
+        waitForTransientMessageToClear("Website rule deleted.")
+        captureSprint26("21_website_rules_delete_keeps_wildcard_light")
+
+        composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasTestTag("settings-browser-support-matrix"))
+        composeRule.onNodeWithTag("settings-browser-support-chrome").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings-browser-support-other").assertIsDisplayed()
+        waitForTransientMessageToClear("Website rule deleted.")
+        captureSprint26("22_website_rules_browser_support_matrix_light")
+    }
+
+    @Test
     fun captureSprint10ReaderProgressStreakAndMeditationScreens() {
         launchOnboardedApp()
         seedUserEpubSelection()
@@ -1608,7 +1737,15 @@ class VisualQaScreenshotTest {
         Thread.sleep(350)
         val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
         val file = File(directory, "$name.png")
-        assertTrue("Could not capture $name into ${file.absolutePath}", device.takeScreenshot(file))
+        var captured = false
+        repeat(3) { attempt ->
+            captured = device.takeScreenshot(file) && file.length() > 10_000L
+            if (!captured) {
+                file.delete()
+                Thread.sleep(500L + (attempt * 250L))
+            }
+        }
+        assertTrue("Could not capture non-empty $name into ${file.absolutePath}", captured)
     }
 
     private fun captureLegacyContentDisplayScreens() {
@@ -2725,6 +2862,10 @@ class VisualQaScreenshotTest {
         composeRule.onNodeWithText(text).fetchSemanticsNode()
         true
     }.getOrDefault(false)
+
+    private fun waitForTransientMessageToClear(text: String) {
+        composeRule.waitUntil(timeoutMillis = 15_000) { !hasNode(text) }
+    }
 
     private fun hasNodeContaining(text: String): Boolean = runCatching {
         composeRule.onNodeWithText(text, substring = true, ignoreCase = true).fetchSemanticsNode()

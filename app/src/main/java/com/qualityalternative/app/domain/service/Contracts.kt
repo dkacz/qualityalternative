@@ -30,6 +30,7 @@ import com.qualityalternative.app.domain.model.UserLinkValidationError
 import com.qualityalternative.app.domain.model.UserDocumentDraft
 import com.qualityalternative.app.domain.model.UserDocumentValidationError
 import com.qualityalternative.app.domain.model.UserPreferences
+import com.qualityalternative.app.domain.model.WebsiteRule
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 
@@ -139,6 +140,7 @@ interface SettingsRepository {
     suspend fun saveReactivatedCompletedContentIds(contentIds: Set<String>)
     suspend fun saveOpenAnywayUnlockMinutes(minutes: Int)
     suspend fun saveBedtimeSettings(enabled: Boolean, startMinutes: Int, endMinutes: Int) {}
+    suspend fun saveWebsiteRules(rules: List<WebsiteRule>) {}
     suspend fun saveAnnotationExportDestination(uri: String, displayName: String)
     suspend fun clearAnnotationExportDestination()
     suspend fun saveAnnotationExportSuccess(timestampMillis: Long)

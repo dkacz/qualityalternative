@@ -50,6 +50,8 @@ import com.qualityalternative.app.domain.model.UserLinkValidationError
 import com.qualityalternative.app.domain.model.UserDocumentDraft
 import com.qualityalternative.app.domain.model.UserDocumentValidationError
 import com.qualityalternative.app.domain.model.UserPreferences
+import com.qualityalternative.app.domain.model.WebsiteRule
+import com.qualityalternative.app.domain.model.WebsiteRuleType
 import com.qualityalternative.app.domain.model.bedtimeWindowIsActive
 import com.qualityalternative.app.domain.model.meditationTimerContentItem
 import com.qualityalternative.app.domain.service.AccountLightProfileAutosaveWriter
@@ -5153,6 +5155,131 @@ class MainViewModelTest {
         assertTrue(viewModel.uiState.availableTargetApps.any { it.packageName == customTarget.packageName })
     }
 
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun saveWebsiteRuleDraft_addsExactRuleWithNormalizedHost() = runTest {
+        val settingsRepository = FakeSettingsRepository(initial = completedSettings(selectedAppPackages = setOf("com.instagram.android")))
+        val viewModel = createViewModel(settingsRepository = settingsRepository, nowProvider = { 12_000L })
+        advanceUntilIdle()
+
+        viewModel.updateWebsiteRuleDraftText("HTTPS://Example.COM:443/deep/read")
+        viewModel.saveWebsiteRuleDraft()
+        advanceUntilIdle()
+
+        val rule = settingsRepository.state.value.websiteRules.single()
+        assertTrue(rule.id.startsWith("website-rule-"))
+        assertEquals(WebsiteRuleType.EXACT_DOMAIN, rule.type)
+        assertEquals("example.com", rule.host)
+        assertEquals(false, rule.includeApex)
+        assertEquals(true, rule.enabled)
+        assertEquals(12_000L, rule.createdAtMillis)
+        assertEquals(12_000L, rule.updatedAtMillis)
+        assertEquals("", viewModel.uiState.websiteRuleDraftText)
+        assertEquals("Website rule saved.", viewModel.uiState.latestMessage)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun saveWebsiteRuleDraft_rejectsDuplicateAndPrivateHosts() = runTest {
+        val settingsRepository = FakeSettingsRepository(initial = completedSettings(selectedAppPackages = setOf("com.instagram.android")))
+        val viewModel = createViewModel(settingsRepository = settingsRepository)
+        advanceUntilIdle()
+
+        viewModel.updateWebsiteRuleDraftText("example.com")
+        viewModel.saveWebsiteRuleDraft()
+        advanceUntilIdle()
+        viewModel.updateWebsiteRuleDraftText("https://example.com/path")
+        viewModel.saveWebsiteRuleDraft()
+
+        assertEquals("This website rule already exists.", viewModel.uiState.websiteRuleDraftError)
+        assertEquals(1, settingsRepository.state.value.websiteRules.size)
+
+        viewModel.updateWebsiteRuleDraftText("192.168.1.5")
+        viewModel.saveWebsiteRuleDraft()
+
+        assertEquals("Private, local, and IP hosts are not website rules.", viewModel.uiState.websiteRuleDraftError)
+        assertEquals(1, settingsRepository.state.value.websiteRules.size)
+
+        viewModel.updateWebsiteRuleDraftText("8.8.8.8")
+        viewModel.saveWebsiteRuleDraft()
+
+        assertEquals("Private, local, and IP hosts are not website rules.", viewModel.uiState.websiteRuleDraftError)
+        assertEquals(1, settingsRepository.state.value.websiteRules.size)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun saveWebsiteRuleDraft_typedWildcardRequiresExplicitApexChoice() = runTest {
+        val settingsRepository = FakeSettingsRepository(initial = completedSettings(selectedAppPackages = setOf("com.instagram.android")))
+        val viewModel = createViewModel(settingsRepository = settingsRepository, nowProvider = { 13_000L })
+        advanceUntilIdle()
+
+        viewModel.updateWebsiteRuleDraftText("*.News.Example")
+        viewModel.saveWebsiteRuleDraft()
+        advanceUntilIdle()
+
+        val subdomainOnly = settingsRepository.state.value.websiteRules.single()
+        assertEquals(WebsiteRuleType.WILDCARD_SUBDOMAINS, subdomainOnly.type)
+        assertEquals("news.example", subdomainOnly.host)
+        assertEquals(false, subdomainOnly.includeApex)
+
+        viewModel.updateWebsiteRuleDraftText("*.Other.Example")
+        viewModel.setWebsiteRuleDraftIncludeApex(true)
+        viewModel.saveWebsiteRuleDraft()
+        advanceUntilIdle()
+
+        val includeApex = settingsRepository.state.value.websiteRules.single { it.host == "other.example" }
+        assertEquals(WebsiteRuleType.WILDCARD_SUBDOMAINS, includeApex.type)
+        assertEquals(true, includeApex.includeApex)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun editToggleAndDeleteWebsiteRule_updatesRepository() = runTest {
+        val originalRule = WebsiteRule(
+            id = "website-rule-11111111-1111-4111-8111-111111111111",
+            type = WebsiteRuleType.EXACT_DOMAIN,
+            host = "example.com",
+            includeApex = false,
+            enabled = true,
+            createdAtMillis = 1_000L,
+            updatedAtMillis = 1_000L,
+        )
+        val settingsRepository = FakeSettingsRepository(
+            initial = completedSettings(selectedAppPackages = setOf("com.instagram.android")).copy(
+                websiteRules = listOf(originalRule),
+            ),
+        )
+        val viewModel = createViewModel(settingsRepository = settingsRepository, nowProvider = { 9_000L })
+        advanceUntilIdle()
+
+        viewModel.beginEditWebsiteRule(originalRule)
+        viewModel.setWebsiteRuleDraftWildcard(true)
+        viewModel.setWebsiteRuleDraftIncludeApex(true)
+        viewModel.saveWebsiteRuleDraft()
+        advanceUntilIdle()
+
+        val edited = settingsRepository.state.value.websiteRules.single()
+        assertEquals(WebsiteRuleType.WILDCARD_SUBDOMAINS, edited.type)
+        assertEquals("example.com", edited.host)
+        assertEquals(true, edited.includeApex)
+        assertEquals(1_000L, edited.createdAtMillis)
+        assertEquals(9_000L, edited.updatedAtMillis)
+        assertEquals("Website rule updated.", viewModel.uiState.latestMessage)
+
+        viewModel.toggleWebsiteRuleEnabled(originalRule.id)
+        advanceUntilIdle()
+
+        assertEquals(false, settingsRepository.state.value.websiteRules.single().enabled)
+
+        viewModel.deleteWebsiteRule(originalRule.id)
+        advanceUntilIdle()
+
+        assertEquals(emptyList<WebsiteRule>(), settingsRepository.state.value.websiteRules)
+        assertEquals(emptyList<WebsiteRule>(), viewModel.uiState.websiteRules)
+        assertEquals("Website rule deleted.", viewModel.uiState.latestMessage)
+    }
+
     private fun completedSettings(selectedAppPackages: Set<String>): AppSettings {
         return AppSettings(
             hasCompletedOnboarding = true,
@@ -5273,6 +5400,7 @@ class MainViewModelTest {
                 profileAutosaveDisplayName = state.value.profileAutosaveDisplayName,
                 profileAutosaveLastSuccessfulAtMillis = state.value.profileAutosaveLastSuccessfulAtMillis,
                 profileAutosaveLastError = state.value.profileAutosaveLastError,
+                websiteRules = state.value.websiteRules,
             )
         }
 
@@ -5304,6 +5432,7 @@ class MainViewModelTest {
                 bedtimeEnabled = settings.bedtimeEnabled,
                 bedtimeStartMinutes = settings.bedtimeStartMinutes,
                 bedtimeEndMinutes = settings.bedtimeEndMinutes,
+                websiteRules = settings.websiteRules,
             )
         }
 
@@ -5357,6 +5486,10 @@ class MainViewModelTest {
                 bedtimeStartMinutes = startMinutes,
                 bedtimeEndMinutes = endMinutes,
             )
+        }
+
+        override suspend fun saveWebsiteRules(rules: List<WebsiteRule>) {
+            state.value = state.value.copy(websiteRules = rules)
         }
 
         override suspend fun saveAnnotationExportDestination(uri: String, displayName: String) {

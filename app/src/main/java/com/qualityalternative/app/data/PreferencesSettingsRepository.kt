@@ -38,6 +38,8 @@ import com.qualityalternative.app.domain.model.MIN_OPEN_ANYWAY_UNLOCK_MINUTES
 import com.qualityalternative.app.domain.model.MIN_READER_FONT_SCALE
 import com.qualityalternative.app.domain.model.OnboardingSelection
 import com.qualityalternative.app.domain.model.TopicTag
+import com.qualityalternative.app.domain.model.WebsiteRule
+import com.qualityalternative.app.domain.model.WebsiteRuleType
 import com.qualityalternative.app.domain.service.SettingsRepository
 import java.io.IOException
 import java.util.UUID
@@ -106,6 +108,8 @@ class PreferencesSettingsRepository(
                     profileAutosaveDisplayName = preferences[ProfileAutosaveDisplayName],
                     profileAutosaveLastSuccessfulAtMillis = preferences[ProfileAutosaveLastSuccessfulAtMillis],
                     profileAutosaveLastError = preferences[ProfileAutosaveLastError],
+                    websiteRules = preferences[WebsiteRules].orEmpty().mapNotNull(::decodeWebsiteRule)
+                        .sortedWith(compareBy<WebsiteRule> { it.createdAtMillis }.thenBy { it.host }.thenBy { it.id }),
                 )
             }
     }
@@ -169,6 +173,7 @@ class PreferencesSettingsRepository(
             preferences[BedtimeEnabled] = settings.bedtimeEnabled
             preferences[BedtimeStartMinutes] = portableBedtimeMinutes(settings.bedtimeStartMinutes)
             preferences[BedtimeEndMinutes] = portableBedtimeMinutes(settings.bedtimeEndMinutes)
+            preferences[WebsiteRules] = settings.websiteRules.mapTo(mutableSetOf(), ::encodeWebsiteRule)
         }
     }
 
@@ -254,6 +259,14 @@ class PreferencesSettingsRepository(
             preferences[BedtimeEnabled] = enabled
             preferences[BedtimeStartMinutes] = portableBedtimeMinutes(startMinutes)
             preferences[BedtimeEndMinutes] = portableBedtimeMinutes(endMinutes)
+        }
+    }
+
+    override suspend fun saveWebsiteRules(rules: List<WebsiteRule>) {
+        dataStore.edit { preferences ->
+            preferences[WebsiteRules] = rules
+                .distinctBy(WebsiteRule::id)
+                .mapTo(mutableSetOf(), ::encodeWebsiteRule)
         }
     }
 
@@ -397,6 +410,40 @@ class PreferencesSettingsRepository(
             return Regex("^qa-local-[0-9a-fA-F-]{36}$").matches(raw)
         }
 
+        fun encodeWebsiteRule(rule: WebsiteRule): String {
+            return listOf(
+                rule.id,
+                rule.type.name,
+                rule.host,
+                rule.includeApex.toString(),
+                rule.enabled.toString(),
+                rule.createdAtMillis.coerceAtLeast(0L).toString(),
+                rule.updatedAtMillis.coerceAtLeast(0L).toString(),
+            ).joinToString(WebsiteRuleDelimiter)
+        }
+
+        fun decodeWebsiteRule(raw: String): WebsiteRule? {
+            val parts = raw.split(WebsiteRuleDelimiter)
+            if (parts.size != 7) return null
+            val type = runCatching { WebsiteRuleType.valueOf(parts[1]) }.getOrNull() ?: return null
+            val normalized = WebsiteRuleNormalizer.normalize(
+                input = parts[2],
+                wildcard = type == WebsiteRuleType.WILDCARD_SUBDOMAINS,
+            ) as? WebsiteRuleDraftResult.Valid ?: return null
+            if (normalized.type != type || normalized.host != parts[2]) return null
+            val createdAtMillis = parts[5].toLongOrNull()?.coerceAtLeast(0L) ?: return null
+            val updatedAtMillis = parts[6].toLongOrNull()?.coerceAtLeast(createdAtMillis) ?: return null
+            return WebsiteRule(
+                id = parts[0].takeIf { it.matches(WebsiteRuleIdRegex) } ?: return null,
+                type = type,
+                host = normalized.host,
+                includeApex = type == WebsiteRuleType.WILDCARD_SUBDOMAINS && (parts[3].toBooleanStrictOrNull() ?: false),
+                enabled = parts[4].toBooleanStrictOrNull() ?: true,
+                createdAtMillis = createdAtMillis,
+                updatedAtMillis = updatedAtMillis,
+            )
+        }
+
         val LocalProfileId = stringPreferencesKey("local_profile_id")
         val LocalProfileCreatedAtMillis = longPreferencesKey("local_profile_created_at_millis")
         val HasCompletedOnboarding = booleanPreferencesKey("has_completed_onboarding")
@@ -428,5 +475,8 @@ class PreferencesSettingsRepository(
         val ProfileAutosaveDisplayName = stringPreferencesKey("profile_autosave_display_name")
         val ProfileAutosaveLastSuccessfulAtMillis = longPreferencesKey("profile_autosave_last_successful_at_millis")
         val ProfileAutosaveLastError = stringPreferencesKey("profile_autosave_last_error")
+        val WebsiteRules = stringSetPreferencesKey("website_rules_v1")
+        const val WebsiteRuleDelimiter = "\u001F"
+        val WebsiteRuleIdRegex = Regex("^website-rule-[0-9a-fA-F-]{36}$")
     }
 }

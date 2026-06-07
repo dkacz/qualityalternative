@@ -18,6 +18,8 @@ import com.qualityalternative.app.data.ReadingTimeEstimator
 import com.qualityalternative.app.data.SupportedCatalog
 import com.qualityalternative.app.data.UserDocumentValidator
 import com.qualityalternative.app.data.UserLinkValidator
+import com.qualityalternative.app.data.WebsiteRuleDraftResult
+import com.qualityalternative.app.data.WebsiteRuleNormalizer
 import com.qualityalternative.app.domain.model.AnalyticsEvent
 import com.qualityalternative.app.domain.model.AnalyticsSemanticKeys
 import com.qualityalternative.app.domain.model.AnalyticsEventType
@@ -73,6 +75,8 @@ import com.qualityalternative.app.domain.model.UserDocumentValidationError
 import com.qualityalternative.app.domain.model.UserLinkDraft
 import com.qualityalternative.app.domain.model.UserLinkValidationError
 import com.qualityalternative.app.domain.model.UserPreferences
+import com.qualityalternative.app.domain.model.WebsiteRule
+import com.qualityalternative.app.domain.model.WebsiteRuleType
 import com.qualityalternative.app.domain.model.bedtimeWindowIsActive
 import com.qualityalternative.app.domain.model.meditationTimerContentItem
 import com.qualityalternative.app.domain.model.usesExternalHandoff
@@ -186,6 +190,12 @@ data class MainUiState(
     val profileAutosaveUsesLocalDefault: Boolean = false,
     val profileAutosaveLastSuccessfulAtMillis: Long? = null,
     val profileAutosaveLastError: String? = null,
+    val websiteRules: List<WebsiteRule> = emptyList(),
+    val websiteRuleDraftText: String = "",
+    val websiteRuleDraftWildcard: Boolean = false,
+    val websiteRuleDraftIncludeApex: Boolean = false,
+    val websiteRuleDraftEditingId: String? = null,
+    val websiteRuleDraftError: String? = null,
     val isProfileAutosaving: Boolean = false,
     val isAnnotationDriveSyncing: Boolean = false,
     val isAccountLightExporting: Boolean = false,
@@ -615,6 +625,143 @@ class MainViewModel(
         viewModelScope.launch {
             settingsRepository.saveSelectedAppPackages(selectedPackages)
             autosaveAccountLightProfileAfterPortableMutation()
+        }
+    }
+
+    fun updateWebsiteRuleDraftText(value: String) {
+        val explicitWildcard = value.trim().startsWith("*.")
+        uiState = uiState.copy(
+            websiteRuleDraftText = value,
+            websiteRuleDraftWildcard = uiState.websiteRuleDraftWildcard || explicitWildcard,
+            websiteRuleDraftError = null,
+            latestMessage = null,
+        )
+    }
+
+    fun setWebsiteRuleDraftWildcard(enabled: Boolean) {
+        uiState = uiState.copy(
+            websiteRuleDraftWildcard = enabled,
+            websiteRuleDraftIncludeApex = if (enabled) uiState.websiteRuleDraftIncludeApex else false,
+            websiteRuleDraftError = null,
+            latestMessage = null,
+        )
+    }
+
+    fun setWebsiteRuleDraftIncludeApex(enabled: Boolean) {
+        uiState = uiState.copy(
+            websiteRuleDraftIncludeApex = enabled,
+            websiteRuleDraftError = null,
+            latestMessage = null,
+        )
+    }
+
+    fun beginEditWebsiteRule(rule: WebsiteRule) {
+        uiState = uiState.copy(
+            websiteRuleDraftText = rule.host,
+            websiteRuleDraftWildcard = rule.type == WebsiteRuleType.WILDCARD_SUBDOMAINS,
+            websiteRuleDraftIncludeApex = rule.includeApex,
+            websiteRuleDraftEditingId = rule.id,
+            websiteRuleDraftError = null,
+            latestMessage = null,
+        )
+    }
+
+    fun cancelWebsiteRuleEdit() {
+        uiState = uiState.copy(
+            websiteRuleDraftText = "",
+            websiteRuleDraftWildcard = false,
+            websiteRuleDraftIncludeApex = false,
+            websiteRuleDraftEditingId = null,
+            websiteRuleDraftError = null,
+            latestMessage = null,
+        )
+    }
+
+    fun saveWebsiteRuleDraft(nowMillis: Long = nowProvider()) {
+        val result = WebsiteRuleNormalizer.normalize(
+            input = uiState.websiteRuleDraftText,
+            wildcard = uiState.websiteRuleDraftWildcard,
+        )
+        if (result is WebsiteRuleDraftResult.Invalid) {
+            uiState = uiState.copy(websiteRuleDraftError = result.message, latestMessage = null)
+            return
+        }
+        val valid = result as WebsiteRuleDraftResult.Valid
+        val editingId = uiState.websiteRuleDraftEditingId
+        val includeApex = valid.type == WebsiteRuleType.WILDCARD_SUBDOMAINS && uiState.websiteRuleDraftIncludeApex
+        val duplicate = uiState.websiteRules.any { rule ->
+            rule.id != editingId &&
+                rule.type == valid.type &&
+                rule.host == valid.host &&
+                rule.includeApex == includeApex
+        }
+        if (duplicate) {
+            uiState = uiState.copy(websiteRuleDraftError = "This website rule already exists.", latestMessage = null)
+            return
+        }
+
+        val updatedRule = uiState.websiteRules.firstOrNull { it.id == editingId }?.copy(
+            type = valid.type,
+            host = valid.host,
+            includeApex = includeApex,
+            updatedAtMillis = nowMillis.coerceAtLeast(0L),
+        ) ?: WebsiteRule(
+            id = "website-rule-${UUID.randomUUID()}",
+            type = valid.type,
+            host = valid.host,
+            includeApex = includeApex,
+            enabled = true,
+            createdAtMillis = nowMillis.coerceAtLeast(0L),
+            updatedAtMillis = nowMillis.coerceAtLeast(0L),
+        )
+        val updatedRules = if (editingId == null) {
+            uiState.websiteRules + updatedRule
+        } else {
+            uiState.websiteRules.map { rule -> if (rule.id == editingId) updatedRule else rule }
+        }.sortedWith(compareBy<WebsiteRule> { it.host }.thenBy { it.type.name }.thenBy { it.id })
+
+        persistWebsiteRules(
+            rules = updatedRules,
+            message = if (editingId == null) "Website rule saved." else "Website rule updated.",
+            nowMillis = nowMillis,
+        )
+        clearWebsiteRuleDraft(clearMessage = false)
+    }
+
+    fun toggleWebsiteRuleEnabled(ruleId: String, nowMillis: Long = nowProvider()) {
+        val updatedRules = uiState.websiteRules.map { rule ->
+            if (rule.id == ruleId) {
+                rule.copy(enabled = !rule.enabled, updatedAtMillis = nowMillis.coerceAtLeast(0L))
+            } else {
+                rule
+            }
+        }
+        persistWebsiteRules(rules = updatedRules, message = "Website rule updated.", nowMillis = nowMillis)
+    }
+
+    fun deleteWebsiteRule(ruleId: String, nowMillis: Long = nowProvider()) {
+        val wasEditing = uiState.websiteRuleDraftEditingId == ruleId
+        val updatedRules = uiState.websiteRules.filterNot { it.id == ruleId }
+        persistWebsiteRules(rules = updatedRules, message = "Website rule deleted.", nowMillis = nowMillis)
+        if (wasEditing) clearWebsiteRuleDraft(clearMessage = false)
+    }
+
+    private fun clearWebsiteRuleDraft(clearMessage: Boolean) {
+        uiState = uiState.copy(
+            websiteRuleDraftText = "",
+            websiteRuleDraftWildcard = false,
+            websiteRuleDraftIncludeApex = false,
+            websiteRuleDraftEditingId = null,
+            websiteRuleDraftError = null,
+            latestMessage = if (clearMessage) null else uiState.latestMessage,
+        )
+    }
+
+    private fun persistWebsiteRules(rules: List<WebsiteRule>, message: String, nowMillis: Long) {
+        uiState = uiState.copy(websiteRules = rules, latestMessage = message)
+        viewModelScope.launch {
+            settingsRepository.saveWebsiteRules(rules)
+            autosaveAccountLightProfileAfterPortableMutation(nowMillis = nowMillis)
         }
     }
 
@@ -3155,6 +3302,7 @@ class MainViewModel(
             profileAutosaveUsesLocalDefault = profileAutosaveUsesLocalDefault,
             profileAutosaveLastSuccessfulAtMillis = settings.profileAutosaveLastSuccessfulAtMillis,
             profileAutosaveLastError = settings.profileAutosaveLastError,
+            websiteRules = settings.websiteRules,
             onboardingSelection = settings.toOnboardingSelection(
                 supportedApps = supportedApps,
                 starterPacks = starterPacks,

@@ -179,6 +179,8 @@ import com.qualityalternative.app.domain.model.ReplacementHistoryEntry
 import com.qualityalternative.app.domain.model.TopicTag
 import com.qualityalternative.app.domain.model.UserDocumentValidationError
 import com.qualityalternative.app.domain.model.UserLinkValidationError
+import com.qualityalternative.app.domain.model.WebsiteRule
+import com.qualityalternative.app.domain.model.WebsiteRuleType
 import com.qualityalternative.app.domain.model.usesExternalHandoff
 import com.qualityalternative.app.domain.model.usesMeditationTimer
 import com.qualityalternative.app.domain.model.usesRepositoryBody
@@ -628,6 +630,14 @@ private fun MainRoute(
             SettingsTab(
                 state = state,
                 onToggleApp = viewModel::toggleSettingsApp,
+                onWebsiteRuleTextChange = viewModel::updateWebsiteRuleDraftText,
+                onWebsiteRuleWildcardChange = viewModel::setWebsiteRuleDraftWildcard,
+                onWebsiteRuleIncludeApexChange = viewModel::setWebsiteRuleDraftIncludeApex,
+                onSaveWebsiteRule = { viewModel.saveWebsiteRuleDraft() },
+                onEditWebsiteRule = viewModel::beginEditWebsiteRule,
+                onToggleWebsiteRuleEnabled = { ruleId -> viewModel.toggleWebsiteRuleEnabled(ruleId) },
+                onDeleteWebsiteRule = { ruleId -> viewModel.deleteWebsiteRule(ruleId) },
+                onCancelWebsiteRuleEdit = viewModel::cancelWebsiteRuleEdit,
                 onSelectDuration = viewModel::setPreferredDuration,
                 onSelectMeditationDuration = viewModel::setMeditationDurationMinutes,
                 onSelectReaderFontScale = viewModel::setReaderFontScale,
@@ -4089,6 +4099,14 @@ private fun AnnotationLibraryRow(
 private fun SettingsTab(
     state: MainUiState,
     onToggleApp: (DistractingApp) -> Unit,
+    onWebsiteRuleTextChange: (String) -> Unit,
+    onWebsiteRuleWildcardChange: (Boolean) -> Unit,
+    onWebsiteRuleIncludeApexChange: (Boolean) -> Unit,
+    onSaveWebsiteRule: () -> Unit,
+    onEditWebsiteRule: (WebsiteRule) -> Unit,
+    onToggleWebsiteRuleEnabled: (String) -> Unit,
+    onDeleteWebsiteRule: (String) -> Unit,
+    onCancelWebsiteRuleEdit: () -> Unit,
     onSelectDuration: (DurationBucket) -> Unit,
     onSelectMeditationDuration: (Int) -> Unit,
     onSelectReaderFontScale: (Double) -> Unit,
@@ -4205,6 +4223,19 @@ private fun SettingsTab(
                     )
                 }
             }
+        }
+        item {
+            WebsiteRulesSettingsSection(
+                state = state,
+                onTextChange = onWebsiteRuleTextChange,
+                onWildcardChange = onWebsiteRuleWildcardChange,
+                onIncludeApexChange = onWebsiteRuleIncludeApexChange,
+                onSave = onSaveWebsiteRule,
+                onEdit = onEditWebsiteRule,
+                onToggleEnabled = onToggleWebsiteRuleEnabled,
+                onDelete = onDeleteWebsiteRule,
+                onCancelEdit = onCancelWebsiteRuleEdit,
+            )
         }
         item {
             SectionLabel("Content priority")
@@ -5317,6 +5348,294 @@ private fun CustomTargetAppPicker(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun WebsiteRulesSettingsSection(
+    state: MainUiState,
+    onTextChange: (String) -> Unit,
+    onWildcardChange: (Boolean) -> Unit,
+    onIncludeApexChange: (Boolean) -> Unit,
+    onSave: () -> Unit,
+    onEdit: (WebsiteRule) -> Unit,
+    onToggleEnabled: (String) -> Unit,
+    onDelete: (String) -> Unit,
+    onCancelEdit: () -> Unit,
+) {
+    val colors = QualityAlternativeThemeTokens.colors
+    val focusManager = LocalFocusManager.current
+    val enabledCount = state.websiteRules.count(WebsiteRule::enabled)
+    val draftWildcardEffective = state.websiteRuleDraftWildcard || state.websiteRuleDraftText.trim().startsWith("*.")
+    Column(modifier = Modifier.testTag("settings-website-rules-section")) {
+        SectionLabel("Website rules", right = "$enabledCount enabled")
+        QaCard {
+            BodyText(
+                text = "Save domains now. Browser interruption starts only when a verified current-host adapter is available; until then, use whole-browser app targets as the reliable fallback.",
+                color = colors.mutedText,
+                fontSize = 12.5.sp,
+                lineHeight = 17.sp,
+                modifier = Modifier.padding(bottom = 12.dp),
+            )
+            QaTextField(
+                value = state.websiteRuleDraftText,
+                onValueChange = onTextChange,
+                placeholder = "example.com or *.example.com",
+                isError = state.websiteRuleDraftError != null,
+                modifier = Modifier.testTag("settings-website-rule-input"),
+            )
+            if (state.websiteRuleDraftError != null) {
+                BodyText(
+                    text = state.websiteRuleDraftError,
+                    color = colors.accent,
+                    fontSize = 12.5.sp,
+                    lineHeight = 17.sp,
+                    modifier = Modifier
+                        .padding(top = 7.dp)
+                        .testTag("settings-website-rule-error"),
+                )
+            }
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.padding(top = 12.dp),
+            ) {
+                QaChip(
+                    text = "Exact",
+                    selected = !draftWildcardEffective,
+                    onClick = { onWildcardChange(false) },
+                    modifier = Modifier.testTag("settings-website-rule-mode-exact"),
+                    minHeight = 32.dp,
+                    horizontalPadding = 12.dp,
+                    verticalPadding = 7.dp,
+                    fontSize = 11.5.sp,
+                )
+                QaChip(
+                    text = "Subdomains",
+                    selected = draftWildcardEffective,
+                    onClick = { onWildcardChange(true) },
+                    modifier = Modifier.testTag("settings-website-rule-mode-wildcard"),
+                    minHeight = 32.dp,
+                    horizontalPadding = 12.dp,
+                    verticalPadding = 7.dp,
+                    fontSize = 11.5.sp,
+                )
+                if (draftWildcardEffective) {
+                    QaChip(
+                        text = "Include main domain",
+                        selected = state.websiteRuleDraftIncludeApex,
+                        onClick = { onIncludeApexChange(!state.websiteRuleDraftIncludeApex) },
+                        modifier = Modifier.testTag("settings-website-rule-include-apex"),
+                        minHeight = 32.dp,
+                        horizontalPadding = 12.dp,
+                        verticalPadding = 7.dp,
+                        fontSize = 11.5.sp,
+                    )
+                }
+            }
+            Row(
+                modifier = Modifier.padding(top = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                QaButton(
+                    text = if (state.websiteRuleDraftEditingId == null) "Add rule" else "Save changes",
+                    onClick = {
+                        focusManager.clearFocus()
+                        onSave()
+                    },
+                    variant = QaButtonVariant.Primary,
+                    size = QaButtonSize.Small,
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("settings-website-rule-save"),
+                )
+                if (state.websiteRuleDraftEditingId != null) {
+                    QaButton(
+                        text = "Cancel",
+                        onClick = {
+                            focusManager.clearFocus()
+                            onCancelEdit()
+                        },
+                        variant = QaButtonVariant.Ghost,
+                        size = QaButtonSize.Small,
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("settings-website-rule-cancel"),
+                    )
+                }
+            }
+            HorizontalDivider(color = colors.line, modifier = Modifier.padding(vertical = 14.dp))
+            if (state.websiteRules.isEmpty()) {
+                BodyText(
+                    text = "No website rules yet.",
+                    color = colors.mutedText,
+                    fontSize = 12.5.sp,
+                    modifier = Modifier.testTag("settings-website-rules-empty"),
+                )
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    state.websiteRules.forEach { rule ->
+                        WebsiteRuleRow(
+                            rule = rule,
+                            onEdit = { onEdit(rule) },
+                            onToggleEnabled = { onToggleEnabled(rule.id) },
+                            onDelete = { onDelete(rule.id) },
+                        )
+                    }
+                }
+            }
+        }
+        BrowserSupportMatrix(modifier = Modifier.padding(top = 10.dp))
+    }
+}
+
+@Composable
+private fun WebsiteRuleRow(
+    rule: WebsiteRule,
+    onEdit: () -> Unit,
+    onToggleEnabled: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    val colors = QualityAlternativeThemeTokens.colors
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("settings-website-rule-row-${rule.id}")
+            .clip(RoundedCornerShape(10.dp))
+            .border(BorderStroke(1.dp, if (rule.enabled) colors.lineStrong else colors.line), RoundedCornerShape(10.dp))
+            .background(if (rule.enabled) colors.background else Color.Transparent)
+            .padding(horizontal = 12.dp, vertical = 11.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .padding(top = 2.dp)
+                    .size(22.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .border(BorderStroke(1.5.dp, if (rule.enabled) colors.primaryText else colors.lineStrong), RoundedCornerShape(6.dp))
+                    .background(if (rule.enabled) colors.primaryText else Color.Transparent)
+                    .clickable(onClick = onToggleEnabled)
+                    .testTag("settings-website-rule-toggle-${rule.id}"),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (rule.enabled) QaIcon(kind = QaIconKind.Check, color = colors.background, size = 14.dp)
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = rule.displayPattern,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = colors.primaryText,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                BodyText(
+                    text = "${if (rule.type == WebsiteRuleType.EXACT_DOMAIN) "Exact domain" else "Wildcard subdomains"} · ${if (rule.enabled) "Enabled" else "Paused"}",
+                    color = colors.mutedText,
+                    fontSize = 11.5.sp,
+                    lineHeight = 15.sp,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 9.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+        ) {
+            QaButton(
+                text = "Edit",
+                onClick = onEdit,
+                variant = QaButtonVariant.Ghost,
+                size = QaButtonSize.Compact,
+                fullWidth = false,
+                modifier = Modifier.testTag("settings-website-rule-edit-${rule.id}"),
+            )
+            QaButton(
+                text = "Delete",
+                onClick = onDelete,
+                variant = QaButtonVariant.Ghost,
+                size = QaButtonSize.Compact,
+                fullWidth = false,
+                modifier = Modifier.testTag("settings-website-rule-delete-${rule.id}"),
+            )
+        }
+    }
+}
+
+@Composable
+private fun BrowserSupportMatrix(modifier: Modifier = Modifier) {
+    val colors = QualityAlternativeThemeTokens.colors
+    QaCard(
+        modifier = modifier.testTag("settings-browser-support-matrix"),
+        padding = 16.dp,
+        background = colors.background,
+    ) {
+        MonoText("Browser support", modifier = Modifier.padding(bottom = 8.dp))
+        BrowserSupportRow(
+            title = "Chrome",
+            status = "Verified-host adapter next",
+            description = "Saved rules stay portable; website interruption activates after the Chrome current-host check passes the next slice.",
+            modifier = Modifier.testTag("settings-browser-support-chrome"),
+        )
+        HorizontalDivider(color = colors.line, modifier = Modifier.padding(vertical = 10.dp))
+        BrowserSupportRow(
+            title = "Other browsers",
+            status = "Use app target fallback",
+            description = "Whole-browser app targets remain the reliable interruption path until a browser-specific host adapter is proven.",
+            modifier = Modifier.testTag("settings-browser-support-other"),
+        )
+    }
+}
+
+@Composable
+private fun BrowserSupportRow(
+    title: String,
+    status: String,
+    description: String,
+    modifier: Modifier = Modifier,
+) {
+    val colors = QualityAlternativeThemeTokens.colors
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .padding(top = 4.dp)
+                .size(8.dp)
+                .clip(CircleShape)
+                .background(colors.accent),
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = colors.primaryText,
+                    modifier = Modifier.weight(1f),
+                )
+                MonoText(status, color = colors.mutedText)
+            }
+            BodyText(
+                text = description,
+                color = colors.mutedText,
+                fontSize = 12.sp,
+                lineHeight = 16.sp,
+                modifier = Modifier.padding(top = 3.dp),
+            )
         }
     }
 }

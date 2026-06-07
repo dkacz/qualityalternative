@@ -28,6 +28,8 @@ import com.qualityalternative.app.domain.model.MIN_OPEN_ANYWAY_UNLOCK_MINUTES
 import com.qualityalternative.app.domain.model.MIN_READER_FONT_SCALE
 import com.qualityalternative.app.domain.model.ReadingProgress
 import com.qualityalternative.app.domain.model.TopicTag
+import com.qualityalternative.app.domain.model.WebsiteRule
+import com.qualityalternative.app.domain.model.WebsiteRuleType
 import com.qualityalternative.app.domain.service.ReadingProgressRepository
 import com.qualityalternative.app.domain.service.SettingsRepository
 import com.qualityalternative.app.domain.service.UserDocumentRepository
@@ -137,6 +139,7 @@ data class AccountLightSettings(
     val bedtimeEnabled: Boolean = DEFAULT_BEDTIME_ENABLED,
     val bedtimeStartMinutes: Int = DEFAULT_BEDTIME_START_MINUTES,
     val bedtimeEndMinutes: Int = DEFAULT_BEDTIME_END_MINUTES,
+    val websiteRules: List<AccountLightWebsiteRule> = emptyList(),
 ) {
     init {
         require(selectedAppPackages.all { it.matches(PackageNameRegex) }) {
@@ -173,6 +176,39 @@ data class AccountLightSettings(
         }
         require(bedtimeEndMinutes in MIN_BEDTIME_MINUTES..MAX_BEDTIME_MINUTES) {
             "bedtimeEndMinutes is outside the portable range."
+        }
+        require(websiteRules.distinctBy(AccountLightWebsiteRule::id).size == websiteRules.size) {
+            "websiteRules contains duplicate ids."
+        }
+    }
+}
+
+@Serializable
+data class AccountLightWebsiteRule(
+    val id: String,
+    val ruleType: String,
+    val host: String,
+    val enabled: Boolean = true,
+    val includeApex: Boolean = false,
+) {
+    init {
+        require(id.matches(WebsiteRulePortableIdRegex)) { "websiteRules contains an invalid id." }
+        require(ruleType in WebsiteRuleType.entries.map(WebsiteRuleType::name)) {
+            "websiteRules contains an invalid ruleType."
+        }
+        val normalized = WebsiteRuleNormalizer.normalize(
+            input = host,
+            wildcard = ruleType == WebsiteRuleType.WILDCARD_SUBDOMAINS.name,
+        )
+        require(
+            normalized is WebsiteRuleDraftResult.Valid &&
+                normalized.host == host &&
+                normalized.type.name == ruleType,
+        ) {
+            "websiteRules contains an invalid host."
+        }
+        require(!includeApex || ruleType == WebsiteRuleType.WILDCARD_SUBDOMAINS.name) {
+            "websiteRules includeApex requires a wildcard rule."
         }
     }
 }
@@ -1518,6 +1554,17 @@ private fun AccountLightSettings.toPortableAppSettings(supportedPackages: Set<St
             ?: DEFAULT_READER_FONT_SCALE,
         interfaceTextScale = interfaceTextScale.takeIf { it in MIN_INTERFACE_TEXT_SCALE..MAX_INTERFACE_TEXT_SCALE }
             ?: DEFAULT_INTERFACE_TEXT_SCALE,
+        websiteRules = websiteRules.map { rule ->
+            WebsiteRule(
+                id = rule.id,
+                type = WebsiteRuleType.valueOf(rule.ruleType),
+                host = rule.host,
+                includeApex = rule.includeApex,
+                enabled = rule.enabled,
+                createdAtMillis = 0L,
+                updatedAtMillis = 0L,
+            )
+        },
     )
 }
 
@@ -1549,6 +1596,17 @@ private fun AppSettings.toAccountLightSettings(
         bedtimeEnabled = bedtimeEnabled,
         bedtimeStartMinutes = bedtimeStartMinutes.coerceIn(MIN_BEDTIME_MINUTES, MAX_BEDTIME_MINUTES),
         bedtimeEndMinutes = bedtimeEndMinutes.coerceIn(MIN_BEDTIME_MINUTES, MAX_BEDTIME_MINUTES),
+        websiteRules = websiteRules
+            .sortedWith(compareBy<WebsiteRule> { it.host }.thenBy { it.type.name }.thenBy { it.id })
+            .map { rule ->
+                AccountLightWebsiteRule(
+                    id = rule.id,
+                    ruleType = rule.type.name,
+                    host = rule.host,
+                    enabled = rule.enabled,
+                    includeApex = rule.includeApex,
+                )
+            },
     )
 }
 
@@ -2122,6 +2180,7 @@ private val ContentIdRegex = Regex(
         "|^(editorial|meditation)-[a-z0-9][a-z0-9._-]{2,120}$",
 )
 private val PackageNameRegex = Regex("^[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z0-9_]+)+$")
+private val WebsiteRulePortableIdRegex = Regex("^website-rule-[0-9a-fA-F-]{36}$")
 private val PortablePackIdRegex = Regex("^[a-z0-9][a-z0-9_-]{0,79}$")
 private val PortableMimeTypeRegex = Regex("^[A-Za-z0-9!#$&^_.+-]+/[A-Za-z0-9!#$&^_.+-]+$")
 private val PortableDisplayNamePunctuation = setOf(' ', '.', '_', '-', '(', ')')
@@ -2185,6 +2244,7 @@ private val AllowedSettingsKeys = RequiredSettingsKeys + setOf(
     "bedtimeEnabled",
     "bedtimeStartMinutes",
     "bedtimeEndMinutes",
+    "websiteRules",
 )
 private val RequiredLibraryKeys = setOf("userLinks", "userDocuments")
 private val RequiredUserLinkKeys = setOf(

@@ -4,7 +4,9 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.qualityalternative.app.domain.model.AppSettings
 import com.qualityalternative.app.domain.model.AppThemeMode
 import com.qualityalternative.app.domain.model.ContentPriority
 import com.qualityalternative.app.domain.model.CustomTargetAppCandidate
@@ -14,6 +16,8 @@ import com.qualityalternative.app.domain.model.DurationBucket
 import com.qualityalternative.app.domain.model.InterventionMode
 import com.qualityalternative.app.domain.model.OnboardingSelection
 import com.qualityalternative.app.domain.model.TopicTag
+import com.qualityalternative.app.domain.model.WebsiteRule
+import com.qualityalternative.app.domain.model.WebsiteRuleType
 import java.io.File
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -460,6 +464,103 @@ class PreferencesSettingsRepositoryTest {
         assertEquals(updatedPackages, restored.selectedAppPackages)
         assertEquals(DurationBucket.DEEP, restored.preferredDurationBucket)
         assertEquals(selection.preferredTopics, restored.preferredTopics)
+    }
+
+    @Test
+    fun saveWebsiteRules_persistsAndRestoresNormalizedRules() = runBlocking {
+        val repository = PreferencesSettingsRepository(
+            dataStore = testDataStore(),
+            supportedApps = SupportedCatalog.distractingApps,
+        )
+        val exactRule = WebsiteRule(
+            id = "website-rule-11111111-1111-4111-8111-111111111111",
+            type = WebsiteRuleType.EXACT_DOMAIN,
+            host = "example.com",
+            enabled = true,
+            createdAtMillis = 100L,
+            updatedAtMillis = 110L,
+        )
+        val wildcardRule = WebsiteRule(
+            id = "website-rule-22222222-2222-4222-8222-222222222222",
+            type = WebsiteRuleType.WILDCARD_SUBDOMAINS,
+            host = "news.example",
+            includeApex = true,
+            enabled = false,
+            createdAtMillis = 120L,
+            updatedAtMillis = 130L,
+        )
+
+        repository.saveWebsiteRules(listOf(wildcardRule, exactRule))
+
+        val restored = repository.observeAppSettings().first()
+        assertEquals(listOf(exactRule, wildcardRule), restored.websiteRules)
+    }
+
+    @Test
+    fun replacePortableSettings_persistsWebsiteRulesWithoutLocalBrowserState() = runBlocking {
+        val repository = PreferencesSettingsRepository(
+            dataStore = testDataStore(),
+            supportedApps = SupportedCatalog.distractingApps,
+        )
+        val rule = WebsiteRule(
+            id = "website-rule-33333333-3333-4333-8333-333333333333",
+            type = WebsiteRuleType.WILDCARD_SUBDOMAINS,
+            host = "portable.example",
+            includeApex = true,
+            enabled = true,
+            createdAtMillis = 0L,
+            updatedAtMillis = 0L,
+        )
+
+        repository.replacePortableSettings(
+            settings = AppSettings(
+                hasCompletedOnboarding = true,
+                selectedAppPackages = SupportedCatalog.distractingApps.take(3).mapTo(mutableSetOf()) { it.packageName },
+                preferredTopics = setOf(TopicTag.PHILOSOPHY, TopicTag.SCIENCE, TopicTag.HISTORY),
+                preferredDurationBucket = DurationBucket.FOCUS,
+                selectedPackIds = setOf("starter_pack"),
+                websiteRules = listOf(rule),
+            ),
+            profileIdentity = null,
+        )
+
+        val restored = repository.observeAppSettings().first()
+        assertEquals(listOf(rule), restored.websiteRules)
+        assertFalse(restored.annotationDriveSyncEnabled)
+        assertEquals(null, restored.annotationDriveFolderId)
+    }
+
+    @Test
+    fun observeAppSettings_ignoresMalformedWebsiteRuleRecords() = runBlocking {
+        val dataStore = testDataStore()
+        val repository = PreferencesSettingsRepository(
+            dataStore = dataStore,
+            supportedApps = SupportedCatalog.distractingApps,
+        )
+        val privateIpRule = listOf(
+            "website-rule-44444444-4444-4444-8444-444444444444",
+            WebsiteRuleType.EXACT_DOMAIN.name,
+            "192.168.1.7",
+            "false",
+            "true",
+            "100",
+            "100",
+        ).joinToString("\u001F")
+        val publicIpRule = listOf(
+            "website-rule-55555555-5555-4555-8555-555555555555",
+            WebsiteRuleType.EXACT_DOMAIN.name,
+            "8.8.8.8",
+            "false",
+            "true",
+            "100",
+            "100",
+        ).joinToString("\u001F")
+
+        dataStore.edit { preferences ->
+            preferences[stringSetPreferencesKey("website_rules_v1")] = setOf(privateIpRule, publicIpRule)
+        }
+
+        assertEquals(emptyList<WebsiteRule>(), repository.observeAppSettings().first().websiteRules)
     }
 
     @Test

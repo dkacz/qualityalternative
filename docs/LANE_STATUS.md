@@ -13,7 +13,7 @@ This file is the repo-level index for active and recently completed execution la
 
 ## Sprint 26 Custom Targets And Website Interventions
 
-Status: `slice26_1_complete_10_10_pass_slice26_2_next`
+Status: `slice26_2_complete_ready_for_slice26_3`
 
 - Branch: `codex/sprint26-custom-targets-website-interventions`
 - Scope: plan and implement support for replacement-first interventions on eligible arbitrary installed apps plus supported-browser website/domain rules, while avoiding universal URL blocking claims.
@@ -36,7 +36,10 @@ Status: `slice26_1_complete_10_10_pass_slice26_2_next`
   - R4 fixes the GPT Pro R3 blockers: the review bundle now includes complete Gradle wrapper files and `app/proguard-rules.pro`; Settings can rebuild from an empty completed target set by allowing additions below the minimum while still blocking below-minimum removals; and the OEM safety boundary has direct regression coverage.
   - Settings separates standard suggestions from custom installed-app search/selection.
   - Selected eligible custom app packages hydrate into settings, Portable Profile import/export, and the AccessibilityService resolver's known target list.
-  - Website/domain rules are not implemented yet and remain scoped to Slice 26.2+.
+  - Slice 26.2 implements the website rule model and Settings UI for exact-domain and wildcard-subdomain rules.
+  - Website rules are normalized, reject local/private/public-IP/IPv6/all-numeric/ambiguous hosts, persist in DataStore, and round-trip through Portable Profile import/export without browser support state, URL observations, tokens, or local folders.
+  - Settings exposes website rules as a separate target category with add, validation, pause, edit, delete, and a browser support matrix. Chrome current-host interception remains scoped to Slice 26.3.
+  - Slice 26.2 R2 fixes the GPT Pro R1 blockers: all IP literals are rejected; typed `*.example.com` exposes the subdomain mode and apex toggle before save; apex inclusion defaults off; the website rule count says `enabled`; the review bundle includes `gradle/libs.versions.toml`; and Android test metadata is sanitized to remove absolute local paths.
   - Slice 26.1 GPT Pro R3 review returned `SCORE 8/10`, `VERDICT FAIL`, `VISUAL REVIEW PASS`.
   - Slice 26.1 GPT Pro R4 review returned `SCORE 10/10`, `VERDICT PASS`, `VISUAL REVIEW PASS`.
   - Slice 26.1 GPT Pro R4 heartbeat was deleted after successful harvest.
@@ -72,8 +75,39 @@ Status: `slice26_1_complete_10_10_pass_slice26_2_next`
   - Passed emulator visual E2E: `VisualQaScreenshotTest#captureSprint26CustomTargetSettingsScreens`
   - Passed `git diff --check`.
 - Next gate:
-  - Commit Slice 26.1 implementation/evidence.
-  - Continue to Slice 26.2 website rule model and Settings UI.
+  - Run GPT Pro Slice 26.2 review with the current implementation/evidence bundle.
+  - If GPT Pro returns `SCORE 10/10`, `VERDICT PASS`, and `VISUAL REVIEW PASS`, commit Slice 26.2 and continue to Slice 26.3 Chrome verified-host adapter.
+  - If GPT Pro returns blockers, fix and rerun review.
+
+### Current Slice 26.2 Validation
+
+- Validation summary: `evidence/sprint26_custom_targets_website_interventions/SLICE26_2_EVIDENCE.md`
+- Visual screenshot directory: `evidence/sprint26_custom_targets_website_interventions/visual_e2e/sprint26-custom-targets-1780833001182/`
+- Visual contact sheet: `evidence/sprint26_custom_targets_website_interventions/visual_e2e/sprint26_slice26_2_website_rules_contact_sheet.png`
+- Passed targeted unit tests:
+  - `WebsiteRuleNormalizerTest`
+  - `PreferencesSettingsRepositoryTest`
+  - `AccountLightProfileExporterTest`
+  - `AccountLightProfileImporterTest`
+  - `MainViewModelTest`
+- Passed emulator visual E2E: `VisualQaScreenshotTest#captureSprint26WebsiteRuleSettingsScreens`
+- Passed `:app:lintDebug`
+- GPT Pro Slice 26.2 lane: `https://chatgpt.com/c/6a255d01-cb24-83eb-b76b-33fcd656b7e7`
+- GPT Pro Slice 26.2 prompt: `evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_2_REVIEW_PROMPT.md`
+- GPT Pro Slice 26.2 bundle: `evidence/sprint26_custom_targets_website_interventions/SPRINT26_SLICE26_2_REVIEW_BUNDLE_20260607.zip`
+- GPT Pro Slice 26.2 R1 output: `evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_2_REVIEW.md`
+- GPT Pro Slice 26.2 R1 verdict: `SCORE 7/10`, `VERDICT FAIL`, `VISUAL REVIEW PASS`
+- GPT Pro Slice 26.2 R1 heartbeat: deleted after successful harvest.
+- GPT Pro Slice 26.2 R2 evidence: `evidence/sprint26_custom_targets_website_interventions/SLICE26_2_R2_EVIDENCE.md`
+- GPT Pro Slice 26.2 R2 prompt: `evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_2_R2_REVIEW_PROMPT.md`
+- GPT Pro Slice 26.2 R2 bundle: `evidence/sprint26_custom_targets_website_interventions/SPRINT26_SLICE26_2_R2_REVIEW_BUNDLE_20260607.zip`
+- GPT Pro Slice 26.2 R2 lane: `https://chatgpt.com/c/6a25665c-17d8-83eb-823f-46295216bbb1`
+- GPT Pro Slice 26.2 R2 output: `evidence/sprint26_custom_targets_website_interventions/GPT_PRO_SLICE26_2_R2_REVIEW.md`
+- GPT Pro Slice 26.2 R2 verdict: `SCORE 10/10`, `VERDICT PASS`, `VISUAL REVIEW PASS`
+- GPT Pro Slice 26.2 R2 heartbeat: deleted after successful harvest.
+- GPT Pro Slice 26.2 R2 visual screenshot directory: `evidence/sprint26_custom_targets_website_interventions/visual_e2e_r2/sprint26-custom-targets-1780835556853/`
+- GPT Pro Slice 26.2 R2 visual contact sheet: `evidence/sprint26_custom_targets_website_interventions/visual_e2e_r2/sprint26_slice26_2_r2_website_rules_contact_sheet.png`
+- GPT Pro Slice 26.2 R2 bundle manifest: `evidence/sprint26_custom_targets_website_interventions/SLICE26_2_R2_REVIEW_BUNDLE_MANIFEST.md`
 
 ## Sprint 25 Markdown Media And Tables
 
