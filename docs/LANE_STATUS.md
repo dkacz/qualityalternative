@@ -1,6 +1,6 @@
 # Lane Status
 
-Status timestamp: 2026-05-31
+Status timestamp: 2026-06-07
 
 This file is the repo-level index for active and recently completed execution lanes. It should point to the canonical branch, review lane, validation artifacts, and next gate for each lane.
 
@@ -10,6 +10,35 @@ This file is the repo-level index for active and recently completed execution la
 - Use the branch-specific sprint docs for detailed implementation notes.
 - Heartbeats should exist only while waiting for a current GPT Pro lane.
 - Do not infer lane status from untracked local files alone. For example, `ios/` can appear untracked on non-iOS branches; the canonical iOS implementation source is the pushed iOS branch listed below.
+
+## Sprint 26 Custom Targets And Website Interventions
+
+Status: `plan_gpt_pro_10_10_pass_slice26_1_ready`
+
+- Branch: `codex/sprint26-custom-targets-website-interventions`
+- Scope: plan and implement support for replacement-first interventions on eligible arbitrary installed apps plus supported-browser website/domain rules, while avoiding universal URL blocking claims.
+- Canonical sprint plan: `docs/SPRINT_26_CUSTOM_TARGETS_WEBSITE_INTERVENTIONS.md`
+- GPT Pro plan review R1 lane: `https://chatgpt.com/c/6a25282f-e0b8-83ed-bc77-15b0fef88cad`
+- GPT Pro plan review R1 output: `evidence/sprint26_custom_targets_website_interventions/GPT_PRO_PLAN_REVIEW.md`
+- GPT Pro plan review R1 verdict: `SCORE 6/10`, `VERDICT FAIL`, `VISUAL REVIEW NOT APPLICABLE`
+- GPT Pro plan review R2 lane: `https://chatgpt.com/c/6a252ba7-7c48-83eb-a9b5-a95bd1d499dd`
+- GPT Pro plan review R2 output: `evidence/sprint26_custom_targets_website_interventions/GPT_PRO_PLAN_REVIEW_R2.md`
+- GPT Pro plan review R2 verdict: `SCORE 10/10`, `VERDICT PASS`, `VISUAL REVIEW NOT APPLICABLE`
+- Heartbeat automation: deleted after successful R2 harvest.
+- Current plan review bundle: `evidence/sprint26_custom_targets_website_interventions/SPRINT26_PLAN_REVIEW_R2_BUNDLE_20260607.zip`
+- Current plan review prompt: `evidence/sprint26_custom_targets_website_interventions/GPT_PRO_PLAN_REVIEW_PROMPT_R2.md`
+- Current implementation state:
+  - Planning document created.
+  - R1 blockers harvested and old heartbeat deleted.
+  - PRD and sprint plan patched for custom app eligibility, supported-browser domain-only website interventions, browser support matrix, stale URL prevention, Portable Profile import behavior, analytics denylist, and visual/E2E evidence contract.
+  - No app code has been changed yet.
+  - R2 GPT Pro plan review passed.
+  - Slice 26.0 contract/plan gate is complete.
+  - Ready to start Slice 26.1 custom app target vertical.
+- Next gate:
+  - Commit Slice 26.0 contract/plan artifacts.
+  - Create the execution goal.
+  - Implement Slice 26.1 custom app target vertical with automated tests, visual evidence, and GPT Pro review until `10/10 PASS`.
 
 ## Sprint 25 Markdown Media And Tables
 

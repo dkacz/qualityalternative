@@ -88,14 +88,16 @@ When I reach for a distracting app out of habit, help me pause and give me one w
 
 ### In Scope
 
-- Android mobile app with system-level interception for a user-selected set of distracting apps.
-- Supported distracting apps at MVP launch:
+- Android mobile app with system-level interception for a user-selected set of distracting apps and supported website targets.
+- Suggested standard distracting apps at MVP launch:
   - Instagram
   - X
   - YouTube
   - Facebook
   - Reddit
   - TikTok
+- User-selected custom app targets from eligible user-launchable installed apps, excluding system-critical, setup-critical, emergency, launcher, installer, permission, and Quality Alternative packages.
+- Supported-browser website interventions for user-authored exact-domain and wildcard-subdomain rules when the active browser exposes a verified current host through a tested adapter.
 - Soft intervention shown when a selected app is opened.
 - One primary replacement recommendation plus a short, bounded backup list.
 - Three core actions in the intervention: start replacement now, delay the distracting app for 15 minutes, open anyway.
@@ -116,8 +118,12 @@ When I reach for a distracting app out of habit, help me pause and give me one w
 - Full RSS ingestion.
 - Full newsletter inbox integration.
 - Browser extensions.
+- Universal URL blocking across all browsers.
+- VPN, DNS, local proxy, or packet-inspection filtering.
 - Audio-first replacement sessions.
 - Social surface blocking at the sub-surface level, such as Reels-only or Shorts-only blocking.
+- Full URL/path blocking unless a tested browser adapter explicitly proves reliable full URL visibility.
+- Browsing-history collection, open-web crawling, or AI categorization of visited sites.
 - Full writing-system annotation workflows beyond replacement reading.
 - MVP-supported reader annotations are in scope only when they stay tied to actively shown reader text, remain locally manageable, use a portable annotation format, and can sync to a user-authorized Google Drive destination.
 - Team, family, or accountability features.
@@ -194,10 +200,29 @@ The system must allow the user to choose which apps should trigger an interventi
 
 #### Acceptance Criteria
 
-- User can select and save a supported set of distracting apps during onboarding.
+- User can select and save a supported set of suggested distracting apps during onboarding.
+- User can add eligible user-launchable installed apps outside the suggested list.
+- The app excludes the Quality Alternative package itself, launchers, Android Settings and permission flows, phone/emergency flows, package installers, system UI, accessibility settings, and other system-critical packages from custom target selection.
 - User can edit the selected set later from settings.
 - The product requires a minimum of three selected apps during onboarding unless fewer than three supported apps are installed.
 - The product stores selections locally and restores them after app restart.
+- Imported custom app targets are resolved locally by package id, deduplicated against suggested targets, and marked unavailable or inactive when the package is not installed on the current device.
+
+### FR1A. Supported Website Target Rules
+
+The system may let the user define website targets that trigger the same replacement-first intervention in supported browsers.
+
+#### Acceptance Criteria
+
+- User can add, edit, disable, and delete exact-domain rules such as `reddit.com`.
+- User can add wildcard-subdomain rules such as `*.reddit.com` with explicit copy explaining whether the apex domain is included.
+- Website rules are limited to host/domain matching unless a browser adapter explicitly proves reliable full URL visibility for path rules.
+- Domain matching never uses substring matching: `reddit.com` must not match `notreddit.com` or `reddit.com.evil.example`.
+- Domain rules normalize host input by stripping scheme, path, query, and fragment; lowercasing the host; handling trailing dots; and handling IDNA/punycode consistently.
+- Website interventions fire only from a current verified host observation for the active browser window.
+- If the active browser URL or host is unreadable, stale, hidden, unsupported, or unverifiable, the app does not reuse a previous URL to trigger a website intervention.
+- Unsupported browsers show truthful unavailable/degraded status and may offer whole-browser app intervention as the reliable fallback.
+- Website targets use the same Soft, Firm, and opt-in Bedtime semantics as app targets.
 
 ### FR2. Permission and Interception Setup
 
@@ -395,6 +420,8 @@ The product must log enough behavior to evaluate whether substitution is working
   - return to distracting app within 60 minutes
 - Each event includes timestamp, target app, recommendation identifiers, and session context.
 - Analytics can distinguish between no recommendation available and user chose Open anyway.
+- Analytics may distinguish target type, rule type, support status, intervention mode, and outcome, but remote analytics must not include raw URLs, hosts, domains, paths, queries, page titles, URL-bar text, non-matching URL observations, browsing-history rows, or domain-derived hashes.
+- Website rule identifiers used in remote analytics must not be reversible to domains and must not become stable cross-device identifiers unless the privacy model is explicitly changed.
 
 ### FR13. Portable Profile
 
@@ -407,6 +434,8 @@ The system must provide account-like portability without requiring a Quality Alt
 - User can import a compatible profile file from Settings and choose a safe restore mode.
 - Profile export includes portable settings, selected distracting apps, topic preferences, starter-pack choices, reader font-size preference, content priority settings, user links, user-document metadata, reading progress, completed/reactivated state, and annotation sync/export preferences that are safe to move across devices.
 - Profile export must not include Google access tokens, authorization grants, OAuth secrets, raw Drive file ids, raw Android `content://` or `file://` URIs, raw SAF tree URIs, account emails, raw analytics event logs, Android-only permission state, or unredacted platform-internal identifiers that would be misleading on another device.
+- Profile export may include user-authored custom app target rules and website domain rules, but import must re-resolve app packages and browser support locally before marking them active.
+- Profile import must not transfer browser compatibility state, Android permission state, protection-active state, raw URL observations, browsing history, Drive/auth state, or platform-only URI grants.
 - User-owned document binaries are not exported in the initial portable profile. The profile may preserve document metadata, stable content identity, and safe document fingerprints, but import must clearly mark missing or unverified local document files as unavailable until the user reattaches and verifies them.
 - The profile format is schema-versioned and must reject unsupported future versions without corrupting local state.
 - Import failures are visible and must not partially overwrite local settings or library data. Merge mode must preserve local settings unless the user explicitly chooses to apply imported settings, and replace mode must show affected scope before destructive mutation.
@@ -431,6 +460,8 @@ The system must provide account-like portability without requiring a Quality Alt
 
 - The product must clearly indicate when interception permissions are missing, degraded, or device-limited.
 - The product must not silently fail while claiming protection is active.
+- Website protection must clearly indicate supported, degraded, and unavailable browser states.
+- The product must not claim domain or URL intervention is active for a browser where the current host cannot be verified.
 
 ### NFR4. Local-First Portability And Privacy
 
@@ -438,6 +469,7 @@ The system must provide account-like portability without requiring a Quality Alt
 - Portable profile exports must be human-auditable JSON rather than opaque database backups.
 - Export/import should preserve behaviorally important state without pretending to provide server-backed identity, cross-device conflict resolution, or guaranteed document-file transfer.
 - Any cloud sync must be explicit, revocable, and scoped to user-owned files. Cloud authorization state must be re-established on each device rather than copied through profile export.
+- Website matching must remain local-first and user-authored. The app must not collect browsing history as an input or side effect of website target matching.
 
 ## Content Strategy for MVP
 
