@@ -13,7 +13,7 @@ This file is the repo-level index for active and recently completed execution la
 
 ## Sprint 27 Agent Content Inbox
 
-Status: `release_gate_passed_pending_publish`
+Status: `release_published`
 
 - Branch: `codex/sprint-agent-content-inbox`
 - Scope: add a Google Drive-backed Agent Inbox so Codex/Claude-style agents can hand private Markdown or EPUB content to the app through a bounded package contract, with manifest priority requiring explicit user confirmation.
@@ -81,8 +81,13 @@ Status: `release_gate_passed_pending_publish`
   - Release APK SHA-256: `10f2d54f7dc06c561afa32a83bcc7c5790c211f17cd320d469d93e6c957278f6`
   - Release gate summary: `docs/release-gate-logs/2026-06-12-sprint27-agent-content-inbox/VALIDATION_SUMMARY.md`
   - Release notes: `docs/release-gate-logs/2026-06-12-sprint27-agent-content-inbox/RELEASE_NOTES_v0.11.15-agent-content-inbox-alpha.md`
+  - Release commit: `b173e3c` (`Complete Sprint 27 agent content inbox`).
+  - Release tag: `v0.11.15-agent-content-inbox-alpha`.
+  - Release URL: `https://github.com/dkacz/qualityalternative/releases/tag/v0.11.15-agent-content-inbox-alpha`.
+  - Published assets: `quality-alternative-v0.11.15-agent-content-inbox-alpha-debug.apk` and `quality-alternative-v0.11.15-agent-content-inbox-alpha-debug.apk.sha256`.
+  - Integration method: committed on `codex/sprint-agent-content-inbox`, tagged the release commit, pushed branch and tag to `origin`, and published the GitHub release from the committed release notes.
 - Next gate:
-  - Commit/tag/push `v0.11.15-agent-content-inbox-alpha`, publish the GitHub release, and record release URL plus commit SHA.
+  - None for Sprint 27; release is published.
 
 ## Sprint 26 Custom Targets And Website Interventions
 
