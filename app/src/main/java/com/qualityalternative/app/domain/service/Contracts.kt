@@ -59,6 +59,14 @@ sealed class AddUserDocumentResult {
     data class Rejected(val errors: Set<UserDocumentValidationError>) : AddUserDocumentResult()
 }
 
+sealed class AddUserDocumentIfFingerprintAbsentResult {
+    data class Added(val item: ContentItem) : AddUserDocumentIfFingerprintAbsentResult()
+
+    data class Duplicate(val item: ContentItem) : AddUserDocumentIfFingerprintAbsentResult()
+
+    data class Rejected(val errors: Set<UserDocumentValidationError>) : AddUserDocumentIfFingerprintAbsentResult()
+}
+
 interface UserLinkRepository {
     fun userLinks(): List<ContentItem>
 
@@ -96,6 +104,24 @@ interface UserDocumentRepository {
         draft: UserDocumentDraft,
         nowMillis: Long = System.currentTimeMillis(),
     ): AddUserDocumentResult
+
+    suspend fun findDocumentByFingerprintSha256(sha256: String): ContentItem? {
+        return userDocuments().firstOrNull { item -> item.documentFingerprintSha256 == sha256 }
+    }
+
+    suspend fun addDocumentIfFingerprintAbsent(
+        draft: UserDocumentDraft,
+        fingerprintSha256: String,
+        nowMillis: Long = System.currentTimeMillis(),
+    ): AddUserDocumentIfFingerprintAbsentResult {
+        findDocumentByFingerprintSha256(fingerprintSha256)?.let { existing ->
+            return AddUserDocumentIfFingerprintAbsentResult.Duplicate(existing)
+        }
+        return when (val result = addDocument(draft = draft, nowMillis = nowMillis)) {
+            is AddUserDocumentResult.Added -> AddUserDocumentIfFingerprintAbsentResult.Added(result.item)
+            is AddUserDocumentResult.Rejected -> AddUserDocumentIfFingerprintAbsentResult.Rejected(result.errors)
+        }
+    }
 
     suspend fun markUnavailable(
         contentId: String,
@@ -153,6 +179,10 @@ interface SettingsRepository {
     suspend fun clearAnnotationDriveSyncConnection()
     suspend fun saveAnnotationDriveSyncSuccess(timestampMillis: Long, folderId: String)
     suspend fun saveAnnotationDriveSyncFailure(errorMessage: String)
+    suspend fun saveAgentInboxDriveConnection(folderId: String?) {}
+    suspend fun clearAgentInboxDriveConnection() {}
+    suspend fun saveAgentInboxDriveScanSuccess(timestampMillis: Long, folderId: String) {}
+    suspend fun saveAgentInboxDriveScanFailure(errorMessage: String) {}
     suspend fun saveProfileAutosaveDestination(uri: String, displayName: String)
     suspend fun clearProfileAutosaveDestination()
     suspend fun saveProfileAutosaveSuccess(timestampMillis: Long)

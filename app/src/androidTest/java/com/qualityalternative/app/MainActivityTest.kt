@@ -2715,7 +2715,7 @@ class MainActivityTest {
             .performScrollToNode(hasTestTag("settings-annotation-drive-connect"))
         composeRule.onNodeWithText("Google Drive not connected").assertIsDisplayed()
         composeRule.onNodeWithTag("settings-annotation-drive-status").assertIsDisplayed()
-        composeRule.onNodeWithText("Connect").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings-annotation-drive-connect").assertIsDisplayed()
         composeRule.onNodeWithTag("settings-annotation-drive-disconnect").assertIsNotEnabled()
         captureSprint17DriveAuthScreenshot("01_drive_connect_light")
 

@@ -26,7 +26,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import com.qualityalternative.app.domain.service.AddUserDocumentIfFingerprintAbsentResult
 
 class RoomUserDocumentRepository(
     private val dao: UserDocumentDao,
@@ -37,6 +40,7 @@ class RoomUserDocumentRepository(
     private val documents = MutableStateFlow(emptyList<ContentItem>())
     private val ready = MutableStateFlow(false)
     private val readerDocumentCache = linkedMapOf<String, ReaderDocument>()
+    private val documentWriteMutex = Mutex()
 
     init {
         scope.launch {
@@ -57,26 +61,67 @@ class RoomUserDocumentRepository(
         draft: UserDocumentDraft,
         nowMillis: Long,
     ): AddUserDocumentResult = withContext(Dispatchers.IO) {
+        documentWriteMutex.withLock {
+            addDocumentUnlocked(draft = draft, nowMillis = nowMillis)
+        }
+    }
+
+    override suspend fun addDocumentIfFingerprintAbsent(
+        draft: UserDocumentDraft,
+        fingerprintSha256: String,
+        nowMillis: Long,
+    ): AddUserDocumentIfFingerprintAbsentResult = withContext(Dispatchers.IO) {
+        val normalizedFingerprint = fingerprintSha256.trim().lowercase()
+        if (normalizedFingerprint.isBlank()) {
+            return@withContext when (val result = addDocument(draft = draft, nowMillis = nowMillis)) {
+                is AddUserDocumentResult.Added -> AddUserDocumentIfFingerprintAbsentResult.Added(result.item)
+                is AddUserDocumentResult.Rejected -> AddUserDocumentIfFingerprintAbsentResult.Rejected(result.errors)
+            }
+        }
+        documentWriteMutex.withLock {
+            dao.findByDocumentFingerprintSha256(normalizedFingerprint)?.let { existing ->
+                return@withLock AddUserDocumentIfFingerprintAbsentResult.Duplicate(existing.toContentItem())
+            }
+            when (
+                val result = addDocumentUnlocked(
+                    draft = draft.copy(documentFingerprintSha256 = normalizedFingerprint),
+                    nowMillis = nowMillis,
+                )
+            ) {
+                is AddUserDocumentResult.Added -> AddUserDocumentIfFingerprintAbsentResult.Added(result.item)
+                is AddUserDocumentResult.Rejected -> AddUserDocumentIfFingerprintAbsentResult.Rejected(result.errors)
+            }
+        }
+    }
+
+    private suspend fun addDocumentUnlocked(
+        draft: UserDocumentDraft,
+        nowMillis: Long,
+    ): AddUserDocumentResult {
         val validation = UserDocumentValidator.validate(draft)
         val format = validation.format
         if (!validation.isValid || format == null) {
-            return@withContext AddUserDocumentResult.Rejected(validation.errors)
+            return AddUserDocumentResult.Rejected(validation.errors)
         }
 
         val normalizedUri = draft.uri.trim()
         val existing = dao.findByUri(normalizedUri)
         val createdAtMillis = existing?.createdAtMillis ?: nowMillis
         val displayName = draft.displayName.trim().ifBlank { draft.title.trim() }
+        val providedFingerprintSha256 = draft.documentFingerprintSha256?.trim()?.lowercase()?.takeIf(String::isNotBlank)
+        val providedFingerprintSizeBytes = draft.documentFingerprintSizeBytes?.takeIf { it >= 0L }
         val loadedFingerprint = if (
             existing?.documentFingerprintSha256 != null &&
             existing.documentFingerprintSizeBytes != null
         ) {
             null
+        } else if (providedFingerprintSha256 != null) {
+            null
         } else {
             (bodyLoader as? UserDocumentFingerprintProvider)?.documentFingerprint(normalizedUri)
         }
-        val fingerprintSha256 = existing?.documentFingerprintSha256 ?: loadedFingerprint?.sha256
-        val fingerprintSizeBytes = existing?.documentFingerprintSizeBytes ?: loadedFingerprint?.sizeBytes
+        val fingerprintSha256 = existing?.documentFingerprintSha256 ?: providedFingerprintSha256 ?: loadedFingerprint?.sha256
+        val fingerprintSizeBytes = existing?.documentFingerprintSizeBytes ?: providedFingerprintSizeBytes ?: loadedFingerprint?.sizeBytes
         val item = ContentItem(
             id = existing?.id ?: idProvider(),
             packId = USER_DOCUMENT_PACK_ID,
@@ -126,7 +171,11 @@ class RoomUserDocumentRepository(
             ),
         )
         documents.value = upsertUserDocumentForOptimisticState(documents.value, item)
-        AddUserDocumentResult.Added(item)
+        return AddUserDocumentResult.Added(item)
+    }
+
+    override suspend fun findDocumentByFingerprintSha256(sha256: String): ContentItem? = withContext(Dispatchers.IO) {
+        dao.findByDocumentFingerprintSha256(sha256)?.toContentItem()
     }
 
     override suspend fun markUnavailable(

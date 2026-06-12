@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.qualityalternative.app.data.AgentInboxReviewCandidateFactoryTest" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-06-12T13:48:55.009Z" hostname="Mac-Studio.local" time="0.004">
+  <properties/>
+  <testcase name="fromDrivePackage_marksTruncatedPackageFileListingInvalid" classname="com.qualityalternative.app.data.AgentInboxReviewCandidateFactoryTest" time="0.001"/>
+  <testcase name="fromDrivePackage_marksActualContentShaAsDuplicateWhenManifestIncludesSameSha" classname="com.qualityalternative.app.data.AgentInboxReviewCandidateFactoryTest" time="0.001"/>
+  <testcase name="fromDrivePackage_marksMissingContentFileInvalid" classname="com.qualityalternative.app.data.AgentInboxReviewCandidateFactoryTest" time="0.0"/>
+  <testcase name="fromDrivePackage_marksUnsupportedExtraFilesInvalid" classname="com.qualityalternative.app.data.AgentInboxReviewCandidateFactoryTest" time="0.0"/>
+  <testcase name="fromDrivePackage_marksActualContentShaAsDuplicateWhenManifestOmitsSha" classname="com.qualityalternative.app.data.AgentInboxReviewCandidateFactoryTest" time="0.0"/>
+  <testcase name="fromDrivePackage_marksDuplicateManifestsInvalid" classname="com.qualityalternative.app.data.AgentInboxReviewCandidateFactoryTest" time="0.0"/>
+  <testcase name="fromDrivePackage_marksMultipleContentFilesInvalid" classname="com.qualityalternative.app.data.AgentInboxReviewCandidateFactoryTest" time="0.001"/>
+  <testcase name="fromDrivePackage_buildsReadyCandidateWithPriorityIntent" classname="com.qualityalternative.app.data.AgentInboxReviewCandidateFactoryTest" time="0.0"/>
+  <testcase name="fromDrivePackage_doesNotMarkDuplicateFromUnverifiedManifestSha" classname="com.qualityalternative.app.data.AgentInboxReviewCandidateFactoryTest" time="0.0"/>
+  <testcase name="fromDrivePackage_marksMissingManifestInvalid" classname="com.qualityalternative.app.data.AgentInboxReviewCandidateFactoryTest" time="0.0"/>
+  <testcase name="fromDrivePackage_marksManifestValidationErrorsInvalid" classname="com.qualityalternative.app.data.AgentInboxReviewCandidateFactoryTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

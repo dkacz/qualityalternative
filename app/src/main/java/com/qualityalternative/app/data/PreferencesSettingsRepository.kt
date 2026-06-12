@@ -104,6 +104,10 @@ class PreferencesSettingsRepository(
                     annotationDriveFolderId = preferences[AnnotationDriveFolderId],
                     annotationDriveLastSuccessfulAtMillis = preferences[AnnotationDriveLastSuccessfulAtMillis],
                     annotationDriveLastError = preferences[AnnotationDriveLastError],
+                    agentInboxDriveEnabled = preferences[AgentInboxDriveEnabled] ?: false,
+                    agentInboxDriveFolderId = preferences[AgentInboxDriveFolderId],
+                    agentInboxDriveLastSuccessfulAtMillis = preferences[AgentInboxDriveLastSuccessfulAtMillis],
+                    agentInboxDriveLastError = preferences[AgentInboxDriveLastError],
                     profileAutosaveUri = preferences[ProfileAutosaveUri],
                     profileAutosaveDisplayName = preferences[ProfileAutosaveDisplayName],
                     profileAutosaveLastSuccessfulAtMillis = preferences[ProfileAutosaveLastSuccessfulAtMillis],
@@ -337,6 +341,42 @@ class PreferencesSettingsRepository(
         }
     }
 
+    override suspend fun saveAgentInboxDriveConnection(folderId: String?) {
+        dataStore.edit { preferences ->
+            preferences[AgentInboxDriveEnabled] = true
+            if (folderId.isNullOrBlank()) {
+                preferences.remove(AgentInboxDriveFolderId)
+            } else {
+                preferences[AgentInboxDriveFolderId] = folderId
+            }
+            preferences.remove(AgentInboxDriveLastError)
+        }
+    }
+
+    override suspend fun clearAgentInboxDriveConnection() {
+        dataStore.edit { preferences ->
+            preferences.remove(AgentInboxDriveEnabled)
+            preferences.remove(AgentInboxDriveFolderId)
+            preferences.remove(AgentInboxDriveLastSuccessfulAtMillis)
+            preferences.remove(AgentInboxDriveLastError)
+        }
+    }
+
+    override suspend fun saveAgentInboxDriveScanSuccess(timestampMillis: Long, folderId: String) {
+        dataStore.edit { preferences ->
+            preferences[AgentInboxDriveEnabled] = true
+            preferences[AgentInboxDriveFolderId] = folderId
+            preferences[AgentInboxDriveLastSuccessfulAtMillis] = timestampMillis
+            preferences.remove(AgentInboxDriveLastError)
+        }
+    }
+
+    override suspend fun saveAgentInboxDriveScanFailure(errorMessage: String) {
+        dataStore.edit { preferences ->
+            preferences[AgentInboxDriveLastError] = errorMessage
+        }
+    }
+
     override suspend fun saveProfileAutosaveDestination(uri: String, displayName: String) {
         dataStore.edit { preferences ->
             preferences[ProfileAutosaveUri] = uri
@@ -471,6 +511,10 @@ class PreferencesSettingsRepository(
         val AnnotationDriveFolderId = stringPreferencesKey("annotation_drive_folder_id")
         val AnnotationDriveLastSuccessfulAtMillis = longPreferencesKey("annotation_drive_last_successful_at_millis")
         val AnnotationDriveLastError = stringPreferencesKey("annotation_drive_last_error")
+        val AgentInboxDriveEnabled = booleanPreferencesKey("agent_inbox_drive_enabled")
+        val AgentInboxDriveFolderId = stringPreferencesKey("agent_inbox_drive_folder_id")
+        val AgentInboxDriveLastSuccessfulAtMillis = longPreferencesKey("agent_inbox_drive_last_successful_at_millis")
+        val AgentInboxDriveLastError = stringPreferencesKey("agent_inbox_drive_last_error")
         val ProfileAutosaveUri = stringPreferencesKey("profile_autosave_uri")
         val ProfileAutosaveDisplayName = stringPreferencesKey("profile_autosave_display_name")
         val ProfileAutosaveLastSuccessfulAtMillis = longPreferencesKey("profile_autosave_last_successful_at_millis")

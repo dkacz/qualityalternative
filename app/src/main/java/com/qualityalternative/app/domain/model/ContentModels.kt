@@ -222,6 +222,8 @@ data class UserDocumentDraft(
     val durationMinutes: Int,
     val topicTags: Set<TopicTag>,
     val imageAttachmentUris: Map<String, String> = emptyMap(),
+    val documentFingerprintSha256: String? = null,
+    val documentFingerprintSizeBytes: Long? = null,
 )
 
 enum class UserDocumentValidationError {

@@ -1641,25 +1641,13 @@ private fun ContentItem.toAccountLightUserDocument(exportedAtMillis: Long): Acco
     val displayName = sourceLabel.toPortableSourceHintOrNull()
         ?: portableTitle.toPortableSourceHintOrNull()
         ?: "Imported document"
-    val fingerprintSha256 = verifiedDocumentFingerprintSha256()
-    val fingerprintSizeBytes = verifiedDocumentFingerprintSizeBytes()
-    val documentFingerprint = if (fingerprintSha256 != null && fingerprintSizeBytes != null) {
-        AccountLightDocumentFingerprint(
-            strategy = "SHA256_BYTES",
-            sha256 = fingerprintSha256,
-            sizeBytes = fingerprintSizeBytes,
-            normalizedTitle = title.normalizedPortableTitle(),
-            format = portableFormat.name,
-        )
-    } else {
-        AccountLightDocumentFingerprint(
-            strategy = "UNVERIFIED_METADATA_ONLY",
-            sha256 = null,
-            sizeBytes = null,
-            normalizedTitle = title.normalizedPortableTitle(),
-            format = portableFormat.name,
-        )
-    }
+    val documentFingerprint = AccountLightDocumentFingerprint(
+        strategy = "UNVERIFIED_METADATA_ONLY",
+        sha256 = null,
+        sizeBytes = null,
+        normalizedTitle = title.normalizedPortableTitle(),
+        format = portableFormat.name,
+    )
     return AccountLightUserDocument(
         contentId = contentId,
         displayName = displayName,

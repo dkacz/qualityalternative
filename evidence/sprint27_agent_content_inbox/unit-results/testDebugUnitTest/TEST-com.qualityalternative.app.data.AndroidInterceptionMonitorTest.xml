@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.qualityalternative.app.data.AndroidInterceptionMonitorTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-06-12T13:48:55.139Z" hostname="Mac-Studio.local" time="0.001">
+  <properties/>
+  <testcase name="isAccessibilityServiceEnabled_returnsTrue_whenMasterSwitchIsOnAndServiceIsListed" classname="com.qualityalternative.app.data.AndroidInterceptionMonitorTest" time="0.001"/>
+  <testcase name="isAccessibilityServiceEnabled_returnsFalse_whenMasterSwitchIsOff" classname="com.qualityalternative.app.data.AndroidInterceptionMonitorTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

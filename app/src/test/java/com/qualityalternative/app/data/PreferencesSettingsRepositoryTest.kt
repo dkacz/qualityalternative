@@ -387,6 +387,42 @@ class PreferencesSettingsRepositoryTest {
     }
 
     @Test
+    fun saveAgentInboxDriveSettings_persistsConnectionStatusAndFailure() = runBlocking {
+        val repository = PreferencesSettingsRepository(
+            dataStore = testDataStore(),
+            supportedApps = SupportedCatalog.distractingApps,
+        )
+
+        repository.saveAgentInboxDriveConnection(folderId = null)
+        repository.saveAgentInboxDriveScanFailure("Agent Inbox scan failed. Retry from Settings.")
+
+        val failed = repository.observeAppSettings().first()
+        assertEquals(true, failed.agentInboxDriveEnabled)
+        assertEquals(null, failed.agentInboxDriveFolderId)
+        assertEquals(null, failed.agentInboxDriveLastSuccessfulAtMillis)
+        assertEquals("Agent Inbox scan failed. Retry from Settings.", failed.agentInboxDriveLastError)
+
+        repository.saveAgentInboxDriveScanSuccess(
+            timestampMillis = 7_000L,
+            folderId = "drive-folder-agent-inbox",
+        )
+
+        val synced = repository.observeAppSettings().first()
+        assertEquals(true, synced.agentInboxDriveEnabled)
+        assertEquals("drive-folder-agent-inbox", synced.agentInboxDriveFolderId)
+        assertEquals(7_000L, synced.agentInboxDriveLastSuccessfulAtMillis)
+        assertEquals(null, synced.agentInboxDriveLastError)
+
+        repository.clearAgentInboxDriveConnection()
+
+        val cleared = repository.observeAppSettings().first()
+        assertEquals(false, cleared.agentInboxDriveEnabled)
+        assertEquals(null, cleared.agentInboxDriveFolderId)
+        assertEquals(null, cleared.agentInboxDriveLastSuccessfulAtMillis)
+        assertEquals(null, cleared.agentInboxDriveLastError)
+    }
+
+    @Test
     fun saveProfileAutosaveSettings_persistsStatusAndClearsFailureOnSuccess() = runBlocking {
         val repository = PreferencesSettingsRepository(
             dataStore = testDataStore(),

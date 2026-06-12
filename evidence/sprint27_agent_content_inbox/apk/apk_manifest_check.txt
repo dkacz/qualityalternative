@@ -1,0 +1,5 @@
+package: com.qualityalternative.app
+uses-permission: name='android.permission.INTERNET'
+uses-permission: name='android.permission.SYSTEM_ALERT_WINDOW'
+permission: com.qualityalternative.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
+uses-permission: name='com.qualityalternative.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION'

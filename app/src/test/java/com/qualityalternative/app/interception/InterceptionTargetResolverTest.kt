@@ -31,6 +31,27 @@ class InterceptionTargetResolverTest {
     }
 
     @Test
+    fun resolve_ignoresFixtureTargetsWhenFixtureGateIsDisabled() {
+        val ownPackageResolved = InterceptionTargetResolver.resolve(
+            foregroundPackage = "com.qualityalternative.app",
+            foregroundClass = "com.qualityalternative.app.fixture.FixtureDistractorOneActivity",
+            selectedPackages = setOf("com.qualityalternative.fixture.one"),
+            appPackage = "com.qualityalternative.app",
+            enableFixtureTargets = false,
+        )
+        val fixturePackageResolved = InterceptionTargetResolver.resolve(
+            foregroundPackage = "com.qualityalternative.fixture.one",
+            foregroundClass = "com.qualityalternative.app.fixture.FixtureDistractorOneActivity",
+            selectedPackages = setOf("com.qualityalternative.fixture.one"),
+            appPackage = "com.qualityalternative.app",
+            enableFixtureTargets = false,
+        )
+
+        assertNull(ownPackageResolved)
+        assertNull(fixturePackageResolved)
+    }
+
+    @Test
     fun resolve_ignoresOwnPackageWhenForegroundComponentIsNotFixture() {
         val resolved = InterceptionTargetResolver.resolve(
             foregroundPackage = "com.qualityalternative.app",

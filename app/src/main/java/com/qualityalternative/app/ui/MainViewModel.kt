@@ -6,6 +6,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.qualityalternative.app.BuildConfig
 import com.qualityalternative.app.data.AccountLightImportException
 import com.qualityalternative.app.data.AccountLightImportPlan
 import com.qualityalternative.app.data.AccountLightImportPreview
@@ -13,8 +14,18 @@ import com.qualityalternative.app.data.AccountLightProfileExporter
 import com.qualityalternative.app.data.AccountLightProfileImporter
 import com.qualityalternative.app.data.AppContainer
 import com.qualityalternative.app.data.ACCOUNT_LIGHT_PROFILE_FILE_NAME
+import com.qualityalternative.app.data.AgentInboxDocumentStore
+import com.qualityalternative.app.data.AgentInboxManifestValidator
+import com.qualityalternative.app.data.AgentInboxImportResult
+import com.qualityalternative.app.data.AgentInboxImportStatus
+import com.qualityalternative.app.data.AgentInboxPackageValidationError
+import com.qualityalternative.app.data.AgentInboxPackageImporter
+import com.qualityalternative.app.data.AgentInboxReviewCandidate
+import com.qualityalternative.app.data.AgentInboxReviewCandidateFactory
+import com.qualityalternative.app.data.AgentInboxReviewStatus
 import com.qualityalternative.app.data.ReadingTimeEstimateSource
 import com.qualityalternative.app.data.ReadingTimeEstimator
+import com.qualityalternative.app.data.StoredAgentInboxDocument
 import com.qualityalternative.app.data.SupportedCatalog
 import com.qualityalternative.app.data.UserDocumentValidator
 import com.qualityalternative.app.data.UserLinkValidator
@@ -86,6 +97,11 @@ import com.qualityalternative.app.domain.service.AccountLightProfileAutosaveWrit
 import com.qualityalternative.app.domain.service.AccountLightProfileBackupReader
 import com.qualityalternative.app.domain.service.AddUserDocumentResult
 import com.qualityalternative.app.domain.service.AddUserLinkResult
+import com.qualityalternative.app.domain.service.AgentInboxDriveClient
+import com.qualityalternative.app.domain.service.AgentInboxDriveDownloadTooLargeException
+import com.qualityalternative.app.domain.service.AgentInboxDriveScanRequest
+import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_MANIFEST_BYTES
+import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_REVIEW_CONTENT_BYTES
 import com.qualityalternative.app.domain.service.AnalyticsTracker
 import com.qualityalternative.app.domain.service.ContentRepository
 import com.qualityalternative.app.domain.service.DelayGate
@@ -188,6 +204,15 @@ data class MainUiState(
     val annotationDriveFolderId: String? = null,
     val annotationDriveLastSuccessfulAtMillis: Long? = null,
     val annotationDriveLastError: String? = null,
+    val agentInboxDriveEnabled: Boolean = false,
+    val agentInboxDriveFolderId: String? = null,
+    val agentInboxDriveLastSuccessfulAtMillis: Long? = null,
+    val agentInboxDriveLastError: String? = null,
+    val isAgentInboxScanning: Boolean = false,
+    val isAgentInboxImporting: Boolean = false,
+    val agentInboxCandidates: List<AgentInboxReviewCandidate> = emptyList(),
+    val agentInboxPriorityAcceptedPackageIds: Set<String> = emptySet(),
+    val agentInboxScanTruncated: Boolean = false,
     val profileAutosaveUri: String? = null,
     val profileAutosaveDisplayName: String? = null,
     val profileAutosaveUsesLocalDefault: Boolean = false,
@@ -311,6 +336,11 @@ class MainViewModel(
     private val readingAnnotationExportWriter: ReadingAnnotationExportWriter = NoOpReadingAnnotationExportWriter,
     private val readingAnnotationDriveSyncClient: ReadingAnnotationDriveSyncClient = NoOpReadingAnnotationDriveSyncClient,
     private val readingAnnotationDriveTokenProvider: ReadingAnnotationDriveTokenProvider = NoOpReadingAnnotationDriveTokenProvider,
+    private var agentInboxDriveClient: AgentInboxDriveClient = NoOpAgentInboxDriveClient,
+    private val agentInboxPackageImporter: AgentInboxPackageImporter = AgentInboxPackageImporter(
+        userDocumentRepository = userDocumentRepository,
+        documentStore = NoOpAgentInboxDocumentStore,
+    ),
     private val accountLightProfileExporter: AccountLightProfileExporter = AccountLightProfileExporter(
         settingsRepository = settingsRepository,
         appVersionName = "test",
@@ -344,6 +374,7 @@ class MainViewModel(
     private val defaultSelectedPackIds = defaultStarterPackIds(starterPacks)
     private var settingsLoaded = false
     private var contentReady = contentRepository.isReady()
+    private var userDocumentReady = userDocumentRepository.isReady()
     private var analyticsReady = analyticsTracker.isReady()
     private var historyReady = historyRepository.isReady()
     private var readingProgressReady = readingProgressRepository.isReady()
@@ -434,6 +465,12 @@ class MainViewModel(
         viewModelScope.launch {
             userDocumentRepository.observeUserDocuments().collect { documents ->
                 uiState = uiState.copy(userDocuments = documents)
+            }
+        }
+        viewModelScope.launch {
+            userDocumentRepository.observeReady().collect { ready ->
+                userDocumentReady = ready
+                updateHydrationState()
             }
         }
         viewModelScope.launch {
@@ -1210,6 +1247,539 @@ class MainViewModel(
                 AnalyticsEvent(
                     type = AnalyticsEventType.ANNOTATION_DRIVE_SYNC_DISCONNECTED,
                     timestampMillis = nowMillis,
+                ),
+            )
+        }
+    }
+
+    fun scanAgentInboxDrive(accessToken: String, nowMillis: Long = nowProvider()) {
+        if (!userDocumentReady) {
+            uiState = uiState.copy(latestMessage = "Agent Inbox is waiting for your library to finish loading.")
+            return
+        }
+        val normalizedToken = accessToken.trim()
+        if (normalizedToken.isBlank()) {
+            reportAgentInboxDriveFailure("Google Drive did not return an access token.")
+            return
+        }
+        uiState = uiState.copy(
+            isAgentInboxScanning = true,
+            agentInboxDriveLastError = null,
+            latestMessage = null,
+        )
+        viewModelScope.launch {
+            try {
+                val scan = agentInboxDriveClient.scanPackages(
+                    AgentInboxDriveScanRequest(
+                        accessToken = normalizedToken,
+                        folderId = uiState.agentInboxDriveFolderId,
+                    ),
+                )
+                val existingDocumentIdsBySha = userDocumentRepository.userDocuments()
+                    .mapNotNull { item ->
+                        item.documentFingerprintSha256?.takeIf(String::isNotBlank)?.let { sha -> sha to item.id }
+                    }
+                    .toMap()
+                val candidates = scan.packages.map { drivePackage ->
+                    val manifestFile = drivePackage.manifestFile
+                    val manifestJson = when {
+                        manifestFile == null -> null
+                        (manifestFile.sizeBytes ?: 0L) > AGENT_INBOX_MAX_MANIFEST_BYTES -> {
+                            return@map AgentInboxReviewCandidateFactory.invalidPackage(
+                                drivePackage = drivePackage,
+                                packageErrors = setOf(AgentInboxPackageValidationError.MANIFEST_FILE_TOO_LARGE),
+                            )
+                        }
+                        else -> {
+                            val manifestBytes = try {
+                                agentInboxDriveClient.downloadFile(
+                                    accessToken = normalizedToken,
+                                    fileId = manifestFile.id,
+                                    maxBytes = AGENT_INBOX_MAX_MANIFEST_BYTES,
+                                )
+                            } catch (tooLarge: AgentInboxDriveDownloadTooLargeException) {
+                                return@map AgentInboxReviewCandidateFactory.invalidPackage(
+                                    drivePackage = drivePackage,
+                                    packageErrors = setOf(AgentInboxPackageValidationError.MANIFEST_FILE_TOO_LARGE),
+                                )
+                            } catch (error: Throwable) {
+                                if (error is CancellationException) throw error
+                                return@map AgentInboxReviewCandidateFactory.invalidPackage(
+                                    drivePackage = drivePackage,
+                                    packageErrors = setOf(AgentInboxPackageValidationError.DOWNLOAD_UNAVAILABLE),
+                                )
+                            }
+                            if (manifestBytes.size.toLong() > AGENT_INBOX_MAX_MANIFEST_BYTES) {
+                                return@map AgentInboxReviewCandidateFactory.invalidPackage(
+                                    drivePackage = drivePackage,
+                                    packageErrors = setOf(AgentInboxPackageValidationError.MANIFEST_FILE_TOO_LARGE),
+                                )
+                            }
+                            String(manifestBytes, Charsets.UTF_8)
+                        }
+                    }
+                    val initialCandidate = AgentInboxReviewCandidateFactory.fromDrivePackage(
+                        drivePackage = drivePackage,
+                        manifestJson = manifestJson,
+                        existingDocumentIdsBySha256 = existingDocumentIdsBySha,
+                    )
+                    val contentFileId = initialCandidate.contentFileId
+                    if (!initialCandidate.canImport || contentFileId == null) {
+                        initialCandidate
+                    } else {
+                        val contentFile = drivePackage.allFiles.firstOrNull { file -> file.id == contentFileId }
+                        if ((contentFile?.sizeBytes ?: 0L) > AGENT_INBOX_MAX_REVIEW_CONTENT_BYTES) {
+                            initialCandidate.copy(
+                                status = AgentInboxReviewStatus.INVALID,
+                                packageErrors = initialCandidate.packageErrors + AgentInboxPackageValidationError.CONTENT_FILE_TOO_LARGE,
+                            )
+                        } else {
+                            val contentBytes = try {
+                                agentInboxDriveClient.downloadFile(
+                                    accessToken = normalizedToken,
+                                    fileId = contentFileId,
+                                    maxBytes = AGENT_INBOX_MAX_REVIEW_CONTENT_BYTES,
+                                )
+                            } catch (tooLarge: AgentInboxDriveDownloadTooLargeException) {
+                                return@map initialCandidate.copy(
+                                    status = AgentInboxReviewStatus.INVALID,
+                                    packageErrors = initialCandidate.packageErrors +
+                                        AgentInboxPackageValidationError.CONTENT_FILE_TOO_LARGE,
+                                )
+                            } catch (error: Throwable) {
+                                if (error is CancellationException) throw error
+                                return@map initialCandidate.copy(
+                                    status = AgentInboxReviewStatus.INVALID,
+                                    packageErrors = initialCandidate.packageErrors +
+                                        AgentInboxPackageValidationError.DOWNLOAD_UNAVAILABLE,
+                                )
+                            }
+                            if (contentBytes.size.toLong() > AGENT_INBOX_MAX_REVIEW_CONTENT_BYTES) {
+                                initialCandidate.copy(
+                                    status = AgentInboxReviewStatus.INVALID,
+                                    packageErrors = initialCandidate.packageErrors + AgentInboxPackageValidationError.CONTENT_FILE_TOO_LARGE,
+                                )
+                            } else {
+                                AgentInboxReviewCandidateFactory.fromDrivePackage(
+                                    drivePackage = drivePackage,
+                                    manifestJson = manifestJson,
+                                    existingDocumentIdsBySha256 = existingDocumentIdsBySha,
+                                    actualContentSha256 = AgentInboxManifestValidator.sha256(contentBytes),
+                                    actualContentSizeBytes = contentBytes.size.toLong(),
+                                )
+                            }
+                        }
+                    }
+                }
+                val scanTruncated = scan.hasMorePackages || scan.packages.any { drivePackage -> drivePackage.hasMoreFiles }
+                settingsRepository.saveAgentInboxDriveScanSuccess(
+                    timestampMillis = nowMillis,
+                    folderId = scan.folderId,
+                )
+                recordEventDurably(
+                    AnalyticsEvent(
+                        type = AnalyticsEventType.AGENT_INBOX_SCAN_SUCCEEDED,
+                        timestampMillis = nowMillis,
+                        metadata = mapOf(
+                            "inboxCandidateCount" to candidates.size.toString(),
+                            "inboxReadyCount" to candidates.count { it.status == AgentInboxReviewStatus.READY }.toString(),
+                            "inboxInvalidCount" to candidates.count { it.status == AgentInboxReviewStatus.INVALID }.toString(),
+                            "inboxDuplicateCount" to candidates.count { it.status == AgentInboxReviewStatus.DUPLICATE }.toString(),
+                        ),
+                    ),
+                )
+                candidates.forEach { candidate ->
+                    recordEventDurably(
+                        AnalyticsEvent(
+                            type = AnalyticsEventType.AGENT_INBOX_CANDIDATE_DETECTED,
+                            timestampMillis = nowMillis,
+                            metadata = candidate.agentInboxAnalyticsMetadata(),
+                        ),
+                    )
+                }
+                uiState = uiState.copy(
+                    agentInboxDriveEnabled = true,
+                    agentInboxDriveFolderId = scan.folderId,
+                    agentInboxDriveLastSuccessfulAtMillis = nowMillis,
+                    agentInboxDriveLastError = null,
+                    isAgentInboxScanning = false,
+                    agentInboxCandidates = candidates,
+                    agentInboxPriorityAcceptedPackageIds = emptySet(),
+                    agentInboxScanTruncated = scanTruncated,
+                    latestMessage = if (candidates.isEmpty()) {
+                        "Agent Inbox is connected. No packages found."
+                    } else if (scanTruncated) {
+                        "Agent Inbox found ${candidates.size} package${if (candidates.size == 1) "" else "s"}; more items were left unshown."
+                    } else {
+                        "Agent Inbox found ${candidates.size} package${if (candidates.size == 1) "" else "s"}."
+                    },
+                )
+            } catch (error: Throwable) {
+                if (error is CancellationException) throw error
+                reportAgentInboxDriveFailure("Agent Inbox scan failed. Retry from Settings.")
+            }
+        }
+    }
+
+    fun beginAgentInboxDriveScan() {
+        uiState = uiState.copy(
+            isAgentInboxScanning = true,
+            agentInboxDriveLastError = null,
+            agentInboxScanTruncated = false,
+            latestMessage = null,
+        )
+    }
+
+    fun reportAgentInboxDriveAuthorizationFailure(errorMessage: String) {
+        val message = errorMessage.trim().ifBlank { "Google Drive authorization failed." }
+        reportAgentInboxDriveFailure(message)
+    }
+
+    fun disconnectAgentInboxDrive(nowMillis: Long = nowProvider()) {
+        uiState = uiState.copy(
+            agentInboxDriveEnabled = false,
+            agentInboxDriveFolderId = null,
+            agentInboxDriveLastSuccessfulAtMillis = null,
+            agentInboxDriveLastError = null,
+            isAgentInboxScanning = false,
+            isAgentInboxImporting = false,
+            agentInboxCandidates = emptyList(),
+            agentInboxPriorityAcceptedPackageIds = emptySet(),
+            agentInboxScanTruncated = false,
+            latestMessage = "Agent Inbox disconnected.",
+        )
+        viewModelScope.launch {
+            settingsRepository.clearAgentInboxDriveConnection()
+            recordEventDurably(
+                AnalyticsEvent(
+                    type = AnalyticsEventType.AGENT_INBOX_DISCONNECTED,
+                    timestampMillis = nowMillis,
+                ),
+            )
+        }
+    }
+
+    fun toggleAgentInboxPriority(packageFolderId: String) {
+        val selected = uiState.agentInboxPriorityAcceptedPackageIds.toMutableSet()
+        val accepted = if (selected.add(packageFolderId)) {
+            true
+        } else {
+            selected.remove(packageFolderId)
+            false
+        }
+        uiState = uiState.copy(
+            agentInboxPriorityAcceptedPackageIds = selected,
+            latestMessage = null,
+        )
+        viewModelScope.launch {
+            recordEventDurably(
+                AnalyticsEvent(
+                    type = AnalyticsEventType.AGENT_INBOX_PRIORITY_TOGGLED,
+                    timestampMillis = nowProvider(),
+                    metadata = mapOf("acceptedPriority" to accepted.toString()),
+                ),
+            )
+        }
+    }
+
+    fun rejectAgentInboxCandidate(packageFolderId: String, nowMillis: Long = nowProvider()) {
+        val candidate = uiState.agentInboxCandidates.firstOrNull { it.packageFolderId == packageFolderId }
+        if (candidate == null) {
+            uiState = uiState.copy(latestMessage = "Agent Inbox package is no longer available.")
+            return
+        }
+        uiState = uiState.copy(
+            agentInboxCandidates = uiState.agentInboxCandidates.filterNot { it.packageFolderId == packageFolderId },
+            agentInboxPriorityAcceptedPackageIds = uiState.agentInboxPriorityAcceptedPackageIds - packageFolderId,
+            latestMessage = "Removed Agent Inbox package from review.",
+        )
+        viewModelScope.launch {
+            recordEventDurably(
+                AnalyticsEvent(
+                    type = AnalyticsEventType.AGENT_INBOX_CANDIDATE_REJECTED,
+                    timestampMillis = nowMillis,
+                    metadata = candidate.agentInboxAnalyticsMetadata() + mapOf("reviewAction" to "rejected"),
+                ),
+            )
+        }
+    }
+
+    fun importAgentInboxCandidate(
+        packageFolderId: String,
+        accessToken: String,
+        nowMillis: Long = nowProvider(),
+    ) {
+        if (!userDocumentReady) {
+            uiState = uiState.copy(latestMessage = "Agent Inbox is waiting for your library to finish loading.")
+            return
+        }
+        if (uiState.isAgentInboxImporting) {
+            uiState = uiState.copy(latestMessage = "Agent Inbox import is already running.")
+            return
+        }
+        val candidate = uiState.agentInboxCandidates.firstOrNull { it.packageFolderId == packageFolderId }
+        if (candidate == null) {
+            uiState = uiState.copy(latestMessage = "Agent Inbox package is no longer available.")
+            return
+        }
+        val normalizedToken = accessToken.trim()
+        if (normalizedToken.isBlank()) {
+            reportAgentInboxDriveFailure("Google Drive did not return an access token.")
+            return
+        }
+        if (!candidate.canImport) {
+            uiState = uiState.copy(latestMessage = "Agent Inbox package needs review before import.")
+            return
+        }
+        uiState = uiState.copy(isAgentInboxImporting = true, latestMessage = null)
+        viewModelScope.launch {
+            try {
+                val contentBytes = try {
+                    agentInboxDriveClient.downloadFile(
+                        accessToken = normalizedToken,
+                        fileId = requireNotNull(candidate.contentFileId),
+                        maxBytes = AGENT_INBOX_MAX_REVIEW_CONTENT_BYTES,
+                    )
+                } catch (tooLarge: AgentInboxDriveDownloadTooLargeException) {
+                    applyAgentInboxImportResult(
+                        packageFolderId = packageFolderId,
+                        result = AgentInboxImportResult(
+                            status = AgentInboxImportStatus.INVALID,
+                            requestedHighPriority = candidate.requestsHighPriority,
+                            packageErrors = setOf(AgentInboxPackageValidationError.CONTENT_FILE_TOO_LARGE),
+                        ),
+                        nowMillis = nowMillis,
+                    )
+                    return@launch
+                } catch (error: Throwable) {
+                    if (error is CancellationException) throw error
+                    applyAgentInboxImportResult(
+                        packageFolderId = packageFolderId,
+                        result = AgentInboxImportResult(
+                            status = AgentInboxImportStatus.INVALID,
+                            requestedHighPriority = candidate.requestsHighPriority,
+                            packageErrors = setOf(AgentInboxPackageValidationError.DOWNLOAD_UNAVAILABLE),
+                        ),
+                        nowMillis = nowMillis,
+                    )
+                    return@launch
+                }
+                val result = agentInboxPackageImporter.importCandidate(
+                    candidate = candidate,
+                    contentBytes = contentBytes,
+                    nowMillis = nowMillis,
+                )
+                applyAgentInboxImportResult(
+                    packageFolderId = packageFolderId,
+                    result = result,
+                    nowMillis = nowMillis,
+                )
+            } catch (error: Throwable) {
+                if (error is CancellationException) throw error
+                applyAgentInboxImportResult(
+                    packageFolderId = packageFolderId,
+                    result = AgentInboxImportResult(
+                        status = AgentInboxImportStatus.REJECTED,
+                        requestedHighPriority = candidate.requestsHighPriority,
+                        packageErrors = setOf(AgentInboxPackageValidationError.LOCAL_IMPORT_REJECTED),
+                    ),
+                    nowMillis = nowMillis,
+                )
+            }
+        }
+    }
+
+    private suspend fun applyAgentInboxImportResult(
+        packageFolderId: String,
+        result: AgentInboxImportResult,
+        nowMillis: Long,
+    ) {
+        when (result.status) {
+            AgentInboxImportStatus.IMPORTED -> {
+                val item = result.item
+                val importedCandidate = uiState.agentInboxCandidates.firstOrNull {
+                    it.packageFolderId == packageFolderId
+                }
+                val duplicatePackageIds = if (item != null && importedCandidate?.reviewedContentSha256 != null) {
+                    uiState.agentInboxCandidates
+                        .filter { candidate ->
+                            candidate.packageFolderId != packageFolderId &&
+                                candidate.reviewedContentSha256 == importedCandidate.reviewedContentSha256
+                        }
+                        .mapTo(mutableSetOf(), AgentInboxReviewCandidate::packageFolderId)
+                } else {
+                    emptySet()
+                }
+                val updatedCandidates = uiState.agentInboxCandidates.mapNotNull { candidate ->
+                    when {
+                        candidate.packageFolderId == packageFolderId -> null
+                        item != null &&
+                            importedCandidate?.reviewedContentSha256 != null &&
+                            candidate.reviewedContentSha256 == importedCandidate.reviewedContentSha256 -> {
+                            candidate.copy(
+                                status = AgentInboxReviewStatus.DUPLICATE,
+                                duplicateContentId = item.id,
+                            )
+                        }
+                        else -> candidate
+                    }
+                }
+                val priorityAccepted = packageFolderId in uiState.agentInboxPriorityAcceptedPackageIds
+                val updatedPriorityIds = if (item != null && priorityAccepted) {
+                    val ids = uiState.priorityContentIds + item.id
+                    settingsRepository.savePriorityContentIds(ids)
+                    recordPrioritySetDuringAdd(
+                        item = item,
+                        nowMillis = nowMillis,
+                        priorityContentIds = ids,
+                    )
+                    ids
+                } else {
+                    uiState.priorityContentIds
+                }
+                recordEventDurably(
+                    AnalyticsEvent(
+                        type = AnalyticsEventType.AGENT_INBOX_CANDIDATE_IMPORTED,
+                        timestampMillis = nowMillis,
+                        contentId = item?.id,
+                        metadata = (item?.analyticsMetadata() ?: emptyMap()) + mapOf(
+                            "acceptedPriority" to priorityAccepted.toString(),
+                            "priorityRequested" to result.requestedHighPriority.toString(),
+                        ),
+                    ),
+                )
+                autosaveAccountLightProfileAfterPortableMutation(nowMillis = nowMillis)
+                uiState = uiState.copy(
+                    isAgentInboxImporting = false,
+                    agentInboxCandidates = updatedCandidates,
+                    agentInboxPriorityAcceptedPackageIds = uiState.agentInboxPriorityAcceptedPackageIds -
+                        packageFolderId -
+                        duplicatePackageIds,
+                    priorityContentIds = updatedPriorityIds,
+                    preferences = uiState.preferences?.copy(priorityContentIds = updatedPriorityIds),
+                    latestMessage = if (item != null) {
+                        "Imported ${item.title} from Agent Inbox."
+                    } else {
+                        "Imported Agent Inbox package."
+                    },
+                )
+            }
+
+            AgentInboxImportStatus.DUPLICATE -> {
+                val duplicateCandidate = uiState.agentInboxCandidates.firstOrNull {
+                    it.packageFolderId == packageFolderId
+                }
+                val duplicatePackageIds = uiState.agentInboxCandidates
+                    .filter { candidate ->
+                        candidate.packageFolderId == packageFolderId ||
+                            (
+                                duplicateCandidate?.reviewedContentSha256 != null &&
+                                    candidate.reviewedContentSha256 == duplicateCandidate.reviewedContentSha256
+                                )
+                    }
+                    .mapTo(mutableSetOf(), AgentInboxReviewCandidate::packageFolderId)
+                val updatedCandidates = uiState.agentInboxCandidates.map { candidate ->
+                    if (candidate.packageFolderId in duplicatePackageIds) {
+                        candidate.copy(
+                            status = AgentInboxReviewStatus.DUPLICATE,
+                            duplicateContentId = result.duplicateContentId ?: candidate.duplicateContentId,
+                        )
+                    } else {
+                        candidate
+                    }
+                }
+                recordEventDurably(
+                    AnalyticsEvent(
+                        type = AnalyticsEventType.AGENT_INBOX_CANDIDATE_DUPLICATE,
+                        timestampMillis = nowMillis,
+                        metadata = mapOf(
+                            "importStatus" to result.status.name,
+                            "priorityRequested" to result.requestedHighPriority.toString(),
+                        ),
+                    ),
+                )
+                uiState = uiState.copy(
+                    isAgentInboxImporting = false,
+                    agentInboxCandidates = updatedCandidates,
+                    agentInboxPriorityAcceptedPackageIds = uiState.agentInboxPriorityAcceptedPackageIds -
+                        duplicatePackageIds,
+                    latestMessage = "Agent Inbox package is already in your library.",
+                )
+            }
+
+            AgentInboxImportStatus.INVALID,
+            AgentInboxImportStatus.REJECTED,
+            -> {
+                val updatedCandidates = uiState.agentInboxCandidates.map { candidate ->
+                    if (candidate.packageFolderId == packageFolderId) {
+                        val packageErrors = candidate.packageErrors +
+                            result.packageErrors +
+                            if (
+                                result.status == AgentInboxImportStatus.REJECTED &&
+                                result.packageErrors.isEmpty() &&
+                                result.documentErrors.isNotEmpty()
+                            ) {
+                                setOf(AgentInboxPackageValidationError.LOCAL_IMPORT_REJECTED)
+                            } else {
+                                emptySet()
+                            }
+                        candidate.copy(
+                            status = AgentInboxReviewStatus.INVALID,
+                            duplicateContentId = null,
+                            reviewedContentSha256 = null,
+                            reviewedContentSizeBytes = null,
+                            manifestErrors = candidate.manifestErrors + result.manifestErrors,
+                            packageErrors = packageErrors,
+                        )
+                    } else {
+                        candidate
+                    }
+                }
+                recordEventDurably(
+                    AnalyticsEvent(
+                        type = AnalyticsEventType.AGENT_INBOX_CANDIDATE_IMPORT_FAILED,
+                        timestampMillis = nowMillis,
+                        metadata = mapOf(
+                            "importStatus" to result.status.name,
+                            "validationErrorCount" to result.manifestErrors.size.toString(),
+                            "packageErrorCount" to result.packageErrors.size.toString(),
+                            "documentErrorCount" to result.documentErrors.size.toString(),
+                            "priorityRequested" to result.requestedHighPriority.toString(),
+                        ),
+                    ),
+                )
+                uiState = uiState.copy(
+                    isAgentInboxImporting = false,
+                    agentInboxCandidates = updatedCandidates,
+                    agentInboxPriorityAcceptedPackageIds = uiState.agentInboxPriorityAcceptedPackageIds -
+                        packageFolderId,
+                    latestMessage = if (
+                        AgentInboxPackageValidationError.CONTENT_CHANGED_AFTER_REVIEW in result.packageErrors
+                    ) {
+                        "Agent Inbox package changed. Scan again before importing."
+                    } else {
+                        "Agent Inbox package could not be imported."
+                    },
+                )
+            }
+        }
+    }
+
+    private fun reportAgentInboxDriveFailure(message: String) {
+        uiState = uiState.copy(
+            isAgentInboxScanning = false,
+            isAgentInboxImporting = false,
+            agentInboxDriveLastError = message,
+            agentInboxScanTruncated = false,
+            latestMessage = "Agent Inbox connection failed.",
+        )
+        viewModelScope.launch {
+            settingsRepository.saveAgentInboxDriveScanFailure(message)
+            recordEventDurably(
+                AnalyticsEvent(
+                    type = AnalyticsEventType.AGENT_INBOX_SCAN_FAILED,
+                    timestampMillis = nowProvider(),
+                    metadata = mapOf("reason" to "scan_failed"),
                 ),
             )
         }
@@ -3362,6 +3932,10 @@ class MainViewModel(
             annotationDriveFolderId = settings.annotationDriveFolderId,
             annotationDriveLastSuccessfulAtMillis = settings.annotationDriveLastSuccessfulAtMillis,
             annotationDriveLastError = settings.annotationDriveLastError,
+            agentInboxDriveEnabled = settings.agentInboxDriveEnabled,
+            agentInboxDriveFolderId = settings.agentInboxDriveFolderId,
+            agentInboxDriveLastSuccessfulAtMillis = settings.agentInboxDriveLastSuccessfulAtMillis,
+            agentInboxDriveLastError = settings.agentInboxDriveLastError,
             profileAutosaveUri = effectiveProfileAutosaveUri,
             profileAutosaveDisplayName = effectiveProfileAutosaveDisplayName,
             profileAutosaveUsesLocalDefault = profileAutosaveUsesLocalDefault,
@@ -4321,7 +4895,7 @@ class MainViewModel(
 
     private fun updateHydrationState() {
         val isReady = settingsLoaded && contentReady && analyticsReady && historyReady && readingProgressReady &&
-            readingAnnotationReady && delayReady
+            readingAnnotationReady && delayReady && userDocumentReady
         if (uiState.isLoadingSettings != !isReady) {
             uiState = uiState.copy(isLoadingSettings = !isReady)
         }
@@ -4425,6 +4999,31 @@ class MainViewModel(
         viewModelScope.cancel()
     }
 
+    internal fun seedAgentInboxReviewForTests(
+        candidates: List<AgentInboxReviewCandidate>,
+        priorityAcceptedPackageIds: Set<String> = emptySet(),
+        lastSuccessfulAtMillis: Long = 1_781_256_600_000L,
+    ) {
+        check(BuildConfig.DEBUG) { "Agent Inbox visual fixture state is only available in debug builds." }
+        uiState = uiState.copy(
+            screen = MainScreen.Settings,
+            agentInboxDriveEnabled = true,
+            agentInboxDriveFolderId = "visual-test-agent-inbox",
+            agentInboxDriveLastSuccessfulAtMillis = lastSuccessfulAtMillis,
+            agentInboxDriveLastError = null,
+            isAgentInboxScanning = false,
+            isAgentInboxImporting = false,
+            agentInboxCandidates = candidates,
+            agentInboxPriorityAcceptedPackageIds = priorityAcceptedPackageIds,
+            agentInboxScanTruncated = false,
+        )
+    }
+
+    internal fun setAgentInboxDriveClientForTests(client: AgentInboxDriveClient) {
+        check(BuildConfig.DEBUG) { "Agent Inbox Drive client override is only available in debug builds." }
+        agentInboxDriveClient = client
+    }
+
     private fun findTargetApp(targetAppPackage: String): DistractingApp? {
         return uiState.availableTargetApps.firstOrNull { it.packageName == targetAppPackage }
     }
@@ -4487,6 +5086,8 @@ class MainViewModelFactory(
             readingAnnotationExportWriter = appContainer.readingAnnotationExportWriter,
             readingAnnotationDriveSyncClient = appContainer.readingAnnotationDriveSyncClient,
             readingAnnotationDriveTokenProvider = appContainer.readingAnnotationDriveTokenProvider,
+            agentInboxDriveClient = appContainer.agentInboxDriveClient,
+            agentInboxPackageImporter = appContainer.agentInboxPackageImporter,
             accountLightProfileExporter = appContainer.accountLightProfileExporter,
             accountLightProfileImporter = appContainer.accountLightProfileImporter,
             accountLightProfileAutosaveWriter = appContainer.accountLightProfileAutosaveWriter,
@@ -4623,6 +5224,15 @@ private fun ReadingProgress.analyticsMetadata(): Map<String, String> {
         "updatedAtMillis" to updatedAtMillis.toString(),
         "completedAtMillis" to (completedAtMillis?.toString() ?: ""),
     )
+}
+
+private fun AgentInboxReviewCandidate.agentInboxAnalyticsMetadata(): Map<String, String> {
+    return buildMap {
+        put("importStatus", status.name)
+        put("priorityRequested", requestsHighPriority.toString())
+        put("validationErrorCount", (manifestErrors.size + packageErrors.size).toString())
+        manifest?.format?.let { format -> put("format", format.name) }
+    }
 }
 
 private fun ContentItem.needsLegacyReadingTimeEstimateRepair(progress: ReadingProgress?): Boolean {
@@ -5151,6 +5761,27 @@ private object NoOpReadingAnnotationDriveSyncClient : ReadingAnnotationDriveSync
 
 private object NoOpReadingAnnotationDriveTokenProvider : ReadingAnnotationDriveTokenProvider {
     override suspend fun driveAccessToken(): String = error("Google Drive authorization is not available in this build.")
+}
+
+private object NoOpAgentInboxDriveClient : AgentInboxDriveClient {
+    override suspend fun scanPackages(
+        request: AgentInboxDriveScanRequest,
+    ) = error("Agent Inbox Drive is not available in this build.")
+
+    override suspend fun downloadFile(accessToken: String, fileId: String, maxBytes: Long): ByteArray =
+        error("Agent Inbox Drive is not available in this build.")
+}
+
+private object NoOpAgentInboxDocumentStore : AgentInboxDocumentStore {
+    override suspend fun writeDocument(
+        packageFolderId: String,
+        contentFileName: String,
+        verifiedContentSha256: String,
+        format: ContentFormat,
+        bytes: ByteArray,
+    ) = error("Agent Inbox document store is not available in this build.")
+
+    override suspend fun deleteDocument(stored: StoredAgentInboxDocument) = Unit
 }
 
 private object NoOpAccountLightProfileAutosaveWriter : AccountLightProfileAutosaveWriter {

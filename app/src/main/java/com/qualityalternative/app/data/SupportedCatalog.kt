@@ -1,5 +1,6 @@
 package com.qualityalternative.app.data
 
+import com.qualityalternative.app.BuildConfig
 import com.qualityalternative.app.domain.model.DistractingApp
 import com.qualityalternative.app.interception.FixtureTargetRegistry
 
@@ -13,8 +14,11 @@ object SupportedCatalog {
         DistractingApp(packageName = "com.zhiliaoapp.musically", displayName = "TikTok"),
     )
 
-    fun findByPackage(packageName: String): DistractingApp? {
+    fun findByPackage(
+        packageName: String,
+        includeFixtures: Boolean = BuildConfig.DEBUG,
+    ): DistractingApp? {
         return distractingApps.firstOrNull { it.packageName == packageName }
-            ?: FixtureTargetRegistry.findByPackage(packageName)
+            ?: FixtureTargetRegistry.findByPackage(packageName, enabled = includeFixtures)
     }
 }

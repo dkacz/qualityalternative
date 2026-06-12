@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <activity
+            android:name=".fixture.FixtureDistractorOneActivity"
+            android:exported="false"
+            android:label="Fixture Feed One" />
+
+        <activity
+            android:name=".fixture.FixtureDistractorTwoActivity"
+            android:exported="false"
+            android:label="Fixture Feed Two" />
+    </application>
+
+</manifest>

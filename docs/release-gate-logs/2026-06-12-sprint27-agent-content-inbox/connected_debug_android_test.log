@@ -1,0 +1,243 @@
+
+> Configure project :app
+WARNING: The option setting 'android.disallowKotlinSourceSets=false' is experimental.
+The current default is 'true'.
+
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:generateDebugBuildConfig UP-TO-DATE
+> Task :app:generateDebugResources UP-TO-DATE
+> Task :app:packageDebugResources UP-TO-DATE
+> Task :app:processDebugNavigationResources UP-TO-DATE
+> Task :app:parseDebugLocalResources UP-TO-DATE
+> Task :app:generateDebugRFile UP-TO-DATE
+> Task :app:kspDebugKotlin UP-TO-DATE
+> Task :app:compileDebugKotlin UP-TO-DATE
+> Task :app:javaPreCompileDebug UP-TO-DATE
+> Task :app:compileDebugJavaWithJavac UP-TO-DATE
+> Task :app:checkDebugAarMetadata UP-TO-DATE
+> Task :app:mapDebugSourceSetPaths UP-TO-DATE
+> Task :app:compileDebugNavigationResources UP-TO-DATE
+> Task :app:mergeDebugResources UP-TO-DATE
+> Task :app:createDebugCompatibleScreenManifests UP-TO-DATE
+> Task :app:extractDeepLinksDebug UP-TO-DATE
+> Task :app:processDebugMainManifest UP-TO-DATE
+> Task :app:processDebugManifest UP-TO-DATE
+> Task :app:processDebugManifestForPackage UP-TO-DATE
+> Task :app:processDebugResources UP-TO-DATE
+> Task :app:bundleDebugClassesToCompileJar UP-TO-DATE
+> Task :app:preDebugAndroidTestBuild SKIPPED
+> Task :app:processDebugAndroidTestManifest UP-TO-DATE
+> Task :app:generateDebugAndroidTestBuildConfig UP-TO-DATE
+> Task :app:generateDebugAndroidTestResources UP-TO-DATE
+> Task :app:packageDebugAndroidTestResources UP-TO-DATE
+> Task :app:processDebugAndroidTestNavigationResources UP-TO-DATE
+> Task :app:parseDebugAndroidTestLocalResources UP-TO-DATE
+> Task :app:generateDebugAndroidTestRFile UP-TO-DATE
+> Task :app:javaPreCompileDebugAndroidTest UP-TO-DATE
+> Task :app:generateDebugAssets UP-TO-DATE
+> Task :app:mergeDebugAssets UP-TO-DATE
+> Task :app:compressDebugAssets UP-TO-DATE
+> Task :app:desugarDebugFileDependencies UP-TO-DATE
+> Task :app:dexBuilderDebug UP-TO-DATE
+> Task :app:mergeDebugGlobalSynthetics UP-TO-DATE
+> Task :app:processDebugJavaRes UP-TO-DATE
+> Task :app:mergeDebugJavaResource UP-TO-DATE
+> Task :app:checkDebugDuplicateClasses UP-TO-DATE
+> Task :app:mergeExtDexDebug UP-TO-DATE
+> Task :app:mergeLibDexDebug UP-TO-DATE
+> Task :app:mergeProjectDexDebug UP-TO-DATE
+> Task :app:mergeDebugJniLibFolders UP-TO-DATE
+> Task :app:mergeDebugNativeLibs UP-TO-DATE
+> Task :app:stripDebugDebugSymbols UP-TO-DATE
+> Task :app:validateSigningDebug UP-TO-DATE
+> Task :app:writeDebugAppMetadata UP-TO-DATE
+> Task :app:writeDebugSigningConfigVersions UP-TO-DATE
+> Task :app:packageDebug UP-TO-DATE
+> Task :app:createDebugApkListingFileRedirect UP-TO-DATE
+> Task :app:generateDebugAndroidTestAssets UP-TO-DATE
+> Task :app:mergeDebugAndroidTestAssets UP-TO-DATE
+> Task :app:compressDebugAndroidTestAssets UP-TO-DATE
+> Task :app:desugarDebugAndroidTestFileDependencies UP-TO-DATE
+> Task :app:checkDebugAndroidTestAarMetadata UP-TO-DATE
+> Task :app:mapDebugAndroidTestSourceSetPaths UP-TO-DATE
+> Task :app:compileDebugAndroidTestNavigationResources UP-TO-DATE
+> Task :app:mergeDebugAndroidTestResources UP-TO-DATE
+> Task :app:processDebugAndroidTestResources UP-TO-DATE
+> Task :app:checkDebugAndroidTestDuplicateClasses UP-TO-DATE
+> Task :app:mergeExtDexDebugAndroidTest UP-TO-DATE
+> Task :app:mergeLibDexDebugAndroidTest UP-TO-DATE
+> Task :app:mergeDebugAndroidTestJniLibFolders UP-TO-DATE
+> Task :app:mergeDebugAndroidTestNativeLibs NO-SOURCE
+> Task :app:stripDebugAndroidTestDebugSymbols NO-SOURCE
+> Task :app:validateSigningDebugAndroidTest UP-TO-DATE
+> Task :app:writeDebugAndroidTestSigningConfigVersions UP-TO-DATE
+> Task :app:kspDebugAndroidTestKotlin
+> Task :app:compileDebugAndroidTestKotlin
+> Task :app:compileDebugAndroidTestJavaWithJavac UP-TO-DATE
+> Task :app:dexBuilderDebugAndroidTest UP-TO-DATE
+> Task :app:mergeDebugAndroidTestGlobalSynthetics UP-TO-DATE
+> Task :app:processDebugAndroidTestJavaRes UP-TO-DATE
+> Task :app:mergeDebugAndroidTestJavaResource UP-TO-DATE
+> Task :app:mergeProjectDexDebugAndroidTest UP-TO-DATE
+> Task :app:packageDebugAndroidTest UP-TO-DATE
+> Task :app:createDebugAndroidTestApkListingFileRedirect UP-TO-DATE
+Starting 137 tests on qaApi36(AVD) - 16
+> Task :app:connectedDebugAndroidTest
+
+qaApi36(AVD) - 16 Tests 0/137 completed. (0 skipped) (0 failed)
+qaApi36(AVD) - 16 Tests 1/137 completed. (0 skipped) (0 failed)
+qaApi36(AVD) - 16 Tests 2/137 completed. (0 skipped) (0 failed)
+qaApi36(AVD) - 16 Tests 4/137 completed. (0 skipped) (0 failed)
+qaApi36(AVD) - 16 Tests 5/137 completed. (0 skipped) (0 failed)
+qaApi36(AVD) - 16 Tests 6/137 completed. (0 skipped) (0 failed)
+qaApi36(AVD) - 16 Tests 7/137 completed. (0 skipped) (0 failed)
+qaApi36(AVD) - 16 Tests 8/137 completed. (0 skipped) (0 failed)
+qaApi36(AVD) - 16 Tests 9/137 completed. (0 skipped) (0 failed)
+qaApi36(AVD) - 16 Tests 10/137 completed. (0 skipped) (0 failed)
+qaApi36(AVD) - 16 Tests 11/137 completed. (0 skipped) (0 failed)
+qaApi36(AVD) - 16 Tests 12/137 completed. (0 skipped) (0 failed)
+qaApi36(AVD) - 16 Tests 13/137 completed. (0 skipped) (0 failed)
+qaApi36(AVD) - 16 Tests 14/137 completed. (0 skipped) (0 failed)
+qaApi36(AVD) - 16 Tests 15/137 completed. (0 skipped) (0 failed)
+qaApi36(AVD) - 16 Tests 16/137 completed. (0 skipped) (0 failed)
+qaApi36(AVD) - 16 Tests 17/137 completed. (0 skipped) (0 failed)
+qaApi36(AVD) - 16 Tests 18/137 completed. (0 skipped) (0 failed)
+qaApi36(AVD) - 16 Tests 19/137 completed. (0 skipped) (0 failed)
+qaApi36(AVD) - 16 Tests 20/137 completed. (0 skipped) (0 failed)
+qaApi36(AVD) - 16 Tests 21/137 completed. (0 skipped) (0 failed)
+qaApi36(AVD) - 16 Tests 22/137 completed. (0 skipped) (0 failed)
+qaApi36(AVD) - 16 Tests 23/137 completed. (0 skipped) (0 failed)
+qaApi36(AVD) - 16 Tests 24/137 completed. (0 skipped) (0 failed)
+qaApi36(AVD) - 16 Tests 25/137 completed. (0 skipped) (0 failed)
+qaApi36(AVD) - 16 Tests 26/137 completed. (0 skipped) (0 failed)
+qaApi36(AVD) - 16 Tests 27/137 completed. (0 skipped) (0 failed)
+qaApi36(AVD) - 16 Tests 28/137 completed. (0 skipped) (0 failed)
+qaApi36(AVD) - 16 Tests 29/137 completed. (0 skipped) (0 failed)
+qaApi36(AVD) - 16 Tests 30/137 completed. (0 skipped) (0 failed)
+qaApi36(AVD) - 16 Tests 31/137 completed. (0 skipped) (0 failed)
+qaApi36(AVD) - 16 Tests 32/137 completed. (0 skipped) (0 failed)
+qaApi36(AVD) - 16 Tests 33/137 completed. (0 skipped) (0 failed)
+qaApi36(AVD) - 16 Tests 34/137 completed. (0 skipped) (0 failed)
+qaApi36(AVD) - 16 Tests 35/137 completed. (0 skipped) (0 failed)
+qaApi36(AVD) - 16 Tests 36/137 completed. (0 skipped) (0 failed)
+qaApi36(AVD) - 16 Tests 37/137 completed. (0 skipped) (0 failed)
+qaApi36(AVD) - 16 Tests 38/137 completed. (0 skipped) (0 failed)
+qaApi36(AVD) - 16 Tests 39/137 completed. (0 skipped) (0 failed)
+qaApi36(AVD) - 16 Tests 40/137 completed. (0 skipped) (0 failed)
+qaApi36(AVD) - 16 Tests 41/137 completed. (0 skipped) (0 failed)
+qaApi36(AVD) - 16 Tests 42/137 completed. (0 skipped) (0 failed)
+qaApi36(AVD) - 16 Tests 43/137 completed. (0 skipped) (0 failed)
+qaApi36(AVD) - 16 Tests 44/137 completed. (0 skipped) (0 failed)
+qaApi36(AVD) - 16 Tests 45/137 completed. (0 skipped) (0 failed)
+qaApi36(AVD) - 16 Tests 46/137 completed. (0 skipped) (0 failed)
+qaApi36(AVD) - 16 Tests 47/137 completed. (0 skipped) (0 failed)
+qaApi36(AVD) - 16 Tests 48/137 completed. (0 skipped) (0 failed)
+qaApi36(AVD) - 16 Tests 49/137 completed. (0 skipped) (0 failed)
+qaApi36(AVD) - 16 Tests 50/137 completed. (0 skipped) (0 failed)
+qaApi36(AVD) - 16 Tests 51/137 completed. (0 skipped) (0 failed)
+qaApi36(AVD) - 16 Tests 52/137 completed. (0 skipped) (0 failed)
+qaApi36(AVD) - 16 Tests 53/137 completed. (0 skipped) (0 failed)
+qaApi36(AVD) - 16 Tests 54/137 completed. (0 skipped) (0 failed)
+qaApi36(AVD) - 16 Tests 55/137 completed. (0 skipped) (0 failed)
+
+com.qualityalternative.app.MainActivityTest > readerAnnotationControlsExpandAndReopenAcrossPages[qaApi36(AVD) - 16] [31mFAILED [0m
+	java.lang.AssertionError: Assert failed: The component with TestTag = 'reader-annotation-save-0' is not displayed!
+	at androidx.compose.ui.test.AssertionsKt.assertIsDisplayed(Assertions.kt:34)
+qaApi36(AVD) - 16 Tests 56/137 completed. (0 skipped) (1 failed)
+qaApi36(AVD) - 16 Tests 57/137 completed. (0 skipped) (1 failed)
+qaApi36(AVD) - 16 Tests 58/137 completed. (0 skipped) (1 failed)
+qaApi36(AVD) - 16 Tests 59/137 completed. (0 skipped) (1 failed)
+qaApi36(AVD) - 16 Tests 60/137 completed. (0 skipped) (1 failed)
+
+com.qualityalternative.app.MainActivityTest > annotationDriveSyncSettingsShowsConnectFailureConnectedAndRetryStates[qaApi36(AVD) - 16] [31mFAILED [0m
+	java.lang.AssertionError: Failed to perform checkIsDisplayed check: Expected at most 1 node but found 2 nodes that satisfy (Text + InputText + EditableText contains 'Connect' (ignoreCase: false))
+	at androidx.compose.ui.test.AndroidAssertions_androidKt.checkIsDisplayed(AndroidAssertions.android.kt:35)
+qaApi36(AVD) - 16 Tests 61/137 completed. (0 skipped) (2 failed)
+qaApi36(AVD) - 16 Tests 62/137 completed. (0 skipped) (2 failed)
+qaApi36(AVD) - 16 Tests 63/137 completed. (0 skipped) (2 failed)
+qaApi36(AVD) - 16 Tests 64/137 completed. (0 skipped) (2 failed)
+qaApi36(AVD) - 16 Tests 65/137 completed. (0 skipped) (2 failed)
+qaApi36(AVD) - 16 Tests 66/137 completed. (0 skipped) (2 failed)
+qaApi36(AVD) - 16 Tests 67/137 completed. (0 skipped) (2 failed)
+qaApi36(AVD) - 16 Tests 68/137 completed. (0 skipped) (2 failed)
+qaApi36(AVD) - 16 Tests 69/137 completed. (0 skipped) (2 failed)
+qaApi36(AVD) - 16 Tests 70/137 completed. (0 skipped) (2 failed)
+qaApi36(AVD) - 16 Tests 71/137 completed. (0 skipped) (2 failed)
+qaApi36(AVD) - 16 Tests 72/137 completed. (0 skipped) (2 failed)
+qaApi36(AVD) - 16 Tests 73/137 completed. (0 skipped) (2 failed)
+
+com.qualityalternative.app.VisualQaScreenshotTest > captureSprint22ReadingTimeRemainingRepair[qaApi36(AVD) - 16] [31mFAILED [0m
+	androidx.compose.ui.test.ComposeTimeoutException: Condition still not satisfied after 15000 ms
+	at androidx.compose.ui.test.AndroidComposeUiTestEnvironment$AndroidComposeUiTestImpl.waitUntil(ComposeUiTest.android.kt:809)
+qaApi36(AVD) - 16 Tests 74/137 completed. (0 skipped) (3 failed)
+qaApi36(AVD) - 16 Tests 75/137 completed. (0 skipped) (3 failed)
+qaApi36(AVD) - 16 Tests 76/137 completed. (0 skipped) (3 failed)
+qaApi36(AVD) - 16 Tests 77/137 completed. (0 skipped) (3 failed)
+qaApi36(AVD) - 16 Tests 78/137 completed. (0 skipped) (3 failed)
+qaApi36(AVD) - 16 Tests 79/137 completed. (0 skipped) (3 failed)
+qaApi36(AVD) - 16 Tests 80/137 completed. (0 skipped) (3 failed)
+qaApi36(AVD) - 16 Tests 81/137 completed. (0 skipped) (3 failed)
+qaApi36(AVD) - 16 Tests 83/137 completed. (0 skipped) (3 failed)
+qaApi36(AVD) - 16 Tests 87/137 completed. (0 skipped) (3 failed)
+qaApi36(AVD) - 16 Tests 89/137 completed. (0 skipped) (3 failed)
+qaApi36(AVD) - 16 Tests 90/137 completed. (0 skipped) (3 failed)
+qaApi36(AVD) - 16 Tests 95/137 completed. (0 skipped) (3 failed)
+qaApi36(AVD) - 16 Tests 100/137 completed. (0 skipped) (3 failed)
+qaApi36(AVD) - 16 Tests 103/137 completed. (0 skipped) (3 failed)
+qaApi36(AVD) - 16 Tests 108/137 completed. (0 skipped) (3 failed)
+qaApi36(AVD) - 16 Tests 112/137 completed. (0 skipped) (3 failed)
+qaApi36(AVD) - 16 Tests 117/137 completed. (0 skipped) (3 failed)
+qaApi36(AVD) - 16 Tests 122/137 completed. (0 skipped) (3 failed)
+qaApi36(AVD) - 16 Tests 126/137 completed. (0 skipped) (3 failed)
+qaApi36(AVD) - 16 Tests 131/137 completed. (0 skipped) (3 failed)
+qaApi36(AVD) - 16 Tests 135/137 completed. (0 skipped) (3 failed)
+Tests on qaApi36(AVD) - 16 failed: There was 3 failure(s).
+Finished 137 tests on qaApi36(AVD) - 16
+Execute com.qualityalternative.app.MainActivityTest.readerAnnotationControlsExpandAndReopenAcrossPages: FAILED
+java.lang.AssertionError: java.lang.AssertionError: Assert failed: The component with TestTag = 'reader-annotation-save-0' is not displayed!
+at androidx.compose.ui.test.AssertionsKt.assertIsDisplayed(Assertions.kt:34)
+at com.qualityalternative.app.MainActivityTest.readerAnnotationControlsExpandAndReopenAcrossPages(MainActivityTest.kt:2434)
+
+java.lang.AssertionError: Assert failed: The component with TestTag = 'reader-annotation-save-0' is not displayed!
+at androidx.compose.ui.test.AssertionsKt.assertIsDisplayed(Assertions.kt:34)
+at com.qualityalternative.app.MainActivityTest.readerAnnotationControlsExpandAndReopenAcrossPages(MainActivityTest.kt:2434)
+Execute com.qualityalternative.app.MainActivityTest.annotationDriveSyncSettingsShowsConnectFailureConnectedAndRetryStates: FAILED
+java.lang.AssertionError: java.lang.AssertionError: Failed to perform checkIsDisplayed check: Expected at most 1 node but found 2 nodes that satisfy (Text + InputText + EditableText contains 'Connect' (ignoreCase: false))
+at androidx.compose.ui.test.AndroidAssertions_androidKt.checkIsDisplayed(AndroidAssertions.android.kt:35)
+at androidx.compose.ui.test.AssertionsKt.isDisplayed(Assertions.kt:351)
+at androidx.compose.ui.test.AssertionsKt.assertIsDisplayed(Assertions.kt:33)
+at com.qualityalternative.app.MainActivityTest.annotationDriveSyncSettingsShowsConnectFailureConnectedAndRetryStates(MainActivityTest.kt:2718)
+
+java.lang.AssertionError: Failed to perform checkIsDisplayed check: Expected at most 1 node but found 2 nodes that satisfy (Text + InputText + EditableText contains 'Connect' (ignoreCase: false))
+at androidx.compose.ui.test.AndroidAssertions_androidKt.checkIsDisplayed(AndroidAssertions.android.kt:35)
+at androidx.compose.ui.test.AssertionsKt.isDisplayed(Assertions.kt:351)
+at androidx.compose.ui.test.AssertionsKt.assertIsDisplayed(Assertions.kt:33)
+at com.qualityalternative.app.MainActivityTest.annotationDriveSyncSettingsShowsConnectFailureConnectedAndRetryStates(MainActivityTest.kt:2718)
+Execute com.qualityalternative.app.VisualQaScreenshotTest.captureSprint22ReadingTimeRemainingRepair: FAILED
+androidx.compose.ui.test.ComposeTimeoutException: androidx.compose.ui.test.ComposeTimeoutException: Condition still not satisfied after 15000 ms
+at androidx.compose.ui.test.AndroidComposeUiTestEnvironment$AndroidComposeUiTestImpl.waitUntil(ComposeUiTest.android.kt:809)
+at androidx.compose.ui.test.junit4.AndroidComposeTestRule.waitUntil(AndroidComposeTestRule.android.kt:378)
+at com.qualityalternative.app.VisualQaScreenshotTest.captureSprint22ReadingTimeRemainingRepair(VisualQaScreenshotTest.kt:1371)
+
+androidx.compose.ui.test.ComposeTimeoutException: Condition still not satisfied after 15000 ms
+at androidx.compose.ui.test.AndroidComposeUiTestEnvironment$AndroidComposeUiTestImpl.waitUntil(ComposeUiTest.android.kt:809)
+at androidx.compose.ui.test.junit4.AndroidComposeTestRule.waitUntil(AndroidComposeTestRule.android.kt:378)
+at com.qualityalternative.app.VisualQaScreenshotTest.captureSprint22ReadingTimeRemainingRepair(VisualQaScreenshotTest.kt:1371)
+
+> Task :app:connectedDebugAndroidTest FAILED
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:connectedDebugAndroidTest'.
+> There were failing tests. See the report at: file:///Users/omare/Documents/qualityalternative/app/build/reports/androidTests/connected/debug/index.html
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 52m 55s
+73 actionable tasks: 3 executed, 70 up-to-date

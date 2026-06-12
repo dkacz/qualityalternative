@@ -1,0 +1,37 @@
+## codex/sprint-agent-content-inbox
+ M PRD.md
+ M app/src/androidTest/java/com/qualityalternative/app/VisualQaScreenshotTest.kt
+ M app/src/main/AndroidManifest.xml
+ M app/src/main/java/com/qualityalternative/app/data/AccountLightProfile.kt
+ M app/src/main/java/com/qualityalternative/app/data/AppContainer.kt
+ M app/src/main/java/com/qualityalternative/app/data/PreferencesSettingsRepository.kt
+ M app/src/main/java/com/qualityalternative/app/data/RoomUserDocumentRepository.kt
+ M app/src/main/java/com/qualityalternative/app/data/SupportedCatalog.kt
+ M app/src/main/java/com/qualityalternative/app/domain/model/AnalyticsPrivacyGuard.kt
+ M app/src/main/java/com/qualityalternative/app/domain/model/ContentModels.kt
+ M app/src/main/java/com/qualityalternative/app/domain/model/InterventionModels.kt
+ M app/src/main/java/com/qualityalternative/app/domain/model/UserModels.kt
+ M app/src/main/java/com/qualityalternative/app/domain/service/Contracts.kt
+ M app/src/main/java/com/qualityalternative/app/interception/FixtureTargetRegistry.kt
+ M app/src/main/java/com/qualityalternative/app/interception/InterceptionTargetResolver.kt
+ M app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
+ M app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
+ M app/src/test/java/com/qualityalternative/app/data/AccountLightProfileExporterTest.kt
+ M app/src/test/java/com/qualityalternative/app/data/AccountLightProfileImporterTest.kt
+ M app/src/test/java/com/qualityalternative/app/data/PreferencesSettingsRepositoryTest.kt
+ M app/src/test/java/com/qualityalternative/app/interception/InterceptionTargetResolverTest.kt
+ M app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
+ M docs/LANE_STATUS.md
+?? app/src/debug/
+?? app/src/main/java/com/qualityalternative/app/data/AgentInboxDocumentStore.kt
+?? app/src/main/java/com/qualityalternative/app/data/AgentInboxManifest.kt
+?? app/src/main/java/com/qualityalternative/app/data/AgentInboxPackageImporter.kt
+?? app/src/main/java/com/qualityalternative/app/data/AgentInboxReviewCandidate.kt
+?? app/src/main/java/com/qualityalternative/app/data/AndroidGoogleDriveAgentInboxClient.kt
+?? app/src/main/java/com/qualityalternative/app/domain/service/AgentInboxDrive.kt
+?? app/src/test/java/com/qualityalternative/app/data/AgentInboxManifestValidatorTest.kt
+?? app/src/test/java/com/qualityalternative/app/data/AgentInboxPackageImporterTest.kt
+?? app/src/test/java/com/qualityalternative/app/data/AgentInboxReviewCandidateFactoryTest.kt
+?? app/src/test/java/com/qualityalternative/app/data/AndroidGoogleDriveAgentInboxClientTest.kt
+?? docs/SPRINT_27_AGENT_CONTENT_INBOX.md
+?? evidence/sprint27_agent_content_inbox/

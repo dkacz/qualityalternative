@@ -6,13 +6,21 @@ import androidx.datastore.preferences.core.Preferences
 import com.qualityalternative.app.analytics.InMemoryAnalyticsTracker
 import com.qualityalternative.app.data.AccountLightProfileExporter
 import com.qualityalternative.app.data.CompositeContentRepository
+import com.qualityalternative.app.data.AgentInboxDocumentStore
+import com.qualityalternative.app.data.AgentInboxManifestValidationError
+import com.qualityalternative.app.data.AgentInboxManifestValidator
+import com.qualityalternative.app.data.AgentInboxPackageValidationError
+import com.qualityalternative.app.data.AgentInboxPackageImporter
+import com.qualityalternative.app.data.AgentInboxReviewStatus
 import com.qualityalternative.app.data.InMemoryDelayGate
 import com.qualityalternative.app.data.PreferencesDelayGate
 import com.qualityalternative.app.data.ReadingTimeEstimateSource
 import com.qualityalternative.app.data.ReadingTimeEstimator
+import com.qualityalternative.app.data.StoredAgentInboxDocument
 import com.qualityalternative.app.data.SupportedCatalog
 import com.qualityalternative.app.domain.model.AppSettings
 import com.qualityalternative.app.domain.model.AnalyticsEventType
+import com.qualityalternative.app.domain.model.AnalyticsPrivacyGuard
 import com.qualityalternative.app.domain.model.BEDTIME_OPEN_ANYWAY_UNLOCK_DELAY_MILLIS
 import com.qualityalternative.app.domain.model.ContentAvailability
 import com.qualityalternative.app.domain.model.AppThemeMode
@@ -54,10 +62,21 @@ import com.qualityalternative.app.domain.model.WebsiteRule
 import com.qualityalternative.app.domain.model.WebsiteRuleType
 import com.qualityalternative.app.domain.model.bedtimeWindowIsActive
 import com.qualityalternative.app.domain.model.meditationTimerContentItem
+import com.qualityalternative.app.domain.model.toRemoteAnalyticsPayload
 import com.qualityalternative.app.domain.service.AccountLightProfileAutosaveWriter
 import com.qualityalternative.app.domain.service.AccountLightProfileBackupReader
+import com.qualityalternative.app.domain.service.AddUserDocumentIfFingerprintAbsentResult
 import com.qualityalternative.app.domain.service.AddUserDocumentResult
 import com.qualityalternative.app.domain.service.AddUserLinkResult
+import com.qualityalternative.app.domain.service.AGENT_INBOX_MANIFEST_FILE_NAME
+import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_MANIFEST_BYTES
+import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_REVIEW_CONTENT_BYTES
+import com.qualityalternative.app.domain.service.AgentInboxDriveClient
+import com.qualityalternative.app.domain.service.AgentInboxDriveDownloadTooLargeException
+import com.qualityalternative.app.domain.service.AgentInboxDriveFile
+import com.qualityalternative.app.domain.service.AgentInboxDrivePackage
+import com.qualityalternative.app.domain.service.AgentInboxDriveScanRequest
+import com.qualityalternative.app.domain.service.AgentInboxDriveScanResult
 import com.qualityalternative.app.domain.service.ContentRepository
 import com.qualityalternative.app.domain.service.DefaultRecommendationEngine
 import com.qualityalternative.app.domain.service.DelayGate
@@ -81,6 +100,7 @@ import com.qualityalternative.app.interception.VerifiedBrowserHostAdapter
 import com.qualityalternative.app.interception.WebsiteInterceptionResolver
 import java.io.ByteArrayInputStream
 import java.io.File
+import java.io.IOException
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
@@ -103,6 +123,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -2556,6 +2577,882 @@ class MainViewModelTest {
         assertEquals("USER_DOCUMENT", event.metadata["sourceType"])
         assertEquals("USER_PRIVATE", event.metadata["rightsClass"])
         assertEquals("USER_PRIVATE_READER", event.metadata["renderMode"])
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun scanAgentInboxDriveBuildsReviewCandidatesWithoutAutoAcceptingManifestPriority() = runTest {
+        val contentBytes = "# Agent Note\n\nPrivate attention note.".toByteArray()
+        val driveClient = RecordingAgentInboxDriveClient(
+            scanResult = AgentInboxDriveScanResult(
+                folderId = "agent-inbox-folder",
+                packages = listOf(agentInboxDrivePackage()),
+            ),
+            files = mapOf(
+                "manifest-file" to agentInboxManifest(priority = "high").toByteArray(),
+                "content-file" to contentBytes,
+            ),
+        )
+        val settingsRepository = FakeSettingsRepository()
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val viewModel = createViewModel(
+            settingsRepository = settingsRepository,
+            agentInboxDriveClient = driveClient,
+            analyticsTracker = analyticsTracker,
+        )
+
+        advanceUntilIdle()
+        viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 5_000L)
+        advanceUntilIdle()
+
+        assertEquals("agent-inbox-folder", viewModel.uiState.agentInboxDriveFolderId)
+        assertEquals(5_000L, viewModel.uiState.agentInboxDriveLastSuccessfulAtMillis)
+        assertEquals(null, viewModel.uiState.agentInboxDriveLastError)
+        assertEquals("agent-package", viewModel.uiState.agentInboxCandidates.single().packageFolderId)
+        assertEquals("Agent Note", viewModel.uiState.agentInboxCandidates.single().manifest?.title)
+        assertEquals(emptySet<String>(), viewModel.uiState.agentInboxPriorityAcceptedPackageIds)
+        assertEquals("agent-inbox-folder", settingsRepository.state.value.agentInboxDriveFolderId)
+        assertEquals(listOf("manifest-file", "content-file"), driveClient.downloadedFileIds)
+        assertEquals(
+            listOf(
+                AgentInboxDownloadRequest("manifest-file", AGENT_INBOX_MAX_MANIFEST_BYTES),
+                AgentInboxDownloadRequest("content-file", AGENT_INBOX_MAX_REVIEW_CONTENT_BYTES),
+            ),
+            driveClient.downloadRequests,
+        )
+        assertEquals("drive-token", driveClient.scanRequests.single().accessToken)
+        val scanEvent = analyticsTracker.allEvents().first { event ->
+            event.type == AnalyticsEventType.AGENT_INBOX_SCAN_SUCCEEDED
+        }
+        assertEquals("1", scanEvent.metadata["inboxCandidateCount"])
+        val detectedEvent = analyticsTracker.allEvents().first { event ->
+            event.type == AnalyticsEventType.AGENT_INBOX_CANDIDATE_DETECTED
+        }
+        assertEquals("READY", detectedEvent.metadata["importStatus"])
+        assertTrue(AnalyticsPrivacyGuard.unsafeRemoteFields(scanEvent.toRemoteAnalyticsPayload()).isEmpty())
+        assertTrue(AnalyticsPrivacyGuard.unsafeRemoteFields(detectedEvent.toRemoteAnalyticsPayload()).isEmpty())
+        val remotePayloadText = analyticsTracker.allRemoteSafePayloads().joinToString("\n") { payload ->
+            payload.toString()
+        }
+        assertFalse(remotePayloadText.contains("agent-inbox-folder"))
+        assertFalse(remotePayloadText.contains("manifest-file"))
+        assertFalse(remotePayloadText.contains("content-file"))
+        assertFalse(remotePayloadText.contains("content.md"))
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun importAgentInboxCandidateDownloadsContentAndAppliesAcceptedPriority() = runTest {
+        val contentBytes = "# Agent Note\n\nPrivate attention note.".toByteArray()
+        val driveClient = RecordingAgentInboxDriveClient(
+            scanResult = AgentInboxDriveScanResult(
+                folderId = "agent-inbox-folder",
+                packages = listOf(agentInboxDrivePackage()),
+            ),
+            files = mapOf(
+                "manifest-file" to agentInboxManifest(priority = "high").toByteArray(),
+                "content-file" to contentBytes,
+            ),
+        )
+        val userDocumentRepository = FakeUserDocumentRepository()
+        val settingsRepository = FakeSettingsRepository()
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val documentStore = RecordingAgentInboxDocumentStore()
+        val viewModel = createViewModel(
+            settingsRepository = settingsRepository,
+            userDocumentRepository = userDocumentRepository,
+            agentInboxDriveClient = driveClient,
+            analyticsTracker = analyticsTracker,
+            agentInboxPackageImporter = AgentInboxPackageImporter(
+                userDocumentRepository = userDocumentRepository,
+                documentStore = documentStore,
+            ),
+        )
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+        viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 5_000L)
+        advanceUntilIdle()
+        viewModel.toggleAgentInboxPriority("agent-package")
+        advanceUntilIdle()
+        viewModel.importAgentInboxCandidate(
+            packageFolderId = "agent-package",
+            accessToken = "drive-token",
+            nowMillis = 6_000L,
+        )
+        advanceUntilIdle()
+
+        val saved = userDocumentRepository.documents.value.single()
+        assertEquals("Agent Note", saved.title)
+        assertEquals(setOf(saved.id), viewModel.uiState.priorityContentIds)
+        assertEquals(setOf(saved.id), settingsRepository.state.value.priorityContentIds)
+        assertTrue(viewModel.uiState.agentInboxCandidates.isEmpty())
+        assertTrue(viewModel.uiState.agentInboxPriorityAcceptedPackageIds.isEmpty())
+        assertEquals(listOf("manifest-file", "content-file", "content-file"), driveClient.downloadedFileIds)
+        assertEquals(
+            listOf(
+                AgentInboxDownloadRequest("manifest-file", AGENT_INBOX_MAX_MANIFEST_BYTES),
+                AgentInboxDownloadRequest("content-file", AGENT_INBOX_MAX_REVIEW_CONTENT_BYTES),
+                AgentInboxDownloadRequest("content-file", AGENT_INBOX_MAX_REVIEW_CONTENT_BYTES),
+            ),
+            driveClient.downloadRequests,
+        )
+        assertEquals(contentBytes.toList(), documentStore.writes.single().bytes.toList())
+        val importedEvent = analyticsTracker.allEvents().first { event ->
+            event.type == AnalyticsEventType.AGENT_INBOX_CANDIDATE_IMPORTED
+        }
+        assertEquals(saved.id, importedEvent.contentId)
+        assertEquals("true", importedEvent.metadata["acceptedPriority"])
+        assertTrue(AnalyticsPrivacyGuard.unsafeRemoteFields(importedEvent.toRemoteAnalyticsPayload()).isEmpty())
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun importAgentInboxCandidateDoesNotApplyManifestPriorityUntilUserAcceptsIt() = runTest {
+        val driveClient = RecordingAgentInboxDriveClient(
+            scanResult = AgentInboxDriveScanResult(
+                folderId = "agent-inbox-folder",
+                packages = listOf(agentInboxDrivePackage()),
+            ),
+            files = mapOf(
+                "manifest-file" to agentInboxManifest(priority = "high").toByteArray(),
+                "content-file" to "# Agent Note\n\nPrivate attention note.".toByteArray(),
+            ),
+        )
+        val userDocumentRepository = FakeUserDocumentRepository()
+        val settingsRepository = FakeSettingsRepository()
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val viewModel = createViewModel(
+            settingsRepository = settingsRepository,
+            userDocumentRepository = userDocumentRepository,
+            agentInboxDriveClient = driveClient,
+            analyticsTracker = analyticsTracker,
+            agentInboxPackageImporter = AgentInboxPackageImporter(
+                userDocumentRepository = userDocumentRepository,
+                documentStore = RecordingAgentInboxDocumentStore(),
+            ),
+        )
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+        viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 5_000L)
+        advanceUntilIdle()
+        viewModel.importAgentInboxCandidate(
+            packageFolderId = "agent-package",
+            accessToken = "drive-token",
+            nowMillis = 6_000L,
+        )
+        advanceUntilIdle()
+
+        assertTrue(userDocumentRepository.documents.value.isNotEmpty())
+        assertTrue(viewModel.uiState.priorityContentIds.isEmpty())
+        assertTrue(settingsRepository.state.value.priorityContentIds.isEmpty())
+        val importedEvent = analyticsTracker.allEvents().first { event ->
+            event.type == AnalyticsEventType.AGENT_INBOX_CANDIDATE_IMPORTED
+        }
+        assertEquals("false", importedEvent.metadata["acceptedPriority"])
+        assertEquals("true", importedEvent.metadata["priorityRequested"])
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun importAgentInboxCandidateMarksSameShaScanSiblingDuplicateAfterFirstImport() = runTest {
+        val contentBytes = "# Agent Note\n\nPrivate attention note.".toByteArray()
+        val sha = AgentInboxManifestValidator.sha256(contentBytes)
+        val driveClient = RecordingAgentInboxDriveClient(
+            scanResult = AgentInboxDriveScanResult(
+                folderId = "agent-inbox-folder",
+                packages = listOf(
+                    agentInboxDrivePackage(
+                        folderId = "agent-package-a",
+                        manifestFileId = "manifest-file-a",
+                        contentFileId = "content-file-a",
+                    ),
+                    agentInboxDrivePackage(
+                        folderId = "agent-package-b",
+                        manifestFileId = "manifest-file-b",
+                        contentFileId = "content-file-b",
+                    ),
+                ),
+            ),
+            files = mapOf(
+                "manifest-file-a" to agentInboxManifest(priority = "normal", documentSha256 = sha).toByteArray(),
+                "content-file-a" to contentBytes,
+                "manifest-file-b" to agentInboxManifest(priority = "normal", documentSha256 = sha).toByteArray(),
+                "content-file-b" to contentBytes,
+            ),
+        )
+        val userDocumentRepository = FakeUserDocumentRepository()
+        val viewModel = createViewModel(
+            userDocumentRepository = userDocumentRepository,
+            agentInboxDriveClient = driveClient,
+            agentInboxPackageImporter = AgentInboxPackageImporter(
+                userDocumentRepository = userDocumentRepository,
+                documentStore = RecordingAgentInboxDocumentStore(),
+            ),
+        )
+
+        advanceUntilIdle()
+        viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 5_000L)
+        advanceUntilIdle()
+        assertEquals(
+            listOf(AgentInboxReviewStatus.READY, AgentInboxReviewStatus.READY),
+            viewModel.uiState.agentInboxCandidates.map { candidate -> candidate.status },
+        )
+
+        viewModel.importAgentInboxCandidate(
+            packageFolderId = "agent-package-a",
+            accessToken = "drive-token",
+            nowMillis = 6_000L,
+        )
+        advanceUntilIdle()
+
+        val saved = userDocumentRepository.documents.value.single()
+        val remaining = viewModel.uiState.agentInboxCandidates.single()
+        assertEquals("agent-package-b", remaining.packageFolderId)
+        assertEquals(AgentInboxReviewStatus.DUPLICATE, remaining.status)
+        assertEquals(saved.id, remaining.duplicateContentId)
+        assertFalse(remaining.canImport)
+        assertTrue(viewModel.uiState.agentInboxPriorityAcceptedPackageIds.isEmpty())
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun importAgentInboxCandidateMarksTargetDuplicateWhenAtomicAddFindsDuplicate() = runTest {
+        val contentBytes = "# Agent Note\n\nPrivate attention note.".toByteArray()
+        val sha = AgentInboxManifestValidator.sha256(contentBytes)
+        val existingDocument = savedUserDocument(ContentFormat.MARKDOWN).copy(
+            id = "existing-private-document",
+            documentFingerprintSha256 = sha,
+            documentFingerprintSizeBytes = contentBytes.size.toLong(),
+        )
+        val driveClient = RecordingAgentInboxDriveClient(
+            scanResult = AgentInboxDriveScanResult(
+                folderId = "agent-inbox-folder",
+                packages = listOf(agentInboxDrivePackage()),
+            ),
+            files = mapOf(
+                "manifest-file" to agentInboxManifest(priority = "normal", documentSha256 = sha).toByteArray(),
+                "content-file" to contentBytes,
+            ),
+        )
+        val userDocumentRepository = FakeUserDocumentRepository(
+            duplicateOnAtomicAddDocuments = mapOf(sha to existingDocument),
+        )
+        val viewModel = createViewModel(
+            userDocumentRepository = userDocumentRepository,
+            agentInboxDriveClient = driveClient,
+            agentInboxPackageImporter = AgentInboxPackageImporter(
+                userDocumentRepository = userDocumentRepository,
+                documentStore = RecordingAgentInboxDocumentStore(),
+            ),
+        )
+
+        advanceUntilIdle()
+        viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 5_000L)
+        advanceUntilIdle()
+        assertEquals(AgentInboxReviewStatus.READY, viewModel.uiState.agentInboxCandidates.single().status)
+
+        viewModel.importAgentInboxCandidate(
+            packageFolderId = "agent-package",
+            accessToken = "drive-token",
+            nowMillis = 6_000L,
+        )
+        advanceUntilIdle()
+
+        val candidate = viewModel.uiState.agentInboxCandidates.single()
+        assertEquals(AgentInboxReviewStatus.DUPLICATE, candidate.status)
+        assertEquals("existing-private-document", candidate.duplicateContentId)
+        assertFalse(candidate.canImport)
+        assertTrue(userDocumentRepository.addedDrafts.isEmpty())
+        assertEquals("Agent Inbox package is already in your library.", viewModel.uiState.latestMessage)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun rejectAgentInboxCandidateRemovesReviewItemAndRecordsAnalytics() = runTest {
+        val driveClient = RecordingAgentInboxDriveClient(
+            scanResult = AgentInboxDriveScanResult(
+                folderId = "agent-inbox-folder",
+                packages = listOf(agentInboxDrivePackage()),
+            ),
+            files = mapOf(
+                "manifest-file" to agentInboxManifest(priority = "high").toByteArray(),
+                "content-file" to "# Agent Note\n\nPrivate attention note.".toByteArray(),
+            ),
+        )
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val viewModel = createViewModel(
+            agentInboxDriveClient = driveClient,
+            analyticsTracker = analyticsTracker,
+        )
+
+        advanceUntilIdle()
+        viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 5_000L)
+        advanceUntilIdle()
+        viewModel.toggleAgentInboxPriority("agent-package")
+        advanceUntilIdle()
+        viewModel.rejectAgentInboxCandidate(packageFolderId = "agent-package", nowMillis = 6_000L)
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.agentInboxCandidates.isEmpty())
+        assertTrue(viewModel.uiState.agentInboxPriorityAcceptedPackageIds.isEmpty())
+        assertEquals("Removed Agent Inbox package from review.", viewModel.uiState.latestMessage)
+        val rejectedEvent = analyticsTracker.allEvents().first { event ->
+            event.type == AnalyticsEventType.AGENT_INBOX_CANDIDATE_REJECTED
+        }
+        assertEquals("READY", rejectedEvent.metadata["importStatus"])
+        assertEquals("true", rejectedEvent.metadata["priorityRequested"])
+        assertEquals("rejected", rejectedEvent.metadata["reviewAction"])
+        assertTrue(AnalyticsPrivacyGuard.unsafeRemoteFields(rejectedEvent.toRemoteAnalyticsPayload()).isEmpty())
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun importAgentInboxCandidateRejectsContentChangedAfterReviewWhenManifestOmitsSha() = runTest {
+        val driveFiles = mutableMapOf(
+            "manifest-file" to agentInboxManifest(priority = "high").toByteArray(),
+            "content-file" to "# Reviewed\n\nOriginal private note.".toByteArray(),
+        )
+        val driveClient = RecordingAgentInboxDriveClient(
+            scanResult = AgentInboxDriveScanResult(
+                folderId = "agent-inbox-folder",
+                packages = listOf(agentInboxDrivePackage()),
+            ),
+            files = driveFiles,
+        )
+        val userDocumentRepository = FakeUserDocumentRepository()
+        val viewModel = createViewModel(
+            userDocumentRepository = userDocumentRepository,
+            agentInboxDriveClient = driveClient,
+            agentInboxPackageImporter = AgentInboxPackageImporter(
+                userDocumentRepository = userDocumentRepository,
+                documentStore = RecordingAgentInboxDocumentStore(),
+            ),
+        )
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+        viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 5_000L)
+        advanceUntilIdle()
+        viewModel.toggleAgentInboxPriority("agent-package")
+        advanceUntilIdle()
+        driveFiles["content-file"] = "# Changed\n\nDifferent private note.".toByteArray()
+        viewModel.importAgentInboxCandidate(
+            packageFolderId = "agent-package",
+            accessToken = "drive-token",
+            nowMillis = 6_000L,
+        )
+        advanceUntilIdle()
+
+        assertTrue(userDocumentRepository.documents.value.isEmpty())
+        assertEquals("Agent Inbox package changed. Scan again before importing.", viewModel.uiState.latestMessage)
+        assertTrue(viewModel.uiState.agentInboxPriorityAcceptedPackageIds.isEmpty())
+        val candidate = viewModel.uiState.agentInboxCandidates.single()
+        assertEquals(AgentInboxReviewStatus.INVALID, candidate.status)
+        assertFalse(candidate.canImport)
+        assertNull(candidate.reviewedContentSha256)
+        assertNull(candidate.reviewedContentSizeBytes)
+        assertEquals(setOf(AgentInboxPackageValidationError.CONTENT_CHANGED_AFTER_REVIEW), candidate.packageErrors)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun importAgentInboxCandidateMarksRowInvalidWhenContentBecomesTooLargeAtImport() = runTest {
+        val driveFiles = mutableMapOf(
+            "manifest-file" to agentInboxManifest(priority = "normal").toByteArray(),
+            "content-file" to "# Reviewed\n\nOriginal private note.".toByteArray(),
+        )
+        val driveClient = RecordingAgentInboxDriveClient(
+            scanResult = AgentInboxDriveScanResult(
+                folderId = "agent-inbox-folder",
+                packages = listOf(agentInboxDrivePackage()),
+            ),
+            files = driveFiles,
+        )
+        val userDocumentRepository = FakeUserDocumentRepository()
+        val viewModel = createViewModel(
+            userDocumentRepository = userDocumentRepository,
+            agentInboxDriveClient = driveClient,
+            agentInboxPackageImporter = AgentInboxPackageImporter(
+                userDocumentRepository = userDocumentRepository,
+                documentStore = RecordingAgentInboxDocumentStore(),
+            ),
+        )
+
+        advanceUntilIdle()
+        viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 5_000L)
+        advanceUntilIdle()
+        driveFiles["content-file"] = ByteArray(AGENT_INBOX_MAX_REVIEW_CONTENT_BYTES.toInt() + 1)
+        viewModel.importAgentInboxCandidate(
+            packageFolderId = "agent-package",
+            accessToken = "drive-token",
+            nowMillis = 6_000L,
+        )
+        advanceUntilIdle()
+
+        val candidate = viewModel.uiState.agentInboxCandidates.single()
+        assertEquals(AgentInboxReviewStatus.INVALID, candidate.status)
+        assertFalse(candidate.canImport)
+        assertNull(candidate.reviewedContentSha256)
+        assertNull(candidate.reviewedContentSizeBytes)
+        assertEquals(setOf(AgentInboxPackageValidationError.CONTENT_FILE_TOO_LARGE), candidate.packageErrors)
+        assertTrue(userDocumentRepository.documents.value.isEmpty())
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun importAgentInboxCandidateMarksRowInvalidWhenImportDownloadFails() = runTest {
+        val downloadFailures = mutableMapOf<String, Throwable>()
+        val driveClient = RecordingAgentInboxDriveClient(
+            scanResult = AgentInboxDriveScanResult(
+                folderId = "agent-inbox-folder",
+                packages = listOf(agentInboxDrivePackage()),
+            ),
+            files = mapOf(
+                "manifest-file" to agentInboxManifest(priority = "normal").toByteArray(),
+                "content-file" to "# Reviewed\n\nOriginal private note.".toByteArray(),
+            ),
+            downloadFailures = downloadFailures,
+        )
+        val userDocumentRepository = FakeUserDocumentRepository()
+        val viewModel = createViewModel(
+            userDocumentRepository = userDocumentRepository,
+            agentInboxDriveClient = driveClient,
+            agentInboxPackageImporter = AgentInboxPackageImporter(
+                userDocumentRepository = userDocumentRepository,
+                documentStore = RecordingAgentInboxDocumentStore(),
+            ),
+        )
+
+        advanceUntilIdle()
+        viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 5_000L)
+        advanceUntilIdle()
+        downloadFailures["content-file"] = IllegalStateException("download failed")
+        viewModel.importAgentInboxCandidate(
+            packageFolderId = "agent-package",
+            accessToken = "drive-token",
+            nowMillis = 6_000L,
+        )
+        advanceUntilIdle()
+
+        val candidate = viewModel.uiState.agentInboxCandidates.single()
+        assertEquals(AgentInboxReviewStatus.INVALID, candidate.status)
+        assertFalse(candidate.canImport)
+        assertNull(candidate.reviewedContentSha256)
+        assertNull(candidate.reviewedContentSizeBytes)
+        assertEquals(setOf(AgentInboxPackageValidationError.DOWNLOAD_UNAVAILABLE), candidate.packageErrors)
+        assertTrue(userDocumentRepository.documents.value.isEmpty())
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun importAgentInboxCandidateMarksRowInvalidWhenRepositoryRejectsSave() = runTest {
+        val driveClient = RecordingAgentInboxDriveClient(
+            scanResult = AgentInboxDriveScanResult(
+                folderId = "agent-inbox-folder",
+                packages = listOf(agentInboxDrivePackage()),
+            ),
+            files = mapOf(
+                "manifest-file" to agentInboxManifest(priority = "normal").toByteArray(),
+                "content-file" to "# Reviewed\n\nOriginal private note.".toByteArray(),
+            ),
+        )
+        val userDocumentRepository = FakeUserDocumentRepository(
+            addResult = AddUserDocumentResult.Rejected(setOf(UserDocumentValidationError.NO_TOPICS)),
+        )
+        val viewModel = createViewModel(
+            userDocumentRepository = userDocumentRepository,
+            agentInboxDriveClient = driveClient,
+            agentInboxPackageImporter = AgentInboxPackageImporter(
+                userDocumentRepository = userDocumentRepository,
+                documentStore = RecordingAgentInboxDocumentStore(),
+            ),
+        )
+
+        advanceUntilIdle()
+        viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 5_000L)
+        advanceUntilIdle()
+        viewModel.importAgentInboxCandidate(
+            packageFolderId = "agent-package",
+            accessToken = "drive-token",
+            nowMillis = 6_000L,
+        )
+        advanceUntilIdle()
+
+        val candidate = viewModel.uiState.agentInboxCandidates.single()
+        assertEquals(AgentInboxReviewStatus.INVALID, candidate.status)
+        assertFalse(candidate.canImport)
+        assertNull(candidate.reviewedContentSha256)
+        assertNull(candidate.reviewedContentSizeBytes)
+        assertEquals(setOf(AgentInboxPackageValidationError.LOCAL_IMPORT_REJECTED), candidate.packageErrors)
+        assertTrue(userDocumentRepository.documents.value.isEmpty())
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun scanAgentInboxDriveMarksActualContentShaDuplicateAtReviewTime() = runTest {
+        val contentBytes = "# Agent Note\n\nPrivate attention note.".toByteArray()
+        val sha = AgentInboxManifestValidator.sha256(contentBytes)
+        val existingDocument = savedUserDocument(ContentFormat.MARKDOWN).copy(
+            id = "existing-private-document",
+            documentFingerprintSha256 = sha,
+            documentFingerprintSizeBytes = contentBytes.size.toLong(),
+        )
+        val driveClient = RecordingAgentInboxDriveClient(
+            scanResult = AgentInboxDriveScanResult(
+                folderId = "agent-inbox-folder",
+                packages = listOf(agentInboxDrivePackage()),
+            ),
+            files = mapOf(
+                "manifest-file" to agentInboxManifest(priority = "normal").toByteArray(),
+                "content-file" to contentBytes,
+            ),
+        )
+        val viewModel = createViewModel(
+            userDocumentRepository = FakeUserDocumentRepository(initialDocuments = listOf(existingDocument)),
+            agentInboxDriveClient = driveClient,
+        )
+
+        advanceUntilIdle()
+        viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 5_000L)
+        advanceUntilIdle()
+
+        val candidate = viewModel.uiState.agentInboxCandidates.single()
+        assertEquals(AgentInboxReviewStatus.DUPLICATE, candidate.status)
+        assertEquals("existing-private-document", candidate.duplicateContentId)
+        assertFalse(candidate.canImport)
+        assertEquals(listOf("manifest-file", "content-file"), driveClient.downloadedFileIds)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun scanAgentInboxDriveDoesNotMarkDuplicateFromManifestShaBeforeHashingActualContent() = runTest {
+        val existingBytes = "# Existing\n\nAlready imported.".toByteArray()
+        val existingSha = AgentInboxManifestValidator.sha256(existingBytes)
+        val differentContentBytes = "# Different\n\nThis package is not the existing document.".toByteArray()
+        val existingDocument = savedUserDocument(ContentFormat.MARKDOWN).copy(
+            id = "existing-private-document",
+            documentFingerprintSha256 = existingSha,
+            documentFingerprintSizeBytes = existingBytes.size.toLong(),
+        )
+        val driveClient = RecordingAgentInboxDriveClient(
+            scanResult = AgentInboxDriveScanResult(
+                folderId = "agent-inbox-folder",
+                packages = listOf(agentInboxDrivePackage()),
+            ),
+            files = mapOf(
+                "manifest-file" to agentInboxManifest(
+                    priority = "normal",
+                    documentSha256 = existingSha,
+                ).toByteArray(),
+                "content-file" to differentContentBytes,
+            ),
+        )
+        val viewModel = createViewModel(
+            userDocumentRepository = FakeUserDocumentRepository(initialDocuments = listOf(existingDocument)),
+            agentInboxDriveClient = driveClient,
+        )
+
+        advanceUntilIdle()
+        viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 5_000L)
+        advanceUntilIdle()
+
+        val candidate = viewModel.uiState.agentInboxCandidates.single()
+        assertEquals(AgentInboxReviewStatus.INVALID, candidate.status)
+        assertEquals(setOf(AgentInboxManifestValidationError.DOCUMENT_SHA256_MISMATCH), candidate.manifestErrors)
+        assertEquals(null, candidate.duplicateContentId)
+        assertEquals(listOf("manifest-file", "content-file"), driveClient.downloadedFileIds)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun scanAgentInboxDriveShowsManifestShaMismatchAtReviewTime() = runTest {
+        val contentBytes = "# Agent Note\n\nPrivate attention note.".toByteArray()
+        val wrongSha = "1".repeat(64)
+        val driveClient = RecordingAgentInboxDriveClient(
+            scanResult = AgentInboxDriveScanResult(
+                folderId = "agent-inbox-folder",
+                packages = listOf(agentInboxDrivePackage()),
+            ),
+            files = mapOf(
+                "manifest-file" to agentInboxManifest(
+                    priority = "normal",
+                    documentSha256 = wrongSha,
+                ).toByteArray(),
+                "content-file" to contentBytes,
+            ),
+        )
+        val viewModel = createViewModel(agentInboxDriveClient = driveClient)
+
+        advanceUntilIdle()
+        viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 5_000L)
+        advanceUntilIdle()
+
+        val candidate = viewModel.uiState.agentInboxCandidates.single()
+        assertEquals(AgentInboxReviewStatus.INVALID, candidate.status)
+        assertEquals(setOf(AgentInboxManifestValidationError.DOCUMENT_SHA256_MISMATCH), candidate.manifestErrors)
+        assertFalse(candidate.canImport)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun scanAgentInboxDriveRejectsOversizedManifestBeforeDownload() = runTest {
+        val driveClient = RecordingAgentInboxDriveClient(
+            scanResult = AgentInboxDriveScanResult(
+                folderId = "agent-inbox-folder",
+                packages = listOf(
+                    agentInboxDrivePackage(manifestSizeBytes = AGENT_INBOX_MAX_MANIFEST_BYTES + 1),
+                ),
+            ),
+            files = mapOf("manifest-file" to ByteArray(0)),
+        )
+        val viewModel = createViewModel(agentInboxDriveClient = driveClient)
+
+        advanceUntilIdle()
+        viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 5_000L)
+        advanceUntilIdle()
+
+        val candidate = viewModel.uiState.agentInboxCandidates.single()
+        assertEquals(AgentInboxReviewStatus.INVALID, candidate.status)
+        assertEquals(setOf(AgentInboxPackageValidationError.MANIFEST_FILE_TOO_LARGE), candidate.packageErrors)
+        assertTrue(driveClient.downloadedFileIds.isEmpty())
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun scanAgentInboxDriveRejectsOversizedManifestAfterDownload() = runTest {
+        val driveClient = RecordingAgentInboxDriveClient(
+            scanResult = AgentInboxDriveScanResult(
+                folderId = "agent-inbox-folder",
+                packages = listOf(agentInboxDrivePackage()),
+            ),
+            files = mapOf("manifest-file" to ByteArray(AGENT_INBOX_MAX_MANIFEST_BYTES.toInt() + 1)),
+        )
+        val viewModel = createViewModel(agentInboxDriveClient = driveClient)
+
+        advanceUntilIdle()
+        viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 5_000L)
+        advanceUntilIdle()
+
+        val candidate = viewModel.uiState.agentInboxCandidates.single()
+        assertEquals(AgentInboxReviewStatus.INVALID, candidate.status)
+        assertEquals(setOf(AgentInboxPackageValidationError.MANIFEST_FILE_TOO_LARGE), candidate.packageErrors)
+        assertEquals(listOf("manifest-file"), driveClient.downloadedFileIds)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun scanAgentInboxDriveRejectsOversizedContentThroughBoundedDownload() = runTest {
+        val driveClient = RecordingAgentInboxDriveClient(
+            scanResult = AgentInboxDriveScanResult(
+                folderId = "agent-inbox-folder",
+                packages = listOf(agentInboxDrivePackage(contentSizeBytes = null)),
+            ),
+            files = mapOf(
+                "manifest-file" to agentInboxManifest(priority = "normal").toByteArray(),
+                "content-file" to ByteArray(AGENT_INBOX_MAX_REVIEW_CONTENT_BYTES.toInt() + 1),
+            ),
+        )
+        val viewModel = createViewModel(agentInboxDriveClient = driveClient)
+
+        advanceUntilIdle()
+        viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 5_000L)
+        advanceUntilIdle()
+
+        val candidate = viewModel.uiState.agentInboxCandidates.single()
+        assertEquals(AgentInboxReviewStatus.INVALID, candidate.status)
+        assertEquals(setOf(AgentInboxPackageValidationError.CONTENT_FILE_TOO_LARGE), candidate.packageErrors)
+        assertEquals(listOf("manifest-file", "content-file"), driveClient.downloadedFileIds)
+        assertEquals(
+            AgentInboxDownloadRequest("content-file", AGENT_INBOX_MAX_REVIEW_CONTENT_BYTES),
+            driveClient.downloadRequests.last(),
+        )
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun scanAgentInboxDriveKeepsOtherPackagesWhenManifestDownloadFails() = runTest {
+        val goodBytes = "# Agent Note\n\nPrivate attention note.".toByteArray()
+        val driveClient = RecordingAgentInboxDriveClient(
+            scanResult = AgentInboxDriveScanResult(
+                folderId = "agent-inbox-folder",
+                packages = listOf(
+                    agentInboxDrivePackage(
+                        folderId = "bad-package",
+                        folderName = "Bad package",
+                        manifestFileId = "bad-manifest-file",
+                        contentFileId = "bad-content-file",
+                    ),
+                    agentInboxDrivePackage(
+                        folderId = "good-package",
+                        folderName = "Good package",
+                        manifestFileId = "good-manifest-file",
+                        contentFileId = "good-content-file",
+                    ),
+                ),
+            ),
+            files = mapOf(
+                "good-manifest-file" to agentInboxManifest(priority = "normal").toByteArray(),
+                "good-content-file" to goodBytes,
+            ),
+            downloadFailures = mapOf("bad-manifest-file" to IOException("HTTP 403")),
+        )
+        val viewModel = createViewModel(agentInboxDriveClient = driveClient)
+
+        advanceUntilIdle()
+        viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 5_000L)
+        advanceUntilIdle()
+
+        val candidates = viewModel.uiState.agentInboxCandidates.associateBy { candidate -> candidate.packageFolderId }
+        assertEquals(2, candidates.size)
+        assertEquals(AgentInboxReviewStatus.INVALID, candidates.getValue("bad-package").status)
+        assertEquals(
+            setOf(AgentInboxPackageValidationError.DOWNLOAD_UNAVAILABLE),
+            candidates.getValue("bad-package").packageErrors,
+        )
+        assertEquals(AgentInboxReviewStatus.READY, candidates.getValue("good-package").status)
+        assertEquals(null, viewModel.uiState.agentInboxDriveLastError)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun scanAgentInboxDriveMarksPackageInvalidWhenContentDownloadFails() = runTest {
+        val driveClient = RecordingAgentInboxDriveClient(
+            scanResult = AgentInboxDriveScanResult(
+                folderId = "agent-inbox-folder",
+                packages = listOf(agentInboxDrivePackage()),
+            ),
+            files = mapOf("manifest-file" to agentInboxManifest(priority = "normal").toByteArray()),
+            downloadFailures = mapOf("content-file" to IOException("HTTP 404")),
+        )
+        val viewModel = createViewModel(agentInboxDriveClient = driveClient)
+
+        advanceUntilIdle()
+        viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 5_000L)
+        advanceUntilIdle()
+
+        val candidate = viewModel.uiState.agentInboxCandidates.single()
+        assertEquals(AgentInboxReviewStatus.INVALID, candidate.status)
+        assertEquals(setOf(AgentInboxPackageValidationError.DOWNLOAD_UNAVAILABLE), candidate.packageErrors)
+        assertEquals(null, viewModel.uiState.agentInboxDriveLastError)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun scanAgentInboxDriveWaitsForUserDocumentRepositoryReadiness() = runTest {
+        val driveClient = RecordingAgentInboxDriveClient(
+            scanResult = AgentInboxDriveScanResult(
+                folderId = "agent-inbox-folder",
+                packages = listOf(agentInboxDrivePackage()),
+            ),
+        )
+        val userDocumentRepository = FakeUserDocumentRepository(isReady = false)
+        val viewModel = createViewModel(
+            userDocumentRepository = userDocumentRepository,
+            agentInboxDriveClient = driveClient,
+        )
+
+        advanceUntilIdle()
+        viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 5_000L)
+        advanceUntilIdle()
+
+        assertTrue(driveClient.scanRequests.isEmpty())
+        assertEquals("Agent Inbox is waiting for your library to finish loading.", viewModel.uiState.latestMessage)
+
+        userDocumentRepository.setReady(true)
+        advanceUntilIdle()
+        viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 6_000L)
+        advanceUntilIdle()
+
+        assertEquals(1, driveClient.scanRequests.size)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun scanAgentInboxDriveFlagsTruncatedResultsWhenDriveHasMorePackages() = runTest {
+        val driveClient = RecordingAgentInboxDriveClient(
+            scanResult = AgentInboxDriveScanResult(
+                folderId = "agent-inbox-folder",
+                packages = listOf(agentInboxDrivePackage()),
+                hasMorePackages = true,
+            ),
+            files = mapOf(
+                "manifest-file" to agentInboxManifest(priority = "normal").toByteArray(),
+                "content-file" to "# Agent Note\n\nPrivate attention note.".toByteArray(),
+            ),
+        )
+        val viewModel = createViewModel(agentInboxDriveClient = driveClient)
+
+        advanceUntilIdle()
+        viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 5_000L)
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.agentInboxScanTruncated)
+        assertTrue(viewModel.uiState.latestMessage.orEmpty().contains("more items were left unshown"))
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun scanAgentInboxDriveRejectsPackageWhenPackageFileListingWasTruncated() = runTest {
+        val driveClient = RecordingAgentInboxDriveClient(
+            scanResult = AgentInboxDriveScanResult(
+                folderId = "agent-inbox-folder",
+                packages = listOf(agentInboxDrivePackage(hasMoreFiles = true)),
+            ),
+            files = mapOf("manifest-file" to agentInboxManifest(priority = "normal").toByteArray()),
+        )
+        val viewModel = createViewModel(agentInboxDriveClient = driveClient)
+
+        advanceUntilIdle()
+        viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 5_000L)
+        advanceUntilIdle()
+
+        val candidate = viewModel.uiState.agentInboxCandidates.single()
+        assertEquals(AgentInboxReviewStatus.INVALID, candidate.status)
+        assertEquals(setOf(AgentInboxPackageValidationError.TOO_MANY_FILES), candidate.packageErrors)
+        assertTrue(viewModel.uiState.agentInboxScanTruncated)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun disconnectAgentInboxDriveClearsConnectionCandidatesAndRecordsEvent() = runTest {
+        val driveClient = RecordingAgentInboxDriveClient(
+            scanResult = AgentInboxDriveScanResult(
+                folderId = "agent-inbox-folder",
+                packages = listOf(agentInboxDrivePackage()),
+            ),
+            files = mapOf(
+                "manifest-file" to agentInboxManifest(priority = "normal").toByteArray(),
+                "content-file" to "# Agent Note\n\nPrivate attention note.".toByteArray(),
+            ),
+        )
+        val settingsRepository = FakeSettingsRepository()
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val viewModel = createViewModel(
+            settingsRepository = settingsRepository,
+            agentInboxDriveClient = driveClient,
+            analyticsTracker = analyticsTracker,
+        )
+
+        advanceUntilIdle()
+        viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 5_000L)
+        advanceUntilIdle()
+        viewModel.disconnectAgentInboxDrive(nowMillis = 6_000L)
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.agentInboxDriveEnabled)
+        assertEquals(null, viewModel.uiState.agentInboxDriveFolderId)
+        assertTrue(viewModel.uiState.agentInboxCandidates.isEmpty())
+        assertTrue(viewModel.uiState.agentInboxPriorityAcceptedPackageIds.isEmpty())
+        assertFalse(settingsRepository.state.value.agentInboxDriveEnabled)
+        val disconnectedEvent = analyticsTracker.allEvents().first { event ->
+            event.type == AnalyticsEventType.AGENT_INBOX_DISCONNECTED
+        }
+        assertEquals(6_000L, disconnectedEvent.timestampMillis)
     }
 
     @Test
@@ -5529,6 +6426,11 @@ class MainViewModelTest {
         readingAnnotationExportWriter: ReadingAnnotationExportWriter = RecordingReadingAnnotationExportWriter(),
         readingAnnotationDriveSyncClient: ReadingAnnotationDriveSyncClient = RecordingReadingAnnotationDriveSyncClient(),
         readingAnnotationDriveTokenProvider: ReadingAnnotationDriveTokenProvider = FailingReadingAnnotationDriveTokenProvider(),
+        agentInboxDriveClient: AgentInboxDriveClient = RecordingAgentInboxDriveClient(),
+        agentInboxPackageImporter: AgentInboxPackageImporter = AgentInboxPackageImporter(
+            userDocumentRepository = userDocumentRepository,
+            documentStore = RecordingAgentInboxDocumentStore(),
+        ),
         accountLightProfileAutosaveWriter: AccountLightProfileAutosaveWriter = RecordingAccountLightProfileAutosaveWriter(),
         accountLightProfileBackupReader: AccountLightProfileBackupReader =
             accountLightProfileAutosaveWriter as? AccountLightProfileBackupReader ?: EmptyAccountLightProfileBackupReader,
@@ -5556,6 +6458,8 @@ class MainViewModelTest {
                 readingAnnotationExportWriter = readingAnnotationExportWriter,
                 readingAnnotationDriveSyncClient = readingAnnotationDriveSyncClient,
                 readingAnnotationDriveTokenProvider = readingAnnotationDriveTokenProvider,
+                agentInboxDriveClient = agentInboxDriveClient,
+                agentInboxPackageImporter = agentInboxPackageImporter,
                 accountLightProfileAutosaveWriter = accountLightProfileAutosaveWriter,
                 accountLightProfileBackupReader = accountLightProfileBackupReader,
                 defaultAnnotationExportUri = defaultAnnotationExportUri,
@@ -5622,6 +6526,10 @@ class MainViewModelTest {
                 annotationDriveFolderId = state.value.annotationDriveFolderId,
                 annotationDriveLastSuccessfulAtMillis = state.value.annotationDriveLastSuccessfulAtMillis,
                 annotationDriveLastError = state.value.annotationDriveLastError,
+                agentInboxDriveEnabled = state.value.agentInboxDriveEnabled,
+                agentInboxDriveFolderId = state.value.agentInboxDriveFolderId,
+                agentInboxDriveLastSuccessfulAtMillis = state.value.agentInboxDriveLastSuccessfulAtMillis,
+                agentInboxDriveLastError = state.value.agentInboxDriveLastError,
                 profileAutosaveUri = state.value.profileAutosaveUri,
                 profileAutosaveDisplayName = state.value.profileAutosaveDisplayName,
                 profileAutosaveLastSuccessfulAtMillis = state.value.profileAutosaveLastSuccessfulAtMillis,
@@ -5716,6 +6624,36 @@ class MainViewModelTest {
 
         override suspend fun saveWebsiteRules(rules: List<WebsiteRule>) {
             state.value = state.value.copy(websiteRules = rules)
+        }
+
+        override suspend fun saveAgentInboxDriveConnection(folderId: String?) {
+            state.value = state.value.copy(
+                agentInboxDriveEnabled = true,
+                agentInboxDriveFolderId = folderId?.takeIf(String::isNotBlank),
+                agentInboxDriveLastError = null,
+            )
+        }
+
+        override suspend fun clearAgentInboxDriveConnection() {
+            state.value = state.value.copy(
+                agentInboxDriveEnabled = false,
+                agentInboxDriveFolderId = null,
+                agentInboxDriveLastSuccessfulAtMillis = null,
+                agentInboxDriveLastError = null,
+            )
+        }
+
+        override suspend fun saveAgentInboxDriveScanSuccess(timestampMillis: Long, folderId: String) {
+            state.value = state.value.copy(
+                agentInboxDriveEnabled = true,
+                agentInboxDriveFolderId = folderId,
+                agentInboxDriveLastSuccessfulAtMillis = timestampMillis,
+                agentInboxDriveLastError = null,
+            )
+        }
+
+        override suspend fun saveAgentInboxDriveScanFailure(errorMessage: String) {
+            state.value = state.value.copy(agentInboxDriveLastError = errorMessage)
         }
 
         override suspend fun saveAnnotationExportDestination(uri: String, displayName: String) {
@@ -6451,8 +7389,13 @@ class MainViewModelTest {
     private class FakeUserDocumentRepository(
         initialDocuments: List<ContentItem> = emptyList(),
         private val throwOnAdd: Boolean = false,
+        private val addResult: AddUserDocumentResult? = null,
+        isReady: Boolean = true,
+        private val fingerprintLookupDocuments: Map<String, ContentItem> = emptyMap(),
+        private val duplicateOnAtomicAddDocuments: Map<String, ContentItem> = emptyMap(),
     ) : UserDocumentRepository {
         val documents = MutableStateFlow(initialDocuments)
+        private val ready = MutableStateFlow(isReady)
         val markedUnavailableIds = mutableListOf<String>()
         val deletedIds = mutableListOf<String>()
         val addedDrafts = mutableListOf<UserDocumentDraft>()
@@ -6463,6 +7406,19 @@ class MainViewModelTest {
 
         override fun observeUserDocuments(): Flow<List<ContentItem>> = documents.asStateFlow()
 
+        override fun isReady(): Boolean = ready.value
+
+        override fun observeReady(): Flow<Boolean> = ready.asStateFlow()
+
+        fun setReady(value: Boolean) {
+            ready.value = value
+        }
+
+        override suspend fun findDocumentByFingerprintSha256(sha256: String): ContentItem? {
+            return fingerprintLookupDocuments[sha256]
+                ?: documents.value.firstOrNull { item -> item.documentFingerprintSha256 == sha256 }
+        }
+
         override suspend fun addDocument(
             draft: UserDocumentDraft,
             nowMillis: Long,
@@ -6471,6 +7427,7 @@ class MainViewModelTest {
                 error("Simulated local persistence failure")
             }
             addedDrafts += draft
+            addResult?.let { return it }
             val item = ContentItem(
                 id = "user-document-00000000-0000-4000-8000-${(++nextId).toString().padStart(12, '0')}",
                 packId = "user-documents",
@@ -6483,9 +7440,36 @@ class MainViewModelTest {
                 sourceType = ContentSourceType.USER_DOCUMENT,
                 availability = ContentAvailability.AVAILABLE,
                 rights = ContentRightsMetadata.userPrivateReader(sourceUrl = draft.uri),
+                documentFingerprintSha256 = draft.documentFingerprintSha256,
+                documentFingerprintSizeBytes = draft.documentFingerprintSizeBytes,
             )
             documents.value = documents.value + item
             return AddUserDocumentResult.Added(item)
+        }
+
+        override suspend fun addDocumentIfFingerprintAbsent(
+            draft: UserDocumentDraft,
+            fingerprintSha256: String,
+            nowMillis: Long,
+        ): AddUserDocumentIfFingerprintAbsentResult {
+            duplicateOnAtomicAddDocuments[fingerprintSha256]?.let { duplicate ->
+                return AddUserDocumentIfFingerprintAbsentResult.Duplicate(duplicate)
+            }
+            findDocumentByFingerprintSha256(fingerprintSha256)?.let { existing ->
+                return AddUserDocumentIfFingerprintAbsentResult.Duplicate(existing)
+            }
+            return when (
+                val result = addDocument(
+                    draft = draft.copy(
+                        documentFingerprintSha256 = fingerprintSha256,
+                        documentFingerprintSizeBytes = draft.documentFingerprintSizeBytes,
+                    ),
+                    nowMillis = nowMillis,
+                )
+            ) {
+                is AddUserDocumentResult.Added -> AddUserDocumentIfFingerprintAbsentResult.Added(result.item)
+                is AddUserDocumentResult.Rejected -> AddUserDocumentIfFingerprintAbsentResult.Rejected(result.errors)
+            }
         }
 
         override suspend fun markUnavailable(
@@ -6521,6 +7505,141 @@ class MainViewModelTest {
             }
             return updatedDocument
         }
+    }
+
+    private class RecordingAgentInboxDriveClient(
+        private val scanResult: AgentInboxDriveScanResult = AgentInboxDriveScanResult(
+            folderId = "agent-inbox-folder",
+            packages = emptyList(),
+        ),
+        private val files: Map<String, ByteArray> = emptyMap(),
+        private val downloadFailures: Map<String, Throwable> = emptyMap(),
+        private val throwOnScan: Boolean = false,
+    ) : AgentInboxDriveClient {
+        val scanRequests = mutableListOf<AgentInboxDriveScanRequest>()
+        val downloadedFileIds = mutableListOf<String>()
+        val downloadRequests = mutableListOf<AgentInboxDownloadRequest>()
+
+        override suspend fun scanPackages(request: AgentInboxDriveScanRequest): AgentInboxDriveScanResult {
+            scanRequests += request
+            if (throwOnScan) {
+                error("scan failed")
+            }
+            return scanResult
+        }
+
+        override suspend fun downloadFile(accessToken: String, fileId: String, maxBytes: Long): ByteArray {
+            downloadedFileIds += fileId
+            downloadRequests += AgentInboxDownloadRequest(fileId = fileId, maxBytes = maxBytes)
+            downloadFailures[fileId]?.let { error -> throw error }
+            val bytes = files[fileId] ?: error("Missing fake Drive file $fileId")
+            if (bytes.size.toLong() > maxBytes) {
+                throw AgentInboxDriveDownloadTooLargeException(maxBytes = maxBytes)
+            }
+            return bytes
+        }
+    }
+
+    private data class AgentInboxDownloadRequest(
+        val fileId: String,
+        val maxBytes: Long,
+    )
+
+    private class RecordingAgentInboxDocumentStore : AgentInboxDocumentStore {
+        val writes = mutableListOf<AgentInboxDocumentWrite>()
+        val deletedUris = mutableListOf<String>()
+
+        override suspend fun writeDocument(
+            packageFolderId: String,
+            contentFileName: String,
+            verifiedContentSha256: String,
+            format: ContentFormat,
+            bytes: ByteArray,
+        ): StoredAgentInboxDocument {
+            writes += AgentInboxDocumentWrite(
+                packageFolderId = packageFolderId,
+                contentFileName = contentFileName,
+                verifiedContentSha256 = verifiedContentSha256,
+                format = format,
+                bytes = bytes,
+            )
+            return StoredAgentInboxDocument(
+                uri = "file:/agent-inbox/$packageFolderId/$verifiedContentSha256.md",
+                displayName = "Agent Inbox document",
+                mimeType = when (format) {
+                    ContentFormat.MARKDOWN -> "text/markdown"
+                    ContentFormat.EPUB -> "application/epub+zip"
+                    ContentFormat.PDF -> "application/pdf"
+                    ContentFormat.HTML -> "text/html"
+                },
+            )
+        }
+
+        override suspend fun deleteDocument(stored: StoredAgentInboxDocument) {
+            deletedUris += stored.uri
+        }
+    }
+
+    private data class AgentInboxDocumentWrite(
+        val packageFolderId: String,
+        val contentFileName: String,
+        val verifiedContentSha256: String,
+        val format: ContentFormat,
+        val bytes: ByteArray,
+    )
+
+    private fun agentInboxDrivePackage(
+        folderId: String = "agent-package",
+        folderName: String = "Codex package",
+        manifestFileId: String = "manifest-file",
+        contentFileId: String = "content-file",
+        manifestSizeBytes: Long? = null,
+        contentSizeBytes: Long? = null,
+        hasMoreFiles: Boolean = false,
+    ): AgentInboxDrivePackage {
+        val manifest = AgentInboxDriveFile(
+            id = manifestFileId,
+            name = AGENT_INBOX_MANIFEST_FILE_NAME,
+            mimeType = "application/json",
+            sizeBytes = manifestSizeBytes,
+            md5Checksum = null,
+            modifiedTime = null,
+        )
+        val content = AgentInboxDriveFile(
+            id = contentFileId,
+            name = "content.md",
+            mimeType = "text/markdown",
+            sizeBytes = contentSizeBytes,
+            md5Checksum = null,
+            modifiedTime = null,
+        )
+        return AgentInboxDrivePackage(
+            folderId = folderId,
+            folderName = folderName,
+            manifestFile = manifest,
+            contentFiles = listOf(content),
+            allFiles = listOf(manifest, content),
+            hasMoreFiles = hasMoreFiles,
+        )
+    }
+
+    private fun agentInboxManifest(
+        priority: String,
+        documentSha256: String? = null,
+    ): String {
+        val shaField = documentSha256?.let { ""","documentSha256":"$it"""" }.orEmpty()
+        return """
+            {
+              "schemaVersion": 1,
+              "title": "Agent Note",
+              "topics": ["ATTENTION"],
+              "contentFile": "content.md",
+              "format": "MARKDOWN",
+              "rightsClass": "USER_PRIVATE",
+              "priority": "$priority"
+              $shaField
+            }
+        """.trimIndent()
     }
 
     private class FakeInterceptionMonitor : InterceptionMonitor {

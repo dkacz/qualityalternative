@@ -1,0 +1,835 @@
+06-12 15:47:43.892 11994 12008 I TestRunner: started: captureSprint27AgentInboxReviewScreens(com.qualityalternative.app.VisualQaScreenshotTest)
+06-12 15:47:43.951 11994 12008 W FileTestStorage: Output properties is not supported.
+06-12 15:47:43.951 11994 12008 I Tracing : Tracer added: class androidx.test.platform.tracing.AndroidXTracer
+06-12 15:47:43.956 11994 11994 D EventInjectionStrategy: Creating injection strategy with input manager.
+06-12 15:47:43.956 11994 11994 I alternative.app: hiddenapi: Accessing hidden method Landroid/hardware/input/InputManager;->getInstance()Landroid/hardware/input/InputManager; (runtime_flags=0, domain=platform, api=unsupported) from Landroidx/test/espresso/base/InputManagerEventInjectionStrategy; (domain=app) using reflection: allowed
+06-12 15:47:43.958 11994 11994 I alternative.app: hiddenapi: Accessing hidden method Landroid/hardware/input/InputManager;->injectInputEvent(Landroid/view/InputEvent;I)Z (runtime_flags=0, domain=platform, api=unsupported) from Landroidx/test/espresso/base/InputManagerEventInjectionStrategy; (domain=app) using reflection: allowed
+06-12 15:47:43.958 11994 11994 I alternative.app: hiddenapi: Accessing hidden field Landroid/hardware/input/InputManager;->INJECT_INPUT_EVENT_MODE_WAIT_FOR_FINISH:I (runtime_flags=0, domain=platform, api=unsupported) from Landroidx/test/espresso/base/InputManagerEventInjectionStrategy; (domain=app) using reflection: allowed
+06-12 15:47:43.961 11994 11994 I alternative.app: hiddenapi: Accessing hidden method Landroid/os/MessageQueue;->next()Landroid/os/Message; (runtime_flags=0, domain=platform, api=unsupported) from Landroidx/test/espresso/base/Interrogator; (domain=app) using reflection: allowed
+06-12 15:47:43.961 11994 11994 I alternative.app: hiddenapi: Accessing hidden field Landroid/os/MessageQueue;->mMessages:Landroid/os/Message; (runtime_flags=0, domain=platform, api=unsupported) from Landroidx/test/espresso/base/Interrogator; (domain=app) using reflection: allowed
+06-12 15:47:43.961 11994 11994 I alternative.app: hiddenapi: Accessing hidden method Landroid/os/Message;->recycleUnchecked()V (runtime_flags=0, domain=platform, api=unsupported) from Landroidx/test/espresso/base/Interrogator; (domain=app) using reflection: allowed
+06-12 15:47:43.961 11994 12008 D IdlingRegistry: Registering idling resources: [androidx.compose.ui.test.EspressoLink@baf4688]
+06-12 15:47:43.996 11994 12026 E ashmem  : Pinning is deprecated since Android Q. Please use trim or other methods.
+06-12 15:47:44.012 11994 12008 I alternative.app: AssetManager2(0xb4000075f3dd9c78) locale list changing from [] to [en-US]
+06-12 15:47:44.030 11994 12008 I alternative.app: AssetManager2(0xb4000075f3ddc518) locale list changing from [] to [en-US]
+06-12 15:47:44.034 11994 12008 I alternative.app: AssetManager2(0xb4000075f3dd44f8) locale list changing from [] to [en-US]
+06-12 15:47:44.040 11994 12008 I alternative.app: AssetManager2(0xb4000075f3dde138) locale list changing from [] to [en-US]
+06-12 15:47:44.054 11994 12008 I alternative.app: AssetManager2(0xb4000075f3ddd4b8) locale list changing from [] to [en-US]
+06-12 15:47:44.058 11994 12008 I alternative.app: AssetManager2(0xb4000075f3dd8058) locale list changing from [] to [en-US]
+06-12 15:47:44.076 11994 12008 I alternative.app: AssetManager2(0xb4000075f3ddea98) locale list changing from [] to [en-US]
+06-12 15:47:44.078 11994 12008 I alternative.app: AssetManager2(0xb4000075f3ddc1f8) locale list changing from [] to [en-US]
+06-12 15:47:44.079 11994 12008 I alternative.app: AssetManager2(0xb4000075f3ddb258) locale list changing from [] to [en-US]
+06-12 15:47:44.088 11994 12008 I alternative.app: AssetManager2(0xb4000075f3dda5d8) locale list changing from [] to [en-US]
+06-12 15:47:44.093 11994 12008 I alternative.app: AssetManager2(0xb4000075f3dd9638) locale list changing from [] to [en-US]
+06-12 15:47:44.109 11994 12008 I alternative.app: AssetManager2(0xb4000075f3ddaf38) locale list changing from [] to [en-US]
+06-12 15:47:44.111 11994 12008 I alternative.app: AssetManager2(0xb4000075f3de6478) locale list changing from [] to [en-US]
+06-12 15:47:44.125 11994 12008 I alternative.app: AssetManager2(0xb4000075f3de0398) locale list changing from [] to [en-US]
+06-12 15:47:44.127 11994 12008 I alternative.app: AssetManager2(0xb4000075f3de5e38) locale list changing from [] to [en-US]
+06-12 15:47:44.129 11994 12008 I alternative.app: AssetManager2(0xb4000075f3ddfa38) locale list changing from [] to [en-US]
+06-12 15:47:44.137 11994 12008 I alternative.app: AssetManager2(0xb4000075f3de3598) locale list changing from [] to [en-US]
+06-12 15:47:44.186 11994 12008 W Settings: Setting always_finish_activities has moved from android.provider.Settings.System to android.provider.Settings.Global, returning read-only value.
+06-12 15:47:44.198   693  2126 V GrammaticalInflectionUtils: AttributionSource: AttributionSource { uid = 10273, packageName = null, attributionTag = null, token = android.os.Binder@51a7416, deviceId = 0, next = null } does not have READ_SYSTEM_GRAMMATICAL_GENDER permission.
+06-12 15:47:44.213   534   577 I BpBinder: onLastStrongRef automatically unlinking death recipients:
+06-12 15:47:44.218   962  1166 I ndroid.systemui: AssetManager2(0xb4000075f3e29138) locale list changing from [] to [en-US]
+06-12 15:47:44.218  1086  1086 W SplitSelectStateCtor: Missing session instanceIds
+06-12 15:47:44.218  1086  1086 D StatsLog: LAUNCHER_SPLIT_SELECTION_EXIT_INTERRUPTED
+06-12 15:47:44.231   962  1169 D SplashScreenView: Build android.window.SplashScreenView{4175202 V.E...... ......ID 0,0-0,0}
+06-12 15:47:44.231   962  1169 D SplashScreenView: Icon: view: null drawable: null size: 0
+06-12 15:47:44.231   962  1169 D SplashScreenView: Branding: view: android.view.View{876b713 G.ED..... ......I. 0,0-0,0 #1020541 android:id/splashscreen_branding_view} drawable: null size w: 0 h: 0
+06-12 15:47:44.233   601   601 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:44.274 11994 11994 I alternative.app: AssetManager2(0xb4000075f3dd76f8) locale list changing from [] to [en-US]
+06-12 15:47:44.288   534   534 I BpBinder: onLastStrongRef automatically unlinking death recipients:
+06-12 15:47:44.298 11994 11994 D LifecycleMonitor: Lifecycle status change: com.qualityalternative.app.MainActivity@d26d2bf in: PRE_ON_CREATE
+06-12 15:47:44.299 11994 11994 V ActivityScenario: Activity lifecycle changed event received but ignored because the reported transition was not ON_CREATE while the last known transition was PRE_ON_CREATE
+06-12 15:47:44.326 11994 11994 D CompatChangeReporter: Compat change id reported: 377864165; UID 10273; state: ENABLED
+06-12 15:47:44.327 11994 11994 D DesktopModeFlags: Toggle override initialized to: OVERRIDE_UNSET
+06-12 15:47:44.351 11994 11994 D LifecycleMonitor: Lifecycle status change: com.qualityalternative.app.MainActivity@d26d2bf in: CREATED
+06-12 15:47:44.351 11994 11994 V ActivityScenario: Update currentActivityStage to CREATED, currentActivity=com.qualityalternative.app.MainActivity@d26d2bf
+06-12 15:47:44.354 11994 11994 D LifecycleMonitor: Lifecycle status change: com.qualityalternative.app.MainActivity@d26d2bf in: STARTED
+06-12 15:47:44.354 11994 11994 V ActivityScenario: Update currentActivityStage to STARTED, currentActivity=com.qualityalternative.app.MainActivity@d26d2bf
+06-12 15:47:44.364 11994 12029 I EGL_emulation: Opening libGLESv1_CM_emulation.so
+06-12 15:47:44.365 11994 12029 I EGL_emulation: Opening libGLESv2_emulation.so
+06-12 15:47:44.372 11994 12029 W HWUI    : Failed to choose config with EGL_SWAP_BEHAVIOR_PRESERVED, retrying without...
+06-12 15:47:44.372 11994 12029 W HWUI    : Failed to initialize 101010-2 format, error = EGL_SUCCESS
+06-12 15:47:44.397  1086  1086 D VRI[NexusLauncherActivity]: visibilityChanged oldVisibility=true newVisibility=false
+06-12 15:47:44.414  1086  1086 D NexusLauncherModelDelegate: notifySmartspaceEvent: SmartspaceTargetEvent{mSmartspaceTarget=null, mSmartspaceActionId='null', mEventType=7}
+06-12 15:47:44.519 11994 11994 D LifecycleMonitor: Lifecycle status change: com.qualityalternative.app.MainActivity@d26d2bf in: RESUMED
+06-12 15:47:44.519 11994 11994 V ActivityScenario: Update currentActivityStage to RESUMED, currentActivity=com.qualityalternative.app.MainActivity@d26d2bf
+06-12 15:47:44.533 11994 11994 W HWUI    : Unknown dataspace 0
+06-12 15:47:44.644 11994 11994 I alternative.app: hiddenapi: Accessing hidden method Landroid/os/SystemProperties;->addChangeCallback(Ljava/lang/Runnable;)V (runtime_flags=0, domain=platform, api=unsupported) from Landroidx/compose/ui/platform/AndroidComposeView$Companion; (domain=app) using reflection: allowed
+06-12 15:47:44.650 11994 11998 I alternative.app: Compiler allocated 5111KB to compile void android.view.ViewRootImpl.performTraversals()
+06-12 15:47:44.782   534   773 W ServiceManagerCppClient: Permission failure: android.permission.ACCESS_SURFACE_FLINGER from uid=10273 pid=0
+06-12 15:47:44.782   534   773 D PermissionCache: checking android.permission.ACCESS_SURFACE_FLINGER for uid=10273 => denied (238 us)
+06-12 15:47:44.782   534   773 W ServiceManagerCppClient: Permission failure: android.permission.ROTATE_SURFACE_FLINGER from uid=10273 pid=0
+06-12 15:47:44.782   534   773 D PermissionCache: checking android.permission.ROTATE_SURFACE_FLINGER for uid=10273 => denied (157 us)
+06-12 15:47:44.782   534   575 W ServiceManagerCppClient: Permission failure: android.permission.ROTATE_SURFACE_FLINGER from uid=10273 pid=11994
+06-12 15:47:44.782   534   575 D PermissionCache: checking android.permission.ROTATE_SURFACE_FLINGER for uid=10273 => denied (181 us)
+06-12 15:47:44.782   534   773 W ServiceManagerCppClient: Permission failure: android.permission.INTERNAL_SYSTEM_WINDOW from uid=10273 pid=0
+06-12 15:47:44.782   534   773 D PermissionCache: checking android.permission.INTERNAL_SYSTEM_WINDOW for uid=10273 => denied (286 us)
+06-12 15:47:44.782   534   575 W ServiceManagerCppClient: Permission failure: android.permission.INTERNAL_SYSTEM_WINDOW from uid=10273 pid=11994
+06-12 15:47:44.782   534   575 D PermissionCache: checking android.permission.INTERNAL_SYSTEM_WINDOW for uid=10273 => denied (185 us)
+06-12 15:47:44.859   693  1772 W ServiceManagerCppClient: Permission failure: android.permission.ACCESS_SURFACE_FLINGER from uid=10273 pid=0
+06-12 15:47:44.859   693  1772 D PermissionCache: checking android.permission.ACCESS_SURFACE_FLINGER for uid=10273 => denied (68 us)
+06-12 15:47:44.859   693  1772 W ServiceManagerCppClient: Permission failure: android.permission.ROTATE_SURFACE_FLINGER from uid=10273 pid=0
+06-12 15:47:44.859   693  1772 D PermissionCache: checking android.permission.ROTATE_SURFACE_FLINGER for uid=10273 => denied (7 us)
+06-12 15:47:44.859   693  1772 W ServiceManagerCppClient: Permission failure: android.permission.INTERNAL_SYSTEM_WINDOW from uid=10273 pid=0
+06-12 15:47:44.859   693  1772 D PermissionCache: checking android.permission.INTERNAL_SYSTEM_WINDOW for uid=10273 => denied (4 us)
+06-12 15:47:44.875   601   601 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:44.885   693   740 I ActivityTaskManager: Displayed com.qualityalternative.app/.MainActivity for user 0: +670ms
+06-12 15:47:44.887  1086  1086 D BaseDepthController: setSurface:
+06-12 15:47:44.887  1086  1086 D BaseDepthController: 	mWaitingOnSurfaceValidity: false
+06-12 15:47:44.887  1086  1086 D BaseDepthController: 	mBaseSurface: null
+06-12 15:47:44.888  1086  1086 D BaseDepthController: mSurface is null and mCurrentBlur is: 0
+06-12 15:47:44.895   468   547 I netd    : tetherGetStats() -> {[]} <0.58ms>
+06-12 15:47:44.903  1086  1086 D StateManager: goToState - fromState: Normal, toState: Normal, partial trace:
+06-12 15:47:44.903  1086  1086 D StateManager: 	at com.android.launcher3.statemanager.StateManager.moveToRestState(go/retraceme 43e00d9cd0eb17b3d9dd30fc1741b1c71445c4c0f7c8c9b81300265c86c5b873:4)
+06-12 15:47:44.903  1086  1086 D StateManager: 	at com.android.launcher3.statemanager.StateManager.moveToRestState(go/retraceme 43e00d9cd0eb17b3d9dd30fc1741b1c71445c4c0f7c8c9b81300265c86c5b873:1)
+06-12 15:47:44.903  1086  1086 D StateManager: 	at com.android.launcher3.statemanager.StatefulActivity.onStop(go/retraceme 43e00d9cd0eb17b3d9dd30fc1741b1c71445c4c0f7c8c9b81300265c86c5b873:34)
+06-12 15:47:44.903  1086  1086 D StatsLog: LAUNCHER_ONSTOP
+06-12 15:47:44.921  1086  1086 D StatsLog: LAUNCHER_GOOGLE_SEARCH_RESTORE_LIST_SIZE_AFTER_ACTIVITY_RESTART
+06-12 15:47:44.935   693   834 I ImeTracker: com.qualityalternative.app:e9a0df91: onRequestHide at ORIGIN_SERVER reason HIDE_UNSPECIFIED_WINDOW fromUser false
+06-12 15:47:44.938 11994 11994 D InsetsController: hide(ime(), fromIme=false)
+06-12 15:47:44.938 11994 11994 I ImeTracker: com.qualityalternative.app:e9a0df91: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+06-12 15:47:44.949  1086  1107 W System  : A resource failed to call release.
+06-12 15:47:44.949  1086  1107 W System  : A resource failed to call release.
+06-12 15:47:44.949  1086  1107 W System  : A resource failed to call release.
+06-12 15:47:44.974   693  2132 I ImeTracker: system_server:51d5edda: onRequestHide at ORIGIN_SERVER reason IME_REQUESTED_CHANGED_LISTENER fromUser false
+06-12 15:47:44.975   693   743 I ImeTracker: system_server:51d5edda: onCancelled at PHASE_SERVER_SHOULD_HIDE
+06-12 15:47:44.980  1531  1531 I GoogleInputMethodService: GoogleInputMethodService.onFinishInput():2043
+06-12 15:47:45.019  1531  1531 I Module  : DeviceLockedStatusModuleProvider$Module.updateDeviceLockedStatus():100 repeatCheckTimes = 0, locked = false
+06-12 15:47:45.034  1281  2582 I FontLog : Received query Noto Color Emoji Compat, URI content://com.google.android.gms.fonts [CONTEXT service_id=132 ]
+06-12 15:47:45.035  1531  1531 I GoogleInputMethodService: GoogleInputMethodService.onStartInput():1293 onStartInput(EditorInfo{EditorInfo{packageName=com.qualityalternative.app, inputType=0, inputTypeString=NULL, enableLearning=false, autoCorrection=false, autoComplete=false, imeOptions=0, privateImeOptions=null, actionName=UNSPECIFIED, actionLabel=null, initialSelStart=-1, initialSelEnd=-1, initialCapsMode=0, label=null, fieldId=0, fieldName=null, extras=null, hintText=null, hintLocales=[]}}, false)
+06-12 15:47:45.037  1281  2582 I FontLog : Query [emojicompat-emoji-font] resolved to {Noto Color Emoji Compat, wdth 100.0, wght 400, ital 0.0, bestEffort false}, isVf false} [CONTEXT service_id=132 ]
+06-12 15:47:45.042  1531  1531 I EmojiCompatManager: EmojiCompatManager.getEmojiCompatIfLoaded():343 EmojiCompat.init() was never called.
+06-12 15:47:45.042  1531  1531 I EmojiCompatManager: java.lang.IllegalStateException: EmojiCompat is not initialized. Please call EmojiCompat.init() first
+06-12 15:47:45.042  1531  1531 I EmojiCompatManager: 	at asx.p(PG:6)
+06-12 15:47:45.042  1531  1531 I EmojiCompatManager: 	at axb.b(PG:13)
+06-12 15:47:45.042  1531  1531 I EmojiCompatManager: 	at jnr.b(PG:2)
+06-12 15:47:45.042  1531  1531 I EmojiCompatManager: 	at jnr.c(PG:4)
+06-12 15:47:45.042  1531  1531 I EmojiCompatManager: 	at jnr.f(PG:3)
+06-12 15:47:45.042  1531  1531 I EmojiCompatManager: 	at jnx.c(PG:3)
+06-12 15:47:45.042  1531  1531 I EmojiCompatManager: 	at kif.cz(PG:47)
+06-12 15:47:45.042  1531  1531 I EmojiCompatManager: 	at lhl.run(PG:1025)
+06-12 15:47:45.042  1531  1531 I EmojiCompatManager: 	at jaf.execute(PG:12)
+06-12 15:47:45.042  1531  1531 I EmojiCompatManager: 	at nco.v(PG:13)
+06-12 15:47:45.042  1531  1531 I EmojiCompatManager: 	at lhn.m(PG:96)
+06-12 15:47:45.042  1531  1531 I EmojiCompatManager: 	at lhn.k(PG:25)
+06-12 15:47:45.042  1531  1531 I EmojiCompatManager: 	at kgn.onStartInput(PG:250)
+06-12 15:47:45.042  1531  1531 I EmojiCompatManager: 	at android.inputmethodservice.InputMethodService.doStartInput(InputMethodService.java:3521)
+06-12 15:47:45.042  1531  1531 I EmojiCompatManager: 	at android.inputmethodservice.InputMethodService$InputMethodImpl.startInput(InputMethodService.java:879)
+06-12 15:47:45.042  1531  1531 I EmojiCompatManager: 	at android.inputmethodservice.InputMethodService$InputMethodImpl.dispatchStartInput(InputMethodService.java:908)
+06-12 15:47:45.042  1531  1531 I EmojiCompatManager: 	at android.inputmethodservice.IInputMethodWrapper.executeMessage(IInputMethodWrapper.java:201)
+06-12 15:47:45.042  1531  1531 I EmojiCompatManager: 	at com.android.internal.os.HandlerCaller$MyHandler.handleMessage(HandlerCaller.java:44)
+06-12 15:47:45.042  1531  1531 I EmojiCompatManager: 	at android.os.Handler.dispatchMessage(Handler.java:110)
+06-12 15:47:45.042  1531  1531 I EmojiCompatManager: 	at android.os.Looper.loopOnce(Looper.java:248)
+06-12 15:47:45.042  1531  1531 I EmojiCompatManager: 	at android.os.Looper.loop(Looper.java:338)
+06-12 15:47:45.042  1531  1531 I EmojiCompatManager: 	at android.app.ActivityThread.main(ActivityThread.java:9067)
+06-12 15:47:45.042  1531  1531 I EmojiCompatManager: 	at java.lang.reflect.Method.invoke(Native Method)
+06-12 15:47:45.042  1531  1531 I EmojiCompatManager: 	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:593)
+06-12 15:47:45.042  1531  1531 I EmojiCompatManager: 	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:932)
+06-12 15:47:45.044  1531  1531 I Module  : DeviceLockedStatusModuleProvider$Module.updateDeviceLockedStatus():100 repeatCheckTimes = 1, locked = false
+06-12 15:47:45.045  1281  2582 I FontLog : Fetch {Noto Color Emoji Compat, wdth 100.0, wght 400, ital 0.0, bestEffort false}, isVf false} end status Status{statusCode=SUCCESS, resolution=null} [CONTEXT service_id=132 ]
+06-12 15:47:45.048  1281  2583 I FontLog : Pulling font file for id = 27, cache size = 4 [CONTEXT service_id=132 ]
+06-12 15:47:45.055  1281  2582 I FontLog : Pulling font file for id = 27, cache size = 4 [CONTEXT service_id=132 ]
+06-12 15:47:45.542   693   863 D WifiClientModeImpl[8882:wlan0]: updateLinkLayerStatsRssiSpeedFrequencyCapabilities rssi=-50 TxLinkspeed=1 freq=2447 RxLinkSpeed=2
+06-12 15:47:45.542   693   863 D WifiDataStall: tx tput in kbps: 11000
+06-12 15:47:45.542   693   863 D WifiDataStall: rx tput in kbps: 11000
+06-12 15:47:45.542   693   863 V WifiConfigManager: Updating scan detail cache freq=2447 BSSID=00:13:10:85:fe:01 RSSI=-50 for "AndroidWifi"NONE
+06-12 15:47:45.542   693   863 D WifiThroughputPredictor:  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+06-12 15:47:45.542   693   863 D WifiThroughputPredictor:  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 11
+06-12 15:47:45.542   693   863 D WifiThroughputPredictor:  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+06-12 15:47:45.542   693   863 D WifiThroughputPredictor:  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 11
+06-12 15:47:45.543   693   863 D WifiThroughputPredictor:  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+06-12 15:47:45.543   693   863 D WifiThroughputPredictor:  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 11
+06-12 15:47:45.543   693   863 D WifiThroughputPredictor:  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+06-12 15:47:45.543   693   863 D WifiThroughputPredictor:  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 11
+06-12 15:47:45.543   693   863 D WifiScoreCard: BSSID update SIGNAL_POLL ID: 273713110 SSID: "AndroidWifi", BSSID: 00:13:10:85:fe:01, MAC: 02:15:b2:00:00:00, IP: /10.0.2.16, Security type: 0, Supplicant state: COMPLETED, Wi-Fi standard: legacy, RSSI: -50, Link speed: 1Mbps, Tx Link speed: 1Mbps, Max Supported Tx Link speed: 11Mbps, Rx Link speed: 2Mbps, Max Supported Rx Link speed: 11Mbps, Frequency: 2447MHz, Net ID: 0, Metered hint: false, score: 60, isUsable: true, CarrierMerged: false, SubscriptionId: -1, IsPrimary: 1, Trusted: true, Restricted: false, Ephemeral: false, OEM paid: false, OEM private: false, OSU AP: false, FQDN: <none>, Provider friendly name: <none>, Requesting package name: <none>"AndroidWifi"openMLO Information: , Is TID-To-Link negotiation supported by the AP: false, AP MLD Address: <none>, AP MLO Link Id: <none>, AP MLO Affiliated links: <none>, Vendor Data: <none>
+06-12 15:47:45.543   693   863 D WifiScoreCard: txRate: 1 txSpeed: 1
+06-12 15:47:45.543   693   863 D WifiScoreCard: network update SIGNAL_POLL "AndroidWifi" ID: 732197599 RSSI -50 txSpeed -1
+06-12 15:47:45.543   693   863 D WifiClientModeImpl[8882:wlan0]:  ClientModeImpl$L2ConnectedState screen=on 4 0 "AndroidWifi" 00:13:10:85:fe:01 rssi=-50 f=2447 sc=60 link=1 tx=0.0, 0.0, 0.0 rx=0.0 bcn=0 [on:0 tx:0 rx:0 period:3001] from screen [on:0 period:-1139362297] score=60
+06-12 15:47:45.588  1585  1585 D BoundBrokerSvc: onBind: Intent { act=com.google.android.gms.auth.api.identity.service.authorization.START dat=chimera-action:/... xflg=0x4 cmp=com.google.android.gms/.chimera.GmsApiService }
+06-12 15:47:45.588  1585  1585 D BoundBrokerSvc: Loading bound service for intent: Intent { act=com.google.android.gms.auth.api.identity.service.authorization.START dat=chimera-action:/... xflg=0x4 cmp=com.google.android.gms/.chimera.GmsApiService }
+06-12 15:47:45.759  1605 11330 E DatabaseUtils: Writing exception to parcel
+06-12 15:47:45.759  1605 11330 E DatabaseUtils: java.lang.IllegalStateException: Failed to build unique file: /storage/emulated/0/Download/Quality Alternative/quality-alternative-profile.json owner_package_name=com.qualityalternative.app _display_name=quality-alternative-profile.json mime_type=application/json _data=/storage/emulated/0/Download/Quality Alternative/quality-alternative-profile.json is_download=1 relative_path=Download/Quality Alternative/
+06-12 15:47:45.759  1605 11330 E DatabaseUtils: 	at com.android.providers.media.MediaProvider.ensureFileColumns(MediaProvider.java:4894)
+06-12 15:47:45.759  1605 11330 E DatabaseUtils: 	at com.android.providers.media.MediaProvider.ensureUniqueFileColumns(MediaProvider.java:4596)
+06-12 15:47:45.759  1605 11330 E DatabaseUtils: 	at com.android.providers.media.MediaProvider.insertFile(MediaProvider.java:5395)
+06-12 15:47:45.759  1605 11330 E DatabaseUtils: 	at com.android.providers.media.MediaProvider.insertInternal(MediaProvider.java:6012)
+06-12 15:47:45.759  1605 11330 E DatabaseUtils: 	at com.android.providers.media.MediaProvider.insert(MediaProvider.java:5683)
+06-12 15:47:45.759  1605 11330 E DatabaseUtils: 	at android.content.ContentProvider$Transport.insert(ContentProvider.java:452)
+06-12 15:47:45.759  1605 11330 E DatabaseUtils: 	at android.content.ContentProviderNative.onTransact(ContentProviderNative.java:180)
+06-12 15:47:45.759  1605 11330 E DatabaseUtils: 	at android.os.Binder.execTransactInternal(Binder.java:1421)
+06-12 15:47:45.759  1605 11330 E DatabaseUtils: 	at android.os.Binder.execTransact(Binder.java:1365)
+06-12 15:47:45.761  1605 11330 W MediaProvider: isAppCloneUserPair for user 0: false
+06-12 15:47:45.774  1605 11330 I MediaProvider: Open with lower FS for /storage/emulated/0/Download/Quality Alternative/quality-alternative-profile (1781272065759).json. Uid: 10273
+06-12 15:47:45.775  1605  1737 V MediaProvider: Created relation b/w 1415 and com.qualityalternative.app::0
+06-12 15:47:45.809  1281  2937 I UriTaskContentObserver: Throttling content uri change event for content://media/external/file/3482 [CONTEXT service_id=218 ]
+06-12 15:47:45.814  1281 10747 I NetworkScheduler.Stats: Task com.google.android.gms/com.google.android.gms.ipa.base.IpaGcmTaskService started execution. cause:9 exec_start_elapsed_seconds: 18775 [CONTEXT service_id=218 ]
+06-12 15:47:45.819  1281 11842 I NetworkScheduler.Stats: Task com.google.android.gms/com.google.android.gms.ipa.base.IpaGcmTaskService finished executing. cause:9 result: 1 elapsed_millis: 14 uptime_millis: 14 exec_start_elapsed_seconds: 18775 [CONTEXT service_id=218 ]
+06-12 15:47:45.993 11994 11994 I alternative.app: hiddenapi: Accessing hidden method Landroid/view/ViewTreeObserver;->dispatchOnScrollChanged()V (runtime_flags=0, domain=platform, api=unsupported) from Landroidx/compose/ui/platform/AndroidComposeView$Companion; (domain=app) using reflection: allowed
+06-12 15:47:46.478   945   945 D wpa_supplicant: nl80211: Drv Event 64 (NL80211_CMD_NOTIFY_CQM) received for wlan0
+06-12 15:47:46.478   945   945 D wpa_supplicant: nl80211: Beacon loss event
+06-12 15:47:46.480   945   945 D wpa_supplicant: wlan0: Event BEACON_LOSS (53) received
+06-12 15:47:46.480   945   945 I wpa_supplicant: wlan0: CTRL-EVENT-BEACON-LOSS
+06-12 15:47:46.510  1754  4858 I IPCThreadState: oneway function results for code 2 on binder at 0xb4000076b3e23ee0 will be dropped but finished with status UNKNOWN_TRANSACTION
+06-12 15:47:46.940 11994 12008 I UiDevice: Creating a new instance, old instance exists: false
+06-12 15:47:46.941 11994 12008 I UiAutomation: Initialized for user 0 on display 0
+06-12 15:47:46.965   693   693 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:46.965 11994 12040 V UiAutomation: Init UiAutomation@4b1a2cc[id=16, displayId=0, flags=0]
+06-12 15:47:46.965   693   693 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:46.965  1628  5105 I AiAiEcho: Settings changed for uri: content://settings/secure/accessibility_enabled
+06-12 15:47:46.965   693   693 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:46.966   693   693 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:46.967   693   693 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:46.967   693   693 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:46.967   693   693 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:46.967 11994 12008 D UiDevice: Setting accessibility service flags: 65618
+06-12 15:47:46.969   693   693 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:46.970   693   693 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:46.970   693   693 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:46.972   693   693 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:46.972   693   693 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:46.972   693   693 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:46.973   693   693 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:46.973   693   693 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:46.973   693   693 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:46.973   693   693 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:46.973   693   693 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:46.974   693   693 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:46.974   693   693 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:46.974   693   693 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:46.974   693   693 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:46.974   693   693 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:46.974   693   693 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:46.974   693   693 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:46.974   693   693 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:46.974   693   693 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:46.974   693   693 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:46.974   693   693 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:46.974   693   693 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:46.980  1628  5105 I AiAiEcho: Settings changed for uri: content://settings/secure/accessibility_enabled
+06-12 15:47:46.983 11994 12008 D UiDevice: Taking screenshot (scale=1.000000, quality=90) and storing at /sdcard/Download/qualityalternative/sprint27-agent-content-inbox-1781272063934/00_agent_inbox_disconnected_light.png.
+06-12 15:47:46.986  1754  1882 I amtp    : NGA disabled due to not being eligible.
+06-12 15:47:46.995  1628  1862 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+06-12 15:47:46.995  1628  1862 I AiAiEcho: EchoTargets:
+06-12 15:47:46.995  1628  1862 I AiAiEcho: Filtered by AiAi flag check:
+06-12 15:47:46.995  1628  1862 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+06-12 15:47:47.000  1628  1862 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+06-12 15:47:47.002  1628  1862 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+06-12 15:47:47.003  1342  1361 D AccessibilitySourceService: enabled a11y services count 0
+06-12 15:47:47.003  1342  1361 D AccessibilitySourceService: a11y source sending 0 issue to sc
+06-12 15:47:47.003  1628  1862 I AiAiEcho: EchoTargets:
+06-12 15:47:47.003  1628  1862 I AiAiEcho: Filtered by AiAi flag check:
+06-12 15:47:47.003  1628  1862 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+06-12 15:47:47.005   693   720 D SafetySourceDataValidat: No cert check requested for package com.google.android.permissioncontroller
+06-12 15:47:47.006  1628  1862 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+06-12 15:47:47.006  1628  1862 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+06-12 15:47:47.006  1628  1862 I AiAiEcho: EchoTargets:
+06-12 15:47:47.006  1628  1862 I AiAiEcho: Filtered by AiAi flag check:
+06-12 15:47:47.006  1628  1862 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+06-12 15:47:47.007  1628  1862 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+06-12 15:47:47.008  1628  1862 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+06-12 15:47:47.008  1628  1862 I AiAiEcho: EchoTargets:
+06-12 15:47:47.008  1628  1862 I AiAiEcho: Filtered by AiAi flag check:
+06-12 15:47:47.008  1628  1862 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+06-12 15:47:47.009  1628  1862 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+06-12 15:47:47.012  1628  1862 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface home with targets# 0 (types=[])
+06-12 15:47:47.014  1628  1862 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface lockscreen with targets# 0 (types=[])
+06-12 15:47:47.014  1628  1862 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface home with targets# 0 (types=[])
+06-12 15:47:47.014  1628  1862 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface lockscreen with targets# 0 (types=[])
+06-12 15:47:47.015  1086  1086 D SsBaseTemplateCard: No text view can be set up
+06-12 15:47:47.015  1086  1086 D SsBaseTemplateCard: Passed-in item info is null
+06-12 15:47:47.015  1086  1086 D SsBaseTemplateCard: Passed-in item info is null
+06-12 15:47:47.015  1086  1086 D SsBaseTemplateCard: Passed-in item info is null
+06-12 15:47:47.015  1086  1086 I SsBaseTemplateCard: Secondary card pane is null
+06-12 15:47:47.016  1086  1086 D SsBaseTemplateCard: No text view can be set up
+06-12 15:47:47.016  1086  1086 D SsBaseTemplateCard: Passed-in item info is null
+06-12 15:47:47.016  1086  1086 D SsBaseTemplateCard: Passed-in item info is null
+06-12 15:47:47.016  1086  1086 D SsBaseTemplateCard: Passed-in item info is null
+06-12 15:47:47.016  1086  1086 I SsBaseTemplateCard: Secondary card pane is null
+06-12 15:47:47.017   962   962 W PageIndicator: Total number of pages invalid: 0. Assuming 1 page.
+06-12 15:47:47.017   962   962 W PageIndicator: Total number of pages invalid: 0. Assuming 1 page.
+06-12 15:47:47.031  1605  1841 W MediaProvider: isAppCloneUserPair for user 0: false
+06-12 15:47:47.031  1605  1841 W MediaProvider: isAppCloneUserPair for user 0: false
+06-12 15:47:47.107 11994 12008 D UiDevice: Taking screenshot (scale=1.000000, quality=90) and storing at /sdcard/Download/qualityalternative/sprint27-agent-content-inbox-1781272063934/00_agent_inbox_disconnected_light.png.
+06-12 15:47:47.191 11994 12008 D UiDevice: Taking screenshot (scale=1.000000, quality=90) and storing at /sdcard/Download/qualityalternative/sprint27-agent-content-inbox-1781272063934/00_agent_inbox_disconnected_light.png.
+06-12 15:47:47.534  1079  1303 D SatelliteController: iisInCarrierRoamingNbIotNtn: satellite is disabled
+06-12 15:47:47.790 11994 12008 D UiDevice: Taking screenshot (scale=1.000000, quality=90) and storing at /sdcard/Download/qualityalternative/sprint27-agent-content-inbox-1781272063934/01_agent_inbox_connected_empty_light.png.
+06-12 15:47:47.812  1605  2504 W MediaProvider: isAppCloneUserPair for user 0: false
+06-12 15:47:47.883 11994 12008 D UiDevice: Taking screenshot (scale=1.000000, quality=90) and storing at /sdcard/Download/qualityalternative/sprint27-agent-content-inbox-1781272063934/01_agent_inbox_connected_empty_light.png.
+06-12 15:47:47.967 11994 12008 D UiDevice: Taking screenshot (scale=1.000000, quality=90) and storing at /sdcard/Download/qualityalternative/sprint27-agent-content-inbox-1781272063934/01_agent_inbox_connected_empty_light.png.
+06-12 15:47:48.288   693   869 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET, states=14
+06-12 15:47:48.288   693   869 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET6, states=14
+06-12 15:47:48.288   693   869 D InetDiagMessage: Destroyed live tcp sockets for uids={10153} in 0ms
+06-12 15:47:48.288   693   869 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET, states=14
+06-12 15:47:48.289   693   869 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET6, states=14
+06-12 15:47:48.289   693   869 D InetDiagMessage: Destroyed live tcp sockets for uids={20153} in 0ms
+06-12 15:47:48.547   693   863 D WifiClientModeImpl[8882:wlan0]: updateLinkLayerStatsRssiSpeedFrequencyCapabilities rssi=-50 TxLinkspeed=1 freq=2447 RxLinkSpeed=2
+06-12 15:47:48.547   693   863 D WifiDataStall: tx tput in kbps: 11000
+06-12 15:47:48.547   693   863 D WifiDataStall: rx tput in kbps: 11000
+06-12 15:47:48.547   693   863 V WifiConfigManager: Updating scan detail cache freq=2447 BSSID=00:13:10:85:fe:01 RSSI=-50 for "AndroidWifi"NONE
+06-12 15:47:48.547   693   863 D WifiThroughputPredictor:  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+06-12 15:47:48.547   693   863 D WifiThroughputPredictor:  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 11
+06-12 15:47:48.547   693   863 D WifiThroughputPredictor:  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+06-12 15:47:48.547   693   863 D WifiThroughputPredictor:  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 11
+06-12 15:47:48.547   693   863 D WifiThroughputPredictor:  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+06-12 15:47:48.547   693   863 D WifiThroughputPredictor:  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 11
+06-12 15:47:48.547   693   863 D WifiThroughputPredictor:  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+06-12 15:47:48.547   693   863 D WifiThroughputPredictor:  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 11
+06-12 15:47:48.547   693   863 D WifiScoreCard: BSSID update SIGNAL_POLL ID: 273713110 SSID: "AndroidWifi", BSSID: 00:13:10:85:fe:01, MAC: 02:15:b2:00:00:00, IP: /10.0.2.16, Security type: 0, Supplicant state: COMPLETED, Wi-Fi standard: legacy, RSSI: -50, Link speed: 1Mbps, Tx Link speed: 1Mbps, Max Supported Tx Link speed: 11Mbps, Rx Link speed: 2Mbps, Max Supported Rx Link speed: 11Mbps, Frequency: 2447MHz, Net ID: 0, Metered hint: false, score: 60, isUsable: true, CarrierMerged: false, SubscriptionId: -1, IsPrimary: 1, Trusted: true, Restricted: false, Ephemeral: false, OEM paid: false, OEM private: false, OSU AP: false, FQDN: <none>, Provider friendly name: <none>, Requesting package name: <none>"AndroidWifi"openMLO Information: , Is TID-To-Link negotiation supported by the AP: false, AP MLD Address: <none>, AP MLO Link Id: <none>, AP MLO Affiliated links: <none>, Vendor Data: <none>
+06-12 15:47:48.547   693   863 D WifiScoreCard: txRate: 1 txSpeed: 1
+06-12 15:47:48.547   693   863 D WifiScoreCard: network update SIGNAL_POLL "AndroidWifi" ID: 732197599 RSSI -50 txSpeed -1
+06-12 15:47:48.547   693   863 D WifiClientModeImpl[8882:wlan0]:  ClientModeImpl$L2ConnectedState screen=on 4 0 "AndroidWifi" 00:13:10:85:fe:01 rssi=-50 f=2447 sc=60 link=1 tx=0.0, 0.0, 0.0 rx=0.0 bcn=0 [on:0 tx:0 rx:0 period:3004] from screen [on:0 period:-1139359293] score=60
+06-12 15:47:48.722 11994 12008 D UiDevice: Taking screenshot (scale=1.000000, quality=90) and storing at /sdcard/Download/qualityalternative/sprint27-agent-content-inbox-1781272063934/02_agent_inbox_review_ready_light.png.
+06-12 15:47:48.744  1605  1841 W MediaProvider: isAppCloneUserPair for user 0: false
+06-12 15:47:48.814 11994 12008 D UiDevice: Taking screenshot (scale=1.000000, quality=90) and storing at /sdcard/Download/qualityalternative/sprint27-agent-content-inbox-1781272063934/02_agent_inbox_review_ready_light.png.
+06-12 15:47:48.895 11994 12008 D UiDevice: Taking screenshot (scale=1.000000, quality=90) and storing at /sdcard/Download/qualityalternative/sprint27-agent-content-inbox-1781272063934/02_agent_inbox_review_ready_light.png.
+06-12 15:47:49.476 11994 12008 D UiDevice: Taking screenshot (scale=1.000000, quality=90) and storing at /sdcard/Download/qualityalternative/sprint27-agent-content-inbox-1781272063934/03_agent_inbox_priority_accepted_light.png.
+06-12 15:47:49.500  1605  1830 W MediaProvider: isAppCloneUserPair for user 0: false
+06-12 15:47:49.533 11994 12042 D ProfileInstaller: Installing profile for com.qualityalternative.app
+06-12 15:47:49.572 11994 12008 D UiDevice: Taking screenshot (scale=1.000000, quality=90) and storing at /sdcard/Download/qualityalternative/sprint27-agent-content-inbox-1781272063934/03_agent_inbox_priority_accepted_light.png.
+06-12 15:47:49.658 11994 12008 D UiDevice: Taking screenshot (scale=1.000000, quality=90) and storing at /sdcard/Download/qualityalternative/sprint27-agent-content-inbox-1781272063934/03_agent_inbox_priority_accepted_light.png.
+06-12 15:47:50.305 11994 12008 D UiDevice: Taking screenshot (scale=1.000000, quality=90) and storing at /sdcard/Download/qualityalternative/sprint27-agent-content-inbox-1781272063934/04_agent_inbox_invalid_duplicate_light.png.
+06-12 15:47:50.326  1605  2504 W MediaProvider: isAppCloneUserPair for user 0: false
+06-12 15:47:50.394 11994 12008 D UiDevice: Taking screenshot (scale=1.000000, quality=90) and storing at /sdcard/Download/qualityalternative/sprint27-agent-content-inbox-1781272063934/04_agent_inbox_invalid_duplicate_light.png.
+06-12 15:47:50.481 11994 12008 D UiDevice: Taking screenshot (scale=1.000000, quality=90) and storing at /sdcard/Download/qualityalternative/sprint27-agent-content-inbox-1781272063934/04_agent_inbox_invalid_duplicate_light.png.
+06-12 15:47:51.075 11994 12008 D UiDevice: Taking screenshot (scale=1.000000, quality=90) and storing at /sdcard/Download/qualityalternative/sprint27-agent-content-inbox-1781272063934/04b_agent_inbox_rejected_light.png.
+06-12 15:47:51.094  1605  2505 W MediaProvider: isAppCloneUserPair for user 0: false
+06-12 15:47:51.170 11994 12008 D UiDevice: Taking screenshot (scale=1.000000, quality=90) and storing at /sdcard/Download/qualityalternative/sprint27-agent-content-inbox-1781272063934/04b_agent_inbox_rejected_light.png.
+06-12 15:47:51.259 11994 12008 D UiDevice: Taking screenshot (scale=1.000000, quality=90) and storing at /sdcard/Download/qualityalternative/sprint27-agent-content-inbox-1781272063934/04b_agent_inbox_rejected_light.png.
+06-12 15:47:51.413  1605 11330 I MediaProvider: Open with lower FS for /storage/emulated/0/Download/Quality Alternative/quality-alternative-profile (1781272065759).json. Uid: 10273
+06-12 15:47:51.551   693   863 D WifiClientModeImpl[8882:wlan0]: updateLinkLayerStatsRssiSpeedFrequencyCapabilities rssi=-50 TxLinkspeed=1 freq=2447 RxLinkSpeed=2
+06-12 15:47:51.551   693   863 D WifiDataStall: tx tput in kbps: 11000
+06-12 15:47:51.551   693   863 D WifiDataStall: rx tput in kbps: 11000
+06-12 15:47:51.551   693   863 V WifiConfigManager: Updating scan detail cache freq=2447 BSSID=00:13:10:85:fe:01 RSSI=-50 for "AndroidWifi"NONE
+06-12 15:47:51.551   693   863 D WifiThroughputPredictor:  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+06-12 15:47:51.551   693   863 D WifiThroughputPredictor:  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 11
+06-12 15:47:51.551   693   863 D WifiThroughputPredictor:  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+06-12 15:47:51.551   693   863 D WifiThroughputPredictor:  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 11
+06-12 15:47:51.551   693   863 D WifiThroughputPredictor:  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+06-12 15:47:51.551   693   863 D WifiThroughputPredictor:  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 11
+06-12 15:47:51.551   693   863 D WifiThroughputPredictor:  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+06-12 15:47:51.551   693   863 D WifiThroughputPredictor:  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 11
+06-12 15:47:51.551   693   863 D WifiScoreCard: BSSID update SIGNAL_POLL ID: 273713110 SSID: "AndroidWifi", BSSID: 00:13:10:85:fe:01, MAC: 02:15:b2:00:00:00, IP: /10.0.2.16, Security type: 0, Supplicant state: COMPLETED, Wi-Fi standard: legacy, RSSI: -50, Link speed: 1Mbps, Tx Link speed: 1Mbps, Max Supported Tx Link speed: 11Mbps, Rx Link speed: 2Mbps, Max Supported Rx Link speed: 11Mbps, Frequency: 2447MHz, Net ID: 0, Metered hint: false, score: 60, isUsable: true, CarrierMerged: false, SubscriptionId: -1, IsPrimary: 1, Trusted: true, Restricted: false, Ephemeral: false, OEM paid: false, OEM private: false, OSU AP: false, FQDN: <none>, Provider friendly name: <none>, Requesting package name: <none>"AndroidWifi"openMLO Information: , Is TID-To-Link negotiation supported by the AP: false, AP MLD Address: <none>, AP MLO Link Id: <none>, AP MLO Affiliated links: <none>, Vendor Data: <none>
+06-12 15:47:51.551   693   863 D WifiScoreCard: txRate: 1 txSpeed: 1
+06-12 15:47:51.551   693   863 D WifiScoreCard: network update SIGNAL_POLL "AndroidWifi" ID: 732197599 RSSI -50 txSpeed -1
+06-12 15:47:51.552   693   863 D WifiClientModeImpl[8882:wlan0]:  ClientModeImpl$L2ConnectedState screen=on 4 0 "AndroidWifi" 00:13:10:85:fe:01 rssi=-50 f=2447 sc=60 link=1 tx=0.0, 0.0, 0.0 rx=0.0 bcn=0 [on:0 tx:0 rx:0 period:3005] from screen [on:0 period:-1139356288] score=60
+06-12 15:47:51.593   693   869 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET, states=14
+06-12 15:47:51.593   693   869 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET6, states=14
+06-12 15:47:51.594   693   869 D InetDiagMessage: Destroyed live tcp sockets for uids={10105} in 1ms
+06-12 15:47:51.635   468   547 I netd    : tetherGetStats() -> {[]} <0.46ms>
+06-12 15:47:51.889 11994 12008 D UiDevice: Taking screenshot (scale=1.000000, quality=90) and storing at /sdcard/Download/qualityalternative/sprint27-agent-content-inbox-1781272063934/05_agent_inbox_review_dark.png.
+06-12 15:47:51.912  1605  1841 W MediaProvider: isAppCloneUserPair for user 0: false
+06-12 15:47:51.984 11994 12008 D UiDevice: Taking screenshot (scale=1.000000, quality=90) and storing at /sdcard/Download/qualityalternative/sprint27-agent-content-inbox-1781272063934/05_agent_inbox_review_dark.png.
+06-12 15:47:52.074 11994 12008 D UiDevice: Taking screenshot (scale=1.000000, quality=90) and storing at /sdcard/Download/qualityalternative/sprint27-agent-content-inbox-1781272063934/05_agent_inbox_review_dark.png.
+06-12 15:47:52.229  1605 11330 I MediaProvider: Open with lower FS for /storage/emulated/0/Download/Quality Alternative/quality-alternative-profile (1781272065759).json. Uid: 10273
+06-12 15:47:52.692  1605 11330 I MediaProvider: Open with lower FS for /storage/emulated/0/Download/Quality Alternative/quality-alternative-profile (1781272065759).json. Uid: 10273
+06-12 15:47:52.707 11994 11998 I alternative.app: Compiler allocated 6258KB to compile void com.qualityalternative.app.ui.QualityAlternativeAppKt.MainRoute(com.qualityalternative.app.ui.MainUiState, com.qualityalternative.app.ui.MainViewModel, kotlin.jvm.functions.Function0, androidx.compose.runtime.Composer, int)
+06-12 15:47:53.069  1605 11330 I MediaProvider: Open with lower FS for /storage/emulated/0/Download/Quality Alternative/quality-alternative-profile (1781272065759).json. Uid: 10273
+06-12 15:47:53.114   693   693 D FlashNotifController: requestStartFlashNotification
+06-12 15:47:53.114   693   693 I FlashNotifController: startFlashNotification: type=1, tag=android
+06-12 15:47:53.114   693   693 D FlashNotifController: Flash notification is disabled
+06-12 15:47:53.115   962  3696 D RingtonePlayer: playAsync(uri=content://settings/system/notification_sound, user=UserHandle{0})
+06-12 15:47:53.115   962  3696 D RingtonePlayer: play uri=content://settings/system/notification_sound
+06-12 15:47:53.117   693   693 I system_server: AssetManager2(0xb4000075f3e42458) locale list changing from [] to [en-US]
+06-12 15:47:53.118   962 12044 D RingtonePlayer: RemoveFirst
+06-12 15:47:53.118   962 12044 D RingtonePlayer: PLAY
+06-12 15:47:53.118   962 12044 D RingtonePlayer: startSound()
+06-12 15:47:53.118   962 12045 D RingtonePlayer: in run: new looper Looper (Thread-16, tid 145) {b6d7229}
+06-12 15:47:53.121  1086  1086 I NotificationListener: received notification posted event - androidx.test.services#UserHandle{0},category=-1
+06-12 15:47:53.127  1628  2005 W AiAiEcho: LyftNotificationParser Ridesharing ETA not enabled
+06-12 15:47:53.127  1628  2005 I AiAiEcho: SmartspaceNotificationPredictor no parser can handle this notification or notification is invalid
+06-12 15:47:53.140   962   962 I ndroid.systemui: AssetManager2(0xb4000075f3de0cf8) locale list changing from [] to [en-US]
+06-12 15:47:53.142   962   962 W HWUI    : Image decoding logging dropped!
+06-12 15:47:53.145   610   610 D NuPlayerDriver: NuPlayerDriver(0xb400007a479efc50) created, clientPid(962)
+06-12 15:47:53.152   227   227 I hwservicemanager: getTransport: Cannot find entry android.hardware.media.omx@1.0::IOmx/default in either framework or device VINTF manifest.
+06-12 15:47:53.152   610   610 D MediaPlayerService: OMX service is not available
+06-12 15:47:53.180   962  3701 W HWUI    : Failed to choose config with EGL_SWAP_BEHAVIOR_PRESERVED, retrying without...
+06-12 15:47:53.180   962  3701 W HWUI    : Failed to initialize 101010-2 format, error = EGL_SUCCESS
+06-12 15:47:53.184   962  1489 W HWUI    : Image decoding logging dropped!
+06-12 15:47:53.191   962  1489 W HWUI    : Image decoding logging dropped!
+06-12 15:47:53.211   610 12048 D GenericSource: FileSource remote
+06-12 15:47:53.270   962 12045 D RingtonePlayer: requesting AudioFocus
+06-12 15:47:53.273   693   720 I MediaFocusControl: requestAudioFocus() from uid/pid 10186/962 AA=USAGE_NOTIFICATION/CONTENT_TYPE_SONIFICATION clientId=android.media.AudioManager@33804ab callingPack=com.android.systemui req=3 flags=0x0 sdk=36
+06-12 15:47:53.275   962 12045 D RingtonePlayer: notification will be delayed by 500ms
+06-12 15:47:53.285   693   869 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET, states=14
+06-12 15:47:53.285   693   869 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET6, states=14
+06-12 15:47:53.285   693   869 D InetDiagMessage: Destroyed live tcp sockets for uids={10153} in 0ms
+06-12 15:47:53.288   693   869 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET, states=14
+06-12 15:47:53.288   693   869 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET6, states=14
+06-12 15:47:53.288   693   869 D InetDiagMessage: Destroyed live tcp sockets for uids={10100} in 1ms
+06-12 15:47:53.778   610 12047 I GenericSource: start
+06-12 15:47:53.778   962 12045 D RingtonePlayer: player.start piid:175
+06-12 15:47:53.786   610 12052 D CCodec  : allocate(c2.android.vorbis.decoder)
+06-12 15:47:53.787   610 12052 I CCodec  : setting up 'default' as default (vendor) store
+06-12 15:47:53.790   962   962 D MediaRouter: onRestoreRoute() : route=RouteInfo{ name=Phone, description=null, status=null, category=RouteCategory{ name=System types=ROUTE_TYPE_LIVE_AUDIO ROUTE_TYPE_LIVE_VIDEO  groupable=false }, supportedTypes=ROUTE_TYPE_LIVE_AUDIO ROUTE_TYPE_LIVE_VIDEO , presentationDisplay=null }
+06-12 15:47:53.790   962   962 V MediaRouter: Selecting route: RouteInfo{ name=Phone, description=null, status=null, category=RouteCategory{ name=System types=ROUTE_TYPE_LIVE_AUDIO ROUTE_TYPE_LIVE_VIDEO  groupable=false }, supportedTypes=ROUTE_TYPE_LIVE_AUDIO ROUTE_TYPE_LIVE_VIDEO , presentationDisplay=null }
+06-12 15:47:53.809   610  5571 D BufferPoolAccessor2.0: bufferpool2 0xb400007a379e84d8 : 0(0 size) total buffers - 0(0 size) used buffers - 93/101 (recycle/alloc) - 14/198 (fetch/transfer)
+06-12 15:47:53.809   610  5571 D BufferPoolAccessor2.0: Destruction - bufferpool2 0xb400007a379e84d8 cached: 0/0M, 0/0% in use; allocs: 101, 92% recycled; transfers: 198, 93% unfetched
+06-12 15:47:53.809   610 12052 I CCodec  : Created component [c2.android.vorbis.decoder] for [c2.android.vorbis.decoder]
+06-12 15:47:53.810   610 12052 D CCodecConfig: read media type: audio/vorbis
+06-12 15:47:53.812   610 12052 D ReflectedParamUpdater: extent() != 1 for single value type: algo.buffers.max-count.values
+06-12 15:47:53.813   610 12052 D ReflectedParamUpdater: extent() != 1 for single value type: output.subscribed-indices.values
+06-12 15:47:53.814   610 12052 D ReflectedParamUpdater: extent() != 1 for single value type: input.buffers.allocator-ids.values
+06-12 15:47:53.814   610 12052 D ReflectedParamUpdater: extent() != 1 for single value type: output.buffers.allocator-ids.values
+06-12 15:47:53.814   610 12052 D ReflectedParamUpdater: extent() != 1 for single value type: algo.buffers.allocator-ids.values
+06-12 15:47:53.814   610 12052 D ReflectedParamUpdater: extent() != 1 for single value type: output.buffers.pool-ids.values
+06-12 15:47:53.814   610 12052 D ReflectedParamUpdater: extent() != 1 for single value type: algo.buffers.pool-ids.values
+06-12 15:47:53.815   610 12052 I CCodecConfig: query failed after returning 8 values (BAD_INDEX)
+06-12 15:47:53.815   610 12052 D CCodecConfig: c2 config diff is Dict {
+06-12 15:47:53.815   610 12052 D CCodecConfig:   c2::u32 coded.bitrate.value = 64000
+06-12 15:47:53.815   610 12052 D CCodecConfig:   c2::u32 input.buffers.max-size.value = 32768
+06-12 15:47:53.815   610 12052 D CCodecConfig:   c2::u32 input.delay.value = 0
+06-12 15:47:53.815   610 12052 D CCodecConfig:   string input.media-type.value = "audio/vorbis"
+06-12 15:47:53.815   610 12052 D CCodecConfig:   c2::u32 output.large-frame.max-size = 0
+06-12 15:47:53.815   610 12052 D CCodecConfig:   c2::u32 output.large-frame.threshold-size = 0
+06-12 15:47:53.815   610 12052 D CCodecConfig:   string output.media-type.value = "audio/raw"
+06-12 15:47:53.815   610 12052 D CCodecConfig:   c2::u32 raw.channel-count.value = 1
+06-12 15:47:53.815   610 12052 D CCodecConfig:   c2::u32 raw.sample-rate.value = 48000
+06-12 15:47:53.815   610 12052 D CCodecConfig: }
+06-12 15:47:53.817   610 12051 W ServiceManagerCppClient: Failed to get isDeclared for media_quality: Status(-1, EX_SECURITY): 'SELinux denied for service.'
+06-12 15:47:53.817   610 12051 E MediaCodec: Media Quality Service not found.
+06-12 15:47:53.817   610 12052 D CCodec  : [c2.android.vorbis.decoder] buffers are bound to CCodec for this session
+06-12 15:47:53.817   610 12052 D CCodecConfig: no c2 equivalents for durationUs
+06-12 15:47:53.817   610 12052 D CCodecConfig: no c2 equivalents for csd-1
+06-12 15:47:53.817   610 12052 D CCodecConfig: no c2 equivalents for flags
+06-12 15:47:53.817   610 12052 D CCodecConfig: c2 config diff is   c2::u32 coded.bitrate.value = 70000
+06-12 15:47:53.818   610 12052 W Codec2Client: query -- param skipped: index = 1107298332.
+06-12 15:47:53.818   610 12052 D CCodec  : encoding statistics level = 0
+06-12 15:47:53.818   610 12052 D CCodec  : setup formats input: AMessage(what = 0x00000000) = {
+06-12 15:47:53.818   610 12052 D CCodec  :   int32_t bitrate = 70000
+06-12 15:47:53.818   610 12052 D CCodec  :   int32_t channel-count = 1
+06-12 15:47:53.818   610 12052 D CCodec  :   int32_t max-input-size = 32768
+06-12 15:47:53.818   610 12052 D CCodec  :   string mime = "audio/vorbis"
+06-12 15:47:53.818   610 12052 D CCodec  :   int32_t sample-rate = 48000
+06-12 15:47:53.818   610 12052 D CCodec  : }
+06-12 15:47:53.818   610 12052 D CCodec  : setup formats output: AMessage(what = 0x00000000) = {
+06-12 15:47:53.818   610 12052 D CCodec  :   int32_t buffer-batch-max-output-size = 0
+06-12 15:47:53.818   610 12052 D CCodec  :   int32_t buffer-batch-threshold-output-size = 0
+06-12 15:47:53.818   610 12052 D CCodec  :   int32_t channel-count = 1
+06-12 15:47:53.818   610 12052 D CCodec  :   string mime = "audio/raw"
+06-12 15:47:53.818   610 12052 D CCodec  :   int32_t sample-rate = 48000
+06-12 15:47:53.818   610 12052 D CCodec  :   int32_t channel-mask = 1
+06-12 15:47:53.818   610 12052 D CCodec  :   int32_t android._config-pcm-encoding = 2
+06-12 15:47:53.818   610 12052 D CCodec  : }
+06-12 15:47:53.818   610 12052 I CCodecConfig: query failed after returning 8 values (BAD_INDEX)
+06-12 15:47:53.818   610 12052 E mediaserver: Failed to query component interface for required system resources: 6
+06-12 15:47:53.819   610 12052 I MediaCodec: MediaCodec will operate in async mode
+06-12 15:47:53.819   610 12051 D MediaCodec: keep callback message for reclaim
+06-12 15:47:53.820   610 12052 W Codec2Client: query -- param skipped: index = 1342179345.
+06-12 15:47:53.820   610 12052 W Codec2Client: query -- param skipped: index = 2415921170.
+06-12 15:47:53.821   610 12052 D CCodecBufferChannel: [c2.android.vorbis.decoder#727] Created input block pool with allocatorID 16 => poolID 30 - OK (0)
+06-12 15:47:53.821   613   680 D BufferPoolAccessor2.0: bufferpool2 0xb400007cb2489758 : 0(0 size) total buffers - 0(0 size) used buffers - 93/97 (recycle/alloc) - 5/96 (fetch/transfer)
+06-12 15:47:53.821   613   680 D BufferPoolAccessor2.0: Destruction - bufferpool2 0xb400007cb2489758 cached: 0/0M, 0/0% in use; allocs: 97, 96% recycled; transfers: 96, 95% unfetched
+06-12 15:47:53.822   610 12052 I CCodecBufferChannel: [c2.android.vorbis.decoder#727] Created output block pool with allocatorID 16 => poolID 62 - OK
+06-12 15:47:53.823   610 12052 D CCodecBufferChannel: [c2.android.vorbis.decoder#727] Configured output block pool ids 62 => OK
+06-12 15:47:53.824   613   663 E Codec2-ComponentInterface: We have a failed config
+06-12 15:47:53.825   613 12053 D SimpleC2Component: Using output block pool with poolID 62 => got 62 - 0
+06-12 15:47:53.845   521   569 D AudioFlinger: Client defaulted notificationFrames to 12512 for frameCount 25024
+06-12 15:47:53.846   521   569 I AF::PthrPatchRecord: creating track with enforcement level 0
+06-12 15:47:53.870   610 12050 D AudioTrack: getTimestamp_l(28): device stall time corrected using current time 18783428668081
+06-12 15:47:53.870   610   610 D MediaPlayerService: onAudioDeviceUpdate deviceIds: 2
+06-12 15:47:53.888 11994 12008 D UiDevice: Taking screenshot (scale=1.000000, quality=90) and storing at /sdcard/Download/qualityalternative/sprint27-agent-content-inbox-1781272063934/06_agent_inbox_library_imported_markdown_light.png.
+06-12 15:47:53.908  1605  2506 W MediaProvider: isAppCloneUserPair for user 0: false
+06-12 15:47:53.950   521   650 D AudioFlinger: mixer(0xb400007d21879770) throttle end: throttle time(19)
+06-12 15:47:53.979 11994 12008 D UiDevice: Taking screenshot (scale=1.000000, quality=90) and storing at /sdcard/Download/qualityalternative/sprint27-agent-content-inbox-1781272063934/06_agent_inbox_library_imported_markdown_light.png.
+06-12 15:47:54.067 11994 12008 D UiDevice: Taking screenshot (scale=1.000000, quality=90) and storing at /sdcard/Download/qualityalternative/sprint27-agent-content-inbox-1781272063934/06_agent_inbox_library_imported_markdown_light.png.
+06-12 15:47:54.159   693  1973 I system_server: AssetManager2(0xb4000075f3e491b8) locale list changing from [] to [en-US]
+06-12 15:47:54.160   693  1973 V GrammaticalInflectionUtils: AttributionSource: AttributionSource { uid = 10276, packageName = null, attributionTag = null, token = android.os.Binder@51a7416, deviceId = 0, next = null } does not have READ_SYSTEM_GRAMMATICAL_GENDER permission.
+06-12 15:47:54.165   534   575 I BpBinder: onLastStrongRef automatically unlinking death recipients:
+06-12 15:47:54.167   962  1166 I ndroid.systemui: AssetManager2(0xb4000075f3de8d18) locale list changing from [] to [en-US]
+06-12 15:47:54.167   693   743 V GrammaticalInflectionUtils: AttributionSource: AttributionSource { uid = 10276, packageName = null, attributionTag = null, token = android.os.Binder@51a7416, deviceId = 0, next = null } does not have READ_SYSTEM_GRAMMATICAL_GENDER permission.
+06-12 15:47:54.170 11994 11994 D LifecycleMonitor: Lifecycle status change: com.qualityalternative.app.MainActivity@d26d2bf in: PAUSED
+06-12 15:47:54.170 11994 11994 V ActivityScenario: Update currentActivityStage to PAUSED, currentActivity=com.qualityalternative.app.MainActivity@d26d2bf
+06-12 15:47:54.172   534   534 I BpBinder: onLastStrongRef automatically unlinking death recipients:
+06-12 15:47:54.174   693   743 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:54.174   693   743 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:54.174   693   743 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:54.174   693   743 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:54.174   693   743 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:54.174   693   743 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:54.174   693   743 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:54.174   693   743 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:54.174   693   743 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:54.174   693   743 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:54.174   693   743 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:54.174   693   743 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:54.174   693   743 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:54.174   693   743 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:54.174   693   743 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:54.175   693   743 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:54.175   693   743 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:54.175   693   743 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:54.175   693   743 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:54.175   693   743 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:54.175   693   743 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:54.175   693   743 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:54.175   693   743 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:54.175   693   743 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:54.175   693   743 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:54.175   693   743 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:54.175   693   743 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:54.175   693   743 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:54.175   693   743 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:54.175   693   743 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:54.175   693   743 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:54.176   693   743 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:54.176   693   743 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:54.176   693   743 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:54.177   693   743 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:54.177   693   743 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:54.177   693   743 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:54.177   693   743 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:54.177   693   743 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:54.183   471   471 D Zygote  : Forked child process 12055
+06-12 15:47:54.184   468   547 I netd    : tetherGetStats() -> {[]} <0.44ms>
+06-12 15:47:54.185   962  1169 D SplashScreenView: Build android.window.SplashScreenView{125c3dd V.E...... ......ID 0,0-0,0}
+06-12 15:47:54.185   962  1169 D SplashScreenView: Icon: view: null drawable: null size: 0
+06-12 15:47:54.185   962  1169 D SplashScreenView: Branding: view: android.view.View{8afeb52 G.ED..... ......I. 0,0-0,0 #1020541 android:id/splashscreen_branding_view} drawable: null size w: 0 h: 0
+06-12 15:47:54.187   601   601 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:54.200 12055 12055 I native.app.test: Late-enabling -Xcheck:jni
+06-12 15:47:54.220 12055 12055 I native.app.test: Using CollectorTypeCMC GC.
+06-12 15:47:54.223   544   567 I adbd    : jdwp connection from 12055
+06-12 15:47:54.237   962  1075 I ndroid.systemui: AssetManager2(0xb4000075f3dedb38) locale list changing from [] to [en-US]
+06-12 15:47:54.237 12055 12055 D nativeloader: Load libframework-connectivity-tiramisu-jni.so using APEX ns com_android_tethering for caller /apex/com.android.tethering/javalib/framework-connectivity-t.jar: ok
+06-12 15:47:54.241   962  1075 I ndroid.systemui: AssetManager2(0xb4000075f3de7d78) locale list changing from [] to [en-US]
+06-12 15:47:54.255   492   492 I RanchuHwc: logCompositionFallbackIfChanged: layer 213 CompositionType fallback from 3 to 1
+06-12 15:47:54.257 11994 11994 D VRI[MainActivity]: visibilityChanged oldVisibility=true newVisibility=false
+06-12 15:47:54.300 12055 12055 D nativeloader: Configuring clns-9 for other apk /data/app/~~rbGLBi7KRFiCT97ExU1f3Q==/com.qualityalternative.app.test-UknusKmm9gPCj-xwKPov3w==/base.apk. target_sdk_version=36, uses_libraries=, library_path=/data/app/~~rbGLBi7KRFiCT97ExU1f3Q==/com.qualityalternative.app.test-UknusKmm9gPCj-xwKPov3w==/lib/arm64, permitted_path=/data:/mnt/expand:/data/user/0/com.qualityalternative.app.test
+06-12 15:47:54.304 12055 12055 I native.app.test: AssetManager2(0xb4000075f3dd76f8) locale list changing from [] to [en-US]
+06-12 15:47:54.308 12055 12055 V GraphicsEnvironment: Currently set values for:
+06-12 15:47:54.308 12055 12055 V GraphicsEnvironment:   angle_gl_driver_selection_pkgs=[]
+06-12 15:47:54.308 12055 12055 V GraphicsEnvironment:   angle_gl_driver_selection_values=[]
+06-12 15:47:54.308 12055 12055 V GraphicsEnvironment: com.qualityalternative.app.test is not listed in per-application setting
+06-12 15:47:54.309 12055 12055 V GraphicsEnvironment: ANGLE allowlist from config: com.dreamgames.royalmatch com.dts.freefiremax com.dxx.firenow com.gramgames.mergedragons com.ludo.king com.mojang.minecraftpe com.my.defense com.nintendo.zaka com.os.airforce com.playrix.fishdomdd.gplay io.teslatech.callbreak jp.konami.prospia net.peakgames.toonblast
+06-12 15:47:54.309 12055 12055 V GraphicsEnvironment: com.qualityalternative.app.test is not listed in ANGLE allowlist or settings, returning default
+06-12 15:47:54.309 12055 12055 V GraphicsEnvironment: Neither updatable production driver nor prerelease driver is supported.
+06-12 15:47:54.320 12055 12055 I native.app.test: AssetManager2(0xb4000075f3dd12f8) locale list changing from [] to [en-US]
+06-12 15:47:54.324 12055 12055 E ashmem  : Pinning is deprecated since Android Q. Please use trim or other methods.
+06-12 15:47:54.333 12055 12055 D CompatChangeReporter: Compat change id reported: 377864165; UID 10276; state: ENABLED
+06-12 15:47:54.334 12055 12055 D DesktopModeFlags: Toggle override initialized to: OVERRIDE_UNSET
+06-12 15:47:54.350 12055 12071 I EGL_emulation: Opening libGLESv1_CM_emulation.so
+06-12 15:47:54.350 12055 12071 I EGL_emulation: Opening libGLESv2_emulation.so
+06-12 15:47:54.354 12055 12055 W HWUI    : Unknown dataspace 0
+06-12 15:47:54.356 11994 11994 D LifecycleMonitor: Lifecycle status change: com.qualityalternative.app.MainActivity@d26d2bf in: STOPPED
+06-12 15:47:54.356 11994 11994 V ActivityScenario: Update currentActivityStage to STOPPED, currentActivity=com.qualityalternative.app.MainActivity@d26d2bf
+06-12 15:47:54.356 12055 12071 W HWUI    : Failed to choose config with EGL_SWAP_BEHAVIOR_PRESERVED, retrying without...
+06-12 15:47:54.357 12055 12071 W HWUI    : Failed to initialize 101010-2 format, error = EGL_SUCCESS
+06-12 15:47:54.376 11994 11994 W WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.app.Activity$$ExternalSyntheticLambda0@c198f33
+06-12 15:47:54.376 11994 11994 D LifecycleMonitor: Lifecycle status change: com.qualityalternative.app.MainActivity@d26d2bf in: DESTROYED
+06-12 15:47:54.376 11994 11994 V ActivityScenario: Update currentActivityStage to DESTROYED, currentActivity=null
+06-12 15:47:54.378 11994 11994 D ViewRootImpl: Skipping stats log for color mode
+06-12 15:47:54.381   693  1972 I ImeTracker: system_server:55208c29: onRequestHide at ORIGIN_SERVER reason IME_REQUESTED_CHANGED_LISTENER fromUser false
+06-12 15:47:54.383   693   743 I ImeTracker: system_server:55208c29: onCancelled at PHASE_SERVER_SHOULD_HIDE
+06-12 15:47:54.384   534   575 I BpBinder: onLastStrongRef automatically unlinking death recipients:
+06-12 15:47:54.393  1086  1086 D RecentsView: onTaskRemoved: 135, not handling task stack changes
+06-12 15:47:54.393  1086  1086 D RecentsView: onTaskRemoved: 135, not handling task stack changes
+06-12 15:47:54.401   534   575 W ServiceManagerCppClient: Permission failure: android.permission.ACCESS_SURFACE_FLINGER from uid=10276 pid=0
+06-12 15:47:54.401   534   575 D PermissionCache: checking android.permission.ACCESS_SURFACE_FLINGER for uid=10276 => denied (239 us)
+06-12 15:47:54.401   534   825 W ServiceManagerCppClient: Permission failure: android.permission.ROTATE_SURFACE_FLINGER from uid=10276 pid=12055
+06-12 15:47:54.401   534   825 D PermissionCache: checking android.permission.ROTATE_SURFACE_FLINGER for uid=10276 => denied (145 us)
+06-12 15:47:54.403   534   825 W ServiceManagerCppClient: Permission failure: android.permission.INTERNAL_SYSTEM_WINDOW from uid=10276 pid=12055
+06-12 15:47:54.403   534   825 D PermissionCache: checking android.permission.INTERNAL_SYSTEM_WINDOW for uid=10276 => denied (1082 us)
+06-12 15:47:54.403   534   575 W ServiceManagerCppClient: Permission failure: android.permission.ROTATE_SURFACE_FLINGER from uid=10276 pid=0
+06-12 15:47:54.403   534   575 D PermissionCache: checking android.permission.ROTATE_SURFACE_FLINGER for uid=10276 => denied (1574 us)
+06-12 15:47:54.405   534   534 I BpBinder: onLastStrongRef automatically unlinking death recipients:
+06-12 15:47:54.410   945   945 D wpa_supplicant: nl80211: Drv Event 64 (NL80211_CMD_NOTIFY_CQM) received for wlan0
+06-12 15:47:54.410   945   945 D wpa_supplicant: nl80211: Beacon loss event
+06-12 15:47:54.410   945   945 D wpa_supplicant: wlan0: Event BEACON_LOSS (53) received
+06-12 15:47:54.410   945   945 I wpa_supplicant: wlan0: CTRL-EVENT-BEACON-LOSS
+06-12 15:47:54.422   693  1973 W ServiceManagerCppClient: Permission failure: android.permission.ACCESS_SURFACE_FLINGER from uid=10276 pid=0
+06-12 15:47:54.422   693  1973 D PermissionCache: checking android.permission.ACCESS_SURFACE_FLINGER for uid=10276 => denied (53 us)
+06-12 15:47:54.422   693  1973 W ServiceManagerCppClient: Permission failure: android.permission.ROTATE_SURFACE_FLINGER from uid=10276 pid=0
+06-12 15:47:54.422   693  1973 D PermissionCache: checking android.permission.ROTATE_SURFACE_FLINGER for uid=10276 => denied (6 us)
+06-12 15:47:54.422   693  1973 W ServiceManagerCppClient: Permission failure: android.permission.INTERNAL_SYSTEM_WINDOW from uid=10276 pid=0
+06-12 15:47:54.422   693  1973 D PermissionCache: checking android.permission.INTERNAL_SYSTEM_WINDOW for uid=10276 => denied (6 us)
+06-12 15:47:54.430  1086  1086 D ViewRootImpl: Skipping stats log for color mode
+06-12 15:47:54.432  1086  1086 D StatsLog: LAUNCHER_ONRESUME
+06-12 15:47:54.438  1086  1140 D QuickstepModelDelegate: notifyAppTargetEvent action=1 launchLocation=workspace/0/[-1,-1]/[1,1]
+06-12 15:47:54.439  1086  1086 D NexusLauncherModelDelegate: notifySmartspaceEvent: SmartspaceTargetEvent{mSmartspaceTarget=null, mSmartspaceActionId='null', mEventType=6}
+06-12 15:47:54.442  1628  1862 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+06-12 15:47:54.442  1628  1862 I AiAiEcho: EchoTargets:
+06-12 15:47:54.442  1628  1862 I AiAiEcho: Filtered by AiAi flag check:
+06-12 15:47:54.442  1628  1862 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+06-12 15:47:54.442  1628  1862 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+06-12 15:47:54.442  1628  1862 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface home with targets# 0 (types=[])
+06-12 15:47:54.446  1086  1086 D BaseDepthController: setSurface:
+06-12 15:47:54.446  1086  1086 D BaseDepthController: 	mWaitingOnSurfaceValidity: false
+06-12 15:47:54.446  1086  1086 D BaseDepthController: 	mBaseSurface: Surface(name=com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity)/@0xf8deafa
+06-12 15:47:54.474  1086  1086 I NotificationListener: Handling notification state refresh for androidx.test.services#0
+06-12 15:47:54.474  1086  1086 D SsBaseTemplateCard: No text view can be set up
+06-12 15:47:54.474  1086  1086 D SsBaseTemplateCard: Passed-in item info is null
+06-12 15:47:54.474  1086  1086 D SsBaseTemplateCard: Passed-in item info is null
+06-12 15:47:54.474  1086  1086 D SsBaseTemplateCard: Passed-in item info is null
+06-12 15:47:54.474  1086  1086 I SsBaseTemplateCard: Secondary card pane is null
+06-12 15:47:54.490  1086  1086 D StateManager: createAtomicAnimation - fromState: Background, toState: Normal, partial trace:
+06-12 15:47:54.490  1086  1086 D StateManager: 	at com.android.quickstep.util.WorkspaceRevealAnim.prepareToAnimate(go/retraceme 43e00d9cd0eb17b3d9dd30fc1741b1c71445c4c0f7c8c9b81300265c86c5b873:22)
+06-12 15:47:54.490  1086  1086 D StateManager: 	at com.android.quickstep.util.WorkspaceRevealAnim.<init>(go/retraceme 43e00d9cd0eb17b3d9dd30fc1741b1c71445c4c0f7c8c9b81300265c86c5b873:11)
+06-12 15:47:54.490  1086  1086 D StateManager: 	at com.android.launcher3.QuickstepTransitionManager.createWallpaperOpenAnimations(go/retraceme 43e00d9cd0eb17b3d9dd30fc1741b1c71445c4c0f7c8c9b81300265c86c5b873:339)
+06-12 15:47:54.491  1086  1086 D b/311077782: LauncherAnimationRunner.setAnimation
+06-12 15:47:54.491  1086  1086 D WorkspaceRevealAnim: onAnimationEnd: workspace alpha = 1.0
+06-12 15:47:54.529 12055 12055 D VRI[InstrumentationActivityInvoker$EmptyActivity]: visibilityChanged oldVisibility=true newVisibility=false
+06-12 15:47:54.530   693   834 I ImeTracker: com.google.android.apps.nexuslauncher:52ca01b5: onRequestHide at ORIGIN_SERVER reason HIDE_UNSPECIFIED_WINDOW fromUser false
+06-12 15:47:54.531  1086  1086 D InsetsController: hide(ime(), fromIme=false)
+06-12 15:47:54.531  1086  1086 I ImeTracker: com.google.android.apps.nexuslauncher:52ca01b5: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+06-12 15:47:54.531  1531  1531 I GoogleInputMethodService: GoogleInputMethodService.onFinishInput():2043
+06-12 15:47:54.532   693   785 I ImeTracker: system_server:6c5fbefa: onRequestHide at ORIGIN_SERVER reason IME_REQUESTED_CHANGED_LISTENER fromUser false
+06-12 15:47:54.533  1531  1531 I Module  : DeviceLockedStatusModuleProvider$Module.updateDeviceLockedStatus():100 repeatCheckTimes = 0, locked = false
+06-12 15:47:54.534  1531  1531 I GoogleInputMethodService: GoogleInputMethodService.onStartInput():1293 onStartInput(EditorInfo{EditorInfo{packageName=com.google.android.apps.nexuslauncher, inputType=0, inputTypeString=NULL, enableLearning=false, autoCorrection=false, autoComplete=false, imeOptions=0, privateImeOptions=null, actionName=UNSPECIFIED, actionLabel=null, initialSelStart=-1, initialSelEnd=-1, initialCapsMode=0, label=null, fieldId=0, fieldName=null, extras=null, hintText=null, hintLocales=[]}}, false)
+06-12 15:47:54.534  1531  1531 I EmojiCompatManager: EmojiCompatManager.getEmojiCompatIfLoaded():343 EmojiCompat.init() was never called.
+06-12 15:47:54.534  1531  1531 I EmojiCompatManager: java.lang.IllegalStateException: EmojiCompat is not initialized. Please call EmojiCompat.init() first
+06-12 15:47:54.534  1531  1531 I EmojiCompatManager: 	at asx.p(PG:6)
+06-12 15:47:54.534  1531  1531 I EmojiCompatManager: 	at axb.b(PG:13)
+06-12 15:47:54.534  1531  1531 I EmojiCompatManager: 	at jnr.b(PG:2)
+06-12 15:47:54.534  1531  1531 I EmojiCompatManager: 	at jnr.c(PG:4)
+06-12 15:47:54.534  1531  1531 I EmojiCompatManager: 	at jnr.f(PG:3)
+06-12 15:47:54.534  1531  1531 I EmojiCompatManager: 	at jnx.c(PG:3)
+06-12 15:47:54.534  1531  1531 I EmojiCompatManager: 	at kif.cz(PG:47)
+06-12 15:47:54.534  1531  1531 I EmojiCompatManager: 	at lhl.run(PG:1025)
+06-12 15:47:54.534  1531  1531 I EmojiCompatManager: 	at jaf.execute(PG:12)
+06-12 15:47:54.534  1531  1531 I EmojiCompatManager: 	at nco.v(PG:13)
+06-12 15:47:54.534  1531  1531 I EmojiCompatManager: 	at lhn.m(PG:96)
+06-12 15:47:54.534  1531  1531 I EmojiCompatManager: 	at lhn.k(PG:25)
+06-12 15:47:54.534  1531  1531 I EmojiCompatManager: 	at kgn.onStartInput(PG:250)
+06-12 15:47:54.534  1531  1531 I EmojiCompatManager: 	at android.inputmethodservice.InputMethodService.doStartInput(InputMethodService.java:3521)
+06-12 15:47:54.534  1531  1531 I EmojiCompatManager: 	at android.inputmethodservice.InputMethodService$InputMethodImpl.startInput(InputMethodService.java:879)
+06-12 15:47:54.534  1531  1531 I EmojiCompatManager: 	at android.inputmethodservice.InputMethodService$InputMethodImpl.dispatchStartInput(InputMethodService.java:908)
+06-12 15:47:54.534  1531  1531 I EmojiCompatManager: 	at android.inputmethodservice.IInputMethodWrapper.executeMessage(IInputMethodWrapper.java:201)
+06-12 15:47:54.534  1531  1531 I EmojiCompatManager: 	at com.android.internal.os.HandlerCaller$MyHandler.handleMessage(HandlerCaller.java:44)
+06-12 15:47:54.534  1531  1531 I EmojiCompatManager: 	at android.os.Handler.dispatchMessage(Handler.java:110)
+06-12 15:47:54.534  1531  1531 I EmojiCompatManager: 	at android.os.Looper.loopOnce(Looper.java:248)
+06-12 15:47:54.534  1531  1531 I EmojiCompatManager: 	at android.os.Looper.loop(Looper.java:338)
+06-12 15:47:54.534  1531  1531 I EmojiCompatManager: 	at android.app.ActivityThread.main(ActivityThread.java:9067)
+06-12 15:47:54.534  1531  1531 I EmojiCompatManager: 	at java.lang.reflect.Method.invoke(Native Method)
+06-12 15:47:54.534  1531  1531 I EmojiCompatManager: 	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:593)
+06-12 15:47:54.534  1531  1531 I EmojiCompatManager: 	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:932)
+06-12 15:47:54.535   693   743 I ImeTracker: system_server:6c5fbefa: onCancelled at PHASE_SERVER_SHOULD_HIDE
+06-12 15:47:54.536  1531  1531 I Module  : DeviceLockedStatusModuleProvider$Module.updateDeviceLockedStatus():100 repeatCheckTimes = 1, locked = false
+06-12 15:47:54.555   693   863 D WifiClientModeImpl[8882:wlan0]: updateLinkLayerStatsRssiSpeedFrequencyCapabilities rssi=-50 TxLinkspeed=1 freq=2447 RxLinkSpeed=2
+06-12 15:47:54.555   693   863 D WifiDataStall: tx tput in kbps: 11000
+06-12 15:47:54.555   693   863 D WifiDataStall: rx tput in kbps: 11000
+06-12 15:47:54.555   693   863 V WifiConfigManager: Updating scan detail cache freq=2447 BSSID=00:13:10:85:fe:01 RSSI=-50 for "AndroidWifi"NONE
+06-12 15:47:54.555   693   863 D WifiThroughputPredictor:  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+06-12 15:47:54.555   693   863 D WifiThroughputPredictor:  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 11
+06-12 15:47:54.555   693   863 D WifiThroughputPredictor:  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+06-12 15:47:54.555   693   863 D WifiThroughputPredictor:  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 11
+06-12 15:47:54.555   693   863 D WifiThroughputPredictor:  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+06-12 15:47:54.555   693   863 D WifiThroughputPredictor:  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 11
+06-12 15:47:54.555   693   863 D WifiThroughputPredictor:  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+06-12 15:47:54.555   693   863 D WifiThroughputPredictor:  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 11
+06-12 15:47:54.555   693   863 D WifiScoreCard: BSSID update SIGNAL_POLL ID: 273713110 SSID: "AndroidWifi", BSSID: 00:13:10:85:fe:01, MAC: 02:15:b2:00:00:00, IP: /10.0.2.16, Security type: 0, Supplicant state: COMPLETED, Wi-Fi standard: legacy, RSSI: -50, Link speed: 1Mbps, Tx Link speed: 1Mbps, Max Supported Tx Link speed: 11Mbps, Rx Link speed: 2Mbps, Max Supported Rx Link speed: 11Mbps, Frequency: 2447MHz, Net ID: 0, Metered hint: false, score: 60, isUsable: true, CarrierMerged: false, SubscriptionId: -1, IsPrimary: 1, Trusted: true, Restricted: false, Ephemeral: false, OEM paid: false, OEM private: false, OSU AP: false, FQDN: <none>, Provider friendly name: <none>, Requesting package name: <none>"AndroidWifi"openMLO Information: , Is TID-To-Link negotiation supported by the AP: false, AP MLD Address: <none>, AP MLO Link Id: <none>, AP MLO Affiliated links: <none>, Vendor Data: <none>
+06-12 15:47:54.555   693   863 D WifiScoreCard: txRate: 1 txSpeed: 1
+06-12 15:47:54.555   693   863 D WifiScoreCard: network update SIGNAL_POLL "AndroidWifi" ID: 732197599 RSSI -50 txSpeed -1
+06-12 15:47:54.555   693   863 D WifiClientModeImpl[8882:wlan0]:  ClientModeImpl$L2ConnectedState screen=on 4 0 "AndroidWifi" 00:13:10:85:fe:01 rssi=-50 f=2447 sc=60 link=1 tx=0.0, 0.0, 0.0 rx=0.0 bcn=0 [on:0 tx:0 rx:0 period:3003] from screen [on:0 period:-1139353285] score=60
+06-12 15:47:54.586   521   650 D AudioFlinger: mixer(0xb400007d21879770) throttle end: throttle time(3)
+06-12 15:47:54.593   601   685 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:54.599 12055 12055 W WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.app.Activity$$ExternalSyntheticLambda0@421b970
+06-12 15:47:54.600 12055 12055 D ViewRootImpl: Skipping stats log for color mode
+06-12 15:47:54.621  1086  1086 D RecentsView: onTaskRemoved: 136, not handling task stack changes
+06-12 15:47:54.621  1086  1086 D RecentsView: onTaskRemoved: 136, not handling task stack changes
+06-12 15:47:54.634 11994 12008 W Settings: Setting always_finish_activities has moved from android.provider.Settings.System to android.provider.Settings.Global, returning read-only value.
+06-12 15:47:54.639   693  2129 V GrammaticalInflectionUtils: AttributionSource: AttributionSource { uid = 10273, packageName = null, attributionTag = null, token = android.os.Binder@51a7416, deviceId = 0, next = null } does not have READ_SYSTEM_GRAMMATICAL_GENDER permission.
+06-12 15:47:54.646   534   825 I BpBinder: onLastStrongRef automatically unlinking death recipients:
+06-12 15:47:54.647  1086  1086 W SplitSelectStateCtor: Missing session instanceIds
+06-12 15:47:54.647  1086  1086 D StatsLog: LAUNCHER_SPLIT_SELECTION_EXIT_INTERRUPTED
+06-12 15:47:54.662 11994 11994 D LifecycleMonitor: Lifecycle status change: com.qualityalternative.app.MainActivity@28b1db6 in: PRE_ON_CREATE
+06-12 15:47:54.662 11994 11994 V ActivityScenario: Activity lifecycle changed event received but ignored because the reported transition was not ON_CREATE while the last known transition was PRE_ON_CREATE
+06-12 15:47:54.666   962  1169 D SplashScreenView: Build android.window.SplashScreenView{f711ddc V.E...... ......ID 0,0-0,0}
+06-12 15:47:54.666   962  1169 D SplashScreenView: Icon: view: null drawable: null size: 0
+06-12 15:47:54.666   962  1169 D SplashScreenView: Branding: view: android.view.View{e6aeee5 G.ED..... ......I. 0,0-0,0 #1020541 android:id/splashscreen_branding_view} drawable: null size w: 0 h: 0
+06-12 15:47:54.671   534   534 I BpBinder: onLastStrongRef automatically unlinking death recipients:
+06-12 15:47:54.672   601   685 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:54.678 11994 11994 D LifecycleMonitor: Lifecycle status change: com.qualityalternative.app.MainActivity@28b1db6 in: CREATED
+06-12 15:47:54.678 11994 11994 V ActivityScenario: Update currentActivityStage to CREATED, currentActivity=com.qualityalternative.app.MainActivity@28b1db6
+06-12 15:47:54.678 11994 11994 D LifecycleMonitor: Lifecycle status change: com.qualityalternative.app.MainActivity@28b1db6 in: STARTED
+06-12 15:47:54.678 11994 11994 V ActivityScenario: Update currentActivityStage to STARTED, currentActivity=com.qualityalternative.app.MainActivity@28b1db6
+06-12 15:47:54.678 11994 11994 D AutofillManager: Fill dialog is enabled:false, hints=[]
+06-12 15:47:54.679 11994 11994 D LifecycleMonitor: Lifecycle status change: com.qualityalternative.app.MainActivity@28b1db6 in: RESUMED
+06-12 15:47:54.679 11994 11994 V ActivityScenario: Update currentActivityStage to RESUMED, currentActivity=com.qualityalternative.app.MainActivity@28b1db6
+06-12 15:47:54.719 12055 12060 I native.app.test: Compiler allocated 5111KB to compile void android.view.ViewRootImpl.performTraversals()
+06-12 15:47:54.733   962   969 I ndroid.systemui: CollectorTransition concurrent mark compact GC freed 5920KB AllocSpace bytes, 25(500KB) LOS objects, 49% free, 19MB/39MB, paused 518us,1.452ms total 139.426ms
+06-12 15:47:54.738  1086  1086 D VRI[NexusLauncherActivity]: visibilityChanged oldVisibility=true newVisibility=false
+06-12 15:47:54.763  1086  1086 D NexusLauncherModelDelegate: notifySmartspaceEvent: SmartspaceTargetEvent{mSmartspaceTarget=null, mSmartspaceActionId='null', mEventType=7}
+06-12 15:47:54.774   693   740 I ActivityTaskManager: Displayed com.qualityalternative.app/.MainActivity for user 0: +135ms
+06-12 15:47:54.778   693  1772 W HWUI    : Image decoding logging dropped!
+06-12 15:47:54.781   693  3700 W HWUI    : Failed to choose config with EGL_SWAP_BEHAVIOR_PRESERVED, retrying without...
+06-12 15:47:54.781   693  3700 W HWUI    : Failed to initialize 101010-2 format, error = EGL_SUCCESS
+06-12 15:47:54.793   601   685 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:47:54.836  1086  1086 D BaseDepthController: setSurface:
+06-12 15:47:54.836  1086  1086 D BaseDepthController: 	mWaitingOnSurfaceValidity: false
+06-12 15:47:54.836  1086  1086 D BaseDepthController: 	mBaseSurface: null
+06-12 15:47:54.837   693   834 I ImeTracker: com.qualityalternative.app:ddaefd83: onRequestHide at ORIGIN_SERVER reason HIDE_UNSPECIFIED_WINDOW fromUser false
+06-12 15:47:54.837  1086  1086 D BaseDepthController: mSurface is null and mCurrentBlur is: 0
+06-12 15:47:54.837  1086  1086 D StateManager: goToState - fromState: Normal, toState: Normal, partial trace:
+06-12 15:47:54.837  1086  1086 D StateManager: 	at com.android.launcher3.statemanager.StateManager.moveToRestState(go/retraceme 43e00d9cd0eb17b3d9dd30fc1741b1c71445c4c0f7c8c9b81300265c86c5b873:4)
+06-12 15:47:54.837  1086  1086 D StateManager: 	at com.android.launcher3.statemanager.StateManager.moveToRestState(go/retraceme 43e00d9cd0eb17b3d9dd30fc1741b1c71445c4c0f7c8c9b81300265c86c5b873:1)
+06-12 15:47:54.837  1086  1086 D StateManager: 	at com.android.launcher3.statemanager.StatefulActivity.onStop(go/retraceme 43e00d9cd0eb17b3d9dd30fc1741b1c71445c4c0f7c8c9b81300265c86c5b873:34)
+06-12 15:47:54.837  1086  1086 D StatsLog: LAUNCHER_ONSTOP
+06-12 15:47:54.841   693  2129 I ImeTracker: system_server:c27d6727: onRequestHide at ORIGIN_SERVER reason IME_REQUESTED_CHANGED_LISTENER fromUser false
+06-12 15:47:54.841 11994 11994 D InsetsController: hide(ime(), fromIme=false)
+06-12 15:47:54.841   693   743 I ImeTracker: system_server:c27d6727: onCancelled at PHASE_SERVER_SHOULD_HIDE
+06-12 15:47:54.844  1086  1086 D StatsLog: LAUNCHER_GOOGLE_SEARCH_RESTORE_LIST_SIZE_AFTER_ACTIVITY_RESTART
+06-12 15:47:54.845 11994 11994 I ImeTracker: com.qualityalternative.app:ddaefd83: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+06-12 15:47:54.848  1531  1531 I GoogleInputMethodService: GoogleInputMethodService.onFinishInput():2043
+06-12 15:47:54.849  1531  1531 I Module  : DeviceLockedStatusModuleProvider$Module.updateDeviceLockedStatus():100 repeatCheckTimes = 0, locked = false
+06-12 15:47:54.849  1531  1531 I GoogleInputMethodService: GoogleInputMethodService.onStartInput():1293 onStartInput(EditorInfo{EditorInfo{packageName=com.qualityalternative.app, inputType=0, inputTypeString=NULL, enableLearning=false, autoCorrection=false, autoComplete=false, imeOptions=0, privateImeOptions=null, actionName=UNSPECIFIED, actionLabel=null, initialSelStart=-1, initialSelEnd=-1, initialCapsMode=0, label=null, fieldId=0, fieldName=null, extras=null, hintText=null, hintLocales=[]}}, false)
+06-12 15:47:54.849  1531  1531 I EmojiCompatManager: EmojiCompatManager.getEmojiCompatIfLoaded():343 EmojiCompat.init() was never called.
+06-12 15:47:54.849  1531  1531 I EmojiCompatManager: java.lang.IllegalStateException: EmojiCompat is not initialized. Please call EmojiCompat.init() first
+06-12 15:47:54.849  1531  1531 I EmojiCompatManager: 	at asx.p(PG:6)
+06-12 15:47:54.849  1531  1531 I EmojiCompatManager: 	at axb.b(PG:13)
+06-12 15:47:54.849  1531  1531 I EmojiCompatManager: 	at jnr.b(PG:2)
+06-12 15:47:54.849  1531  1531 I EmojiCompatManager: 	at jnr.c(PG:4)
+06-12 15:47:54.849  1531  1531 I EmojiCompatManager: 	at jnr.f(PG:3)
+06-12 15:47:54.849  1531  1531 I EmojiCompatManager: 	at jnx.c(PG:3)
+06-12 15:47:54.849  1531  1531 I EmojiCompatManager: 	at kif.cz(PG:47)
+06-12 15:47:54.849  1531  1531 I EmojiCompatManager: 	at lhl.run(PG:1025)
+06-12 15:47:54.849  1531  1531 I EmojiCompatManager: 	at jaf.execute(PG:12)
+06-12 15:47:54.849  1531  1531 I EmojiCompatManager: 	at nco.v(PG:13)
+06-12 15:47:54.849  1531  1531 I EmojiCompatManager: 	at lhn.m(PG:96)
+06-12 15:47:54.849  1531  1531 I EmojiCompatManager: 	at lhn.k(PG:25)
+06-12 15:47:54.849  1531  1531 I EmojiCompatManager: 	at kgn.onStartInput(PG:250)
+06-12 15:47:54.849  1531  1531 I EmojiCompatManager: 	at android.inputmethodservice.InputMethodService.doStartInput(InputMethodService.java:3521)
+06-12 15:47:54.849  1531  1531 I EmojiCompatManager: 	at android.inputmethodservice.InputMethodService$InputMethodImpl.startInput(InputMethodService.java:879)
+06-12 15:47:54.849  1531  1531 I EmojiCompatManager: 	at android.inputmethodservice.InputMethodService$InputMethodImpl.dispatchStartInput(InputMethodService.java:908)
+06-12 15:47:54.849  1531  1531 I EmojiCompatManager: 	at android.inputmethodservice.IInputMethodWrapper.executeMessage(IInputMethodWrapper.java:201)
+06-12 15:47:54.849  1531  1531 I EmojiCompatManager: 	at com.android.internal.os.HandlerCaller$MyHandler.handleMessage(HandlerCaller.java:44)
+06-12 15:47:54.849  1531  1531 I EmojiCompatManager: 	at android.os.Handler.dispatchMessage(Handler.java:110)
+06-12 15:47:54.849  1531  1531 I EmojiCompatManager: 	at android.os.Looper.loopOnce(Looper.java:248)
+06-12 15:47:54.849  1531  1531 I EmojiCompatManager: 	at android.os.Looper.loop(Looper.java:338)
+06-12 15:47:54.849  1531  1531 I EmojiCompatManager: 	at android.app.ActivityThread.main(ActivityThread.java:9067)
+06-12 15:47:54.849  1531  1531 I EmojiCompatManager: 	at java.lang.reflect.Method.invoke(Native Method)
+06-12 15:47:54.849  1531  1531 I EmojiCompatManager: 	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:593)
+06-12 15:47:54.849  1531  1531 I EmojiCompatManager: 	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:932)
+06-12 15:47:54.849  1531  1531 I Module  : DeviceLockedStatusModuleProvider$Module.updateDeviceLockedStatus():100 repeatCheckTimes = 1, locked = false
+06-12 15:47:55.232   610 12050 D AudioTrack: stop(28): called with 82980 frames delivered
+06-12 15:47:55.657   962 12045 D RingtonePlayer: onCompletion() abandoning AudioFocus
+06-12 15:47:55.657   693  2132 I MediaFocusControl: abandonAudioFocus() from uid/pid 10186/962 clientId=android.media.AudioManager@33804ab callingPack=com.android.systemui
+06-12 15:47:55.658   962 12045 D RingtonePlayer: onCompletion queue size=0
+06-12 15:47:55.658   962 12045 D RingtonePlayer: in onCompletion quitting looper Looper (Thread-16, tid 145) {b6d7229}
+06-12 15:47:55.658   962 12045 I NotificationPlayer: About to release MediaPlayer piid:175 due to onCompletion
+06-12 15:47:55.658   962 12045 V MediaPlayer: resetDrmState:  mDrmInfo=null mDrmProvisioningThread=null mPrepareDrmInProgress=false mActiveDrmScheme=false
+06-12 15:47:55.658   962 12045 V MediaPlayer: cleanDrmObj: mDrmObj=null mDrmSessionId=null
+06-12 15:47:55.658   610   610 D NuPlayerDriver: reset(0xb400007a479efc50) at state 6
+06-12 15:47:55.661   610 12052 I hw-BpHwBinder: onLastStrongRef automatically unlinking death recipients
+06-12 15:47:55.661   613   683 I hw-BpHwBinder: onLastStrongRef automatically unlinking death recipients
+06-12 15:47:55.661   613   683 I hw-BpHwBinder: onLastStrongRef automatically unlinking death recipients
+06-12 15:47:55.662   613   683 D BufferPoolAccessor2.0: Destruction - bufferpool2 0xb400007cb248c348 cached: 0/0M, 0/0% in use; allocs: 0, 0% recycled; transfers: 0, 0% unfetched
+06-12 15:47:55.664   610 12047 D NuPlayerDriver: notifyResetComplete(0xb400007a479efc50)
+06-12 15:47:55.664   610   610 W AMessage: failed to post message as target looper for handler 0 is gone.
+06-12 15:47:55.722 11994 12008 D UiDevice: Taking screenshot (scale=1.000000, quality=90) and storing at /sdcard/Download/qualityalternative/sprint27-agent-content-inbox-1781272063934/07_agent_inbox_intervention_imported_markdown_light.png.
+06-12 15:47:55.755  1605  2505 W MediaProvider: isAppCloneUserPair for user 0: false
+06-12 15:47:55.835 11994 12008 D UiDevice: Taking screenshot (scale=1.000000, quality=90) and storing at /sdcard/Download/qualityalternative/sprint27-agent-content-inbox-1781272063934/07_agent_inbox_intervention_imported_markdown_light.png.
+06-12 15:47:55.929 11994 12008 D UiDevice: Taking screenshot (scale=1.000000, quality=90) and storing at /sdcard/Download/qualityalternative/sprint27-agent-content-inbox-1781272063934/07_agent_inbox_intervention_imported_markdown_light.png.
+06-12 15:47:56.351  1585  1585 D BoundBrokerSvc: onUnbind: Intent { act=com.google.android.gms.feedback.internal.IFeedbackService dat=chimera-action:/... xflg=0x4 cmp=com.google.android.gms/.chimera.GmsBoundBrokerService }
+06-12 15:47:57.523  1079  1303 D SatelliteController: iisInCarrierRoamingNbIotNtn: satellite is disabled
+06-12 15:47:57.560   693   863 D WifiClientModeImpl[8882:wlan0]: updateLinkLayerStatsRssiSpeedFrequencyCapabilities rssi=-50 TxLinkspeed=1 freq=2447 RxLinkSpeed=2
+06-12 15:47:57.560   693   863 D WifiDataStall: tx tput in kbps: 11000
+06-12 15:47:57.560   693   863 D WifiDataStall: rx tput in kbps: 11000
+06-12 15:47:57.560   693   863 V WifiConfigManager: Updating scan detail cache freq=2447 BSSID=00:13:10:85:fe:01 RSSI=-50 for "AndroidWifi"NONE
+06-12 15:47:57.560   693   863 D WifiThroughputPredictor:  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+06-12 15:47:57.560   693   863 D WifiThroughputPredictor:  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 11
+06-12 15:47:57.560   693   863 D WifiThroughputPredictor:  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+06-12 15:47:57.560   693   863 D WifiThroughputPredictor:  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 11
+06-12 15:47:57.560   693   863 D WifiThroughputPredictor:  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+06-12 15:47:57.560   693   863 D WifiThroughputPredictor:  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 11
+06-12 15:47:57.560   693   863 D WifiThroughputPredictor:  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+06-12 15:47:57.560   693   863 D WifiThroughputPredictor:  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 11
+06-12 15:47:57.560   693   863 D WifiScoreCard: BSSID update SIGNAL_POLL ID: 273713110 SSID: "AndroidWifi", BSSID: 00:13:10:85:fe:01, MAC: 02:15:b2:00:00:00, IP: /10.0.2.16, Security type: 0, Supplicant state: COMPLETED, Wi-Fi standard: legacy, RSSI: -50, Link speed: 1Mbps, Tx Link speed: 1Mbps, Max Supported Tx Link speed: 11Mbps, Rx Link speed: 2Mbps, Max Supported Rx Link speed: 11Mbps, Frequency: 2447MHz, Net ID: 0, Metered hint: false, score: 60, isUsable: true, CarrierMerged: false, SubscriptionId: -1, IsPrimary: 1, Trusted: true, Restricted: false, Ephemeral: false, OEM paid: false, OEM private: false, OSU AP: false, FQDN: <none>, Provider friendly name: <none>, Requesting package name: <none>"AndroidWifi"openMLO Information: , Is TID-To-Link negotiation supported by the AP: false, AP MLD Address: <none>, AP MLO Link Id: <none>, AP MLO Affiliated links: <none>, Vendor Data: <none>
+06-12 15:47:57.560   693   863 D WifiScoreCard: txRate: 1 txSpeed: 1
+06-12 15:47:57.560   693   863 D WifiScoreCard: network update SIGNAL_POLL "AndroidWifi" ID: 732197599 RSSI -50 txSpeed -1
+06-12 15:47:57.560   693   863 D WifiClientModeImpl[8882:wlan0]:  ClientModeImpl$L2ConnectedState screen=on 4 0 "AndroidWifi" 00:13:10:85:fe:01 rssi=-50 f=2447 sc=60 link=1 tx=0.0, 0.0, 0.0 rx=0.0 bcn=0 [on:0 tx:0 rx:0 period:3005] from screen [on:0 period:-1139350280] score=60
+06-12 15:47:58.275  1585  1585 D BoundBrokerSvc: onUnbind: Intent { act=com.google.android.gms.backup.GMS_MODULE_RESTORE dat=chimera-action:/... xflg=0x4 cmp=com.google.android.gms/.chimera.GmsInternalBoundBrokerService }
+06-12 15:47:58.588   474  4744 D android.hardware.audio@7.1-impl.ranchu: threadLoop: entering standby, frames: 3227008
+06-12 15:47:58.588   474  4744 D android.hardware.audio@7.1-impl.ranchu: ~TinyalsaSink: joining consumeThread
+06-12 15:47:58.597   474 12054 D android.hardware.audio@7.1-impl.ranchu: consumeThread: exiting
+06-12 15:47:58.597   474  4744 D android.hardware.audio@7.1-impl.ranchu: ~TinyalsaSink: stopping PCM stream
+06-12 15:47:58.811   610  4740 D BufferPoolAccessor2.0: evictor expired: 1, evicted: 0
+06-12 15:47:59.098 11994 11994 W WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=androidx.navigationevent.OnBackInvokedInput$createOnBackAnimationCallback$1@2228d95
+06-12 15:47:59.557 11994 12008 D UiDevice: Taking screenshot (scale=1.000000, quality=90) and storing at /sdcard/Download/qualityalternative/sprint27-agent-content-inbox-1781272063934/08_agent_inbox_reader_markdown_light.png.
+06-12 15:47:59.581  1605  2504 W MediaProvider: isAppCloneUserPair for user 0: false
+06-12 15:47:59.643 11994 12008 D UiDevice: Taking screenshot (scale=1.000000, quality=90) and storing at /sdcard/Download/qualityalternative/sprint27-agent-content-inbox-1781272063934/08_agent_inbox_reader_markdown_light.png.
+06-12 15:47:59.725 11994 12008 D UiDevice: Taking screenshot (scale=1.000000, quality=90) and storing at /sdcard/Download/qualityalternative/sprint27-agent-content-inbox-1781272063934/08_agent_inbox_reader_markdown_light.png.
+06-12 15:47:59.817   613   666 D BufferPoolAccessor2.0: evictor expired: 1, evicted: 0
+06-12 15:48:00.323 11994 12008 D UiDevice: Taking screenshot (scale=1.000000, quality=90) and storing at /sdcard/Download/qualityalternative/sprint27-agent-content-inbox-1781272063934/09_agent_inbox_reader_epub_light.png.
+06-12 15:48:00.344  1605  1830 W MediaProvider: isAppCloneUserPair for user 0: false
+06-12 15:48:00.423 11994 12008 D UiDevice: Taking screenshot (scale=1.000000, quality=90) and storing at /sdcard/Download/qualityalternative/sprint27-agent-content-inbox-1781272063934/09_agent_inbox_reader_epub_light.png.
+06-12 15:48:00.514 11994 12008 D UiDevice: Taking screenshot (scale=1.000000, quality=90) and storing at /sdcard/Download/qualityalternative/sprint27-agent-content-inbox-1781272063934/09_agent_inbox_reader_epub_light.png.
+06-12 15:48:00.565   693   863 D WifiClientModeImpl[8882:wlan0]: updateLinkLayerStatsRssiSpeedFrequencyCapabilities rssi=-50 TxLinkspeed=1 freq=2447 RxLinkSpeed=2
+06-12 15:48:00.566   693   863 D WifiDataStall: tx tput in kbps: 11000
+06-12 15:48:00.566   693   863 D WifiDataStall: rx tput in kbps: 11000
+06-12 15:48:00.566   693   863 V WifiConfigManager: Updating scan detail cache freq=2447 BSSID=00:13:10:85:fe:01 RSSI=-50 for "AndroidWifi"NONE
+06-12 15:48:00.566   693   863 D WifiThroughputPredictor:  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+06-12 15:48:00.566   693   863 D WifiThroughputPredictor:  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 11
+06-12 15:48:00.566   693   863 D WifiThroughputPredictor:  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+06-12 15:48:00.566   693   863 D WifiThroughputPredictor:  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 11
+06-12 15:48:00.566   693   863 D WifiThroughputPredictor:  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+06-12 15:48:00.566   693   863 D WifiThroughputPredictor:  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 11
+06-12 15:48:00.566   693   863 D WifiThroughputPredictor:  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+06-12 15:48:00.566   693   863 D WifiThroughputPredictor:  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 11
+06-12 15:48:00.566   693   863 D WifiScoreCard: BSSID update SIGNAL_POLL ID: 273713110 SSID: "AndroidWifi", BSSID: 00:13:10:85:fe:01, MAC: 02:15:b2:00:00:00, IP: /10.0.2.16, Security type: 0, Supplicant state: COMPLETED, Wi-Fi standard: legacy, RSSI: -50, Link speed: 1Mbps, Tx Link speed: 1Mbps, Max Supported Tx Link speed: 11Mbps, Rx Link speed: 2Mbps, Max Supported Rx Link speed: 11Mbps, Frequency: 2447MHz, Net ID: 0, Metered hint: false, score: 60, isUsable: true, CarrierMerged: false, SubscriptionId: -1, IsPrimary: 1, Trusted: true, Restricted: false, Ephemeral: false, OEM paid: false, OEM private: false, OSU AP: false, FQDN: <none>, Provider friendly name: <none>, Requesting package name: <none>"AndroidWifi"openMLO Information: , Is TID-To-Link negotiation supported by the AP: false, AP MLD Address: <none>, AP MLO Link Id: <none>, AP MLO Affiliated links: <none>, Vendor Data: <none>
+06-12 15:48:00.566   693   863 D WifiScoreCard: txRate: 1 txSpeed: 1
+06-12 15:48:00.566   693   863 D WifiScoreCard: network update SIGNAL_POLL "AndroidWifi" ID: 732197599 RSSI -50 txSpeed -1
+06-12 15:48:00.566   693   863 D WifiClientModeImpl[8882:wlan0]:  ClientModeImpl$L2ConnectedState screen=on 4 0 "AndroidWifi" 00:13:10:85:fe:01 rssi=-50 f=2447 sc=60 link=1 tx=0.0, 0.0, 0.0 rx=0.0 bcn=0 [on:0 tx:0 rx:0 period:3006] from screen [on:0 period:-1139347274] score=60
+06-12 15:48:00.608   693  2132 V GrammaticalInflectionUtils: AttributionSource: AttributionSource { uid = 10276, packageName = null, attributionTag = null, token = android.os.Binder@51a7416, deviceId = 0, next = null } does not have READ_SYSTEM_GRAMMATICAL_GENDER permission.
+06-12 15:48:00.612   534   825 I BpBinder: onLastStrongRef automatically unlinking death recipients:
+06-12 15:48:00.613   962  1166 I ndroid.systemui: AssetManager2(0xb4000075f3e24c78) locale list changing from [] to [en-US]
+06-12 15:48:00.615   962  1169 D SplashScreenView: Build android.window.SplashScreenView{eff78e V.E...... ......ID 0,0-0,0}
+06-12 15:48:00.615   962  1169 D SplashScreenView: Icon: view: null drawable: null size: 0
+06-12 15:48:00.615   962  1169 D SplashScreenView: Branding: view: android.view.View{96ddbaf G.ED..... ......I. 0,0-0,0 #1020541 android:id/splashscreen_branding_view} drawable: null size w: 0 h: 0
+06-12 15:48:00.617 11994 11994 D LifecycleMonitor: Lifecycle status change: com.qualityalternative.app.MainActivity@28b1db6 in: PAUSED
+06-12 15:48:00.617 11994 11994 V ActivityScenario: Update currentActivityStage to PAUSED, currentActivity=com.qualityalternative.app.MainActivity@28b1db6
+06-12 15:48:00.617   601   685 W IPCThreadState: Sending oneway calls to frozen process.
+06-12 15:48:00.621   534   534 I BpBinder: onLastStrongRef automatically unlinking death recipients:
+06-12 15:48:00.623 12055 12071 I EGL_emulation: Opening libGLESv1_CM_emulation.so
+06-12 15:48:00.623 12055 12071 I EGL_emulation: Opening libGLESv2_emulation.so
+06-12 15:48:00.634   468   547 I netd    : tetherGetStats() -> {[]} <0.66ms>
+06-12 15:48:00.636 12055 12071 W HWUI    : Failed to choose config with EGL_SWAP_BEHAVIOR_PRESERVED, retrying without...
+06-12 15:48:00.636 12055 12071 W HWUI    : Failed to initialize 101010-2 format, error = EGL_SUCCESS
+06-12 15:48:00.643 12055 12055 D AutofillManager: Fill dialog is enabled:false, hints=[]
+06-12 15:48:00.647   962  1075 I ndroid.systemui: AssetManager2(0xb4000075f3e27518) locale list changing from [] to [en-US]
+06-12 15:48:00.676   962  1075 I ndroid.systemui: AssetManager2(0xb4000075f3dedb38) locale list changing from [] to [en-US]
+06-12 15:48:00.688   492   492 I RanchuHwc: logCompositionFallbackIfChanged: layer 220 CompositionType fallback from 3 to 1
+06-12 15:48:00.692   693   740 I ActivityTaskManager: Displayed com.qualityalternative.app.test/androidx.test.core.app.InstrumentationActivityInvoker$EmptyActivity for user 0: +83ms
+06-12 15:48:00.693  1086  1107 W System  : A resource failed to call release.
+06-12 15:48:00.693  1086  1107 W System  : A resource failed to call release.
+06-12 15:48:00.693  1086  1107 W System  : A resource failed to call release.
+06-12 15:48:00.695   534   577 I BpBinder: onLastStrongRef automatically unlinking death recipients:
+06-12 15:48:00.699  1086  1086 D ViewRootImpl: Skipping stats log for color mode
+06-12 15:48:00.700  1086  1086 D StatsLog: LAUNCHER_ONRESUME
+06-12 15:48:00.700 11994 11994 D VRI[MainActivity]: visibilityChanged oldVisibility=true newVisibility=false
+06-12 15:48:00.701 11994 11994 W WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=androidx.navigationevent.OnBackInvokedInput$createOnBackAnimationCallback$1@2228d95
+06-12 15:48:00.703 11994 11994 D LifecycleMonitor: Lifecycle status change: com.qualityalternative.app.MainActivity@28b1db6 in: STOPPED
+06-12 15:48:00.704 11994 11994 V ActivityScenario: Update currentActivityStage to STOPPED, currentActivity=com.qualityalternative.app.MainActivity@28b1db6
+06-12 15:48:00.704  1086  1140 D QuickstepModelDelegate: notifyAppTargetEvent action=1 launchLocation=workspace/0/[-1,-1]/[1,1]
+06-12 15:48:00.705  1086  1086 D NexusLauncherModelDelegate: notifySmartspaceEvent: SmartspaceTargetEvent{mSmartspaceTarget=null, mSmartspaceActionId='null', mEventType=6}
+06-12 15:48:00.710  1628  1862 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+06-12 15:48:00.710  1628  1862 I AiAiEcho: EchoTargets:
+06-12 15:48:00.710  1628  1862 I AiAiEcho: Filtered by AiAi flag check:
+06-12 15:48:00.710  1628  1862 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+06-12 15:48:00.710  1628  1862 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+06-12 15:48:00.711  1628  1862 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface home with targets# 0 (types=[])
+06-12 15:48:00.714  1086  1086 D BaseDepthController: setSurface:
+06-12 15:48:00.714  1086  1086 D BaseDepthController: 	mWaitingOnSurfaceValidity: false
+06-12 15:48:00.714  1086  1086 D BaseDepthController: 	mBaseSurface: Surface(name=com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity)/@0xf8deafa
+06-12 15:48:00.716 11994 11994 W WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.app.Activity$$ExternalSyntheticLambda0@8cba6a2
+06-12 15:48:00.716 11994 11994 D LifecycleMonitor: Lifecycle status change: com.qualityalternative.app.MainActivity@28b1db6 in: DESTROYED
+06-12 15:48:00.716 11994 11994 V ActivityScenario: Update currentActivityStage to DESTROYED, currentActivity=null
+06-12 15:48:00.722 11994 11994 D ViewRootImpl: Skipping stats log for color mode
+06-12 15:48:00.724   693  1202 I ImeTracker: system_server:693a0128: onRequestHide at ORIGIN_SERVER reason IME_REQUESTED_CHANGED_LISTENER fromUser false
+06-12 15:48:00.726   693   743 I ImeTracker: system_server:693a0128: onCancelled at PHASE_SERVER_SHOULD_HIDE
+06-12 15:48:00.741  1086  1086 I NotificationListener: Handling notification state refresh for androidx.test.services#0
+06-12 15:48:00.741  1086  1086 D SsBaseTemplateCard: No text view can be set up
+06-12 15:48:00.741  1086  1086 D SsBaseTemplateCard: Passed-in item info is null
+06-12 15:48:00.741  1086  1086 D SsBaseTemplateCard: Passed-in item info is null
+06-12 15:48:00.741  1086  1086 D SsBaseTemplateCard: Passed-in item info is null
+06-12 15:48:00.741  1086  1086 I SsBaseTemplateCard: Secondary card pane is null
+06-12 15:48:00.741  1086  1086 D RecentsView: onTaskRemoved: 137, not handling task stack changes
+06-12 15:48:00.741  1086  1086 D RecentsView: onTaskRemoved: 137, not handling task stack changes
+06-12 15:48:00.752  1086  1086 D StateManager: createAtomicAnimation - fromState: Background, toState: Normal, partial trace:
+06-12 15:48:00.752  1086  1086 D StateManager: 	at com.android.quickstep.util.WorkspaceRevealAnim.prepareToAnimate(go/retraceme 43e00d9cd0eb17b3d9dd30fc1741b1c71445c4c0f7c8c9b81300265c86c5b873:22)
+06-12 15:48:00.752  1086  1086 D StateManager: 	at com.android.quickstep.util.WorkspaceRevealAnim.<init>(go/retraceme 43e00d9cd0eb17b3d9dd30fc1741b1c71445c4c0f7c8c9b81300265c86c5b873:11)
+06-12 15:48:00.752  1086  1086 D StateManager: 	at com.android.launcher3.QuickstepTransitionManager.createWallpaperOpenAnimations(go/retraceme 43e00d9cd0eb17b3d9dd30fc1741b1c71445c4c0f7c8c9b81300265c86c5b873:339)
+06-12 15:48:00.753  1086  1086 D b/311077782: LauncherAnimationRunner.setAnimation
+06-12 15:48:00.753  1086  1086 D WorkspaceRevealAnim: onAnimationEnd: workspace alpha = 1.0
+06-12 15:48:00.765 11994 12008 D IdlingRegistry: Unregistering idling resources: [androidx.compose.ui.test.EspressoLink@baf4688]
+06-12 15:48:00.765 11994 12008 I TestRunner: finished: captureSprint27AgentInboxReviewScreens(com.qualityalternative.app.VisualQaScreenshotTest)

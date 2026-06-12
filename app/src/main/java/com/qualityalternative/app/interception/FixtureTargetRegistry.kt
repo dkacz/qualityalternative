@@ -1,5 +1,6 @@
 package com.qualityalternative.app.interception
 
+import com.qualityalternative.app.BuildConfig
 import com.qualityalternative.app.domain.model.DistractingApp
 
 object FixtureTargetRegistry {
@@ -27,11 +28,19 @@ object FixtureTargetRegistry {
         FIXTURE_TWO_COMPONENT to fixtureDistractors[1],
     )
 
-    fun findByPackage(packageName: String): DistractingApp? {
+    fun findByPackage(
+        packageName: String,
+        enabled: Boolean = BuildConfig.DEBUG,
+    ): DistractingApp? {
+        if (!enabled) return null
         return fixtureDistractors.firstOrNull { it.packageName == packageName }
     }
 
-    fun findByComponent(componentName: String?): DistractingApp? {
+    fun findByComponent(
+        componentName: String?,
+        enabled: Boolean = BuildConfig.DEBUG,
+    ): DistractingApp? {
+        if (!enabled) return null
         return componentToDistractor[componentName]
     }
 }

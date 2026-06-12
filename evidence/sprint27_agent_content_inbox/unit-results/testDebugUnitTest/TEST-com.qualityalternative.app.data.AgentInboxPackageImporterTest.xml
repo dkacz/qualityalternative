@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.qualityalternative.app.data.AgentInboxPackageImporterTest" tests="13" skipped="0" failures="0" errors="0" timestamp="2026-06-12T13:48:54.963Z" hostname="Mac-Studio.local" time="0.045">
+  <properties/>
+  <testcase name="importCandidateDoesNotExposeRawDriveFileNameAsDocumentDisplayName" classname="com.qualityalternative.app.data.AgentInboxPackageImporterTest" time="0.013"/>
+  <testcase name="fileStoreReplacesStaleMismatchingFinalFileWithVerifiedBytes" classname="com.qualityalternative.app.data.AgentInboxPackageImporterTest" time="0.006"/>
+  <testcase name="importCandidateRejectsContentChangedAfterReviewWhenManifestOmitsSha" classname="com.qualityalternative.app.data.AgentInboxPackageImporterTest" time="0.001"/>
+  <testcase name="importCandidateWritesDocumentAndAddsUserDocumentDraft" classname="com.qualityalternative.app.data.AgentInboxPackageImporterTest" time="0.002"/>
+  <testcase name="importCandidateReturnsDuplicateFromAuthoritativeFingerprintLookupWhenSnapshotIsEmpty" classname="com.qualityalternative.app.data.AgentInboxPackageImporterTest" time="0.002"/>
+  <testcase name="importCandidateRejectsShaMismatchBeforeWriting" classname="com.qualityalternative.app.data.AgentInboxPackageImporterTest" time="0.001"/>
+  <testcase name="importCandidateRejectsOversizedContentBeforeWriting" classname="com.qualityalternative.app.data.AgentInboxPackageImporterTest" time="0.002"/>
+  <testcase name="importCandidateReturnsInvalidForNonImportableCandidate" classname="com.qualityalternative.app.data.AgentInboxPackageImporterTest" time="0.001"/>
+  <testcase name="importCandidateWithSamePackageAndNameButDifferentBytesDoesNotOverwritePriorDocument" classname="com.qualityalternative.app.data.AgentInboxPackageImporterTest" time="0.005"/>
+  <testcase name="importCandidateDeletesStoredFileWhenAtomicRepositoryAddThrows" classname="com.qualityalternative.app.data.AgentInboxPackageImporterTest" time="0.002"/>
+  <testcase name="importCandidateReturnsRepositoryValidationErrors" classname="com.qualityalternative.app.data.AgentInboxPackageImporterTest" time="0.003"/>
+  <testcase name="importCandidateReturnsDuplicateBeforeWritingWhenContentShaAlreadyExists" classname="com.qualityalternative.app.data.AgentInboxPackageImporterTest" time="0.002"/>
+  <testcase name="importCandidateSerializesConcurrentSameShaPackagesThroughAtomicRepositoryAdd" classname="com.qualityalternative.app.data.AgentInboxPackageImporterTest" time="0.005"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

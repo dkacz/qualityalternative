@@ -88,6 +88,13 @@ class AppContainer(context: Context) {
     val readingAnnotationDriveTokenProvider: ReadingAnnotationDriveTokenProvider = AndroidGoogleDriveTokenProvider(
         context = context,
     )
+    val agentInboxDriveClient = AndroidGoogleDriveAgentInboxClient()
+    val agentInboxPackageImporter = AgentInboxPackageImporter(
+        userDocumentRepository = userDocumentRepository,
+        documentStore = FileAgentInboxDocumentStore(
+            rootDirectory = File(context.filesDir, "agent-inbox-imports"),
+        ),
+    )
     val settingsRepository: SettingsRepository = PreferencesSettingsRepository(
         dataStore = context.appSettingsDataStore,
         customTargetCandidatesProvider = AndroidInstalledAppTargetCatalog(context = context)::candidates,

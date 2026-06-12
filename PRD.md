@@ -106,6 +106,7 @@ When I reach for a distracting app out of habit, help me pause and give me one w
   - editorial starter packs curated by the product
   - user-added links
   - user-owned documents, starting with PDF, Markdown, and EPUB import
+  - user-authorized Google Drive Agent Inbox packages containing private Markdown or EPUB files prepared by a user-controlled agent workflow
   - a lightweight saved queue maintained inside the app
 - Minimal preference capture for topic interests and preferred format. Session-length settings may shape a reading segment or reminder, but must not exclude or down-rank long source materials.
 - A simple reader or handoff experience for articles and user-owned documents.
@@ -117,6 +118,7 @@ When I reach for a distracting app out of habit, help me pause and give me one w
 - iOS system-interception parity at launch.
 - Full RSS ingestion.
 - Full newsletter inbox integration.
+- Silent cloud ingestion that imports or prioritizes agent-supplied content without explicit user review.
 - Browser extensions.
 - Universal URL blocking across all browsers.
 - VPN, DNS, local proxy, or packet-inspection filtering.
@@ -244,8 +246,26 @@ The system must give the user enough replacement inventory to support useful rec
 - User can choose one or more editorial starter packs during onboarding.
 - User can add a web link manually.
 - User can upload at least one PDF, Markdown, or EPUB document manually.
+- User can connect a Google Drive Agent Inbox folder and review compatible agent-supplied Markdown or EPUB packages before importing them.
 - User can save at least ten content items before any archival or overflow handling is needed.
 - Newsletter forwarding, inbox sync, and RSS import are not required for MVP.
+
+### FR3B. Google Drive Agent Inbox
+
+The system may let the user import private replacement content prepared by Codex, Claude Code, or another user-controlled agent from a Google Drive folder.
+
+#### Acceptance Criteria
+
+- User can authorize Google Drive access for an Agent Inbox folder through an explicit Settings action.
+- The Agent Inbox uses the narrowest practical Drive access model and must not scan the user's whole Drive.
+- Each import candidate is represented by a package containing a manifest plus one Markdown or EPUB content file.
+- The package manifest stores title, topic tags, source label, rights class, optional description, optional priority intent, and enough file identity data to detect duplicates.
+- Agent-supplied content is treated as `user_private` by default and must not become shared editorial inventory.
+- Agent-supplied priority is visible before import. The user can accept or remove the priority before saving.
+- Invalid, unsupported, duplicated, unavailable, or partially missing packages are visible as finite review items and are not silently imported.
+- Importing an accepted package uses the same user-document model, reading-time estimation, progress tracking, and reader behavior as manually imported Markdown or EPUB documents.
+- The Agent Inbox review surface is finite and must not become a discovery feed.
+- Google Drive authorization failures distinguish user cancellation from technical/configuration failure where Android APIs allow it, present a retry path, and do not erase local library data.
 
 ### FR4. Content Item Model
 
@@ -260,6 +280,7 @@ The system must normalize each piece of replacement content into a small, rankab
   - format
   - automatically computed reading-length metadata when the app has body text
   - availability status
+- Agent Inbox imported items preserve private source provenance without storing raw Drive file identifiers in remote analytics or portable profile exports.
 - User-added or imported materials must not require the user to save a manual reading-time estimate.
 - Long readable materials can be recommended as smaller continuation segments from the current reader position.
 - EPUB and Markdown imports store a full-source reading-time estimate from extracted text, capped defensively for extreme inputs, so a many-hour book is not mislabeled as a 20-minute document.
@@ -279,6 +300,7 @@ The system must choose one primary recommendation and a short, bounded backup li
   - prior accepts
   - prior skips
   - source availability
+- User-confirmed priority from an Agent Inbox manifest may raise a content item's rank through the existing priority mechanism, but only after the user accepts that priority during import.
 - The ranking logic must not penalize a readable item because the whole source is longer than the user's session target.
 - The system returns exactly one primary recommendation and at least two backups when enough inventory exists.
 - The system may expose additional finite backups in a bounded scrollable list, capped below feed-like scale.
@@ -418,10 +440,12 @@ The product must log enough behavior to evaluate whether substitution is working
   - feedback submitted
   - return to distracting app within 15 minutes
   - return to distracting app within 60 minutes
+  - Agent Inbox package detected, accepted, rejected, skipped as duplicate, or failed validation
 - Each event includes timestamp, target app, recommendation identifiers, and session context.
 - Analytics can distinguish between no recommendation available and user chose Open anyway.
 - Analytics may distinguish target type, rule type, support status, intervention mode, and outcome, but remote analytics must not include raw URLs, hosts, domains, paths, queries, page titles, URL-bar text, non-matching URL observations, browsing-history rows, or domain-derived hashes.
 - Website rule identifiers used in remote analytics must not be reversible to domains and must not become stable cross-device identifiers unless the privacy model is explicitly changed.
+- Agent Inbox remote analytics must not include raw Google Drive folder ids, file ids, file names from the user's Drive, manifest source paths, document body text, or reversible document fingerprints.
 
 ### FR13. Portable Profile
 
@@ -440,6 +464,7 @@ The system must provide account-like portability without requiring a Quality Alt
 - The profile format is schema-versioned and must reject unsupported future versions without corrupting local state.
 - Import failures are visible and must not partially overwrite local settings or library data. Merge mode must preserve local settings unless the user explicitly chooses to apply imported settings, and replace mode must show affected scope before destructive mutation.
 - Portable Profile may optionally autosave the profile to a user-authorized local or Google Drive destination, but imported autosave or Drive metadata must be informational only until the current device user reselects a destination or reauthorizes Drive. The canonical product behavior must remain usable without a backend server.
+- Agent Inbox connection state, Drive folder ids, raw file ids, package paths, access tokens, and authorization grants are not portable. Imported profile metadata may state that an Agent Inbox existed on the source device, but the current device user must reconnect Drive before scanning.
 - Portable Profile autosave must also have a working local default destination. Choosing a folder changes where portable backups are written; it is not a prerequisite for the first successful local profile backup.
 - Settings copy must make the distinction between annotation autosave/sync and Portable Profile backup clear: annotations export notes tied to reader text, while Portable Profile backs up app configuration, library metadata, and reading state.
 
@@ -469,6 +494,7 @@ The system must provide account-like portability without requiring a Quality Alt
 - Portable profile exports must be human-auditable JSON rather than opaque database backups.
 - Export/import should preserve behaviorally important state without pretending to provide server-backed identity, cross-device conflict resolution, or guaranteed document-file transfer.
 - Any cloud sync must be explicit, revocable, and scoped to user-owned files. Cloud authorization state must be re-established on each device rather than copied through profile export.
+- Agent Inbox cloud access must remain explicit, revocable, finite, and user-reviewed. The product must not ingest agent-produced Drive content without a visible accept/reject step.
 - Website matching must remain local-first and user-authored. The app must not collect browsing history as an input or side effect of website target matching.
 
 ## Content Strategy for MVP

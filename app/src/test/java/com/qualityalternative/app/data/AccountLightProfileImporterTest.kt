@@ -965,7 +965,7 @@ class AccountLightProfileImporterTest {
     }
 
     @Test
-    fun exportedVerifiedDocumentFingerprintReconcilesCrossDeviceImport() = runBlocking {
+    fun exportedPrivateDocumentOmitsRawFingerprintAndDoesNotReconcileBySha() = runBlocking {
         val sharedFingerprint = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
         val exportedContentId = "user-document-33333333-3333-4333-8333-333333333333"
         val localContentId = "user-document-44444444-4444-4444-8444-444444444444"
@@ -996,9 +996,10 @@ class AccountLightProfileImporterTest {
         ).exportSettingsOnlyProfileJson(nowMillis = 40_000L)
         val exportedProfile = AccountLightProfileCodec().decode(exportedJson)
         val portableDocument = exportedProfile.library.userDocuments.single()
-        assertEquals("SHA256_BYTES", portableDocument.documentFingerprint.strategy)
-        assertEquals(sharedFingerprint, portableDocument.documentFingerprint.sha256)
-        assertEquals(1_024L, portableDocument.documentFingerprint.sizeBytes)
+        assertEquals("UNVERIFIED_METADATA_ONLY", portableDocument.documentFingerprint.strategy)
+        assertEquals(null, portableDocument.documentFingerprint.sha256)
+        assertEquals(null, portableDocument.documentFingerprint.sizeBytes)
+        assertFalse(exportedJson.contains(sharedFingerprint))
 
         val targetSettings = PreferencesSettingsRepository(
             dataStore = testDataStore(),
@@ -1015,12 +1016,13 @@ class AccountLightProfileImporterTest {
         )
 
         val plan = importer.validateImportProfileJson(exportedJson)
-        assertTrue(plan.generatedWarnings.map(AccountLightWarning::code).contains("CONFLICT_RETAINED_LOCAL_VALUE"))
+        assertTrue(plan.allWarnings.map(AccountLightWarning::code).contains("DOCUMENT_FINGERPRINT_UNVERIFIED"))
+        assertTrue(plan.generatedWarnings.map(AccountLightWarning::code).contains("DOCUMENT_FILE_MISSING_ON_IMPORT"))
 
         importer.applyMerge(plan)
 
-        assertEquals(listOf(localContentId), documentRepository.documents.map(ContentItem::id))
-        assertEquals(listOf(localContentId), readingProgressRepository.progress.map(ReadingProgress::contentId))
+        assertEquals(setOf(localContentId, exportedContentId), documentRepository.documents.mapTo(mutableSetOf(), ContentItem::id))
+        assertEquals(listOf(exportedContentId), readingProgressRepository.progress.map(ReadingProgress::contentId))
     }
 
     @Test

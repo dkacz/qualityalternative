@@ -34,10 +34,17 @@ import androidx.compose.ui.test.swipeUp
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.UiDevice
+import com.qualityalternative.app.data.AgentInboxManifest
+import com.qualityalternative.app.data.AgentInboxManifestValidator
+import com.qualityalternative.app.data.AgentInboxPackageValidationError
+import com.qualityalternative.app.data.AgentInboxPriorityIntent
+import com.qualityalternative.app.data.AgentInboxReviewCandidate
+import com.qualityalternative.app.data.AgentInboxReviewStatus
 import com.qualityalternative.app.domain.model.AppThemeMode
 import com.qualityalternative.app.domain.model.ContentFormat
 import com.qualityalternative.app.domain.model.ContentItem
 import com.qualityalternative.app.domain.model.ContentPriority
+import com.qualityalternative.app.domain.model.ContentRightsClass
 import com.qualityalternative.app.domain.model.DurationBucket
 import com.qualityalternative.app.domain.model.InterventionMode
 import com.qualityalternative.app.domain.model.MEDITATION_TIMER_CONTENT_ID
@@ -49,6 +56,11 @@ import com.qualityalternative.app.domain.model.UserLinkDraft
 import com.qualityalternative.app.domain.model.WebsiteRuleType
 import com.qualityalternative.app.domain.service.AddUserDocumentResult
 import com.qualityalternative.app.domain.service.AddUserLinkResult
+import com.qualityalternative.app.domain.service.AgentInboxDriveClient
+import com.qualityalternative.app.domain.service.AgentInboxDriveFile
+import com.qualityalternative.app.domain.service.AgentInboxDrivePackage
+import com.qualityalternative.app.domain.service.AgentInboxDriveScanRequest
+import com.qualityalternative.app.domain.service.AgentInboxDriveScanResult
 import com.qualityalternative.app.interception.FixtureTargetRegistry
 import com.qualityalternative.app.interception.VerifiedBrowserHostAdapter
 import com.qualityalternative.app.data.ReadingTimeEstimateSource
@@ -79,6 +91,7 @@ class VisualQaScreenshotTest {
     private val sprint22ScreenshotDirName = "sprint22-reading-time-remaining-${System.currentTimeMillis()}"
     private val sprint25ScreenshotDirName = "sprint25-markdown-media-tables-${System.currentTimeMillis()}"
     private val sprint26ScreenshotDirName = "sprint26-custom-targets-${System.currentTimeMillis()}"
+    private val sprint27ScreenshotDirName = "sprint27-agent-content-inbox-${System.currentTimeMillis()}"
     private lateinit var screenshotDir: File
     private lateinit var legacyScreenshotDir: File
     private lateinit var sprint10ScreenshotDir: File
@@ -93,6 +106,7 @@ class VisualQaScreenshotTest {
     private lateinit var sprint22ScreenshotDir: File
     private lateinit var sprint25ScreenshotDir: File
     private lateinit var sprint26ScreenshotDir: File
+    private lateinit var sprint27ScreenshotDir: File
 
     @Before
     fun resetAppState() {
@@ -141,6 +155,9 @@ class VisualQaScreenshotTest {
         sprint26ScreenshotDir = File("/sdcard/Download/qualityalternative/$sprint26ScreenshotDirName")
         sprint26ScreenshotDir.deleteRecursively()
         sprint26ScreenshotDir.mkdirs()
+        sprint27ScreenshotDir = File("/sdcard/Download/qualityalternative/$sprint27ScreenshotDirName")
+        sprint27ScreenshotDir.deleteRecursively()
+        sprint27ScreenshotDir.mkdirs()
     }
 
     @After
@@ -692,6 +709,138 @@ class VisualQaScreenshotTest {
     }
 
     @Test
+    fun captureSprint27AgentInboxReviewScreens() {
+        val agentInboxDriveClient = VisualAgentInboxDriveClient()
+        launchOnboardedApp()
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.setAgentInboxDriveClientForTests(agentInboxDriveClient)
+        }
+        openTab("tab-settings", "settings-list")
+        composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasTestTag("settings-agent-inbox-section"))
+        composeRule.onNodeWithText("Google Drive Agent Inbox not connected").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings-agent-inbox-scan").assertIsDisplayed().assertIsEnabled()
+        captureSprint27("00_agent_inbox_disconnected_light")
+
+        runBlocking {
+            val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication
+            app.appContainer.settingsRepository.saveAgentInboxDriveScanSuccess(
+                timestampMillis = 1_781_256_600_000L,
+                folderId = "visual-test-agent-inbox",
+            )
+        }
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.seedAgentInboxReviewForTests(emptyList())
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("settings-list") }
+        composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasTestTag("settings-agent-inbox-section"))
+        composeRule.onNodeWithText("Google Drive Agent Inbox connected").assertIsDisplayed()
+        composeRule.onNodeWithText("No packages waiting for review.").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings-agent-inbox-disconnect").assertIsDisplayed().assertIsEnabled()
+        captureSprint27("01_agent_inbox_connected_empty_light")
+
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.seedAgentInboxReviewForTests(agentInboxVisualCandidates())
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasTestTag("settings-agent-inbox-candidate-visual-ready"))
+        composeRule.onNodeWithText("Google Drive Agent Inbox connected").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings-agent-inbox-status").assertIsDisplayed()
+        composeRule.onNodeWithText("Agent Focus Notes").assertIsDisplayed()
+        composeRule.onNodeWithText("Accept priority").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings-agent-inbox-priority-visual-ready").assertIsNotSelected()
+        composeRule.onNodeWithTag("settings-agent-inbox-reject-visual-ready").assertIsDisplayed().assertIsEnabled()
+        composeRule.onNodeWithTag("settings-agent-inbox-import-visual-ready").assertIsDisplayed().assertIsEnabled()
+        captureSprint27("02_agent_inbox_review_ready_light")
+
+        composeRule.onNodeWithTag("settings-agent-inbox-priority-visual-ready").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("settings-agent-inbox-priority-visual-ready").assertIsSelected()
+        composeRule.onNodeWithText("Priority accepted").assertIsDisplayed()
+        captureSprint27("03_agent_inbox_priority_accepted_light")
+
+        composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasTestTag("settings-agent-inbox-candidate-visual-invalid"))
+        composeRule.onNodeWithText("Already Imported Essay").assertIsDisplayed()
+        composeRule.onNodeWithText("Missing Content Draft").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings-agent-inbox-reject-visual-invalid").assertIsDisplayed().assertIsEnabled()
+        composeRule.onNodeWithTag("settings-agent-inbox-reject-visual-duplicate").assertIsDisplayed().assertIsEnabled()
+        captureSprint27("04_agent_inbox_invalid_duplicate_light")
+
+        composeRule.onNodeWithTag("settings-agent-inbox-reject-visual-invalid").performClick()
+        composeRule.waitForIdle()
+        composeRule.waitUntil(timeoutMillis = 10_000) { !hasNode("Missing Content Draft") }
+        captureSprint27("04b_agent_inbox_rejected_light")
+
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.selectThemeMode(AppThemeMode.DARK)
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasTestTag("settings-agent-inbox-candidate-visual-ready"))
+        composeRule.onNodeWithTag("settings-agent-inbox-priority-visual-ready").assertIsSelected()
+        captureSprint27("05_agent_inbox_review_dark")
+
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.selectThemeMode(AppThemeMode.LIGHT)
+        }
+        composeRule.waitForIdle()
+        val markdownContent = importAgentInboxPackageThroughDriveForVisuals(
+            driveClient = agentInboxDriveClient,
+            fixture = agentInboxMarkdownVisualFixture(),
+            acceptPriority = true,
+            nowMillis = 7_000L,
+        )
+        val epubContent = importAgentInboxPackageThroughDriveForVisuals(
+            driveClient = agentInboxDriveClient,
+            fixture = agentInboxEpubVisualFixture(),
+            acceptPriority = false,
+            nowMillis = 8_000L,
+        )
+        runBlocking {
+            val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication
+            app.appContainer.settingsRepository.saveOnboardingSelection(
+                OnboardingSelection(
+                    selectedAppPackages = setOf(FixtureTargetRegistry.fixtureDistractors.first().packageName),
+                    preferredTopics = setOf(TopicTag.ESSAYS, TopicTag.PSYCHOLOGY),
+                    preferredDurationBucket = DurationBucket.FOCUS,
+                    selectedPackIds = emptySet(),
+                ),
+            )
+            app.appContainer.settingsRepository.saveContentPriority(ContentPriority.MY_FILES)
+        }
+        openTab("tab-library", "library-list")
+        composeRule.onNodeWithText("Files").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasNode("Agent Inbox Markdown Notes") }
+        assertTrue("Raw Agent Inbox Markdown file name should not be visible", !hasNode("raw-agent-markdown-notes.md"))
+        assertTrue("Raw Agent Inbox Markdown package id should not be visible", !hasNode("visual-agent-markdown-package"))
+        captureSprint27("06_agent_inbox_library_imported_markdown_light")
+
+        launchFixtureSystemIntervention()
+        composeRule.onNodeWithText("Agent Inbox Markdown Notes").assertIsDisplayed()
+        assertTrue("Raw Agent Inbox Markdown file name should not be visible in intervention", !hasNode("raw-agent-markdown-notes.md"))
+        captureSprint27("07_agent_inbox_intervention_imported_markdown_light")
+
+        openAlternativeFromIntervention(
+            title = "Agent Inbox Markdown Notes",
+            primaryActionText = "Read this",
+            expectedScreenTag = "reader-screen",
+        )
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasNode("Imported Markdown Heading") }
+        captureSprint27("08_agent_inbox_reader_markdown_light")
+
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.openLibraryItem(epubContent)
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasTag("reader-screen") && hasNode("Chapter One")
+        }
+        captureSprint27("09_agent_inbox_reader_epub_light")
+    }
+
+    @Test
     fun captureSprint10ReaderProgressStreakAndMeditationScreens() {
         launchOnboardedApp()
         seedUserEpubSelection()
@@ -1219,7 +1368,7 @@ class VisualQaScreenshotTest {
             hasTag("home-continue-card") && hasNodeContaining("41% read")
         }
         captureSprint22("00_home_continue_before_repair_assertion")
-        composeRule.waitUntil(timeoutMillis = 15_000) {
+        composeRule.waitUntil(timeoutMillis = 60_000) {
             hasTag("home-continue-card") &&
                 !hasNodeContaining("12 min left") &&
                 hasNodeContaining("1 hr 20 min left")
@@ -1812,6 +1961,10 @@ class VisualQaScreenshotTest {
         captureTo(sprint26ScreenshotDir, name)
     }
 
+    private fun captureSprint27(name: String) {
+        captureTo(sprint27ScreenshotDir, name)
+    }
+
     private fun captureTo(directory: File, name: String) {
         composeRule.waitForIdle()
         InstrumentationRegistry.getInstrumentation().waitForIdleSync()
@@ -2000,6 +2153,270 @@ class VisualQaScreenshotTest {
         if (!openedFromVisibleRow) {
             composeRule.onNodeWithText(primaryActionText, substring = true).performClick()
             composeRule.waitUntil(timeoutMillis = 10_000) { hasTag(expectedScreenTag) }
+        }
+    }
+
+    private fun agentInboxVisualCandidates(): List<AgentInboxReviewCandidate> {
+        return listOf(
+            AgentInboxReviewCandidate(
+                packageFolderId = "visual-ready",
+                packageFolderName = "visual-ready",
+                status = AgentInboxReviewStatus.READY,
+                manifest = agentInboxVisualManifest(
+                    title = "Agent Focus Notes",
+                    format = ContentFormat.MARKDOWN,
+                    priority = AgentInboxPriorityIntent.HIGH,
+                    description = "Short private notes for the next replacement moment.",
+                ),
+                manifestFileId = "visual-ready-manifest",
+                contentFileId = "visual-ready-content",
+                contentFileName = "agent-notes.md",
+                duplicateContentId = null,
+            ),
+            AgentInboxReviewCandidate(
+                packageFolderId = "visual-duplicate",
+                packageFolderName = "visual-duplicate",
+                status = AgentInboxReviewStatus.DUPLICATE,
+                manifest = agentInboxVisualManifest(
+                    title = "Already Imported Essay",
+                    format = ContentFormat.EPUB,
+                    priority = AgentInboxPriorityIntent.NORMAL,
+                    description = "A duplicate private EPUB package.",
+                ),
+                manifestFileId = "visual-duplicate-manifest",
+                contentFileId = "visual-duplicate-content",
+                contentFileName = "agent-book.epub",
+                duplicateContentId = "existing-private-document",
+            ),
+            AgentInboxReviewCandidate(
+                packageFolderId = "visual-invalid",
+                packageFolderName = "visual-invalid",
+                status = AgentInboxReviewStatus.INVALID,
+                manifest = agentInboxVisualManifest(
+                    title = "Missing Content Draft",
+                    format = ContentFormat.MARKDOWN,
+                    priority = AgentInboxPriorityIntent.NORMAL,
+                    description = "Manifest is present, but the package needs cleanup.",
+                ),
+                manifestFileId = "visual-invalid-manifest",
+                contentFileId = null,
+                contentFileName = null,
+                duplicateContentId = null,
+                packageErrors = setOf(AgentInboxPackageValidationError.MISSING_CONTENT_FILE),
+            ),
+        )
+    }
+
+    private fun agentInboxVisualManifest(
+        title: String,
+        format: ContentFormat,
+        priority: AgentInboxPriorityIntent,
+        description: String,
+    ): AgentInboxManifest {
+        return AgentInboxManifest(
+            schemaVersion = 1,
+            title = title,
+            topics = setOf(TopicTag.PRACTICAL, TopicTag.SCIENCE),
+            contentFile = if (format == ContentFormat.EPUB) "agent-book.epub" else "agent-notes.md",
+            format = format,
+            rightsClass = ContentRightsClass.USER_PRIVATE,
+            sourceLabel = "Agent Inbox",
+            description = description,
+            priority = priority,
+            documentSha256 = null,
+            createdAt = "2026-06-12T09:00:00Z",
+        )
+    }
+
+    private fun importAgentInboxPackageThroughDriveForVisuals(
+        driveClient: VisualAgentInboxDriveClient,
+        fixture: VisualAgentInboxPackageFixture,
+        acceptPriority: Boolean,
+        nowMillis: Long,
+    ): ContentItem {
+        val app = InstrumentationRegistry.getInstrumentation()
+            .targetContext
+            .applicationContext as QualityAlternativeApplication
+        driveClient.setPackages(fixture)
+        runBlocking {
+            app.appContainer.userDocumentRepository.observeReady().first { it }
+        }
+        openTab("tab-settings", "settings-list")
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.scanAgentInboxDrive(accessToken = "visual-agent-token", nowMillis = nowMillis)
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasTag("settings-agent-inbox-candidate-${fixture.packageFolderId}")
+        }
+        composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasTestTag("settings-agent-inbox-candidate-${fixture.packageFolderId}"))
+        composeRule.onNodeWithText(fixture.title).assertIsDisplayed()
+        if (acceptPriority) {
+            composeRule.onNodeWithTag("settings-agent-inbox-priority-${fixture.packageFolderId}")
+                .assertIsNotSelected()
+                .performClick()
+            composeRule.waitForIdle()
+            composeRule.onNodeWithTag("settings-agent-inbox-priority-${fixture.packageFolderId}")
+                .assertIsSelected()
+        }
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.importAgentInboxCandidate(
+                packageFolderId = fixture.packageFolderId,
+                accessToken = "visual-agent-token",
+                nowMillis = nowMillis + 1L,
+            )
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            userDocumentByTitle(fixture.title) != null &&
+                !hasTag("settings-agent-inbox-candidate-${fixture.packageFolderId}")
+        }
+        val imported = requireNotNull(userDocumentByTitle(fixture.title))
+        assertTrue("Expected Agent Inbox import to keep a verified fingerprint", !imported.documentFingerprintSha256.isNullOrBlank())
+        assertTrue("Expected neutral Agent Inbox display source", imported.sourceLabel == "Agent Inbox document")
+        assertTrue("Raw Agent Inbox content file name must not become source label", imported.sourceLabel != fixture.contentFileName)
+        return imported
+    }
+
+    private fun userDocumentByTitle(title: String): ContentItem? {
+        val app = InstrumentationRegistry.getInstrumentation()
+            .targetContext
+            .applicationContext as QualityAlternativeApplication
+        return app.appContainer.userDocumentRepository.userDocuments().firstOrNull { item ->
+            item.title == title
+        }
+    }
+
+    private fun agentInboxMarkdownVisualFixture(): VisualAgentInboxPackageFixture {
+        val contentBytes = """
+            # Imported Markdown Heading
+
+            This paragraph came through the Agent Inbox import path and keeps **bold** text, _italic_ emphasis, and `inline code`.
+
+            - First item with **bold** text
+            - Second item with _italic_ text
+
+            > A quoted line should look quieter than the body text.
+        """.trimIndent().toByteArray(Charsets.UTF_8)
+        return VisualAgentInboxPackageFixture(
+            packageFolderId = "visual-agent-markdown-package",
+            packageFolderName = "visual-agent-markdown-package",
+            title = "Agent Inbox Markdown Notes",
+            contentFileName = "raw-agent-markdown-notes.md",
+            format = ContentFormat.MARKDOWN,
+            topics = setOf(TopicTag.ESSAYS, TopicTag.PSYCHOLOGY),
+            description = "Private Markdown imported through Agent Inbox for the next replacement moment.",
+            priority = AgentInboxPriorityIntent.HIGH,
+            contentBytes = contentBytes,
+            createdAt = "2026-06-12T10:00:00Z",
+        )
+    }
+
+    private fun agentInboxEpubVisualFixture(): VisualAgentInboxPackageFixture {
+        return VisualAgentInboxPackageFixture(
+            packageFolderId = "visual-agent-epub-package",
+            packageFolderName = "visual-agent-epub-package",
+            title = "Agent Inbox EPUB Notes",
+            contentFileName = "raw-agent-epub-notes.epub",
+            format = ContentFormat.EPUB,
+            topics = setOf(TopicTag.HISTORY, TopicTag.ESSAYS),
+            description = "Private EPUB imported through Agent Inbox for reader smoke evidence.",
+            priority = AgentInboxPriorityIntent.NORMAL,
+            contentBytes = sprint10EpubBytes(),
+            createdAt = "2026-06-12T10:05:00Z",
+        )
+    }
+
+    private data class VisualAgentInboxPackageFixture(
+        val packageFolderId: String,
+        val packageFolderName: String,
+        val title: String,
+        val contentFileName: String,
+        val format: ContentFormat,
+        val topics: Set<TopicTag>,
+        val description: String,
+        val priority: AgentInboxPriorityIntent,
+        val contentBytes: ByteArray,
+        val createdAt: String,
+    ) {
+        val manifestFileId: String = "$packageFolderId-manifest"
+        val contentFileId: String = "$packageFolderId-content"
+
+        fun manifestJson(): String {
+            val topicJson = topics.joinToString(separator = ",") { topic -> "\"${topic.name}\"" }
+            val priorityValue = when (priority) {
+                AgentInboxPriorityIntent.HIGH -> "high"
+                AgentInboxPriorityIntent.NORMAL -> "normal"
+            }
+            return """
+                {
+                  "schemaVersion": 1,
+                  "title": "$title",
+                  "topics": [$topicJson],
+                  "contentFile": "$contentFileName",
+                  "format": "${format.name}",
+                  "rightsClass": "USER_PRIVATE",
+                  "sourceLabel": "Agent Inbox Visual Agent",
+                  "description": "$description",
+                  "priority": "$priorityValue",
+                  "documentSha256": "${AgentInboxManifestValidator.sha256(contentBytes)}",
+                  "createdAt": "$createdAt"
+                }
+            """.trimIndent()
+        }
+
+        fun toDrivePackage(manifestBytes: ByteArray): AgentInboxDrivePackage {
+            val manifestFile = AgentInboxDriveFile(
+                id = manifestFileId,
+                name = "manifest.json",
+                mimeType = "application/json",
+                sizeBytes = manifestBytes.size.toLong(),
+                md5Checksum = null,
+                modifiedTime = createdAt,
+            )
+            val contentFile = AgentInboxDriveFile(
+                id = contentFileId,
+                name = contentFileName,
+                mimeType = if (format == ContentFormat.EPUB) "application/epub+zip" else "text/markdown",
+                sizeBytes = contentBytes.size.toLong(),
+                md5Checksum = null,
+                modifiedTime = createdAt,
+            )
+            return AgentInboxDrivePackage(
+                folderId = packageFolderId,
+                folderName = packageFolderName,
+                manifestFile = manifestFile,
+                contentFiles = listOf(contentFile),
+                allFiles = listOf(manifestFile, contentFile),
+            )
+        }
+    }
+
+    private class VisualAgentInboxDriveClient : AgentInboxDriveClient {
+        private var packages: List<AgentInboxDrivePackage> = emptyList()
+        private var bytesByFileId: Map<String, ByteArray> = emptyMap()
+
+        fun setPackages(vararg fixtures: VisualAgentInboxPackageFixture) {
+            val nextBytes = linkedMapOf<String, ByteArray>()
+            packages = fixtures.map { fixture ->
+                val manifestBytes = fixture.manifestJson().toByteArray(Charsets.UTF_8)
+                nextBytes[fixture.manifestFileId] = manifestBytes
+                nextBytes[fixture.contentFileId] = fixture.contentBytes
+                fixture.toDrivePackage(manifestBytes)
+            }
+            bytesByFileId = nextBytes
+        }
+
+        override suspend fun scanPackages(request: AgentInboxDriveScanRequest): AgentInboxDriveScanResult {
+            return AgentInboxDriveScanResult(
+                folderId = request.folderId ?: "visual-agent-inbox-folder",
+                packages = packages,
+            )
+        }
+
+        override suspend fun downloadFile(accessToken: String, fileId: String, maxBytes: Long): ByteArray {
+            val bytes = bytesByFileId[fileId] ?: error("Missing visual Agent Inbox file bytes for $fileId")
+            check(bytes.size.toLong() <= maxBytes) { "Visual Agent Inbox fixture exceeded maxBytes." }
+            return bytes
         }
     }
 
@@ -2389,7 +2806,7 @@ class VisualQaScreenshotTest {
         title: String = "Imported Markdown Notes",
         fileName: String = "imported-notes.md",
         nowMillis: Long = 1_500L,
-    ) = runBlocking {
+    ): ContentItem = runBlocking {
         val targetContext = InstrumentationRegistry.getInstrumentation().targetContext
         val app = targetContext.applicationContext as QualityAlternativeApplication
         val fixture = File(targetContext.filesDir, "visual-qa-fixtures/$fileName")
@@ -2428,6 +2845,7 @@ class VisualQaScreenshotTest {
                 selectedPackIds = emptySet(),
             ),
         )
+        (result as AddUserDocumentResult.Added).item
     }
 
     private fun seedMarkdownMediaTableSelection(

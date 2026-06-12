@@ -93,6 +93,13 @@ class AccountLightProfileExporterTest {
             timestampMillis = 13_000L,
             folderId = "raw-drive-folder-id",
         )
+        repository.saveAgentInboxDriveScanSuccess(
+            timestampMillis = 15_000L,
+            folderId = "raw-agent-inbox-folder-id",
+        )
+        repository.saveAgentInboxDriveScanFailure(
+            "Agent Inbox scan failed for raw-agent-inbox-folder-id",
+        )
         repository.saveProfileAutosaveDestination(
             uri = "content://tree/raw-profile-folder-id",
             displayName = "QA profile",
@@ -177,6 +184,10 @@ class AccountLightProfileExporterTest {
 
         assertFalse(rawJson.contains("content://"))
         assertFalse(rawJson.contains("raw-drive-folder-id"))
+        assertFalse(rawJson.contains("raw-agent-inbox-folder-id"))
+        assertFalse(rawJson.contains("Agent Inbox scan failed"))
+        assertFalse(rawJson.contains("agentInbox"))
+        assertFalse(rawJson.contains("agent_inbox"))
         assertFalse(rawJson.contains("raw-profile-folder-id"))
         assertFalse(rawJson.contains("Drive write unavailable"))
         assertFalse(rawJson.contains("browserPackage"))
@@ -502,10 +513,10 @@ class AccountLightProfileExporterTest {
         assertTrue(exportedDocument.contentId.startsWith("user-document-"))
         assertEquals("Saved document metadata.", exportedDocument.description)
         assertEquals("MISSING_FILE_NEEDS_REATTACH", exportedDocument.documentImportState)
-        assertEquals("SHA256_BYTES", exportedDocument.documentFingerprint.strategy)
-        assertEquals(documentFingerprintSha256, exportedDocument.documentFingerprint.sha256)
-        assertEquals(4_096L, exportedDocument.documentFingerprint.sizeBytes)
-        assertFalse(
+        assertEquals("UNVERIFIED_METADATA_ONLY", exportedDocument.documentFingerprint.strategy)
+        assertEquals(null, exportedDocument.documentFingerprint.sha256)
+        assertEquals(null, exportedDocument.documentFingerprint.sizeBytes)
+        assertTrue(
             profile.warnings.any {
                 it.code == "DOCUMENT_FINGERPRINT_UNVERIFIED" &&
                     it.contentId == exportedDocument.contentId
@@ -525,6 +536,7 @@ class AccountLightProfileExporterTest {
         assertEquals(37, profile.reading.progress.single().lastVisibleTextOffset)
         assertFalse(rawJson.contains("content://"))
         assertFalse(rawJson.contains("raw-book"))
+        assertFalse(rawJson.contains(documentFingerprintSha256))
         assertFalse(rawJson.contains("raw-link"))
         assertFalse(rawJson.contains("user@example.com"))
         assertFalse(rawJson.contains("oauth"))

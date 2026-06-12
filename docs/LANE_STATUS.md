@@ -1,6 +1,6 @@
 # Lane Status
 
-Status timestamp: 2026-06-08
+Status timestamp: 2026-06-12
 
 This file is the repo-level index for active and recently completed execution lanes. It should point to the canonical branch, review lane, validation artifacts, and next gate for each lane.
 
@@ -10,6 +10,79 @@ This file is the repo-level index for active and recently completed execution la
 - Use the branch-specific sprint docs for detailed implementation notes.
 - Heartbeats should exist only while waiting for a current GPT Pro lane.
 - Do not infer lane status from untracked local files alone. For example, `ios/` can appear untracked on non-iOS branches; the canonical iOS implementation source is the pushed iOS branch listed below.
+
+## Sprint 27 Agent Content Inbox
+
+Status: `release_gate_passed_pending_publish`
+
+- Branch: `codex/sprint-agent-content-inbox`
+- Scope: add a Google Drive-backed Agent Inbox so Codex/Claude-style agents can hand private Markdown or EPUB content to the app through a bounded package contract, with manifest priority requiring explicit user confirmation.
+- Canonical sprint plan: `docs/SPRINT_27_AGENT_CONTENT_INBOX.md`
+- Current implementation state:
+  - Drive Agent Inbox scanning, review, import, duplicate detection, disconnect, settings UI, analytics, and Portable Profile metadata-only export/import are implemented locally.
+  - Manifest priority is shown during review and is opt-in before it affects ranking.
+  - Import accepts one reviewed private Markdown or EPUB content file through the existing document model; raw Drive content file names and raw document SHA values are not exported in Portable Profile.
+  - Visual E2E covers Settings review, manifest priority opt-in, duplicate/rejected packages, imported reader content, EPUB rendering, and Portable Profile privacy copy.
+  - R1 GPT Pro review returned `SCORE 6/10`, `VERDICT BLOCK`, `VISUAL REVIEW REVISE`; blockers were priority auto-acceptance, unbounded scan/review, missing disconnect UI, raw SHA export, weak duplicate/SHA visibility, and incomplete visual evidence.
+  - R1 blockers were fixed with explicit priority opt-in, bounded scan and package review, disconnect UI, metadata-only Portable Profile export, duplicate/SHA mismatch review states, and expanded visual evidence.
+  - R2 GPT Pro review returned `SCORE 6/10`, `VERDICT BLOCK`, `VISUAL REVIEW PASS`; blockers were missing cryptographic binding from reviewed content to import, raw Drive content file names leaking through `sourceLabel`, loose package cardinality, and unbounded manifest download.
+  - R2 blockers were fixed with reviewed content SHA/size binding at import, neutral imported document source label, strict one manifest plus one content file contract, unsupported extra-file rejection, and a 64 KiB manifest cap before and after metadata download.
+  - Validation passed after R2 fixes: `testDebugUnitTest`, `compileDebugAndroidTestKotlin`, and connected `VisualQaScreenshotTest#captureSprint27AgentInboxReviewScreens`.
+  - R3 GPT Pro review returned `SCORE 6/10`, `VERDICT BLOCK`, `VISUAL REVIEW PASS`; blockers were same folder/name changed-byte overwrite risk, duplicate review from unverified manifest SHA, unbounded network reads when Drive metadata is missing/wrong, missing reject/remove path and rejected analytics, unqualified first-connect folder name search, and production fixture resolution/manifest risk.
+  - R3 blockers were fixed with verified-SHA content-addressed Agent Inbox storage, duplicate status only from actual reviewed content SHA, bounded Drive client downloads with typed too-large handling, visible Remove action plus `AGENT_INBOX_CANDIDATE_REJECTED`, first-connect folder creation with persisted id, and BuildConfig/debug-manifest fixture gating.
+  - R4 validation passed: 498 debug unit testcases, `compileDebugAndroidTestKotlin`, `lintDebug`, `processReleaseManifestForPackage`, `assembleDebug`, `git diff --check`, and connected `VisualQaScreenshotTest#captureSprint27AgentInboxReviewScreens`.
+  - R4 GPT Pro review returned `SCORE 7/10`, `VERDICT REVISE`, `VISUAL REVIEW REVISE`; findings were non-size Drive download failures collapsing a scan, duplicate safety depending on an unhydrated in-memory document list, clipped priority-control labels in screenshots, and a connected-logcat bundle gap.
+  - R5 fixes the R4 findings with package-level `DOWNLOAD_UNAVAILABLE`, a user-document readiness gate, repository/DAO duplicate lookup by verified fingerprint, full-width priority confirmation UI plus screenshot assertions, a fresh canonical visual run, and standalone connected logcat evidence.
+  - R5 validation passed: 502 debug unit testcases, `compileDebugAndroidTestKotlin`, `lintDebug`, `processReleaseManifestForPackage`, `assembleDebug`, connected `VisualQaScreenshotTest#captureSprint27AgentInboxReviewScreens`, and `git diff --check`.
+  - R5 GPT Pro review returned `SCORE 8/10`, `VERDICT BLOCK`, `VISUAL REVIEW PASS`; the remaining blocker was non-atomic same-fingerprint duplicate prevention plus duplicate import results leaving candidates visually ready.
+  - R6 fixes the R5 blocker with `addDocumentIfFingerprintAbsent`, Room repository write mutex serialization, verified fingerprint fields on `UserDocumentDraft`, ViewModel import single-flight, duplicate-state updates after import-time duplicates, and same-scan same-SHA sibling duplicate marking after first import.
+  - R6 validation passed: 505 debug unit testcases, `compileDebugAndroidTestKotlin`, `lintDebug`, `processReleaseManifestForPackage`, `assembleDebug`, connected `VisualQaScreenshotTest#captureSprint27AgentInboxReviewScreens`, and `git diff --check`.
+  - R6 GPT Pro review returned `SCORE 8/10`, `VERDICT BLOCK`, `VISUAL REVIEW PASS`; the remaining blocker was import-time invalid/rejected/download-failure paths leaving rows visually READY with stale reviewed fingerprints.
+  - R7 fixes the R6 blocker by converting import-time invalid/rejected/download-failure results into finite non-importable invalid candidates, clearing stale reviewed fingerprint/size, clearing accepted priority, adding `LOCAL_IMPORT_REJECTED` copy, and covering changed-after-review, oversize, download failure, and repository rejection with ViewModel tests.
+  - R7 validation passed: 508 debug unit testcases, `compileDebugAndroidTestKotlin`, `lintDebug`, `processReleaseManifestForPackage`, `assembleDebug`, connected `VisualQaScreenshotTest#captureSprint27AgentInboxReviewScreens`, and `git diff --check`.
+  - R7 GPT Pro review returned `SCORE 9/10`, `VERDICT REVISE`, `VISUAL REVIEW PASS`; the remaining finding was invisible local retention of private Agent Inbox files after post-write duplicate/rejected results.
+  - R8 fixes the R7 finding with `AgentInboxDocumentStore.deleteDocument`, guarded File store deletion under the Agent Inbox root, importer cleanup on duplicate/rejected/exception after write, and tests for concurrent duplicate cleanup, repository rejection cleanup, and atomic-add exception cleanup.
+  - R8 validation passed: 509 debug unit testcases, `compileDebugAndroidTestKotlin`, `lintDebug`, `processReleaseManifestForPackage`, `assembleDebug`, connected `VisualQaScreenshotTest#captureSprint27AgentInboxReviewScreens`, and `git diff --check`.
+  - R8 GPT Pro review returned `SCORE 9/10`, `VERDICT REVISE`, `VISUAL REVIEW PASS`; the remaining finding was direct final-path writes in `FileAgentInboxDocumentStore.writeDocument`, which could leave a stale partial/mismatching final file after a write failure and block later valid import.
+  - R9 fixes the R8 finding with scoped temp-file writes, SHA-256 verification before final promotion, atomic move with filesystem fallback, stale mismatching final-file replacement, temp cleanup in `finally`, and a regression test for stale-final replacement.
+  - R9 validation passed: 510 debug unit testcases, `compileDebugAndroidTestKotlin`, `lintDebug`, `processReleaseManifestForPackage`, `assembleDebug`, connected `VisualQaScreenshotTest#captureSprint27AgentInboxReviewScreens`, and `git diff --check`.
+  - R9 GPT Pro review returned `SCORE 9/10`, `VERDICT REVISE`, `VISUAL REVIEW REVISE`; the remaining finding was that screenshots `06`-`09` were generic user-document seed smoke evidence instead of proof that actual Agent Inbox import renders correctly in Library, intervention, Markdown reader, and EPUB reader.
+  - R10 fixes the R9 visual finding by generating imported-content screenshots after `scanAgentInboxDrive` and `importAgentInboxCandidate` against a debug-gated fake Drive client, accepting Markdown priority before import, asserting verified fingerprint and neutral `Agent Inbox document` provenance, and asserting raw Drive content file names/package ids are not visible.
+  - R10 validation passed: 510 debug unit testcases, `compileDebugAndroidTestKotlin`, `lintDebug`, `processReleaseManifestForPackage`, `assembleDebug`, connected `VisualQaScreenshotTest#captureSprint27AgentInboxReviewScreens`, and `git diff --check`.
+  - R10 GPT Pro review returned `SCORE 10/10`, `VERDICT PASS`, `VISUAL REVIEW PASS`; no fresh findings, no bundle gaps, and package hygiene clean enough for release-gate audit.
+- Current evidence:
+  - Validation summary: `evidence/sprint27_agent_content_inbox/VALIDATION_SUMMARY.md`
+  - Review bundle manifest: `evidence/sprint27_agent_content_inbox/REVIEW_BUNDLE_MANIFEST.md`
+  - Visual contact sheet: `evidence/sprint27_agent_content_inbox/visual_e2e/sprint27_agent_inbox_contact_sheet.png`
+  - Canonical screenshot run: `evidence/sprint27_agent_content_inbox/visual_e2e/sprint27-agent-content-inbox-1781272063934/`
+  - GPT Pro R1 output: `evidence/sprint27_agent_content_inbox/pro_review_harvest/GPT_PRO_REVIEW_R1.md`
+  - GPT Pro R2 output: `evidence/sprint27_agent_content_inbox/pro_review_harvest/GPT_PRO_REVIEW_R2.md`
+  - GPT Pro R3 output: `evidence/sprint27_agent_content_inbox/pro_review_harvest/GPT_PRO_REVIEW_R3.md`
+  - GPT Pro R4 lane: `https://chatgpt.com/c/6a2bdd0d-b5e8-83eb-972d-813bd00130f7`
+  - GPT Pro R4 output: `evidence/sprint27_agent_content_inbox/pro_review_harvest/GPT_PRO_REVIEW_R4.md`
+  - GPT Pro R5 lane: `https://chatgpt.com/c/6a2be5be-1d60-83eb-b0ba-01b633e2bcd1`
+  - GPT Pro R5 output: `evidence/sprint27_agent_content_inbox/pro_review_harvest/GPT_PRO_REVIEW_R5.md`
+  - GPT Pro R6 lane: `https://chatgpt.com/c/6a2bed8f-7c34-83ed-a148-9e749cf8a099`
+  - GPT Pro R6 output: `evidence/sprint27_agent_content_inbox/pro_review_harvest/GPT_PRO_REVIEW_R6.md`
+  - GPT Pro R7 lane: `https://chatgpt.com/c/6a2bf46d-43bc-83eb-8125-c1002b3ea3dd`
+  - GPT Pro R7 output: `evidence/sprint27_agent_content_inbox/pro_review_harvest/GPT_PRO_REVIEW_R7.md`
+  - GPT Pro R8 lane: `https://chatgpt.com/c/6a2bfb46-2550-83eb-a06a-889265bc2c57`
+  - GPT Pro R8 output: `evidence/sprint27_agent_content_inbox/pro_review_harvest/GPT_PRO_REVIEW_R8.md`
+  - GPT Pro R9 lane: `https://chatgpt.com/c/6a2c059d-9764-83ed-b808-4538ad6a3160`
+  - GPT Pro R9 output: `evidence/sprint27_agent_content_inbox/pro_review_harvest/GPT_PRO_REVIEW_R9.md`
+  - GPT Pro R10 lane: `https://chatgpt.com/c/6a2c0f4a-b3e0-83eb-97a2-4762aeb641b2`
+  - GPT Pro R10 output: `evidence/sprint27_agent_content_inbox/pro_review_harvest/GPT_PRO_REVIEW_R10.md`
+  - GPT Pro R10 bundle manifest: `evidence/sprint27_agent_content_inbox/REVIEW_BUNDLE_MANIFEST.md`
+  - Final release gate passed after Android version bump to `versionCode=31`, `versionName=0.11.15-alpha`.
+  - Final Gradle gate passed: `:app:testDebugUnitTest :app:lintDebug :app:assembleDebug`.
+  - Final full connected Android gate passed on R2: 137 tests, 0 failures, 0 skipped.
+  - APK badging/signature/install/launch evidence passed.
+  - Release artifact: `release_artifacts/quality-alternative-v0.11.15-agent-content-inbox-alpha-debug.apk`
+  - Release APK SHA-256: `10f2d54f7dc06c561afa32a83bcc7c5790c211f17cd320d469d93e6c957278f6`
+  - Release gate summary: `docs/release-gate-logs/2026-06-12-sprint27-agent-content-inbox/VALIDATION_SUMMARY.md`
+  - Release notes: `docs/release-gate-logs/2026-06-12-sprint27-agent-content-inbox/RELEASE_NOTES_v0.11.15-agent-content-inbox-alpha.md`
+- Next gate:
+  - Commit/tag/push `v0.11.15-agent-content-inbox-alpha`, publish the GitHub release, and record release URL plus commit SHA.
 
 ## Sprint 26 Custom Targets And Website Interventions
 

@@ -134,7 +134,11 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.qualityalternative.app.data.ACCOUNT_LIGHT_PROFILE_FILE_NAME
+import com.qualityalternative.app.data.AgentInboxPackageValidationError
+import com.qualityalternative.app.data.AgentInboxReviewCandidate
+import com.qualityalternative.app.data.AgentInboxReviewStatus
 import com.qualityalternative.app.data.accountLightTimestampedBackupFileName
+import com.qualityalternative.app.data.displayTitle
 import com.qualityalternative.app.BuildConfig
 import com.qualityalternative.app.data.ReadingTimeEstimateSource
 import com.qualityalternative.app.data.SupportedCatalog
@@ -339,9 +343,11 @@ private tailrec fun Context.findActivity(): Activity? {
     }
 }
 
-private enum class AnnotationDriveSyncMode {
-    CONNECT,
-    RETRY,
+private enum class GoogleDriveAuthorizationMode {
+    ANNOTATION_CONNECT,
+    ANNOTATION_RETRY,
+    AGENT_INBOX_SCAN,
+    AGENT_INBOX_IMPORT,
 }
 
 @Composable
@@ -385,18 +391,49 @@ private fun MainRoute(
     val driveAuthorizationClient = remember(driveAuthorizationContext) {
         Identity.getAuthorizationClient(driveAuthorizationContext)
     }
-    var driveSyncMode by remember { mutableStateOf(AnnotationDriveSyncMode.CONNECT) }
+    var driveAuthorizationMode by remember { mutableStateOf(GoogleDriveAuthorizationMode.ANNOTATION_CONNECT) }
+    var pendingAgentInboxImportPackageId by remember { mutableStateOf<String?>(null) }
+    fun reportDriveAuthorizationFailure(message: String) {
+        when (driveAuthorizationMode) {
+            GoogleDriveAuthorizationMode.AGENT_INBOX_SCAN,
+            GoogleDriveAuthorizationMode.AGENT_INBOX_IMPORT -> {
+                pendingAgentInboxImportPackageId = null
+                viewModel.reportAgentInboxDriveAuthorizationFailure(message)
+            }
+
+            GoogleDriveAuthorizationMode.ANNOTATION_CONNECT,
+            GoogleDriveAuthorizationMode.ANNOTATION_RETRY -> {
+                viewModel.reportAnnotationDriveAuthorizationFailure(message)
+            }
+        }
+    }
     fun handleDriveAuthorizationResult(result: AuthorizationResult) {
         val token = result.accessToken?.takeIf(String::isNotBlank)
         val hasDriveScope = result.grantedScopes.orEmpty().contains(ANNOTATION_DRIVE_SCOPE)
         if (token == null || !hasDriveScope) {
-            viewModel.reportAnnotationDriveAuthorizationFailure("Google Drive permission was not granted.")
+            reportDriveAuthorizationFailure("Google Drive permission was not granted.")
             return
         }
-        if (driveSyncMode == AnnotationDriveSyncMode.RETRY || state.annotationDriveSyncEnabled) {
-            viewModel.retryAnnotationDriveSync(token)
-        } else {
-            viewModel.connectAnnotationDriveSync(token)
+        when (driveAuthorizationMode) {
+            GoogleDriveAuthorizationMode.ANNOTATION_CONNECT -> {
+                if (state.annotationDriveSyncEnabled) {
+                    viewModel.retryAnnotationDriveSync(token)
+                } else {
+                    viewModel.connectAnnotationDriveSync(token)
+                }
+            }
+
+            GoogleDriveAuthorizationMode.ANNOTATION_RETRY -> viewModel.retryAnnotationDriveSync(token)
+            GoogleDriveAuthorizationMode.AGENT_INBOX_SCAN -> viewModel.scanAgentInboxDrive(token)
+            GoogleDriveAuthorizationMode.AGENT_INBOX_IMPORT -> {
+                val packageFolderId = pendingAgentInboxImportPackageId
+                pendingAgentInboxImportPackageId = null
+                if (packageFolderId == null) {
+                    viewModel.reportAgentInboxDriveAuthorizationFailure("Agent Inbox package is no longer available.")
+                } else {
+                    viewModel.importAgentInboxCandidate(packageFolderId = packageFolderId, accessToken = token)
+                }
+            }
         }
     }
     val driveAuthorizationLauncher = rememberLauncherForActivityResult(
@@ -406,18 +443,24 @@ private fun MainRoute(
             resultCode = result.resultCode,
             hasResultIntent = result.data != null,
         )?.let { message ->
-            viewModel.reportAnnotationDriveAuthorizationFailure(message)
+            reportDriveAuthorizationFailure(message)
             return@rememberLauncherForActivityResult
         }
         runCatching {
             driveAuthorizationClient.getAuthorizationResultFromIntent(result.data!!)
         }.onSuccess(::handleDriveAuthorizationResult).onFailure { error ->
-            viewModel.reportAnnotationDriveAuthorizationFailure(error.googleDriveAuthMessage())
+            reportDriveAuthorizationFailure(error.googleDriveAuthMessage())
         }
     }
-    val startGoogleDriveSyncAuthorization: (AnnotationDriveSyncMode) -> Unit = { mode ->
-        driveSyncMode = mode
-        viewModel.beginAnnotationDriveAuthorization()
+    val startGoogleDriveSyncAuthorization: (GoogleDriveAuthorizationMode) -> Unit = { mode ->
+        driveAuthorizationMode = mode
+        when (mode) {
+            GoogleDriveAuthorizationMode.ANNOTATION_CONNECT,
+            GoogleDriveAuthorizationMode.ANNOTATION_RETRY -> viewModel.beginAnnotationDriveAuthorization()
+
+            GoogleDriveAuthorizationMode.AGENT_INBOX_SCAN -> viewModel.beginAgentInboxDriveScan()
+            GoogleDriveAuthorizationMode.AGENT_INBOX_IMPORT -> Unit
+        }
         val authorizationRequest = AuthorizationRequest.builder()
             .setRequestedScopes(listOf(Scope(ANNOTATION_DRIVE_SCOPE)))
             .build()
@@ -426,7 +469,7 @@ private fun MainRoute(
                 if (authorizationResult.hasResolution()) {
                     val pendingIntent = authorizationResult.pendingIntent
                     if (pendingIntent == null) {
-                        viewModel.reportAnnotationDriveAuthorizationFailure(
+                        reportDriveAuthorizationFailure(
                             "Google Drive authorization needs a missing consent screen.",
                         )
                     } else {
@@ -439,7 +482,7 @@ private fun MainRoute(
                 }
             }
             .addOnFailureListener { error ->
-                viewModel.reportAnnotationDriveAuthorizationFailure(error.googleDriveAuthMessage())
+                reportDriveAuthorizationFailure(error.googleDriveAuthMessage())
             }
     }
     val disconnectGoogleDriveSync = {
@@ -448,6 +491,17 @@ private fun MainRoute(
             .build()
         driveAuthorizationClient.revokeAccess(revokeRequest)
         viewModel.disconnectAnnotationDriveSync()
+    }
+    val disconnectAgentInboxDrive = {
+        val annotationDriveConfigured = state.annotationDriveSyncEnabled ||
+            annotationExportUsesGoogleDriveProvider(state.annotationExportUri)
+        if (!annotationDriveConfigured) {
+            val revokeRequest = RevokeAccessRequest.builder()
+                .setScopes(listOf(Scope(ANNOTATION_DRIVE_SCOPE)))
+                .build()
+            driveAuthorizationClient.revokeAccess(revokeRequest)
+        }
+        viewModel.disconnectAgentInboxDrive()
     }
     val documentPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         if (uris.isEmpty()) {
@@ -653,9 +707,23 @@ private fun MainRoute(
                     viewModel.clearReadingAnnotationExport(releaseWritePermission = releasePersistedAnnotationExportPermission)
                 },
                 onRetryAnnotationExport = { viewModel.retryReadingAnnotationExport() },
-                onConnectAnnotationDrive = { startGoogleDriveSyncAuthorization(AnnotationDriveSyncMode.CONNECT) },
-                onRetryAnnotationDrive = { startGoogleDriveSyncAuthorization(AnnotationDriveSyncMode.RETRY) },
+                onConnectAnnotationDrive = {
+                    startGoogleDriveSyncAuthorization(GoogleDriveAuthorizationMode.ANNOTATION_CONNECT)
+                },
+                onRetryAnnotationDrive = {
+                    startGoogleDriveSyncAuthorization(GoogleDriveAuthorizationMode.ANNOTATION_RETRY)
+                },
                 onDisconnectAnnotationDrive = disconnectGoogleDriveSync,
+                onScanAgentInbox = {
+                    startGoogleDriveSyncAuthorization(GoogleDriveAuthorizationMode.AGENT_INBOX_SCAN)
+                },
+                onDisconnectAgentInbox = disconnectAgentInboxDrive,
+                onToggleAgentInboxPriority = viewModel::toggleAgentInboxPriority,
+                onRejectAgentInboxCandidate = viewModel::rejectAgentInboxCandidate,
+                onImportAgentInboxCandidate = { packageFolderId ->
+                    pendingAgentInboxImportPackageId = packageFolderId
+                    startGoogleDriveSyncAuthorization(GoogleDriveAuthorizationMode.AGENT_INBOX_IMPORT)
+                },
                 onExportAccountLightProfile = { accountLightExportPicker.launch(ACCOUNT_LIGHT_PROFILE_FILE_NAME) },
                 onExportAccountLightBackup = { accountLightExportPicker.launch(accountLightTimestampedBackupFileName()) },
                 onImportAccountLightProfile = { accountLightImportPicker.launch(arrayOf("application/json", "text/json", "*/*")) },
@@ -4123,6 +4191,11 @@ private fun SettingsTab(
     onConnectAnnotationDrive: () -> Unit,
     onRetryAnnotationDrive: () -> Unit,
     onDisconnectAnnotationDrive: () -> Unit,
+    onScanAgentInbox: () -> Unit,
+    onDisconnectAgentInbox: () -> Unit,
+    onToggleAgentInboxPriority: (String) -> Unit,
+    onRejectAgentInboxCandidate: (String) -> Unit,
+    onImportAgentInboxCandidate: (String) -> Unit,
     onExportAccountLightProfile: () -> Unit,
     onExportAccountLightBackup: () -> Unit,
     onImportAccountLightProfile: () -> Unit,
@@ -4319,6 +4392,16 @@ private fun SettingsTab(
                 onConnectAnnotationDrive = onConnectAnnotationDrive,
                 onRetryAnnotationDrive = onRetryAnnotationDrive,
                 onDisconnectAnnotationDrive = onDisconnectAnnotationDrive,
+            )
+        }
+        item {
+            AgentInboxSettingsSection(
+                state = state,
+                onScan = onScanAgentInbox,
+                onDisconnect = onDisconnectAgentInbox,
+                onTogglePriority = onToggleAgentInboxPriority,
+                onRejectCandidate = onRejectAgentInboxCandidate,
+                onImportCandidate = onImportAgentInboxCandidate,
             )
         }
         item {
@@ -5181,6 +5264,312 @@ private fun AnnotationAutosaveSettingsSection(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun AgentInboxSettingsSection(
+    state: MainUiState,
+    onScan: () -> Unit,
+    onDisconnect: () -> Unit,
+    onTogglePriority: (String) -> Unit,
+    onRejectCandidate: (String) -> Unit,
+    onImportCandidate: (String) -> Unit,
+) {
+    val colors = QualityAlternativeThemeTokens.colors
+    val candidateCount = state.agentInboxCandidates.size
+    Column(modifier = Modifier.testTag("settings-agent-inbox-section")) {
+        SectionLabel(
+            "Agent Inbox",
+            right = when {
+                state.isAgentInboxScanning -> "Scanning"
+                state.agentInboxDriveEnabled -> "Drive"
+                else -> "Off"
+            },
+        )
+        QaCard {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                SourceBadge(sourceType = ContentSourceType.USER_DOCUMENT, icon = QaIconKind.Note)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (state.agentInboxDriveEnabled) {
+                            "Google Drive Agent Inbox connected"
+                        } else {
+                            "Google Drive Agent Inbox not connected"
+                        },
+                        style = MaterialTheme.typography.titleMedium,
+                        fontSize = 16.sp,
+                        lineHeight = 20.sp,
+                        color = colors.primaryText,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    MonoText(
+                        text = agentInboxDriveStatusText(state),
+                        color = if (state.agentInboxDriveLastError == null) colors.mutedText else colors.accent,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .padding(top = 4.dp)
+                            .testTag("settings-agent-inbox-status"),
+                    )
+                }
+                if (state.isAgentInboxScanning) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp).testTag("settings-agent-inbox-progress"),
+                        strokeWidth = 2.dp,
+                        color = colors.accent,
+                    )
+                }
+            }
+            Row(
+                modifier = Modifier.padding(top = 14.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                QaButton(
+                    text = when {
+                        state.isAgentInboxScanning -> "Scanning"
+                        state.agentInboxDriveEnabled -> "Scan now"
+                        else -> "Connect"
+                    },
+                    onClick = onScan,
+                    variant = QaButtonVariant.Outline,
+                    size = QaButtonSize.Small,
+                    enabled = !state.isAgentInboxScanning && !state.isAgentInboxImporting,
+                    leadingIcon = QaIconKind.External,
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("settings-agent-inbox-scan"),
+                )
+                if (state.agentInboxDriveEnabled) {
+                    QaButton(
+                        text = "Disconnect",
+                        onClick = onDisconnect,
+                        variant = QaButtonVariant.Ghost,
+                        size = QaButtonSize.Small,
+                        enabled = !state.isAgentInboxScanning && !state.isAgentInboxImporting,
+                        fullWidth = false,
+                        modifier = Modifier.testTag("settings-agent-inbox-disconnect"),
+                    )
+                }
+            }
+            HorizontalDivider(
+                color = colors.line,
+                modifier = Modifier.padding(vertical = 14.dp),
+            )
+            if (state.agentInboxScanTruncated) {
+                BodyText(
+                    text = "Showing the first finite set of packages. Clean up extra folders or files, then scan again.",
+                    color = colors.accent,
+                    fontSize = 12.5.sp,
+                    lineHeight = 17.sp,
+                    modifier = Modifier.padding(bottom = 8.dp),
+                )
+            }
+            if (candidateCount == 0) {
+                BodyText(
+                    text = "No packages waiting for review.",
+                    color = colors.mutedText,
+                    fontSize = 12.5.sp,
+                    lineHeight = 17.sp,
+                )
+            } else {
+                MonoText(
+                    text = "${quantityLabel(candidateCount, "package")} waiting for review",
+                    color = colors.mutedText,
+                    modifier = Modifier.padding(bottom = 8.dp),
+                    preserveCase = true,
+                )
+                state.agentInboxCandidates.forEachIndexed { index, candidate ->
+                    if (index > 0) {
+                        HorizontalDivider(
+                            color = colors.line,
+                            modifier = Modifier.padding(vertical = 12.dp),
+                        )
+                    }
+                    AgentInboxCandidateRow(
+                        candidate = candidate,
+                        priorityAccepted = candidate.packageFolderId in state.agentInboxPriorityAcceptedPackageIds,
+                        isImporting = state.isAgentInboxImporting,
+                        onTogglePriority = { onTogglePriority(candidate.packageFolderId) },
+                        onReject = { onRejectCandidate(candidate.packageFolderId) },
+                        onImport = { onImportCandidate(candidate.packageFolderId) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AgentInboxCandidateRow(
+    candidate: AgentInboxReviewCandidate,
+    priorityAccepted: Boolean,
+    isImporting: Boolean,
+    onTogglePriority: () -> Unit,
+    onReject: () -> Unit,
+    onImport: () -> Unit,
+) {
+    val colors = QualityAlternativeThemeTokens.colors
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("settings-agent-inbox-candidate-${candidate.packageFolderId}"),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            SourceBadge(sourceType = ContentSourceType.USER_DOCUMENT, icon = QaIconKind.Book)
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = candidate.displayTitle(),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontSize = 15.5.sp,
+                    lineHeight = 19.sp,
+                    color = colors.primaryText,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                MonoText(
+                    text = agentInboxCandidateStatusText(candidate),
+                    color = when (candidate.status) {
+                        AgentInboxReviewStatus.READY -> colors.success
+                        AgentInboxReviewStatus.DUPLICATE -> colors.mutedText
+                        AgentInboxReviewStatus.INVALID -> colors.accent
+                    },
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+                BodyText(
+                    text = agentInboxCandidateDetailText(candidate),
+                    color = colors.mutedText,
+                    fontSize = 12.5.sp,
+                    lineHeight = 17.sp,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 5.dp),
+                )
+            }
+        }
+        if (candidate.status == AgentInboxReviewStatus.READY) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                AgentInboxPriorityToggle(
+                    checked = priorityAccepted,
+                    requested = candidate.requestsHighPriority,
+                    onToggle = onTogglePriority,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("settings-agent-inbox-priority-${candidate.packageFolderId}"),
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    QaButton(
+                        text = "Remove",
+                        onClick = onReject,
+                        variant = QaButtonVariant.Ghost,
+                        size = QaButtonSize.Small,
+                        enabled = !isImporting,
+                        fullWidth = false,
+                        modifier = Modifier.testTag("settings-agent-inbox-reject-${candidate.packageFolderId}"),
+                    )
+                    Spacer(modifier = Modifier.size(8.dp))
+                    QaButton(
+                        text = if (isImporting) "Importing" else "Import",
+                        onClick = onImport,
+                        variant = QaButtonVariant.Primary,
+                        size = QaButtonSize.Small,
+                        enabled = !isImporting,
+                        fullWidth = false,
+                        leadingIcon = QaIconKind.Plus,
+                        modifier = Modifier.testTag("settings-agent-inbox-import-${candidate.packageFolderId}"),
+                    )
+                }
+            }
+        } else {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                QaButton(
+                    text = "Remove",
+                    onClick = onReject,
+                    variant = QaButtonVariant.Ghost,
+                    size = QaButtonSize.Small,
+                    enabled = !isImporting,
+                    fullWidth = false,
+                    modifier = Modifier.testTag("settings-agent-inbox-reject-${candidate.packageFolderId}"),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AgentInboxPriorityToggle(
+    checked: Boolean,
+    requested: Boolean,
+    onToggle: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = QualityAlternativeThemeTokens.colors
+    val label = when {
+        checked && requested -> "Priority accepted"
+        checked -> "Priority on"
+        requested -> "Accept priority"
+        else -> "Set priority"
+    }
+    Row(
+        modifier = modifier
+            .heightIn(min = 42.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .border(
+                BorderStroke(1.dp, if (checked) colors.accent else colors.lineStrong),
+                RoundedCornerShape(10.dp),
+            )
+            .background(if (checked) colors.accentSoft else colors.elevatedSurface)
+            .semantics { selected = checked }
+            .clickable(onClick = onToggle)
+            .padding(horizontal = 11.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(9.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(20.dp)
+                .clip(RoundedCornerShape(5.dp))
+                .border(BorderStroke(1.4.dp, if (checked) colors.accent else colors.lineStrong), RoundedCornerShape(5.dp))
+                .background(if (checked) colors.accent else Color.Transparent),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (checked) {
+                QaIcon(kind = QaIconKind.Check, color = Color.White, size = 13.dp)
+            }
+        }
+        BodyText(
+            text = label,
+            color = if (checked) colors.primaryText else colors.mutedText,
+            fontSize = 12.5.sp,
+            lineHeight = 16.sp,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -9174,6 +9563,115 @@ private fun annotationDriveStatusText(state: MainUiState): String {
         "Ready to sync"
     } else {
         "Uses Google Drive file access only"
+    }
+}
+
+private fun agentInboxDriveStatusText(state: MainUiState): String {
+    if (state.isAgentInboxScanning) {
+        return "Scanning private packages"
+    }
+    state.agentInboxDriveLastError?.takeIf(String::isNotBlank)?.let { error ->
+        return error.removeSuffix(".")
+    }
+    state.agentInboxDriveLastSuccessfulAtMillis?.let { timestampMillis ->
+        return "Last scanned ${annotationUpdatedLabel(timestampMillis)}"
+    }
+    return if (state.agentInboxDriveEnabled) {
+        "Ready to scan private Markdown and EPUB packages"
+    } else {
+        "Connect Google Drive to review private Markdown and EPUB packages from your agent"
+    }
+}
+
+private fun agentInboxCandidateStatusText(candidate: AgentInboxReviewCandidate): String {
+    return when (candidate.status) {
+        AgentInboxReviewStatus.READY -> {
+            val manifest = candidate.manifest
+            val format = manifest?.format?.agentInboxFormatLabel() ?: "Document"
+            val priority = if (candidate.requestsHighPriority) "priority requested" else "normal priority"
+            val topics = manifest?.topics
+                ?.sortedBy { topic -> topic.name }
+                ?.take(2)
+                ?.joinToString(", ") { topic -> topic.displayName() }
+                ?.takeIf(String::isNotBlank)
+                ?: "topics set"
+            "$format · $topics · $priority"
+        }
+
+        AgentInboxReviewStatus.DUPLICATE -> "Already in your library"
+        AgentInboxReviewStatus.INVALID -> "Needs package cleanup"
+    }
+}
+
+private fun agentInboxCandidateDetailText(candidate: AgentInboxReviewCandidate): String {
+    return when (candidate.status) {
+        AgentInboxReviewStatus.READY -> candidate.manifest?.description
+            ?.takeIf(String::isNotBlank)
+            ?: "Ready to import into your private library."
+
+        AgentInboxReviewStatus.DUPLICATE -> "This package matches an existing private document and will not be imported again."
+        AgentInboxReviewStatus.INVALID -> {
+            when {
+                AgentInboxPackageValidationError.MISSING_MANIFEST in candidate.packageErrors -> {
+                    "Package is missing manifest.json."
+                }
+
+                AgentInboxPackageValidationError.MISSING_CONTENT_FILE in candidate.packageErrors -> {
+                    "Manifest points to content that is not present in the package."
+                }
+
+                AgentInboxPackageValidationError.TOO_MANY_FILES in candidate.packageErrors -> {
+                    "Package has too many files for review. Keep one manifest and one content file."
+                }
+
+                AgentInboxPackageValidationError.MANIFEST_FILE_TOO_LARGE in candidate.packageErrors -> {
+                    "Manifest is too large for review. Keep manifest.json small and scan again."
+                }
+
+                AgentInboxPackageValidationError.MULTIPLE_MANIFESTS in candidate.packageErrors -> {
+                    "Package has more than one manifest.json. Keep one manifest and scan again."
+                }
+
+                AgentInboxPackageValidationError.MULTIPLE_CONTENT_FILES in candidate.packageErrors -> {
+                    "Package has more than one Markdown or EPUB file. Keep one content file."
+                }
+
+                AgentInboxPackageValidationError.UNSUPPORTED_EXTRA_FILES in candidate.packageErrors -> {
+                    "Package has extra files. Keep one manifest and one Markdown or EPUB file."
+                }
+
+                AgentInboxPackageValidationError.CONTENT_FILE_TOO_LARGE in candidate.packageErrors -> {
+                    "Content is too large for review. Use a smaller Markdown or EPUB package."
+                }
+
+                AgentInboxPackageValidationError.CONTENT_CHANGED_AFTER_REVIEW in candidate.packageErrors -> {
+                    "Package changed after review. Scan again before importing."
+                }
+
+                AgentInboxPackageValidationError.DOWNLOAD_UNAVAILABLE in candidate.packageErrors -> {
+                    "Package file could not be downloaded. Check Drive access and scan again."
+                }
+
+                AgentInboxPackageValidationError.LOCAL_IMPORT_REJECTED in candidate.packageErrors -> {
+                    "Package could not be saved. Update it and scan again."
+                }
+
+                candidate.manifestErrors.isNotEmpty() -> {
+                    "${quantityLabel(candidate.manifestErrors.size, "manifest issue")} found. Update the package and scan again."
+                }
+
+                else -> "Package cannot be imported yet. Update it and scan again."
+            }
+        }
+    }
+}
+
+private fun ContentFormat.agentInboxFormatLabel(): String {
+    return when (this) {
+        ContentFormat.MARKDOWN -> "Markdown"
+        ContentFormat.EPUB -> "EPUB"
+        ContentFormat.PDF -> "PDF"
+        ContentFormat.HTML -> "Document"
     }
 }
 
