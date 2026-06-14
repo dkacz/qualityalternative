@@ -56,6 +56,7 @@ import com.qualityalternative.app.domain.model.UserLinkDraft
 import com.qualityalternative.app.domain.model.WebsiteRuleType
 import com.qualityalternative.app.domain.service.AddUserDocumentResult
 import com.qualityalternative.app.domain.service.AddUserLinkResult
+import com.qualityalternative.app.domain.service.AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER
 import com.qualityalternative.app.domain.service.AgentInboxDriveClient
 import com.qualityalternative.app.domain.service.AgentInboxDriveFile
 import com.qualityalternative.app.domain.service.AgentInboxDriveHttpException
@@ -730,6 +731,10 @@ class VisualQaScreenshotTest {
 
         runBlocking {
             val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication
+            app.appContainer.settingsRepository.saveAgentInboxDriveConnection(
+                folderId = "visual-test-agent-inbox",
+                grantMode = AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER,
+            )
             app.appContainer.settingsRepository.saveAgentInboxDriveScanSuccess(
                 timestampMillis = 1_781_256_600_000L,
                 folderId = "visual-test-agent-inbox",
@@ -741,7 +746,7 @@ class VisualQaScreenshotTest {
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("settings-list") }
         composeRule.onNodeWithTag("settings-list")
             .performScrollToNode(hasTestTag("settings-agent-inbox-section"))
-        composeRule.onNodeWithText("Google Drive Agent Inbox folder selected").assertIsDisplayed()
+        composeRule.onNodeWithText("Google Drive Agent Inbox folder connected").assertIsDisplayed()
         composeRule.onNodeWithText("No packages waiting for review.").assertIsDisplayed()
         composeRule.onNodeWithTag("settings-agent-inbox-disconnect").assertIsDisplayed().assertIsEnabled()
         captureSprint27("01_agent_inbox_connected_empty_light")
@@ -752,7 +757,7 @@ class VisualQaScreenshotTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("settings-list")
             .performScrollToNode(hasTestTag("settings-agent-inbox-candidate-visual-ready"))
-        composeRule.onNodeWithText("Google Drive Agent Inbox folder selected").assertIsDisplayed()
+        composeRule.onNodeWithText("Google Drive Agent Inbox folder connected").assertIsDisplayed()
         composeRule.onNodeWithTag("settings-agent-inbox-status").assertIsDisplayed()
         composeRule.onNodeWithText("Agent Focus Notes").assertIsDisplayed()
         composeRule.onNodeWithText("Accept priority").assertIsDisplayed()
@@ -854,26 +859,28 @@ class VisualQaScreenshotTest {
         composeRule.onNodeWithTag("settings-list")
             .performScrollToNode(hasTestTag("settings-agent-inbox-section"))
         composeRule.onNodeWithText("Google Drive Agent Inbox not connected").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings-agent-inbox-folder-draft").assertIsDisplayed()
         composeRule.onNodeWithTag("settings-agent-inbox-scan").assertIsDisplayed().assertIsEnabled()
-        composeRule.onNodeWithText("Select folder").assertIsDisplayed()
-        captureSprint28("00_agent_inbox_select_folder_light")
+        composeRule.onNodeWithText("Connect folder").assertIsDisplayed()
+        captureSprint28("00_agent_inbox_connect_folder_light")
 
         scenario?.onActivity { activity ->
-            activity.mainViewModel.connectAgentInboxDriveFolder(
-                folderId = "visual-picker-folder",
+            activity.mainViewModel.connectAgentInboxReadonlyDriveFolder(
+                folderId = "visual-readonly-folder",
                 nowMillis = 1_781_256_700_000L,
             )
         }
         composeRule.waitUntil(timeoutMillis = 10_000) {
-            hasNode("Google Drive Agent Inbox folder selected")
+            hasNode("Google Drive Agent Inbox folder connected")
         }
         composeRule.onNodeWithTag("settings-list")
             .performScrollToNode(hasTestTag("settings-agent-inbox-section"))
-        composeRule.onNodeWithText("Google Drive Agent Inbox folder selected").assertIsDisplayed()
+        composeRule.onNodeWithText("Google Drive Agent Inbox folder connected").assertIsDisplayed()
+        composeRule.onNodeWithText("Drive read access", substring = true).assertIsDisplayed()
         composeRule.onNodeWithText("Scan now").assertIsDisplayed()
         composeRule.onNodeWithTag("settings-agent-inbox-disconnect").assertIsDisplayed().assertIsEnabled()
-        waitForTransientMessageToClear("Agent Inbox folder selected.")
-        captureSprint28("01_agent_inbox_picker_folder_selected_light")
+        waitForTransientMessageToClear("Agent Inbox folder connected with Drive read access.")
+        captureSprint28("01_agent_inbox_readonly_folder_connected_light")
 
         scenario?.onActivity { activity ->
             activity.mainViewModel.seedAgentInboxDriveAccessLostForTests()
@@ -884,7 +891,8 @@ class VisualQaScreenshotTest {
         composeRule.onNodeWithTag("settings-list")
             .performScrollToNode(hasTestTag("settings-agent-inbox-section"))
         composeRule.onNodeWithText("Google Drive Agent Inbox not connected").assertIsDisplayed()
-        composeRule.onNodeWithText("Select folder").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings-agent-inbox-folder-draft").assertIsDisplayed()
+        composeRule.onNodeWithText("Connect folder").assertIsDisplayed()
         waitForTransientMessageToClear("Agent Inbox folder access was lost.")
         captureSprint28("02_agent_inbox_access_lost_light")
 
@@ -892,8 +900,8 @@ class VisualQaScreenshotTest {
         val imageFixture = agentInboxMarkdownImageVisualFixture()
         scenario?.onActivity { activity ->
             activity.mainViewModel.setAgentInboxDriveClientForTests(imageDriveClient)
-            activity.mainViewModel.connectAgentInboxDriveFolder(
-                folderId = "visual-picker-folder",
+            activity.mainViewModel.connectAgentInboxReadonlyDriveFolder(
+                folderId = "visual-readonly-folder",
                 nowMillis = 1_781_256_702_000L,
             )
         }
@@ -915,8 +923,8 @@ class VisualQaScreenshotTest {
 
         scenario?.onActivity { activity ->
             activity.mainViewModel.openSettings()
-            activity.mainViewModel.connectAgentInboxDriveFolder(
-                folderId = "visual-picker-folder",
+            activity.mainViewModel.connectAgentInboxReadonlyDriveFolder(
+                folderId = "visual-readonly-folder",
                 nowMillis = 1_781_256_704_000L,
             )
             activity.mainViewModel.selectThemeMode(AppThemeMode.DARK)
@@ -924,9 +932,10 @@ class VisualQaScreenshotTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("settings-list")
             .performScrollToNode(hasTestTag("settings-agent-inbox-section"))
-        composeRule.onNodeWithText("Google Drive Agent Inbox folder selected").assertIsDisplayed()
-        waitForTransientMessageToClear("Agent Inbox folder selected.")
-        captureSprint28("04_agent_inbox_picker_folder_selected_dark")
+        composeRule.onNodeWithText("Google Drive Agent Inbox folder connected").assertIsDisplayed()
+        composeRule.onNodeWithText("Drive read access", substring = true).assertIsDisplayed()
+        waitForTransientMessageToClear("Agent Inbox folder connected with Drive read access.")
+        captureSprint28("04_agent_inbox_readonly_folder_connected_dark")
     }
 
     @Test

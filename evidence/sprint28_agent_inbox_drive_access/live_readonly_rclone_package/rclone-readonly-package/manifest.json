@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "title": "Rclone Readonly Inbox Smoke",
+  "topics": ["PRACTICAL"],
+  "contentFile": "rclone-readonly-smoke.md",
+  "format": "MARKDOWN",
+  "rightsClass": "USER_PRIVATE",
+  "sourceLabel": "Rclone Agent",
+  "description": "Private Markdown package uploaded externally by rclone for the Agent Inbox readonly fallback.",
+  "priority": "normal",
+  "createdAt": "2026-06-14T18:20:00Z"
+}

@@ -41,6 +41,7 @@ import com.qualityalternative.app.domain.model.TopicTag
 import com.qualityalternative.app.domain.model.WebsiteRule
 import com.qualityalternative.app.domain.model.WebsiteRuleType
 import com.qualityalternative.app.domain.service.AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER
+import com.qualityalternative.app.domain.service.AGENT_INBOX_DRIVE_GRANT_MODE_READONLY_FOLDER
 import com.qualityalternative.app.domain.service.SettingsRepository
 import java.io.IOException
 import java.util.UUID
@@ -66,10 +67,10 @@ class PreferencesSettingsRepository(
             .map { preferences ->
                 val agentInboxDriveFolderId = preferences[AgentInboxDriveFolderId]?.takeIf(String::isNotBlank)
                 val agentInboxDriveGrantMode = preferences[AgentInboxDriveGrantMode]
-                val hasAgentInboxPickerFolderGrant =
+                val hasAgentInboxFolderGrant =
                     preferences[AgentInboxDriveEnabled] == true &&
                         agentInboxDriveFolderId != null &&
-                        agentInboxDriveGrantMode == AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER
+                        agentInboxDriveGrantMode in AGENT_INBOX_SUPPORTED_GRANT_MODES
                 AppSettings(
                     hasCompletedOnboarding = preferences[HasCompletedOnboarding] ?: false,
                     selectedAppPackages = preferences[SelectedAppPackages].orEmpty(),
@@ -111,11 +112,11 @@ class PreferencesSettingsRepository(
                     annotationDriveFolderId = preferences[AnnotationDriveFolderId],
                     annotationDriveLastSuccessfulAtMillis = preferences[AnnotationDriveLastSuccessfulAtMillis],
                     annotationDriveLastError = preferences[AnnotationDriveLastError],
-                    agentInboxDriveEnabled = hasAgentInboxPickerFolderGrant,
-                    agentInboxDriveFolderId = agentInboxDriveFolderId.takeIf { hasAgentInboxPickerFolderGrant },
-                    agentInboxDriveGrantMode = agentInboxDriveGrantMode.takeIf { hasAgentInboxPickerFolderGrant },
+                    agentInboxDriveEnabled = hasAgentInboxFolderGrant,
+                    agentInboxDriveFolderId = agentInboxDriveFolderId.takeIf { hasAgentInboxFolderGrant },
+                    agentInboxDriveGrantMode = agentInboxDriveGrantMode.takeIf { hasAgentInboxFolderGrant },
                     agentInboxDriveLastSuccessfulAtMillis =
-                        preferences[AgentInboxDriveLastSuccessfulAtMillis].takeIf { hasAgentInboxPickerFolderGrant },
+                        preferences[AgentInboxDriveLastSuccessfulAtMillis].takeIf { hasAgentInboxFolderGrant },
                     agentInboxDriveLastError = preferences[AgentInboxDriveLastError],
                     profileAutosaveUri = preferences[ProfileAutosaveUri],
                     profileAutosaveDisplayName = preferences[ProfileAutosaveDisplayName],
@@ -350,7 +351,7 @@ class PreferencesSettingsRepository(
         }
     }
 
-    override suspend fun saveAgentInboxDriveConnection(folderId: String?) {
+    override suspend fun saveAgentInboxDriveConnection(folderId: String?, grantMode: String) {
         dataStore.edit { preferences ->
             if (folderId.isNullOrBlank()) {
                 preferences.remove(AgentInboxDriveEnabled)
@@ -359,7 +360,8 @@ class PreferencesSettingsRepository(
             } else {
                 preferences[AgentInboxDriveEnabled] = true
                 preferences[AgentInboxDriveFolderId] = folderId
-                preferences[AgentInboxDriveGrantMode] = AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER
+                preferences[AgentInboxDriveGrantMode] = grantMode.takeIf(AGENT_INBOX_SUPPORTED_GRANT_MODES::contains)
+                    ?: AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER
             }
             preferences.remove(AgentInboxDriveLastError)
         }
@@ -378,7 +380,7 @@ class PreferencesSettingsRepository(
     override suspend fun saveAgentInboxDriveScanSuccess(timestampMillis: Long, folderId: String) {
         dataStore.edit { preferences ->
             val currentFolderId = preferences[AgentInboxDriveFolderId]?.takeIf(String::isNotBlank)
-            if (preferences[AgentInboxDriveGrantMode] == AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER &&
+            if (preferences[AgentInboxDriveGrantMode] in AGENT_INBOX_SUPPORTED_GRANT_MODES &&
                 currentFolderId != null &&
                 folderId == currentFolderId
             ) {
@@ -540,6 +542,10 @@ class PreferencesSettingsRepository(
         val AgentInboxDriveGrantMode = stringPreferencesKey("agent_inbox_drive_grant_mode")
         val AgentInboxDriveLastSuccessfulAtMillis = longPreferencesKey("agent_inbox_drive_last_successful_at_millis")
         val AgentInboxDriveLastError = stringPreferencesKey("agent_inbox_drive_last_error")
+        val AGENT_INBOX_SUPPORTED_GRANT_MODES = setOf(
+            AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER,
+            AGENT_INBOX_DRIVE_GRANT_MODE_READONLY_FOLDER,
+        )
         val ProfileAutosaveUri = stringPreferencesKey("profile_autosave_uri")
         val ProfileAutosaveDisplayName = stringPreferencesKey("profile_autosave_display_name")
         val ProfileAutosaveLastSuccessfulAtMillis = longPreferencesKey("profile_autosave_last_successful_at_millis")

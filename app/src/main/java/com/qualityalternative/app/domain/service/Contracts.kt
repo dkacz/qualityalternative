@@ -179,7 +179,7 @@ interface SettingsRepository {
     suspend fun clearAnnotationDriveSyncConnection()
     suspend fun saveAnnotationDriveSyncSuccess(timestampMillis: Long, folderId: String)
     suspend fun saveAnnotationDriveSyncFailure(errorMessage: String)
-    suspend fun saveAgentInboxDriveConnection(folderId: String?) {}
+    suspend fun saveAgentInboxDriveConnection(folderId: String?, grantMode: String = AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER) {}
     suspend fun clearAgentInboxDriveConnection() {}
     suspend fun saveAgentInboxDriveScanSuccess(timestampMillis: Long, folderId: String) {}
     suspend fun saveAgentInboxDriveScanFailure(errorMessage: String) {}

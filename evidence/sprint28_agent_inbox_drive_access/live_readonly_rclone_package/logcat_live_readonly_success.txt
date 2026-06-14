@@ -1,0 +1,2 @@
+06-14 20:30:10.192  8563  8580 W IPCThreadState: call to talkWithDriver in joinThreadPool returned error: -9 (Bad file descriptor), FD: -1
+06-14 20:30:10.192  8563  8577 W IPCThreadState: call to talkWithDriver in joinThreadPool returned error: -9 (Bad file descriptor), FD: -1

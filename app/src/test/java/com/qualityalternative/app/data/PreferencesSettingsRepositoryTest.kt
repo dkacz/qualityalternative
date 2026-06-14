@@ -21,6 +21,7 @@ import com.qualityalternative.app.domain.model.TopicTag
 import com.qualityalternative.app.domain.model.WebsiteRule
 import com.qualityalternative.app.domain.model.WebsiteRuleType
 import com.qualityalternative.app.domain.service.AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER
+import com.qualityalternative.app.domain.service.AGENT_INBOX_DRIVE_GRANT_MODE_READONLY_FOLDER
 import java.io.File
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -396,7 +397,10 @@ class PreferencesSettingsRepositoryTest {
             supportedApps = SupportedCatalog.distractingApps,
         )
 
-        repository.saveAgentInboxDriveConnection(folderId = null)
+        repository.saveAgentInboxDriveConnection(
+            folderId = null,
+            grantMode = AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER,
+        )
         repository.saveAgentInboxDriveScanFailure("Agent Inbox scan failed. Retry from Settings.")
 
         val failed = repository.observeAppSettings().first()
@@ -418,7 +422,10 @@ class PreferencesSettingsRepositoryTest {
         assertEquals(null, synced.agentInboxDriveLastSuccessfulAtMillis)
         assertEquals(null, synced.agentInboxDriveLastError)
 
-        repository.saveAgentInboxDriveConnection(folderId = "drive-folder-agent-inbox")
+        repository.saveAgentInboxDriveConnection(
+            folderId = "drive-folder-agent-inbox",
+            grantMode = AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER,
+        )
         repository.saveAgentInboxDriveScanSuccess(
             timestampMillis = 8_000L,
             folderId = "drive-folder-agent-inbox",
@@ -430,6 +437,22 @@ class PreferencesSettingsRepositoryTest {
         assertEquals(AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER, pickerSynced.agentInboxDriveGrantMode)
         assertEquals(8_000L, pickerSynced.agentInboxDriveLastSuccessfulAtMillis)
         assertEquals(null, pickerSynced.agentInboxDriveLastError)
+
+        repository.saveAgentInboxDriveConnection(
+            folderId = "drive-folder-agent-inbox-readonly",
+            grantMode = AGENT_INBOX_DRIVE_GRANT_MODE_READONLY_FOLDER,
+        )
+        repository.saveAgentInboxDriveScanSuccess(
+            timestampMillis = 8_500L,
+            folderId = "drive-folder-agent-inbox-readonly",
+        )
+
+        val readonlySynced = repository.observeAppSettings().first()
+        assertEquals(true, readonlySynced.agentInboxDriveEnabled)
+        assertEquals("drive-folder-agent-inbox-readonly", readonlySynced.agentInboxDriveFolderId)
+        assertEquals(AGENT_INBOX_DRIVE_GRANT_MODE_READONLY_FOLDER, readonlySynced.agentInboxDriveGrantMode)
+        assertEquals(8_500L, readonlySynced.agentInboxDriveLastSuccessfulAtMillis)
+        assertEquals(null, readonlySynced.agentInboxDriveLastError)
 
         repository.saveAgentInboxDriveScanSuccess(
             timestampMillis = 9_000L,

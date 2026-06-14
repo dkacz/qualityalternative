@@ -9,6 +9,7 @@ const val AGENT_INBOX_MAX_IMAGE_ATTACHMENTS_PER_PACKAGE = 6
 const val AGENT_INBOX_MAX_IMAGE_ATTACHMENT_BYTES = 5L * 1024L * 1024L
 const val AGENT_INBOX_MAX_TOTAL_IMAGE_ATTACHMENT_BYTES = 15L * 1024L * 1024L
 const val AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER = "picker_folder"
+const val AGENT_INBOX_DRIVE_GRANT_MODE_READONLY_FOLDER = "readonly_folder"
 
 data class AgentInboxDriveScanRequest(
     val accessToken: String,
@@ -44,7 +45,7 @@ class AgentInboxDriveDownloadTooLargeException(
 ) : java.io.IOException("Agent Inbox Drive download exceeded $maxBytes bytes.")
 
 class AgentInboxDriveFolderNotSelectedException :
-    java.io.IOException("Select an Agent Inbox folder before scanning.")
+    java.io.IOException("Connect an Agent Inbox folder before scanning.")
 
 class AgentInboxDriveHttpException(
     val statusCode: Int,

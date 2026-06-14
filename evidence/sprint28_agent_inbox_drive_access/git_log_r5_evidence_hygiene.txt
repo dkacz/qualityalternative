@@ -1,0 +1,12 @@
+e5b12a9 (HEAD -> codex/sprint28-agent-inbox-drive-access) Record Sprint 28 Google services handoff
+0add41a Record Sprint 28 emulator login handoff
+683ffc8 Record Sprint 28 preflight APK evidence
+661fb36 Record Sprint 28 live spike environment probe
+3bb611a Prepare Sprint 28 live rclone Picker spike
+8c50e47 Document Sprint 28 live spike blocker
+e507699 Record Sprint 28 GPT Pro R3 review
+6b4eabf Record Sprint 28 GPT Pro R3 lane
+663eea8 Prepare Sprint 28 GPT Pro R3 review
+482478d Fix Sprint 28 Markdown sidecar review blockers
+64c2327 Record Sprint 28 GPT Pro R2 review
+ee8365e Record Sprint 28 GPT Pro R2 lane

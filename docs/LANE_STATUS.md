@@ -13,20 +13,20 @@ This file is the repo-level index for active and recently completed execution la
 
 ## Sprint 28 Agent Inbox Drive Access Fix
 
-Status: `in_progress`
+Status: `release_gate_passed`
 
 - Branch: `codex/sprint28-agent-inbox-drive-access`
 - Scope: fix the post-release Agent Inbox Drive access gap for packages uploaded later by rclone/external agents under the current `drive.file` model, and close the added Markdown image attachment gap for manual imports plus Agent Inbox Markdown packages.
 - Canonical sprint plan: `docs/SPRINT_28_AGENT_INBOX_DRIVE_ACCESS.md`
 - Current implementation state:
   - Sprint opened from Sprint 27 release branch after recording the `drive.file`/rclone diagnosis.
-  - Default decision is Picker-first: keep `drive.file`, require explicit Google Picker folder selection for Agent Inbox, and only consider `drive.readonly` if a selected folder grant does not expose later-added package children.
+  - Initial decision was Picker-first: keep `drive.file`, require explicit Google Picker folder selection for Agent Inbox, and only consider `drive.readonly` if a selected folder grant cannot be obtained or does not expose later-added package children.
   - Current validation/evidence summary: `evidence/sprint28_agent_inbox_drive_access/VALIDATION_SUMMARY.md`
   - Live rclone/Picker spike checklist: `evidence/sprint28_agent_inbox_drive_access/device_spike/RCLONE_PICKER_FOLDER_SPIKE.md`
   - `play-services-auth` is bumped to `21.6.0` because Google Play services release notes state this version adds `PICKER_ALLOW_FOLDER_SELECTION`.
   - App-side Picker-folder authorization is implemented with `PICKER_OAUTH_TRIGGER=true`, `PICKER_ALLOW_FOLDER_SELECTION=true`, consent prompt, and opt-out from previously granted scopes.
   - Agent Inbox scan now requires a selected folder id and no longer silently creates a separate app-owned inbox folder.
-  - Selected-folder Drive 401/403/404 scan failures are treated as access-lost states that clear the local folder grant, show `Select folder`, and record privacy-safe failure analytics.
+  - Selected-folder Drive 401/403/404 scan failures are treated as access-lost states that clear the local folder grant, show reconnect copy, and record privacy-safe failure analytics.
   - GPT Pro R1 returned `SCORE 7/10`, `VERDICT BLOCK`, `VISUAL REVIEW REVISE`; the blockers were legacy Sprint 27 app-created folder ids bypassing Picker and a connected-without-folder Settings state.
   - R1 fixes are implemented locally: Agent Inbox connection now requires durable `agent_inbox_drive_grant_mode=picker_folder`, legacy folder ids without that marker hydrate as disconnected, `saveAgentInboxDriveConnection(null)` clears connection state, and Settings copy/actions derive connected state from the Picker grant predicate.
   - Manual Markdown image attachment imports now allow image-only follow-up picker results to merge into the already selected Markdown file while preserving edited title, selected topics, and priority.
@@ -34,8 +34,25 @@ Status: `in_progress`
   - GPT Pro R2 returned `SCORE 7/10`, `VERDICT REVISE`, `VISUAL REVIEW PASS`; the remaining findings were duplicate/colliding sidecar names, unreviewed Markdown local-image fallback, and incomplete sidecar rollback on mid-write failure.
   - R2 fixes are implemented locally: duplicate/colliding sidecar names are invalid during review, Agent Inbox Markdown reader rendering disables local fallback for stored Agent Inbox files, and sidecar writes use temp/backup rollback that removes promoted files after later failures.
   - GPT Pro R3 returned `SCORE 10/10`, `VERDICT PASS`, `VISUAL REVIEW PASS`; no fresh findings.
-  - Visual E2E coverage for disconnected select-folder, selected-folder, access-lost reconnect, Agent Inbox Markdown image reader, and dark selected-folder states passed in `VisualQaScreenshotTest#captureSprint28AgentInboxDriveAccessStates`.
+  - Historical R3 visual E2E coverage for disconnected Picker connect, selected-folder, access-lost reconnect, Agent Inbox Markdown image reader, and dark selected-folder states passed in `VisualQaScreenshotTest#captureSprint28AgentInboxDriveAccessStates`.
   - Canonical Sprint 28 R3 visual evidence: `evidence/sprint28_agent_inbox_drive_access/visual_e2e_r3/contact_sheet_r3.png` and `evidence/sprint28_agent_inbox_drive_access/visual_e2e_r3/sprint28-agent-inbox-drive-access-1781437194813/`.
+  - Live Picker runtime evidence on signed-in `qaApi36` failed before folder selection: Google Play Services showed account selection, then returned to the app with `No Agent Inbox folder was selected`; no Drive folder Picker appeared and no folder id was returned.
+  - The controlled `drive.readonly` fallback is implemented locally: Settings accepts an Agent Inbox Drive folder URL/id, validates and normalizes the folder id, requests explicit read-only Drive consent, persists `agent_inbox_drive_grant_mode=readonly_folder`, scans only the saved folder id, and revokes the read-only scope on disconnect.
+  - Fallback UX copy says Drive read access is used only after consent and that the app scans only the pasted folder id.
+  - Fallback analytics remain privacy-safe: connection metadata records only `grantMode=readOnlyFolder`, and raw folder ids/file ids/package ids/content names/raw failure text stay out of remote-safe analytics and Portable Profile.
+  - Current readonly visual evidence: `evidence/sprint28_agent_inbox_drive_access/visual_e2e_readonly_r1/contact_sheet_readonly_r1.png` and `evidence/sprint28_agent_inbox_drive_access/visual_e2e_readonly_r1/sprint28-agent-inbox-drive-access-1781460684272/`.
+  - Current live rclone fallback evidence: `evidence/sprint28_agent_inbox_drive_access/live_readonly_rclone_package/RESULT.md` and `evidence/sprint28_agent_inbox_drive_access/live_readonly_rclone_package/live_readonly_rclone_success.png`.
+  - Live readonly fallback passed on `qaApi36`: after explicit Google consent, the app scanned the pasted Drive folder id and displayed the rclone-uploaded package as one package waiting for review.
+  - GPT Pro R4 readonly fallback review returned `SCORE 9/10`, `VERDICT PASS`, `VISUAL REVIEW PASS`; the only fresh finding was evidence/package hygiene: the live result overstated a two-line logcat as auth-flow proof and referenced rclone listing JSON files excluded from the bundle.
+  - R4 evidence-hygiene fixes are implemented locally: live RESULT now relies on final-state screenshot/UI XML, `rclone_listing_summary_redacted.md` replaces raw Drive-id listing evidence for review, raw Gradle logs are available, and Sprint 27 visual seeding now writes a durable `picker_folder` grant marker before scan success.
+  - GPT Pro R5 evidence-hygiene lane was launched at `https://chatgpt.com/c/6a2f0b18-a1e0-83ed-a622-e228bc775631` with bundle `SPRINT28_R5_EVIDENCE_HYGIENE_REVIEW_BUNDLE_20260614.zip`.
+  - GPT Pro R5 returned `SCORE 10/10`, `VERDICT PASS`, `VISUAL REVIEW PASS`; fresh findings none, bundle gaps none, package hygiene clean enough for this lane.
+  - Final release gate passed for `v0.11.16-agent-inbox-drive-access-alpha`: `versionCode=32`, `versionName=0.11.16-alpha`, final local Gradle gate PASS, final connected Android gate PASS 138/138, APK badging/signature/install/launch PASS.
+  - Release artifact: `release_artifacts/quality-alternative-v0.11.16-agent-inbox-drive-access-alpha-debug.apk`
+  - SHA-256: `acb460d2ca6e8e1129607eed43171464eef192f7e470f4ef82dcda7286e5841d`
+  - Release gate summary: `docs/release-gate-logs/2026-06-14-sprint28-agent-inbox-drive-access/VALIDATION_SUMMARY.md`
+  - Release notes: `docs/release-gate-logs/2026-06-14-sprint28-agent-inbox-drive-access/RELEASE_NOTES_v0.11.16-agent-inbox-drive-access-alpha.md`
+  - Commit/tag/release URL: pending integration.
 - Validation:
   - Passed: full `testDebugUnitTest`.
   - Passed: targeted Markdown image/Agent Inbox tests for `DocumentImportCandidateFactoryTest`, `MainViewModelTest`, `AgentInboxReviewCandidateFactoryTest`, and `AgentInboxPackageImporterTest`.
@@ -46,11 +63,15 @@ Status: `in_progress`
   - Passed: focused connected visual E2E on `qaApi36(AVD) - 16` for `VisualQaScreenshotTest#captureSprint28AgentInboxDriveAccessStates`.
   - Passed: `lintDebug`, `processReleaseManifestForPackage`, and `assembleDebug`.
   - Passed: `git diff --check`.
+  - Passed for readonly fallback: targeted `GoogleDriveAuthorizationTest`, `MainViewModelTest`, and `PreferencesSettingsRepositoryTest`.
+  - Passed for readonly fallback: focused connected visual E2E on `qaApi36(AVD) - 16` for `VisualQaScreenshotTest#captureSprint28AgentInboxDriveAccessStates`.
+  - Passed for readonly fallback: `assembleDebug`.
+  - Passed for readonly fallback: live signed-in emulator/rclone scan.
+  - Passed after R4 evidence fix: targeted Chrome verified-host rerun, targeted Sprint 27 Agent Inbox visual rerun, targeted Sprint 28 readonly visual rerun, full local unit/compile/lint/release-manifest/build gate, and fresh full connected Android run with 138/138 tests.
+  - Historical exploratory full connected run after R4 failed 2/138 before targeted reruns: Chrome verified-host test passed when rerun alone, Sprint 27 visual passed after the durable grant seed fix, and the fresh R5 full connected run passed.
 - Next gate:
-  - 2026-06-14 handoff: `qaApi36` is running as `emulator-5554` and is parked on the Google sign-in screen (`Email or phone`) for the operator to add the Google account needed for the live Picker/rclone spike.
-  - 2026-06-14 update: the emulator was driven through Google account entry to the `Google services` consent/settings screen for `omareth@gmail.com`; Codex can operate emulator UI, but the remaining `MORE`/`ACCEPT` action confirms Google account service/privacy settings and is intentionally left to the operator.
-  - Run the signed-in live rclone/Picker spike using `evidence/sprint28_agent_inbox_drive_access/device_spike/LIVE_RCLONE_PICKER_SPIKE_RUNBOOK.md`; only after it passes should the final release APK gate and alpha publication proceed.
-  - Preflight APK install/launch evidence exists at `docs/release-gate-logs/2026-06-14-sprint28-agent-inbox-drive-access-preflight/`, but it is explicitly not the final release gate.
+  - Commit, tag, push, and publish the GitHub release if this local release gate is accepted for publication.
+  - Preflight APK install/launch evidence remains at `docs/release-gate-logs/2026-06-14-sprint28-agent-inbox-drive-access-preflight/`, but the final release gate is now `docs/release-gate-logs/2026-06-14-sprint28-agent-inbox-drive-access/`.
 
 ## Sprint 27 Agent Content Inbox
 

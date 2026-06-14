@@ -98,6 +98,7 @@ import com.qualityalternative.app.domain.service.AccountLightProfileBackupReader
 import com.qualityalternative.app.domain.service.AddUserDocumentResult
 import com.qualityalternative.app.domain.service.AddUserLinkResult
 import com.qualityalternative.app.domain.service.AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER
+import com.qualityalternative.app.domain.service.AGENT_INBOX_DRIVE_GRANT_MODE_READONLY_FOLDER
 import com.qualityalternative.app.domain.service.AgentInboxDriveClient
 import com.qualityalternative.app.domain.service.AgentInboxDriveDownloadTooLargeException
 import com.qualityalternative.app.domain.service.AgentInboxDriveHttpException
@@ -213,6 +214,8 @@ data class MainUiState(
     val agentInboxDriveGrantMode: String? = null,
     val agentInboxDriveLastSuccessfulAtMillis: Long? = null,
     val agentInboxDriveLastError: String? = null,
+    val agentInboxDriveFolderDraft: String = "",
+    val agentInboxDriveFolderDraftError: String? = null,
     val isAgentInboxScanning: Boolean = false,
     val isAgentInboxImporting: Boolean = false,
     val agentInboxCandidates: List<AgentInboxReviewCandidate> = emptyList(),
@@ -251,6 +254,24 @@ data class MainUiState(
         get() = agentInboxDriveEnabled &&
             !agentInboxDriveFolderId.isNullOrBlank() &&
             agentInboxDriveGrantMode == AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER
+
+    val hasAgentInboxReadonlyFolderGrant: Boolean
+        get() = agentInboxDriveEnabled &&
+            !agentInboxDriveFolderId.isNullOrBlank() &&
+            agentInboxDriveGrantMode == AGENT_INBOX_DRIVE_GRANT_MODE_READONLY_FOLDER
+
+    val hasAgentInboxDriveFolderGrant: Boolean
+        get() = hasAgentInboxPickerFolderGrant || hasAgentInboxReadonlyFolderGrant
+}
+
+internal fun parseAgentInboxDriveFolderId(value: String): String? {
+    val trimmed = value.trim().trim('"', '\'')
+    if (trimmed.isBlank()) return null
+    val fromFolderPath = Regex("""/folders/([^/?#]+)""").find(trimmed)?.groupValues?.getOrNull(1)
+    val fromQuery = Regex("""[?&]id=([^&#]+)""").find(trimmed)?.groupValues?.getOrNull(1)
+    val candidate = (fromFolderPath ?: fromQuery ?: trimmed).trim()
+    if (candidate.startsWith("http://") || candidate.startsWith("https://")) return null
+    return candidate.takeIf { it.matches(Regex("""[A-Za-z0-9_-]{8,}""")) }
 }
 
 data class AddLinkConfirmation(
@@ -1269,8 +1290,9 @@ class MainViewModel(
             return
         }
         val selectedFolderId = uiState.agentInboxDriveFolderId?.takeIf(String::isNotBlank)
-        if (!uiState.hasAgentInboxPickerFolderGrant || selectedFolderId == null) {
-            reportAgentInboxDriveFailure("Select an Agent Inbox folder before scanning.")
+        val selectedGrantMode = uiState.agentInboxDriveGrantMode
+        if (!uiState.hasAgentInboxDriveFolderGrant || selectedFolderId == null || selectedGrantMode == null) {
+            reportAgentInboxDriveFailure("Connect an Agent Inbox folder before scanning.")
             return
         }
         val normalizedToken = accessToken.trim()
@@ -1285,6 +1307,10 @@ class MainViewModel(
         )
         viewModelScope.launch {
             try {
+                settingsRepository.saveAgentInboxDriveConnection(
+                    folderId = selectedFolderId,
+                    grantMode = selectedGrantMode,
+                )
                 val scan = agentInboxDriveClient.scanPackages(
                     AgentInboxDriveScanRequest(
                         accessToken = normalizedToken,
@@ -1418,6 +1444,8 @@ class MainViewModel(
                     agentInboxDriveFolderId = scan.folderId,
                     agentInboxDriveLastSuccessfulAtMillis = nowMillis,
                     agentInboxDriveLastError = null,
+                    agentInboxDriveFolderDraft = scan.folderId,
+                    agentInboxDriveFolderDraftError = null,
                     isAgentInboxScanning = false,
                     agentInboxCandidates = candidates,
                     agentInboxPriorityAcceptedPackageIds = emptySet(),
@@ -1434,7 +1462,7 @@ class MainViewModel(
                 if (error is CancellationException) throw error
                 if (error is AgentInboxDriveHttpException && error.requiresAgentInboxReconnect()) {
                     reportAgentInboxDriveAccessLost(
-                        "Agent Inbox folder access was lost. Select the folder again.",
+                        "Agent Inbox folder access was lost. Connect the folder again.",
                     )
                 } else {
                     reportAgentInboxDriveFailure("Agent Inbox scan failed. Retry from Settings.")
@@ -1455,9 +1483,37 @@ class MainViewModel(
     fun beginAgentInboxFolderSelection() {
         uiState = uiState.copy(
             agentInboxDriveLastError = null,
+            agentInboxDriveFolderDraftError = null,
             agentInboxScanTruncated = false,
             latestMessage = null,
         )
+    }
+
+    fun updateAgentInboxDriveFolderDraft(value: String) {
+        uiState = uiState.copy(
+            agentInboxDriveFolderDraft = value,
+            agentInboxDriveFolderDraftError = null,
+            agentInboxDriveLastError = null,
+        )
+    }
+
+    fun beginAgentInboxReadonlyFolderConnection(): Boolean {
+        val parsedFolderId = parseAgentInboxDriveFolderId(uiState.agentInboxDriveFolderDraft)
+        if (parsedFolderId == null) {
+            uiState = uiState.copy(
+                agentInboxDriveFolderDraftError = "Paste a Google Drive folder link or folder id.",
+                latestMessage = "Paste an Agent Inbox Drive folder link first.",
+            )
+            return false
+        }
+        uiState = uiState.copy(
+            agentInboxDriveFolderDraft = parsedFolderId,
+            agentInboxDriveFolderDraftError = null,
+            agentInboxDriveLastError = null,
+            agentInboxScanTruncated = false,
+            latestMessage = null,
+        )
+        return true
     }
 
     fun connectAgentInboxDriveFolder(folderId: String, nowMillis: Long = nowProvider()) {
@@ -1488,6 +1544,40 @@ class MainViewModel(
         }
     }
 
+    fun connectAgentInboxReadonlyDriveFolder(folderId: String, nowMillis: Long = nowProvider()) {
+        val normalizedFolderId = parseAgentInboxDriveFolderId(folderId)
+        if (normalizedFolderId == null) {
+            reportAgentInboxDriveFailure("Paste a Google Drive folder link or folder id.")
+            uiState = uiState.copy(agentInboxDriveFolderDraftError = "Paste a Google Drive folder link or folder id.")
+            return
+        }
+        uiState = uiState.copy(
+            agentInboxDriveEnabled = true,
+            agentInboxDriveFolderId = normalizedFolderId,
+            agentInboxDriveGrantMode = AGENT_INBOX_DRIVE_GRANT_MODE_READONLY_FOLDER,
+            agentInboxDriveLastError = null,
+            agentInboxDriveFolderDraft = normalizedFolderId,
+            agentInboxDriveFolderDraftError = null,
+            agentInboxCandidates = emptyList(),
+            agentInboxPriorityAcceptedPackageIds = emptySet(),
+            agentInboxScanTruncated = false,
+            latestMessage = "Agent Inbox folder connected with Drive read access.",
+        )
+        viewModelScope.launch {
+            settingsRepository.saveAgentInboxDriveConnection(
+                folderId = normalizedFolderId,
+                grantMode = AGENT_INBOX_DRIVE_GRANT_MODE_READONLY_FOLDER,
+            )
+            recordEventDurably(
+                AnalyticsEvent(
+                    type = AnalyticsEventType.AGENT_INBOX_CONNECTED,
+                    timestampMillis = nowMillis,
+                    metadata = mapOf("grantMode" to "readOnlyFolder"),
+                ),
+            )
+        }
+    }
+
     fun reportAgentInboxDriveAuthorizationFailure(errorMessage: String) {
         val message = errorMessage.trim().ifBlank { "Google Drive authorization failed." }
         reportAgentInboxDriveFailure(message)
@@ -1500,6 +1590,8 @@ class MainViewModel(
             agentInboxDriveGrantMode = null,
             agentInboxDriveLastSuccessfulAtMillis = null,
             agentInboxDriveLastError = null,
+            agentInboxDriveFolderDraft = "",
+            agentInboxDriveFolderDraftError = null,
             isAgentInboxScanning = false,
             isAgentInboxImporting = false,
             agentInboxCandidates = emptyList(),
@@ -1906,12 +1998,15 @@ class MainViewModel(
     }
 
     private fun reportAgentInboxDriveAccessLost(message: String) {
+        val reconnectFolderDraft = uiState.agentInboxDriveFolderId.orEmpty()
         uiState = uiState.copy(
             agentInboxDriveEnabled = false,
             agentInboxDriveFolderId = null,
             agentInboxDriveGrantMode = null,
             agentInboxDriveLastSuccessfulAtMillis = null,
             agentInboxDriveLastError = message,
+            agentInboxDriveFolderDraft = reconnectFolderDraft,
+            agentInboxDriveFolderDraftError = null,
             isAgentInboxScanning = false,
             isAgentInboxImporting = false,
             agentInboxCandidates = emptyList(),
@@ -4111,6 +4206,7 @@ class MainViewModel(
             agentInboxDriveGrantMode = settings.agentInboxDriveGrantMode,
             agentInboxDriveLastSuccessfulAtMillis = settings.agentInboxDriveLastSuccessfulAtMillis,
             agentInboxDriveLastError = settings.agentInboxDriveLastError,
+            agentInboxDriveFolderDraft = settings.agentInboxDriveFolderId ?: uiState.agentInboxDriveFolderDraft,
             profileAutosaveUri = effectiveProfileAutosaveUri,
             profileAutosaveDisplayName = effectiveProfileAutosaveDisplayName,
             profileAutosaveUsesLocalDefault = profileAutosaveUsesLocalDefault,
@@ -5196,7 +5292,7 @@ class MainViewModel(
     }
 
     internal fun seedAgentInboxDriveAccessLostForTests(
-        message: String = "Agent Inbox folder access was lost. Select the folder again.",
+        message: String = "Agent Inbox folder access was lost. Connect the folder again.",
     ) {
         check(BuildConfig.DEBUG) { "Agent Inbox access-lost visual fixture state is only available in debug builds." }
         uiState = uiState.copy(

@@ -188,6 +188,7 @@ import com.qualityalternative.app.domain.model.WebsiteRuleType
 import com.qualityalternative.app.domain.model.usesExternalHandoff
 import com.qualityalternative.app.domain.model.usesMeditationTimer
 import com.qualityalternative.app.domain.model.usesRepositoryBody
+import com.qualityalternative.app.domain.service.AGENT_INBOX_DRIVE_READONLY_SCOPE
 import com.qualityalternative.app.domain.service.ANNOTATION_DRIVE_SCOPE
 import com.qualityalternative.app.domain.service.RecommendationExplainer
 import com.qualityalternative.app.domain.service.RecommendationExplanation
@@ -388,8 +389,12 @@ private fun MainRoute(
     fun reportDriveAuthorizationFailure(message: String) {
         when (driveAuthorizationMode) {
             GoogleDriveAuthorizationMode.AGENT_INBOX_PICK_FOLDER,
+            GoogleDriveAuthorizationMode.AGENT_INBOX_CONNECT_READONLY,
             GoogleDriveAuthorizationMode.AGENT_INBOX_SCAN,
-            GoogleDriveAuthorizationMode.AGENT_INBOX_IMPORT -> {
+            GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_SCAN,
+            GoogleDriveAuthorizationMode.AGENT_INBOX_IMPORT,
+            GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_IMPORT,
+            -> {
                 pendingAgentInboxImportPackageId = null
                 viewModel.reportAgentInboxDriveAuthorizationFailure(message)
             }
@@ -402,7 +407,9 @@ private fun MainRoute(
     }
     fun handleDriveAuthorizationResult(result: AuthorizationResult) {
         val token = result.accessToken?.takeIf(String::isNotBlank)
-        val hasDriveScope = result.grantedScopes.orEmpty().contains(ANNOTATION_DRIVE_SCOPE)
+        val hasDriveScope = result.grantedScopes.orEmpty().contains(
+            googleDriveAuthorizationScopeFor(driveAuthorizationMode),
+        )
         if (token == null || !hasDriveScope) {
             reportDriveAuthorizationFailure("Google Drive permission was not granted.")
             return
@@ -426,8 +433,24 @@ private fun MainRoute(
                     viewModel.scanAgentInboxDrive(token)
                 }
             }
+            GoogleDriveAuthorizationMode.AGENT_INBOX_CONNECT_READONLY -> {
+                viewModel.connectAgentInboxReadonlyDriveFolder(
+                    folderId = viewModel.uiState.agentInboxDriveFolderDraft,
+                )
+                viewModel.scanAgentInboxDrive(token)
+            }
             GoogleDriveAuthorizationMode.AGENT_INBOX_SCAN -> viewModel.scanAgentInboxDrive(token)
+            GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_SCAN -> viewModel.scanAgentInboxDrive(token)
             GoogleDriveAuthorizationMode.AGENT_INBOX_IMPORT -> {
+                val packageFolderId = pendingAgentInboxImportPackageId
+                pendingAgentInboxImportPackageId = null
+                if (packageFolderId == null) {
+                    viewModel.reportAgentInboxDriveAuthorizationFailure("Agent Inbox package is no longer available.")
+                } else {
+                    viewModel.importAgentInboxCandidate(packageFolderId = packageFolderId, accessToken = token)
+                }
+            }
+            GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_IMPORT -> {
                 val packageFolderId = pendingAgentInboxImportPackageId
                 pendingAgentInboxImportPackageId = null
                 if (packageFolderId == null) {
@@ -461,8 +484,13 @@ private fun MainRoute(
             GoogleDriveAuthorizationMode.ANNOTATION_RETRY -> viewModel.beginAnnotationDriveAuthorization()
 
             GoogleDriveAuthorizationMode.AGENT_INBOX_PICK_FOLDER -> viewModel.beginAgentInboxFolderSelection()
-            GoogleDriveAuthorizationMode.AGENT_INBOX_SCAN -> viewModel.beginAgentInboxDriveScan()
-            GoogleDriveAuthorizationMode.AGENT_INBOX_IMPORT -> Unit
+            GoogleDriveAuthorizationMode.AGENT_INBOX_CONNECT_READONLY -> Unit
+            GoogleDriveAuthorizationMode.AGENT_INBOX_SCAN,
+            GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_SCAN,
+            -> viewModel.beginAgentInboxDriveScan()
+            GoogleDriveAuthorizationMode.AGENT_INBOX_IMPORT,
+            GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_IMPORT,
+            -> Unit
         }
         val authorizationRequest = googleDriveAuthorizationRequestFor(mode)
         driveAuthorizationClient.authorize(authorizationRequest)
@@ -496,9 +524,14 @@ private fun MainRoute(
     val disconnectAgentInboxDrive = {
         val annotationDriveConfigured = state.annotationDriveSyncEnabled ||
             annotationExportUsesGoogleDriveProvider(state.annotationExportUri)
-        if (!annotationDriveConfigured) {
+        val agentInboxScope = if (state.hasAgentInboxReadonlyFolderGrant) {
+            AGENT_INBOX_DRIVE_READONLY_SCOPE
+        } else {
+            ANNOTATION_DRIVE_SCOPE
+        }
+        if (agentInboxScope == AGENT_INBOX_DRIVE_READONLY_SCOPE || !annotationDriveConfigured) {
             val revokeRequest = RevokeAccessRequest.builder()
-                .setScopes(listOf(Scope(ANNOTATION_DRIVE_SCOPE)))
+                .setScopes(listOf(Scope(agentInboxScope)))
                 .build()
             driveAuthorizationClient.revokeAccess(revokeRequest)
         }
@@ -715,20 +748,31 @@ private fun MainRoute(
                     startGoogleDriveSyncAuthorization(GoogleDriveAuthorizationMode.ANNOTATION_RETRY)
                 },
                 onDisconnectAnnotationDrive = disconnectGoogleDriveSync,
+                onAgentInboxFolderDraftChange = viewModel::updateAgentInboxDriveFolderDraft,
                 onScanAgentInbox = {
-                    val mode = if (state.hasAgentInboxPickerFolderGrant) {
-                        GoogleDriveAuthorizationMode.AGENT_INBOX_SCAN
-                    } else {
-                        GoogleDriveAuthorizationMode.AGENT_INBOX_PICK_FOLDER
+                    val mode = when {
+                        state.hasAgentInboxReadonlyFolderGrant -> GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_SCAN
+                        state.hasAgentInboxPickerFolderGrant -> GoogleDriveAuthorizationMode.AGENT_INBOX_SCAN
+                        viewModel.beginAgentInboxReadonlyFolderConnection() -> {
+                            GoogleDriveAuthorizationMode.AGENT_INBOX_CONNECT_READONLY
+                        }
+                        else -> null
                     }
-                    startGoogleDriveSyncAuthorization(mode)
+                    if (mode != null) {
+                        startGoogleDriveSyncAuthorization(mode)
+                    }
                 },
                 onDisconnectAgentInbox = disconnectAgentInboxDrive,
                 onToggleAgentInboxPriority = viewModel::toggleAgentInboxPriority,
                 onRejectAgentInboxCandidate = viewModel::rejectAgentInboxCandidate,
                 onImportAgentInboxCandidate = { packageFolderId ->
                     pendingAgentInboxImportPackageId = packageFolderId
-                    startGoogleDriveSyncAuthorization(GoogleDriveAuthorizationMode.AGENT_INBOX_IMPORT)
+                    val mode = if (state.hasAgentInboxReadonlyFolderGrant) {
+                        GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_IMPORT
+                    } else {
+                        GoogleDriveAuthorizationMode.AGENT_INBOX_IMPORT
+                    }
+                    startGoogleDriveSyncAuthorization(mode)
                 },
                 onExportAccountLightProfile = { accountLightExportPicker.launch(ACCOUNT_LIGHT_PROFILE_FILE_NAME) },
                 onExportAccountLightBackup = { accountLightExportPicker.launch(accountLightTimestampedBackupFileName()) },
@@ -4197,6 +4241,7 @@ private fun SettingsTab(
     onConnectAnnotationDrive: () -> Unit,
     onRetryAnnotationDrive: () -> Unit,
     onDisconnectAnnotationDrive: () -> Unit,
+    onAgentInboxFolderDraftChange: (String) -> Unit,
     onScanAgentInbox: () -> Unit,
     onDisconnectAgentInbox: () -> Unit,
     onToggleAgentInboxPriority: (String) -> Unit,
@@ -4403,6 +4448,7 @@ private fun SettingsTab(
         item {
             AgentInboxSettingsSection(
                 state = state,
+                onFolderDraftChange = onAgentInboxFolderDraftChange,
                 onScan = onScanAgentInbox,
                 onDisconnect = onDisconnectAgentInbox,
                 onTogglePriority = onToggleAgentInboxPriority,
@@ -5276,6 +5322,7 @@ private fun AnnotationAutosaveSettingsSection(
 @Composable
 private fun AgentInboxSettingsSection(
     state: MainUiState,
+    onFolderDraftChange: (String) -> Unit,
     onScan: () -> Unit,
     onDisconnect: () -> Unit,
     onTogglePriority: (String) -> Unit,
@@ -5289,7 +5336,7 @@ private fun AgentInboxSettingsSection(
             "Agent Inbox",
             right = when {
                 state.isAgentInboxScanning -> "Scanning"
-                state.hasAgentInboxPickerFolderGrant -> "Drive"
+                state.hasAgentInboxDriveFolderGrant -> "Drive"
                 else -> "Off"
             },
         )
@@ -5302,8 +5349,8 @@ private fun AgentInboxSettingsSection(
                 SourceBadge(sourceType = ContentSourceType.USER_DOCUMENT, icon = QaIconKind.Note)
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = if (state.hasAgentInboxPickerFolderGrant) {
-                            "Google Drive Agent Inbox folder selected"
+                        text = if (state.hasAgentInboxDriveFolderGrant) {
+                            "Google Drive Agent Inbox folder connected"
                         } else {
                             "Google Drive Agent Inbox not connected"
                         },
@@ -5331,6 +5378,33 @@ private fun AgentInboxSettingsSection(
                     )
                 }
             }
+            if (!state.hasAgentInboxDriveFolderGrant) {
+                QaTextField(
+                    value = state.agentInboxDriveFolderDraft,
+                    onValueChange = onFolderDraftChange,
+                    placeholder = "Drive folder URL or id",
+                    isError = state.agentInboxDriveFolderDraftError != null,
+                    modifier = Modifier
+                        .padding(top = 14.dp)
+                        .testTag("settings-agent-inbox-folder-draft"),
+                )
+                state.agentInboxDriveFolderDraftError?.let { error ->
+                    BodyText(
+                        text = error,
+                        color = colors.accent,
+                        fontSize = 12.5.sp,
+                        lineHeight = 17.sp,
+                        modifier = Modifier.padding(top = 6.dp),
+                    )
+                }
+                BodyText(
+                    text = "Drive read access is used only after consent, and this app scans only the folder id pasted here.",
+                    color = colors.mutedText,
+                    fontSize = 12.5.sp,
+                    lineHeight = 17.sp,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
             Row(
                 modifier = Modifier.padding(top = 14.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -5338,8 +5412,8 @@ private fun AgentInboxSettingsSection(
                 QaButton(
                     text = when {
                         state.isAgentInboxScanning -> "Scanning"
-                        state.hasAgentInboxPickerFolderGrant -> "Scan now"
-                        else -> "Select folder"
+                        state.hasAgentInboxDriveFolderGrant -> "Scan now"
+                        else -> "Connect folder"
                     },
                     onClick = onScan,
                     variant = QaButtonVariant.Outline,
@@ -5350,7 +5424,7 @@ private fun AgentInboxSettingsSection(
                         .weight(1f)
                         .testTag("settings-agent-inbox-scan"),
                 )
-                if (state.hasAgentInboxPickerFolderGrant) {
+                if (state.hasAgentInboxDriveFolderGrant) {
                     QaButton(
                         text = "Disconnect",
                         onClick = onDisconnect,
@@ -9582,10 +9656,16 @@ private fun agentInboxDriveStatusText(state: MainUiState): String {
     state.agentInboxDriveLastSuccessfulAtMillis?.let { timestampMillis ->
         return "Last scanned ${annotationUpdatedLabel(timestampMillis)}"
     }
-    return if (state.hasAgentInboxPickerFolderGrant) {
-        "Ready to scan the selected folder for private Markdown and EPUB packages"
-    } else {
-        "Select the Drive folder your agent or rclone writes packages into"
+    return when {
+        state.hasAgentInboxReadonlyFolderGrant -> {
+            "Drive read access; scanning only the saved Agent Inbox folder"
+        }
+        state.hasAgentInboxPickerFolderGrant -> {
+            "Ready to scan the selected folder for private Markdown and EPUB packages"
+        }
+        else -> {
+            "Paste the Drive folder URL or id your agent or rclone writes packages into"
+        }
     }
 }
 
