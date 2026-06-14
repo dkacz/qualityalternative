@@ -49,7 +49,7 @@ Current status on 2026-06-14:
 - Controlled `drive.readonly` fallback has passed targeted unit tests, visual E2E, debug APK build, a live rclone-to-Drive emulator scan, and a fresh full connected Android test run after the R4 evidence fix.
 - GPT Pro R4 reviewed the fallback at `SCORE 9/10`, `VERDICT PASS`, `VISUAL REVIEW PASS`; the only remaining finding was evidence/package hygiene, not implementation behavior.
 - R4 evidence fixes are implemented locally before R5: live evidence now relies on final-state screenshot/UI XML instead of logcat as OAuth proof, a redacted rclone listing summary replaces raw Drive-id JSON for review, raw Gradle logs are included, and the Sprint 27 visual regression seed now writes the durable `picker_folder` grant marker.
-- GPT Pro R5 and the final release gate remain pending.
+- GPT Pro R5 returned `SCORE 10/10`, `VERDICT PASS`, `VISUAL REVIEW PASS`; the final release gate passed and the APK was published as `v0.11.16-agent-inbox-drive-access-alpha`.
 
 ### Slice 28.0 - Contract And Dependency Gate
 
@@ -209,6 +209,8 @@ Current review state:
 - R5 readonly fallback evidence-hygiene output: `evidence/sprint28_agent_inbox_drive_access/GPT_PRO_REVIEW_R5_EVIDENCE_HYGIENE.md`.
 - R5 readonly fallback evidence-hygiene result: `SCORE 10/10`, `VERDICT PASS`, `VISUAL REVIEW PASS`; fresh findings none; bundle gaps none.
 - Final release gate passed for `v0.11.16-agent-inbox-drive-access-alpha` with `versionCode=32`, `versionName=0.11.16-alpha`, final full connected Android gate 138/138, debug APK verification, install, and launch evidence.
+- Release commit: `646d6f79551e79e0a4a4f5204919348c78968ab9`.
+- Release URL: `https://github.com/dkacz/qualityalternative/releases/tag/v0.11.16-agent-inbox-drive-access-alpha`.
 
 Acceptance:
 

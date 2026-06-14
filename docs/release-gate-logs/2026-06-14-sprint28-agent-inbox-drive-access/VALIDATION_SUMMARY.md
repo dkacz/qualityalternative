@@ -49,4 +49,9 @@ GPT Pro R5 returned `SCORE 10/10`, `VERDICT PASS`, `VISUAL REVIEW PASS`, with no
 
 ## Publication Status
 
-The APK artifact is built and verified locally. Git commit/tag/push and GitHub release publication are pending as the integration step after this release gate.
+Published to GitHub Releases.
+
+- Release commit: `646d6f79551e79e0a4a4f5204919348c78968ab9`
+- Release tag: `v0.11.16-agent-inbox-drive-access-alpha`
+- Release URL: `https://github.com/dkacz/qualityalternative/releases/tag/v0.11.16-agent-inbox-drive-access-alpha`
+- Integration method: committed on `codex/sprint28-agent-inbox-drive-access`, tagged the release commit, pushed branch and tag to `origin`, and published the GitHub release from these release notes.

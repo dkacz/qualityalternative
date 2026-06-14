@@ -1,10 +1,10 @@
 # Sprint 28 Validation Summary
 
-Status: in progress
+Status: complete
 
 Branch: `codex/sprint28-agent-inbox-drive-access`
 
-Review base commits include the first Drive access slice, device validation gate, GPT Pro R1 fix commit, Markdown image attachment fixes, and the current controlled read-only fallback slice on `codex/sprint28-agent-inbox-drive-access`. Later evidence should update this file with the final reviewed release commit.
+Review base commits include the first Drive access slice, device validation gate, GPT Pro R1 fix commit, Markdown image attachment fixes, and the controlled read-only fallback slice on `codex/sprint28-agent-inbox-drive-access`. The final reviewed release commit is `646d6f79551e79e0a4a4f5204919348c78968ab9`.
 
 ## GPT Pro Review Trail
 
@@ -154,10 +154,13 @@ The focused visual E2E passed on `qaApi36(AVD) - 16` with `tests=1`, `failures=0
 
 The current readonly visual E2E passed on `qaApi36(AVD) - 16` with `tests=1`, `failures=0`, `errors=0`, `skipped=0`. The live rclone fallback flow also passed on `qaApi36`: after explicit Google read-only consent, the app scanned the pasted folder id and displayed the rclone-uploaded package as one package waiting for review.
 
-## Pending Before Release
+## Release Integration
 
 - Local final release gate is complete and passed.
-- Commit/tag/push/GitHub release publication remains the integration step if this release gate is accepted for publication.
+- Release commit: `646d6f79551e79e0a4a4f5204919348c78968ab9`.
+- Release tag: `v0.11.16-agent-inbox-drive-access-alpha`.
+- Release URL: `https://github.com/dkacz/qualityalternative/releases/tag/v0.11.16-agent-inbox-drive-access-alpha`.
+- Integration method: committed on `codex/sprint28-agent-inbox-drive-access`, tagged the release commit, pushed branch and tag to `origin`, and published the GitHub release from the committed release notes.
 
 ## Preflight APK Evidence
 

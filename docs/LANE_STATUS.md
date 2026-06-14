@@ -52,7 +52,10 @@ Status: `release_gate_passed`
   - SHA-256: `acb460d2ca6e8e1129607eed43171464eef192f7e470f4ef82dcda7286e5841d`
   - Release gate summary: `docs/release-gate-logs/2026-06-14-sprint28-agent-inbox-drive-access/VALIDATION_SUMMARY.md`
   - Release notes: `docs/release-gate-logs/2026-06-14-sprint28-agent-inbox-drive-access/RELEASE_NOTES_v0.11.16-agent-inbox-drive-access-alpha.md`
-  - Commit/tag/release URL: pending integration.
+  - Release commit: `646d6f79551e79e0a4a4f5204919348c78968ab9` (`Complete Sprint 28 Agent Inbox Drive access release`).
+  - Release tag: `v0.11.16-agent-inbox-drive-access-alpha`.
+  - Release URL: `https://github.com/dkacz/qualityalternative/releases/tag/v0.11.16-agent-inbox-drive-access-alpha`.
+  - Integration method: committed on `codex/sprint28-agent-inbox-drive-access`, tagged the release commit, pushed branch and tag to `origin`, and published the GitHub release from the committed release notes.
 - Validation:
   - Passed: full `testDebugUnitTest`.
   - Passed: targeted Markdown image/Agent Inbox tests for `DocumentImportCandidateFactoryTest`, `MainViewModelTest`, `AgentInboxReviewCandidateFactoryTest`, and `AgentInboxPackageImporterTest`.
