@@ -43,7 +43,7 @@ Status: `in_progress`
   - Passed: `lintDebug`, `processReleaseManifestForPackage`, and `assembleDebug`.
   - Passed: `git diff --check`.
 - Next gate:
-  - Build GPT Pro R2 review bundle for the Drive access plus Markdown image slice, then continue to the live rclone/Picker device spike and release gate.
+  - GPT Pro R2 is running at `https://chatgpt.com/c/6a2e869b-ec48-83ed-a929-adb856a72d07`; harvest it into `evidence/sprint28_agent_inbox_drive_access/GPT_PRO_REVIEW_R2.md`, then continue to the live rclone/Picker device spike and release gate.
 
 ## Sprint 27 Agent Content Inbox
 

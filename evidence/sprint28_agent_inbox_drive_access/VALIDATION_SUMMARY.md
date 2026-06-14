@@ -13,6 +13,9 @@ Review base commits include the first Drive access slice, device validation gate
 - R1 blocker 1: legacy Sprint 27 app-created Agent Inbox folder ids could bypass the new Picker path because persisted state had only `enabled` plus `folderId`, not a durable Picker grant marker.
 - R1 blocker 2: `agentInboxDriveEnabled=true` with a missing folder id could still render connected Settings copy.
 - R1 fixes: persist `agent_inbox_drive_grant_mode=picker_folder`; hydrate Agent Inbox Drive as connected only when enabled, folder id, and marker are all present; route scan authorization from that derived predicate; clear connection state for `saveAgentInboxDriveConnection(null)`; add regressions for legacy no-marker state and missing-folder behavior.
+- R2 lane: `https://chatgpt.com/c/6a2e869b-ec48-83ed-a929-adb856a72d07`
+- R2 prompt: `evidence/sprint28_agent_inbox_drive_access/GPT_PRO_REVIEW_PROMPT_R2.md`
+- R2 bundle manifest: `evidence/sprint28_agent_inbox_drive_access/REVIEW_BUNDLE_MANIFEST_R2.md`
 
 R2 candidate scope adds the user-requested Markdown image fix:
 
