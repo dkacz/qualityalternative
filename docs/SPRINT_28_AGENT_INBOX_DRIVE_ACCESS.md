@@ -34,6 +34,8 @@ Current status on 2026-06-14:
 - Slice 28.2 implementation is in place for the no-auto-create contract: scans require a selected folder id, the Drive client rejects missing folder ids before any HTTP request, and selected-folder scans list only children of that folder.
 - Slice 28.2 also handles selected-folder 401/403/404 scan failures as access-lost states that clear the local folder grant and return the UI to `Select folder`.
 - Slice 28.4 has a deterministic instrumented screenshot test added for disconnected, missing-folder error, selected-folder, and access-lost states. Physical screenshots are pending a connected emulator/device.
+- Current validation/evidence summary: `evidence/sprint28_agent_inbox_drive_access/VALIDATION_SUMMARY.md`.
+- Live rclone/Picker spike checklist: `evidence/sprint28_agent_inbox_drive_access/device_spike/RCLONE_PICKER_FOLDER_SPIKE.md`.
 - Slice 28.3 and the GPT Pro/release gate are still pending.
 
 ### Slice 28.0 - Contract And Dependency Gate
@@ -103,6 +105,11 @@ Acceptance:
 
 - Evidence records whether the later-added child package is visible under `drive.file`.
 - If not visible, create the `drive.readonly` fallback plan and do not claim release readiness for Picker-only behavior.
+
+Current evidence:
+
+- Checklist is documented in `evidence/sprint28_agent_inbox_drive_access/device_spike/RCLONE_PICKER_FOLDER_SPIKE.md`.
+- Result is pending because no device/emulator is attached in the current environment.
 
 ### Slice 28.4 - Visual E2E
 
