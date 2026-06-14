@@ -11,6 +11,31 @@ This file is the repo-level index for active and recently completed execution la
 - Heartbeats should exist only while waiting for a current GPT Pro lane.
 - Do not infer lane status from untracked local files alone. For example, `ios/` can appear untracked on non-iOS branches; the canonical iOS implementation source is the pushed iOS branch listed below.
 
+## Sprint 28 Agent Inbox Drive Access Fix
+
+Status: `in_progress`
+
+- Branch: `codex/sprint28-agent-inbox-drive-access`
+- Scope: fix the post-release Agent Inbox Drive access gap for packages uploaded later by rclone/external agents under the current `drive.file` model.
+- Canonical sprint plan: `docs/SPRINT_28_AGENT_INBOX_DRIVE_ACCESS.md`
+- Current implementation state:
+  - Sprint opened from Sprint 27 release branch after recording the `drive.file`/rclone diagnosis.
+  - Default decision is Picker-first: keep `drive.file`, require explicit Google Picker folder selection for Agent Inbox, and only consider `drive.readonly` if a selected folder grant does not expose later-added package children.
+  - `play-services-auth` is bumped to `21.6.0` because Google Play services release notes state this version adds `PICKER_ALLOW_FOLDER_SELECTION`.
+  - App-side Picker-folder authorization is implemented with `PICKER_OAUTH_TRIGGER=true`, `PICKER_ALLOW_FOLDER_SELECTION=true`, consent prompt, and opt-out from previously granted scopes.
+  - Agent Inbox scan now requires a selected folder id and no longer silently creates a separate app-owned inbox folder.
+  - Selected-folder Drive 401/403/404 scan failures are treated as access-lost states that clear the local folder grant, show `Select folder`, and record privacy-safe failure analytics.
+  - Visual E2E coverage for disconnected, missing-folder error, selected-folder, and access-lost states is added in `VisualQaScreenshotTest#captureSprint28AgentInboxDriveAccessStates`; physical PNG evidence is pending a connected emulator/device.
+- Validation:
+  - Passed: full `testDebugUnitTest`.
+  - Passed: targeted `testDebugUnitTest` for `GoogleDriveAuthorizationTest`, `MainViewModelTest`, and `AndroidGoogleDriveAgentInboxClientTest`.
+  - Passed: `compileDebugAndroidTestKotlin`.
+  - Passed: `lintDebug`, `processReleaseManifestForPackage`, and `assembleDebug`.
+  - Passed: `git diff --check`.
+  - Blocked locally: connected screenshot run, because `adb devices` reported no attached devices.
+- Next gate:
+  - Run the external rclone child-package spike and connected screenshot test on a device, then build the scoped GPT Pro review bundle.
+
 ## Sprint 27 Agent Content Inbox
 
 Status: `release_published`

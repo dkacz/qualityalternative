@@ -99,6 +99,7 @@ import com.qualityalternative.app.domain.service.AddUserDocumentResult
 import com.qualityalternative.app.domain.service.AddUserLinkResult
 import com.qualityalternative.app.domain.service.AgentInboxDriveClient
 import com.qualityalternative.app.domain.service.AgentInboxDriveDownloadTooLargeException
+import com.qualityalternative.app.domain.service.AgentInboxDriveHttpException
 import com.qualityalternative.app.domain.service.AgentInboxDriveScanRequest
 import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_MANIFEST_BYTES
 import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_REVIEW_CONTENT_BYTES
@@ -1257,6 +1258,11 @@ class MainViewModel(
             uiState = uiState.copy(latestMessage = "Agent Inbox is waiting for your library to finish loading.")
             return
         }
+        val selectedFolderId = uiState.agentInboxDriveFolderId?.takeIf(String::isNotBlank)
+        if (selectedFolderId == null) {
+            reportAgentInboxDriveFailure("Select an Agent Inbox folder before scanning.")
+            return
+        }
         val normalizedToken = accessToken.trim()
         if (normalizedToken.isBlank()) {
             reportAgentInboxDriveFailure("Google Drive did not return an access token.")
@@ -1272,7 +1278,7 @@ class MainViewModel(
                 val scan = agentInboxDriveClient.scanPackages(
                     AgentInboxDriveScanRequest(
                         accessToken = normalizedToken,
-                        folderId = uiState.agentInboxDriveFolderId,
+                        folderId = selectedFolderId,
                     ),
                 )
                 val existingDocumentIdsBySha = userDocumentRepository.userDocuments()
@@ -1416,7 +1422,13 @@ class MainViewModel(
                 )
             } catch (error: Throwable) {
                 if (error is CancellationException) throw error
-                reportAgentInboxDriveFailure("Agent Inbox scan failed. Retry from Settings.")
+                if (error is AgentInboxDriveHttpException && error.requiresAgentInboxReconnect()) {
+                    reportAgentInboxDriveAccessLost(
+                        "Agent Inbox folder access was lost. Select the folder again.",
+                    )
+                } else {
+                    reportAgentInboxDriveFailure("Agent Inbox scan failed. Retry from Settings.")
+                }
             }
         }
     }
@@ -1428,6 +1440,41 @@ class MainViewModel(
             agentInboxScanTruncated = false,
             latestMessage = null,
         )
+    }
+
+    fun beginAgentInboxFolderSelection() {
+        uiState = uiState.copy(
+            agentInboxDriveLastError = null,
+            agentInboxScanTruncated = false,
+            latestMessage = null,
+        )
+    }
+
+    fun connectAgentInboxDriveFolder(folderId: String, nowMillis: Long = nowProvider()) {
+        val normalizedFolderId = folderId.trim()
+        if (normalizedFolderId.isBlank()) {
+            reportAgentInboxDriveFailure("No Agent Inbox folder was selected.")
+            return
+        }
+        uiState = uiState.copy(
+            agentInboxDriveEnabled = true,
+            agentInboxDriveFolderId = normalizedFolderId,
+            agentInboxDriveLastError = null,
+            agentInboxCandidates = emptyList(),
+            agentInboxPriorityAcceptedPackageIds = emptySet(),
+            agentInboxScanTruncated = false,
+            latestMessage = "Agent Inbox folder selected.",
+        )
+        viewModelScope.launch {
+            settingsRepository.saveAgentInboxDriveConnection(normalizedFolderId)
+            recordEventDurably(
+                AnalyticsEvent(
+                    type = AnalyticsEventType.AGENT_INBOX_CONNECTED,
+                    timestampMillis = nowMillis,
+                    metadata = mapOf("grantMode" to "pickerFolder"),
+                ),
+            )
+        }
     }
 
     fun reportAgentInboxDriveAuthorizationFailure(errorMessage: String) {
@@ -1783,6 +1830,36 @@ class MainViewModel(
                 ),
             )
         }
+    }
+
+    private fun reportAgentInboxDriveAccessLost(message: String) {
+        uiState = uiState.copy(
+            agentInboxDriveEnabled = false,
+            agentInboxDriveFolderId = null,
+            agentInboxDriveLastSuccessfulAtMillis = null,
+            agentInboxDriveLastError = message,
+            isAgentInboxScanning = false,
+            isAgentInboxImporting = false,
+            agentInboxCandidates = emptyList(),
+            agentInboxPriorityAcceptedPackageIds = emptySet(),
+            agentInboxScanTruncated = false,
+            latestMessage = "Agent Inbox folder access was lost.",
+        )
+        viewModelScope.launch {
+            settingsRepository.clearAgentInboxDriveConnection()
+            settingsRepository.saveAgentInboxDriveScanFailure(message)
+            recordEventDurably(
+                AnalyticsEvent(
+                    type = AnalyticsEventType.AGENT_INBOX_SCAN_FAILED,
+                    timestampMillis = nowProvider(),
+                    metadata = mapOf("reason" to "access_lost"),
+                ),
+            )
+        }
+    }
+
+    private fun AgentInboxDriveHttpException.requiresAgentInboxReconnect(): Boolean {
+        return statusCode == 401 || statusCode == 403 || statusCode == 404
     }
 
     fun toggleOnboardingPack(pack: EditorialPack) {

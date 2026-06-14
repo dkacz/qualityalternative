@@ -1,14 +1,14 @@
 package com.qualityalternative.app.data
 
-import com.qualityalternative.app.domain.service.AGENT_INBOX_DRIVE_FOLDER_NAME
 import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_FILES_PER_PACKAGE
 import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_PACKAGES_PER_SCAN
 import com.qualityalternative.app.domain.service.AGENT_INBOX_MANIFEST_FILE_NAME
 import com.qualityalternative.app.domain.service.AgentInboxDriveDownloadTooLargeException
+import com.qualityalternative.app.domain.service.AgentInboxDriveFolderNotSelectedException
+import com.qualityalternative.app.domain.service.AgentInboxDriveHttpException
 import com.qualityalternative.app.domain.service.AgentInboxDriveScanRequest
 import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpServer
-import java.io.IOException
 import java.net.InetSocketAddress
 import java.net.URLDecoder
 import kotlinx.coroutines.runBlocking
@@ -30,17 +30,27 @@ class AndroidGoogleDriveAgentInboxClientTest {
     }
 
     @Test
-    fun scanPackagesCreatesInboxFolderThenListsOnlyPackageFoldersAndPackageFiles() = runBlocking {
+    fun scanPackagesRejectsMissingFolderIdWithoutDriveRequest() {
+        val baseUrl = startDriveServer { request ->
+            404 to """{"error":"unexpected ${request.method} ${request.path} ${request.decodedQuery}"}"""
+        }
+        val client = AndroidGoogleDriveAgentInboxClient(testEndpoints(baseUrl))
+
+        assertThrows(AgentInboxDriveFolderNotSelectedException::class.java) {
+            runBlocking {
+                client.scanPackages(
+                    AgentInboxDriveScanRequest(accessToken = "drive-token", folderId = null),
+                )
+            }
+        }
+
+        assertTrue(capturedRequests.isEmpty())
+    }
+
+    @Test
+    fun scanPackagesListsOnlyPackageFoldersAndPackageFilesInsideSelectedFolder() = runBlocking {
         val baseUrl = startDriveServer { request ->
             when {
-                request.method == "GET" &&
-                    request.path == "/drive/v3/files" &&
-                    request.decodedQuery.contains("name = '$AGENT_INBOX_DRIVE_FOLDER_NAME'") ->
-                    200 to """{"files":[]}"""
-
-                request.method == "POST" && request.path == "/drive/v3/files" ->
-                    200 to """{"id":"agent-inbox-folder","name":"$AGENT_INBOX_DRIVE_FOLDER_NAME"}"""
-
                 request.method == "GET" &&
                     request.path == "/drive/v3/files" &&
                     request.decodedQuery.contains("'agent-inbox-folder' in parents") ->
@@ -92,7 +102,7 @@ class AndroidGoogleDriveAgentInboxClientTest {
         val client = AndroidGoogleDriveAgentInboxClient(testEndpoints(baseUrl))
 
         val result = client.scanPackages(
-            AgentInboxDriveScanRequest(accessToken = "drive-token", folderId = null),
+            AgentInboxDriveScanRequest(accessToken = "drive-token", folderId = "agent-inbox-folder"),
         )
 
         assertEquals("agent-inbox-folder", result.folderId)
@@ -316,7 +326,7 @@ class AndroidGoogleDriveAgentInboxClientTest {
         val baseUrl = startDriveServer { 403 to """{"error":"forbidden"}""" }
         val client = AndroidGoogleDriveAgentInboxClient(testEndpoints(baseUrl))
 
-        val error = assertThrows(IOException::class.java) {
+        val error = assertThrows(AgentInboxDriveHttpException::class.java) {
             runBlocking {
                 client.scanPackages(
                     AgentInboxDriveScanRequest(accessToken = "drive-token", folderId = "known-inbox"),
@@ -324,6 +334,8 @@ class AndroidGoogleDriveAgentInboxClientTest {
             }
         }
 
+        assertEquals(403, error.statusCode)
+        assertEquals("""{"error":"forbidden"}""", error.errorBody)
         assertTrue(error.message.orEmpty().contains("HTTP 403"))
         assertTrue(error.message.orEmpty().contains("forbidden"))
     }

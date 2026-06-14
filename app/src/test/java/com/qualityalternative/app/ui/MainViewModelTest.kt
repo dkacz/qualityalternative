@@ -74,6 +74,7 @@ import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_REVIEW_CONTENT_
 import com.qualityalternative.app.domain.service.AgentInboxDriveClient
 import com.qualityalternative.app.domain.service.AgentInboxDriveDownloadTooLargeException
 import com.qualityalternative.app.domain.service.AgentInboxDriveFile
+import com.qualityalternative.app.domain.service.AgentInboxDriveHttpException
 import com.qualityalternative.app.domain.service.AgentInboxDrivePackage
 import com.qualityalternative.app.domain.service.AgentInboxDriveScanRequest
 import com.qualityalternative.app.domain.service.AgentInboxDriveScanResult
@@ -2581,6 +2582,133 @@ class MainViewModelTest {
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
+    fun connectAgentInboxDriveFolderPersistsPickerFolderAndRecordsPrivacySafeEvent() = runTest {
+        val settingsRepository = FakeSettingsRepository()
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val viewModel = createViewModel(
+            settingsRepository = settingsRepository,
+            analyticsTracker = analyticsTracker,
+        )
+
+        advanceUntilIdle()
+        viewModel.connectAgentInboxDriveFolder(folderId = " picked-folder ", nowMillis = 4_000L)
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.agentInboxDriveEnabled)
+        assertEquals("picked-folder", viewModel.uiState.agentInboxDriveFolderId)
+        assertEquals(null, viewModel.uiState.agentInboxDriveLastError)
+        assertEquals("Agent Inbox folder selected.", viewModel.uiState.latestMessage)
+        assertEquals("picked-folder", settingsRepository.state.value.agentInboxDriveFolderId)
+        val connectedEvent = analyticsTracker.allEvents().single { event ->
+            event.type == AnalyticsEventType.AGENT_INBOX_CONNECTED
+        }
+        assertEquals(4_000L, connectedEvent.timestampMillis)
+        assertEquals("pickerFolder", connectedEvent.metadata["grantMode"])
+        assertTrue(AnalyticsPrivacyGuard.unsafeRemoteFields(connectedEvent.toRemoteAnalyticsPayload()).isEmpty())
+        val remotePayloadText = analyticsTracker.allRemoteSafePayloads().joinToString("\n") { payload ->
+            payload.toString()
+        }
+        assertFalse(remotePayloadText.contains("picked-folder"))
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun connectAgentInboxDriveFolderReconnectReplacesPreviousFolderId() = runTest {
+        val settingsRepository = FakeSettingsRepository()
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val viewModel = createViewModel(
+            settingsRepository = settingsRepository,
+            analyticsTracker = analyticsTracker,
+        )
+
+        advanceUntilIdle()
+        viewModel.connectAgentInboxDriveFolder(folderId = "old-folder", nowMillis = 4_000L)
+        advanceUntilIdle()
+        viewModel.connectAgentInboxDriveFolder(folderId = "new-folder", nowMillis = 5_000L)
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.agentInboxDriveEnabled)
+        assertEquals("new-folder", viewModel.uiState.agentInboxDriveFolderId)
+        assertEquals("new-folder", settingsRepository.state.value.agentInboxDriveFolderId)
+        val connectedEvents = analyticsTracker.allEvents().filter { event ->
+            event.type == AnalyticsEventType.AGENT_INBOX_CONNECTED
+        }
+        assertEquals(listOf(4_000L, 5_000L), connectedEvents.map { event -> event.timestampMillis }.sorted())
+        val remotePayloadText = analyticsTracker.allRemoteSafePayloads().joinToString("\n") { payload ->
+            payload.toString()
+        }
+        assertFalse(remotePayloadText.contains("old-folder"))
+        assertFalse(remotePayloadText.contains("new-folder"))
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun scanAgentInboxDriveWithoutSelectedFolderDoesNotCallDrive() = runTest {
+        val driveClient = RecordingAgentInboxDriveClient()
+        val settingsRepository = FakeSettingsRepository()
+        val viewModel = createViewModel(
+            settingsRepository = settingsRepository,
+            agentInboxDriveClient = driveClient,
+        )
+
+        advanceUntilIdle()
+        viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 5_000L)
+        advanceUntilIdle()
+
+        assertTrue(driveClient.scanRequests.isEmpty())
+        assertFalse(viewModel.uiState.isAgentInboxScanning)
+        assertEquals("Select an Agent Inbox folder before scanning.", viewModel.uiState.agentInboxDriveLastError)
+        assertEquals("Select an Agent Inbox folder before scanning.", settingsRepository.state.value.agentInboxDriveLastError)
+        assertTrue(viewModel.uiState.agentInboxCandidates.isEmpty())
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun scanAgentInboxDriveAccessFailureClearsFolderAndShowsSelectFolderPath() = runTest {
+        val driveClient = RecordingAgentInboxDriveClient(
+            scanFailure = AgentInboxDriveHttpException(
+                statusCode = 403,
+                errorBody = """{"error":"forbidden"}""",
+            ),
+        )
+        val settingsRepository = FakeSettingsRepository()
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val viewModel = createViewModel(
+            settingsRepository = settingsRepository,
+            agentInboxDriveClient = driveClient,
+            analyticsTracker = analyticsTracker,
+        )
+
+        advanceUntilIdle()
+        viewModel.selectAgentInboxDriveFolderForTest()
+        advanceUntilIdle()
+        viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 5_000L)
+        advanceUntilIdle()
+
+        assertEquals(1, driveClient.scanRequests.size)
+        assertFalse(viewModel.uiState.agentInboxDriveEnabled)
+        assertEquals(null, viewModel.uiState.agentInboxDriveFolderId)
+        assertFalse(viewModel.uiState.isAgentInboxScanning)
+        assertEquals(
+            "Agent Inbox folder access was lost. Select the folder again.",
+            viewModel.uiState.agentInboxDriveLastError,
+        )
+        assertTrue(viewModel.uiState.agentInboxCandidates.isEmpty())
+        assertFalse(settingsRepository.state.value.agentInboxDriveEnabled)
+        assertEquals(null, settingsRepository.state.value.agentInboxDriveFolderId)
+        assertEquals(
+            "Agent Inbox folder access was lost. Select the folder again.",
+            settingsRepository.state.value.agentInboxDriveLastError,
+        )
+        val failedEvent = analyticsTracker.allEvents().last { event ->
+            event.type == AnalyticsEventType.AGENT_INBOX_SCAN_FAILED
+        }
+        assertEquals("access_lost", failedEvent.metadata["reason"])
+        assertTrue(AnalyticsPrivacyGuard.unsafeRemoteFields(failedEvent.toRemoteAnalyticsPayload()).isEmpty())
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
     fun scanAgentInboxDriveBuildsReviewCandidatesWithoutAutoAcceptingManifestPriority() = runTest {
         val contentBytes = "# Agent Note\n\nPrivate attention note.".toByteArray()
         val driveClient = RecordingAgentInboxDriveClient(
@@ -2601,6 +2729,8 @@ class MainViewModelTest {
             analyticsTracker = analyticsTracker,
         )
 
+        advanceUntilIdle()
+        viewModel.selectAgentInboxDriveFolderForTest()
         advanceUntilIdle()
         viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 5_000L)
         advanceUntilIdle()
@@ -2672,6 +2802,8 @@ class MainViewModelTest {
         advanceUntilIdle()
         viewModel.completeOnboarding()
         advanceUntilIdle()
+        viewModel.selectAgentInboxDriveFolderForTest()
+        advanceUntilIdle()
         viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 5_000L)
         advanceUntilIdle()
         viewModel.toggleAgentInboxPriority("agent-package")
@@ -2737,6 +2869,8 @@ class MainViewModelTest {
         advanceUntilIdle()
         viewModel.completeOnboarding()
         advanceUntilIdle()
+        viewModel.selectAgentInboxDriveFolderForTest()
+        advanceUntilIdle()
         viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 5_000L)
         advanceUntilIdle()
         viewModel.importAgentInboxCandidate(
@@ -2795,6 +2929,8 @@ class MainViewModelTest {
         )
 
         advanceUntilIdle()
+        viewModel.selectAgentInboxDriveFolderForTest()
+        advanceUntilIdle()
         viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 5_000L)
         advanceUntilIdle()
         assertEquals(
@@ -2851,6 +2987,8 @@ class MainViewModelTest {
         )
 
         advanceUntilIdle()
+        viewModel.selectAgentInboxDriveFolderForTest()
+        advanceUntilIdle()
         viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 5_000L)
         advanceUntilIdle()
         assertEquals(AgentInboxReviewStatus.READY, viewModel.uiState.agentInboxCandidates.single().status)
@@ -2889,6 +3027,8 @@ class MainViewModelTest {
             analyticsTracker = analyticsTracker,
         )
 
+        advanceUntilIdle()
+        viewModel.selectAgentInboxDriveFolderForTest()
         advanceUntilIdle()
         viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 5_000L)
         advanceUntilIdle()
@@ -2935,6 +3075,8 @@ class MainViewModelTest {
 
         advanceUntilIdle()
         viewModel.completeOnboarding()
+        advanceUntilIdle()
+        viewModel.selectAgentInboxDriveFolderForTest()
         advanceUntilIdle()
         viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 5_000L)
         advanceUntilIdle()
@@ -2984,6 +3126,8 @@ class MainViewModelTest {
         )
 
         advanceUntilIdle()
+        viewModel.selectAgentInboxDriveFolderForTest()
+        advanceUntilIdle()
         viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 5_000L)
         advanceUntilIdle()
         driveFiles["content-file"] = ByteArray(AGENT_INBOX_MAX_REVIEW_CONTENT_BYTES.toInt() + 1)
@@ -3028,6 +3172,8 @@ class MainViewModelTest {
             ),
         )
 
+        advanceUntilIdle()
+        viewModel.selectAgentInboxDriveFolderForTest()
         advanceUntilIdle()
         viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 5_000L)
         advanceUntilIdle()
@@ -3074,6 +3220,8 @@ class MainViewModelTest {
         )
 
         advanceUntilIdle()
+        viewModel.selectAgentInboxDriveFolderForTest()
+        advanceUntilIdle()
         viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 5_000L)
         advanceUntilIdle()
         viewModel.importAgentInboxCandidate(
@@ -3118,6 +3266,8 @@ class MainViewModelTest {
         )
 
         advanceUntilIdle()
+        viewModel.selectAgentInboxDriveFolderForTest()
+        advanceUntilIdle()
         viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 5_000L)
         advanceUntilIdle()
 
@@ -3158,6 +3308,8 @@ class MainViewModelTest {
         )
 
         advanceUntilIdle()
+        viewModel.selectAgentInboxDriveFolderForTest()
+        advanceUntilIdle()
         viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 5_000L)
         advanceUntilIdle()
 
@@ -3189,6 +3341,8 @@ class MainViewModelTest {
         val viewModel = createViewModel(agentInboxDriveClient = driveClient)
 
         advanceUntilIdle()
+        viewModel.selectAgentInboxDriveFolderForTest()
+        advanceUntilIdle()
         viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 5_000L)
         advanceUntilIdle()
 
@@ -3213,6 +3367,8 @@ class MainViewModelTest {
         val viewModel = createViewModel(agentInboxDriveClient = driveClient)
 
         advanceUntilIdle()
+        viewModel.selectAgentInboxDriveFolderForTest()
+        advanceUntilIdle()
         viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 5_000L)
         advanceUntilIdle()
 
@@ -3234,6 +3390,8 @@ class MainViewModelTest {
         )
         val viewModel = createViewModel(agentInboxDriveClient = driveClient)
 
+        advanceUntilIdle()
+        viewModel.selectAgentInboxDriveFolderForTest()
         advanceUntilIdle()
         viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 5_000L)
         advanceUntilIdle()
@@ -3259,6 +3417,8 @@ class MainViewModelTest {
         )
         val viewModel = createViewModel(agentInboxDriveClient = driveClient)
 
+        advanceUntilIdle()
+        viewModel.selectAgentInboxDriveFolderForTest()
         advanceUntilIdle()
         viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 5_000L)
         advanceUntilIdle()
@@ -3304,6 +3464,8 @@ class MainViewModelTest {
         val viewModel = createViewModel(agentInboxDriveClient = driveClient)
 
         advanceUntilIdle()
+        viewModel.selectAgentInboxDriveFolderForTest()
+        advanceUntilIdle()
         viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 5_000L)
         advanceUntilIdle()
 
@@ -3332,6 +3494,8 @@ class MainViewModelTest {
         val viewModel = createViewModel(agentInboxDriveClient = driveClient)
 
         advanceUntilIdle()
+        viewModel.selectAgentInboxDriveFolderForTest()
+        advanceUntilIdle()
         viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 5_000L)
         advanceUntilIdle()
 
@@ -3357,6 +3521,8 @@ class MainViewModelTest {
         )
 
         advanceUntilIdle()
+        viewModel.selectAgentInboxDriveFolderForTest()
+        advanceUntilIdle()
         viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 5_000L)
         advanceUntilIdle()
 
@@ -3364,6 +3530,8 @@ class MainViewModelTest {
         assertEquals("Agent Inbox is waiting for your library to finish loading.", viewModel.uiState.latestMessage)
 
         userDocumentRepository.setReady(true)
+        advanceUntilIdle()
+        viewModel.selectAgentInboxDriveFolderForTest()
         advanceUntilIdle()
         viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 6_000L)
         advanceUntilIdle()
@@ -3388,6 +3556,8 @@ class MainViewModelTest {
         val viewModel = createViewModel(agentInboxDriveClient = driveClient)
 
         advanceUntilIdle()
+        viewModel.selectAgentInboxDriveFolderForTest()
+        advanceUntilIdle()
         viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 5_000L)
         advanceUntilIdle()
 
@@ -3407,6 +3577,8 @@ class MainViewModelTest {
         )
         val viewModel = createViewModel(agentInboxDriveClient = driveClient)
 
+        advanceUntilIdle()
+        viewModel.selectAgentInboxDriveFolderForTest()
         advanceUntilIdle()
         viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 5_000L)
         advanceUntilIdle()
@@ -3438,6 +3610,8 @@ class MainViewModelTest {
             analyticsTracker = analyticsTracker,
         )
 
+        advanceUntilIdle()
+        viewModel.selectAgentInboxDriveFolderForTest()
         advanceUntilIdle()
         viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 5_000L)
         advanceUntilIdle()
@@ -7514,7 +7688,7 @@ class MainViewModelTest {
         ),
         private val files: Map<String, ByteArray> = emptyMap(),
         private val downloadFailures: Map<String, Throwable> = emptyMap(),
-        private val throwOnScan: Boolean = false,
+        private val scanFailure: Throwable? = null,
     ) : AgentInboxDriveClient {
         val scanRequests = mutableListOf<AgentInboxDriveScanRequest>()
         val downloadedFileIds = mutableListOf<String>()
@@ -7522,9 +7696,7 @@ class MainViewModelTest {
 
         override suspend fun scanPackages(request: AgentInboxDriveScanRequest): AgentInboxDriveScanResult {
             scanRequests += request
-            if (throwOnScan) {
-                error("scan failed")
-            }
+            scanFailure?.let { error -> throw error }
             return scanResult
         }
 
@@ -7544,6 +7716,12 @@ class MainViewModelTest {
         val fileId: String,
         val maxBytes: Long,
     )
+
+    private fun MainViewModel.selectAgentInboxDriveFolderForTest(
+        folderId: String = "agent-inbox-folder",
+    ) {
+        connectAgentInboxDriveFolder(folderId = folderId, nowMillis = 4_000L)
+    }
 
     private class RecordingAgentInboxDocumentStore : AgentInboxDocumentStore {
         val writes = mutableListOf<AgentInboxDocumentWrite>()

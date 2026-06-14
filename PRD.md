@@ -258,6 +258,8 @@ The system may let the user import private replacement content prepared by Codex
 
 - User can authorize Google Drive access for an Agent Inbox folder through an explicit Settings action.
 - The Agent Inbox uses the narrowest practical Drive access model and must not scan the user's whole Drive.
+- Under `drive.file`, Agent Inbox folder access must be granted by an explicit Google Picker folder selection or by files the app created itself. Packages uploaded later by a user-controlled external tool such as rclone must be supported only after the selected folder grant is proven to expose those package children to the app; otherwise the fallback scope decision must be documented before widening access.
+- The app must not silently create a separate app-owned inbox folder when the user intends to scan an externally populated Agent Inbox folder.
 - Each import candidate is represented by a package containing a manifest plus one Markdown or EPUB content file.
 - The package manifest stores title, topic tags, source label, rights class, optional description, optional priority intent, and enough file identity data to detect duplicates.
 - Agent-supplied content is treated as `user_private` by default and must not become shared editorial inventory.
@@ -266,6 +268,7 @@ The system may let the user import private replacement content prepared by Codex
 - Importing an accepted package uses the same user-document model, reading-time estimation, progress tracking, and reader behavior as manually imported Markdown or EPUB documents.
 - The Agent Inbox review surface is finite and must not become a discovery feed.
 - Google Drive authorization failures distinguish user cancellation from technical/configuration failure where Android APIs allow it, present a retry path, and do not erase local library data.
+- If the selected Agent Inbox folder grant is missing, revoked, or no longer exposes its children under the current scope, Settings must show a reconnect/select-folder path instead of reporting a successful empty scan.
 
 ### FR4. Content Item Model
 
@@ -495,6 +498,7 @@ The system must provide account-like portability without requiring a Quality Alt
 - Export/import should preserve behaviorally important state without pretending to provide server-backed identity, cross-device conflict resolution, or guaranteed document-file transfer.
 - Any cloud sync must be explicit, revocable, and scoped to user-owned files. Cloud authorization state must be re-established on each device rather than copied through profile export.
 - Agent Inbox cloud access must remain explicit, revocable, finite, and user-reviewed. The product must not ingest agent-produced Drive content without a visible accept/reject step.
+- Agent Inbox Drive access must prefer Picker-scoped `drive.file` grants over broader Drive scopes. A move to `drive.readonly` is allowed only after the Picker-folder flow is tested and documented as insufficient for externally added package children.
 - Website matching must remain local-first and user-authored. The app must not collect browsing history as an input or side effect of website target matching.
 
 ## Content Strategy for MVP

@@ -1,17 +1,17 @@
 package com.qualityalternative.app.data
 
-import com.qualityalternative.app.domain.service.AGENT_INBOX_DRIVE_FOLDER_NAME
 import com.qualityalternative.app.domain.service.AGENT_INBOX_MANIFEST_FILE_NAME
 import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_FILES_PER_PACKAGE
 import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_PACKAGES_PER_SCAN
 import com.qualityalternative.app.domain.service.AgentInboxDriveClient
 import com.qualityalternative.app.domain.service.AgentInboxDriveDownloadTooLargeException
 import com.qualityalternative.app.domain.service.AgentInboxDriveFile
+import com.qualityalternative.app.domain.service.AgentInboxDriveFolderNotSelectedException
+import com.qualityalternative.app.domain.service.AgentInboxDriveHttpException
 import com.qualityalternative.app.domain.service.AgentInboxDrivePackage
 import com.qualityalternative.app.domain.service.AgentInboxDriveScanRequest
 import com.qualityalternative.app.domain.service.AgentInboxDriveScanResult
 import java.io.ByteArrayOutputStream
-import java.io.IOException
 import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
@@ -28,7 +28,7 @@ class AndroidGoogleDriveAgentInboxClient(
         request: AgentInboxDriveScanRequest,
     ): AgentInboxDriveScanResult = withContext(Dispatchers.IO) {
         val folderId = request.folderId?.takeIf(String::isNotBlank)
-            ?: createFolder(accessToken = request.accessToken)
+            ?: throw AgentInboxDriveFolderNotSelectedException()
         val packageFolders = listChildFolders(accessToken = request.accessToken, parentFolderId = folderId)
         val packages = packageFolders.files.map { folder ->
             val files = listChildFiles(accessToken = request.accessToken, parentFolderId = folder.id)
@@ -60,21 +60,6 @@ class AndroidGoogleDriveAgentInboxClient(
             throwOnError = true,
             maxBodyBytes = maxBytes,
         ).body
-    }
-
-    private fun createFolder(accessToken: String): String {
-        val metadata = JSONObject()
-            .put("name", AGENT_INBOX_DRIVE_FOLDER_NAME)
-            .put("mimeType", DRIVE_FOLDER_MIME_TYPE)
-        val response = requestJson(
-            method = "POST",
-            url = driveApiUrl(endpoints.filesUrl, mapOf("fields" to "id,name")),
-            accessToken = accessToken,
-            body = metadata.toString().toByteArray(Charsets.UTF_8),
-            contentType = "application/json; charset=UTF-8",
-        )
-        return response.optString("id").takeIf(String::isNotBlank)
-            ?: throw IOException("Drive did not return an Agent Inbox folder id.")
     }
 
     private fun listChildFolders(accessToken: String, parentFolderId: String): ListedAgentInboxFiles {
@@ -183,8 +168,9 @@ class AndroidGoogleDriveAgentInboxClient(
             } else {
                 val errorBody = connection.errorStream?.readBoundedBytes(MAX_JSON_RESPONSE_BYTES) ?: ByteArray(0)
                 if (throwOnError) {
-                    throw IOException(
-                        "Drive request failed with HTTP $code${String(errorBody, Charsets.UTF_8).toErrorSuffix()}",
+                    throw AgentInboxDriveHttpException(
+                        statusCode = code,
+                        errorBody = String(errorBody, Charsets.UTF_8),
                     )
                 }
                 errorBody
@@ -238,11 +224,6 @@ private fun <T> JSONArray.mapObjects(transform: (JSONObject) -> T): List<T> {
     }
 }
 
-private fun JSONArray.firstObjectId(): String? {
-    if (length() == 0) return null
-    return optJSONObject(0)?.optString("id")?.takeIf(String::isNotBlank)
-}
-
 private fun String.driveQueryValue(): String {
     return replace("\\", "\\\\").replace("'", "\\'")
 }
@@ -267,7 +248,3 @@ private fun InputStream.readBoundedBytes(maxBytes: Long?): ByteArray {
 private fun String.urlEncode(): String = URLEncoder.encode(this, "UTF-8")
 
 private fun String.urlPathEncode(): String = urlEncode().replace("+", "%20")
-
-private fun String.toErrorSuffix(): String {
-    return takeIf(String::isNotBlank)?.let { ": $it" }.orEmpty()
-}

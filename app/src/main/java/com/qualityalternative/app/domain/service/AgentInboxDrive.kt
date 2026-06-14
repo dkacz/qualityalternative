@@ -40,8 +40,21 @@ class AgentInboxDriveDownloadTooLargeException(
     val maxBytes: Long,
 ) : java.io.IOException("Agent Inbox Drive download exceeded $maxBytes bytes.")
 
+class AgentInboxDriveFolderNotSelectedException :
+    java.io.IOException("Select an Agent Inbox folder before scanning.")
+
+class AgentInboxDriveHttpException(
+    val statusCode: Int,
+    val errorBody: String,
+) : java.io.IOException("Drive request failed with HTTP $statusCode${errorBody.toErrorSuffix()}")
+
 interface AgentInboxDriveClient {
     suspend fun scanPackages(request: AgentInboxDriveScanRequest): AgentInboxDriveScanResult
 
     suspend fun downloadFile(accessToken: String, fileId: String, maxBytes: Long): ByteArray
+}
+
+private fun String.toErrorSuffix(): String {
+    val trimmed = trim()
+    return if (trimmed.isBlank()) "" else ": $trimmed"
 }
