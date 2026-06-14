@@ -31,19 +31,22 @@ Status: `in_progress`
   - R1 fixes are implemented locally: Agent Inbox connection now requires durable `agent_inbox_drive_grant_mode=picker_folder`, legacy folder ids without that marker hydrate as disconnected, `saveAgentInboxDriveConnection(null)` clears connection state, and Settings copy/actions derive connected state from the Picker grant predicate.
   - Manual Markdown image attachment imports now allow image-only follow-up picker results to merge into the already selected Markdown file while preserving edited title, selected topics, and priority.
   - Agent Inbox Markdown packages can carry bounded safe sidecar images through review, Drive download, local Agent Inbox document storage, `UserDocumentDraft.imageAttachmentUris`, and reader rendering; EPUB package sidecars remain invalid.
+  - GPT Pro R2 returned `SCORE 7/10`, `VERDICT REVISE`, `VISUAL REVIEW PASS`; the remaining findings were duplicate/colliding sidecar names, unreviewed Markdown local-image fallback, and incomplete sidecar rollback on mid-write failure.
+  - R2 fixes are implemented locally: duplicate/colliding sidecar names are invalid during review, Agent Inbox Markdown reader rendering disables local fallback for stored Agent Inbox files, and sidecar writes use temp/backup rollback that removes promoted files after later failures.
   - Visual E2E coverage for disconnected select-folder, selected-folder, access-lost reconnect, Agent Inbox Markdown image reader, and dark selected-folder states passed in `VisualQaScreenshotTest#captureSprint28AgentInboxDriveAccessStates`.
-  - Canonical Sprint 28 visual evidence: `evidence/sprint28_agent_inbox_drive_access/visual_e2e/contact_sheet_r2.png` and `evidence/sprint28_agent_inbox_drive_access/visual_e2e/sprint28-agent-inbox-drive-access-1781433607325/`.
+  - Canonical Sprint 28 R3 visual evidence: `evidence/sprint28_agent_inbox_drive_access/visual_e2e_r3/contact_sheet_r3.png` and `evidence/sprint28_agent_inbox_drive_access/visual_e2e_r3/sprint28-agent-inbox-drive-access-1781437194813/`.
 - Validation:
   - Passed: full `testDebugUnitTest`.
   - Passed: targeted Markdown image/Agent Inbox tests for `DocumentImportCandidateFactoryTest`, `MainViewModelTest`, `AgentInboxReviewCandidateFactoryTest`, and `AgentInboxPackageImporterTest`.
   - Passed: targeted `testDebugUnitTest` for `GoogleDriveAuthorizationTest`, `MainViewModelTest`, and `AndroidGoogleDriveAgentInboxClientTest`.
   - Passed after R1 fixes: targeted rerun for `PreferencesSettingsRepositoryTest` and `MainViewModelTest`.
   - Passed: `compileDebugAndroidTestKotlin`.
+  - Passed: targeted R2-fix unit tests for `AgentInboxReviewCandidateFactoryTest`, `AgentInboxPackageImporterTest`, `MarkdownReaderDocumentParserTest`, and `RoomUserDocumentRepositoryTest`.
   - Passed: focused connected visual E2E on `qaApi36(AVD) - 16` for `VisualQaScreenshotTest#captureSprint28AgentInboxDriveAccessStates`.
   - Passed: `lintDebug`, `processReleaseManifestForPackage`, and `assembleDebug`.
   - Passed: `git diff --check`.
 - Next gate:
-  - GPT Pro R2 returned `SCORE 7/10`, `VERDICT REVISE`, `VISUAL REVIEW PASS`; fix the three Markdown image sidecar findings, rerun validation, and send R3 before any release gate.
+  - Prepare GPT Pro R3 from the fresh R2-fix bundle before any release gate.
 
 ## Sprint 27 Agent Content Inbox
 

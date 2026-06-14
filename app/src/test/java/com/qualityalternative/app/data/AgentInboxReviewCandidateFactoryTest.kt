@@ -305,6 +305,44 @@ class AgentInboxReviewCandidateFactoryTest {
         assertEquals(setOf(AgentInboxPackageValidationError.IMAGE_ATTACHMENT_TOO_LARGE), candidate.packageErrors)
     }
 
+    @Test
+    fun fromDrivePackage_marksDuplicateMarkdownImageAttachmentNamesInvalid() {
+        val candidate = AgentInboxReviewCandidateFactory.fromDrivePackage(
+            drivePackage = drivePackage(
+                files = listOf(
+                    driveFile("manifest-id", AGENT_INBOX_MANIFEST_FILE_NAME),
+                    driveFile("content-id", "content.md"),
+                    driveFile("cover-id-1", "cover.png"),
+                    driveFile("cover-id-2", "COVER.png"),
+                ),
+            ),
+            manifestJson = manifestJson(),
+        )
+
+        assertEquals(AgentInboxReviewStatus.INVALID, candidate.status)
+        assertFalse(candidate.canImport)
+        assertEquals(setOf(AgentInboxPackageValidationError.DUPLICATE_IMAGE_ATTACHMENTS), candidate.packageErrors)
+    }
+
+    @Test
+    fun fromDrivePackage_marksCanonicalMarkdownImageAttachmentCollisionsInvalid() {
+        val candidate = AgentInboxReviewCandidateFactory.fromDrivePackage(
+            drivePackage = drivePackage(
+                files = listOf(
+                    driveFile("manifest-id", AGENT_INBOX_MANIFEST_FILE_NAME),
+                    driveFile("content-id", "content.md"),
+                    driveFile("chart-id-1", "chart one.png"),
+                    driveFile("chart-id-2", "chart:one.png"),
+                ),
+            ),
+            manifestJson = manifestJson(),
+        )
+
+        assertEquals(AgentInboxReviewStatus.INVALID, candidate.status)
+        assertFalse(candidate.canImport)
+        assertEquals(setOf(AgentInboxPackageValidationError.DUPLICATE_IMAGE_ATTACHMENTS), candidate.packageErrors)
+    }
+
     private fun drivePackage(
         files: List<AgentInboxDriveFile>,
         hasMoreFiles: Boolean = false,

@@ -65,6 +65,32 @@ class MarkdownReaderDocumentParserTest {
     }
 
     @Test
+    fun parseBlocksUnreviewedLocalImagesWhenFallbackDisabled() {
+        val document = MarkdownReaderDocumentParser.parse(
+            markdown = """
+                ![Outside](../outside.png)
+
+                ![Absolute](/tmp/outside.png)
+
+                ![File](file:///tmp/outside.png)
+
+                ![Cover](cover.png)
+
+                ![Pixel](data:image/png;base64,iVBORw0KGgo=)
+            """.trimIndent(),
+            baseUri = "file:///tmp/books/session-notes.md",
+            imageAttachmentUris = mapOf("cover.png" to "content://provider/document/cover-image"),
+            allowLocalImageFallback = false,
+        )
+
+        assertEquals("", document.blocks[0].image?.source)
+        assertEquals("", document.blocks[1].image?.source)
+        assertEquals("", document.blocks[2].image?.source)
+        assertEquals("content://provider/document/cover-image", document.blocks[3].image?.source)
+        assertEquals("data:image/png;base64,iVBORw0KGgo=", document.blocks[4].image?.source)
+    }
+
+    @Test
     fun parseReplacesInlineMarkdownImagesWithAltTextInsideTextBlocks() {
         val document = MarkdownReaderDocumentParser.parse(
             markdown = "See ![diagram](diagram.png) before reading the next section.",

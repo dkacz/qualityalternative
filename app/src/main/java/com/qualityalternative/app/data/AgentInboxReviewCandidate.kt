@@ -24,6 +24,7 @@ enum class AgentInboxPackageValidationError {
     MULTIPLE_CONTENT_FILES,
     UNSUPPORTED_EXTRA_FILES,
     TOO_MANY_IMAGE_ATTACHMENTS,
+    DUPLICATE_IMAGE_ATTACHMENTS,
     IMAGE_ATTACHMENT_TOO_LARGE,
     CONTENT_CHANGED_AFTER_REVIEW,
     DOWNLOAD_UNAVAILABLE,
@@ -135,6 +136,13 @@ object AgentInboxReviewCandidateFactory {
                     packageErrors = setOf(AgentInboxPackageValidationError.TOO_MANY_IMAGE_ATTACHMENTS),
                 )
             }
+            imageAttachments.hasDuplicateAddressableNames() -> {
+                return drivePackage.invalidCandidate(
+                    manifestFileId = manifestFile.id,
+                    manifest = manifest,
+                    packageErrors = setOf(AgentInboxPackageValidationError.DUPLICATE_IMAGE_ATTACHMENTS),
+                )
+            }
             imageAttachments.any { file -> (file.sizeBytes ?: 0L) > AGENT_INBOX_MAX_IMAGE_ATTACHMENT_BYTES } ||
                 imageAttachments.sumOf { file -> file.sizeBytes ?: 0L } > AGENT_INBOX_MAX_TOTAL_IMAGE_ATTACHMENT_BYTES -> {
                 return drivePackage.invalidCandidate(
@@ -218,6 +226,15 @@ private fun AgentInboxDrivePackage.markdownImageAttachmentFiles(contentFileId: S
                 sizeBytes = file.sizeBytes,
             )
         }
+}
+
+private fun List<AgentInboxImageAttachmentFile>.hasDuplicateAddressableNames(): Boolean {
+    val displayNames = map { file -> file.fileName.trim().lowercase(Locale.US) }
+    if (displayNames.distinct().size != displayNames.size) {
+        return true
+    }
+    val storageSegments = map { file -> file.fileName.safeAgentInboxFileSegment().lowercase(Locale.US) }
+    return storageSegments.distinct().size != storageSegments.size
 }
 
 private fun String.isSafeAgentInboxMarkdownImageAttachmentName(): Boolean {

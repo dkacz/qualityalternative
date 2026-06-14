@@ -1,0 +1,677 @@
+diff --git a/app/src/main/java/com/qualityalternative/app/data/AgentInboxDocumentStore.kt b/app/src/main/java/com/qualityalternative/app/data/AgentInboxDocumentStore.kt
+index c970ac3..8b79015 100644
+--- a/app/src/main/java/com/qualityalternative/app/data/AgentInboxDocumentStore.kt
++++ b/app/src/main/java/com/qualityalternative/app/data/AgentInboxDocumentStore.kt
+@@ -47,9 +47,9 @@ class FileAgentInboxDocumentStore(
+     ): StoredAgentInboxDocument = withContext(Dispatchers.IO) {
+         rootDirectory.mkdirs()
+         val safeName = buildString {
+-            append(packageFolderId.safeFileSegment())
++            append(packageFolderId.safeAgentInboxFileSegment())
+             append('-')
+-            append(verifiedContentSha256.safeFileSegment())
++            append(verifiedContentSha256.safeAgentInboxFileSegment())
+             append('.')
+             append(format.agentInboxFileExtension(contentFileName))
+         }
+@@ -57,10 +57,7 @@ class FileAgentInboxDocumentStore(
+         if (file.exists()) {
+             val existingSha256 = runCatching { AgentInboxManifestValidator.sha256(file.readBytes()) }.getOrNull()
+             if (existingSha256 == verifiedContentSha256) {
+-                val existingAttachments = imageAttachments.writeImageAttachments(
+-                    contentSafeName = safeName,
+-                    replaceExisting = true,
+-                )
++                val existingAttachments = imageAttachments.writeImageAttachmentsAtomically(contentSafeName = safeName)
+                 return@withContext file.toStoredAgentInboxDocument(format, existingAttachments)
+             }
+             check(file.delete()) { "Could not delete stale Agent Inbox document." }
+@@ -75,10 +72,7 @@ class FileAgentInboxDocumentStore(
+                 "Temporary Agent Inbox document bytes do not match verified SHA-256."
+             }
+             moveIntoPlace(tempFile = tempFile, targetFile = file)
+-            attachmentUris = imageAttachments.writeImageAttachments(
+-                contentSafeName = safeName,
+-                replaceExisting = true,
+-            )
++            attachmentUris = imageAttachments.writeImageAttachmentsAtomically(contentSafeName = safeName)
+         } catch (error: Throwable) {
+             if (file.exists()) {
+                 file.delete()
+@@ -95,23 +89,57 @@ class FileAgentInboxDocumentStore(
+         file.toStoredAgentInboxDocument(format, attachmentUris)
+     }
+
+-    private fun List<AgentInboxImageAttachmentWrite>.writeImageAttachments(
++    private fun List<AgentInboxImageAttachmentWrite>.writeImageAttachmentsAtomically(
+         contentSafeName: String,
+-        replaceExisting: Boolean,
+     ): Map<String, String> {
+-        return flatMap { attachment ->
+-            val safeAttachmentName = attachment.fileName.safeFileSegment()
+-            val attachmentFile = File(rootDirectory, "$contentSafeName-img-$safeAttachmentName")
+-            if (replaceExisting || !attachmentFile.exists()) {
+-                attachmentFile.writeBytes(attachment.bytes)
++        if (isEmpty()) return emptyMap()
++        val plans = map { attachment ->
++            val safeAttachmentName = attachment.fileName.safeAgentInboxFileSegment()
++            AttachmentWritePlan(
++                displayName = attachment.fileName.trim(),
++                targetFile = File(rootDirectory, "$contentSafeName-img-$safeAttachmentName"),
++                tempFile = File.createTempFile("$contentSafeName-img-$safeAttachmentName-", ".tmp", rootDirectory),
++                bytes = attachment.bytes,
++            )
++        }
++        val backups = mutableListOf<Pair<File, File>>()
++        val promotedTargets = mutableListOf<File>()
++        try {
++            check(plans.map { plan -> plan.targetFile.name }.distinct().size == plans.size) {
++                "Duplicate Agent Inbox image attachment storage segment."
++            }
++            plans.forEach { plan -> plan.tempFile.writeBytes(plan.bytes) }
++            plans.forEach { plan ->
++                if (plan.targetFile.exists()) {
++                    check(plan.targetFile.isFile) { "Agent Inbox image attachment target is not a file." }
++                    val backup = File.createTempFile("${plan.targetFile.name}-", ".bak", rootDirectory)
++                    moveIntoPlace(tempFile = plan.targetFile, targetFile = backup)
++                    backups += plan.targetFile to backup
++                }
++                moveIntoPlace(tempFile = plan.tempFile, targetFile = plan.targetFile)
++                promotedTargets += plan.targetFile
++            }
++            backups.forEach { (_, backup) -> if (backup.exists()) backup.delete() }
++        } catch (error: Throwable) {
++            plans.forEach { plan -> if (plan.tempFile.exists()) plan.tempFile.delete() }
++            promotedTargets.forEach { target -> if (target.exists()) target.delete() }
++            backups.asReversed().forEach { (target, backup) ->
++                if (backup.exists()) {
++                    runCatching { moveIntoPlace(tempFile = backup, targetFile = target) }
++                }
+             }
+-            val uri = attachmentFile.toURI().toString()
+-            val displayName = attachment.fileName.trim()
++            throw error
++        } finally {
++            plans.forEach { plan -> if (plan.tempFile.exists()) plan.tempFile.delete() }
++        }
++        return plans.flatMap { plan ->
++            val uri = plan.targetFile.toURI().toString()
+             listOfNotNull(
+-                displayName.takeIf(String::isNotBlank)?.let { key -> key to uri },
+-                displayName.lowercase().takeIf { it.isNotBlank() && it != displayName }?.let { key -> key to uri },
++                plan.displayName.takeIf(String::isNotBlank)?.let { key -> key to uri },
++                plan.displayName.lowercase().takeIf { it.isNotBlank() && it != plan.displayName }
++                    ?.let { key -> key to uri },
+             )
+-        }.distinctBy { (key, _) -> key }.toMap()
++        }.toMap()
+     }
+
+     private fun moveIntoPlace(tempFile: File, targetFile: File) {
+@@ -162,7 +190,14 @@ class FileAgentInboxDocumentStore(
+     }
+ }
+
+-private fun String.safeFileSegment(): String {
++private data class AttachmentWritePlan(
++    val displayName: String,
++    val targetFile: File,
++    val tempFile: File,
++    val bytes: ByteArray,
++)
++
++internal fun String.safeAgentInboxFileSegment(): String {
+     return trim()
+         .ifBlank { "document" }
+         .replace(Regex("""[^A-Za-z0-9._-]+"""), "-")
+@@ -182,7 +217,7 @@ private fun ContentFormat.agentInboxMimeType(): String {
+ private fun ContentFormat.agentInboxFileExtension(contentFileName: String): String {
+     val sourceExtension = contentFileName
+         .substringAfterLast('.', missingDelimiterValue = "")
+-        .safeFileSegment()
++        .safeAgentInboxFileSegment()
+         .takeIf { it != "document" }
+     return when (this) {
+         ContentFormat.MARKDOWN -> when (sourceExtension) {
+diff --git a/app/src/main/java/com/qualityalternative/app/data/AgentInboxPackageImporter.kt b/app/src/main/java/com/qualityalternative/app/data/AgentInboxPackageImporter.kt
+index 6aae1eb..55d7d4b 100644
+--- a/app/src/main/java/com/qualityalternative/app/data/AgentInboxPackageImporter.kt
++++ b/app/src/main/java/com/qualityalternative/app/data/AgentInboxPackageImporter.kt
+@@ -11,6 +11,8 @@ import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_REVIEW_CONTENT_
+ import com.qualityalternative.app.domain.service.UserDocumentRepository
+ import java.io.ByteArrayInputStream
+
++internal const val AGENT_INBOX_DOCUMENT_DISPLAY_NAME = "Agent Inbox document"
++
+ enum class AgentInboxImportStatus {
+     IMPORTED,
+     DUPLICATE,
+@@ -164,8 +166,4 @@ class AgentInboxPackageImporter(
+             }
+         }
+     }
+-
+-    private companion object {
+-        const val AGENT_INBOX_DOCUMENT_DISPLAY_NAME = "Agent Inbox document"
+-    }
+ }
+diff --git a/app/src/main/java/com/qualityalternative/app/data/AgentInboxReviewCandidate.kt b/app/src/main/java/com/qualityalternative/app/data/AgentInboxReviewCandidate.kt
+index b8fd67a..1e18274 100644
+--- a/app/src/main/java/com/qualityalternative/app/data/AgentInboxReviewCandidate.kt
++++ b/app/src/main/java/com/qualityalternative/app/data/AgentInboxReviewCandidate.kt
+@@ -24,6 +24,7 @@ enum class AgentInboxPackageValidationError {
+     MULTIPLE_CONTENT_FILES,
+     UNSUPPORTED_EXTRA_FILES,
+     TOO_MANY_IMAGE_ATTACHMENTS,
++    DUPLICATE_IMAGE_ATTACHMENTS,
+     IMAGE_ATTACHMENT_TOO_LARGE,
+     CONTENT_CHANGED_AFTER_REVIEW,
+     DOWNLOAD_UNAVAILABLE,
+@@ -135,6 +136,13 @@ object AgentInboxReviewCandidateFactory {
+                     packageErrors = setOf(AgentInboxPackageValidationError.TOO_MANY_IMAGE_ATTACHMENTS),
+                 )
+             }
++            imageAttachments.hasDuplicateAddressableNames() -> {
++                return drivePackage.invalidCandidate(
++                    manifestFileId = manifestFile.id,
++                    manifest = manifest,
++                    packageErrors = setOf(AgentInboxPackageValidationError.DUPLICATE_IMAGE_ATTACHMENTS),
++                )
++            }
+             imageAttachments.any { file -> (file.sizeBytes ?: 0L) > AGENT_INBOX_MAX_IMAGE_ATTACHMENT_BYTES } ||
+                 imageAttachments.sumOf { file -> file.sizeBytes ?: 0L } > AGENT_INBOX_MAX_TOTAL_IMAGE_ATTACHMENT_BYTES -> {
+                 return drivePackage.invalidCandidate(
+@@ -220,6 +228,15 @@ private fun AgentInboxDrivePackage.markdownImageAttachmentFiles(contentFileId: S
+         }
+ }
+
++private fun List<AgentInboxImageAttachmentFile>.hasDuplicateAddressableNames(): Boolean {
++    val displayNames = map { file -> file.fileName.trim().lowercase(Locale.US) }
++    if (displayNames.distinct().size != displayNames.size) {
++        return true
++    }
++    val storageSegments = map { file -> file.fileName.safeAgentInboxFileSegment().lowercase(Locale.US) }
++    return storageSegments.distinct().size != storageSegments.size
++}
++
+ private fun String.isSafeAgentInboxMarkdownImageAttachmentName(): Boolean {
+     val lower = lowercase(Locale.US)
+     if (isBlank() || contains('/') || contains('\\') || contains("..")) {
+diff --git a/app/src/main/java/com/qualityalternative/app/data/MarkdownReaderDocumentParser.kt b/app/src/main/java/com/qualityalternative/app/data/MarkdownReaderDocumentParser.kt
+index e0198ca..69eb74c 100644
+--- a/app/src/main/java/com/qualityalternative/app/data/MarkdownReaderDocumentParser.kt
++++ b/app/src/main/java/com/qualityalternative/app/data/MarkdownReaderDocumentParser.kt
+@@ -13,6 +13,7 @@ object MarkdownReaderDocumentParser {
+         markdown: String,
+         baseUri: String? = null,
+         imageAttachmentUris: Map<String, String> = emptyMap(),
++        allowLocalImageFallback: Boolean = true,
+     ): ReaderDocument {
+         val blocks = mutableListOf<ReaderDocumentBlock>()
+         markdown
+@@ -25,6 +26,7 @@ object MarkdownReaderDocumentParser {
+                     rawBlock = block,
+                     baseUri = baseUri,
+                     imageAttachmentUris = imageAttachmentUris,
++                    allowLocalImageFallback = allowLocalImageFallback,
+                 )
+             }
+         return ReaderDocument(blocks = blocks)
+@@ -35,6 +37,7 @@ object MarkdownReaderDocumentParser {
+         rawBlock: String,
+         baseUri: String?,
+         imageAttachmentUris: Map<String, String>,
++        allowLocalImageFallback: Boolean,
+     ) {
+         val pendingTextLines = mutableListOf<String>()
+
+@@ -70,6 +73,7 @@ object MarkdownReaderDocumentParser {
+                     line = line,
+                     baseUri = baseUri,
+                     imageAttachmentUris = imageAttachmentUris,
++                    allowLocalImageFallback = allowLocalImageFallback,
+                 )
+                 if (image == null) {
+                     pendingTextLines += line
+@@ -128,6 +132,7 @@ object MarkdownReaderDocumentParser {
+         line: String,
+         baseUri: String?,
+         imageAttachmentUris: Map<String, String>,
++        allowLocalImageFallback: Boolean,
+     ): ParsedMarkdownImage? {
+         val trimmed = line.trim()
+         if (!trimmed.startsWith("![") || !trimmed.endsWith(")")) {
+@@ -144,6 +149,7 @@ object MarkdownReaderDocumentParser {
+             target = parsedDestination.target,
+             baseUri = baseUri,
+             imageAttachmentUris = imageAttachmentUris,
++            allowLocalImageFallback = allowLocalImageFallback,
+         )
+         val title = parsedDestination.title?.decodeMarkdownImageText()?.trim()?.takeIf(String::isNotBlank)
+         val readerText = listOf(alt, title)
+@@ -242,6 +248,7 @@ object MarkdownReaderDocumentParser {
+         target: String,
+         baseUri: String?,
+         imageAttachmentUris: Map<String, String>,
++        allowLocalImageFallback: Boolean,
+     ): String {
+         val cleanedTarget = target.trim()
+         if (cleanedTarget.isBlank() || cleanedTarget.startsWith("data:image/", ignoreCase = true)) {
+@@ -250,6 +257,9 @@ object MarkdownReaderDocumentParser {
+         imageAttachmentUris.attachmentUriForMarkdownTarget(cleanedTarget)?.let { attachmentUri ->
+             return attachmentUri
+         }
++        if (!allowLocalImageFallback) {
++            return ""
++        }
+         val targetUri = runCatching { URI(cleanedTarget) }.getOrNull()
+         if (targetUri?.scheme != null) {
+             return cleanedTarget
+diff --git a/app/src/main/java/com/qualityalternative/app/data/RoomUserDocumentRepository.kt b/app/src/main/java/com/qualityalternative/app/data/RoomUserDocumentRepository.kt
+index eec1701..58f87f2 100644
+--- a/app/src/main/java/com/qualityalternative/app/data/RoomUserDocumentRepository.kt
++++ b/app/src/main/java/com/qualityalternative/app/data/RoomUserDocumentRepository.kt
+@@ -289,6 +289,7 @@ class RoomUserDocumentRepository(
+                 uri = uri,
+                 format = item.format,
+                 imageAttachmentUris = item.imageAttachmentUris,
++                allowLocalImageFallback = item.allowsLocalMarkdownImageFallback(),
+             )
+                 ?: ReaderDocument.fromPlainText(bodyLoader.loadBody(uri = uri, format = item.format))
+             cacheReaderDocument(cacheKey = cacheKey, document = document)
+@@ -342,6 +343,7 @@ interface UserDocumentReaderDocumentLoader : UserDocumentBodyLoader {
+         uri: String,
+         format: ContentFormat,
+         imageAttachmentUris: Map<String, String> = emptyMap(),
++        allowLocalImageFallback: Boolean = true,
+     ): ReaderDocument
+ }
+
+@@ -358,6 +360,7 @@ class AndroidUserDocumentBodyLoader(
+         uri: String,
+         format: ContentFormat,
+         imageAttachmentUris: Map<String, String>,
++        allowLocalImageFallback: Boolean,
+     ): ReaderDocument {
+         if (!format.usesPrivateReader()) {
+             return ReaderDocument.fromPlainText("")
+@@ -370,6 +373,7 @@ class AndroidUserDocumentBodyLoader(
+                         markdown = input.bufferedReader(Charsets.UTF_8).readText(),
+                         baseUri = uri,
+                         imageAttachmentUris = imageAttachmentUris,
++                        allowLocalImageFallback = allowLocalImageFallback,
+                     )
+                     ContentFormat.EPUB -> EpubTextExtractor.extractDocument(input)
+                     else -> ReaderDocument.fromPlainText("")
+@@ -508,6 +512,12 @@ private fun String.toImageAttachmentUris(): Map<String, String> {
+     }.getOrDefault(emptyMap())
+ }
+
++internal fun ContentItem.allowsLocalMarkdownImageFallback(): Boolean {
++    val isAgentInboxStoredDocument = sourceLabel == AGENT_INBOX_DOCUMENT_DISPLAY_NAME &&
++        rights.sourceUrl?.startsWith("file:", ignoreCase = true) == true
++    return !isAgentInboxStoredDocument
++}
++
+ private fun Map<String, String>.sanitizedImageAttachmentUris(): Map<String, String> {
+     return entries
+         .mapNotNull { (rawKey, rawUri) ->
+diff --git a/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt b/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
+index 632cf1b..4adb0f9 100644
+--- a/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
++++ b/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
+@@ -9650,6 +9650,10 @@ private fun agentInboxCandidateDetailText(candidate: AgentInboxReviewCandidate):
+                     "Markdown package has too many image attachments. Keep six or fewer."
+                 }
+
++                AgentInboxPackageValidationError.DUPLICATE_IMAGE_ATTACHMENTS in candidate.packageErrors -> {
++                    "Markdown image attachment names must be unique after cleanup."
++                }
++
+                 AgentInboxPackageValidationError.IMAGE_ATTACHMENT_TOO_LARGE in candidate.packageErrors -> {
+                     "Markdown image attachment is too large. Use smaller images and scan again."
+                 }
+diff --git a/app/src/test/java/com/qualityalternative/app/data/AgentInboxPackageImporterTest.kt b/app/src/test/java/com/qualityalternative/app/data/AgentInboxPackageImporterTest.kt
+index c378849..93e5e50 100644
+--- a/app/src/test/java/com/qualityalternative/app/data/AgentInboxPackageImporterTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/data/AgentInboxPackageImporterTest.kt
+@@ -22,6 +22,7 @@ import kotlinx.coroutines.runBlocking
+ import kotlinx.coroutines.sync.Mutex
+ import kotlinx.coroutines.sync.withLock
+ import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
+ import org.junit.Assert.assertNotEquals
+ import org.junit.Assert.assertNull
+ import org.junit.Assert.assertTrue
+@@ -154,6 +155,37 @@ class AgentInboxPackageImporterTest {
+         assertEquals(1, storageRoot.listFiles().orEmpty().count { file -> file.extension == "md" })
+     }
+
++    @Test
++    fun fileStoreRemovesPromotedSidecarsWhenLaterAttachmentWriteFails() = runBlocking {
++        val storageRoot = temporaryFolder.newFolder("failing-sidecar-agent-inbox")
++        val contentBytes = "# Verified\n\nComplete private note.".toByteArray()
++        val sha = AgentInboxManifestValidator.sha256(contentBytes)
++        val safeContentName = "package-folder-$sha.md"
++        val firstSidecar = File(storageRoot, "$safeContentName-img-first.png")
++        val blockingSecondTarget = File(storageRoot, "$safeContentName-img-second.png")
++        assertTrue(blockingSecondTarget.mkdir())
++        val store = FileAgentInboxDocumentStore(storageRoot)
++
++        val error = runCatching {
++            store.writeDocument(
++                packageFolderId = "package-folder",
++                contentFileName = "content.md",
++                verifiedContentSha256 = sha,
++                format = ContentFormat.MARKDOWN,
++                bytes = contentBytes,
++                imageAttachments = listOf(
++                    AgentInboxImageAttachmentWrite(fileName = "first.png", bytes = byteArrayOf(1)),
++                    AgentInboxImageAttachmentWrite(fileName = "second.png", bytes = byteArrayOf(2)),
++                ),
++            )
++        }.exceptionOrNull()
++
++        assertTrue(error is IllegalStateException)
++        assertFalse(File(storageRoot, safeContentName).exists())
++        assertFalse(firstSidecar.exists())
++        assertTrue(storageRoot.listFiles().orEmpty().none { file -> file.name.endsWith(".tmp") })
++    }
++
+     @Test
+     fun importCandidateReturnsDuplicateBeforeWritingWhenContentShaAlreadyExists() = runBlocking {
+         val contentBytes = "duplicate".toByteArray()
+diff --git a/app/src/test/java/com/qualityalternative/app/data/AgentInboxReviewCandidateFactoryTest.kt b/app/src/test/java/com/qualityalternative/app/data/AgentInboxReviewCandidateFactoryTest.kt
+index 2695b23..609aba7 100644
+--- a/app/src/test/java/com/qualityalternative/app/data/AgentInboxReviewCandidateFactoryTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/data/AgentInboxReviewCandidateFactoryTest.kt
+@@ -305,6 +305,44 @@ class AgentInboxReviewCandidateFactoryTest {
+         assertEquals(setOf(AgentInboxPackageValidationError.IMAGE_ATTACHMENT_TOO_LARGE), candidate.packageErrors)
+     }
+
++    @Test
++    fun fromDrivePackage_marksDuplicateMarkdownImageAttachmentNamesInvalid() {
++        val candidate = AgentInboxReviewCandidateFactory.fromDrivePackage(
++            drivePackage = drivePackage(
++                files = listOf(
++                    driveFile("manifest-id", AGENT_INBOX_MANIFEST_FILE_NAME),
++                    driveFile("content-id", "content.md"),
++                    driveFile("cover-id-1", "cover.png"),
++                    driveFile("cover-id-2", "COVER.png"),
++                ),
++            ),
++            manifestJson = manifestJson(),
++        )
++
++        assertEquals(AgentInboxReviewStatus.INVALID, candidate.status)
++        assertFalse(candidate.canImport)
++        assertEquals(setOf(AgentInboxPackageValidationError.DUPLICATE_IMAGE_ATTACHMENTS), candidate.packageErrors)
++    }
++
++    @Test
++    fun fromDrivePackage_marksCanonicalMarkdownImageAttachmentCollisionsInvalid() {
++        val candidate = AgentInboxReviewCandidateFactory.fromDrivePackage(
++            drivePackage = drivePackage(
++                files = listOf(
++                    driveFile("manifest-id", AGENT_INBOX_MANIFEST_FILE_NAME),
++                    driveFile("content-id", "content.md"),
++                    driveFile("chart-id-1", "chart one.png"),
++                    driveFile("chart-id-2", "chart:one.png"),
++                ),
++            ),
++            manifestJson = manifestJson(),
++        )
++
++        assertEquals(AgentInboxReviewStatus.INVALID, candidate.status)
++        assertFalse(candidate.canImport)
++        assertEquals(setOf(AgentInboxPackageValidationError.DUPLICATE_IMAGE_ATTACHMENTS), candidate.packageErrors)
++    }
++
+     private fun drivePackage(
+         files: List<AgentInboxDriveFile>,
+         hasMoreFiles: Boolean = false,
+diff --git a/app/src/test/java/com/qualityalternative/app/data/MarkdownReaderDocumentParserTest.kt b/app/src/test/java/com/qualityalternative/app/data/MarkdownReaderDocumentParserTest.kt
+index 595b0c6..3276be8 100644
+--- a/app/src/test/java/com/qualityalternative/app/data/MarkdownReaderDocumentParserTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/data/MarkdownReaderDocumentParserTest.kt
+@@ -64,6 +64,32 @@ class MarkdownReaderDocumentParserTest {
+         assertEquals("content://provider/document/cover-image", document.blocks.single().image?.source)
+     }
+
++    @Test
++    fun parseBlocksUnreviewedLocalImagesWhenFallbackDisabled() {
++        val document = MarkdownReaderDocumentParser.parse(
++            markdown = """
++                ![Outside](../outside.png)
++
++                ![Absolute](/tmp/outside.png)
++
++                ![File](file:///tmp/outside.png)
++
++                ![Cover](cover.png)
++
++                ![Pixel](data:image/png;base64,iVBORw0KGgo=)
++            """.trimIndent(),
++            baseUri = "file:///tmp/books/session-notes.md",
++            imageAttachmentUris = mapOf("cover.png" to "content://provider/document/cover-image"),
++            allowLocalImageFallback = false,
++        )
++
++        assertEquals("", document.blocks[0].image?.source)
++        assertEquals("", document.blocks[1].image?.source)
++        assertEquals("", document.blocks[2].image?.source)
++        assertEquals("content://provider/document/cover-image", document.blocks[3].image?.source)
++        assertEquals("data:image/png;base64,iVBORw0KGgo=", document.blocks[4].image?.source)
++    }
++
+     @Test
+     fun parseReplacesInlineMarkdownImagesWithAltTextInsideTextBlocks() {
+         val document = MarkdownReaderDocumentParser.parse(
+diff --git a/app/src/test/java/com/qualityalternative/app/data/RoomUserDocumentRepositoryTest.kt b/app/src/test/java/com/qualityalternative/app/data/RoomUserDocumentRepositoryTest.kt
+new file mode 100644
+index 0000000..23babb0
+--- /dev/null
++++ b/app/src/test/java/com/qualityalternative/app/data/RoomUserDocumentRepositoryTest.kt
+@@ -0,0 +1,55 @@
++package com.qualityalternative.app.data
++
++import com.qualityalternative.app.domain.model.ContentAvailability
++import com.qualityalternative.app.domain.model.ContentFormat
++import com.qualityalternative.app.domain.model.ContentItem
++import com.qualityalternative.app.domain.model.ContentRightsMetadata
++import com.qualityalternative.app.domain.model.ContentSourceType
++import com.qualityalternative.app.domain.model.TopicTag
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++class RoomUserDocumentRepositoryTest {
++    @Test
++    fun allowsLocalMarkdownImageFallback_blocksAgentInboxStoredDocumentsOnly() {
++        val agentInboxDocument = userDocument(
++            sourceLabel = AGENT_INBOX_DOCUMENT_DISPLAY_NAME,
++            sourceUrl = "file:///data/user/0/com.qualityalternative.app/files/agent-inbox-imports/pkg.md",
++        )
++        val sameLabelManualDocument = userDocument(
++            sourceLabel = AGENT_INBOX_DOCUMENT_DISPLAY_NAME,
++            sourceUrl = "content://provider/documents/manual-md",
++        )
++        val regularManualDocument = userDocument(
++            sourceLabel = "notes.md",
++            sourceUrl = "content://provider/documents/notes-md",
++        )
++
++        assertFalse(agentInboxDocument.allowsLocalMarkdownImageFallback())
++        assertTrue(sameLabelManualDocument.allowsLocalMarkdownImageFallback())
++        assertTrue(regularManualDocument.allowsLocalMarkdownImageFallback())
++    }
++
++    private fun userDocument(
++        sourceLabel: String,
++        sourceUrl: String,
++    ): ContentItem {
++        return ContentItem(
++            id = "doc-$sourceLabel-$sourceUrl",
++            packId = "user-documents",
++            title = "Document",
++            description = "Private document",
++            durationMinutes = 5,
++            format = ContentFormat.MARKDOWN,
++            topicTags = setOf(TopicTag.ESSAYS),
++            sourceLabel = sourceLabel,
++            sourceType = ContentSourceType.USER_DOCUMENT,
++            availability = ContentAvailability.AVAILABLE,
++            rights = ContentRightsMetadata.userPrivateReader(
++                sourceUrl = sourceUrl,
++                attribution = sourceLabel,
++            ),
++        )
++    }
++}
+diff --git a/docs/LANE_STATUS.md b/docs/LANE_STATUS.md
+index 2e0a04b..9d86fbd 100644
+--- a/docs/LANE_STATUS.md
++++ b/docs/LANE_STATUS.md
+@@ -31,19 +31,22 @@ Status: `in_progress`
+   - R1 fixes are implemented locally: Agent Inbox connection now requires durable `agent_inbox_drive_grant_mode=picker_folder`, legacy folder ids without that marker hydrate as disconnected, `saveAgentInboxDriveConnection(null)` clears connection state, and Settings copy/actions derive connected state from the Picker grant predicate.
+   - Manual Markdown image attachment imports now allow image-only follow-up picker results to merge into the already selected Markdown file while preserving edited title, selected topics, and priority.
+   - Agent Inbox Markdown packages can carry bounded safe sidecar images through review, Drive download, local Agent Inbox document storage, `UserDocumentDraft.imageAttachmentUris`, and reader rendering; EPUB package sidecars remain invalid.
++  - GPT Pro R2 returned `SCORE 7/10`, `VERDICT REVISE`, `VISUAL REVIEW PASS`; the remaining findings were duplicate/colliding sidecar names, unreviewed Markdown local-image fallback, and incomplete sidecar rollback on mid-write failure.
++  - R2 fixes are implemented locally: duplicate/colliding sidecar names are invalid during review, Agent Inbox Markdown reader rendering disables local fallback for stored Agent Inbox files, and sidecar writes use temp/backup rollback that removes promoted files after later failures.
+   - Visual E2E coverage for disconnected select-folder, selected-folder, access-lost reconnect, Agent Inbox Markdown image reader, and dark selected-folder states passed in `VisualQaScreenshotTest#captureSprint28AgentInboxDriveAccessStates`.
+-  - Canonical Sprint 28 visual evidence: `evidence/sprint28_agent_inbox_drive_access/visual_e2e/contact_sheet_r2.png` and `evidence/sprint28_agent_inbox_drive_access/visual_e2e/sprint28-agent-inbox-drive-access-1781433607325/`.
++  - Canonical Sprint 28 R3 visual evidence: `evidence/sprint28_agent_inbox_drive_access/visual_e2e_r3/contact_sheet_r3.png` and `evidence/sprint28_agent_inbox_drive_access/visual_e2e_r3/sprint28-agent-inbox-drive-access-1781437194813/`.
+ - Validation:
+   - Passed: full `testDebugUnitTest`.
+   - Passed: targeted Markdown image/Agent Inbox tests for `DocumentImportCandidateFactoryTest`, `MainViewModelTest`, `AgentInboxReviewCandidateFactoryTest`, and `AgentInboxPackageImporterTest`.
+   - Passed: targeted `testDebugUnitTest` for `GoogleDriveAuthorizationTest`, `MainViewModelTest`, and `AndroidGoogleDriveAgentInboxClientTest`.
+   - Passed after R1 fixes: targeted rerun for `PreferencesSettingsRepositoryTest` and `MainViewModelTest`.
+   - Passed: `compileDebugAndroidTestKotlin`.
++  - Passed: targeted R2-fix unit tests for `AgentInboxReviewCandidateFactoryTest`, `AgentInboxPackageImporterTest`, `MarkdownReaderDocumentParserTest`, and `RoomUserDocumentRepositoryTest`.
+   - Passed: focused connected visual E2E on `qaApi36(AVD) - 16` for `VisualQaScreenshotTest#captureSprint28AgentInboxDriveAccessStates`.
+   - Passed: `lintDebug`, `processReleaseManifestForPackage`, and `assembleDebug`.
+   - Passed: `git diff --check`.
+ - Next gate:
+-  - GPT Pro R2 returned `SCORE 7/10`, `VERDICT REVISE`, `VISUAL REVIEW PASS`; fix the three Markdown image sidecar findings, rerun validation, and send R3 before any release gate.
++  - Prepare GPT Pro R3 from the fresh R2-fix bundle before any release gate.
+
+ ## Sprint 27 Agent Content Inbox
+
+diff --git a/docs/SPRINT_28_AGENT_INBOX_DRIVE_ACCESS.md b/docs/SPRINT_28_AGENT_INBOX_DRIVE_ACCESS.md
+index bcd2d87..24a35d6 100644
+--- a/docs/SPRINT_28_AGENT_INBOX_DRIVE_ACCESS.md
++++ b/docs/SPRINT_28_AGENT_INBOX_DRIVE_ACCESS.md
+@@ -114,17 +114,16 @@ Acceptance:
+ Current evidence:
+
+ - Checklist is documented in `evidence/sprint28_agent_inbox_drive_access/device_spike/RCLONE_PICKER_FOLDER_SPIKE.md`.
+-- Result is pending because no device/emulator is attached in the current environment.
++- Result is pending because the deterministic emulator run does not include a signed-in production OAuth/rclone scenario.
+
+ ### Slice 28.4 - Visual E2E
+
+ - Add deterministic screenshots for:
+   - disconnected Agent Inbox with `Select folder`,
+   - Picker-granted folder connected,
+-  - scan blocked before folder selection,
+   - inaccessible/revoked folder reconnect state,
+-  - selected-folder scan showing package review,
+-  - imported package still flowing through existing Markdown/EPUB reader evidence.
++  - imported Agent Inbox Markdown sidecar image rendering in the reader,
++  - selected-folder state in dark mode.
+
+ Acceptance:
+
+@@ -134,9 +133,9 @@ Acceptance:
+ Current coverage:
+
+ - Added and passed: `VisualQaScreenshotTest#captureSprint28AgentInboxDriveAccessStates`, including disconnected select-folder, selected-folder, access-lost reconnect, Agent Inbox Markdown image reader, and dark selected-folder evidence.
+-- Canonical screenshot run: `evidence/sprint28_agent_inbox_drive_access/visual_e2e/sprint28-agent-inbox-drive-access-1781433607325/`.
+-- Contact sheet: `evidence/sprint28_agent_inbox_drive_access/visual_e2e/contact_sheet_r2.png`.
+-- Connected result XML/logs: `evidence/sprint28_agent_inbox_drive_access/android-results-r2/` and `evidence/sprint28_agent_inbox_drive_access/logs/connected_sprint28_visual_r2_final.log`.
++- Current canonical screenshot run: `evidence/sprint28_agent_inbox_drive_access/visual_e2e_r3/sprint28-agent-inbox-drive-access-1781437194813/`.
++- Current contact sheet: `evidence/sprint28_agent_inbox_drive_access/visual_e2e_r3/contact_sheet_r3.png`.
++- Current connected result XML/logs: `evidence/sprint28_agent_inbox_drive_access/android-results-r3/` and `evidence/sprint28_agent_inbox_drive_access/logs/connected_sprint28_visual_r3_candidate.log`.
+
+ ### Slice 28.6 - Markdown Image Attachment Parity
+
+@@ -164,7 +163,7 @@ Current review state:
+ - R1 blockers fixed locally before R2: durable Picker grant marker, legacy state normalization, and missing-folder connected-state normalization.
+ - R2 output: `evidence/sprint28_agent_inbox_drive_access/GPT_PRO_REVIEW_R2.md`.
+ - R2 result: `SCORE 7/10`, `VERDICT REVISE`, `VISUAL REVIEW PASS`.
+-- R2 blockers to fix before R3: duplicate/colliding Markdown sidecar names, Agent Inbox reader fallback to unreviewed local image paths, and mid-write sidecar cleanup.
++- R2 blockers fixed locally before R3: duplicate/colliding Markdown sidecar names are invalid, Agent Inbox Markdown reader image resolution is restricted to reviewed sidecars plus data URIs, and sidecar writes now clean up promoted files on mid-write failure.
+
+ Acceptance:
+
+diff --git a/evidence/sprint28_agent_inbox_drive_access/VALIDATION_SUMMARY.md b/evidence/sprint28_agent_inbox_drive_access/VALIDATION_SUMMARY.md
+index ece3f05..36e0181 100644
+--- a/evidence/sprint28_agent_inbox_drive_access/VALIDATION_SUMMARY.md
++++ b/evidence/sprint28_agent_inbox_drive_access/VALIDATION_SUMMARY.md
+@@ -21,6 +21,7 @@ Review base commits include the first Drive access slice, device validation gate
+ - R2 finding 1: Agent Inbox Markdown image sidecars can collapse through duplicate filenames or storage-safe filename collisions.
+ - R2 finding 2: Agent Inbox Markdown reader rendering can fall back to local file paths that were not reviewed sidecars.
+ - R2 finding 3: sidecar rollback can leave files behind if local attachment writing fails mid-loop.
++- R2 fixes implemented locally before R3: duplicate/colliding sidecar names are invalid during review; Agent Inbox Markdown image resolution allows only reviewed attachments and `data:image` sources; sidecar writes use temp/backup cleanup and remove promoted files on failure.
+
+ R2 candidate scope adds the user-requested Markdown image fix:
+
+@@ -32,6 +33,7 @@ R2 candidate scope adds the user-requested Markdown image fix:
+
+ - `JAVA_HOME=/opt/homebrew/opt/openjdk@17 ./gradlew :app:testDebugUnitTest`
+ - `JAVA_HOME=/opt/homebrew/opt/openjdk@17 ./gradlew :app:testDebugUnitTest --tests com.qualityalternative.app.ui.DocumentImportCandidateFactoryTest --tests com.qualityalternative.app.ui.MainViewModelTest --tests com.qualityalternative.app.data.AgentInboxReviewCandidateFactoryTest --tests com.qualityalternative.app.data.AgentInboxPackageImporterTest`
++- `JAVA_HOME=/opt/homebrew/opt/openjdk@17 ./gradlew :app:testDebugUnitTest --tests com.qualityalternative.app.data.AgentInboxReviewCandidateFactoryTest --tests com.qualityalternative.app.data.AgentInboxPackageImporterTest --tests com.qualityalternative.app.data.MarkdownReaderDocumentParserTest --tests com.qualityalternative.app.data.RoomUserDocumentRepositoryTest`
+ - `JAVA_HOME=/opt/homebrew/opt/openjdk@17 ./gradlew :app:testDebugUnitTest --tests com.qualityalternative.app.ui.GoogleDriveAuthorizationTest --tests com.qualityalternative.app.ui.MainViewModelTest --tests com.qualityalternative.app.data.AndroidGoogleDriveAgentInboxClientTest`
+ - `JAVA_HOME=/opt/homebrew/opt/openjdk@17 ./gradlew :app:testDebugUnitTest --rerun-tasks --tests com.qualityalternative.app.data.PreferencesSettingsRepositoryTest --tests com.qualityalternative.app.ui.MainViewModelTest`
+ - `JAVA_HOME=/opt/homebrew/opt/openjdk@17 ./gradlew :app:compileDebugAndroidTestKotlin`
+@@ -39,6 +41,7 @@ R2 candidate scope adds the user-requested Markdown image fix:
+ - `JAVA_HOME=/opt/homebrew/opt/openjdk@17 ./gradlew :app:lintDebug`
+ - `JAVA_HOME=/opt/homebrew/opt/openjdk@17 ./gradlew :app:processReleaseManifestForPackage`
+ - `JAVA_HOME=/opt/homebrew/opt/openjdk@17 ./gradlew :app:assembleDebug`
++- `JAVA_HOME=/opt/homebrew/opt/openjdk@17 ./gradlew :app:testDebugUnitTest :app:compileDebugAndroidTestKotlin :app:lintDebug :app:processReleaseManifestForPackage :app:assembleDebug`
+ - `git diff --check`
+
+ ## Implemented Contract
+@@ -52,6 +55,9 @@ R2 candidate scope adds the user-requested Markdown image fix:
+ - Connection and access-lost analytics are privacy-safe and do not include raw folder ids.
+ - Manual Markdown image attachment imports support image-only follow-up picker selections against the already selected Markdown document while preserving edited title, topics, and priority.
+ - Agent Inbox Markdown sidecar images use safe filenames, a maximum of six attachments, a 5 MiB per-image metadata/download cap, and a 15 MiB total download cap.
++- Agent Inbox Markdown sidecar image filenames must be unique after case normalization and after local storage-segment cleanup.
++- Agent Inbox Markdown reader rendering disables local file/path fallback; unmatched local/absolute/file URI image targets render as placeholders instead of reading unreviewed local bytes.
++- Agent Inbox sidecar storage writes attachments through rollback-aware temp/backup handling and removes promoted sidecars if a later attachment write fails.
+ - Agent Inbox imported Markdown image sidecars are stored under the Agent Inbox document root, passed through `UserDocumentDraft.imageAttachmentUris`, rendered by the existing Markdown reader, and deleted if import is rolled back.
+ - Agent Inbox EPUB package sidecars and unsupported extra files remain invalid finite review items.
+
+@@ -62,10 +68,22 @@ R2 candidate scope adds the user-requested Markdown image fix:
+ - Connected result XML/logs: `evidence/sprint28_agent_inbox_drive_access/android-results-r2/`
+ - Connected Gradle log: `evidence/sprint28_agent_inbox_drive_access/logs/connected_sprint28_visual_r2_final.log`
+ - Targeted Markdown image unit log: `evidence/sprint28_agent_inbox_drive_access/logs/targeted_markdown_image_r2.log`
++- Targeted R2-fix unit log: `evidence/sprint28_agent_inbox_drive_access/logs/targeted_r2_fixes.log`
+ - Full local gate log: `evidence/sprint28_agent_inbox_drive_access/logs/full_local_gate_r2.log`
+ - Diff-check log: `evidence/sprint28_agent_inbox_drive_access/logs/git_diff_check_r2.log`
+ - R2 diff and commit context: `evidence/sprint28_agent_inbox_drive_access/sprint28_r2_tracked_diff.patch`, `evidence/sprint28_agent_inbox_drive_access/git_log_r2.txt`, and `evidence/sprint28_agent_inbox_drive_access/adb_devices_r2.txt`
+
++## R3 Candidate Evidence
++
++- Targeted R2-fix unit log: `evidence/sprint28_agent_inbox_drive_access/logs/targeted_r2_fixes.log`
++- Full local gate log: `evidence/sprint28_agent_inbox_drive_access/logs/full_local_gate_r3_candidate.log`
++- Connected visual log: `evidence/sprint28_agent_inbox_drive_access/logs/connected_sprint28_visual_r3_candidate.log`
++- Diff-check log: `evidence/sprint28_agent_inbox_drive_access/logs/git_diff_check_r3.log`
++- R3 diff and commit context: `evidence/sprint28_agent_inbox_drive_access/sprint28_r3_tracked_diff.patch`, `evidence/sprint28_agent_inbox_drive_access/git_log_r3.txt`, and `evidence/sprint28_agent_inbox_drive_access/adb_devices_r3.txt`
++- Android connected results: `evidence/sprint28_agent_inbox_drive_access/android-results-r3/`
++- Canonical R3 screenshot run: `evidence/sprint28_agent_inbox_drive_access/visual_e2e_r3/sprint28-agent-inbox-drive-access-1781437194813/`
++- R3 contact sheet: `evidence/sprint28_agent_inbox_drive_access/visual_e2e_r3/contact_sheet_r3.png`
++
+ The focused visual E2E passed on `qaApi36(AVD) - 16` with `tests=1`, `failures=0`, `errors=0`, `skipped=0`.
+
+ ## Pending Before Release
+diff --git a/evidence/sprint28_agent_inbox_drive_access/device_spike/RCLONE_PICKER_FOLDER_SPIKE.md b/evidence/sprint28_agent_inbox_drive_access/device_spike/RCLONE_PICKER_FOLDER_SPIKE.md
+index 38d7483..a96ce2a 100644
+--- a/evidence/sprint28_agent_inbox_drive_access/device_spike/RCLONE_PICKER_FOLDER_SPIKE.md
++++ b/evidence/sprint28_agent_inbox_drive_access/device_spike/RCLONE_PICKER_FOLDER_SPIKE.md
+@@ -34,4 +34,4 @@ If the scan reports an access-lost state or does not see a valid package that is
+
+ ## Result
+
+-Pending. No device/emulator was attached in the current Codex environment on 2026-06-14.
++Pending. On 2026-06-14, Codex had a local `qaApi36` emulator for deterministic visual E2E, but not a signed-in production OAuth/rclone scenario that can prove whether a Picker-selected Drive folder under `drive.file` exposes child packages added later by rclone.

@@ -9650,6 +9650,10 @@ private fun agentInboxCandidateDetailText(candidate: AgentInboxReviewCandidate):
                     "Markdown package has too many image attachments. Keep six or fewer."
                 }
 
+                AgentInboxPackageValidationError.DUPLICATE_IMAGE_ATTACHMENTS in candidate.packageErrors -> {
+                    "Markdown image attachment names must be unique after cleanup."
+                }
+
                 AgentInboxPackageValidationError.IMAGE_ATTACHMENT_TOO_LARGE in candidate.packageErrors -> {
                     "Markdown image attachment is too large. Use smaller images and scan again."
                 }

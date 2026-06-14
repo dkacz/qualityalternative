@@ -289,6 +289,7 @@ class RoomUserDocumentRepository(
                 uri = uri,
                 format = item.format,
                 imageAttachmentUris = item.imageAttachmentUris,
+                allowLocalImageFallback = item.allowsLocalMarkdownImageFallback(),
             )
                 ?: ReaderDocument.fromPlainText(bodyLoader.loadBody(uri = uri, format = item.format))
             cacheReaderDocument(cacheKey = cacheKey, document = document)
@@ -342,6 +343,7 @@ interface UserDocumentReaderDocumentLoader : UserDocumentBodyLoader {
         uri: String,
         format: ContentFormat,
         imageAttachmentUris: Map<String, String> = emptyMap(),
+        allowLocalImageFallback: Boolean = true,
     ): ReaderDocument
 }
 
@@ -358,6 +360,7 @@ class AndroidUserDocumentBodyLoader(
         uri: String,
         format: ContentFormat,
         imageAttachmentUris: Map<String, String>,
+        allowLocalImageFallback: Boolean,
     ): ReaderDocument {
         if (!format.usesPrivateReader()) {
             return ReaderDocument.fromPlainText("")
@@ -370,6 +373,7 @@ class AndroidUserDocumentBodyLoader(
                         markdown = input.bufferedReader(Charsets.UTF_8).readText(),
                         baseUri = uri,
                         imageAttachmentUris = imageAttachmentUris,
+                        allowLocalImageFallback = allowLocalImageFallback,
                     )
                     ContentFormat.EPUB -> EpubTextExtractor.extractDocument(input)
                     else -> ReaderDocument.fromPlainText("")
@@ -506,6 +510,12 @@ private fun String.toImageAttachmentUris(): Map<String, String> {
             }
         }
     }.getOrDefault(emptyMap())
+}
+
+internal fun ContentItem.allowsLocalMarkdownImageFallback(): Boolean {
+    val isAgentInboxStoredDocument = sourceLabel == AGENT_INBOX_DOCUMENT_DISPLAY_NAME &&
+        rights.sourceUrl?.startsWith("file:", ignoreCase = true) == true
+    return !isAgentInboxStoredDocument
 }
 
 private fun Map<String, String>.sanitizedImageAttachmentUris(): Map<String, String> {

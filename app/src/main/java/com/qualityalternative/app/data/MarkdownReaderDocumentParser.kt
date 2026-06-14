@@ -13,6 +13,7 @@ object MarkdownReaderDocumentParser {
         markdown: String,
         baseUri: String? = null,
         imageAttachmentUris: Map<String, String> = emptyMap(),
+        allowLocalImageFallback: Boolean = true,
     ): ReaderDocument {
         val blocks = mutableListOf<ReaderDocumentBlock>()
         markdown
@@ -25,6 +26,7 @@ object MarkdownReaderDocumentParser {
                     rawBlock = block,
                     baseUri = baseUri,
                     imageAttachmentUris = imageAttachmentUris,
+                    allowLocalImageFallback = allowLocalImageFallback,
                 )
             }
         return ReaderDocument(blocks = blocks)
@@ -35,6 +37,7 @@ object MarkdownReaderDocumentParser {
         rawBlock: String,
         baseUri: String?,
         imageAttachmentUris: Map<String, String>,
+        allowLocalImageFallback: Boolean,
     ) {
         val pendingTextLines = mutableListOf<String>()
 
@@ -70,6 +73,7 @@ object MarkdownReaderDocumentParser {
                     line = line,
                     baseUri = baseUri,
                     imageAttachmentUris = imageAttachmentUris,
+                    allowLocalImageFallback = allowLocalImageFallback,
                 )
                 if (image == null) {
                     pendingTextLines += line
@@ -128,6 +132,7 @@ object MarkdownReaderDocumentParser {
         line: String,
         baseUri: String?,
         imageAttachmentUris: Map<String, String>,
+        allowLocalImageFallback: Boolean,
     ): ParsedMarkdownImage? {
         val trimmed = line.trim()
         if (!trimmed.startsWith("![") || !trimmed.endsWith(")")) {
@@ -144,6 +149,7 @@ object MarkdownReaderDocumentParser {
             target = parsedDestination.target,
             baseUri = baseUri,
             imageAttachmentUris = imageAttachmentUris,
+            allowLocalImageFallback = allowLocalImageFallback,
         )
         val title = parsedDestination.title?.decodeMarkdownImageText()?.trim()?.takeIf(String::isNotBlank)
         val readerText = listOf(alt, title)
@@ -242,6 +248,7 @@ object MarkdownReaderDocumentParser {
         target: String,
         baseUri: String?,
         imageAttachmentUris: Map<String, String>,
+        allowLocalImageFallback: Boolean,
     ): String {
         val cleanedTarget = target.trim()
         if (cleanedTarget.isBlank() || cleanedTarget.startsWith("data:image/", ignoreCase = true)) {
@@ -249,6 +256,9 @@ object MarkdownReaderDocumentParser {
         }
         imageAttachmentUris.attachmentUriForMarkdownTarget(cleanedTarget)?.let { attachmentUri ->
             return attachmentUri
+        }
+        if (!allowLocalImageFallback) {
+            return ""
         }
         val targetUri = runCatching { URI(cleanedTarget) }.getOrNull()
         if (targetUri?.scheme != null) {

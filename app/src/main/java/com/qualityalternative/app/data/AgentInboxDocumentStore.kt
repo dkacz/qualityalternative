@@ -47,9 +47,9 @@ class FileAgentInboxDocumentStore(
     ): StoredAgentInboxDocument = withContext(Dispatchers.IO) {
         rootDirectory.mkdirs()
         val safeName = buildString {
-            append(packageFolderId.safeFileSegment())
+            append(packageFolderId.safeAgentInboxFileSegment())
             append('-')
-            append(verifiedContentSha256.safeFileSegment())
+            append(verifiedContentSha256.safeAgentInboxFileSegment())
             append('.')
             append(format.agentInboxFileExtension(contentFileName))
         }
@@ -57,10 +57,7 @@ class FileAgentInboxDocumentStore(
         if (file.exists()) {
             val existingSha256 = runCatching { AgentInboxManifestValidator.sha256(file.readBytes()) }.getOrNull()
             if (existingSha256 == verifiedContentSha256) {
-                val existingAttachments = imageAttachments.writeImageAttachments(
-                    contentSafeName = safeName,
-                    replaceExisting = true,
-                )
+                val existingAttachments = imageAttachments.writeImageAttachmentsAtomically(contentSafeName = safeName)
                 return@withContext file.toStoredAgentInboxDocument(format, existingAttachments)
             }
             check(file.delete()) { "Could not delete stale Agent Inbox document." }
@@ -75,10 +72,7 @@ class FileAgentInboxDocumentStore(
                 "Temporary Agent Inbox document bytes do not match verified SHA-256."
             }
             moveIntoPlace(tempFile = tempFile, targetFile = file)
-            attachmentUris = imageAttachments.writeImageAttachments(
-                contentSafeName = safeName,
-                replaceExisting = true,
-            )
+            attachmentUris = imageAttachments.writeImageAttachmentsAtomically(contentSafeName = safeName)
         } catch (error: Throwable) {
             if (file.exists()) {
                 file.delete()
@@ -95,23 +89,57 @@ class FileAgentInboxDocumentStore(
         file.toStoredAgentInboxDocument(format, attachmentUris)
     }
 
-    private fun List<AgentInboxImageAttachmentWrite>.writeImageAttachments(
+    private fun List<AgentInboxImageAttachmentWrite>.writeImageAttachmentsAtomically(
         contentSafeName: String,
-        replaceExisting: Boolean,
     ): Map<String, String> {
-        return flatMap { attachment ->
-            val safeAttachmentName = attachment.fileName.safeFileSegment()
-            val attachmentFile = File(rootDirectory, "$contentSafeName-img-$safeAttachmentName")
-            if (replaceExisting || !attachmentFile.exists()) {
-                attachmentFile.writeBytes(attachment.bytes)
-            }
-            val uri = attachmentFile.toURI().toString()
-            val displayName = attachment.fileName.trim()
-            listOfNotNull(
-                displayName.takeIf(String::isNotBlank)?.let { key -> key to uri },
-                displayName.lowercase().takeIf { it.isNotBlank() && it != displayName }?.let { key -> key to uri },
+        if (isEmpty()) return emptyMap()
+        val plans = map { attachment ->
+            val safeAttachmentName = attachment.fileName.safeAgentInboxFileSegment()
+            AttachmentWritePlan(
+                displayName = attachment.fileName.trim(),
+                targetFile = File(rootDirectory, "$contentSafeName-img-$safeAttachmentName"),
+                tempFile = File.createTempFile("$contentSafeName-img-$safeAttachmentName-", ".tmp", rootDirectory),
+                bytes = attachment.bytes,
             )
-        }.distinctBy { (key, _) -> key }.toMap()
+        }
+        val backups = mutableListOf<Pair<File, File>>()
+        val promotedTargets = mutableListOf<File>()
+        try {
+            check(plans.map { plan -> plan.targetFile.name }.distinct().size == plans.size) {
+                "Duplicate Agent Inbox image attachment storage segment."
+            }
+            plans.forEach { plan -> plan.tempFile.writeBytes(plan.bytes) }
+            plans.forEach { plan ->
+                if (plan.targetFile.exists()) {
+                    check(plan.targetFile.isFile) { "Agent Inbox image attachment target is not a file." }
+                    val backup = File.createTempFile("${plan.targetFile.name}-", ".bak", rootDirectory)
+                    moveIntoPlace(tempFile = plan.targetFile, targetFile = backup)
+                    backups += plan.targetFile to backup
+                }
+                moveIntoPlace(tempFile = plan.tempFile, targetFile = plan.targetFile)
+                promotedTargets += plan.targetFile
+            }
+            backups.forEach { (_, backup) -> if (backup.exists()) backup.delete() }
+        } catch (error: Throwable) {
+            plans.forEach { plan -> if (plan.tempFile.exists()) plan.tempFile.delete() }
+            promotedTargets.forEach { target -> if (target.exists()) target.delete() }
+            backups.asReversed().forEach { (target, backup) ->
+                if (backup.exists()) {
+                    runCatching { moveIntoPlace(tempFile = backup, targetFile = target) }
+                }
+            }
+            throw error
+        } finally {
+            plans.forEach { plan -> if (plan.tempFile.exists()) plan.tempFile.delete() }
+        }
+        return plans.flatMap { plan ->
+            val uri = plan.targetFile.toURI().toString()
+            listOfNotNull(
+                plan.displayName.takeIf(String::isNotBlank)?.let { key -> key to uri },
+                plan.displayName.lowercase().takeIf { it.isNotBlank() && it != plan.displayName }
+                    ?.let { key -> key to uri },
+            )
+        }.toMap()
     }
 
     private fun moveIntoPlace(tempFile: File, targetFile: File) {
@@ -162,7 +190,14 @@ class FileAgentInboxDocumentStore(
     }
 }
 
-private fun String.safeFileSegment(): String {
+private data class AttachmentWritePlan(
+    val displayName: String,
+    val targetFile: File,
+    val tempFile: File,
+    val bytes: ByteArray,
+)
+
+internal fun String.safeAgentInboxFileSegment(): String {
     return trim()
         .ifBlank { "document" }
         .replace(Regex("""[^A-Za-z0-9._-]+"""), "-")
@@ -182,7 +217,7 @@ private fun ContentFormat.agentInboxMimeType(): String {
 private fun ContentFormat.agentInboxFileExtension(contentFileName: String): String {
     val sourceExtension = contentFileName
         .substringAfterLast('.', missingDelimiterValue = "")
-        .safeFileSegment()
+        .safeAgentInboxFileSegment()
         .takeIf { it != "document" }
     return when (this) {
         ContentFormat.MARKDOWN -> when (sourceExtension) {

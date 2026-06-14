@@ -11,6 +11,8 @@ import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_REVIEW_CONTENT_
 import com.qualityalternative.app.domain.service.UserDocumentRepository
 import java.io.ByteArrayInputStream
 
+internal const val AGENT_INBOX_DOCUMENT_DISPLAY_NAME = "Agent Inbox document"
+
 enum class AgentInboxImportStatus {
     IMPORTED,
     DUPLICATE,
@@ -163,9 +165,5 @@ class AgentInboxPackageImporter(
                 )
             }
         }
-    }
-
-    private companion object {
-        const val AGENT_INBOX_DOCUMENT_DISPLAY_NAME = "Agent Inbox document"
     }
 }

@@ -22,6 +22,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -152,6 +153,37 @@ class AgentInboxPackageImporterTest {
         assertEquals(contentBytes.toList(), storedFile.readBytes().toList())
         assertTrue(storageRoot.listFiles().orEmpty().none { file -> file.name.endsWith(".tmp") })
         assertEquals(1, storageRoot.listFiles().orEmpty().count { file -> file.extension == "md" })
+    }
+
+    @Test
+    fun fileStoreRemovesPromotedSidecarsWhenLaterAttachmentWriteFails() = runBlocking {
+        val storageRoot = temporaryFolder.newFolder("failing-sidecar-agent-inbox")
+        val contentBytes = "# Verified\n\nComplete private note.".toByteArray()
+        val sha = AgentInboxManifestValidator.sha256(contentBytes)
+        val safeContentName = "package-folder-$sha.md"
+        val firstSidecar = File(storageRoot, "$safeContentName-img-first.png")
+        val blockingSecondTarget = File(storageRoot, "$safeContentName-img-second.png")
+        assertTrue(blockingSecondTarget.mkdir())
+        val store = FileAgentInboxDocumentStore(storageRoot)
+
+        val error = runCatching {
+            store.writeDocument(
+                packageFolderId = "package-folder",
+                contentFileName = "content.md",
+                verifiedContentSha256 = sha,
+                format = ContentFormat.MARKDOWN,
+                bytes = contentBytes,
+                imageAttachments = listOf(
+                    AgentInboxImageAttachmentWrite(fileName = "first.png", bytes = byteArrayOf(1)),
+                    AgentInboxImageAttachmentWrite(fileName = "second.png", bytes = byteArrayOf(2)),
+                ),
+            )
+        }.exceptionOrNull()
+
+        assertTrue(error is IllegalStateException)
+        assertFalse(File(storageRoot, safeContentName).exists())
+        assertFalse(firstSidecar.exists())
+        assertTrue(storageRoot.listFiles().orEmpty().none { file -> file.name.endsWith(".tmp") })
     }
 
     @Test

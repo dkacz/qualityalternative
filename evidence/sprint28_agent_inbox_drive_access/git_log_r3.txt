@@ -1,0 +1,12 @@
+fd3ab88 Fix Sprint 28 Markdown sidecar review blockers
+64c2327 Record Sprint 28 GPT Pro R2 review
+ee8365e Record Sprint 28 GPT Pro R2 lane
+4d153f6 Prepare Sprint 28 GPT Pro R2 review
+c98cd6a Add Sprint 28 Markdown image attachment flows
+224adc4 Fix Sprint 28 Picker grant persistence
+81ae703 Launch Sprint 28 GPT Pro review R1
+5fafa58 Stabilize Sprint 28 validation base note
+047ead9 Update Sprint 28 validation summary head
+1cf5ac1 Document Sprint 28 device validation gate
+b2f9818 Fix Agent Inbox Drive folder access flow
+0925266 Record Agent Inbox Drive access diagnosis

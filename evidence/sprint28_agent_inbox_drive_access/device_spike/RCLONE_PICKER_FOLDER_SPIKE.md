@@ -34,4 +34,4 @@ If the scan reports an access-lost state or does not see a valid package that is
 
 ## Result
 
-Pending. No device/emulator was attached in the current Codex environment on 2026-06-14.
+Pending. On 2026-06-14, Codex had a local `qaApi36` emulator for deterministic visual E2E, but not a signed-in production OAuth/rclone scenario that can prove whether a Picker-selected Drive folder under `drive.file` exposes child packages added later by rclone.

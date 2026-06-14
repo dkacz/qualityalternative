@@ -114,17 +114,16 @@ Acceptance:
 Current evidence:
 
 - Checklist is documented in `evidence/sprint28_agent_inbox_drive_access/device_spike/RCLONE_PICKER_FOLDER_SPIKE.md`.
-- Result is pending because no device/emulator is attached in the current environment.
+- Result is pending because the deterministic emulator run does not include a signed-in production OAuth/rclone scenario.
 
 ### Slice 28.4 - Visual E2E
 
 - Add deterministic screenshots for:
   - disconnected Agent Inbox with `Select folder`,
   - Picker-granted folder connected,
-  - scan blocked before folder selection,
   - inaccessible/revoked folder reconnect state,
-  - selected-folder scan showing package review,
-  - imported package still flowing through existing Markdown/EPUB reader evidence.
+  - imported Agent Inbox Markdown sidecar image rendering in the reader,
+  - selected-folder state in dark mode.
 
 Acceptance:
 
@@ -134,9 +133,9 @@ Acceptance:
 Current coverage:
 
 - Added and passed: `VisualQaScreenshotTest#captureSprint28AgentInboxDriveAccessStates`, including disconnected select-folder, selected-folder, access-lost reconnect, Agent Inbox Markdown image reader, and dark selected-folder evidence.
-- Canonical screenshot run: `evidence/sprint28_agent_inbox_drive_access/visual_e2e/sprint28-agent-inbox-drive-access-1781433607325/`.
-- Contact sheet: `evidence/sprint28_agent_inbox_drive_access/visual_e2e/contact_sheet_r2.png`.
-- Connected result XML/logs: `evidence/sprint28_agent_inbox_drive_access/android-results-r2/` and `evidence/sprint28_agent_inbox_drive_access/logs/connected_sprint28_visual_r2_final.log`.
+- Current canonical screenshot run: `evidence/sprint28_agent_inbox_drive_access/visual_e2e_r3/sprint28-agent-inbox-drive-access-1781437194813/`.
+- Current contact sheet: `evidence/sprint28_agent_inbox_drive_access/visual_e2e_r3/contact_sheet_r3.png`.
+- Current connected result XML/logs: `evidence/sprint28_agent_inbox_drive_access/android-results-r3/` and `evidence/sprint28_agent_inbox_drive_access/logs/connected_sprint28_visual_r3_candidate.log`.
 
 ### Slice 28.6 - Markdown Image Attachment Parity
 
@@ -164,7 +163,7 @@ Current review state:
 - R1 blockers fixed locally before R2: durable Picker grant marker, legacy state normalization, and missing-folder connected-state normalization.
 - R2 output: `evidence/sprint28_agent_inbox_drive_access/GPT_PRO_REVIEW_R2.md`.
 - R2 result: `SCORE 7/10`, `VERDICT REVISE`, `VISUAL REVIEW PASS`.
-- R2 blockers to fix before R3: duplicate/colliding Markdown sidecar names, Agent Inbox reader fallback to unreviewed local image paths, and mid-write sidecar cleanup.
+- R2 blockers fixed locally before R3: duplicate/colliding Markdown sidecar names are invalid, Agent Inbox Markdown reader image resolution is restricted to reviewed sidecars plus data URIs, and sidecar writes now clean up promoted files on mid-write failure.
 
 Acceptance:
 
