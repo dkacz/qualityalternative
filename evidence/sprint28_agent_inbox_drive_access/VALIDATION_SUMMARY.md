@@ -22,6 +22,10 @@ Review base commits include the first Drive access slice, device validation gate
 - R2 finding 2: Agent Inbox Markdown reader rendering can fall back to local file paths that were not reviewed sidecars.
 - R2 finding 3: sidecar rollback can leave files behind if local attachment writing fails mid-loop.
 - R2 fixes implemented locally before R3: duplicate/colliding sidecar names are invalid during review; Agent Inbox Markdown image resolution allows only reviewed attachments and `data:image` sources; sidecar writes use temp/backup cleanup and remove promoted files on failure.
+- R3 lane: `https://chatgpt.com/c/6a2e94c5-d82c-83eb-88f9-3a0304226708`
+- R3 prompt: `evidence/sprint28_agent_inbox_drive_access/GPT_PRO_REVIEW_PROMPT_R3.md`
+- R3 bundle manifest: `evidence/sprint28_agent_inbox_drive_access/REVIEW_BUNDLE_MANIFEST_R3.md`
+- R3 output: pending harvest.
 
 R2 candidate scope adds the user-requested Markdown image fix:
 
@@ -83,6 +87,7 @@ R2 candidate scope adds the user-requested Markdown image fix:
 - Android connected results: `evidence/sprint28_agent_inbox_drive_access/android-results-r3/`
 - Canonical R3 screenshot run: `evidence/sprint28_agent_inbox_drive_access/visual_e2e_r3/sprint28-agent-inbox-drive-access-1781437194813/`
 - R3 contact sheet: `evidence/sprint28_agent_inbox_drive_access/visual_e2e_r3/contact_sheet_r3.png`
+- R3 ChatGPT URL: `evidence/sprint28_agent_inbox_drive_access/chatgpt_r3_url.txt`
 
 The focused visual E2E passed on `qaApi36(AVD) - 16` with `tests=1`, `failures=0`, `errors=0`, `skipped=0`.
 

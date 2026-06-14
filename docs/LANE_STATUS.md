@@ -46,7 +46,7 @@ Status: `in_progress`
   - Passed: `lintDebug`, `processReleaseManifestForPackage`, and `assembleDebug`.
   - Passed: `git diff --check`.
 - Next gate:
-  - Prepare GPT Pro R3 from the fresh R2-fix bundle before any release gate.
+  - Harvest GPT Pro R3 from `https://chatgpt.com/c/6a2e94c5-d82c-83eb-88f9-3a0304226708`; continue fixes until `SCORE 10/10`, `VERDICT PASS`, and `VISUAL REVIEW PASS` before any release gate.
 
 ## Sprint 27 Agent Content Inbox
 
