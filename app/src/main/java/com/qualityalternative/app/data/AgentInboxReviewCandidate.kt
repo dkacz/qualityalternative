@@ -1,7 +1,12 @@
 package com.qualityalternative.app.data
 
+import com.qualityalternative.app.domain.model.ContentFormat
 import com.qualityalternative.app.domain.service.AGENT_INBOX_MANIFEST_FILE_NAME
+import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_IMAGE_ATTACHMENT_BYTES
+import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_IMAGE_ATTACHMENTS_PER_PACKAGE
+import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_TOTAL_IMAGE_ATTACHMENT_BYTES
 import com.qualityalternative.app.domain.service.AgentInboxDrivePackage
+import java.util.Locale
 
 enum class AgentInboxReviewStatus {
     READY,
@@ -18,10 +23,18 @@ enum class AgentInboxPackageValidationError {
     MULTIPLE_MANIFESTS,
     MULTIPLE_CONTENT_FILES,
     UNSUPPORTED_EXTRA_FILES,
+    TOO_MANY_IMAGE_ATTACHMENTS,
+    IMAGE_ATTACHMENT_TOO_LARGE,
     CONTENT_CHANGED_AFTER_REVIEW,
     DOWNLOAD_UNAVAILABLE,
     LOCAL_IMPORT_REJECTED,
 }
+
+data class AgentInboxImageAttachmentFile(
+    val fileId: String,
+    val fileName: String,
+    val sizeBytes: Long?,
+)
 
 data class AgentInboxReviewCandidate(
     val packageFolderId: String,
@@ -34,6 +47,7 @@ data class AgentInboxReviewCandidate(
     val duplicateContentId: String?,
     val reviewedContentSha256: String? = null,
     val reviewedContentSizeBytes: Long? = null,
+    val imageAttachmentFiles: List<AgentInboxImageAttachmentFile> = emptyList(),
     val manifestErrors: Set<AgentInboxManifestValidationError> = emptySet(),
     val packageErrors: Set<AgentInboxPackageValidationError> = emptySet(),
 ) {
@@ -72,12 +86,6 @@ object AgentInboxReviewCandidateFactory {
                 packageErrors = setOf(AgentInboxPackageValidationError.MULTIPLE_CONTENT_FILES),
             )
         }
-        if (drivePackage.unsupportedExtraFiles().isNotEmpty()) {
-            return drivePackage.invalidCandidate(
-                manifestFileId = manifestFile?.id,
-                packageErrors = setOf(AgentInboxPackageValidationError.UNSUPPORTED_EXTRA_FILES),
-            )
-        }
         if (manifestFile == null || manifestJson == null) {
             return drivePackage.invalidCandidate(
                 packageErrors = setOf(AgentInboxPackageValidationError.MISSING_MANIFEST),
@@ -104,6 +112,38 @@ object AgentInboxReviewCandidateFactory {
                 packageErrors = setOf(AgentInboxPackageValidationError.MISSING_CONTENT_FILE),
             )
         }
+        val imageAttachments = if (manifest.format == ContentFormat.MARKDOWN) {
+            drivePackage.markdownImageAttachmentFiles(contentFileId = contentFile.id)
+        } else {
+            emptyList()
+        }
+        when {
+            drivePackage.unsupportedExtraFiles(
+                contentFileId = contentFile.id,
+                imageAttachmentFileIds = imageAttachments.mapTo(mutableSetOf()) { file -> file.fileId },
+            ).isNotEmpty() -> {
+                return drivePackage.invalidCandidate(
+                    manifestFileId = manifestFile.id,
+                    manifest = manifest,
+                    packageErrors = setOf(AgentInboxPackageValidationError.UNSUPPORTED_EXTRA_FILES),
+                )
+            }
+            imageAttachments.size > AGENT_INBOX_MAX_IMAGE_ATTACHMENTS_PER_PACKAGE -> {
+                return drivePackage.invalidCandidate(
+                    manifestFileId = manifestFile.id,
+                    manifest = manifest,
+                    packageErrors = setOf(AgentInboxPackageValidationError.TOO_MANY_IMAGE_ATTACHMENTS),
+                )
+            }
+            imageAttachments.any { file -> (file.sizeBytes ?: 0L) > AGENT_INBOX_MAX_IMAGE_ATTACHMENT_BYTES } ||
+                imageAttachments.sumOf { file -> file.sizeBytes ?: 0L } > AGENT_INBOX_MAX_TOTAL_IMAGE_ATTACHMENT_BYTES -> {
+                return drivePackage.invalidCandidate(
+                    manifestFileId = manifestFile.id,
+                    manifest = manifest,
+                    packageErrors = setOf(AgentInboxPackageValidationError.IMAGE_ATTACHMENT_TOO_LARGE),
+                )
+            }
+        }
 
         val duplicateContentId = actualContentSha256?.let(existingDocumentIdsBySha256::get)
         return AgentInboxReviewCandidate(
@@ -121,6 +161,7 @@ object AgentInboxReviewCandidateFactory {
             duplicateContentId = duplicateContentId,
             reviewedContentSha256 = actualContentSha256,
             reviewedContentSizeBytes = actualContentSizeBytes,
+            imageAttachmentFiles = imageAttachments,
         )
     }
 
@@ -155,11 +196,41 @@ object AgentInboxReviewCandidateFactory {
     }
 }
 
-private fun AgentInboxDrivePackage.unsupportedExtraFiles(): List<com.qualityalternative.app.domain.service.AgentInboxDriveFile> {
+private fun AgentInboxDrivePackage.unsupportedExtraFiles(
+    contentFileId: String,
+    imageAttachmentFileIds: Set<String>,
+): List<com.qualityalternative.app.domain.service.AgentInboxDriveFile> {
     return allFiles.filterNot { file ->
         file.name == AGENT_INBOX_MANIFEST_FILE_NAME ||
-            contentFiles.any { contentFile -> contentFile.id == file.id }
+            file.id == contentFileId ||
+            file.id in imageAttachmentFileIds
     }
+}
+
+private fun AgentInboxDrivePackage.markdownImageAttachmentFiles(contentFileId: String): List<AgentInboxImageAttachmentFile> {
+    return allFiles
+        .filter { file -> file.id != contentFileId && file.name != AGENT_INBOX_MANIFEST_FILE_NAME }
+        .filter { file -> file.name.isSafeAgentInboxMarkdownImageAttachmentName() }
+        .map { file ->
+            AgentInboxImageAttachmentFile(
+                fileId = file.id,
+                fileName = file.name,
+                sizeBytes = file.sizeBytes,
+            )
+        }
+}
+
+private fun String.isSafeAgentInboxMarkdownImageAttachmentName(): Boolean {
+    val lower = lowercase(Locale.US)
+    if (isBlank() || contains('/') || contains('\\') || contains("..")) {
+        return false
+    }
+    return lower.endsWith(".png") ||
+        lower.endsWith(".jpg") ||
+        lower.endsWith(".jpeg") ||
+        lower.endsWith(".webp") ||
+        lower.endsWith(".gif") ||
+        lower.endsWith(".bmp")
 }
 
 fun AgentInboxReviewCandidate.displayTitle(): String {

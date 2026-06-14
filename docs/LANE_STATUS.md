@@ -16,7 +16,7 @@ This file is the repo-level index for active and recently completed execution la
 Status: `in_progress`
 
 - Branch: `codex/sprint28-agent-inbox-drive-access`
-- Scope: fix the post-release Agent Inbox Drive access gap for packages uploaded later by rclone/external agents under the current `drive.file` model.
+- Scope: fix the post-release Agent Inbox Drive access gap for packages uploaded later by rclone/external agents under the current `drive.file` model, and close the added Markdown image attachment gap for manual imports plus Agent Inbox Markdown packages.
 - Canonical sprint plan: `docs/SPRINT_28_AGENT_INBOX_DRIVE_ACCESS.md`
 - Current implementation state:
   - Sprint opened from Sprint 27 release branch after recording the `drive.file`/rclone diagnosis.
@@ -29,17 +29,21 @@ Status: `in_progress`
   - Selected-folder Drive 401/403/404 scan failures are treated as access-lost states that clear the local folder grant, show `Select folder`, and record privacy-safe failure analytics.
   - GPT Pro R1 returned `SCORE 7/10`, `VERDICT BLOCK`, `VISUAL REVIEW REVISE`; the blockers were legacy Sprint 27 app-created folder ids bypassing Picker and a connected-without-folder Settings state.
   - R1 fixes are implemented locally: Agent Inbox connection now requires durable `agent_inbox_drive_grant_mode=picker_folder`, legacy folder ids without that marker hydrate as disconnected, `saveAgentInboxDriveConnection(null)` clears connection state, and Settings copy/actions derive connected state from the Picker grant predicate.
-  - Visual E2E coverage for disconnected, missing-folder error, selected-folder, and access-lost states is added in `VisualQaScreenshotTest#captureSprint28AgentInboxDriveAccessStates`; physical PNG evidence is pending a connected emulator/device.
+  - Manual Markdown image attachment imports now allow image-only follow-up picker results to merge into the already selected Markdown file while preserving edited title, selected topics, and priority.
+  - Agent Inbox Markdown packages can carry bounded safe sidecar images through review, Drive download, local Agent Inbox document storage, `UserDocumentDraft.imageAttachmentUris`, and reader rendering; EPUB package sidecars remain invalid.
+  - Visual E2E coverage for disconnected select-folder, selected-folder, access-lost reconnect, Agent Inbox Markdown image reader, and dark selected-folder states passed in `VisualQaScreenshotTest#captureSprint28AgentInboxDriveAccessStates`.
+  - Canonical Sprint 28 visual evidence: `evidence/sprint28_agent_inbox_drive_access/visual_e2e/contact_sheet_r2.png` and `evidence/sprint28_agent_inbox_drive_access/visual_e2e/sprint28-agent-inbox-drive-access-1781433607325/`.
 - Validation:
   - Passed: full `testDebugUnitTest`.
+  - Passed: targeted Markdown image/Agent Inbox tests for `DocumentImportCandidateFactoryTest`, `MainViewModelTest`, `AgentInboxReviewCandidateFactoryTest`, and `AgentInboxPackageImporterTest`.
   - Passed: targeted `testDebugUnitTest` for `GoogleDriveAuthorizationTest`, `MainViewModelTest`, and `AndroidGoogleDriveAgentInboxClientTest`.
   - Passed after R1 fixes: targeted rerun for `PreferencesSettingsRepositoryTest` and `MainViewModelTest`.
   - Passed: `compileDebugAndroidTestKotlin`.
+  - Passed: focused connected visual E2E on `qaApi36(AVD) - 16` for `VisualQaScreenshotTest#captureSprint28AgentInboxDriveAccessStates`.
   - Passed: `lintDebug`, `processReleaseManifestForPackage`, and `assembleDebug`.
   - Passed: `git diff --check`.
-  - Blocked locally: connected screenshot run, because `adb devices` reported no attached devices.
 - Next gate:
-  - Run full local validation for the R1 fixes, build GPT Pro R2 review bundle, then continue to device spike/connected screenshots before release.
+  - Build GPT Pro R2 review bundle for the Drive access plus Markdown image slice, then continue to the live rclone/Picker device spike and release gate.
 
 ## Sprint 27 Agent Content Inbox
 

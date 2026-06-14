@@ -1,0 +1,1515 @@
+diff --git a/PRD.md b/PRD.md
+index 928cf54..172a0f8 100644
+--- a/PRD.md
++++ b/PRD.md
+@@ -245,7 +245,7 @@ The system must give the user enough replacement inventory to support useful rec
+
+ - User can choose one or more editorial starter packs during onboarding.
+ - User can add a web link manually.
+-- User can upload at least one PDF, Markdown, or EPUB document manually.
++- User can upload at least one PDF, Markdown, or EPUB document manually. When a Markdown document is already selected, the manual picker can add local image attachments to that Markdown document without forcing the user to choose the Markdown file again.
+ - User can connect a Google Drive Agent Inbox folder and review compatible agent-supplied Markdown or EPUB packages before importing them.
+ - User can save at least ten content items before any archival or overflow handling is needed.
+ - Newsletter forwarding, inbox sync, and RSS import are not required for MVP.
+@@ -260,11 +260,11 @@ The system may let the user import private replacement content prepared by Codex
+ - The Agent Inbox uses the narrowest practical Drive access model and must not scan the user's whole Drive.
+ - Under `drive.file`, Agent Inbox folder access must be granted by an explicit Google Picker folder selection or by files the app created itself. Packages uploaded later by a user-controlled external tool such as rclone must be supported only after the selected folder grant is proven to expose those package children to the app; otherwise the fallback scope decision must be documented before widening access.
+ - The app must not silently create a separate app-owned inbox folder when the user intends to scan an externally populated Agent Inbox folder.
+-- Each import candidate is represented by a package containing a manifest plus one Markdown or EPUB content file.
++- Each import candidate is represented by a package containing a manifest plus one Markdown or EPUB content file. Markdown packages may also include bounded sidecar image attachments referenced by that Markdown file; EPUB packages must keep their assets inside the EPUB and may not add package sidecars.
+ - The package manifest stores title, topic tags, source label, rights class, optional description, optional priority intent, and enough file identity data to detect duplicates.
+ - Agent-supplied content is treated as `user_private` by default and must not become shared editorial inventory.
+ - Agent-supplied priority is visible before import. The user can accept or remove the priority before saving.
+-- Invalid, unsupported, duplicated, unavailable, or partially missing packages are visible as finite review items and are not silently imported.
++- Invalid, unsupported, duplicated, unavailable, partially missing, or over-limit packages are visible as finite review items and are not silently imported.
+ - Importing an accepted package uses the same user-document model, reading-time estimation, progress tracking, and reader behavior as manually imported Markdown or EPUB documents.
+ - The Agent Inbox review surface is finite and must not become a discovery feed.
+ - Google Drive authorization failures distinguish user cancellation from technical/configuration failure where Android APIs allow it, present a retry path, and do not erase local library data.
+diff --git a/app/src/androidTest/java/com/qualityalternative/app/VisualQaScreenshotTest.kt b/app/src/androidTest/java/com/qualityalternative/app/VisualQaScreenshotTest.kt
+index b52266b..be422f3 100644
+--- a/app/src/androidTest/java/com/qualityalternative/app/VisualQaScreenshotTest.kt
++++ b/app/src/androidTest/java/com/qualityalternative/app/VisualQaScreenshotTest.kt
+@@ -854,26 +854,10 @@ class VisualQaScreenshotTest {
+         composeRule.onNodeWithTag("settings-list")
+             .performScrollToNode(hasTestTag("settings-agent-inbox-section"))
+         composeRule.onNodeWithText("Google Drive Agent Inbox not connected").assertIsDisplayed()
+-        composeRule.onNodeWithText("Select the Drive folder your agent or rclone writes packages into")
+-            .assertIsDisplayed()
+         composeRule.onNodeWithTag("settings-agent-inbox-scan").assertIsDisplayed().assertIsEnabled()
+         composeRule.onNodeWithText("Select folder").assertIsDisplayed()
+         captureSprint28("00_agent_inbox_select_folder_light")
+
+-        scenario?.onActivity { activity ->
+-            activity.mainViewModel.reportAgentInboxDriveAuthorizationFailure(
+-                "Select an Agent Inbox folder before scanning.",
+-            )
+-        }
+-        composeRule.waitUntil(timeoutMillis = 10_000) {
+-            hasNode("Select an Agent Inbox folder before scanning")
+-        }
+-        composeRule.onNodeWithTag("settings-list")
+-            .performScrollToNode(hasTestTag("settings-agent-inbox-section"))
+-        composeRule.onNodeWithText("Google Drive Agent Inbox not connected").assertIsDisplayed()
+-        composeRule.onNodeWithText("Select an Agent Inbox folder before scanning").assertIsDisplayed()
+-        captureSprint28("01_agent_inbox_missing_folder_error_light")
+-
+         scenario?.onActivity { activity ->
+             activity.mainViewModel.connectAgentInboxDriveFolder(
+                 folderId = "visual-picker-folder",
+@@ -886,41 +870,62 @@ class VisualQaScreenshotTest {
+         composeRule.onNodeWithTag("settings-list")
+             .performScrollToNode(hasTestTag("settings-agent-inbox-section"))
+         composeRule.onNodeWithText("Google Drive Agent Inbox folder selected").assertIsDisplayed()
+-        composeRule.onNodeWithText("Ready to scan the selected folder for private Markdown and EPUB packages")
+-            .assertIsDisplayed()
+         composeRule.onNodeWithText("Scan now").assertIsDisplayed()
+         composeRule.onNodeWithTag("settings-agent-inbox-disconnect").assertIsDisplayed().assertIsEnabled()
+-        captureSprint28("02_agent_inbox_picker_folder_selected_light")
++        waitForTransientMessageToClear("Agent Inbox folder selected.")
++        captureSprint28("01_agent_inbox_picker_folder_selected_light")
+
+         scenario?.onActivity { activity ->
+-            activity.mainViewModel.setAgentInboxDriveClientForTests(AccessLostAgentInboxDriveClient())
+-            activity.mainViewModel.scanAgentInboxDrive(
+-                accessToken = "visual-agent-token",
+-                nowMillis = 1_781_256_701_000L,
+-            )
++            activity.mainViewModel.seedAgentInboxDriveAccessLostForTests()
+         }
+         composeRule.waitUntil(timeoutMillis = 10_000) {
+-            hasNode("Agent Inbox folder access was lost. Select the folder again")
++            hasNode("Google Drive Agent Inbox not connected")
+         }
+         composeRule.onNodeWithTag("settings-list")
+             .performScrollToNode(hasTestTag("settings-agent-inbox-section"))
+         composeRule.onNodeWithText("Google Drive Agent Inbox not connected").assertIsDisplayed()
+-        composeRule.onNodeWithText("Agent Inbox folder access was lost. Select the folder again")
+-            .assertIsDisplayed()
+         composeRule.onNodeWithText("Select folder").assertIsDisplayed()
+-        captureSprint28("03_agent_inbox_access_lost_light")
++        waitForTransientMessageToClear("Agent Inbox folder access was lost.")
++        captureSprint28("02_agent_inbox_access_lost_light")
+
++        val imageDriveClient = VisualAgentInboxDriveClient()
++        val imageFixture = agentInboxMarkdownImageVisualFixture()
+         scenario?.onActivity { activity ->
++            activity.mainViewModel.setAgentInboxDriveClientForTests(imageDriveClient)
+             activity.mainViewModel.connectAgentInboxDriveFolder(
+                 folderId = "visual-picker-folder",
+                 nowMillis = 1_781_256_702_000L,
+             )
++        }
++        val importedImageMarkdown = importAgentInboxPackageThroughDriveForVisuals(
++            driveClient = imageDriveClient,
++            fixture = imageFixture,
++            acceptPriority = false,
++            nowMillis = 1_781_256_703_000L,
++        )
++        assertTrue(
++            "Expected Agent Inbox Markdown image attachment to import with the user document",
++            importedImageMarkdown.imageAttachmentUris.containsKey("inbox-blue.png"),
++        )
++        scenario?.onActivity { activity -> activity.mainViewModel.openLibraryItem(importedImageMarkdown) }
++        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
++        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-markdown-image") }
++        composeRule.onNodeWithText("Inbox blue square").assertIsDisplayed()
++        captureSprint28("03_agent_inbox_markdown_image_reader_light")
++
++        scenario?.onActivity { activity ->
++            activity.mainViewModel.openSettings()
++            activity.mainViewModel.connectAgentInboxDriveFolder(
++                folderId = "visual-picker-folder",
++                nowMillis = 1_781_256_704_000L,
++            )
+             activity.mainViewModel.selectThemeMode(AppThemeMode.DARK)
+         }
+         composeRule.waitForIdle()
+         composeRule.onNodeWithTag("settings-list")
+             .performScrollToNode(hasTestTag("settings-agent-inbox-section"))
+         composeRule.onNodeWithText("Google Drive Agent Inbox folder selected").assertIsDisplayed()
++        waitForTransientMessageToClear("Agent Inbox folder selected.")
+         captureSprint28("04_agent_inbox_picker_folder_selected_dark")
+     }
+
+@@ -2399,6 +2404,35 @@ class VisualQaScreenshotTest {
+         )
+     }
+
++    private fun agentInboxMarkdownImageVisualFixture(): VisualAgentInboxPackageFixture {
++        val contentBytes = """
++            # Inbox Markdown Image
++
++            ![Inbox blue square](inbox-blue.png "Inbox blue square")
++
++            This Markdown arrived through Agent Inbox with a sidecar image file.
++        """.trimIndent().toByteArray(Charsets.UTF_8)
++        return VisualAgentInboxPackageFixture(
++            packageFolderId = "visual-agent-markdown-image-package",
++            packageFolderName = "visual-agent-markdown-image-package",
++            title = "Agent Inbox Markdown Image Notes",
++            contentFileName = "raw-agent-markdown-image-notes.md",
++            format = ContentFormat.MARKDOWN,
++            topics = setOf(TopicTag.ESSAYS, TopicTag.PSYCHOLOGY),
++            description = "Private Markdown with an embedded image imported through Agent Inbox.",
++            priority = AgentInboxPriorityIntent.NORMAL,
++            contentBytes = contentBytes,
++            createdAt = "2026-06-14T10:00:00Z",
++            imageAttachments = listOf(
++                VisualAgentInboxImageAttachment(
++                    fileName = "inbox-blue.png",
++                    mimeType = "image/png",
++                    bytes = visualPngBytes(),
++                ),
++            ),
++        )
++    }
++
+     private fun agentInboxEpubVisualFixture(): VisualAgentInboxPackageFixture {
+         return VisualAgentInboxPackageFixture(
+             packageFolderId = "visual-agent-epub-package",
+@@ -2425,6 +2459,7 @@ class VisualQaScreenshotTest {
+         val priority: AgentInboxPriorityIntent,
+         val contentBytes: ByteArray,
+         val createdAt: String,
++        val imageAttachments: List<VisualAgentInboxImageAttachment> = emptyList(),
+     ) {
+         val manifestFileId: String = "$packageFolderId-manifest"
+         val contentFileId: String = "$packageFolderId-content"
+@@ -2469,14 +2504,42 @@ class VisualQaScreenshotTest {
+                 md5Checksum = null,
+                 modifiedTime = createdAt,
+             )
++            val imageFiles = imageAttachments.mapIndexed { index, attachment ->
++                AgentInboxDriveFile(
++                    id = imageFileId(index),
++                    name = attachment.fileName,
++                    mimeType = attachment.mimeType,
++                    sizeBytes = attachment.bytes.size.toLong(),
++                    md5Checksum = null,
++                    modifiedTime = createdAt,
++                )
++            }
+             return AgentInboxDrivePackage(
+                 folderId = packageFolderId,
+                 folderName = packageFolderName,
+                 manifestFile = manifestFile,
+                 contentFiles = listOf(contentFile),
+-                allFiles = listOf(manifestFile, contentFile),
++                allFiles = listOf(manifestFile, contentFile) + imageFiles,
+             )
+         }
++
++        fun imageFileId(index: Int): String = "$packageFolderId-image-$index"
++    }
++
++    private data class VisualAgentInboxImageAttachment(
++        val fileName: String,
++        val mimeType: String,
++        val bytes: ByteArray,
++    )
++
++    private fun visualPngBytes(): ByteArray {
++        val bitmap = Bitmap.createBitmap(96, 96, Bitmap.Config.ARGB_8888)
++        bitmap.eraseColor(Color.rgb(70, 126, 178))
++        return ByteArrayOutputStream().use { output ->
++            bitmap.compress(Bitmap.CompressFormat.PNG, 100, output)
++            bitmap.recycle()
++            output.toByteArray()
++        }
+     }
+
+     private class VisualAgentInboxDriveClient : AgentInboxDriveClient {
+@@ -2489,6 +2552,9 @@ class VisualQaScreenshotTest {
+                 val manifestBytes = fixture.manifestJson().toByteArray(Charsets.UTF_8)
+                 nextBytes[fixture.manifestFileId] = manifestBytes
+                 nextBytes[fixture.contentFileId] = fixture.contentBytes
++                fixture.imageAttachments.forEachIndexed { index, attachment ->
++                    nextBytes[fixture.imageFileId(index)] = attachment.bytes
++                }
+                 fixture.toDrivePackage(manifestBytes)
+             }
+             bytesByFileId = nextBytes
+diff --git a/app/src/main/java/com/qualityalternative/app/data/AgentInboxDocumentStore.kt b/app/src/main/java/com/qualityalternative/app/data/AgentInboxDocumentStore.kt
+index 32aaa55..c970ac3 100644
+--- a/app/src/main/java/com/qualityalternative/app/data/AgentInboxDocumentStore.kt
++++ b/app/src/main/java/com/qualityalternative/app/data/AgentInboxDocumentStore.kt
+@@ -13,6 +13,12 @@ data class StoredAgentInboxDocument(
+     val uri: String,
+     val displayName: String,
+     val mimeType: String,
++    val imageAttachmentUris: Map<String, String> = emptyMap(),
++)
++
++data class AgentInboxImageAttachmentWrite(
++    val fileName: String,
++    val bytes: ByteArray,
+ )
+
+ interface AgentInboxDocumentStore {
+@@ -22,6 +28,7 @@ interface AgentInboxDocumentStore {
+         verifiedContentSha256: String,
+         format: ContentFormat,
+         bytes: ByteArray,
++        imageAttachments: List<AgentInboxImageAttachmentWrite> = emptyList(),
+     ): StoredAgentInboxDocument
+
+     suspend fun deleteDocument(stored: StoredAgentInboxDocument)
+@@ -36,6 +43,7 @@ class FileAgentInboxDocumentStore(
+         verifiedContentSha256: String,
+         format: ContentFormat,
+         bytes: ByteArray,
++        imageAttachments: List<AgentInboxImageAttachmentWrite>,
+     ): StoredAgentInboxDocument = withContext(Dispatchers.IO) {
+         rootDirectory.mkdirs()
+         val safeName = buildString {
+@@ -49,11 +57,16 @@ class FileAgentInboxDocumentStore(
+         if (file.exists()) {
+             val existingSha256 = runCatching { AgentInboxManifestValidator.sha256(file.readBytes()) }.getOrNull()
+             if (existingSha256 == verifiedContentSha256) {
+-                return@withContext file.toStoredAgentInboxDocument(format)
++                val existingAttachments = imageAttachments.writeImageAttachments(
++                    contentSafeName = safeName,
++                    replaceExisting = true,
++                )
++                return@withContext file.toStoredAgentInboxDocument(format, existingAttachments)
+             }
+             check(file.delete()) { "Could not delete stale Agent Inbox document." }
+         }
+
++        var attachmentUris: Map<String, String> = emptyMap()
+         val tempFile = File.createTempFile("$safeName-", ".tmp", rootDirectory)
+         try {
+             tempFile.writeBytes(bytes)
+@@ -62,12 +75,43 @@ class FileAgentInboxDocumentStore(
+                 "Temporary Agent Inbox document bytes do not match verified SHA-256."
+             }
+             moveIntoPlace(tempFile = tempFile, targetFile = file)
++            attachmentUris = imageAttachments.writeImageAttachments(
++                contentSafeName = safeName,
++                replaceExisting = true,
++            )
++        } catch (error: Throwable) {
++            if (file.exists()) {
++                file.delete()
++            }
++            attachmentUris.values.forEach { uri ->
++                runCatching { File(URI(uri)).delete() }
++            }
++            throw error
+         } finally {
+             if (tempFile.exists()) {
+                 tempFile.delete()
+             }
+         }
+-        file.toStoredAgentInboxDocument(format)
++        file.toStoredAgentInboxDocument(format, attachmentUris)
++    }
++
++    private fun List<AgentInboxImageAttachmentWrite>.writeImageAttachments(
++        contentSafeName: String,
++        replaceExisting: Boolean,
++    ): Map<String, String> {
++        return flatMap { attachment ->
++            val safeAttachmentName = attachment.fileName.safeFileSegment()
++            val attachmentFile = File(rootDirectory, "$contentSafeName-img-$safeAttachmentName")
++            if (replaceExisting || !attachmentFile.exists()) {
++                attachmentFile.writeBytes(attachment.bytes)
++            }
++            val uri = attachmentFile.toURI().toString()
++            val displayName = attachment.fileName.trim()
++            listOfNotNull(
++                displayName.takeIf(String::isNotBlank)?.let { key -> key to uri },
++                displayName.lowercase().takeIf { it.isNotBlank() && it != displayName }?.let { key -> key to uri },
++            )
++        }.distinctBy { (key, _) -> key }.toMap()
+     }
+
+     private fun moveIntoPlace(tempFile: File, targetFile: File) {
+@@ -86,11 +130,15 @@ class FileAgentInboxDocumentStore(
+         }
+     }
+
+-    private fun File.toStoredAgentInboxDocument(format: ContentFormat): StoredAgentInboxDocument {
++    private fun File.toStoredAgentInboxDocument(
++        format: ContentFormat,
++        imageAttachmentUris: Map<String, String>,
++    ): StoredAgentInboxDocument {
+         return StoredAgentInboxDocument(
+             uri = toURI().toString(),
+             displayName = "Agent Inbox document",
+             mimeType = format.agentInboxMimeType(),
++            imageAttachmentUris = imageAttachmentUris,
+         )
+     }
+
+@@ -102,6 +150,14 @@ class FileAgentInboxDocumentStore(
+             if (file.exists()) {
+                 check(file.delete()) { "Could not delete uncommitted Agent Inbox document." }
+             }
++            stored.imageAttachmentUris.values.toSet().forEach { attachmentUri ->
++                val attachmentFile = runCatching { File(URI(attachmentUri)).canonicalFile }.getOrNull()
++                    ?: return@forEach
++                if (!attachmentFile.toPath().startsWith(rootPath)) return@forEach
++                if (attachmentFile.exists()) {
++                    check(attachmentFile.delete()) { "Could not delete uncommitted Agent Inbox image attachment." }
++                }
++            }
+         }
+     }
+ }
+diff --git a/app/src/main/java/com/qualityalternative/app/data/AgentInboxPackageImporter.kt b/app/src/main/java/com/qualityalternative/app/data/AgentInboxPackageImporter.kt
+index 12f8c11..6aae1eb 100644
+--- a/app/src/main/java/com/qualityalternative/app/data/AgentInboxPackageImporter.kt
++++ b/app/src/main/java/com/qualityalternative/app/data/AgentInboxPackageImporter.kt
+@@ -1,9 +1,12 @@
+ package com.qualityalternative.app.data
+
+ import com.qualityalternative.app.domain.model.ContentItem
++import com.qualityalternative.app.domain.model.ContentFormat
+ import com.qualityalternative.app.domain.model.UserDocumentDraft
+ import com.qualityalternative.app.domain.model.UserDocumentValidationError
+ import com.qualityalternative.app.domain.service.AddUserDocumentIfFingerprintAbsentResult
++import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_IMAGE_ATTACHMENT_BYTES
++import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_TOTAL_IMAGE_ATTACHMENT_BYTES
+ import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_REVIEW_CONTENT_BYTES
+ import com.qualityalternative.app.domain.service.UserDocumentRepository
+ import java.io.ByteArrayInputStream
+@@ -32,6 +35,7 @@ class AgentInboxPackageImporter(
+     suspend fun importCandidate(
+         candidate: AgentInboxReviewCandidate,
+         contentBytes: ByteArray,
++        imageAttachmentBytes: Map<String, ByteArray> = emptyMap(),
+         nowMillis: Long = System.currentTimeMillis(),
+     ): AgentInboxImportResult {
+         val manifest = candidate.manifest
+@@ -72,6 +76,21 @@ class AgentInboxPackageImporter(
+                 manifestErrors = setOf(AgentInboxManifestValidationError.DOCUMENT_SHA256_MISMATCH),
+             )
+         }
++        val safeImageAttachmentBytes = if (manifest.format == ContentFormat.MARKDOWN) {
++            imageAttachmentBytes
++        } else {
++            emptyMap()
++        }
++        if (
++            safeImageAttachmentBytes.values.any { bytes -> bytes.size.toLong() > AGENT_INBOX_MAX_IMAGE_ATTACHMENT_BYTES } ||
++            safeImageAttachmentBytes.values.sumOf { bytes -> bytes.size.toLong() } > AGENT_INBOX_MAX_TOTAL_IMAGE_ATTACHMENT_BYTES
++        ) {
++            return AgentInboxImportResult(
++                status = AgentInboxImportStatus.INVALID,
++                requestedHighPriority = manifest.requestsHighPriority,
++                packageErrors = setOf(AgentInboxPackageValidationError.IMAGE_ATTACHMENT_TOO_LARGE),
++            )
++        }
+
+         val duplicate = userDocumentRepository.findDocumentByFingerprintSha256(contentSha256)
+         if (duplicate != null) {
+@@ -88,6 +107,9 @@ class AgentInboxPackageImporter(
+             verifiedContentSha256 = contentSha256,
+             format = manifest.format,
+             bytes = contentBytes,
++            imageAttachments = safeImageAttachmentBytes.map { (fileName, bytes) ->
++                AgentInboxImageAttachmentWrite(fileName = fileName, bytes = bytes)
++            },
+         )
+         val estimate = DocumentReadingTimeEstimator.estimate(manifest.format) {
+             ByteArrayInputStream(contentBytes)
+@@ -100,6 +122,7 @@ class AgentInboxPackageImporter(
+             description = manifest.description.orEmpty(),
+             durationMinutes = estimate.minutes,
+             topicTags = manifest.topics,
++            imageAttachmentUris = stored.imageAttachmentUris,
+             documentFingerprintSha256 = contentSha256,
+             documentFingerprintSizeBytes = contentBytes.size.toLong(),
+         )
+diff --git a/app/src/main/java/com/qualityalternative/app/data/AgentInboxReviewCandidate.kt b/app/src/main/java/com/qualityalternative/app/data/AgentInboxReviewCandidate.kt
+index 19f7e9e..b8fd67a 100644
+--- a/app/src/main/java/com/qualityalternative/app/data/AgentInboxReviewCandidate.kt
++++ b/app/src/main/java/com/qualityalternative/app/data/AgentInboxReviewCandidate.kt
+@@ -1,7 +1,12 @@
+ package com.qualityalternative.app.data
+
++import com.qualityalternative.app.domain.model.ContentFormat
+ import com.qualityalternative.app.domain.service.AGENT_INBOX_MANIFEST_FILE_NAME
++import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_IMAGE_ATTACHMENT_BYTES
++import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_IMAGE_ATTACHMENTS_PER_PACKAGE
++import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_TOTAL_IMAGE_ATTACHMENT_BYTES
+ import com.qualityalternative.app.domain.service.AgentInboxDrivePackage
++import java.util.Locale
+
+ enum class AgentInboxReviewStatus {
+     READY,
+@@ -18,11 +23,19 @@ enum class AgentInboxPackageValidationError {
+     MULTIPLE_MANIFESTS,
+     MULTIPLE_CONTENT_FILES,
+     UNSUPPORTED_EXTRA_FILES,
++    TOO_MANY_IMAGE_ATTACHMENTS,
++    IMAGE_ATTACHMENT_TOO_LARGE,
+     CONTENT_CHANGED_AFTER_REVIEW,
+     DOWNLOAD_UNAVAILABLE,
+     LOCAL_IMPORT_REJECTED,
+ }
+
++data class AgentInboxImageAttachmentFile(
++    val fileId: String,
++    val fileName: String,
++    val sizeBytes: Long?,
++)
++
+ data class AgentInboxReviewCandidate(
+     val packageFolderId: String,
+     val packageFolderName: String,
+@@ -34,6 +47,7 @@ data class AgentInboxReviewCandidate(
+     val duplicateContentId: String?,
+     val reviewedContentSha256: String? = null,
+     val reviewedContentSizeBytes: Long? = null,
++    val imageAttachmentFiles: List<AgentInboxImageAttachmentFile> = emptyList(),
+     val manifestErrors: Set<AgentInboxManifestValidationError> = emptySet(),
+     val packageErrors: Set<AgentInboxPackageValidationError> = emptySet(),
+ ) {
+@@ -72,12 +86,6 @@ object AgentInboxReviewCandidateFactory {
+                 packageErrors = setOf(AgentInboxPackageValidationError.MULTIPLE_CONTENT_FILES),
+             )
+         }
+-        if (drivePackage.unsupportedExtraFiles().isNotEmpty()) {
+-            return drivePackage.invalidCandidate(
+-                manifestFileId = manifestFile?.id,
+-                packageErrors = setOf(AgentInboxPackageValidationError.UNSUPPORTED_EXTRA_FILES),
+-            )
+-        }
+         if (manifestFile == null || manifestJson == null) {
+             return drivePackage.invalidCandidate(
+                 packageErrors = setOf(AgentInboxPackageValidationError.MISSING_MANIFEST),
+@@ -104,6 +112,38 @@ object AgentInboxReviewCandidateFactory {
+                 packageErrors = setOf(AgentInboxPackageValidationError.MISSING_CONTENT_FILE),
+             )
+         }
++        val imageAttachments = if (manifest.format == ContentFormat.MARKDOWN) {
++            drivePackage.markdownImageAttachmentFiles(contentFileId = contentFile.id)
++        } else {
++            emptyList()
++        }
++        when {
++            drivePackage.unsupportedExtraFiles(
++                contentFileId = contentFile.id,
++                imageAttachmentFileIds = imageAttachments.mapTo(mutableSetOf()) { file -> file.fileId },
++            ).isNotEmpty() -> {
++                return drivePackage.invalidCandidate(
++                    manifestFileId = manifestFile.id,
++                    manifest = manifest,
++                    packageErrors = setOf(AgentInboxPackageValidationError.UNSUPPORTED_EXTRA_FILES),
++                )
++            }
++            imageAttachments.size > AGENT_INBOX_MAX_IMAGE_ATTACHMENTS_PER_PACKAGE -> {
++                return drivePackage.invalidCandidate(
++                    manifestFileId = manifestFile.id,
++                    manifest = manifest,
++                    packageErrors = setOf(AgentInboxPackageValidationError.TOO_MANY_IMAGE_ATTACHMENTS),
++                )
++            }
++            imageAttachments.any { file -> (file.sizeBytes ?: 0L) > AGENT_INBOX_MAX_IMAGE_ATTACHMENT_BYTES } ||
++                imageAttachments.sumOf { file -> file.sizeBytes ?: 0L } > AGENT_INBOX_MAX_TOTAL_IMAGE_ATTACHMENT_BYTES -> {
++                return drivePackage.invalidCandidate(
++                    manifestFileId = manifestFile.id,
++                    manifest = manifest,
++                    packageErrors = setOf(AgentInboxPackageValidationError.IMAGE_ATTACHMENT_TOO_LARGE),
++                )
++            }
++        }
+
+         val duplicateContentId = actualContentSha256?.let(existingDocumentIdsBySha256::get)
+         return AgentInboxReviewCandidate(
+@@ -121,6 +161,7 @@ object AgentInboxReviewCandidateFactory {
+             duplicateContentId = duplicateContentId,
+             reviewedContentSha256 = actualContentSha256,
+             reviewedContentSizeBytes = actualContentSizeBytes,
++            imageAttachmentFiles = imageAttachments,
+         )
+     }
+
+@@ -155,11 +196,41 @@ object AgentInboxReviewCandidateFactory {
+     }
+ }
+
+-private fun AgentInboxDrivePackage.unsupportedExtraFiles(): List<com.qualityalternative.app.domain.service.AgentInboxDriveFile> {
++private fun AgentInboxDrivePackage.unsupportedExtraFiles(
++    contentFileId: String,
++    imageAttachmentFileIds: Set<String>,
++): List<com.qualityalternative.app.domain.service.AgentInboxDriveFile> {
+     return allFiles.filterNot { file ->
+         file.name == AGENT_INBOX_MANIFEST_FILE_NAME ||
+-            contentFiles.any { contentFile -> contentFile.id == file.id }
++            file.id == contentFileId ||
++            file.id in imageAttachmentFileIds
++    }
++}
++
++private fun AgentInboxDrivePackage.markdownImageAttachmentFiles(contentFileId: String): List<AgentInboxImageAttachmentFile> {
++    return allFiles
++        .filter { file -> file.id != contentFileId && file.name != AGENT_INBOX_MANIFEST_FILE_NAME }
++        .filter { file -> file.name.isSafeAgentInboxMarkdownImageAttachmentName() }
++        .map { file ->
++            AgentInboxImageAttachmentFile(
++                fileId = file.id,
++                fileName = file.name,
++                sizeBytes = file.sizeBytes,
++            )
++        }
++}
++
++private fun String.isSafeAgentInboxMarkdownImageAttachmentName(): Boolean {
++    val lower = lowercase(Locale.US)
++    if (isBlank() || contains('/') || contains('\\') || contains("..")) {
++        return false
+     }
++    return lower.endsWith(".png") ||
++        lower.endsWith(".jpg") ||
++        lower.endsWith(".jpeg") ||
++        lower.endsWith(".webp") ||
++        lower.endsWith(".gif") ||
++        lower.endsWith(".bmp")
+ }
+
+ fun AgentInboxReviewCandidate.displayTitle(): String {
+diff --git a/app/src/main/java/com/qualityalternative/app/domain/service/AgentInboxDrive.kt b/app/src/main/java/com/qualityalternative/app/domain/service/AgentInboxDrive.kt
+index 8a4d169..6acebd9 100644
+--- a/app/src/main/java/com/qualityalternative/app/domain/service/AgentInboxDrive.kt
++++ b/app/src/main/java/com/qualityalternative/app/domain/service/AgentInboxDrive.kt
+@@ -5,6 +5,9 @@ const val AGENT_INBOX_MAX_PACKAGES_PER_SCAN = 10
+ const val AGENT_INBOX_MAX_FILES_PER_PACKAGE = 8
+ const val AGENT_INBOX_MAX_MANIFEST_BYTES = 64L * 1024L
+ const val AGENT_INBOX_MAX_REVIEW_CONTENT_BYTES = 10L * 1024L * 1024L
++const val AGENT_INBOX_MAX_IMAGE_ATTACHMENTS_PER_PACKAGE = 6
++const val AGENT_INBOX_MAX_IMAGE_ATTACHMENT_BYTES = 5L * 1024L * 1024L
++const val AGENT_INBOX_MAX_TOTAL_IMAGE_ATTACHMENT_BYTES = 15L * 1024L * 1024L
+ const val AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER = "picker_folder"
+
+ data class AgentInboxDriveScanRequest(
+diff --git a/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt b/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
+index 818647c..c790e53 100644
+--- a/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
++++ b/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
+@@ -102,6 +102,8 @@ import com.qualityalternative.app.domain.service.AgentInboxDriveClient
+ import com.qualityalternative.app.domain.service.AgentInboxDriveDownloadTooLargeException
+ import com.qualityalternative.app.domain.service.AgentInboxDriveHttpException
+ import com.qualityalternative.app.domain.service.AgentInboxDriveScanRequest
++import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_IMAGE_ATTACHMENT_BYTES
++import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_TOTAL_IMAGE_ATTACHMENT_BYTES
+ import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_MANIFEST_BYTES
+ import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_REVIEW_CONTENT_BYTES
+ import com.qualityalternative.app.domain.service.AnalyticsTracker
+@@ -395,6 +397,7 @@ class MainViewModel(
+     private var pendingAccountLightImportPlan: AccountLightImportPlan? = null
+     private var annotationDriveAccessToken: String? = null
+     private var documentImportPreparationRequestId = 0
++    private var pendingDocumentImportBase: PendingDocumentImportBase? = null
+     private var readerOpenRequestId = 0
+     // Single-flight for interventions: a newer trigger supersedes an older in-flight one so two rapid
+     // triggers cannot interleave their writes to the shared intervention state (latest wins).
+@@ -1620,9 +1623,70 @@ class MainViewModel(
+                     )
+                     return@launch
+                 }
++                val imageAttachmentBytes = mutableMapOf<String, ByteArray>()
++                var totalImageAttachmentBytes = 0L
++                candidate.imageAttachmentFiles.forEach { attachment ->
++                    if ((attachment.sizeBytes ?: 0L) > AGENT_INBOX_MAX_IMAGE_ATTACHMENT_BYTES) {
++                        applyAgentInboxImportResult(
++                            packageFolderId = packageFolderId,
++                            result = AgentInboxImportResult(
++                                status = AgentInboxImportStatus.INVALID,
++                                requestedHighPriority = candidate.requestsHighPriority,
++                                packageErrors = setOf(AgentInboxPackageValidationError.IMAGE_ATTACHMENT_TOO_LARGE),
++                            ),
++                            nowMillis = nowMillis,
++                        )
++                        return@launch
++                    }
++                    val attachmentBytes = try {
++                        agentInboxDriveClient.downloadFile(
++                            accessToken = normalizedToken,
++                            fileId = attachment.fileId,
++                            maxBytes = AGENT_INBOX_MAX_IMAGE_ATTACHMENT_BYTES,
++                        )
++                    } catch (tooLarge: AgentInboxDriveDownloadTooLargeException) {
++                        applyAgentInboxImportResult(
++                            packageFolderId = packageFolderId,
++                            result = AgentInboxImportResult(
++                                status = AgentInboxImportStatus.INVALID,
++                                requestedHighPriority = candidate.requestsHighPriority,
++                                packageErrors = setOf(AgentInboxPackageValidationError.IMAGE_ATTACHMENT_TOO_LARGE),
++                            ),
++                            nowMillis = nowMillis,
++                        )
++                        return@launch
++                    } catch (error: Throwable) {
++                        if (error is CancellationException) throw error
++                        applyAgentInboxImportResult(
++                            packageFolderId = packageFolderId,
++                            result = AgentInboxImportResult(
++                                status = AgentInboxImportStatus.INVALID,
++                                requestedHighPriority = candidate.requestsHighPriority,
++                                packageErrors = setOf(AgentInboxPackageValidationError.DOWNLOAD_UNAVAILABLE),
++                            ),
++                            nowMillis = nowMillis,
++                        )
++                        return@launch
++                    }
++                    totalImageAttachmentBytes += attachmentBytes.size.toLong()
++                    if (totalImageAttachmentBytes > AGENT_INBOX_MAX_TOTAL_IMAGE_ATTACHMENT_BYTES) {
++                        applyAgentInboxImportResult(
++                            packageFolderId = packageFolderId,
++                            result = AgentInboxImportResult(
++                                status = AgentInboxImportStatus.INVALID,
++                                requestedHighPriority = candidate.requestsHighPriority,
++                                packageErrors = setOf(AgentInboxPackageValidationError.IMAGE_ATTACHMENT_TOO_LARGE),
++                            ),
++                            nowMillis = nowMillis,
++                        )
++                        return@launch
++                    }
++                    imageAttachmentBytes[attachment.fileName] = attachmentBytes
++                }
+                 val result = agentInboxPackageImporter.importCandidate(
+                     candidate = candidate,
+                     contentBytes = contentBytes,
++                    imageAttachmentBytes = imageAttachmentBytes,
+                     nowMillis = nowMillis,
+                 )
+                 applyAgentInboxImportResult(
+@@ -1912,6 +1976,11 @@ class MainViewModel(
+
+     fun beginUserDocumentImportPreparation(): Int {
+         documentImportPreparationRequestId += 1
++        pendingDocumentImportBase = if (uiState.screen == MainScreen.AddDocument) {
++            uiState.addDocumentForm.pendingMarkdownAttachmentBase()
++        } else {
++            null
++        }
+         uiState = uiState.copy(
+             screen = MainScreen.AddDocument,
+             addDocumentForm = AddDocumentFormState(isPreparing = true),
+@@ -1926,6 +1995,7 @@ class MainViewModel(
+             return
+         }
+         documentImportPreparationRequestId += 1
++        pendingDocumentImportBase = null
+         uiState = uiState.copy(
+             screen = MainScreen.AddDocument,
+             addDocumentForm = AddDocumentFormState(),
+@@ -1940,6 +2010,7 @@ class MainViewModel(
+         openInputStream: () -> InputStream? = { null },
+     ) {
+         val requestId = ++documentImportPreparationRequestId
++        pendingDocumentImportBase = null
+         uiState = uiState.copy(
+             screen = MainScreen.AddDocument,
+             addDocumentForm = AddDocumentFormState(isPreparing = true),
+@@ -1987,9 +2058,23 @@ class MainViewModel(
+         if (requestId != documentImportPreparationRequestId) {
+             return
+         }
+-        val cleanedCandidates = candidates
++        val pickedCandidates = candidates
+             .map(DocumentImportCandidate::cleaned)
+             .distinctBy(DocumentImportCandidate::uri)
++        val pendingBase = pendingDocumentImportBase
++        val attachmentOnlySelection = pickedCandidates.isNotEmpty() &&
++            pickedCandidates.all(DocumentImportCandidate::isMarkdownImageAttachmentCandidate)
++        val cleanedCandidates = pickedCandidates
++            .withMarkdownImageAttachments(
++                baseCandidates = if (attachmentOnlySelection) {
++                    pendingBase?.candidates.orEmpty()
++                } else {
++                    emptyList()
++                },
++            )
++            .map(DocumentImportCandidate::cleaned)
++            .distinctBy(DocumentImportCandidate::uri)
++        pendingDocumentImportBase = null
+         documentImportPreparationRequestId += 1
+         if (cleanedCandidates.isEmpty()) {
+             uiState = uiState.copy(latestMessage = "Choose local PDF, Markdown, or EPUB files first.")
+@@ -2005,6 +2090,8 @@ class MainViewModel(
+                 title = primary.title,
+                 durationMinutes = primary.durationMinutes,
+                 candidates = cleanedCandidates,
++                selectedTopics = if (attachmentOnlySelection) pendingBase?.selectedTopics.orEmpty() else emptySet(),
++                markPriority = attachmentOnlySelection && pendingBase?.markPriority == true,
+             ),
+             screen = MainScreen.AddDocument,
+         )
+@@ -5108,6 +5195,26 @@ class MainViewModel(
+         )
+     }
+
++    internal fun seedAgentInboxDriveAccessLostForTests(
++        message: String = "Agent Inbox folder access was lost. Select the folder again.",
++    ) {
++        check(BuildConfig.DEBUG) { "Agent Inbox access-lost visual fixture state is only available in debug builds." }
++        uiState = uiState.copy(
++            screen = MainScreen.Settings,
++            agentInboxDriveEnabled = false,
++            agentInboxDriveFolderId = null,
++            agentInboxDriveGrantMode = null,
++            agentInboxDriveLastSuccessfulAtMillis = null,
++            agentInboxDriveLastError = message,
++            isAgentInboxScanning = false,
++            isAgentInboxImporting = false,
++            agentInboxCandidates = emptyList(),
++            agentInboxPriorityAcceptedPackageIds = emptySet(),
++            agentInboxScanTruncated = false,
++            latestMessage = "Agent Inbox folder access was lost.",
++        )
++    }
++
+     internal fun setAgentInboxDriveClientForTests(client: AgentInboxDriveClient) {
+         check(BuildConfig.DEBUG) { "Agent Inbox Drive client override is only available in debug builds." }
+         agentInboxDriveClient = client
+@@ -5152,9 +5259,16 @@ class MainViewModel(
+
+     private fun invalidatePendingDocumentImportPreparation() {
+         documentImportPreparationRequestId += 1
++        pendingDocumentImportBase = null
+     }
+ }
+
++private data class PendingDocumentImportBase(
++    val candidates: List<DocumentImportCandidate>,
++    val selectedTopics: Set<TopicTag>,
++    val markPriority: Boolean,
++)
++
+ class MainViewModelFactory(
+     private val appContainer: AppContainer,
+ ) : ViewModelProvider.Factory {
+@@ -5629,6 +5743,18 @@ private fun AddDocumentFormState.documentCandidates(): List<DocumentImportCandid
+     )
+ }
+
++private fun AddDocumentFormState.pendingMarkdownAttachmentBase(): PendingDocumentImportBase? {
++    val currentCandidates = documentCandidates()
++    if (currentCandidates.none { candidate -> candidate.format == ContentFormat.MARKDOWN }) {
++        return null
++    }
++    return PendingDocumentImportBase(
++        candidates = currentCandidates,
++        selectedTopics = selectedTopics,
++        markPriority = markPriority,
++    )
++}
++
+ private fun DocumentImportCandidate.cleaned(): DocumentImportCandidate {
+     val cleanedName = displayName.trim().ifBlank { "Untitled document" }
+     val cleanedTitle = title.trim().ifBlank {
+@@ -5868,6 +5994,7 @@ private object NoOpAgentInboxDocumentStore : AgentInboxDocumentStore {
+         verifiedContentSha256: String,
+         format: ContentFormat,
+         bytes: ByteArray,
++        imageAttachments: List<com.qualityalternative.app.data.AgentInboxImageAttachmentWrite>,
+     ) = error("Agent Inbox document store is not available in this build.")
+
+     override suspend fun deleteDocument(stored: StoredAgentInboxDocument) = Unit
+diff --git a/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt b/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
+index 9b241c8..632cf1b 100644
+--- a/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
++++ b/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
+@@ -516,7 +516,7 @@ private fun MainRoute(
+                 }
+             }.onSuccess { candidates ->
+                 viewModel.prepareUserDocumentBatchImport(
+-                    candidates = candidates.withMarkdownImageAttachments(),
++                    candidates = candidates,
+                     requestId = requestId,
+                 )
+             }.onFailure {
+@@ -9643,7 +9643,15 @@ private fun agentInboxCandidateDetailText(candidate: AgentInboxReviewCandidate):
+                 }
+
+                 AgentInboxPackageValidationError.UNSUPPORTED_EXTRA_FILES in candidate.packageErrors -> {
+-                    "Package has extra files. Keep one manifest and one Markdown or EPUB file."
++                    "Package has unsupported extra files. Markdown packages may include only bounded image attachments."
++                }
++
++                AgentInboxPackageValidationError.TOO_MANY_IMAGE_ATTACHMENTS in candidate.packageErrors -> {
++                    "Markdown package has too many image attachments. Keep six or fewer."
++                }
++
++                AgentInboxPackageValidationError.IMAGE_ATTACHMENT_TOO_LARGE in candidate.packageErrors -> {
++                    "Markdown image attachment is too large. Use smaller images and scan again."
+                 }
+
+                 AgentInboxPackageValidationError.CONTENT_FILE_TOO_LARGE in candidate.packageErrors -> {
+@@ -9932,24 +9940,32 @@ private fun Context.documentImportCandidate(uri: Uri): DocumentImportCandidate {
+     ) { contentResolver.openInputStream(uri) }
+ }
+
+-internal fun List<DocumentImportCandidate>.withMarkdownImageAttachments(): List<DocumentImportCandidate> {
++internal fun List<DocumentImportCandidate>.withMarkdownImageAttachments(
++    baseCandidates: List<DocumentImportCandidate> = emptyList(),
++): List<DocumentImportCandidate> {
+     val imageAttachmentUris = filter(DocumentImportCandidate::isMarkdownImageAttachmentCandidate)
+         .flatMap { candidate ->
+             candidate.markdownImageAttachmentKeys().map { key -> key to candidate.uri }
+         }
+         .distinctBy { (key, _) -> key }
+         .toMap()
+-    return filterNot(DocumentImportCandidate::isMarkdownImageAttachmentCandidate)
++    val documentCandidates = filterNot(DocumentImportCandidate::isMarkdownImageAttachmentCandidate)
++    val targetCandidates = if (documentCandidates.isEmpty() && imageAttachmentUris.isNotEmpty()) {
++        baseCandidates.filterNot(DocumentImportCandidate::isMarkdownImageAttachmentCandidate)
++    } else {
++        documentCandidates
++    }
++    return targetCandidates
+         .map { candidate ->
+             if (candidate.format == ContentFormat.MARKDOWN && imageAttachmentUris.isNotEmpty()) {
+-                candidate.copy(imageAttachmentUris = imageAttachmentUris)
++                candidate.copy(imageAttachmentUris = candidate.imageAttachmentUris + imageAttachmentUris)
+             } else {
+                 candidate
+             }
+         }
+ }
+
+-private fun DocumentImportCandidate.isMarkdownImageAttachmentCandidate(): Boolean {
++internal fun DocumentImportCandidate.isMarkdownImageAttachmentCandidate(): Boolean {
+     val lowerName = displayName.lowercase(Locale.US)
+     return mimeType?.lowercase(Locale.US)?.startsWith("image/") == true ||
+         MarkdownImageAttachmentExtensions.any { extension -> lowerName.endsWith(extension) }
+diff --git a/app/src/test/java/com/qualityalternative/app/data/AgentInboxPackageImporterTest.kt b/app/src/test/java/com/qualityalternative/app/data/AgentInboxPackageImporterTest.kt
+index e01df16..c378849 100644
+--- a/app/src/test/java/com/qualityalternative/app/data/AgentInboxPackageImporterTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/data/AgentInboxPackageImporterTest.kt
+@@ -63,6 +63,32 @@ class AgentInboxPackageImporterTest {
+         assertEquals(contentBytes.size.toLong(), repository.addedDrafts.single().documentFingerprintSizeBytes)
+     }
+
++    @Test
++    fun importCandidateStoresMarkdownImageAttachmentsInDraft() = runBlocking {
++        val contentBytes = "# Attention\n\n![Cover](cover.png)".toByteArray()
++        val imageBytes = byteArrayOf(1, 2, 3, 4)
++        val sha = AgentInboxManifestValidator.sha256(contentBytes)
++        val repository = FakeAgentInboxUserDocumentRepository()
++        val storageRoot = temporaryFolder.newFolder("agent-inbox-images")
++        val store = FileAgentInboxDocumentStore(storageRoot)
++        val importer = AgentInboxPackageImporter(userDocumentRepository = repository, documentStore = store)
++        val candidate = readyCandidate(documentSha256 = sha)
++
++        val result = importer.importCandidate(
++            candidate = candidate,
++            contentBytes = contentBytes,
++            imageAttachmentBytes = mapOf("cover.png" to imageBytes),
++            nowMillis = 2_000L,
++        )
++
++        assertEquals(AgentInboxImportStatus.IMPORTED, result.status)
++        val attachmentUris = repository.addedDrafts.single().imageAttachmentUris
++        assertEquals(setOf("cover.png"), attachmentUris.keys)
++        val storedImage = File(URI.create(requireNotNull(attachmentUris["cover.png"])))
++        assertEquals(imageBytes.toList(), storedImage.readBytes().toList())
++        assertTrue(storedImage.canonicalFile.toPath().startsWith(storageRoot.canonicalFile.toPath()))
++    }
++
+     @Test
+     fun importCandidateWithSamePackageAndNameButDifferentBytesDoesNotOverwritePriorDocument() = runBlocking {
+         val firstBytes = "# First\n\nOriginal private note.".toByteArray()
+@@ -118,6 +144,7 @@ class AgentInboxPackageImporterTest {
+             verifiedContentSha256 = sha,
+             format = ContentFormat.MARKDOWN,
+             bytes = contentBytes,
++            imageAttachments = emptyList(),
+         )
+
+         val storedFile = File(URI.create(stored.uri))
+@@ -409,8 +436,9 @@ class AgentInboxPackageImporterTest {
+             verifiedContentSha256: String,
+             format: ContentFormat,
+             bytes: ByteArray,
++            imageAttachments: List<AgentInboxImageAttachmentWrite>,
+         ): StoredAgentInboxDocument {
+-            writes += Write(packageFolderId, contentFileName, verifiedContentSha256, format, bytes)
++            writes += Write(packageFolderId, contentFileName, verifiedContentSha256, format, bytes, imageAttachments)
+             return StoredAgentInboxDocument(
+                 uri = "file:/agent-inbox/$packageFolderId/$verifiedContentSha256.md",
+                 displayName = "Agent Inbox document",
+@@ -420,6 +448,9 @@ class AgentInboxPackageImporterTest {
+                     ContentFormat.PDF -> "application/pdf"
+                     ContentFormat.HTML -> "text/html"
+                 },
++                imageAttachmentUris = imageAttachments.associate { attachment ->
++                    attachment.fileName to "file:/agent-inbox/$packageFolderId/${attachment.fileName}"
++                },
+             )
+         }
+
+@@ -434,6 +465,7 @@ class AgentInboxPackageImporterTest {
+         val verifiedContentSha256: String,
+         val format: ContentFormat,
+         val bytes: ByteArray,
++        val imageAttachments: List<AgentInboxImageAttachmentWrite>,
+     )
+
+     private class UriUpsertingFingerprintRepository : UserDocumentRepository {
+diff --git a/app/src/test/java/com/qualityalternative/app/data/AgentInboxReviewCandidateFactoryTest.kt b/app/src/test/java/com/qualityalternative/app/data/AgentInboxReviewCandidateFactoryTest.kt
+index 925bfb1..2695b23 100644
+--- a/app/src/test/java/com/qualityalternative/app/data/AgentInboxReviewCandidateFactoryTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/data/AgentInboxReviewCandidateFactoryTest.kt
+@@ -1,6 +1,9 @@
+ package com.qualityalternative.app.data
+
+ import com.qualityalternative.app.domain.service.AGENT_INBOX_MANIFEST_FILE_NAME
++import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_IMAGE_ATTACHMENT_BYTES
++import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_IMAGE_ATTACHMENTS_PER_PACKAGE
++import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_TOTAL_IMAGE_ATTACHMENT_BYTES
+ import com.qualityalternative.app.domain.service.AgentInboxDriveFile
+ import com.qualityalternative.app.domain.service.AgentInboxDrivePackage
+ import org.junit.Assert.assertEquals
+@@ -189,7 +192,7 @@ class AgentInboxReviewCandidateFactoryTest {
+     }
+
+     @Test
+-    fun fromDrivePackage_marksUnsupportedExtraFilesInvalid() {
++    fun fromDrivePackage_allowsMarkdownImageAttachments() {
+         val candidate = AgentInboxReviewCandidateFactory.fromDrivePackage(
+             drivePackage = drivePackage(
+                 files = listOf(
+@@ -201,11 +204,107 @@ class AgentInboxReviewCandidateFactoryTest {
+             manifestJson = manifestJson(),
+         )
+
++        assertEquals(AgentInboxReviewStatus.READY, candidate.status)
++        assertTrue(candidate.canImport)
++        assertEquals(
++            listOf(AgentInboxImageAttachmentFile(fileId = "cover-id", fileName = "cover.png", sizeBytes = null)),
++            candidate.imageAttachmentFiles,
++        )
++    }
++
++    @Test
++    fun fromDrivePackage_marksUnsupportedExtraFilesInvalid() {
++        val candidate = AgentInboxReviewCandidateFactory.fromDrivePackage(
++            drivePackage = drivePackage(
++                files = listOf(
++                    driveFile("manifest-id", AGENT_INBOX_MANIFEST_FILE_NAME),
++                    driveFile("content-id", "content.md"),
++                    driveFile("archive-id", "archive.zip"),
++                ),
++            ),
++            manifestJson = manifestJson(),
++        )
++
+         assertEquals(AgentInboxReviewStatus.INVALID, candidate.status)
+         assertFalse(candidate.canImport)
+         assertEquals(setOf(AgentInboxPackageValidationError.UNSUPPORTED_EXTRA_FILES), candidate.packageErrors)
+     }
+
++    @Test
++    fun fromDrivePackage_marksEpubImageSidecarInvalid() {
++        val candidate = AgentInboxReviewCandidateFactory.fromDrivePackage(
++            drivePackage = drivePackage(
++                files = listOf(
++                    driveFile("manifest-id", AGENT_INBOX_MANIFEST_FILE_NAME),
++                    driveFile("content-id", "content.epub"),
++                    driveFile("cover-id", "cover.png"),
++                ),
++            ),
++            manifestJson = manifestJson(contentFile = "content.epub", format = "EPUB"),
++        )
++
++        assertEquals(AgentInboxReviewStatus.INVALID, candidate.status)
++        assertFalse(candidate.canImport)
++        assertEquals(setOf(AgentInboxPackageValidationError.UNSUPPORTED_EXTRA_FILES), candidate.packageErrors)
++    }
++
++    @Test
++    fun fromDrivePackage_marksOversizedMarkdownImageAttachmentInvalid() {
++        val candidate = AgentInboxReviewCandidateFactory.fromDrivePackage(
++            drivePackage = drivePackage(
++                files = listOf(
++                    driveFile("manifest-id", AGENT_INBOX_MANIFEST_FILE_NAME),
++                    driveFile("content-id", "content.md"),
++                    driveFile("cover-id", "cover.png", sizeBytes = AGENT_INBOX_MAX_IMAGE_ATTACHMENT_BYTES + 1),
++                ),
++            ),
++            manifestJson = manifestJson(),
++        )
++
++        assertEquals(AgentInboxReviewStatus.INVALID, candidate.status)
++        assertFalse(candidate.canImport)
++        assertEquals(setOf(AgentInboxPackageValidationError.IMAGE_ATTACHMENT_TOO_LARGE), candidate.packageErrors)
++    }
++
++    @Test
++    fun fromDrivePackage_marksTooManyMarkdownImageAttachmentsInvalid() {
++        val imageFiles = (0..AGENT_INBOX_MAX_IMAGE_ATTACHMENTS_PER_PACKAGE).map { index ->
++            driveFile("cover-id-$index", "cover-$index.png")
++        }
++        val candidate = AgentInboxReviewCandidateFactory.fromDrivePackage(
++            drivePackage = drivePackage(
++                files = listOf(
++                    driveFile("manifest-id", AGENT_INBOX_MANIFEST_FILE_NAME),
++                    driveFile("content-id", "content.md"),
++                ) + imageFiles,
++            ),
++            manifestJson = manifestJson(),
++        )
++
++        assertEquals(AgentInboxReviewStatus.INVALID, candidate.status)
++        assertFalse(candidate.canImport)
++        assertEquals(setOf(AgentInboxPackageValidationError.TOO_MANY_IMAGE_ATTACHMENTS), candidate.packageErrors)
++    }
++
++    @Test
++    fun fromDrivePackage_marksTotalMarkdownImageAttachmentBytesInvalid() {
++        val candidate = AgentInboxReviewCandidateFactory.fromDrivePackage(
++            drivePackage = drivePackage(
++                files = listOf(
++                    driveFile("manifest-id", AGENT_INBOX_MANIFEST_FILE_NAME),
++                    driveFile("content-id", "content.md"),
++                    driveFile("cover-id-1", "cover-1.png", sizeBytes = AGENT_INBOX_MAX_TOTAL_IMAGE_ATTACHMENT_BYTES),
++                    driveFile("cover-id-2", "cover-2.png", sizeBytes = 1),
++                ),
++            ),
++            manifestJson = manifestJson(),
++        )
++
++        assertEquals(AgentInboxReviewStatus.INVALID, candidate.status)
++        assertFalse(candidate.canImport)
++        assertEquals(setOf(AgentInboxPackageValidationError.IMAGE_ATTACHMENT_TOO_LARGE), candidate.packageErrors)
++    }
++
+     private fun drivePackage(
+         files: List<AgentInboxDriveFile>,
+         hasMoreFiles: Boolean = false,
+@@ -220,12 +319,16 @@ class AgentInboxReviewCandidateFactoryTest {
+         )
+     }
+
+-    private fun driveFile(id: String, name: String): AgentInboxDriveFile {
++    private fun driveFile(
++        id: String,
++        name: String,
++        sizeBytes: Long? = null,
++    ): AgentInboxDriveFile {
+         return AgentInboxDriveFile(
+             id = id,
+             name = name,
+             mimeType = null,
+-            sizeBytes = null,
++            sizeBytes = sizeBytes,
+             md5Checksum = null,
+             modifiedTime = null,
+         )
+@@ -233,6 +336,7 @@ class AgentInboxReviewCandidateFactoryTest {
+
+     private fun manifestJson(
+         contentFile: String = "content.md",
++        format: String = "MARKDOWN",
+         rightsClass: String = "USER_PRIVATE",
+         priority: String = "normal",
+         documentSha256: String? = null,
+@@ -244,7 +348,7 @@ class AgentInboxReviewCandidateFactoryTest {
+               "title": "Agent Note",
+               "topics": ["ATTENTION"],
+               "contentFile": "$contentFile",
+-              "format": "MARKDOWN",
++              "format": "$format",
+               "rightsClass": "$rightsClass",
+               "priority": "$priority"
+               $shaField
+diff --git a/app/src/test/java/com/qualityalternative/app/ui/DocumentImportCandidateFactoryTest.kt b/app/src/test/java/com/qualityalternative/app/ui/DocumentImportCandidateFactoryTest.kt
+index 41b87ac..ab3c424 100644
+--- a/app/src/test/java/com/qualityalternative/app/ui/DocumentImportCandidateFactoryTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/ui/DocumentImportCandidateFactoryTest.kt
+@@ -60,6 +60,24 @@ class DocumentImportCandidateFactoryTest {
+         assertEquals(emptyMap<String, String>(), prepared.first { it.displayName == "book.epub" }.imageAttachmentUris)
+     }
+
++    @Test
++    fun imageOnlySelectionMergesIntoExistingMarkdownCandidate() {
++        val existingMarkdown = candidate("notes.md", "text/markdown", markdownBytes(200))
++            .copy(title = "Edited notes")
++        val image = candidate("diagram.webp", "image/webp", ByteArray(0))
++
++        val prepared = listOf(image).withMarkdownImageAttachments(baseCandidates = listOf(existingMarkdown))
++
++        assertEquals(listOf("notes.md"), prepared.map(DocumentImportCandidate::displayName))
++        assertEquals("Edited notes", prepared.single().title)
++        assertEquals(
++            mapOf(
++                "diagram.webp" to "content://quality/diagram.webp",
++            ),
++            prepared.single().imageAttachmentUris,
++        )
++    }
++
+     private fun assertCandidateEstimate(
+         displayName: String,
+         mimeType: String,
+diff --git a/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt b/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
+index 6214c65..bd5c3a2 100644
+--- a/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
+@@ -7,6 +7,7 @@ import com.qualityalternative.app.analytics.InMemoryAnalyticsTracker
+ import com.qualityalternative.app.data.AccountLightProfileExporter
+ import com.qualityalternative.app.data.CompositeContentRepository
+ import com.qualityalternative.app.data.AgentInboxDocumentStore
++import com.qualityalternative.app.data.AgentInboxImageAttachmentWrite
+ import com.qualityalternative.app.data.AgentInboxManifestValidationError
+ import com.qualityalternative.app.data.AgentInboxManifestValidator
+ import com.qualityalternative.app.data.AgentInboxPackageValidationError
+@@ -70,6 +71,7 @@ import com.qualityalternative.app.domain.service.AddUserDocumentResult
+ import com.qualityalternative.app.domain.service.AddUserLinkResult
+ import com.qualityalternative.app.domain.service.AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER
+ import com.qualityalternative.app.domain.service.AGENT_INBOX_MANIFEST_FILE_NAME
++import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_IMAGE_ATTACHMENT_BYTES
+ import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_MANIFEST_BYTES
+ import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_REVIEW_CONTENT_BYTES
+ import com.qualityalternative.app.domain.service.AgentInboxDriveClient
+@@ -2892,6 +2894,75 @@ class MainViewModelTest {
+         assertTrue(AnalyticsPrivacyGuard.unsafeRemoteFields(importedEvent.toRemoteAnalyticsPayload()).isEmpty())
+     }
+
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun importAgentInboxMarkdownCandidateDownloadsAndStoresImageAttachments() = runTest {
++        val contentBytes = "# Agent Note\n\n![Cover](cover.png)".toByteArray()
++        val imageBytes = byteArrayOf(9, 8, 7)
++        val coverFile = AgentInboxDriveFile(
++            id = "cover-file",
++            name = "cover.png",
++            mimeType = "image/png",
++            sizeBytes = imageBytes.size.toLong(),
++            md5Checksum = null,
++            modifiedTime = null,
++        )
++        val driveClient = RecordingAgentInboxDriveClient(
++            scanResult = AgentInboxDriveScanResult(
++                folderId = "agent-inbox-folder",
++                packages = listOf(agentInboxDrivePackage(imageFiles = listOf(coverFile))),
++            ),
++            files = mapOf(
++                "manifest-file" to agentInboxManifest(priority = "normal").toByteArray(),
++                "content-file" to contentBytes,
++                "cover-file" to imageBytes,
++            ),
++        )
++        val userDocumentRepository = FakeUserDocumentRepository()
++        val documentStore = RecordingAgentInboxDocumentStore()
++        val viewModel = createViewModel(
++            userDocumentRepository = userDocumentRepository,
++            agentInboxDriveClient = driveClient,
++            agentInboxPackageImporter = AgentInboxPackageImporter(
++                userDocumentRepository = userDocumentRepository,
++                documentStore = documentStore,
++            ),
++        )
++
++        advanceUntilIdle()
++        viewModel.completeOnboarding()
++        advanceUntilIdle()
++        viewModel.selectAgentInboxDriveFolderForTest()
++        advanceUntilIdle()
++        viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 5_000L)
++        advanceUntilIdle()
++        assertEquals(listOf("cover.png"), viewModel.uiState.agentInboxCandidates.single().imageAttachmentFiles.map { it.fileName })
++
++        viewModel.importAgentInboxCandidate(
++            packageFolderId = "agent-package",
++            accessToken = "drive-token",
++            nowMillis = 6_000L,
++        )
++        advanceUntilIdle()
++
++        assertEquals(
++            listOf(
++                AgentInboxDownloadRequest("manifest-file", AGENT_INBOX_MAX_MANIFEST_BYTES),
++                AgentInboxDownloadRequest("content-file", AGENT_INBOX_MAX_REVIEW_CONTENT_BYTES),
++                AgentInboxDownloadRequest("content-file", AGENT_INBOX_MAX_REVIEW_CONTENT_BYTES),
++                AgentInboxDownloadRequest("cover-file", AGENT_INBOX_MAX_IMAGE_ATTACHMENT_BYTES),
++            ),
++            driveClient.downloadRequests,
++        )
++        assertEquals(listOf("cover.png"), documentStore.writes.single().imageAttachments.map { it.fileName })
++        assertEquals(imageBytes.toList(), documentStore.writes.single().imageAttachments.single().bytes.toList())
++        assertEquals(
++            mapOf("cover.png" to "file:/agent-inbox/agent-package/cover.png"),
++            userDocumentRepository.addedDrafts.single().imageAttachmentUris,
++        )
++        assertTrue(userDocumentRepository.documents.value.single().imageAttachmentUris.containsKey("cover.png"))
++    }
++
+     @Test
+     @OptIn(ExperimentalCoroutinesApi::class)
+     fun importAgentInboxCandidateDoesNotApplyManifestPriorityUntilUserAcceptsIt() = runTest {
+@@ -3734,6 +3805,58 @@ class MainViewModelTest {
+         assertEquals("book", viewModel.uiState.addDocumentForm.title)
+     }
+
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun imageOnlyDocumentPickerResultAttachesToAlreadySelectedMarkdown() = runTest {
++        val viewModel = createViewModel()
++
++        advanceUntilIdle()
++        viewModel.prepareUserDocumentBatchImport(
++            candidates = listOf(
++                DocumentImportCandidate(
++                    uri = "content://quality/notes.md",
++                    displayName = "notes.md",
++                    mimeType = "text/markdown",
++                    title = "Notes",
++                    durationMinutes = "5",
++                    format = ContentFormat.MARKDOWN,
++                ),
++            ),
++        )
++        viewModel.toggleAddDocumentTopic(TopicTag.SCIENCE)
++        viewModel.toggleAddDocumentPriority()
++        viewModel.updateAddDocumentTitle("Edited notes")
++        val requestId = viewModel.beginUserDocumentImportPreparation()
++
++        viewModel.prepareUserDocumentBatchImport(
++            requestId = requestId,
++            candidates = listOf(
++                DocumentImportCandidate(
++                    uri = "content://quality/cover.png",
++                    displayName = "cover.png",
++                    mimeType = "image/png",
++                    title = "cover",
++                    durationMinutes = "10",
++                    format = null,
++                ),
++            ),
++        )
++        advanceUntilIdle()
++
++        val form = viewModel.uiState.addDocumentForm
++        assertFalse(form.isPreparing)
++        assertTrue(form.canSave)
++        assertEquals("Edited notes", form.title)
++        assertEquals(setOf(TopicTag.SCIENCE), form.selectedTopics)
++        assertTrue(form.markPriority)
++        assertEquals("content://quality/notes.md", form.candidates.single().uri)
++        assertEquals(
++            mapOf("cover.png" to "content://quality/cover.png"),
++            form.candidates.single().imageAttachmentUris,
++        )
++        assertEquals(null, viewModel.uiState.latestMessage)
++    }
++
+     @Test
+     @OptIn(ExperimentalCoroutinesApi::class)
+     fun cancelAddDocumentImportPreparationIgnoresLateBatchResult() = runTest {
+@@ -7695,6 +7818,7 @@ class MainViewModelTest {
+                 rights = ContentRightsMetadata.userPrivateReader(sourceUrl = draft.uri),
+                 documentFingerprintSha256 = draft.documentFingerprintSha256,
+                 documentFingerprintSizeBytes = draft.documentFingerprintSizeBytes,
++                imageAttachmentUris = draft.imageAttachmentUris,
+             )
+             documents.value = documents.value + item
+             return AddUserDocumentResult.Added(item)
+@@ -7812,6 +7936,7 @@ class MainViewModelTest {
+             verifiedContentSha256: String,
+             format: ContentFormat,
+             bytes: ByteArray,
++            imageAttachments: List<AgentInboxImageAttachmentWrite>,
+         ): StoredAgentInboxDocument {
+             writes += AgentInboxDocumentWrite(
+                 packageFolderId = packageFolderId,
+@@ -7819,6 +7944,7 @@ class MainViewModelTest {
+                 verifiedContentSha256 = verifiedContentSha256,
+                 format = format,
+                 bytes = bytes,
++                imageAttachments = imageAttachments,
+             )
+             return StoredAgentInboxDocument(
+                 uri = "file:/agent-inbox/$packageFolderId/$verifiedContentSha256.md",
+@@ -7829,6 +7955,9 @@ class MainViewModelTest {
+                     ContentFormat.PDF -> "application/pdf"
+                     ContentFormat.HTML -> "text/html"
+                 },
++                imageAttachmentUris = imageAttachments.associate { attachment ->
++                    attachment.fileName to "file:/agent-inbox/$packageFolderId/${attachment.fileName}"
++                },
+             )
+         }
+
+@@ -7843,6 +7972,7 @@ class MainViewModelTest {
+         val verifiedContentSha256: String,
+         val format: ContentFormat,
+         val bytes: ByteArray,
++        val imageAttachments: List<AgentInboxImageAttachmentWrite>,
+     )
+
+     private fun agentInboxDrivePackage(
+@@ -7852,6 +7982,7 @@ class MainViewModelTest {
+         contentFileId: String = "content-file",
+         manifestSizeBytes: Long? = null,
+         contentSizeBytes: Long? = null,
++        imageFiles: List<AgentInboxDriveFile> = emptyList(),
+         hasMoreFiles: Boolean = false,
+     ): AgentInboxDrivePackage {
+         val manifest = AgentInboxDriveFile(
+@@ -7875,7 +8006,7 @@ class MainViewModelTest {
+             folderName = folderName,
+             manifestFile = manifest,
+             contentFiles = listOf(content),
+-            allFiles = listOf(manifest, content),
++            allFiles = listOf(manifest, content) + imageFiles,
+             hasMoreFiles = hasMoreFiles,
+         )
+     }
+diff --git a/docs/LANE_STATUS.md b/docs/LANE_STATUS.md
+index d37b66a..27e729e 100644
+--- a/docs/LANE_STATUS.md
++++ b/docs/LANE_STATUS.md
+@@ -16,7 +16,7 @@ This file is the repo-level index for active and recently completed execution la
+ Status: `in_progress`
+
+ - Branch: `codex/sprint28-agent-inbox-drive-access`
+-- Scope: fix the post-release Agent Inbox Drive access gap for packages uploaded later by rclone/external agents under the current `drive.file` model.
++- Scope: fix the post-release Agent Inbox Drive access gap for packages uploaded later by rclone/external agents under the current `drive.file` model, and close the added Markdown image attachment gap for manual imports plus Agent Inbox Markdown packages.
+ - Canonical sprint plan: `docs/SPRINT_28_AGENT_INBOX_DRIVE_ACCESS.md`
+ - Current implementation state:
+   - Sprint opened from Sprint 27 release branch after recording the `drive.file`/rclone diagnosis.
+@@ -29,17 +29,21 @@ Status: `in_progress`
+   - Selected-folder Drive 401/403/404 scan failures are treated as access-lost states that clear the local folder grant, show `Select folder`, and record privacy-safe failure analytics.
+   - GPT Pro R1 returned `SCORE 7/10`, `VERDICT BLOCK`, `VISUAL REVIEW REVISE`; the blockers were legacy Sprint 27 app-created folder ids bypassing Picker and a connected-without-folder Settings state.
+   - R1 fixes are implemented locally: Agent Inbox connection now requires durable `agent_inbox_drive_grant_mode=picker_folder`, legacy folder ids without that marker hydrate as disconnected, `saveAgentInboxDriveConnection(null)` clears connection state, and Settings copy/actions derive connected state from the Picker grant predicate.
+-  - Visual E2E coverage for disconnected, missing-folder error, selected-folder, and access-lost states is added in `VisualQaScreenshotTest#captureSprint28AgentInboxDriveAccessStates`; physical PNG evidence is pending a connected emulator/device.
++  - Manual Markdown image attachment imports now allow image-only follow-up picker results to merge into the already selected Markdown file while preserving edited title, selected topics, and priority.
++  - Agent Inbox Markdown packages can carry bounded safe sidecar images through review, Drive download, local Agent Inbox document storage, `UserDocumentDraft.imageAttachmentUris`, and reader rendering; EPUB package sidecars remain invalid.
++  - Visual E2E coverage for disconnected select-folder, selected-folder, access-lost reconnect, Agent Inbox Markdown image reader, and dark selected-folder states passed in `VisualQaScreenshotTest#captureSprint28AgentInboxDriveAccessStates`.
++  - Canonical Sprint 28 visual evidence: `evidence/sprint28_agent_inbox_drive_access/visual_e2e/contact_sheet_r2.png` and `evidence/sprint28_agent_inbox_drive_access/visual_e2e/sprint28-agent-inbox-drive-access-1781433607325/`.
+ - Validation:
+   - Passed: full `testDebugUnitTest`.
++  - Passed: targeted Markdown image/Agent Inbox tests for `DocumentImportCandidateFactoryTest`, `MainViewModelTest`, `AgentInboxReviewCandidateFactoryTest`, and `AgentInboxPackageImporterTest`.
+   - Passed: targeted `testDebugUnitTest` for `GoogleDriveAuthorizationTest`, `MainViewModelTest`, and `AndroidGoogleDriveAgentInboxClientTest`.
+   - Passed after R1 fixes: targeted rerun for `PreferencesSettingsRepositoryTest` and `MainViewModelTest`.
+   - Passed: `compileDebugAndroidTestKotlin`.
++  - Passed: focused connected visual E2E on `qaApi36(AVD) - 16` for `VisualQaScreenshotTest#captureSprint28AgentInboxDriveAccessStates`.
+   - Passed: `lintDebug`, `processReleaseManifestForPackage`, and `assembleDebug`.
+   - Passed: `git diff --check`.
+-  - Blocked locally: connected screenshot run, because `adb devices` reported no attached devices.
+ - Next gate:
+-  - Run full local validation for the R1 fixes, build GPT Pro R2 review bundle, then continue to device spike/connected screenshots before release.
++  - Build GPT Pro R2 review bundle for the Drive access plus Markdown image slice, then continue to the live rclone/Picker device spike and release gate.
+
+ ## Sprint 27 Agent Content Inbox
+
+diff --git a/docs/SPRINT_28_AGENT_INBOX_DRIVE_ACCESS.md b/docs/SPRINT_28_AGENT_INBOX_DRIVE_ACCESS.md
+index 08d071a..68c87d2 100644
+--- a/docs/SPRINT_28_AGENT_INBOX_DRIVE_ACCESS.md
++++ b/docs/SPRINT_28_AGENT_INBOX_DRIVE_ACCESS.md
+@@ -35,10 +35,11 @@ Current status on 2026-06-14:
+ - Slice 28.2 also handles selected-folder 401/403/404 scan failures as access-lost states that clear the local folder grant and return the UI to `Select folder`.
+ - GPT Pro R1 returned `SCORE 7/10`, `VERDICT BLOCK`, `VISUAL REVIEW REVISE`.
+ - R1 fixes are implemented locally: the app persists `agent_inbox_drive_grant_mode=picker_folder`, derives connected state from nonblank folder id plus that marker, treats legacy Sprint 27 app-created folder ids without the marker as disconnected, and no longer supports `enabled=true` with a missing folder id.
+-- Slice 28.4 has a deterministic instrumented screenshot test added for disconnected, missing-folder error, selected-folder, and access-lost states. Physical screenshots are pending a connected emulator/device.
++- Slice 28.4 has deterministic instrumented screenshot evidence for disconnected, selected-folder, access-lost, imported Agent Inbox Markdown image reader, and dark selected-folder states.
++- Slice 28.6 is implemented locally for the added Markdown image scope: the manual document picker now supports adding image files to an already selected Markdown file, and Agent Inbox Markdown packages carry bounded sidecar image attachments through import and reader rendering.
+ - Current validation/evidence summary: `evidence/sprint28_agent_inbox_drive_access/VALIDATION_SUMMARY.md`.
+ - Live rclone/Picker spike checklist: `evidence/sprint28_agent_inbox_drive_access/device_spike/RCLONE_PICKER_FOLDER_SPIKE.md`.
+-- Slice 28.3, GPT Pro R2, and the release gate are still pending.
++- Slice 28.3 live device spike, GPT Pro R2, and the release gate are still pending.
+
+ ### Slice 28.0 - Contract And Dependency Gate
+
+@@ -132,9 +133,23 @@ Acceptance:
+
+ Current coverage:
+
+-- Added: `VisualQaScreenshotTest#captureSprint28AgentInboxDriveAccessStates`, including access-lost reconnect evidence.
+-- Passed: `JAVA_HOME=/opt/homebrew/opt/openjdk@17 ./gradlew :app:compileDebugAndroidTestKotlin`.
+-- Pending: connected emulator run and copying/curating PNG evidence under `evidence/sprint28_agent_inbox_drive_access/`.
++- Added and passed: `VisualQaScreenshotTest#captureSprint28AgentInboxDriveAccessStates`, including disconnected select-folder, selected-folder, access-lost reconnect, Agent Inbox Markdown image reader, and dark selected-folder evidence.
++- Canonical screenshot run: `evidence/sprint28_agent_inbox_drive_access/visual_e2e/sprint28-agent-inbox-drive-access-1781433607325/`.
++- Contact sheet: `evidence/sprint28_agent_inbox_drive_access/visual_e2e/contact_sheet_r2.png`.
++- Connected result XML/logs: `evidence/sprint28_agent_inbox_drive_access/android-results-r2/` and `evidence/sprint28_agent_inbox_drive_access/logs/connected_sprint28_visual_r2_final.log`.
++
++### Slice 28.6 - Markdown Image Attachment Parity
++
++- Fix the manual picker bug where adding image files after a Markdown file was already selected still showed "choose Markdown first".
++- Keep the current Add Document form state when the user opens the picker only to add Markdown image attachments: title, selected topics, and priority survive the second picker result.
++- Let Agent Inbox Markdown packages include a small bounded set of safe image sidecars while keeping EPUB sidecars unsupported.
++- Download image sidecars only after content review, enforce per-image and total byte limits, store them under the Agent Inbox document root, pass them through `UserDocumentDraft.imageAttachmentUris`, and delete them if the import is rolled back.
++
++Acceptance:
++
++- Unit tests cover image-only picker results merging into an already selected Markdown candidate.
++- Unit tests cover Agent Inbox Markdown image sidecar review, unsupported EPUB sidecars, too many images, per-image and total-size limits, Drive download/storage, and reader-visible image attachment import.
++- Visual E2E shows an Agent Inbox Markdown package rendering its sidecar image in the reader.
+
+ ### Slice 28.5 - GPT Pro Review And Release
+
+diff --git a/evidence/sprint28_agent_inbox_drive_access/VALIDATION_SUMMARY.md b/evidence/sprint28_agent_inbox_drive_access/VALIDATION_SUMMARY.md
+index 2f5f903..06159a9 100644
+--- a/evidence/sprint28_agent_inbox_drive_access/VALIDATION_SUMMARY.md
++++ b/evidence/sprint28_agent_inbox_drive_access/VALIDATION_SUMMARY.md
+@@ -4,7 +4,7 @@ Status: in progress
+
+ Branch: `codex/sprint28-agent-inbox-drive-access`
+
+-Review base commits include the first Drive access slice and device validation gate commits on `codex/sprint28-agent-inbox-drive-access`. Use `git log --oneline -3` as the canonical commit list for the exact bundle base. Later evidence should update this file with the final reviewed release commit.
++Review base commits include the first Drive access slice, device validation gate, GPT Pro R1 fix commit, and the current Markdown image attachment slice on `codex/sprint28-agent-inbox-drive-access`. Later evidence should update this file with the final reviewed release commit.
+
+ ## GPT Pro Review Trail
+
+@@ -14,12 +14,20 @@ Review base commits include the first Drive access slice and device validation g
+ - R1 blocker 2: `agentInboxDriveEnabled=true` with a missing folder id could still render connected Settings copy.
+ - R1 fixes: persist `agent_inbox_drive_grant_mode=picker_folder`; hydrate Agent Inbox Drive as connected only when enabled, folder id, and marker are all present; route scan authorization from that derived predicate; clear connection state for `saveAgentInboxDriveConnection(null)`; add regressions for legacy no-marker state and missing-folder behavior.
+
++R2 candidate scope adds the user-requested Markdown image fix:
++
++- Manual picker: adding image files after a Markdown file is already selected now merges those images into the existing Markdown candidate instead of asking the user to choose Markdown again.
++- Agent Inbox: Markdown packages may include bounded safe image sidecars; EPUB package sidecars remain invalid because EPUB assets belong inside the EPUB.
++- Visual evidence now includes an Agent Inbox Markdown package imported through the fake Drive flow and rendered with its sidecar image in the reader.
++
+ ## Passed Locally
+
+ - `JAVA_HOME=/opt/homebrew/opt/openjdk@17 ./gradlew :app:testDebugUnitTest`
++- `JAVA_HOME=/opt/homebrew/opt/openjdk@17 ./gradlew :app:testDebugUnitTest --tests com.qualityalternative.app.ui.DocumentImportCandidateFactoryTest --tests com.qualityalternative.app.ui.MainViewModelTest --tests com.qualityalternative.app.data.AgentInboxReviewCandidateFactoryTest --tests com.qualityalternative.app.data.AgentInboxPackageImporterTest`
+ - `JAVA_HOME=/opt/homebrew/opt/openjdk@17 ./gradlew :app:testDebugUnitTest --tests com.qualityalternative.app.ui.GoogleDriveAuthorizationTest --tests com.qualityalternative.app.ui.MainViewModelTest --tests com.qualityalternative.app.data.AndroidGoogleDriveAgentInboxClientTest`
+ - `JAVA_HOME=/opt/homebrew/opt/openjdk@17 ./gradlew :app:testDebugUnitTest --rerun-tasks --tests com.qualityalternative.app.data.PreferencesSettingsRepositoryTest --tests com.qualityalternative.app.ui.MainViewModelTest`
+ - `JAVA_HOME=/opt/homebrew/opt/openjdk@17 ./gradlew :app:compileDebugAndroidTestKotlin`
++- `JAVA_HOME=/opt/homebrew/opt/openjdk@17 ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.qualityalternative.app.VisualQaScreenshotTest#captureSprint28AgentInboxDriveAccessStates`
+ - `JAVA_HOME=/opt/homebrew/opt/openjdk@17 ./gradlew :app:lintDebug`
+ - `JAVA_HOME=/opt/homebrew/opt/openjdk@17 ./gradlew :app:processReleaseManifestForPackage`
+ - `JAVA_HOME=/opt/homebrew/opt/openjdk@17 ./gradlew :app:assembleDebug`
+@@ -34,15 +42,30 @@ Review base commits include the first Drive access slice and device validation g
+ - The Drive client no longer creates an app-owned inbox folder when `folderId` is missing.
+ - Selected-folder HTTP 401/403/404 failures clear the local folder grant and return Settings to `Select folder`.
+ - Connection and access-lost analytics are privacy-safe and do not include raw folder ids.
++- Manual Markdown image attachment imports support image-only follow-up picker selections against the already selected Markdown document while preserving edited title, topics, and priority.
++- Agent Inbox Markdown sidecar images use safe filenames, a maximum of six attachments, a 5 MiB per-image metadata/download cap, and a 15 MiB total download cap.
++- Agent Inbox imported Markdown image sidecars are stored under the Agent Inbox document root, passed through `UserDocumentDraft.imageAttachmentUris`, rendered by the existing Markdown reader, and deleted if import is rolled back.
++- Agent Inbox EPUB package sidecars and unsupported extra files remain invalid finite review items.
++
++## Visual Evidence
++
++- Canonical screenshot run: `evidence/sprint28_agent_inbox_drive_access/visual_e2e/sprint28-agent-inbox-drive-access-1781433607325/`
++- Contact sheet: `evidence/sprint28_agent_inbox_drive_access/visual_e2e/contact_sheet_r2.png`
++- Connected result XML/logs: `evidence/sprint28_agent_inbox_drive_access/android-results-r2/`
++- Connected Gradle log: `evidence/sprint28_agent_inbox_drive_access/logs/connected_sprint28_visual_r2_final.log`
++- Targeted Markdown image unit log: `evidence/sprint28_agent_inbox_drive_access/logs/targeted_markdown_image_r2.log`
++- Full local gate log: `evidence/sprint28_agent_inbox_drive_access/logs/full_local_gate_r2.log`
++- Diff-check log: `evidence/sprint28_agent_inbox_drive_access/logs/git_diff_check_r2.log`
++- R2 diff and commit context: `evidence/sprint28_agent_inbox_drive_access/sprint28_r2_tracked_diff.patch`, `evidence/sprint28_agent_inbox_drive_access/git_log_r2.txt`, and `evidence/sprint28_agent_inbox_drive_access/adb_devices_r2.txt`
++
++The focused visual E2E passed on `qaApi36(AVD) - 16` with `tests=1`, `failures=0`, `errors=0`, `skipped=0`.
+
+ ## Pending Before Release
+
+-- Connected run of `VisualQaScreenshotTest#captureSprint28AgentInboxDriveAccessStates`.
+-- Copy and curate generated PNGs under `evidence/sprint28_agent_inbox_drive_access/visual_e2e/`.
+ - Live device spike: select the Agent Inbox folder through Picker, add a later package through rclone, scan it in the app under `drive.file`, and record the result.
+ - GPT Pro review iterations until `SCORE 10/10`, `VERDICT PASS`, and `VISUAL REVIEW PASS`.
+ - Final release APK gate and alpha publication.
+
+-## Environment Blocker
++## Live Spike Constraint
+
+-On 2026-06-14, `adb devices` returned no attached devices and `emulator` was not available in PATH. `local.properties` points to `/opt/homebrew/share/android-commandlinetools`, which does not include a runnable emulator binary in the checked locations.
++On 2026-06-14, a local `qaApi36` emulator was available for deterministic visual E2E. The live rclone/Picker spike still requires a signed-in Google account/device environment with the production OAuth flow and an external rclone upload into the selected folder.

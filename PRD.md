@@ -245,7 +245,7 @@ The system must give the user enough replacement inventory to support useful rec
 
 - User can choose one or more editorial starter packs during onboarding.
 - User can add a web link manually.
-- User can upload at least one PDF, Markdown, or EPUB document manually.
+- User can upload at least one PDF, Markdown, or EPUB document manually. When a Markdown document is already selected, the manual picker can add local image attachments to that Markdown document without forcing the user to choose the Markdown file again.
 - User can connect a Google Drive Agent Inbox folder and review compatible agent-supplied Markdown or EPUB packages before importing them.
 - User can save at least ten content items before any archival or overflow handling is needed.
 - Newsletter forwarding, inbox sync, and RSS import are not required for MVP.
@@ -260,11 +260,11 @@ The system may let the user import private replacement content prepared by Codex
 - The Agent Inbox uses the narrowest practical Drive access model and must not scan the user's whole Drive.
 - Under `drive.file`, Agent Inbox folder access must be granted by an explicit Google Picker folder selection or by files the app created itself. Packages uploaded later by a user-controlled external tool such as rclone must be supported only after the selected folder grant is proven to expose those package children to the app; otherwise the fallback scope decision must be documented before widening access.
 - The app must not silently create a separate app-owned inbox folder when the user intends to scan an externally populated Agent Inbox folder.
-- Each import candidate is represented by a package containing a manifest plus one Markdown or EPUB content file.
+- Each import candidate is represented by a package containing a manifest plus one Markdown or EPUB content file. Markdown packages may also include bounded sidecar image attachments referenced by that Markdown file; EPUB packages must keep their assets inside the EPUB and may not add package sidecars.
 - The package manifest stores title, topic tags, source label, rights class, optional description, optional priority intent, and enough file identity data to detect duplicates.
 - Agent-supplied content is treated as `user_private` by default and must not become shared editorial inventory.
 - Agent-supplied priority is visible before import. The user can accept or remove the priority before saving.
-- Invalid, unsupported, duplicated, unavailable, or partially missing packages are visible as finite review items and are not silently imported.
+- Invalid, unsupported, duplicated, unavailable, partially missing, or over-limit packages are visible as finite review items and are not silently imported.
 - Importing an accepted package uses the same user-document model, reading-time estimation, progress tracking, and reader behavior as manually imported Markdown or EPUB documents.
 - The Agent Inbox review surface is finite and must not become a discovery feed.
 - Google Drive authorization failures distinguish user cancellation from technical/configuration failure where Android APIs allow it, present a retry path, and do not erase local library data.

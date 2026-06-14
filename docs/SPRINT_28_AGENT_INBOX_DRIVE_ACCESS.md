@@ -35,10 +35,11 @@ Current status on 2026-06-14:
 - Slice 28.2 also handles selected-folder 401/403/404 scan failures as access-lost states that clear the local folder grant and return the UI to `Select folder`.
 - GPT Pro R1 returned `SCORE 7/10`, `VERDICT BLOCK`, `VISUAL REVIEW REVISE`.
 - R1 fixes are implemented locally: the app persists `agent_inbox_drive_grant_mode=picker_folder`, derives connected state from nonblank folder id plus that marker, treats legacy Sprint 27 app-created folder ids without the marker as disconnected, and no longer supports `enabled=true` with a missing folder id.
-- Slice 28.4 has a deterministic instrumented screenshot test added for disconnected, missing-folder error, selected-folder, and access-lost states. Physical screenshots are pending a connected emulator/device.
+- Slice 28.4 has deterministic instrumented screenshot evidence for disconnected, selected-folder, access-lost, imported Agent Inbox Markdown image reader, and dark selected-folder states.
+- Slice 28.6 is implemented locally for the added Markdown image scope: the manual document picker now supports adding image files to an already selected Markdown file, and Agent Inbox Markdown packages carry bounded sidecar image attachments through import and reader rendering.
 - Current validation/evidence summary: `evidence/sprint28_agent_inbox_drive_access/VALIDATION_SUMMARY.md`.
 - Live rclone/Picker spike checklist: `evidence/sprint28_agent_inbox_drive_access/device_spike/RCLONE_PICKER_FOLDER_SPIKE.md`.
-- Slice 28.3, GPT Pro R2, and the release gate are still pending.
+- Slice 28.3 live device spike, GPT Pro R2, and the release gate are still pending.
 
 ### Slice 28.0 - Contract And Dependency Gate
 
@@ -132,9 +133,23 @@ Acceptance:
 
 Current coverage:
 
-- Added: `VisualQaScreenshotTest#captureSprint28AgentInboxDriveAccessStates`, including access-lost reconnect evidence.
-- Passed: `JAVA_HOME=/opt/homebrew/opt/openjdk@17 ./gradlew :app:compileDebugAndroidTestKotlin`.
-- Pending: connected emulator run and copying/curating PNG evidence under `evidence/sprint28_agent_inbox_drive_access/`.
+- Added and passed: `VisualQaScreenshotTest#captureSprint28AgentInboxDriveAccessStates`, including disconnected select-folder, selected-folder, access-lost reconnect, Agent Inbox Markdown image reader, and dark selected-folder evidence.
+- Canonical screenshot run: `evidence/sprint28_agent_inbox_drive_access/visual_e2e/sprint28-agent-inbox-drive-access-1781433607325/`.
+- Contact sheet: `evidence/sprint28_agent_inbox_drive_access/visual_e2e/contact_sheet_r2.png`.
+- Connected result XML/logs: `evidence/sprint28_agent_inbox_drive_access/android-results-r2/` and `evidence/sprint28_agent_inbox_drive_access/logs/connected_sprint28_visual_r2_final.log`.
+
+### Slice 28.6 - Markdown Image Attachment Parity
+
+- Fix the manual picker bug where adding image files after a Markdown file was already selected still showed "choose Markdown first".
+- Keep the current Add Document form state when the user opens the picker only to add Markdown image attachments: title, selected topics, and priority survive the second picker result.
+- Let Agent Inbox Markdown packages include a small bounded set of safe image sidecars while keeping EPUB sidecars unsupported.
+- Download image sidecars only after content review, enforce per-image and total byte limits, store them under the Agent Inbox document root, pass them through `UserDocumentDraft.imageAttachmentUris`, and delete them if the import is rolled back.
+
+Acceptance:
+
+- Unit tests cover image-only picker results merging into an already selected Markdown candidate.
+- Unit tests cover Agent Inbox Markdown image sidecar review, unsupported EPUB sidecars, too many images, per-image and total-size limits, Drive download/storage, and reader-visible image attachment import.
+- Visual E2E shows an Agent Inbox Markdown package rendering its sidecar image in the reader.
 
 ### Slice 28.5 - GPT Pro Review And Release
 

@@ -102,6 +102,8 @@ import com.qualityalternative.app.domain.service.AgentInboxDriveClient
 import com.qualityalternative.app.domain.service.AgentInboxDriveDownloadTooLargeException
 import com.qualityalternative.app.domain.service.AgentInboxDriveHttpException
 import com.qualityalternative.app.domain.service.AgentInboxDriveScanRequest
+import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_IMAGE_ATTACHMENT_BYTES
+import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_TOTAL_IMAGE_ATTACHMENT_BYTES
 import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_MANIFEST_BYTES
 import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_REVIEW_CONTENT_BYTES
 import com.qualityalternative.app.domain.service.AnalyticsTracker
@@ -395,6 +397,7 @@ class MainViewModel(
     private var pendingAccountLightImportPlan: AccountLightImportPlan? = null
     private var annotationDriveAccessToken: String? = null
     private var documentImportPreparationRequestId = 0
+    private var pendingDocumentImportBase: PendingDocumentImportBase? = null
     private var readerOpenRequestId = 0
     // Single-flight for interventions: a newer trigger supersedes an older in-flight one so two rapid
     // triggers cannot interleave their writes to the shared intervention state (latest wins).
@@ -1620,9 +1623,70 @@ class MainViewModel(
                     )
                     return@launch
                 }
+                val imageAttachmentBytes = mutableMapOf<String, ByteArray>()
+                var totalImageAttachmentBytes = 0L
+                candidate.imageAttachmentFiles.forEach { attachment ->
+                    if ((attachment.sizeBytes ?: 0L) > AGENT_INBOX_MAX_IMAGE_ATTACHMENT_BYTES) {
+                        applyAgentInboxImportResult(
+                            packageFolderId = packageFolderId,
+                            result = AgentInboxImportResult(
+                                status = AgentInboxImportStatus.INVALID,
+                                requestedHighPriority = candidate.requestsHighPriority,
+                                packageErrors = setOf(AgentInboxPackageValidationError.IMAGE_ATTACHMENT_TOO_LARGE),
+                            ),
+                            nowMillis = nowMillis,
+                        )
+                        return@launch
+                    }
+                    val attachmentBytes = try {
+                        agentInboxDriveClient.downloadFile(
+                            accessToken = normalizedToken,
+                            fileId = attachment.fileId,
+                            maxBytes = AGENT_INBOX_MAX_IMAGE_ATTACHMENT_BYTES,
+                        )
+                    } catch (tooLarge: AgentInboxDriveDownloadTooLargeException) {
+                        applyAgentInboxImportResult(
+                            packageFolderId = packageFolderId,
+                            result = AgentInboxImportResult(
+                                status = AgentInboxImportStatus.INVALID,
+                                requestedHighPriority = candidate.requestsHighPriority,
+                                packageErrors = setOf(AgentInboxPackageValidationError.IMAGE_ATTACHMENT_TOO_LARGE),
+                            ),
+                            nowMillis = nowMillis,
+                        )
+                        return@launch
+                    } catch (error: Throwable) {
+                        if (error is CancellationException) throw error
+                        applyAgentInboxImportResult(
+                            packageFolderId = packageFolderId,
+                            result = AgentInboxImportResult(
+                                status = AgentInboxImportStatus.INVALID,
+                                requestedHighPriority = candidate.requestsHighPriority,
+                                packageErrors = setOf(AgentInboxPackageValidationError.DOWNLOAD_UNAVAILABLE),
+                            ),
+                            nowMillis = nowMillis,
+                        )
+                        return@launch
+                    }
+                    totalImageAttachmentBytes += attachmentBytes.size.toLong()
+                    if (totalImageAttachmentBytes > AGENT_INBOX_MAX_TOTAL_IMAGE_ATTACHMENT_BYTES) {
+                        applyAgentInboxImportResult(
+                            packageFolderId = packageFolderId,
+                            result = AgentInboxImportResult(
+                                status = AgentInboxImportStatus.INVALID,
+                                requestedHighPriority = candidate.requestsHighPriority,
+                                packageErrors = setOf(AgentInboxPackageValidationError.IMAGE_ATTACHMENT_TOO_LARGE),
+                            ),
+                            nowMillis = nowMillis,
+                        )
+                        return@launch
+                    }
+                    imageAttachmentBytes[attachment.fileName] = attachmentBytes
+                }
                 val result = agentInboxPackageImporter.importCandidate(
                     candidate = candidate,
                     contentBytes = contentBytes,
+                    imageAttachmentBytes = imageAttachmentBytes,
                     nowMillis = nowMillis,
                 )
                 applyAgentInboxImportResult(
@@ -1912,6 +1976,11 @@ class MainViewModel(
 
     fun beginUserDocumentImportPreparation(): Int {
         documentImportPreparationRequestId += 1
+        pendingDocumentImportBase = if (uiState.screen == MainScreen.AddDocument) {
+            uiState.addDocumentForm.pendingMarkdownAttachmentBase()
+        } else {
+            null
+        }
         uiState = uiState.copy(
             screen = MainScreen.AddDocument,
             addDocumentForm = AddDocumentFormState(isPreparing = true),
@@ -1926,6 +1995,7 @@ class MainViewModel(
             return
         }
         documentImportPreparationRequestId += 1
+        pendingDocumentImportBase = null
         uiState = uiState.copy(
             screen = MainScreen.AddDocument,
             addDocumentForm = AddDocumentFormState(),
@@ -1940,6 +2010,7 @@ class MainViewModel(
         openInputStream: () -> InputStream? = { null },
     ) {
         val requestId = ++documentImportPreparationRequestId
+        pendingDocumentImportBase = null
         uiState = uiState.copy(
             screen = MainScreen.AddDocument,
             addDocumentForm = AddDocumentFormState(isPreparing = true),
@@ -1987,9 +2058,23 @@ class MainViewModel(
         if (requestId != documentImportPreparationRequestId) {
             return
         }
-        val cleanedCandidates = candidates
+        val pickedCandidates = candidates
             .map(DocumentImportCandidate::cleaned)
             .distinctBy(DocumentImportCandidate::uri)
+        val pendingBase = pendingDocumentImportBase
+        val attachmentOnlySelection = pickedCandidates.isNotEmpty() &&
+            pickedCandidates.all(DocumentImportCandidate::isMarkdownImageAttachmentCandidate)
+        val cleanedCandidates = pickedCandidates
+            .withMarkdownImageAttachments(
+                baseCandidates = if (attachmentOnlySelection) {
+                    pendingBase?.candidates.orEmpty()
+                } else {
+                    emptyList()
+                },
+            )
+            .map(DocumentImportCandidate::cleaned)
+            .distinctBy(DocumentImportCandidate::uri)
+        pendingDocumentImportBase = null
         documentImportPreparationRequestId += 1
         if (cleanedCandidates.isEmpty()) {
             uiState = uiState.copy(latestMessage = "Choose local PDF, Markdown, or EPUB files first.")
@@ -2005,6 +2090,8 @@ class MainViewModel(
                 title = primary.title,
                 durationMinutes = primary.durationMinutes,
                 candidates = cleanedCandidates,
+                selectedTopics = if (attachmentOnlySelection) pendingBase?.selectedTopics.orEmpty() else emptySet(),
+                markPriority = attachmentOnlySelection && pendingBase?.markPriority == true,
             ),
             screen = MainScreen.AddDocument,
         )
@@ -5108,6 +5195,26 @@ class MainViewModel(
         )
     }
 
+    internal fun seedAgentInboxDriveAccessLostForTests(
+        message: String = "Agent Inbox folder access was lost. Select the folder again.",
+    ) {
+        check(BuildConfig.DEBUG) { "Agent Inbox access-lost visual fixture state is only available in debug builds." }
+        uiState = uiState.copy(
+            screen = MainScreen.Settings,
+            agentInboxDriveEnabled = false,
+            agentInboxDriveFolderId = null,
+            agentInboxDriveGrantMode = null,
+            agentInboxDriveLastSuccessfulAtMillis = null,
+            agentInboxDriveLastError = message,
+            isAgentInboxScanning = false,
+            isAgentInboxImporting = false,
+            agentInboxCandidates = emptyList(),
+            agentInboxPriorityAcceptedPackageIds = emptySet(),
+            agentInboxScanTruncated = false,
+            latestMessage = "Agent Inbox folder access was lost.",
+        )
+    }
+
     internal fun setAgentInboxDriveClientForTests(client: AgentInboxDriveClient) {
         check(BuildConfig.DEBUG) { "Agent Inbox Drive client override is only available in debug builds." }
         agentInboxDriveClient = client
@@ -5152,8 +5259,15 @@ class MainViewModel(
 
     private fun invalidatePendingDocumentImportPreparation() {
         documentImportPreparationRequestId += 1
+        pendingDocumentImportBase = null
     }
 }
+
+private data class PendingDocumentImportBase(
+    val candidates: List<DocumentImportCandidate>,
+    val selectedTopics: Set<TopicTag>,
+    val markPriority: Boolean,
+)
 
 class MainViewModelFactory(
     private val appContainer: AppContainer,
@@ -5629,6 +5743,18 @@ private fun AddDocumentFormState.documentCandidates(): List<DocumentImportCandid
     )
 }
 
+private fun AddDocumentFormState.pendingMarkdownAttachmentBase(): PendingDocumentImportBase? {
+    val currentCandidates = documentCandidates()
+    if (currentCandidates.none { candidate -> candidate.format == ContentFormat.MARKDOWN }) {
+        return null
+    }
+    return PendingDocumentImportBase(
+        candidates = currentCandidates,
+        selectedTopics = selectedTopics,
+        markPriority = markPriority,
+    )
+}
+
 private fun DocumentImportCandidate.cleaned(): DocumentImportCandidate {
     val cleanedName = displayName.trim().ifBlank { "Untitled document" }
     val cleanedTitle = title.trim().ifBlank {
@@ -5868,6 +5994,7 @@ private object NoOpAgentInboxDocumentStore : AgentInboxDocumentStore {
         verifiedContentSha256: String,
         format: ContentFormat,
         bytes: ByteArray,
+        imageAttachments: List<com.qualityalternative.app.data.AgentInboxImageAttachmentWrite>,
     ) = error("Agent Inbox document store is not available in this build.")
 
     override suspend fun deleteDocument(stored: StoredAgentInboxDocument) = Unit

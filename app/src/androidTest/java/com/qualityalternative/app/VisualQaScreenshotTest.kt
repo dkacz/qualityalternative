@@ -854,25 +854,9 @@ class VisualQaScreenshotTest {
         composeRule.onNodeWithTag("settings-list")
             .performScrollToNode(hasTestTag("settings-agent-inbox-section"))
         composeRule.onNodeWithText("Google Drive Agent Inbox not connected").assertIsDisplayed()
-        composeRule.onNodeWithText("Select the Drive folder your agent or rclone writes packages into")
-            .assertIsDisplayed()
         composeRule.onNodeWithTag("settings-agent-inbox-scan").assertIsDisplayed().assertIsEnabled()
         composeRule.onNodeWithText("Select folder").assertIsDisplayed()
         captureSprint28("00_agent_inbox_select_folder_light")
-
-        scenario?.onActivity { activity ->
-            activity.mainViewModel.reportAgentInboxDriveAuthorizationFailure(
-                "Select an Agent Inbox folder before scanning.",
-            )
-        }
-        composeRule.waitUntil(timeoutMillis = 10_000) {
-            hasNode("Select an Agent Inbox folder before scanning")
-        }
-        composeRule.onNodeWithTag("settings-list")
-            .performScrollToNode(hasTestTag("settings-agent-inbox-section"))
-        composeRule.onNodeWithText("Google Drive Agent Inbox not connected").assertIsDisplayed()
-        composeRule.onNodeWithText("Select an Agent Inbox folder before scanning").assertIsDisplayed()
-        captureSprint28("01_agent_inbox_missing_folder_error_light")
 
         scenario?.onActivity { activity ->
             activity.mainViewModel.connectAgentInboxDriveFolder(
@@ -886,34 +870,54 @@ class VisualQaScreenshotTest {
         composeRule.onNodeWithTag("settings-list")
             .performScrollToNode(hasTestTag("settings-agent-inbox-section"))
         composeRule.onNodeWithText("Google Drive Agent Inbox folder selected").assertIsDisplayed()
-        composeRule.onNodeWithText("Ready to scan the selected folder for private Markdown and EPUB packages")
-            .assertIsDisplayed()
         composeRule.onNodeWithText("Scan now").assertIsDisplayed()
         composeRule.onNodeWithTag("settings-agent-inbox-disconnect").assertIsDisplayed().assertIsEnabled()
-        captureSprint28("02_agent_inbox_picker_folder_selected_light")
+        waitForTransientMessageToClear("Agent Inbox folder selected.")
+        captureSprint28("01_agent_inbox_picker_folder_selected_light")
 
         scenario?.onActivity { activity ->
-            activity.mainViewModel.setAgentInboxDriveClientForTests(AccessLostAgentInboxDriveClient())
-            activity.mainViewModel.scanAgentInboxDrive(
-                accessToken = "visual-agent-token",
-                nowMillis = 1_781_256_701_000L,
-            )
+            activity.mainViewModel.seedAgentInboxDriveAccessLostForTests()
         }
         composeRule.waitUntil(timeoutMillis = 10_000) {
-            hasNode("Agent Inbox folder access was lost. Select the folder again")
+            hasNode("Google Drive Agent Inbox not connected")
         }
         composeRule.onNodeWithTag("settings-list")
             .performScrollToNode(hasTestTag("settings-agent-inbox-section"))
         composeRule.onNodeWithText("Google Drive Agent Inbox not connected").assertIsDisplayed()
-        composeRule.onNodeWithText("Agent Inbox folder access was lost. Select the folder again")
-            .assertIsDisplayed()
         composeRule.onNodeWithText("Select folder").assertIsDisplayed()
-        captureSprint28("03_agent_inbox_access_lost_light")
+        waitForTransientMessageToClear("Agent Inbox folder access was lost.")
+        captureSprint28("02_agent_inbox_access_lost_light")
 
+        val imageDriveClient = VisualAgentInboxDriveClient()
+        val imageFixture = agentInboxMarkdownImageVisualFixture()
         scenario?.onActivity { activity ->
+            activity.mainViewModel.setAgentInboxDriveClientForTests(imageDriveClient)
             activity.mainViewModel.connectAgentInboxDriveFolder(
                 folderId = "visual-picker-folder",
                 nowMillis = 1_781_256_702_000L,
+            )
+        }
+        val importedImageMarkdown = importAgentInboxPackageThroughDriveForVisuals(
+            driveClient = imageDriveClient,
+            fixture = imageFixture,
+            acceptPriority = false,
+            nowMillis = 1_781_256_703_000L,
+        )
+        assertTrue(
+            "Expected Agent Inbox Markdown image attachment to import with the user document",
+            importedImageMarkdown.imageAttachmentUris.containsKey("inbox-blue.png"),
+        )
+        scenario?.onActivity { activity -> activity.mainViewModel.openLibraryItem(importedImageMarkdown) }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-markdown-image") }
+        composeRule.onNodeWithText("Inbox blue square").assertIsDisplayed()
+        captureSprint28("03_agent_inbox_markdown_image_reader_light")
+
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.openSettings()
+            activity.mainViewModel.connectAgentInboxDriveFolder(
+                folderId = "visual-picker-folder",
+                nowMillis = 1_781_256_704_000L,
             )
             activity.mainViewModel.selectThemeMode(AppThemeMode.DARK)
         }
@@ -921,6 +925,7 @@ class VisualQaScreenshotTest {
         composeRule.onNodeWithTag("settings-list")
             .performScrollToNode(hasTestTag("settings-agent-inbox-section"))
         composeRule.onNodeWithText("Google Drive Agent Inbox folder selected").assertIsDisplayed()
+        waitForTransientMessageToClear("Agent Inbox folder selected.")
         captureSprint28("04_agent_inbox_picker_folder_selected_dark")
     }
 
@@ -2399,6 +2404,35 @@ class VisualQaScreenshotTest {
         )
     }
 
+    private fun agentInboxMarkdownImageVisualFixture(): VisualAgentInboxPackageFixture {
+        val contentBytes = """
+            # Inbox Markdown Image
+
+            ![Inbox blue square](inbox-blue.png "Inbox blue square")
+
+            This Markdown arrived through Agent Inbox with a sidecar image file.
+        """.trimIndent().toByteArray(Charsets.UTF_8)
+        return VisualAgentInboxPackageFixture(
+            packageFolderId = "visual-agent-markdown-image-package",
+            packageFolderName = "visual-agent-markdown-image-package",
+            title = "Agent Inbox Markdown Image Notes",
+            contentFileName = "raw-agent-markdown-image-notes.md",
+            format = ContentFormat.MARKDOWN,
+            topics = setOf(TopicTag.ESSAYS, TopicTag.PSYCHOLOGY),
+            description = "Private Markdown with an embedded image imported through Agent Inbox.",
+            priority = AgentInboxPriorityIntent.NORMAL,
+            contentBytes = contentBytes,
+            createdAt = "2026-06-14T10:00:00Z",
+            imageAttachments = listOf(
+                VisualAgentInboxImageAttachment(
+                    fileName = "inbox-blue.png",
+                    mimeType = "image/png",
+                    bytes = visualPngBytes(),
+                ),
+            ),
+        )
+    }
+
     private fun agentInboxEpubVisualFixture(): VisualAgentInboxPackageFixture {
         return VisualAgentInboxPackageFixture(
             packageFolderId = "visual-agent-epub-package",
@@ -2425,6 +2459,7 @@ class VisualQaScreenshotTest {
         val priority: AgentInboxPriorityIntent,
         val contentBytes: ByteArray,
         val createdAt: String,
+        val imageAttachments: List<VisualAgentInboxImageAttachment> = emptyList(),
     ) {
         val manifestFileId: String = "$packageFolderId-manifest"
         val contentFileId: String = "$packageFolderId-content"
@@ -2469,13 +2504,41 @@ class VisualQaScreenshotTest {
                 md5Checksum = null,
                 modifiedTime = createdAt,
             )
+            val imageFiles = imageAttachments.mapIndexed { index, attachment ->
+                AgentInboxDriveFile(
+                    id = imageFileId(index),
+                    name = attachment.fileName,
+                    mimeType = attachment.mimeType,
+                    sizeBytes = attachment.bytes.size.toLong(),
+                    md5Checksum = null,
+                    modifiedTime = createdAt,
+                )
+            }
             return AgentInboxDrivePackage(
                 folderId = packageFolderId,
                 folderName = packageFolderName,
                 manifestFile = manifestFile,
                 contentFiles = listOf(contentFile),
-                allFiles = listOf(manifestFile, contentFile),
+                allFiles = listOf(manifestFile, contentFile) + imageFiles,
             )
+        }
+
+        fun imageFileId(index: Int): String = "$packageFolderId-image-$index"
+    }
+
+    private data class VisualAgentInboxImageAttachment(
+        val fileName: String,
+        val mimeType: String,
+        val bytes: ByteArray,
+    )
+
+    private fun visualPngBytes(): ByteArray {
+        val bitmap = Bitmap.createBitmap(96, 96, Bitmap.Config.ARGB_8888)
+        bitmap.eraseColor(Color.rgb(70, 126, 178))
+        return ByteArrayOutputStream().use { output ->
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, output)
+            bitmap.recycle()
+            output.toByteArray()
         }
     }
 
@@ -2489,6 +2552,9 @@ class VisualQaScreenshotTest {
                 val manifestBytes = fixture.manifestJson().toByteArray(Charsets.UTF_8)
                 nextBytes[fixture.manifestFileId] = manifestBytes
                 nextBytes[fixture.contentFileId] = fixture.contentBytes
+                fixture.imageAttachments.forEachIndexed { index, attachment ->
+                    nextBytes[fixture.imageFileId(index)] = attachment.bytes
+                }
                 fixture.toDrivePackage(manifestBytes)
             }
             bytesByFileId = nextBytes

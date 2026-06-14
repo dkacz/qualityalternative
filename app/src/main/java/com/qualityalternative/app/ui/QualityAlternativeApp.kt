@@ -516,7 +516,7 @@ private fun MainRoute(
                 }
             }.onSuccess { candidates ->
                 viewModel.prepareUserDocumentBatchImport(
-                    candidates = candidates.withMarkdownImageAttachments(),
+                    candidates = candidates,
                     requestId = requestId,
                 )
             }.onFailure {
@@ -9643,7 +9643,15 @@ private fun agentInboxCandidateDetailText(candidate: AgentInboxReviewCandidate):
                 }
 
                 AgentInboxPackageValidationError.UNSUPPORTED_EXTRA_FILES in candidate.packageErrors -> {
-                    "Package has extra files. Keep one manifest and one Markdown or EPUB file."
+                    "Package has unsupported extra files. Markdown packages may include only bounded image attachments."
+                }
+
+                AgentInboxPackageValidationError.TOO_MANY_IMAGE_ATTACHMENTS in candidate.packageErrors -> {
+                    "Markdown package has too many image attachments. Keep six or fewer."
+                }
+
+                AgentInboxPackageValidationError.IMAGE_ATTACHMENT_TOO_LARGE in candidate.packageErrors -> {
+                    "Markdown image attachment is too large. Use smaller images and scan again."
                 }
 
                 AgentInboxPackageValidationError.CONTENT_FILE_TOO_LARGE in candidate.packageErrors -> {
@@ -9932,24 +9940,32 @@ private fun Context.documentImportCandidate(uri: Uri): DocumentImportCandidate {
     ) { contentResolver.openInputStream(uri) }
 }
 
-internal fun List<DocumentImportCandidate>.withMarkdownImageAttachments(): List<DocumentImportCandidate> {
+internal fun List<DocumentImportCandidate>.withMarkdownImageAttachments(
+    baseCandidates: List<DocumentImportCandidate> = emptyList(),
+): List<DocumentImportCandidate> {
     val imageAttachmentUris = filter(DocumentImportCandidate::isMarkdownImageAttachmentCandidate)
         .flatMap { candidate ->
             candidate.markdownImageAttachmentKeys().map { key -> key to candidate.uri }
         }
         .distinctBy { (key, _) -> key }
         .toMap()
-    return filterNot(DocumentImportCandidate::isMarkdownImageAttachmentCandidate)
+    val documentCandidates = filterNot(DocumentImportCandidate::isMarkdownImageAttachmentCandidate)
+    val targetCandidates = if (documentCandidates.isEmpty() && imageAttachmentUris.isNotEmpty()) {
+        baseCandidates.filterNot(DocumentImportCandidate::isMarkdownImageAttachmentCandidate)
+    } else {
+        documentCandidates
+    }
+    return targetCandidates
         .map { candidate ->
             if (candidate.format == ContentFormat.MARKDOWN && imageAttachmentUris.isNotEmpty()) {
-                candidate.copy(imageAttachmentUris = imageAttachmentUris)
+                candidate.copy(imageAttachmentUris = candidate.imageAttachmentUris + imageAttachmentUris)
             } else {
                 candidate
             }
         }
 }
 
-private fun DocumentImportCandidate.isMarkdownImageAttachmentCandidate(): Boolean {
+internal fun DocumentImportCandidate.isMarkdownImageAttachmentCandidate(): Boolean {
     val lowerName = displayName.lowercase(Locale.US)
     return mimeType?.lowercase(Locale.US)?.startsWith("image/") == true ||
         MarkdownImageAttachmentExtensions.any { extension -> lowerName.endsWith(extension) }

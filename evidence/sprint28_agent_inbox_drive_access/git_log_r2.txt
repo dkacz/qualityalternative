@@ -1,0 +1,10 @@
+98afe60 Add Sprint 28 Markdown image attachment flows
+224adc4 Fix Sprint 28 Picker grant persistence
+81ae703 Launch Sprint 28 GPT Pro review R1
+5fafa58 Stabilize Sprint 28 validation base note
+047ead9 Update Sprint 28 validation summary head
+1cf5ac1 Document Sprint 28 device validation gate
+b2f9818 Fix Agent Inbox Drive folder access flow
+0925266 Record Agent Inbox Drive access diagnosis
+638355b Record Sprint 27 emulator shutdown
+f421cd5 Record Sprint 27 release publication

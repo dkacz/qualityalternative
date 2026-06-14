@@ -1,6 +1,9 @@
 package com.qualityalternative.app.data
 
 import com.qualityalternative.app.domain.service.AGENT_INBOX_MANIFEST_FILE_NAME
+import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_IMAGE_ATTACHMENT_BYTES
+import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_IMAGE_ATTACHMENTS_PER_PACKAGE
+import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_TOTAL_IMAGE_ATTACHMENT_BYTES
 import com.qualityalternative.app.domain.service.AgentInboxDriveFile
 import com.qualityalternative.app.domain.service.AgentInboxDrivePackage
 import org.junit.Assert.assertEquals
@@ -189,7 +192,7 @@ class AgentInboxReviewCandidateFactoryTest {
     }
 
     @Test
-    fun fromDrivePackage_marksUnsupportedExtraFilesInvalid() {
+    fun fromDrivePackage_allowsMarkdownImageAttachments() {
         val candidate = AgentInboxReviewCandidateFactory.fromDrivePackage(
             drivePackage = drivePackage(
                 files = listOf(
@@ -201,9 +204,105 @@ class AgentInboxReviewCandidateFactoryTest {
             manifestJson = manifestJson(),
         )
 
+        assertEquals(AgentInboxReviewStatus.READY, candidate.status)
+        assertTrue(candidate.canImport)
+        assertEquals(
+            listOf(AgentInboxImageAttachmentFile(fileId = "cover-id", fileName = "cover.png", sizeBytes = null)),
+            candidate.imageAttachmentFiles,
+        )
+    }
+
+    @Test
+    fun fromDrivePackage_marksUnsupportedExtraFilesInvalid() {
+        val candidate = AgentInboxReviewCandidateFactory.fromDrivePackage(
+            drivePackage = drivePackage(
+                files = listOf(
+                    driveFile("manifest-id", AGENT_INBOX_MANIFEST_FILE_NAME),
+                    driveFile("content-id", "content.md"),
+                    driveFile("archive-id", "archive.zip"),
+                ),
+            ),
+            manifestJson = manifestJson(),
+        )
+
         assertEquals(AgentInboxReviewStatus.INVALID, candidate.status)
         assertFalse(candidate.canImport)
         assertEquals(setOf(AgentInboxPackageValidationError.UNSUPPORTED_EXTRA_FILES), candidate.packageErrors)
+    }
+
+    @Test
+    fun fromDrivePackage_marksEpubImageSidecarInvalid() {
+        val candidate = AgentInboxReviewCandidateFactory.fromDrivePackage(
+            drivePackage = drivePackage(
+                files = listOf(
+                    driveFile("manifest-id", AGENT_INBOX_MANIFEST_FILE_NAME),
+                    driveFile("content-id", "content.epub"),
+                    driveFile("cover-id", "cover.png"),
+                ),
+            ),
+            manifestJson = manifestJson(contentFile = "content.epub", format = "EPUB"),
+        )
+
+        assertEquals(AgentInboxReviewStatus.INVALID, candidate.status)
+        assertFalse(candidate.canImport)
+        assertEquals(setOf(AgentInboxPackageValidationError.UNSUPPORTED_EXTRA_FILES), candidate.packageErrors)
+    }
+
+    @Test
+    fun fromDrivePackage_marksOversizedMarkdownImageAttachmentInvalid() {
+        val candidate = AgentInboxReviewCandidateFactory.fromDrivePackage(
+            drivePackage = drivePackage(
+                files = listOf(
+                    driveFile("manifest-id", AGENT_INBOX_MANIFEST_FILE_NAME),
+                    driveFile("content-id", "content.md"),
+                    driveFile("cover-id", "cover.png", sizeBytes = AGENT_INBOX_MAX_IMAGE_ATTACHMENT_BYTES + 1),
+                ),
+            ),
+            manifestJson = manifestJson(),
+        )
+
+        assertEquals(AgentInboxReviewStatus.INVALID, candidate.status)
+        assertFalse(candidate.canImport)
+        assertEquals(setOf(AgentInboxPackageValidationError.IMAGE_ATTACHMENT_TOO_LARGE), candidate.packageErrors)
+    }
+
+    @Test
+    fun fromDrivePackage_marksTooManyMarkdownImageAttachmentsInvalid() {
+        val imageFiles = (0..AGENT_INBOX_MAX_IMAGE_ATTACHMENTS_PER_PACKAGE).map { index ->
+            driveFile("cover-id-$index", "cover-$index.png")
+        }
+        val candidate = AgentInboxReviewCandidateFactory.fromDrivePackage(
+            drivePackage = drivePackage(
+                files = listOf(
+                    driveFile("manifest-id", AGENT_INBOX_MANIFEST_FILE_NAME),
+                    driveFile("content-id", "content.md"),
+                ) + imageFiles,
+            ),
+            manifestJson = manifestJson(),
+        )
+
+        assertEquals(AgentInboxReviewStatus.INVALID, candidate.status)
+        assertFalse(candidate.canImport)
+        assertEquals(setOf(AgentInboxPackageValidationError.TOO_MANY_IMAGE_ATTACHMENTS), candidate.packageErrors)
+    }
+
+    @Test
+    fun fromDrivePackage_marksTotalMarkdownImageAttachmentBytesInvalid() {
+        val candidate = AgentInboxReviewCandidateFactory.fromDrivePackage(
+            drivePackage = drivePackage(
+                files = listOf(
+                    driveFile("manifest-id", AGENT_INBOX_MANIFEST_FILE_NAME),
+                    driveFile("content-id", "content.md"),
+                    driveFile("cover-id-1", "cover-1.png", sizeBytes = AGENT_INBOX_MAX_TOTAL_IMAGE_ATTACHMENT_BYTES),
+                    driveFile("cover-id-2", "cover-2.png", sizeBytes = 1),
+                ),
+            ),
+            manifestJson = manifestJson(),
+        )
+
+        assertEquals(AgentInboxReviewStatus.INVALID, candidate.status)
+        assertFalse(candidate.canImport)
+        assertEquals(setOf(AgentInboxPackageValidationError.IMAGE_ATTACHMENT_TOO_LARGE), candidate.packageErrors)
     }
 
     private fun drivePackage(
@@ -220,12 +319,16 @@ class AgentInboxReviewCandidateFactoryTest {
         )
     }
 
-    private fun driveFile(id: String, name: String): AgentInboxDriveFile {
+    private fun driveFile(
+        id: String,
+        name: String,
+        sizeBytes: Long? = null,
+    ): AgentInboxDriveFile {
         return AgentInboxDriveFile(
             id = id,
             name = name,
             mimeType = null,
-            sizeBytes = null,
+            sizeBytes = sizeBytes,
             md5Checksum = null,
             modifiedTime = null,
         )
@@ -233,6 +336,7 @@ class AgentInboxReviewCandidateFactoryTest {
 
     private fun manifestJson(
         contentFile: String = "content.md",
+        format: String = "MARKDOWN",
         rightsClass: String = "USER_PRIVATE",
         priority: String = "normal",
         documentSha256: String? = null,
@@ -244,7 +348,7 @@ class AgentInboxReviewCandidateFactoryTest {
               "title": "Agent Note",
               "topics": ["ATTENTION"],
               "contentFile": "$contentFile",
-              "format": "MARKDOWN",
+              "format": "$format",
               "rightsClass": "$rightsClass",
               "priority": "$priority"
               $shaField

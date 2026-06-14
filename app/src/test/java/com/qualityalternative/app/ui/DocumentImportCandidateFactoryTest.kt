@@ -60,6 +60,24 @@ class DocumentImportCandidateFactoryTest {
         assertEquals(emptyMap<String, String>(), prepared.first { it.displayName == "book.epub" }.imageAttachmentUris)
     }
 
+    @Test
+    fun imageOnlySelectionMergesIntoExistingMarkdownCandidate() {
+        val existingMarkdown = candidate("notes.md", "text/markdown", markdownBytes(200))
+            .copy(title = "Edited notes")
+        val image = candidate("diagram.webp", "image/webp", ByteArray(0))
+
+        val prepared = listOf(image).withMarkdownImageAttachments(baseCandidates = listOf(existingMarkdown))
+
+        assertEquals(listOf("notes.md"), prepared.map(DocumentImportCandidate::displayName))
+        assertEquals("Edited notes", prepared.single().title)
+        assertEquals(
+            mapOf(
+                "diagram.webp" to "content://quality/diagram.webp",
+            ),
+            prepared.single().imageAttachmentUris,
+        )
+    }
+
     private fun assertCandidateEstimate(
         displayName: String,
         mimeType: String,

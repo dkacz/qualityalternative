@@ -1,9 +1,12 @@
 package com.qualityalternative.app.data
 
 import com.qualityalternative.app.domain.model.ContentItem
+import com.qualityalternative.app.domain.model.ContentFormat
 import com.qualityalternative.app.domain.model.UserDocumentDraft
 import com.qualityalternative.app.domain.model.UserDocumentValidationError
 import com.qualityalternative.app.domain.service.AddUserDocumentIfFingerprintAbsentResult
+import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_IMAGE_ATTACHMENT_BYTES
+import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_TOTAL_IMAGE_ATTACHMENT_BYTES
 import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_REVIEW_CONTENT_BYTES
 import com.qualityalternative.app.domain.service.UserDocumentRepository
 import java.io.ByteArrayInputStream
@@ -32,6 +35,7 @@ class AgentInboxPackageImporter(
     suspend fun importCandidate(
         candidate: AgentInboxReviewCandidate,
         contentBytes: ByteArray,
+        imageAttachmentBytes: Map<String, ByteArray> = emptyMap(),
         nowMillis: Long = System.currentTimeMillis(),
     ): AgentInboxImportResult {
         val manifest = candidate.manifest
@@ -72,6 +76,21 @@ class AgentInboxPackageImporter(
                 manifestErrors = setOf(AgentInboxManifestValidationError.DOCUMENT_SHA256_MISMATCH),
             )
         }
+        val safeImageAttachmentBytes = if (manifest.format == ContentFormat.MARKDOWN) {
+            imageAttachmentBytes
+        } else {
+            emptyMap()
+        }
+        if (
+            safeImageAttachmentBytes.values.any { bytes -> bytes.size.toLong() > AGENT_INBOX_MAX_IMAGE_ATTACHMENT_BYTES } ||
+            safeImageAttachmentBytes.values.sumOf { bytes -> bytes.size.toLong() } > AGENT_INBOX_MAX_TOTAL_IMAGE_ATTACHMENT_BYTES
+        ) {
+            return AgentInboxImportResult(
+                status = AgentInboxImportStatus.INVALID,
+                requestedHighPriority = manifest.requestsHighPriority,
+                packageErrors = setOf(AgentInboxPackageValidationError.IMAGE_ATTACHMENT_TOO_LARGE),
+            )
+        }
 
         val duplicate = userDocumentRepository.findDocumentByFingerprintSha256(contentSha256)
         if (duplicate != null) {
@@ -88,6 +107,9 @@ class AgentInboxPackageImporter(
             verifiedContentSha256 = contentSha256,
             format = manifest.format,
             bytes = contentBytes,
+            imageAttachments = safeImageAttachmentBytes.map { (fileName, bytes) ->
+                AgentInboxImageAttachmentWrite(fileName = fileName, bytes = bytes)
+            },
         )
         val estimate = DocumentReadingTimeEstimator.estimate(manifest.format) {
             ByteArrayInputStream(contentBytes)
@@ -100,6 +122,7 @@ class AgentInboxPackageImporter(
             description = manifest.description.orEmpty(),
             durationMinutes = estimate.minutes,
             topicTags = manifest.topics,
+            imageAttachmentUris = stored.imageAttachmentUris,
             documentFingerprintSha256 = contentSha256,
             documentFingerprintSizeBytes = contentBytes.size.toLong(),
         )

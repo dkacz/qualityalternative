@@ -13,6 +13,12 @@ data class StoredAgentInboxDocument(
     val uri: String,
     val displayName: String,
     val mimeType: String,
+    val imageAttachmentUris: Map<String, String> = emptyMap(),
+)
+
+data class AgentInboxImageAttachmentWrite(
+    val fileName: String,
+    val bytes: ByteArray,
 )
 
 interface AgentInboxDocumentStore {
@@ -22,6 +28,7 @@ interface AgentInboxDocumentStore {
         verifiedContentSha256: String,
         format: ContentFormat,
         bytes: ByteArray,
+        imageAttachments: List<AgentInboxImageAttachmentWrite> = emptyList(),
     ): StoredAgentInboxDocument
 
     suspend fun deleteDocument(stored: StoredAgentInboxDocument)
@@ -36,6 +43,7 @@ class FileAgentInboxDocumentStore(
         verifiedContentSha256: String,
         format: ContentFormat,
         bytes: ByteArray,
+        imageAttachments: List<AgentInboxImageAttachmentWrite>,
     ): StoredAgentInboxDocument = withContext(Dispatchers.IO) {
         rootDirectory.mkdirs()
         val safeName = buildString {
@@ -49,11 +57,16 @@ class FileAgentInboxDocumentStore(
         if (file.exists()) {
             val existingSha256 = runCatching { AgentInboxManifestValidator.sha256(file.readBytes()) }.getOrNull()
             if (existingSha256 == verifiedContentSha256) {
-                return@withContext file.toStoredAgentInboxDocument(format)
+                val existingAttachments = imageAttachments.writeImageAttachments(
+                    contentSafeName = safeName,
+                    replaceExisting = true,
+                )
+                return@withContext file.toStoredAgentInboxDocument(format, existingAttachments)
             }
             check(file.delete()) { "Could not delete stale Agent Inbox document." }
         }
 
+        var attachmentUris: Map<String, String> = emptyMap()
         val tempFile = File.createTempFile("$safeName-", ".tmp", rootDirectory)
         try {
             tempFile.writeBytes(bytes)
@@ -62,12 +75,43 @@ class FileAgentInboxDocumentStore(
                 "Temporary Agent Inbox document bytes do not match verified SHA-256."
             }
             moveIntoPlace(tempFile = tempFile, targetFile = file)
+            attachmentUris = imageAttachments.writeImageAttachments(
+                contentSafeName = safeName,
+                replaceExisting = true,
+            )
+        } catch (error: Throwable) {
+            if (file.exists()) {
+                file.delete()
+            }
+            attachmentUris.values.forEach { uri ->
+                runCatching { File(URI(uri)).delete() }
+            }
+            throw error
         } finally {
             if (tempFile.exists()) {
                 tempFile.delete()
             }
         }
-        file.toStoredAgentInboxDocument(format)
+        file.toStoredAgentInboxDocument(format, attachmentUris)
+    }
+
+    private fun List<AgentInboxImageAttachmentWrite>.writeImageAttachments(
+        contentSafeName: String,
+        replaceExisting: Boolean,
+    ): Map<String, String> {
+        return flatMap { attachment ->
+            val safeAttachmentName = attachment.fileName.safeFileSegment()
+            val attachmentFile = File(rootDirectory, "$contentSafeName-img-$safeAttachmentName")
+            if (replaceExisting || !attachmentFile.exists()) {
+                attachmentFile.writeBytes(attachment.bytes)
+            }
+            val uri = attachmentFile.toURI().toString()
+            val displayName = attachment.fileName.trim()
+            listOfNotNull(
+                displayName.takeIf(String::isNotBlank)?.let { key -> key to uri },
+                displayName.lowercase().takeIf { it.isNotBlank() && it != displayName }?.let { key -> key to uri },
+            )
+        }.distinctBy { (key, _) -> key }.toMap()
     }
 
     private fun moveIntoPlace(tempFile: File, targetFile: File) {
@@ -86,11 +130,15 @@ class FileAgentInboxDocumentStore(
         }
     }
 
-    private fun File.toStoredAgentInboxDocument(format: ContentFormat): StoredAgentInboxDocument {
+    private fun File.toStoredAgentInboxDocument(
+        format: ContentFormat,
+        imageAttachmentUris: Map<String, String>,
+    ): StoredAgentInboxDocument {
         return StoredAgentInboxDocument(
             uri = toURI().toString(),
             displayName = "Agent Inbox document",
             mimeType = format.agentInboxMimeType(),
+            imageAttachmentUris = imageAttachmentUris,
         )
     }
 
@@ -101,6 +149,14 @@ class FileAgentInboxDocumentStore(
             if (!file.toPath().startsWith(rootPath)) return@withContext
             if (file.exists()) {
                 check(file.delete()) { "Could not delete uncommitted Agent Inbox document." }
+            }
+            stored.imageAttachmentUris.values.toSet().forEach { attachmentUri ->
+                val attachmentFile = runCatching { File(URI(attachmentUri)).canonicalFile }.getOrNull()
+                    ?: return@forEach
+                if (!attachmentFile.toPath().startsWith(rootPath)) return@forEach
+                if (attachmentFile.exists()) {
+                    check(attachmentFile.delete()) { "Could not delete uncommitted Agent Inbox image attachment." }
+                }
             }
         }
     }

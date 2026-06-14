@@ -64,6 +64,32 @@ class AgentInboxPackageImporterTest {
     }
 
     @Test
+    fun importCandidateStoresMarkdownImageAttachmentsInDraft() = runBlocking {
+        val contentBytes = "# Attention\n\n![Cover](cover.png)".toByteArray()
+        val imageBytes = byteArrayOf(1, 2, 3, 4)
+        val sha = AgentInboxManifestValidator.sha256(contentBytes)
+        val repository = FakeAgentInboxUserDocumentRepository()
+        val storageRoot = temporaryFolder.newFolder("agent-inbox-images")
+        val store = FileAgentInboxDocumentStore(storageRoot)
+        val importer = AgentInboxPackageImporter(userDocumentRepository = repository, documentStore = store)
+        val candidate = readyCandidate(documentSha256 = sha)
+
+        val result = importer.importCandidate(
+            candidate = candidate,
+            contentBytes = contentBytes,
+            imageAttachmentBytes = mapOf("cover.png" to imageBytes),
+            nowMillis = 2_000L,
+        )
+
+        assertEquals(AgentInboxImportStatus.IMPORTED, result.status)
+        val attachmentUris = repository.addedDrafts.single().imageAttachmentUris
+        assertEquals(setOf("cover.png"), attachmentUris.keys)
+        val storedImage = File(URI.create(requireNotNull(attachmentUris["cover.png"])))
+        assertEquals(imageBytes.toList(), storedImage.readBytes().toList())
+        assertTrue(storedImage.canonicalFile.toPath().startsWith(storageRoot.canonicalFile.toPath()))
+    }
+
+    @Test
     fun importCandidateWithSamePackageAndNameButDifferentBytesDoesNotOverwritePriorDocument() = runBlocking {
         val firstBytes = "# First\n\nOriginal private note.".toByteArray()
         val secondBytes = "# Second\n\nUpdated but distinct private note.".toByteArray()
@@ -118,6 +144,7 @@ class AgentInboxPackageImporterTest {
             verifiedContentSha256 = sha,
             format = ContentFormat.MARKDOWN,
             bytes = contentBytes,
+            imageAttachments = emptyList(),
         )
 
         val storedFile = File(URI.create(stored.uri))
@@ -409,8 +436,9 @@ class AgentInboxPackageImporterTest {
             verifiedContentSha256: String,
             format: ContentFormat,
             bytes: ByteArray,
+            imageAttachments: List<AgentInboxImageAttachmentWrite>,
         ): StoredAgentInboxDocument {
-            writes += Write(packageFolderId, contentFileName, verifiedContentSha256, format, bytes)
+            writes += Write(packageFolderId, contentFileName, verifiedContentSha256, format, bytes, imageAttachments)
             return StoredAgentInboxDocument(
                 uri = "file:/agent-inbox/$packageFolderId/$verifiedContentSha256.md",
                 displayName = "Agent Inbox document",
@@ -419,6 +447,9 @@ class AgentInboxPackageImporterTest {
                     ContentFormat.EPUB -> "application/epub+zip"
                     ContentFormat.PDF -> "application/pdf"
                     ContentFormat.HTML -> "text/html"
+                },
+                imageAttachmentUris = imageAttachments.associate { attachment ->
+                    attachment.fileName to "file:/agent-inbox/$packageFolderId/${attachment.fileName}"
                 },
             )
         }
@@ -434,6 +465,7 @@ class AgentInboxPackageImporterTest {
         val verifiedContentSha256: String,
         val format: ContentFormat,
         val bytes: ByteArray,
+        val imageAttachments: List<AgentInboxImageAttachmentWrite>,
     )
 
     private class UriUpsertingFingerprintRepository : UserDocumentRepository {

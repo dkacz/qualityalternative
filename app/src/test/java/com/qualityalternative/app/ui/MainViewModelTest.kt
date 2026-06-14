@@ -7,6 +7,7 @@ import com.qualityalternative.app.analytics.InMemoryAnalyticsTracker
 import com.qualityalternative.app.data.AccountLightProfileExporter
 import com.qualityalternative.app.data.CompositeContentRepository
 import com.qualityalternative.app.data.AgentInboxDocumentStore
+import com.qualityalternative.app.data.AgentInboxImageAttachmentWrite
 import com.qualityalternative.app.data.AgentInboxManifestValidationError
 import com.qualityalternative.app.data.AgentInboxManifestValidator
 import com.qualityalternative.app.data.AgentInboxPackageValidationError
@@ -70,6 +71,7 @@ import com.qualityalternative.app.domain.service.AddUserDocumentResult
 import com.qualityalternative.app.domain.service.AddUserLinkResult
 import com.qualityalternative.app.domain.service.AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER
 import com.qualityalternative.app.domain.service.AGENT_INBOX_MANIFEST_FILE_NAME
+import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_IMAGE_ATTACHMENT_BYTES
 import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_MANIFEST_BYTES
 import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_REVIEW_CONTENT_BYTES
 import com.qualityalternative.app.domain.service.AgentInboxDriveClient
@@ -2894,6 +2896,75 @@ class MainViewModelTest {
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
+    fun importAgentInboxMarkdownCandidateDownloadsAndStoresImageAttachments() = runTest {
+        val contentBytes = "# Agent Note\n\n![Cover](cover.png)".toByteArray()
+        val imageBytes = byteArrayOf(9, 8, 7)
+        val coverFile = AgentInboxDriveFile(
+            id = "cover-file",
+            name = "cover.png",
+            mimeType = "image/png",
+            sizeBytes = imageBytes.size.toLong(),
+            md5Checksum = null,
+            modifiedTime = null,
+        )
+        val driveClient = RecordingAgentInboxDriveClient(
+            scanResult = AgentInboxDriveScanResult(
+                folderId = "agent-inbox-folder",
+                packages = listOf(agentInboxDrivePackage(imageFiles = listOf(coverFile))),
+            ),
+            files = mapOf(
+                "manifest-file" to agentInboxManifest(priority = "normal").toByteArray(),
+                "content-file" to contentBytes,
+                "cover-file" to imageBytes,
+            ),
+        )
+        val userDocumentRepository = FakeUserDocumentRepository()
+        val documentStore = RecordingAgentInboxDocumentStore()
+        val viewModel = createViewModel(
+            userDocumentRepository = userDocumentRepository,
+            agentInboxDriveClient = driveClient,
+            agentInboxPackageImporter = AgentInboxPackageImporter(
+                userDocumentRepository = userDocumentRepository,
+                documentStore = documentStore,
+            ),
+        )
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+        viewModel.selectAgentInboxDriveFolderForTest()
+        advanceUntilIdle()
+        viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 5_000L)
+        advanceUntilIdle()
+        assertEquals(listOf("cover.png"), viewModel.uiState.agentInboxCandidates.single().imageAttachmentFiles.map { it.fileName })
+
+        viewModel.importAgentInboxCandidate(
+            packageFolderId = "agent-package",
+            accessToken = "drive-token",
+            nowMillis = 6_000L,
+        )
+        advanceUntilIdle()
+
+        assertEquals(
+            listOf(
+                AgentInboxDownloadRequest("manifest-file", AGENT_INBOX_MAX_MANIFEST_BYTES),
+                AgentInboxDownloadRequest("content-file", AGENT_INBOX_MAX_REVIEW_CONTENT_BYTES),
+                AgentInboxDownloadRequest("content-file", AGENT_INBOX_MAX_REVIEW_CONTENT_BYTES),
+                AgentInboxDownloadRequest("cover-file", AGENT_INBOX_MAX_IMAGE_ATTACHMENT_BYTES),
+            ),
+            driveClient.downloadRequests,
+        )
+        assertEquals(listOf("cover.png"), documentStore.writes.single().imageAttachments.map { it.fileName })
+        assertEquals(imageBytes.toList(), documentStore.writes.single().imageAttachments.single().bytes.toList())
+        assertEquals(
+            mapOf("cover.png" to "file:/agent-inbox/agent-package/cover.png"),
+            userDocumentRepository.addedDrafts.single().imageAttachmentUris,
+        )
+        assertTrue(userDocumentRepository.documents.value.single().imageAttachmentUris.containsKey("cover.png"))
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
     fun importAgentInboxCandidateDoesNotApplyManifestPriorityUntilUserAcceptsIt() = runTest {
         val driveClient = RecordingAgentInboxDriveClient(
             scanResult = AgentInboxDriveScanResult(
@@ -3732,6 +3803,58 @@ class MainViewModelTest {
 
         assertFalse(viewModel.uiState.addDocumentForm.isPreparing)
         assertEquals("book", viewModel.uiState.addDocumentForm.title)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun imageOnlyDocumentPickerResultAttachesToAlreadySelectedMarkdown() = runTest {
+        val viewModel = createViewModel()
+
+        advanceUntilIdle()
+        viewModel.prepareUserDocumentBatchImport(
+            candidates = listOf(
+                DocumentImportCandidate(
+                    uri = "content://quality/notes.md",
+                    displayName = "notes.md",
+                    mimeType = "text/markdown",
+                    title = "Notes",
+                    durationMinutes = "5",
+                    format = ContentFormat.MARKDOWN,
+                ),
+            ),
+        )
+        viewModel.toggleAddDocumentTopic(TopicTag.SCIENCE)
+        viewModel.toggleAddDocumentPriority()
+        viewModel.updateAddDocumentTitle("Edited notes")
+        val requestId = viewModel.beginUserDocumentImportPreparation()
+
+        viewModel.prepareUserDocumentBatchImport(
+            requestId = requestId,
+            candidates = listOf(
+                DocumentImportCandidate(
+                    uri = "content://quality/cover.png",
+                    displayName = "cover.png",
+                    mimeType = "image/png",
+                    title = "cover",
+                    durationMinutes = "10",
+                    format = null,
+                ),
+            ),
+        )
+        advanceUntilIdle()
+
+        val form = viewModel.uiState.addDocumentForm
+        assertFalse(form.isPreparing)
+        assertTrue(form.canSave)
+        assertEquals("Edited notes", form.title)
+        assertEquals(setOf(TopicTag.SCIENCE), form.selectedTopics)
+        assertTrue(form.markPriority)
+        assertEquals("content://quality/notes.md", form.candidates.single().uri)
+        assertEquals(
+            mapOf("cover.png" to "content://quality/cover.png"),
+            form.candidates.single().imageAttachmentUris,
+        )
+        assertEquals(null, viewModel.uiState.latestMessage)
     }
 
     @Test
@@ -7695,6 +7818,7 @@ class MainViewModelTest {
                 rights = ContentRightsMetadata.userPrivateReader(sourceUrl = draft.uri),
                 documentFingerprintSha256 = draft.documentFingerprintSha256,
                 documentFingerprintSizeBytes = draft.documentFingerprintSizeBytes,
+                imageAttachmentUris = draft.imageAttachmentUris,
             )
             documents.value = documents.value + item
             return AddUserDocumentResult.Added(item)
@@ -7812,6 +7936,7 @@ class MainViewModelTest {
             verifiedContentSha256: String,
             format: ContentFormat,
             bytes: ByteArray,
+            imageAttachments: List<AgentInboxImageAttachmentWrite>,
         ): StoredAgentInboxDocument {
             writes += AgentInboxDocumentWrite(
                 packageFolderId = packageFolderId,
@@ -7819,6 +7944,7 @@ class MainViewModelTest {
                 verifiedContentSha256 = verifiedContentSha256,
                 format = format,
                 bytes = bytes,
+                imageAttachments = imageAttachments,
             )
             return StoredAgentInboxDocument(
                 uri = "file:/agent-inbox/$packageFolderId/$verifiedContentSha256.md",
@@ -7828,6 +7954,9 @@ class MainViewModelTest {
                     ContentFormat.EPUB -> "application/epub+zip"
                     ContentFormat.PDF -> "application/pdf"
                     ContentFormat.HTML -> "text/html"
+                },
+                imageAttachmentUris = imageAttachments.associate { attachment ->
+                    attachment.fileName to "file:/agent-inbox/$packageFolderId/${attachment.fileName}"
                 },
             )
         }
@@ -7843,6 +7972,7 @@ class MainViewModelTest {
         val verifiedContentSha256: String,
         val format: ContentFormat,
         val bytes: ByteArray,
+        val imageAttachments: List<AgentInboxImageAttachmentWrite>,
     )
 
     private fun agentInboxDrivePackage(
@@ -7852,6 +7982,7 @@ class MainViewModelTest {
         contentFileId: String = "content-file",
         manifestSizeBytes: Long? = null,
         contentSizeBytes: Long? = null,
+        imageFiles: List<AgentInboxDriveFile> = emptyList(),
         hasMoreFiles: Boolean = false,
     ): AgentInboxDrivePackage {
         val manifest = AgentInboxDriveFile(
@@ -7875,7 +8006,7 @@ class MainViewModelTest {
             folderName = folderName,
             manifestFile = manifest,
             contentFiles = listOf(content),
-            allFiles = listOf(manifest, content),
+            allFiles = listOf(manifest, content) + imageFiles,
             hasMoreFiles = hasMoreFiles,
         )
     }
