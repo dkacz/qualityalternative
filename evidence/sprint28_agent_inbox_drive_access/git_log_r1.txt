@@ -1,0 +1,4 @@
+5fafa58 (HEAD -> codex/sprint28-agent-inbox-drive-access) Stabilize Sprint 28 validation base note
+047ead9 Update Sprint 28 validation summary head
+1cf5ac1 Document Sprint 28 device validation gate
+b2f9818 Fix Agent Inbox Drive folder access flow
