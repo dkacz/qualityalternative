@@ -152,6 +152,7 @@ data class AppSettings(
     val annotationDriveLastError: String? = null,
     val agentInboxDriveEnabled: Boolean = false,
     val agentInboxDriveFolderId: String? = null,
+    val agentInboxDriveGrantMode: String? = null,
     val agentInboxDriveLastSuccessfulAtMillis: Long? = null,
     val agentInboxDriveLastError: String? = null,
     val profileAutosaveUri: String? = null,

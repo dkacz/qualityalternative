@@ -97,6 +97,7 @@ import com.qualityalternative.app.domain.service.AccountLightProfileAutosaveWrit
 import com.qualityalternative.app.domain.service.AccountLightProfileBackupReader
 import com.qualityalternative.app.domain.service.AddUserDocumentResult
 import com.qualityalternative.app.domain.service.AddUserLinkResult
+import com.qualityalternative.app.domain.service.AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER
 import com.qualityalternative.app.domain.service.AgentInboxDriveClient
 import com.qualityalternative.app.domain.service.AgentInboxDriveDownloadTooLargeException
 import com.qualityalternative.app.domain.service.AgentInboxDriveHttpException
@@ -207,6 +208,7 @@ data class MainUiState(
     val annotationDriveLastError: String? = null,
     val agentInboxDriveEnabled: Boolean = false,
     val agentInboxDriveFolderId: String? = null,
+    val agentInboxDriveGrantMode: String? = null,
     val agentInboxDriveLastSuccessfulAtMillis: Long? = null,
     val agentInboxDriveLastError: String? = null,
     val isAgentInboxScanning: Boolean = false,
@@ -242,7 +244,12 @@ data class MainUiState(
     val events: List<AnalyticsEvent> = emptyList(),
     val screen: MainScreen = MainScreen.Onboarding,
     val lastFeedback: SessionFeedback? = null,
-)
+) {
+    val hasAgentInboxPickerFolderGrant: Boolean
+        get() = agentInboxDriveEnabled &&
+            !agentInboxDriveFolderId.isNullOrBlank() &&
+            agentInboxDriveGrantMode == AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER
+}
 
 data class AddLinkConfirmation(
     val title: String,
@@ -1259,7 +1266,7 @@ class MainViewModel(
             return
         }
         val selectedFolderId = uiState.agentInboxDriveFolderId?.takeIf(String::isNotBlank)
-        if (selectedFolderId == null) {
+        if (!uiState.hasAgentInboxPickerFolderGrant || selectedFolderId == null) {
             reportAgentInboxDriveFailure("Select an Agent Inbox folder before scanning.")
             return
         }
@@ -1459,6 +1466,7 @@ class MainViewModel(
         uiState = uiState.copy(
             agentInboxDriveEnabled = true,
             agentInboxDriveFolderId = normalizedFolderId,
+            agentInboxDriveGrantMode = AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER,
             agentInboxDriveLastError = null,
             agentInboxCandidates = emptyList(),
             agentInboxPriorityAcceptedPackageIds = emptySet(),
@@ -1486,6 +1494,7 @@ class MainViewModel(
         uiState = uiState.copy(
             agentInboxDriveEnabled = false,
             agentInboxDriveFolderId = null,
+            agentInboxDriveGrantMode = null,
             agentInboxDriveLastSuccessfulAtMillis = null,
             agentInboxDriveLastError = null,
             isAgentInboxScanning = false,
@@ -1836,6 +1845,7 @@ class MainViewModel(
         uiState = uiState.copy(
             agentInboxDriveEnabled = false,
             agentInboxDriveFolderId = null,
+            agentInboxDriveGrantMode = null,
             agentInboxDriveLastSuccessfulAtMillis = null,
             agentInboxDriveLastError = message,
             isAgentInboxScanning = false,
@@ -4011,6 +4021,7 @@ class MainViewModel(
             annotationDriveLastError = settings.annotationDriveLastError,
             agentInboxDriveEnabled = settings.agentInboxDriveEnabled,
             agentInboxDriveFolderId = settings.agentInboxDriveFolderId,
+            agentInboxDriveGrantMode = settings.agentInboxDriveGrantMode,
             agentInboxDriveLastSuccessfulAtMillis = settings.agentInboxDriveLastSuccessfulAtMillis,
             agentInboxDriveLastError = settings.agentInboxDriveLastError,
             profileAutosaveUri = effectiveProfileAutosaveUri,
@@ -5086,6 +5097,7 @@ class MainViewModel(
             screen = MainScreen.Settings,
             agentInboxDriveEnabled = true,
             agentInboxDriveFolderId = "visual-test-agent-inbox",
+            agentInboxDriveGrantMode = AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER,
             agentInboxDriveLastSuccessfulAtMillis = lastSuccessfulAtMillis,
             agentInboxDriveLastError = null,
             isAgentInboxScanning = false,

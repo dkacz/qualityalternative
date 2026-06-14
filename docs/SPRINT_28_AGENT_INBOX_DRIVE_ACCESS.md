@@ -33,10 +33,12 @@ Current status on 2026-06-14:
 - Slice 28.1 implementation is in place for the app-side Picker result path: `picked_file_ids` is read, the selected folder id is persisted, and `AGENT_INBOX_CONNECTED` analytics records only `grantMode=pickerFolder`.
 - Slice 28.2 implementation is in place for the no-auto-create contract: scans require a selected folder id, the Drive client rejects missing folder ids before any HTTP request, and selected-folder scans list only children of that folder.
 - Slice 28.2 also handles selected-folder 401/403/404 scan failures as access-lost states that clear the local folder grant and return the UI to `Select folder`.
+- GPT Pro R1 returned `SCORE 7/10`, `VERDICT BLOCK`, `VISUAL REVIEW REVISE`.
+- R1 fixes are implemented locally: the app persists `agent_inbox_drive_grant_mode=picker_folder`, derives connected state from nonblank folder id plus that marker, treats legacy Sprint 27 app-created folder ids without the marker as disconnected, and no longer supports `enabled=true` with a missing folder id.
 - Slice 28.4 has a deterministic instrumented screenshot test added for disconnected, missing-folder error, selected-folder, and access-lost states. Physical screenshots are pending a connected emulator/device.
 - Current validation/evidence summary: `evidence/sprint28_agent_inbox_drive_access/VALIDATION_SUMMARY.md`.
 - Live rclone/Picker spike checklist: `evidence/sprint28_agent_inbox_drive_access/device_spike/RCLONE_PICKER_FOLDER_SPIKE.md`.
-- Slice 28.3 and the GPT Pro/release gate are still pending.
+- Slice 28.3, GPT Pro R2, and the release gate are still pending.
 
 ### Slice 28.0 - Contract And Dependency Gate
 
@@ -74,6 +76,7 @@ Current coverage:
 
 - Covered: picked folder id persistence, reconnect replacement, empty picker result, privacy-safe connection analytics, and no raw folder id in remote-safe analytics payloads.
 - Covered: Portable Profile omits raw Agent Inbox folder ids and raw Agent Inbox scan failure text in `AccountLightProfileExporterTest`.
+- Covered after GPT Pro R1: Picker folder selection persists a durable grant marker and reconnect replaces both the folder id and marker.
 
 ### Slice 28.2 - Scan Semantics
 
@@ -92,6 +95,7 @@ Current coverage:
 
 - Covered: scan with no folder id is blocked before Drive calls; the HTTP client rejects missing folder id before any request; selected-folder scans do not create/search by folder name.
 - Covered: selected-folder HTTP 401/403/404 scan failures clear the local folder grant, show `Select folder`, and record `AGENT_INBOX_SCAN_FAILED` with `reason=access_lost`.
+- Covered after GPT Pro R1: a pre-upgrade legacy folder id without the Picker grant marker is not restored as connected and cannot enter `AGENT_INBOX_SCAN`.
 
 ### Slice 28.3 - External Package Spike Evidence
 
@@ -137,6 +141,12 @@ Current coverage:
 - Build a scoped review bundle with PRD, sprint plan, changed source, tests, logs, visual screenshots, and dependency evidence.
 - Iterate with GPT Pro until `SCORE 10/10`, `VERDICT PASS`, and `VISUAL REVIEW PASS`.
 - Bump Android version, run full release gate, publish the alpha APK.
+
+Current review state:
+
+- R1 output: `evidence/sprint28_agent_inbox_drive_access/GPT_PRO_REVIEW_R1.md`.
+- R1 result: `SCORE 7/10`, `VERDICT BLOCK`, `VISUAL REVIEW REVISE`.
+- R1 blockers fixed locally before R2: durable Picker grant marker, legacy state normalization, and missing-folder connected-state normalization.
 
 Acceptance:
 

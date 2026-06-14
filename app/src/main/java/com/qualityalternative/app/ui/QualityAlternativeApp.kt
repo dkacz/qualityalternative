@@ -716,7 +716,7 @@ private fun MainRoute(
                 },
                 onDisconnectAnnotationDrive = disconnectGoogleDriveSync,
                 onScanAgentInbox = {
-                    val mode = if (state.agentInboxDriveEnabled && !state.agentInboxDriveFolderId.isNullOrBlank()) {
+                    val mode = if (state.hasAgentInboxPickerFolderGrant) {
                         GoogleDriveAuthorizationMode.AGENT_INBOX_SCAN
                     } else {
                         GoogleDriveAuthorizationMode.AGENT_INBOX_PICK_FOLDER
@@ -5289,7 +5289,7 @@ private fun AgentInboxSettingsSection(
             "Agent Inbox",
             right = when {
                 state.isAgentInboxScanning -> "Scanning"
-                state.agentInboxDriveEnabled -> "Drive"
+                state.hasAgentInboxPickerFolderGrant -> "Drive"
                 else -> "Off"
             },
         )
@@ -5302,7 +5302,7 @@ private fun AgentInboxSettingsSection(
                 SourceBadge(sourceType = ContentSourceType.USER_DOCUMENT, icon = QaIconKind.Note)
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = if (state.agentInboxDriveEnabled) {
+                        text = if (state.hasAgentInboxPickerFolderGrant) {
                             "Google Drive Agent Inbox folder selected"
                         } else {
                             "Google Drive Agent Inbox not connected"
@@ -5338,7 +5338,7 @@ private fun AgentInboxSettingsSection(
                 QaButton(
                     text = when {
                         state.isAgentInboxScanning -> "Scanning"
-                        state.agentInboxDriveEnabled -> "Scan now"
+                        state.hasAgentInboxPickerFolderGrant -> "Scan now"
                         else -> "Select folder"
                     },
                     onClick = onScan,
@@ -5350,7 +5350,7 @@ private fun AgentInboxSettingsSection(
                         .weight(1f)
                         .testTag("settings-agent-inbox-scan"),
                 )
-                if (state.agentInboxDriveEnabled) {
+                if (state.hasAgentInboxPickerFolderGrant) {
                     QaButton(
                         text = "Disconnect",
                         onClick = onDisconnect,
@@ -9582,7 +9582,7 @@ private fun agentInboxDriveStatusText(state: MainUiState): String {
     state.agentInboxDriveLastSuccessfulAtMillis?.let { timestampMillis ->
         return "Last scanned ${annotationUpdatedLabel(timestampMillis)}"
     }
-    return if (state.agentInboxDriveEnabled) {
+    return if (state.hasAgentInboxPickerFolderGrant) {
         "Ready to scan the selected folder for private Markdown and EPUB packages"
     } else {
         "Select the Drive folder your agent or rclone writes packages into"

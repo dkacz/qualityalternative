@@ -1,11 +1,11 @@
 package com.qualityalternative.app.domain.service
 
-const val AGENT_INBOX_DRIVE_FOLDER_NAME = "Quality Alternative Agent Inbox"
 const val AGENT_INBOX_MANIFEST_FILE_NAME = "manifest.json"
 const val AGENT_INBOX_MAX_PACKAGES_PER_SCAN = 10
 const val AGENT_INBOX_MAX_FILES_PER_PACKAGE = 8
 const val AGENT_INBOX_MAX_MANIFEST_BYTES = 64L * 1024L
 const val AGENT_INBOX_MAX_REVIEW_CONTENT_BYTES = 10L * 1024L * 1024L
+const val AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER = "picker_folder"
 
 data class AgentInboxDriveScanRequest(
     val accessToken: String,

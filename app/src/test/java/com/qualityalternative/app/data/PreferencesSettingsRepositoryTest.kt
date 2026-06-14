@@ -3,7 +3,9 @@ package com.qualityalternative.app.data
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.qualityalternative.app.domain.model.AppSettings
@@ -18,6 +20,7 @@ import com.qualityalternative.app.domain.model.OnboardingSelection
 import com.qualityalternative.app.domain.model.TopicTag
 import com.qualityalternative.app.domain.model.WebsiteRule
 import com.qualityalternative.app.domain.model.WebsiteRuleType
+import com.qualityalternative.app.domain.service.AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER
 import java.io.File
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -397,8 +400,9 @@ class PreferencesSettingsRepositoryTest {
         repository.saveAgentInboxDriveScanFailure("Agent Inbox scan failed. Retry from Settings.")
 
         val failed = repository.observeAppSettings().first()
-        assertEquals(true, failed.agentInboxDriveEnabled)
+        assertEquals(false, failed.agentInboxDriveEnabled)
         assertEquals(null, failed.agentInboxDriveFolderId)
+        assertEquals(null, failed.agentInboxDriveGrantMode)
         assertEquals(null, failed.agentInboxDriveLastSuccessfulAtMillis)
         assertEquals("Agent Inbox scan failed. Retry from Settings.", failed.agentInboxDriveLastError)
 
@@ -408,18 +412,66 @@ class PreferencesSettingsRepositoryTest {
         )
 
         val synced = repository.observeAppSettings().first()
-        assertEquals(true, synced.agentInboxDriveEnabled)
-        assertEquals("drive-folder-agent-inbox", synced.agentInboxDriveFolderId)
-        assertEquals(7_000L, synced.agentInboxDriveLastSuccessfulAtMillis)
+        assertEquals(false, synced.agentInboxDriveEnabled)
+        assertEquals(null, synced.agentInboxDriveFolderId)
+        assertEquals(null, synced.agentInboxDriveGrantMode)
+        assertEquals(null, synced.agentInboxDriveLastSuccessfulAtMillis)
         assertEquals(null, synced.agentInboxDriveLastError)
+
+        repository.saveAgentInboxDriveConnection(folderId = "drive-folder-agent-inbox")
+        repository.saveAgentInboxDriveScanSuccess(
+            timestampMillis = 8_000L,
+            folderId = "drive-folder-agent-inbox",
+        )
+
+        val pickerSynced = repository.observeAppSettings().first()
+        assertEquals(true, pickerSynced.agentInboxDriveEnabled)
+        assertEquals("drive-folder-agent-inbox", pickerSynced.agentInboxDriveFolderId)
+        assertEquals(AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER, pickerSynced.agentInboxDriveGrantMode)
+        assertEquals(8_000L, pickerSynced.agentInboxDriveLastSuccessfulAtMillis)
+        assertEquals(null, pickerSynced.agentInboxDriveLastError)
+
+        repository.saveAgentInboxDriveScanSuccess(
+            timestampMillis = 9_000L,
+            folderId = "unexpected-folder",
+        )
+
+        val mismatchedScan = repository.observeAppSettings().first()
+        assertEquals(false, mismatchedScan.agentInboxDriveEnabled)
+        assertEquals(null, mismatchedScan.agentInboxDriveFolderId)
+        assertEquals(null, mismatchedScan.agentInboxDriveGrantMode)
+        assertEquals(null, mismatchedScan.agentInboxDriveLastSuccessfulAtMillis)
+        assertEquals(null, mismatchedScan.agentInboxDriveLastError)
 
         repository.clearAgentInboxDriveConnection()
 
         val cleared = repository.observeAppSettings().first()
         assertEquals(false, cleared.agentInboxDriveEnabled)
         assertEquals(null, cleared.agentInboxDriveFolderId)
+        assertEquals(null, cleared.agentInboxDriveGrantMode)
         assertEquals(null, cleared.agentInboxDriveLastSuccessfulAtMillis)
         assertEquals(null, cleared.agentInboxDriveLastError)
+    }
+
+    @Test
+    fun legacyAgentInboxDriveFolderWithoutPickerGrantIsNotRestoredAsConnected() = runBlocking {
+        val dataStore = testDataStore()
+        val repository = PreferencesSettingsRepository(
+            dataStore = dataStore,
+            supportedApps = SupportedCatalog.distractingApps,
+        )
+
+        dataStore.edit { preferences ->
+            preferences[booleanPreferencesKey("agent_inbox_drive_enabled")] = true
+            preferences[stringPreferencesKey("agent_inbox_drive_folder_id")] = "legacy-app-created-folder"
+            preferences[longPreferencesKey("agent_inbox_drive_last_successful_at_millis")] = 7_000L
+        }
+
+        val restored = repository.observeAppSettings().first()
+        assertEquals(false, restored.agentInboxDriveEnabled)
+        assertEquals(null, restored.agentInboxDriveFolderId)
+        assertEquals(null, restored.agentInboxDriveGrantMode)
+        assertEquals(null, restored.agentInboxDriveLastSuccessfulAtMillis)
     }
 
     @Test

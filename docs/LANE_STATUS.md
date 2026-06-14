@@ -27,16 +27,19 @@ Status: `in_progress`
   - App-side Picker-folder authorization is implemented with `PICKER_OAUTH_TRIGGER=true`, `PICKER_ALLOW_FOLDER_SELECTION=true`, consent prompt, and opt-out from previously granted scopes.
   - Agent Inbox scan now requires a selected folder id and no longer silently creates a separate app-owned inbox folder.
   - Selected-folder Drive 401/403/404 scan failures are treated as access-lost states that clear the local folder grant, show `Select folder`, and record privacy-safe failure analytics.
+  - GPT Pro R1 returned `SCORE 7/10`, `VERDICT BLOCK`, `VISUAL REVIEW REVISE`; the blockers were legacy Sprint 27 app-created folder ids bypassing Picker and a connected-without-folder Settings state.
+  - R1 fixes are implemented locally: Agent Inbox connection now requires durable `agent_inbox_drive_grant_mode=picker_folder`, legacy folder ids without that marker hydrate as disconnected, `saveAgentInboxDriveConnection(null)` clears connection state, and Settings copy/actions derive connected state from the Picker grant predicate.
   - Visual E2E coverage for disconnected, missing-folder error, selected-folder, and access-lost states is added in `VisualQaScreenshotTest#captureSprint28AgentInboxDriveAccessStates`; physical PNG evidence is pending a connected emulator/device.
 - Validation:
   - Passed: full `testDebugUnitTest`.
   - Passed: targeted `testDebugUnitTest` for `GoogleDriveAuthorizationTest`, `MainViewModelTest`, and `AndroidGoogleDriveAgentInboxClientTest`.
+  - Passed after R1 fixes: targeted rerun for `PreferencesSettingsRepositoryTest` and `MainViewModelTest`.
   - Passed: `compileDebugAndroidTestKotlin`.
   - Passed: `lintDebug`, `processReleaseManifestForPackage`, and `assembleDebug`.
   - Passed: `git diff --check`.
   - Blocked locally: connected screenshot run, because `adb devices` reported no attached devices.
 - Next gate:
-  - Run the external rclone child-package spike and connected screenshot test on a device, then build the scoped GPT Pro review bundle.
+  - Run full local validation for the R1 fixes, build GPT Pro R2 review bundle, then continue to device spike/connected screenshots before release.
 
 ## Sprint 27 Agent Content Inbox
 
