@@ -1,6 +1,6 @@
 # Lane Status
 
-Status timestamp: 2026-06-12
+Status timestamp: 2026-06-14
 
 This file is the repo-level index for active and recently completed execution lanes. It should point to the canonical branch, review lane, validation artifacts, and next gate for each lane.
 
@@ -86,8 +86,13 @@ Status: `release_published`
   - Release URL: `https://github.com/dkacz/qualityalternative/releases/tag/v0.11.15-agent-content-inbox-alpha`.
   - Published assets: `quality-alternative-v0.11.15-agent-content-inbox-alpha-debug.apk` and `quality-alternative-v0.11.15-agent-content-inbox-alpha-debug.apk.sha256`.
   - Integration method: committed on `codex/sprint-agent-content-inbox`, tagged the release commit, pushed branch and tag to `origin`, and published the GitHub release from the committed release notes.
+- Post-release diagnosis on 2026-06-14:
+  - Agent Inbox packages uploaded by an external rclone daemon are not visible to the Android app under the current `drive.file` OAuth scope unless the app created those files or the user explicitly grants access through a Drive selection flow.
+  - This differs from the user's Boox/rclone annotation pipeline, which runs outside the app with broader Drive access, and from the app's internal annotation sync, where the app creates/uploads the files itself and can later see them.
+  - The observed app state `connected, no packages found` with externally uploaded packages is therefore expected under `drive.file`; the blocker is file authorization/ownership, not upload method.
+  - Follow-up implementation decision: either request broader `drive.readonly` for Agent Inbox, or keep `drive.file` and add a Google Picker folder/file grant flow. The Picker route still needs validation for whether files added later to the granted folder remain visible.
 - Next gate:
-  - None for Sprint 27; release is published.
+  - Choose the post-release Agent Inbox Drive access strategy before implementing the rclone-uploaded package fix.
 
 ## Sprint 26 Custom Targets And Website Interventions
 
