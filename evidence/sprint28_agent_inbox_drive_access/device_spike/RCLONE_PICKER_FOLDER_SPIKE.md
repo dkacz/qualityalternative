@@ -4,7 +4,7 @@ Purpose: prove whether the documented Google Picker folder grant under `drive.fi
 
 ## Preconditions
 
-- Install a debug or alpha build containing Sprint 28 commit `b2f9818` or later.
+- Install a debug or alpha build containing Sprint 28 R3 implementation commit `482478d` or later.
 - Use a Google account authorized for the app's OAuth client.
 - Prepare a Drive folder intended to be the Agent Inbox.
 - Ensure the package producer can upload to that same folder through rclone.
@@ -34,4 +34,4 @@ If the scan reports an access-lost state or does not see a valid package that is
 
 ## Result
 
-Pending. On 2026-06-14, Codex had a local `qaApi36` emulator for deterministic visual E2E, but not a signed-in production OAuth/rclone scenario that can prove whether a Picker-selected Drive folder under `drive.file` exposes child packages added later by rclone.
+Pending. On 2026-06-14, Codex had a local `qaApi36` emulator for deterministic visual E2E and `rclone v1.73.2` available on macOS, but `adb shell cmd account list` returned no Google account on the emulator. The live spike still requires a signed-in production OAuth/rclone scenario that can prove whether a Picker-selected Drive folder under `drive.file` exposes child packages added later by rclone.
