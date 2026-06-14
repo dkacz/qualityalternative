@@ -1,4 +1,4 @@
-fd3ab88 Fix Sprint 28 Markdown sidecar review blockers
+482478d Fix Sprint 28 Markdown sidecar review blockers
 64c2327 Record Sprint 28 GPT Pro R2 review
 ee8365e Record Sprint 28 GPT Pro R2 lane
 4d153f6 Prepare Sprint 28 GPT Pro R2 review
