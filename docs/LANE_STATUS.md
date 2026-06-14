@@ -48,6 +48,7 @@ Status: `in_progress`
   - Passed: `git diff --check`.
 - Next gate:
   - 2026-06-14 handoff: `qaApi36` is running as `emulator-5554` and is parked on the Google sign-in screen (`Email or phone`) for the operator to add the Google account needed for the live Picker/rclone spike.
+  - 2026-06-14 update: the emulator was driven through Google account entry to the `Google services` consent/settings screen for `omareth@gmail.com`; Codex can operate emulator UI, but the remaining `MORE`/`ACCEPT` action confirms Google account service/privacy settings and is intentionally left to the operator.
   - Run the signed-in live rclone/Picker spike using `evidence/sprint28_agent_inbox_drive_access/device_spike/LIVE_RCLONE_PICKER_SPIKE_RUNBOOK.md`; only after it passes should the final release APK gate and alpha publication proceed.
   - Preflight APK install/launch evidence exists at `docs/release-gate-logs/2026-06-14-sprint28-agent-inbox-drive-access-preflight/`, but it is explicitly not the final release gate.
 
