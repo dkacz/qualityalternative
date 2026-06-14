@@ -16,6 +16,11 @@ Review base commits include the first Drive access slice, device validation gate
 - R2 lane: `https://chatgpt.com/c/6a2e869b-ec48-83ed-a929-adb856a72d07`
 - R2 prompt: `evidence/sprint28_agent_inbox_drive_access/GPT_PRO_REVIEW_PROMPT_R2.md`
 - R2 bundle manifest: `evidence/sprint28_agent_inbox_drive_access/REVIEW_BUNDLE_MANIFEST_R2.md`
+- R2 output: `evidence/sprint28_agent_inbox_drive_access/GPT_PRO_REVIEW_R2.md`
+- R2 result: `SCORE 7/10`, `VERDICT REVISE`, `VISUAL REVIEW PASS`
+- R2 finding 1: Agent Inbox Markdown image sidecars can collapse through duplicate filenames or storage-safe filename collisions.
+- R2 finding 2: Agent Inbox Markdown reader rendering can fall back to local file paths that were not reviewed sidecars.
+- R2 finding 3: sidecar rollback can leave files behind if local attachment writing fails mid-loop.
 
 R2 candidate scope adds the user-requested Markdown image fix:
 

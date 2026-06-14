@@ -162,6 +162,9 @@ Current review state:
 - R1 output: `evidence/sprint28_agent_inbox_drive_access/GPT_PRO_REVIEW_R1.md`.
 - R1 result: `SCORE 7/10`, `VERDICT BLOCK`, `VISUAL REVIEW REVISE`.
 - R1 blockers fixed locally before R2: durable Picker grant marker, legacy state normalization, and missing-folder connected-state normalization.
+- R2 output: `evidence/sprint28_agent_inbox_drive_access/GPT_PRO_REVIEW_R2.md`.
+- R2 result: `SCORE 7/10`, `VERDICT REVISE`, `VISUAL REVIEW PASS`.
+- R2 blockers to fix before R3: duplicate/colliding Markdown sidecar names, Agent Inbox reader fallback to unreviewed local image paths, and mid-write sidecar cleanup.
 
 Acceptance:
 
