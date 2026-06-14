@@ -4,7 +4,7 @@ Status: in progress
 
 Branch: `codex/sprint28-agent-inbox-drive-access`
 
-Current commit: `b2f9818` implements the first Drive access slice. Later evidence should update this file with the final reviewed commit.
+Current commit: `1cf5ac1` implements the first Drive access slice and documents the device validation gate. Later evidence should update this file with the final reviewed commit.
 
 ## Passed Locally
 
