@@ -48,6 +48,7 @@ Status: `in_progress`
   - Passed: `git diff --check`.
 - Next gate:
   - Run the signed-in live rclone/Picker spike using `evidence/sprint28_agent_inbox_drive_access/device_spike/LIVE_RCLONE_PICKER_SPIKE_RUNBOOK.md`; only after it passes should the final release APK gate and alpha publication proceed.
+  - Preflight APK install/launch evidence exists at `docs/release-gate-logs/2026-06-14-sprint28-agent-inbox-drive-access-preflight/`, but it is explicitly not the final release gate.
 
 ## Sprint 27 Agent Content Inbox
 
