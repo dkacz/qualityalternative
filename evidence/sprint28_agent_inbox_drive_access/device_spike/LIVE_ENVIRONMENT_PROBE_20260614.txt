@@ -1,0 +1,31 @@
+Sprint 28 live spike environment probe
+Date: 2026-06-14
+Branch: codex/sprint28-agent-inbox-drive-access
+Head: 3bb611a
+
+## adb devices -l
+List of devices attached
+emulator-5554          device product:sdk_gphone64_arm64 model:sdk_gphone64_arm64 device:emu64a transport_id:1
+
+
+## adb shell cmd account list
+
+## adb shell pm path com.google.android.gms
+package:/product/priv-app/PrebuiltGmsCore/PrebuiltGmsCore.apk
+
+## rclone version
+rclone v1.73.2
+- os/version: darwin 26.1 (64 bit)
+- os/kernel: 25.1.0 (arm64)
+- os/type: darwin
+- os/arch: arm64 (ARMv8 compatible)
+- go/version: go1.26.1
+- go/linking: dynamic
+- go/tags: none
+
+## rclone listremotes
+onedrive:
+gdrive:
+onedrive-personal:
+
+Conclusion: live Picker+rclone spike is blocked in this local emulator because no Google account is signed in; a gdrive remote and Google Play services are present.

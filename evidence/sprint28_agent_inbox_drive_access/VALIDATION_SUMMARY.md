@@ -93,6 +93,7 @@ R2 candidate scope adds the user-requested Markdown image fix:
 - R3 contact sheet: `evidence/sprint28_agent_inbox_drive_access/visual_e2e_r3/contact_sheet_r3.png`
 - R3 ChatGPT URL: `evidence/sprint28_agent_inbox_drive_access/chatgpt_r3_url.txt`
 - Live spike runbook and fixture: `evidence/sprint28_agent_inbox_drive_access/device_spike/LIVE_RCLONE_PICKER_SPIKE_RUNBOOK.md` and `evidence/sprint28_agent_inbox_drive_access/device_spike/rclone_picker_live_package/`
+- Live environment probe: `evidence/sprint28_agent_inbox_drive_access/device_spike/LIVE_ENVIRONMENT_PROBE_20260614.txt`
 
 The focused visual E2E passed on `qaApi36(AVD) - 16` with `tests=1`, `failures=0`, `errors=0`, `skipped=0`.
 
@@ -103,4 +104,4 @@ The focused visual E2E passed on `qaApi36(AVD) - 16` with `tests=1`, `failures=0
 
 ## Live Spike Constraint
 
-On 2026-06-14, a local `qaApi36` emulator was available for deterministic visual E2E, Google Play services was installed, `rclone v1.73.2` and a configured `gdrive:` remote were available on macOS, but `adb shell cmd account list` returned no Google account on the emulator. The live rclone/Picker spike still requires a signed-in Google account/device environment with the production OAuth flow and an external rclone upload into the selected folder. A ready-to-upload fixture and operator runbook are in `evidence/sprint28_agent_inbox_drive_access/device_spike/`.
+On 2026-06-14, a local `qaApi36` emulator was available for deterministic visual E2E, Google Play services was installed, `rclone v1.73.2` and a configured `gdrive:` remote were available on macOS, but `adb shell cmd account list` returned no Google account on the emulator. The probe is recorded in `evidence/sprint28_agent_inbox_drive_access/device_spike/LIVE_ENVIRONMENT_PROBE_20260614.txt`. The live rclone/Picker spike still requires a signed-in Google account/device environment with the production OAuth flow and an external rclone upload into the selected folder. A ready-to-upload fixture and operator runbook are in `evidence/sprint28_agent_inbox_drive_access/device_spike/`.

@@ -15,6 +15,7 @@ For the ready-to-run operator flow and fixture, use:
 
 - `evidence/sprint28_agent_inbox_drive_access/device_spike/LIVE_RCLONE_PICKER_SPIKE_RUNBOOK.md`
 - `evidence/sprint28_agent_inbox_drive_access/device_spike/rclone_picker_live_package/`
+- `evidence/sprint28_agent_inbox_drive_access/device_spike/LIVE_ENVIRONMENT_PROBE_20260614.txt`
 
 1. Open app Settings.
 2. In `Agent Inbox`, tap `Select folder`.
@@ -39,4 +40,4 @@ If the scan reports an access-lost state or does not see a valid package that is
 
 ## Result
 
-Pending. On 2026-06-14, Codex had a local `qaApi36` emulator for deterministic visual E2E, Google Play services installed, `rclone v1.73.2` available on macOS, and a configured `gdrive:` remote, but `adb shell cmd account list` returned no Google account on the emulator. The live spike still requires a signed-in production OAuth/rclone scenario that can prove whether a Picker-selected Drive folder under `drive.file` exposes child packages added later by rclone.
+Pending. On 2026-06-14, Codex had a local `qaApi36` emulator for deterministic visual E2E, Google Play services installed, `rclone v1.73.2` available on macOS, and a configured `gdrive:` remote, but `adb shell cmd account list` returned no Google account on the emulator. The environment probe is recorded in `LIVE_ENVIRONMENT_PROBE_20260614.txt`. The live spike still requires a signed-in production OAuth/rclone scenario that can prove whether a Picker-selected Drive folder under `drive.file` exposes child packages added later by rclone.
