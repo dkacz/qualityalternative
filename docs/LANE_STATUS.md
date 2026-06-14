@@ -47,7 +47,7 @@ Status: `in_progress`
   - Passed: `lintDebug`, `processReleaseManifestForPackage`, and `assembleDebug`.
   - Passed: `git diff --check`.
 - Next gate:
-  - Run the signed-in live rclone/Picker spike; only after it passes should the final release APK gate and alpha publication proceed.
+  - Run the signed-in live rclone/Picker spike using `evidence/sprint28_agent_inbox_drive_access/device_spike/LIVE_RCLONE_PICKER_SPIKE_RUNBOOK.md`; only after it passes should the final release APK gate and alpha publication proceed.
 
 ## Sprint 27 Agent Content Inbox
 

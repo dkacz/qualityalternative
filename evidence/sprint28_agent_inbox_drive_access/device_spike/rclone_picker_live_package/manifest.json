@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "title": "Sprint 28 rclone Picker proof",
+  "topics": ["ATTENTION"],
+  "contentFile": "content.md",
+  "format": "MARKDOWN",
+  "rightsClass": "USER_PRIVATE",
+  "sourceLabel": "Codex live spike",
+  "description": "Live proof package for the Sprint 28 Google Picker folder grant under drive.file.",
+  "priority": "normal",
+  "documentSha256": "7aafb776a9cd2f5e1447ccffb587409f86d3eadcd654e88bf223224fab908bbf",
+  "createdAt": "2026-06-14T12:00:00Z"
+}
