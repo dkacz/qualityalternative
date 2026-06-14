@@ -39,7 +39,7 @@ Current status on 2026-06-14:
 - Slice 28.6 is implemented locally for the added Markdown image scope: the manual document picker now supports adding image files to an already selected Markdown file, and Agent Inbox Markdown packages carry bounded sidecar image attachments through import and reader rendering.
 - Current validation/evidence summary: `evidence/sprint28_agent_inbox_drive_access/VALIDATION_SUMMARY.md`.
 - Live rclone/Picker spike checklist: `evidence/sprint28_agent_inbox_drive_access/device_spike/RCLONE_PICKER_FOLDER_SPIKE.md`.
-- Slice 28.3 live device spike, GPT Pro R2, and the release gate are still pending.
+- GPT Pro R3 returned `SCORE 10/10`, `VERDICT PASS`, `VISUAL REVIEW PASS`; the live device rclone/Picker spike and final release gate remain pending.
 
 ### Slice 28.0 - Contract And Dependency Gate
 

@@ -25,7 +25,10 @@ Review base commits include the first Drive access slice, device validation gate
 - R3 lane: `https://chatgpt.com/c/6a2e94c5-d82c-83eb-88f9-3a0304226708`
 - R3 prompt: `evidence/sprint28_agent_inbox_drive_access/GPT_PRO_REVIEW_PROMPT_R3.md`
 - R3 bundle manifest: `evidence/sprint28_agent_inbox_drive_access/REVIEW_BUNDLE_MANIFEST_R3.md`
-- R3 output: pending harvest.
+- R3 output: `evidence/sprint28_agent_inbox_drive_access/GPT_PRO_REVIEW_R3.md`
+- R3 result: `SCORE 10/10`, `VERDICT PASS`, `VISUAL REVIEW PASS`
+- R3 finding recheck: all three R2 findings fully fixed; no fresh findings.
+- R3 bundle gap: live rclone-after-Picker visibility remains unproven and is correctly treated as a pending release gate outside the deterministic local review.
 
 R2 candidate scope adds the user-requested Markdown image fix:
 
@@ -65,7 +68,7 @@ R2 candidate scope adds the user-requested Markdown image fix:
 - Agent Inbox imported Markdown image sidecars are stored under the Agent Inbox document root, passed through `UserDocumentDraft.imageAttachmentUris`, rendered by the existing Markdown reader, and deleted if import is rolled back.
 - Agent Inbox EPUB package sidecars and unsupported extra files remain invalid finite review items.
 
-## Visual Evidence
+## Historical R2 Visual Evidence
 
 - Canonical screenshot run: `evidence/sprint28_agent_inbox_drive_access/visual_e2e/sprint28-agent-inbox-drive-access-1781433607325/`
 - Contact sheet: `evidence/sprint28_agent_inbox_drive_access/visual_e2e/contact_sheet_r2.png`
@@ -79,6 +82,7 @@ R2 candidate scope adds the user-requested Markdown image fix:
 
 ## R3 Candidate Evidence
 
+- GPT Pro R3 review: `evidence/sprint28_agent_inbox_drive_access/GPT_PRO_REVIEW_R3.md`
 - Targeted R2-fix unit log: `evidence/sprint28_agent_inbox_drive_access/logs/targeted_r2_fixes.log`
 - Full local gate log: `evidence/sprint28_agent_inbox_drive_access/logs/full_local_gate_r3_candidate.log`
 - Connected visual log: `evidence/sprint28_agent_inbox_drive_access/logs/connected_sprint28_visual_r3_candidate.log`
@@ -94,7 +98,6 @@ The focused visual E2E passed on `qaApi36(AVD) - 16` with `tests=1`, `failures=0
 ## Pending Before Release
 
 - Live device spike: select the Agent Inbox folder through Picker, add a later package through rclone, scan it in the app under `drive.file`, and record the result.
-- GPT Pro review iterations until `SCORE 10/10`, `VERDICT PASS`, and `VISUAL REVIEW PASS`.
 - Final release APK gate and alpha publication.
 
 ## Live Spike Constraint

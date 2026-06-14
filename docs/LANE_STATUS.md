@@ -33,6 +33,7 @@ Status: `in_progress`
   - Agent Inbox Markdown packages can carry bounded safe sidecar images through review, Drive download, local Agent Inbox document storage, `UserDocumentDraft.imageAttachmentUris`, and reader rendering; EPUB package sidecars remain invalid.
   - GPT Pro R2 returned `SCORE 7/10`, `VERDICT REVISE`, `VISUAL REVIEW PASS`; the remaining findings were duplicate/colliding sidecar names, unreviewed Markdown local-image fallback, and incomplete sidecar rollback on mid-write failure.
   - R2 fixes are implemented locally: duplicate/colliding sidecar names are invalid during review, Agent Inbox Markdown reader rendering disables local fallback for stored Agent Inbox files, and sidecar writes use temp/backup rollback that removes promoted files after later failures.
+  - GPT Pro R3 returned `SCORE 10/10`, `VERDICT PASS`, `VISUAL REVIEW PASS`; no fresh findings.
   - Visual E2E coverage for disconnected select-folder, selected-folder, access-lost reconnect, Agent Inbox Markdown image reader, and dark selected-folder states passed in `VisualQaScreenshotTest#captureSprint28AgentInboxDriveAccessStates`.
   - Canonical Sprint 28 R3 visual evidence: `evidence/sprint28_agent_inbox_drive_access/visual_e2e_r3/contact_sheet_r3.png` and `evidence/sprint28_agent_inbox_drive_access/visual_e2e_r3/sprint28-agent-inbox-drive-access-1781437194813/`.
 - Validation:
@@ -46,7 +47,7 @@ Status: `in_progress`
   - Passed: `lintDebug`, `processReleaseManifestForPackage`, and `assembleDebug`.
   - Passed: `git diff --check`.
 - Next gate:
-  - Harvest GPT Pro R3 from `https://chatgpt.com/c/6a2e94c5-d82c-83eb-88f9-3a0304226708`; continue fixes until `SCORE 10/10`, `VERDICT PASS`, and `VISUAL REVIEW PASS` before any release gate.
+  - Run the signed-in live rclone/Picker spike; only after it passes should the final release APK gate and alpha publication proceed.
 
 ## Sprint 27 Agent Content Inbox
 
