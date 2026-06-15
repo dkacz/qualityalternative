@@ -88,7 +88,7 @@ class AppContainer(context: Context) {
     val readingAnnotationDriveTokenProvider: ReadingAnnotationDriveTokenProvider = AndroidGoogleDriveTokenProvider(
         context = context,
     )
-    val agentInboxDriveClient = AndroidGoogleDriveAgentInboxClient()
+    val agentInboxDriveClient = AndroidHybridAgentInboxDriveClient(context = context)
     val agentInboxPackageImporter = AgentInboxPackageImporter(
         userDocumentRepository = userDocumentRepository,
         documentStore = FileAgentInboxDocumentStore(

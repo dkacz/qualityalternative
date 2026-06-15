@@ -524,16 +524,22 @@ private fun MainRoute(
     val disconnectAgentInboxDrive = {
         val annotationDriveConfigured = state.annotationDriveSyncEnabled ||
             annotationExportUsesGoogleDriveProvider(state.annotationExportUri)
-        val agentInboxScope = if (state.hasAgentInboxReadonlyFolderGrant) {
-            AGENT_INBOX_DRIVE_READONLY_SCOPE
+        if (state.hasAgentInboxDocumentTreeFolderGrant) {
+            state.agentInboxDriveFolderId?.takeIf(String::isNotBlank)?.let { folderUri ->
+                releaseAgentInboxFolderPermission(context = context, uri = Uri.parse(folderUri))
+            }
         } else {
-            ANNOTATION_DRIVE_SCOPE
-        }
-        if (agentInboxScope == AGENT_INBOX_DRIVE_READONLY_SCOPE || !annotationDriveConfigured) {
-            val revokeRequest = RevokeAccessRequest.builder()
-                .setScopes(listOf(Scope(agentInboxScope)))
-                .build()
-            driveAuthorizationClient.revokeAccess(revokeRequest)
+            val agentInboxScope = if (state.hasAgentInboxReadonlyFolderGrant) {
+                AGENT_INBOX_DRIVE_READONLY_SCOPE
+            } else {
+                ANNOTATION_DRIVE_SCOPE
+            }
+            if (agentInboxScope == AGENT_INBOX_DRIVE_READONLY_SCOPE || !annotationDriveConfigured) {
+                val revokeRequest = RevokeAccessRequest.builder()
+                    .setScopes(listOf(Scope(agentInboxScope)))
+                    .build()
+                driveAuthorizationClient.revokeAccess(revokeRequest)
+            }
         }
         viewModel.disconnectAgentInboxDrive()
     }
@@ -582,6 +588,23 @@ private fun MainRoute(
                 persistProfileAutosavePermission(context = context, uri = Uri.parse(uriString))
             },
         )
+    }
+    val agentInboxFolderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri == null) {
+            return@rememberLauncherForActivityResult
+        }
+        val metadata = context.documentMetadata(uri)
+        runCatching {
+            persistAgentInboxFolderPermission(context = context, uri = uri)
+        }.onSuccess {
+            viewModel.connectAgentInboxDocumentTreeFolder(
+                uri = uri.toString(),
+                displayName = metadata.displayName,
+            )
+            viewModel.scanAgentInboxDrive(accessToken = "")
+        }.onFailure {
+            viewModel.reportAgentInboxDriveAuthorizationFailure("Agent Inbox folder permission was not granted.")
+        }
     }
     val accountLightExportPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json"),
@@ -748,31 +771,38 @@ private fun MainRoute(
                     startGoogleDriveSyncAuthorization(GoogleDriveAuthorizationMode.ANNOTATION_RETRY)
                 },
                 onDisconnectAnnotationDrive = disconnectGoogleDriveSync,
-                onAgentInboxFolderDraftChange = viewModel::updateAgentInboxDriveFolderDraft,
                 onScanAgentInbox = {
-                    val mode = when {
-                        state.hasAgentInboxReadonlyFolderGrant -> GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_SCAN
-                        state.hasAgentInboxPickerFolderGrant -> GoogleDriveAuthorizationMode.AGENT_INBOX_SCAN
-                        viewModel.beginAgentInboxReadonlyFolderConnection() -> {
-                            GoogleDriveAuthorizationMode.AGENT_INBOX_CONNECT_READONLY
+                    when {
+                        state.hasAgentInboxDocumentTreeFolderGrant -> {
+                            viewModel.scanAgentInboxDrive(accessToken = "")
                         }
-                        else -> null
-                    }
-                    if (mode != null) {
-                        startGoogleDriveSyncAuthorization(mode)
+                        state.hasAgentInboxReadonlyFolderGrant -> {
+                            startGoogleDriveSyncAuthorization(GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_SCAN)
+                        }
+                        state.hasAgentInboxPickerFolderGrant -> {
+                            startGoogleDriveSyncAuthorization(GoogleDriveAuthorizationMode.AGENT_INBOX_SCAN)
+                        }
+                        else -> {
+                            viewModel.beginAgentInboxFolderSelection()
+                            agentInboxFolderPicker.launch(null)
+                        }
                     }
                 },
                 onDisconnectAgentInbox = disconnectAgentInboxDrive,
                 onToggleAgentInboxPriority = viewModel::toggleAgentInboxPriority,
                 onRejectAgentInboxCandidate = viewModel::rejectAgentInboxCandidate,
                 onImportAgentInboxCandidate = { packageFolderId ->
-                    pendingAgentInboxImportPackageId = packageFolderId
-                    val mode = if (state.hasAgentInboxReadonlyFolderGrant) {
-                        GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_IMPORT
+                    if (state.hasAgentInboxDocumentTreeFolderGrant) {
+                        viewModel.importAgentInboxCandidate(packageFolderId = packageFolderId, accessToken = "")
                     } else {
-                        GoogleDriveAuthorizationMode.AGENT_INBOX_IMPORT
+                        pendingAgentInboxImportPackageId = packageFolderId
+                        val mode = if (state.hasAgentInboxReadonlyFolderGrant) {
+                            GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_IMPORT
+                        } else {
+                            GoogleDriveAuthorizationMode.AGENT_INBOX_IMPORT
+                        }
+                        startGoogleDriveSyncAuthorization(mode)
                     }
-                    startGoogleDriveSyncAuthorization(mode)
                 },
                 onExportAccountLightProfile = { accountLightExportPicker.launch(ACCOUNT_LIGHT_PROFILE_FILE_NAME) },
                 onExportAccountLightBackup = { accountLightExportPicker.launch(accountLightTimestampedBackupFileName()) },
@@ -4241,7 +4271,6 @@ private fun SettingsTab(
     onConnectAnnotationDrive: () -> Unit,
     onRetryAnnotationDrive: () -> Unit,
     onDisconnectAnnotationDrive: () -> Unit,
-    onAgentInboxFolderDraftChange: (String) -> Unit,
     onScanAgentInbox: () -> Unit,
     onDisconnectAgentInbox: () -> Unit,
     onToggleAgentInboxPriority: (String) -> Unit,
@@ -4448,7 +4477,6 @@ private fun SettingsTab(
         item {
             AgentInboxSettingsSection(
                 state = state,
-                onFolderDraftChange = onAgentInboxFolderDraftChange,
                 onScan = onScanAgentInbox,
                 onDisconnect = onDisconnectAgentInbox,
                 onTogglePriority = onToggleAgentInboxPriority,
@@ -5322,7 +5350,6 @@ private fun AnnotationAutosaveSettingsSection(
 @Composable
 private fun AgentInboxSettingsSection(
     state: MainUiState,
-    onFolderDraftChange: (String) -> Unit,
     onScan: () -> Unit,
     onDisconnect: () -> Unit,
     onTogglePriority: (String) -> Unit,
@@ -5336,6 +5363,7 @@ private fun AgentInboxSettingsSection(
             "Agent Inbox",
             right = when {
                 state.isAgentInboxScanning -> "Scanning"
+                state.hasAgentInboxDocumentTreeFolderGrant -> "Folder"
                 state.hasAgentInboxDriveFolderGrant -> "Drive"
                 else -> "Off"
             },
@@ -5350,9 +5378,9 @@ private fun AgentInboxSettingsSection(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = if (state.hasAgentInboxDriveFolderGrant) {
-                            "Google Drive Agent Inbox folder connected"
+                            "Agent Inbox folder connected"
                         } else {
-                            "Google Drive Agent Inbox not connected"
+                            "Agent Inbox folder not selected"
                         },
                         style = MaterialTheme.typography.titleMedium,
                         fontSize = 16.sp,
@@ -5378,31 +5406,22 @@ private fun AgentInboxSettingsSection(
                     )
                 }
             }
-            if (!state.hasAgentInboxDriveFolderGrant) {
-                QaTextField(
-                    value = state.agentInboxDriveFolderDraft,
-                    onValueChange = onFolderDraftChange,
-                    placeholder = "Drive folder URL or id",
-                    isError = state.agentInboxDriveFolderDraftError != null,
-                    modifier = Modifier
-                        .padding(top = 14.dp)
-                        .testTag("settings-agent-inbox-folder-draft"),
-                )
-                state.agentInboxDriveFolderDraftError?.let { error ->
-                    BodyText(
-                        text = error,
-                        color = colors.accent,
-                        fontSize = 12.5.sp,
-                        lineHeight = 17.sp,
-                        modifier = Modifier.padding(top = 6.dp),
-                    )
-                }
+            if (!state.hasAgentInboxDriveFolderGrant && state.agentInboxDriveFolderDraftError != null) {
                 BodyText(
-                    text = "Drive read access is used only after consent, and this app scans only the folder id pasted here.",
+                    text = state.agentInboxDriveFolderDraftError,
+                    color = colors.accent,
+                    fontSize = 12.5.sp,
+                    lineHeight = 17.sp,
+                    modifier = Modifier.padding(top = 10.dp),
+                )
+            }
+            if (!state.hasAgentInboxDriveFolderGrant) {
+                BodyText(
+                    text = "Choose the folder where your agent writes package folders.",
                     color = colors.mutedText,
                     fontSize = 12.5.sp,
                     lineHeight = 17.sp,
-                    modifier = Modifier.padding(top = 8.dp),
+                    modifier = Modifier.padding(top = 10.dp),
                 )
             }
             Row(
@@ -5413,7 +5432,7 @@ private fun AgentInboxSettingsSection(
                     text = when {
                         state.isAgentInboxScanning -> "Scanning"
                         state.hasAgentInboxDriveFolderGrant -> "Scan now"
-                        else -> "Connect folder"
+                        else -> "Choose folder"
                     },
                     onClick = onScan,
                     variant = QaButtonVariant.Outline,
@@ -9657,6 +9676,9 @@ private fun agentInboxDriveStatusText(state: MainUiState): String {
         return "Last scanned ${annotationUpdatedLabel(timestampMillis)}"
     }
     return when {
+        state.hasAgentInboxDocumentTreeFolderGrant -> {
+            "Ready to scan the selected folder for private Markdown and EPUB packages"
+        }
         state.hasAgentInboxReadonlyFolderGrant -> {
             "Drive read access; scanning only the saved Agent Inbox folder"
         }
@@ -9664,7 +9686,7 @@ private fun agentInboxDriveStatusText(state: MainUiState): String {
             "Ready to scan the selected folder for private Markdown and EPUB packages"
         }
         else -> {
-            "Paste the Drive folder URL or id your agent or rclone writes packages into"
+            "Choose the folder your agent writes packages into"
         }
     }
 }
@@ -10135,6 +10157,16 @@ private fun persistProfileAutosavePermission(context: Context, uri: Uri) {
         uri,
         Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
     )
+}
+
+private fun persistAgentInboxFolderPermission(context: Context, uri: Uri) {
+    context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+}
+
+private fun releaseAgentInboxFolderPermission(context: Context, uri: Uri) {
+    runCatching {
+        context.contentResolver.releasePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
 }
 
 private fun releaseAnnotationExportPermission(context: Context, uri: Uri) {

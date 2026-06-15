@@ -69,12 +69,14 @@ import com.qualityalternative.app.domain.service.AccountLightProfileBackupReader
 import com.qualityalternative.app.domain.service.AddUserDocumentIfFingerprintAbsentResult
 import com.qualityalternative.app.domain.service.AddUserDocumentResult
 import com.qualityalternative.app.domain.service.AddUserLinkResult
+import com.qualityalternative.app.domain.service.AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER
 import com.qualityalternative.app.domain.service.AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER
 import com.qualityalternative.app.domain.service.AGENT_INBOX_DRIVE_GRANT_MODE_READONLY_FOLDER
 import com.qualityalternative.app.domain.service.AGENT_INBOX_MANIFEST_FILE_NAME
 import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_IMAGE_ATTACHMENT_BYTES
 import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_MANIFEST_BYTES
 import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_REVIEW_CONTENT_BYTES
+import com.qualityalternative.app.domain.service.AgentInboxDriveAccessLostException
 import com.qualityalternative.app.domain.service.AgentInboxDriveClient
 import com.qualityalternative.app.domain.service.AgentInboxDriveDownloadTooLargeException
 import com.qualityalternative.app.domain.service.AgentInboxDriveFile
@@ -2733,6 +2735,46 @@ class MainViewModelTest {
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
+    fun connectAgentInboxDocumentTreeFolderPersistsSelectorGrantWithoutLeakingUri() = runTest {
+        val folderUri = "content://com.google.android.apps.docs.storage/tree/agent-inbox"
+        val settingsRepository = FakeSettingsRepository()
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val viewModel = createViewModel(
+            settingsRepository = settingsRepository,
+            analyticsTracker = analyticsTracker,
+        )
+
+        advanceUntilIdle()
+        viewModel.connectAgentInboxDocumentTreeFolder(
+            uri = folderUri,
+            displayName = "Agent Inbox",
+            nowMillis = 4_000L,
+        )
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.agentInboxDriveEnabled)
+        assertEquals(folderUri, viewModel.uiState.agentInboxDriveFolderId)
+        assertEquals(AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER, viewModel.uiState.agentInboxDriveGrantMode)
+        assertTrue(viewModel.uiState.hasAgentInboxDocumentTreeFolderGrant)
+        assertTrue(viewModel.uiState.hasAgentInboxDriveFolderGrant)
+        assertEquals(folderUri, settingsRepository.state.value.agentInboxDriveFolderId)
+        assertEquals(
+            AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER,
+            settingsRepository.state.value.agentInboxDriveGrantMode,
+        )
+        val connectedEvent = analyticsTracker.allEvents().single { event ->
+            event.type == AnalyticsEventType.AGENT_INBOX_CONNECTED
+        }
+        assertEquals("documentTreeFolder", connectedEvent.metadata["grantMode"])
+        val remotePayloadText = analyticsTracker.allRemoteSafePayloads().joinToString("\n") { payload ->
+            payload.toString()
+        }
+        assertFalse(remotePayloadText.contains(folderUri))
+        assertFalse(remotePayloadText.contains("agent-inbox"))
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
     fun scanAgentInboxDriveWithLegacyFolderIdWithoutPickerGrantDoesNotCallDrive() = runTest {
         val driveClient = RecordingAgentInboxDriveClient()
         val legacySettings = FakeSettingsRepository(
@@ -2816,7 +2858,7 @@ class MainViewModelTest {
             "Agent Inbox folder access was lost. Connect the folder again.",
             viewModel.uiState.agentInboxDriveLastError,
         )
-        assertEquals("agent-inbox-folder", viewModel.uiState.agentInboxDriveFolderDraft)
+        assertEquals("", viewModel.uiState.agentInboxDriveFolderDraft)
         assertTrue(viewModel.uiState.agentInboxCandidates.isEmpty())
         assertFalse(settingsRepository.state.value.agentInboxDriveEnabled)
         assertEquals(null, settingsRepository.state.value.agentInboxDriveFolderId)
@@ -2825,6 +2867,162 @@ class MainViewModelTest {
             "Agent Inbox folder access was lost. Connect the folder again.",
             settingsRepository.state.value.agentInboxDriveLastError,
         )
+        val failedEvent = analyticsTracker.allEvents().last { event ->
+            event.type == AnalyticsEventType.AGENT_INBOX_SCAN_FAILED
+        }
+        assertEquals("access_lost", failedEvent.metadata["reason"])
+        assertTrue(AnalyticsPrivacyGuard.unsafeRemoteFields(failedEvent.toRemoteAnalyticsPayload()).isEmpty())
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun scanAgentInboxDocumentTreeFolderDoesNotRequireGoogleAccessToken() = runTest {
+        val folderUri = "content://com.google.android.apps.docs.storage/tree/agent-inbox"
+        val contentBytes = "# Agent Note\n\nPrivate attention note.".toByteArray()
+        val driveClient = RecordingAgentInboxDriveClient(
+            scanResult = AgentInboxDriveScanResult(
+                folderId = folderUri,
+                packages = listOf(agentInboxDrivePackage()),
+            ),
+            files = mapOf(
+                "manifest-file" to agentInboxManifest(priority = "normal").toByteArray(),
+                "content-file" to contentBytes,
+            ),
+        )
+        val viewModel = createViewModel(agentInboxDriveClient = driveClient)
+
+        advanceUntilIdle()
+        viewModel.connectAgentInboxDocumentTreeFolder(uri = folderUri, displayName = "Agent Inbox")
+        advanceUntilIdle()
+        viewModel.scanAgentInboxDrive(accessToken = "", nowMillis = 5_000L)
+        advanceUntilIdle()
+
+        assertEquals(folderUri, viewModel.uiState.agentInboxDriveFolderId)
+        assertEquals(AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER, viewModel.uiState.agentInboxDriveGrantMode)
+        assertTrue(viewModel.uiState.hasAgentInboxDocumentTreeFolderGrant)
+        assertEquals("", driveClient.scanRequests.single().accessToken)
+        assertEquals(folderUri, driveClient.scanRequests.single().folderId)
+        assertEquals("agent-package", viewModel.uiState.agentInboxCandidates.single().packageFolderId)
+        assertEquals(listOf("manifest-file", "content-file"), driveClient.downloadedFileIds)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun scanAgentInboxDocumentTreeFolderAccessLostDuringDownloadClearsFolderGrant() = runTest {
+        val folderUri = "content://com.google.android.apps.docs.storage/tree/agent-inbox"
+        val settingsRepository = FakeSettingsRepository()
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val driveClient = RecordingAgentInboxDriveClient(
+            scanResult = AgentInboxDriveScanResult(
+                folderId = folderUri,
+                packages = listOf(agentInboxDrivePackage()),
+            ),
+            downloadFailures = mapOf("manifest-file" to AgentInboxDriveAccessLostException()),
+        )
+        val viewModel = createViewModel(
+            settingsRepository = settingsRepository,
+            agentInboxDriveClient = driveClient,
+            analyticsTracker = analyticsTracker,
+        )
+
+        advanceUntilIdle()
+        viewModel.connectAgentInboxDocumentTreeFolder(uri = folderUri, displayName = "Agent Inbox")
+        advanceUntilIdle()
+        viewModel.scanAgentInboxDrive(accessToken = "", nowMillis = 5_000L)
+        advanceUntilIdle()
+
+        assertEquals(listOf("manifest-file"), driveClient.downloadedFileIds)
+        assertFalse(viewModel.uiState.agentInboxDriveEnabled)
+        assertNull(viewModel.uiState.agentInboxDriveFolderId)
+        assertNull(viewModel.uiState.agentInboxDriveGrantMode)
+        assertFalse(viewModel.uiState.hasAgentInboxDocumentTreeFolderGrant)
+        assertFalse(viewModel.uiState.isAgentInboxScanning)
+        assertEquals(
+            "Agent Inbox folder access was lost. Choose the folder again.",
+            viewModel.uiState.agentInboxDriveLastError,
+        )
+        assertEquals("", viewModel.uiState.agentInboxDriveFolderDraft)
+        assertTrue(viewModel.uiState.agentInboxCandidates.isEmpty())
+        assertFalse(settingsRepository.state.value.agentInboxDriveEnabled)
+        assertNull(settingsRepository.state.value.agentInboxDriveFolderId)
+        assertNull(settingsRepository.state.value.agentInboxDriveGrantMode)
+        assertEquals(
+            "Agent Inbox folder access was lost. Choose the folder again.",
+            settingsRepository.state.value.agentInboxDriveLastError,
+        )
+        val failedEvent = analyticsTracker.allEvents().last { event ->
+            event.type == AnalyticsEventType.AGENT_INBOX_SCAN_FAILED
+        }
+        assertEquals("access_lost", failedEvent.metadata["reason"])
+        assertTrue(AnalyticsPrivacyGuard.unsafeRemoteFields(failedEvent.toRemoteAnalyticsPayload()).isEmpty())
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun importAgentInboxDocumentTreeAccessLostDuringDownloadClearsFolderGrant() = runTest {
+        val folderUri = "content://com.google.android.apps.docs.storage/tree/agent-inbox"
+        val contentBytes = "# Agent Note\n\nPrivate attention note.".toByteArray()
+        val settingsRepository = FakeSettingsRepository()
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val driveClient = RecordingAgentInboxDriveClient(
+            scanResult = AgentInboxDriveScanResult(
+                folderId = folderUri,
+                packages = listOf(agentInboxDrivePackage()),
+            ),
+            files = mapOf(
+                "manifest-file" to agentInboxManifest(priority = "normal").toByteArray(),
+                "content-file" to contentBytes,
+            ),
+            downloadFailuresByOrdinal = mapOf(3 to AgentInboxDriveAccessLostException()),
+        )
+        val userDocumentRepository = FakeUserDocumentRepository()
+        val viewModel = createViewModel(
+            settingsRepository = settingsRepository,
+            userDocumentRepository = userDocumentRepository,
+            agentInboxDriveClient = driveClient,
+            analyticsTracker = analyticsTracker,
+            agentInboxPackageImporter = AgentInboxPackageImporter(
+                userDocumentRepository = userDocumentRepository,
+                documentStore = RecordingAgentInboxDocumentStore(),
+            ),
+        )
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+        viewModel.connectAgentInboxDocumentTreeFolder(uri = folderUri, displayName = "Agent Inbox")
+        advanceUntilIdle()
+        viewModel.scanAgentInboxDrive(accessToken = "", nowMillis = 5_000L)
+        advanceUntilIdle()
+        viewModel.importAgentInboxCandidate(
+            packageFolderId = "agent-package",
+            accessToken = "",
+            nowMillis = 6_000L,
+        )
+        advanceUntilIdle()
+
+        assertEquals(
+            listOf(
+                AgentInboxDownloadRequest("manifest-file", AGENT_INBOX_MAX_MANIFEST_BYTES, accessToken = ""),
+                AgentInboxDownloadRequest("content-file", AGENT_INBOX_MAX_REVIEW_CONTENT_BYTES, accessToken = ""),
+                AgentInboxDownloadRequest("content-file", AGENT_INBOX_MAX_REVIEW_CONTENT_BYTES, accessToken = ""),
+            ),
+            driveClient.downloadRequests,
+        )
+        assertFalse(viewModel.uiState.agentInboxDriveEnabled)
+        assertNull(viewModel.uiState.agentInboxDriveFolderId)
+        assertNull(viewModel.uiState.agentInboxDriveGrantMode)
+        assertFalse(viewModel.uiState.hasAgentInboxDocumentTreeFolderGrant)
+        assertFalse(viewModel.uiState.isAgentInboxImporting)
+        assertEquals(
+            "Agent Inbox folder access was lost. Choose the folder again.",
+            viewModel.uiState.agentInboxDriveLastError,
+        )
+        assertTrue(viewModel.uiState.agentInboxCandidates.isEmpty())
+        assertTrue(userDocumentRepository.documents.value.isEmpty())
+        assertFalse(settingsRepository.state.value.agentInboxDriveEnabled)
+        assertNull(settingsRepository.state.value.agentInboxDriveFolderId)
+        assertNull(settingsRepository.state.value.agentInboxDriveGrantMode)
         val failedEvent = analyticsTracker.allEvents().last { event ->
             event.type == AnalyticsEventType.AGENT_INBOX_SCAN_FAILED
         }
@@ -2968,6 +3166,59 @@ class MainViewModelTest {
         assertEquals(saved.id, importedEvent.contentId)
         assertEquals("true", importedEvent.metadata["acceptedPriority"])
         assertTrue(AnalyticsPrivacyGuard.unsafeRemoteFields(importedEvent.toRemoteAnalyticsPayload()).isEmpty())
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun importAgentInboxDocumentTreeCandidateDoesNotRequireGoogleAccessToken() = runTest {
+        val folderUri = "content://com.google.android.apps.docs.storage/tree/agent-inbox"
+        val contentBytes = "# Agent Note\n\nPrivate attention note.".toByteArray()
+        val driveClient = RecordingAgentInboxDriveClient(
+            scanResult = AgentInboxDriveScanResult(
+                folderId = folderUri,
+                packages = listOf(agentInboxDrivePackage()),
+            ),
+            files = mapOf(
+                "manifest-file" to agentInboxManifest(priority = "normal").toByteArray(),
+                "content-file" to contentBytes,
+            ),
+        )
+        val userDocumentRepository = FakeUserDocumentRepository()
+        val documentStore = RecordingAgentInboxDocumentStore()
+        val viewModel = createViewModel(
+            userDocumentRepository = userDocumentRepository,
+            agentInboxDriveClient = driveClient,
+            agentInboxPackageImporter = AgentInboxPackageImporter(
+                userDocumentRepository = userDocumentRepository,
+                documentStore = documentStore,
+            ),
+        )
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+        viewModel.connectAgentInboxDocumentTreeFolder(uri = folderUri, displayName = "Agent Inbox")
+        advanceUntilIdle()
+        viewModel.scanAgentInboxDrive(accessToken = "", nowMillis = 5_000L)
+        advanceUntilIdle()
+        viewModel.importAgentInboxCandidate(
+            packageFolderId = "agent-package",
+            accessToken = "",
+            nowMillis = 6_000L,
+        )
+        advanceUntilIdle()
+
+        assertEquals("Agent Note", userDocumentRepository.documents.value.single().title)
+        assertTrue(viewModel.uiState.agentInboxCandidates.isEmpty())
+        assertEquals(
+            listOf(
+                AgentInboxDownloadRequest("manifest-file", AGENT_INBOX_MAX_MANIFEST_BYTES, accessToken = ""),
+                AgentInboxDownloadRequest("content-file", AGENT_INBOX_MAX_REVIEW_CONTENT_BYTES, accessToken = ""),
+                AgentInboxDownloadRequest("content-file", AGENT_INBOX_MAX_REVIEW_CONTENT_BYTES, accessToken = ""),
+            ),
+            driveClient.downloadRequests,
+        )
+        assertEquals(contentBytes.toList(), documentStore.writes.single().bytes.toList())
     }
 
     @Test
@@ -7057,6 +7308,7 @@ class MainViewModelTest {
             val normalizedFolderId = folderId?.takeIf(String::isNotBlank)
             val normalizedGrantMode = grantMode.takeIf {
                 it == AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER ||
+                    it == AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER ||
                     it == AGENT_INBOX_DRIVE_GRANT_MODE_READONLY_FOLDER
             } ?: AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER
             state.value = if (normalizedFolderId == null) {
@@ -7089,8 +7341,9 @@ class MainViewModelTest {
         override suspend fun saveAgentInboxDriveScanSuccess(timestampMillis: Long, folderId: String) {
             state.value = if (
                 (
-                    state.value.agentInboxDriveGrantMode == AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER ||
-                        state.value.agentInboxDriveGrantMode == AGENT_INBOX_DRIVE_GRANT_MODE_READONLY_FOLDER
+                state.value.agentInboxDriveGrantMode == AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER ||
+                    state.value.agentInboxDriveGrantMode == AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER ||
+                    state.value.agentInboxDriveGrantMode == AGENT_INBOX_DRIVE_GRANT_MODE_READONLY_FOLDER
                     ) &&
                 state.value.agentInboxDriveFolderId == folderId
             ) {
@@ -7974,6 +8227,7 @@ class MainViewModelTest {
         ),
         private val files: Map<String, ByteArray> = emptyMap(),
         private val downloadFailures: Map<String, Throwable> = emptyMap(),
+        private val downloadFailuresByOrdinal: Map<Int, Throwable> = emptyMap(),
         private val scanFailure: Throwable? = null,
     ) : AgentInboxDriveClient {
         val scanRequests = mutableListOf<AgentInboxDriveScanRequest>()
@@ -7988,7 +8242,12 @@ class MainViewModelTest {
 
         override suspend fun downloadFile(accessToken: String, fileId: String, maxBytes: Long): ByteArray {
             downloadedFileIds += fileId
-            downloadRequests += AgentInboxDownloadRequest(fileId = fileId, maxBytes = maxBytes)
+            downloadRequests += AgentInboxDownloadRequest(
+                fileId = fileId,
+                maxBytes = maxBytes,
+                accessToken = accessToken,
+            )
+            downloadFailuresByOrdinal[downloadRequests.size]?.let { error -> throw error }
             downloadFailures[fileId]?.let { error -> throw error }
             val bytes = files[fileId] ?: error("Missing fake Drive file $fileId")
             if (bytes.size.toLong() > maxBytes) {
@@ -8001,6 +8260,7 @@ class MainViewModelTest {
     private data class AgentInboxDownloadRequest(
         val fileId: String,
         val maxBytes: Long,
+        val accessToken: String = "drive-token",
     )
 
     private fun MainViewModel.selectAgentInboxDriveFolderForTest(

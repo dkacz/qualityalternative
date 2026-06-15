@@ -20,6 +20,7 @@ import com.qualityalternative.app.domain.model.OnboardingSelection
 import com.qualityalternative.app.domain.model.TopicTag
 import com.qualityalternative.app.domain.model.WebsiteRule
 import com.qualityalternative.app.domain.model.WebsiteRuleType
+import com.qualityalternative.app.domain.service.AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER
 import com.qualityalternative.app.domain.service.AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER
 import com.qualityalternative.app.domain.service.AGENT_INBOX_DRIVE_GRANT_MODE_READONLY_FOLDER
 import java.io.File
@@ -453,6 +454,25 @@ class PreferencesSettingsRepositoryTest {
         assertEquals(AGENT_INBOX_DRIVE_GRANT_MODE_READONLY_FOLDER, readonlySynced.agentInboxDriveGrantMode)
         assertEquals(8_500L, readonlySynced.agentInboxDriveLastSuccessfulAtMillis)
         assertEquals(null, readonlySynced.agentInboxDriveLastError)
+
+        repository.saveAgentInboxDriveConnection(
+            folderId = "content://com.google.android.apps.docs.storage/tree/agent-inbox",
+            grantMode = AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER,
+        )
+        repository.saveAgentInboxDriveScanSuccess(
+            timestampMillis = 8_750L,
+            folderId = "content://com.google.android.apps.docs.storage/tree/agent-inbox",
+        )
+
+        val documentTreeSynced = repository.observeAppSettings().first()
+        assertEquals(true, documentTreeSynced.agentInboxDriveEnabled)
+        assertEquals(
+            "content://com.google.android.apps.docs.storage/tree/agent-inbox",
+            documentTreeSynced.agentInboxDriveFolderId,
+        )
+        assertEquals(AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER, documentTreeSynced.agentInboxDriveGrantMode)
+        assertEquals(8_750L, documentTreeSynced.agentInboxDriveLastSuccessfulAtMillis)
+        assertEquals(null, documentTreeSynced.agentInboxDriveLastError)
 
         repository.saveAgentInboxDriveScanSuccess(
             timestampMillis = 9_000L,

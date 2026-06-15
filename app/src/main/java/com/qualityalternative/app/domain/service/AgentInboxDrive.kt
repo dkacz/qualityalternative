@@ -10,6 +10,7 @@ const val AGENT_INBOX_MAX_IMAGE_ATTACHMENT_BYTES = 5L * 1024L * 1024L
 const val AGENT_INBOX_MAX_TOTAL_IMAGE_ATTACHMENT_BYTES = 15L * 1024L * 1024L
 const val AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER = "picker_folder"
 const val AGENT_INBOX_DRIVE_GRANT_MODE_READONLY_FOLDER = "readonly_folder"
+const val AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER = "document_tree_folder"
 
 data class AgentInboxDriveScanRequest(
     val accessToken: String,
@@ -51,6 +52,11 @@ class AgentInboxDriveHttpException(
     val statusCode: Int,
     val errorBody: String,
 ) : java.io.IOException("Drive request failed with HTTP $statusCode${errorBody.toErrorSuffix()}")
+
+class AgentInboxDriveAccessLostException(
+    message: String = "Agent Inbox folder access was lost.",
+    cause: Throwable? = null,
+) : java.io.IOException(message, cause)
 
 interface AgentInboxDriveClient {
     suspend fun scanPackages(request: AgentInboxDriveScanRequest): AgentInboxDriveScanResult

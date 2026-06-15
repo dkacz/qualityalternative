@@ -24,6 +24,7 @@ import com.qualityalternative.app.domain.model.WebsiteRule
 import com.qualityalternative.app.domain.model.WebsiteRuleType
 import com.qualityalternative.app.domain.service.AddUserDocumentResult
 import com.qualityalternative.app.domain.service.AddUserLinkResult
+import com.qualityalternative.app.domain.service.AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER
 import com.qualityalternative.app.domain.service.ReadingProgressRepository
 import com.qualityalternative.app.domain.service.UserDocumentRepository
 import com.qualityalternative.app.domain.service.UserLinkRepository
@@ -93,9 +94,13 @@ class AccountLightProfileExporterTest {
             timestampMillis = 13_000L,
             folderId = "raw-drive-folder-id",
         )
+        repository.saveAgentInboxDriveConnection(
+            folderId = "content://com.google.android.apps.docs.storage/tree/raw-agent-inbox-tree-id",
+            grantMode = AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER,
+        )
         repository.saveAgentInboxDriveScanSuccess(
             timestampMillis = 15_000L,
-            folderId = "raw-agent-inbox-folder-id",
+            folderId = "content://com.google.android.apps.docs.storage/tree/raw-agent-inbox-tree-id",
         )
         repository.saveAgentInboxDriveScanFailure(
             "Agent Inbox scan failed for raw-agent-inbox-folder-id",
@@ -185,6 +190,7 @@ class AccountLightProfileExporterTest {
         assertFalse(rawJson.contains("content://"))
         assertFalse(rawJson.contains("raw-drive-folder-id"))
         assertFalse(rawJson.contains("raw-agent-inbox-folder-id"))
+        assertFalse(rawJson.contains("raw-agent-inbox-tree-id"))
         assertFalse(rawJson.contains("Agent Inbox scan failed"))
         assertFalse(rawJson.contains("agentInbox"))
         assertFalse(rawJson.contains("agent_inbox"))

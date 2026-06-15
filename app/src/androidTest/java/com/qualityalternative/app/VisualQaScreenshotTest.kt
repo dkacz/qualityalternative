@@ -33,7 +33,9 @@ import androidx.compose.ui.test.swipeRight
 import androidx.compose.ui.test.swipeUp
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
+import androidx.test.uiautomator.Until
 import com.qualityalternative.app.data.AgentInboxManifest
 import com.qualityalternative.app.data.AgentInboxManifestValidator
 import com.qualityalternative.app.data.AgentInboxPackageValidationError
@@ -94,7 +96,7 @@ class VisualQaScreenshotTest {
     private val sprint25ScreenshotDirName = "sprint25-markdown-media-tables-${System.currentTimeMillis()}"
     private val sprint26ScreenshotDirName = "sprint26-custom-targets-${System.currentTimeMillis()}"
     private val sprint27ScreenshotDirName = "sprint27-agent-content-inbox-${System.currentTimeMillis()}"
-    private val sprint28ScreenshotDirName = "sprint28-agent-inbox-drive-access-${System.currentTimeMillis()}"
+    private val sprint29ScreenshotDirName = "sprint29-agent-inbox-folder-selector-${System.currentTimeMillis()}"
     private lateinit var screenshotDir: File
     private lateinit var legacyScreenshotDir: File
     private lateinit var sprint10ScreenshotDir: File
@@ -110,7 +112,7 @@ class VisualQaScreenshotTest {
     private lateinit var sprint25ScreenshotDir: File
     private lateinit var sprint26ScreenshotDir: File
     private lateinit var sprint27ScreenshotDir: File
-    private lateinit var sprint28ScreenshotDir: File
+    private lateinit var sprint29ScreenshotDir: File
 
     @Before
     fun resetAppState() {
@@ -162,9 +164,9 @@ class VisualQaScreenshotTest {
         sprint27ScreenshotDir = File("/sdcard/Download/qualityalternative/$sprint27ScreenshotDirName")
         sprint27ScreenshotDir.deleteRecursively()
         sprint27ScreenshotDir.mkdirs()
-        sprint28ScreenshotDir = File("/sdcard/Download/qualityalternative/$sprint28ScreenshotDirName")
-        sprint28ScreenshotDir.deleteRecursively()
-        sprint28ScreenshotDir.mkdirs()
+        sprint29ScreenshotDir = File("/sdcard/Download/qualityalternative/$sprint29ScreenshotDirName")
+        sprint29ScreenshotDir.deleteRecursively()
+        sprint29ScreenshotDir.mkdirs()
     }
 
     @After
@@ -725,7 +727,7 @@ class VisualQaScreenshotTest {
         openTab("tab-settings", "settings-list")
         composeRule.onNodeWithTag("settings-list")
             .performScrollToNode(hasTestTag("settings-agent-inbox-section"))
-        composeRule.onNodeWithText("Google Drive Agent Inbox not connected").assertIsDisplayed()
+        composeRule.onNodeWithText("Agent Inbox folder not selected").assertIsDisplayed()
         composeRule.onNodeWithTag("settings-agent-inbox-scan").assertIsDisplayed().assertIsEnabled()
         captureSprint27("00_agent_inbox_disconnected_light")
 
@@ -746,7 +748,7 @@ class VisualQaScreenshotTest {
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("settings-list") }
         composeRule.onNodeWithTag("settings-list")
             .performScrollToNode(hasTestTag("settings-agent-inbox-section"))
-        composeRule.onNodeWithText("Google Drive Agent Inbox folder connected").assertIsDisplayed()
+        composeRule.onNodeWithText("Agent Inbox folder connected").assertIsDisplayed()
         composeRule.onNodeWithText("No packages waiting for review.").assertIsDisplayed()
         composeRule.onNodeWithTag("settings-agent-inbox-disconnect").assertIsDisplayed().assertIsEnabled()
         captureSprint27("01_agent_inbox_connected_empty_light")
@@ -757,7 +759,7 @@ class VisualQaScreenshotTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("settings-list")
             .performScrollToNode(hasTestTag("settings-agent-inbox-candidate-visual-ready"))
-        composeRule.onNodeWithText("Google Drive Agent Inbox folder connected").assertIsDisplayed()
+        composeRule.onNodeWithText("Agent Inbox folder connected").assertIsDisplayed()
         composeRule.onNodeWithTag("settings-agent-inbox-status").assertIsDisplayed()
         composeRule.onNodeWithText("Agent Focus Notes").assertIsDisplayed()
         composeRule.onNodeWithText("Accept priority").assertIsDisplayed()
@@ -852,56 +854,71 @@ class VisualQaScreenshotTest {
     }
 
     @Test
-    fun captureSprint28AgentInboxDriveAccessStates() {
+    fun captureSprint29AgentInboxFolderSelectorStates() {
         launchOnboardedApp()
 
         openTab("tab-settings", "settings-list")
         composeRule.onNodeWithTag("settings-list")
             .performScrollToNode(hasTestTag("settings-agent-inbox-section"))
-        composeRule.onNodeWithText("Google Drive Agent Inbox not connected").assertIsDisplayed()
-        composeRule.onNodeWithTag("settings-agent-inbox-folder-draft").assertIsDisplayed()
+        composeRule.onNodeWithText("Agent Inbox folder not selected").assertIsDisplayed()
         composeRule.onNodeWithTag("settings-agent-inbox-scan").assertIsDisplayed().assertIsEnabled()
-        composeRule.onNodeWithText("Connect folder").assertIsDisplayed()
-        captureSprint28("00_agent_inbox_connect_folder_light")
+        composeRule.onNodeWithText("Choose folder").assertIsDisplayed()
+        captureSprint29("00_agent_inbox_choose_folder_light")
 
-        scenario?.onActivity { activity ->
-            activity.mainViewModel.connectAgentInboxReadonlyDriveFolder(
-                folderId = "visual-readonly-folder",
-                nowMillis = 1_781_256_700_000L,
-            )
+        composeRule.onNodeWithTag("settings-agent-inbox-scan").performClick()
+        val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            device.currentPackageName != "com.qualityalternative.app"
+        }
+        assertTrue(
+            "Expected Android folder picker instead of an in-app paste field.",
+            device.currentPackageName.contains("documentsui"),
+        )
+        captureSprint29("00b_agent_inbox_system_folder_picker_light")
+        val documentsFolder = device.wait(Until.findObject(By.text("Documents")), 5_000)
+            ?: error("Expected Documents folder in Android folder picker.")
+        documentsFolder.click()
+        val useFolderButton = device.wait(Until.findObject(By.text("USE THIS FOLDER")), 5_000)
+            ?: error("Expected Use this folder action after selecting Documents.")
+        useFolderButton.click()
+        val allowButton = device.wait(Until.findObject(By.text("ALLOW")), 3_000)
+            ?: device.wait(Until.findObject(By.text("Allow")), 1_000)
+        allowButton?.click()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            device.currentPackageName == "com.qualityalternative.app"
         }
         composeRule.waitUntil(timeoutMillis = 10_000) {
-            hasNode("Google Drive Agent Inbox folder connected")
+            hasNode("Agent Inbox folder connected")
         }
         composeRule.onNodeWithTag("settings-list")
             .performScrollToNode(hasTestTag("settings-agent-inbox-section"))
-        composeRule.onNodeWithText("Google Drive Agent Inbox folder connected").assertIsDisplayed()
-        composeRule.onNodeWithText("Drive read access", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("Agent Inbox folder connected").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings-agent-inbox-status").assertIsDisplayed()
         composeRule.onNodeWithText("Scan now").assertIsDisplayed()
         composeRule.onNodeWithTag("settings-agent-inbox-disconnect").assertIsDisplayed().assertIsEnabled()
-        waitForTransientMessageToClear("Agent Inbox folder connected with Drive read access.")
-        captureSprint28("01_agent_inbox_readonly_folder_connected_light")
+        waitForTransientMessageToClear("Agent Inbox folder selected.")
+        captureSprint29("01_agent_inbox_document_tree_folder_connected_light")
 
         scenario?.onActivity { activity ->
             activity.mainViewModel.seedAgentInboxDriveAccessLostForTests()
         }
         composeRule.waitUntil(timeoutMillis = 10_000) {
-            hasNode("Google Drive Agent Inbox not connected")
+            hasNode("Agent Inbox folder not selected")
         }
         composeRule.onNodeWithTag("settings-list")
             .performScrollToNode(hasTestTag("settings-agent-inbox-section"))
-        composeRule.onNodeWithText("Google Drive Agent Inbox not connected").assertIsDisplayed()
-        composeRule.onNodeWithTag("settings-agent-inbox-folder-draft").assertIsDisplayed()
-        composeRule.onNodeWithText("Connect folder").assertIsDisplayed()
+        composeRule.onNodeWithText("Agent Inbox folder not selected").assertIsDisplayed()
+        composeRule.onNodeWithText("Choose folder").assertIsDisplayed()
         waitForTransientMessageToClear("Agent Inbox folder access was lost.")
-        captureSprint28("02_agent_inbox_access_lost_light")
+        captureSprint29("02_agent_inbox_access_lost_light")
 
         val imageDriveClient = VisualAgentInboxDriveClient()
         val imageFixture = agentInboxMarkdownImageVisualFixture()
         scenario?.onActivity { activity ->
             activity.mainViewModel.setAgentInboxDriveClientForTests(imageDriveClient)
-            activity.mainViewModel.connectAgentInboxReadonlyDriveFolder(
-                folderId = "visual-readonly-folder",
+            activity.mainViewModel.connectAgentInboxDocumentTreeFolder(
+                uri = "content://com.google.android.apps.docs.storage/tree/visual-agent-inbox",
+                displayName = "Visual Agent Inbox",
                 nowMillis = 1_781_256_702_000L,
             )
         }
@@ -910,6 +927,7 @@ class VisualQaScreenshotTest {
             fixture = imageFixture,
             acceptPriority = false,
             nowMillis = 1_781_256_703_000L,
+            accessToken = "",
         )
         assertTrue(
             "Expected Agent Inbox Markdown image attachment to import with the user document",
@@ -919,12 +937,13 @@ class VisualQaScreenshotTest {
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-markdown-image") }
         composeRule.onNodeWithText("Inbox blue square").assertIsDisplayed()
-        captureSprint28("03_agent_inbox_markdown_image_reader_light")
+        captureSprint29("03_agent_inbox_markdown_image_reader_light")
 
         scenario?.onActivity { activity ->
             activity.mainViewModel.openSettings()
-            activity.mainViewModel.connectAgentInboxReadonlyDriveFolder(
-                folderId = "visual-readonly-folder",
+            activity.mainViewModel.connectAgentInboxDocumentTreeFolder(
+                uri = "content://com.google.android.apps.docs.storage/tree/visual-agent-inbox",
+                displayName = "Visual Agent Inbox",
                 nowMillis = 1_781_256_704_000L,
             )
             activity.mainViewModel.selectThemeMode(AppThemeMode.DARK)
@@ -932,10 +951,10 @@ class VisualQaScreenshotTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("settings-list")
             .performScrollToNode(hasTestTag("settings-agent-inbox-section"))
-        composeRule.onNodeWithText("Google Drive Agent Inbox folder connected").assertIsDisplayed()
-        composeRule.onNodeWithText("Drive read access", substring = true).assertIsDisplayed()
-        waitForTransientMessageToClear("Agent Inbox folder connected with Drive read access.")
-        captureSprint28("04_agent_inbox_readonly_folder_connected_dark")
+        composeRule.onNodeWithText("Agent Inbox folder connected").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings-agent-inbox-status").assertIsDisplayed()
+        waitForTransientMessageToClear("Agent Inbox folder selected.")
+        captureSprint29("04_agent_inbox_document_tree_folder_connected_dark")
     }
 
     @Test
@@ -2063,8 +2082,8 @@ class VisualQaScreenshotTest {
         captureTo(sprint27ScreenshotDir, name)
     }
 
-    private fun captureSprint28(name: String) {
-        captureTo(sprint28ScreenshotDir, name)
+    private fun captureSprint29(name: String) {
+        captureTo(sprint29ScreenshotDir, name)
     }
 
     private fun captureTo(directory: File, name: String) {
@@ -2335,6 +2354,7 @@ class VisualQaScreenshotTest {
         fixture: VisualAgentInboxPackageFixture,
         acceptPriority: Boolean,
         nowMillis: Long,
+        accessToken: String = "visual-agent-token",
     ): ContentItem {
         val app = InstrumentationRegistry.getInstrumentation()
             .targetContext
@@ -2345,7 +2365,7 @@ class VisualQaScreenshotTest {
         }
         openTab("tab-settings", "settings-list")
         scenario?.onActivity { activity ->
-            activity.mainViewModel.scanAgentInboxDrive(accessToken = "visual-agent-token", nowMillis = nowMillis)
+            activity.mainViewModel.scanAgentInboxDrive(accessToken = accessToken, nowMillis = nowMillis)
         }
         composeRule.waitUntil(timeoutMillis = 10_000) {
             hasTag("settings-agent-inbox-candidate-${fixture.packageFolderId}")
@@ -2364,7 +2384,7 @@ class VisualQaScreenshotTest {
         scenario?.onActivity { activity ->
             activity.mainViewModel.importAgentInboxCandidate(
                 packageFolderId = fixture.packageFolderId,
-                accessToken = "visual-agent-token",
+                accessToken = accessToken,
                 nowMillis = nowMillis + 1L,
             )
         }

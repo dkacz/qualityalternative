@@ -1,6 +1,6 @@
 # Lane Status
 
-Status timestamp: 2026-06-14
+Status timestamp: 2026-06-15
 
 This file is the repo-level index for active and recently completed execution lanes. It should point to the canonical branch, review lane, validation artifacts, and next gate for each lane.
 
@@ -10,6 +10,41 @@ This file is the repo-level index for active and recently completed execution la
 - Use the branch-specific sprint docs for detailed implementation notes.
 - Heartbeats should exist only while waiting for a current GPT Pro lane.
 - Do not infer lane status from untracked local files alone. For example, `ios/` can appear untracked on non-iOS branches; the canonical iOS implementation source is the pushed iOS branch listed below.
+
+## Sprint 29 Agent Inbox Folder Selector
+
+Status: `gpt_pro_passed`
+
+- Branch: `codex/sprint29-agent-inbox-folder-selector`
+- Scope: remove the need to paste an Agent Inbox Drive folder URL/id by making Android's normal folder picker the primary connection path.
+- Canonical sprint plan: `docs/SPRINT_29_AGENT_INBOX_FOLDER_SELECTOR.md`
+- Current implementation state:
+  - Added `AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER`.
+  - Added a document-tree Agent Inbox client that scans direct child folders under a persisted `content://tree/...` URI and downloads manifest/content/image files through the selected tree grant.
+  - Added a hybrid production client so existing Google Drive API folder ids still route through the Drive API, while new system-folder grants route through DocumentsProvider.
+  - Settings disconnected Agent Inbox state now shows `Choose folder` and launches `OpenDocumentTree`; it no longer shows the pasted Drive folder URL/id field in the primary UX.
+  - Document-tree scan/import no longer require a Google OAuth token; the persisted URI read grant is the authorization boundary.
+  - Disconnect releases the persisted document-tree read permission.
+  - Historical `drive.readonly` compatibility remains for already-connected states, but the disconnected primary UX is the folder selector.
+  - GPT Pro R1 returned `SCORE 8/10`, `VERDICT REVISE`, `VISUAL REVIEW REVISE`; R2 fixes the access-loss stream handling and stale Drive visual copy.
+  - R2 visual evidence uses `VisualQaScreenshotTest#captureSprint29AgentInboxFolderSelectorStates`, opens Android DocumentsUI, selects the `Documents` folder through the system picker, returns through the real ActivityResult callback, and captures the connected folder state.
+  - R2 adds direct Portable Profile exporter evidence that raw `content://tree/...` Agent Inbox folder URIs are omitted from profile JSON.
+  - GPT Pro R2 returned `SCORE 10/10`, `VERDICT PASS`, `VISUAL REVIEW PASS`; fresh findings none, bundle gaps none.
+- Validation:
+  - Passed: targeted `MainViewModelTest`, `PreferencesSettingsRepositoryTest`, and `AccountLightProfileExporterTest`.
+  - Passed: full local gate `testDebugUnitTest :app:compileDebugAndroidTestKotlin :app:lintDebug :app:processReleaseManifestForPackage :app:assembleDebug`.
+  - Passed: focused connected visual E2E on `qaApi36(AVD) - 16` for `VisualQaScreenshotTest#captureSprint29AgentInboxFolderSelectorStates`.
+  - Passed: full `connectedDebugAndroidTest` on `qaApi36(AVD) - 16`, 138/138 tests, 0 skipped, 0 failed.
+  - Passed: `git diff --check`.
+- Evidence:
+  - Visual selector contact sheet: `evidence/sprint29_agent_inbox_folder_selector/visual_e2e_selector_r2/contact_sheet_selector_r2.png`
+  - Visual selector screenshots: `evidence/sprint29_agent_inbox_folder_selector/visual_e2e_selector_r2/sprint29-agent-inbox-folder-selector-1781513593337/`
+  - Focused visual result XML/logcat: `evidence/sprint29_agent_inbox_folder_selector/visual_e2e_selector_r2/TEST-sprint29-selector-visual-r2.xml`, `evidence/sprint29_agent_inbox_folder_selector/visual_e2e_selector_r2/logcat-sprint29-selector-visual-r2.txt`
+  - Full connected log/XML: `evidence/sprint29_agent_inbox_folder_selector/logs/full_connected_debug_android_test_r2.log`, `evidence/sprint29_agent_inbox_folder_selector/logs/TEST-full-connected-debug-android-test-r2.xml`
+  - Local gate log: `evidence/sprint29_agent_inbox_folder_selector/logs/full_local_gate_r2.log`
+  - GPT Pro R2 output: `evidence/sprint29_agent_inbox_folder_selector/GPT_PRO_REVIEW_R2.md`
+- Next gate:
+  - Commit the completed sprint branch and decide whether to roll this into an APK release gate.
 
 ## Sprint 28 Agent Inbox Drive Access Fix
 

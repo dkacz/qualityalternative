@@ -1,0 +1,1783 @@
+diff --git a/PRD.md b/PRD.md
+index e16b078..1d4c04e 100644
+--- a/PRD.md
++++ b/PRD.md
+@@ -256,10 +256,10 @@ The system may let the user import private replacement content prepared by Codex
+
+ #### Acceptance Criteria
+
+-- User can authorize Google Drive access for an Agent Inbox folder through an explicit Settings action.
++- User can authorize an Agent Inbox folder through an explicit Settings action that opens a normal Android folder picker. On devices where Google Drive is available as a DocumentsProvider, the user should choose the Google Drive folder there rather than pasting a folder id.
+ - The Agent Inbox uses the narrowest practical Drive access model and must not scan the user's whole Drive.
+-- Under `drive.file`, Agent Inbox folder access must be granted by an explicit Google Picker folder selection or by files the app created itself. Packages uploaded later by a user-controlled external tool such as rclone must be supported only after the selected folder grant is proven to expose those package children to the app; otherwise the fallback scope decision must be documented before widening access.
+-- If the Picker folder grant cannot be obtained or cannot expose later rclone-added package children, the controlled fallback may use `drive.readonly` only after explicit user consent and only for a user-supplied Agent Inbox folder URL/id. The app must not search or scan the user's whole Drive to discover an inbox folder.
++- Under `drive.file`, Agent Inbox folder access must be granted by an explicit Google Picker folder selection or by files the app created itself. Packages uploaded later by a user-controlled external tool such as rclone must be supported only after the selected folder grant is proven to expose those package children to the app; otherwise the fallback scope decision must be documented before widening access or changing the folder-selection mechanism.
++- If the Google Picker folder grant cannot be obtained or cannot expose later rclone-added package children, the preferred user-facing fallback is Android `OpenDocumentTree`: the user selects the Agent Inbox folder in the system folder picker, the app persists the folder URI read grant, and the app scans only that selected tree. A controlled `drive.readonly` fallback may remain for migration or device-specific recovery only after explicit user consent and only for a user-supplied Agent Inbox folder URL/id. The app must not search or scan the user's whole Drive to discover an inbox folder.
+ - The app must not silently create a separate app-owned inbox folder when the user intends to scan an externally populated Agent Inbox folder.
+ - Each import candidate is represented by a package containing a manifest plus one Markdown or EPUB content file. Markdown packages may also include bounded sidecar image attachments referenced by that Markdown file; EPUB packages must keep their assets inside the EPUB and may not add package sidecars.
+ - The package manifest stores title, topic tags, source label, rights class, optional description, optional priority intent, and enough file identity data to detect duplicates.
+@@ -499,7 +499,7 @@ The system must provide account-like portability without requiring a Quality Alt
+ - Export/import should preserve behaviorally important state without pretending to provide server-backed identity, cross-device conflict resolution, or guaranteed document-file transfer.
+ - Any cloud sync must be explicit, revocable, and scoped to user-owned files. Cloud authorization state must be re-established on each device rather than copied through profile export.
+ - Agent Inbox cloud access must remain explicit, revocable, finite, and user-reviewed. The product must not ingest agent-produced Drive content without a visible accept/reject step.
+-- Agent Inbox Drive access must prefer Picker-scoped `drive.file` grants over broader Drive scopes. A move to `drive.readonly` is allowed only after the Picker-folder flow is tested and documented as unavailable or insufficient for externally added package children. The `drive.readonly` fallback must be explicit, revocable, limited in app behavior to the user-supplied Agent Inbox folder id, and described in Settings copy as broader Drive read authorization.
++- Agent Inbox Drive access must prefer user-scoped folder selection over broader Drive scopes. If Google Picker folder selection is unavailable, Android `OpenDocumentTree` is the preferred user-facing fallback because it gives a revocable persisted read grant to the selected folder tree without requiring a pasted Drive id. A move to visible `drive.readonly` UX is allowed only after Picker and Android folder-selection flows are tested and documented as unavailable or insufficient for externally added package children. Any retained `drive.readonly` compatibility path must be explicit, revocable, limited in app behavior to the user-supplied Agent Inbox folder id, and described as broader Drive read authorization.
+ - Website matching must remain local-first and user-authored. The app must not collect browsing history as an input or side effect of website target matching.
+
+ ## Content Strategy for MVP
+diff --git a/app/src/androidTest/java/com/qualityalternative/app/VisualQaScreenshotTest.kt b/app/src/androidTest/java/com/qualityalternative/app/VisualQaScreenshotTest.kt
+index ba4aff0..db89d05 100644
+--- a/app/src/androidTest/java/com/qualityalternative/app/VisualQaScreenshotTest.kt
++++ b/app/src/androidTest/java/com/qualityalternative/app/VisualQaScreenshotTest.kt
+@@ -33,7 +33,9 @@ import androidx.compose.ui.test.swipeRight
+ import androidx.compose.ui.test.swipeUp
+ import androidx.test.core.app.ActivityScenario
+ import androidx.test.platform.app.InstrumentationRegistry
++import androidx.test.uiautomator.By
+ import androidx.test.uiautomator.UiDevice
++import androidx.test.uiautomator.Until
+ import com.qualityalternative.app.data.AgentInboxManifest
+ import com.qualityalternative.app.data.AgentInboxManifestValidator
+ import com.qualityalternative.app.data.AgentInboxPackageValidationError
+@@ -94,7 +96,7 @@ class VisualQaScreenshotTest {
+     private val sprint25ScreenshotDirName = "sprint25-markdown-media-tables-${System.currentTimeMillis()}"
+     private val sprint26ScreenshotDirName = "sprint26-custom-targets-${System.currentTimeMillis()}"
+     private val sprint27ScreenshotDirName = "sprint27-agent-content-inbox-${System.currentTimeMillis()}"
+-    private val sprint28ScreenshotDirName = "sprint28-agent-inbox-drive-access-${System.currentTimeMillis()}"
++    private val sprint29ScreenshotDirName = "sprint29-agent-inbox-folder-selector-${System.currentTimeMillis()}"
+     private lateinit var screenshotDir: File
+     private lateinit var legacyScreenshotDir: File
+     private lateinit var sprint10ScreenshotDir: File
+@@ -110,7 +112,7 @@ class VisualQaScreenshotTest {
+     private lateinit var sprint25ScreenshotDir: File
+     private lateinit var sprint26ScreenshotDir: File
+     private lateinit var sprint27ScreenshotDir: File
+-    private lateinit var sprint28ScreenshotDir: File
++    private lateinit var sprint29ScreenshotDir: File
+
+     @Before
+     fun resetAppState() {
+@@ -162,9 +164,9 @@ class VisualQaScreenshotTest {
+         sprint27ScreenshotDir = File("/sdcard/Download/qualityalternative/$sprint27ScreenshotDirName")
+         sprint27ScreenshotDir.deleteRecursively()
+         sprint27ScreenshotDir.mkdirs()
+-        sprint28ScreenshotDir = File("/sdcard/Download/qualityalternative/$sprint28ScreenshotDirName")
+-        sprint28ScreenshotDir.deleteRecursively()
+-        sprint28ScreenshotDir.mkdirs()
++        sprint29ScreenshotDir = File("/sdcard/Download/qualityalternative/$sprint29ScreenshotDirName")
++        sprint29ScreenshotDir.deleteRecursively()
++        sprint29ScreenshotDir.mkdirs()
+     }
+
+     @After
+@@ -725,7 +727,7 @@ class VisualQaScreenshotTest {
+         openTab("tab-settings", "settings-list")
+         composeRule.onNodeWithTag("settings-list")
+             .performScrollToNode(hasTestTag("settings-agent-inbox-section"))
+-        composeRule.onNodeWithText("Google Drive Agent Inbox not connected").assertIsDisplayed()
++        composeRule.onNodeWithText("Agent Inbox folder not selected").assertIsDisplayed()
+         composeRule.onNodeWithTag("settings-agent-inbox-scan").assertIsDisplayed().assertIsEnabled()
+         captureSprint27("00_agent_inbox_disconnected_light")
+
+@@ -746,7 +748,7 @@ class VisualQaScreenshotTest {
+         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("settings-list") }
+         composeRule.onNodeWithTag("settings-list")
+             .performScrollToNode(hasTestTag("settings-agent-inbox-section"))
+-        composeRule.onNodeWithText("Google Drive Agent Inbox folder connected").assertIsDisplayed()
++        composeRule.onNodeWithText("Agent Inbox folder connected").assertIsDisplayed()
+         composeRule.onNodeWithText("No packages waiting for review.").assertIsDisplayed()
+         composeRule.onNodeWithTag("settings-agent-inbox-disconnect").assertIsDisplayed().assertIsEnabled()
+         captureSprint27("01_agent_inbox_connected_empty_light")
+@@ -757,7 +759,7 @@ class VisualQaScreenshotTest {
+         composeRule.waitForIdle()
+         composeRule.onNodeWithTag("settings-list")
+             .performScrollToNode(hasTestTag("settings-agent-inbox-candidate-visual-ready"))
+-        composeRule.onNodeWithText("Google Drive Agent Inbox folder connected").assertIsDisplayed()
++        composeRule.onNodeWithText("Agent Inbox folder connected").assertIsDisplayed()
+         composeRule.onNodeWithTag("settings-agent-inbox-status").assertIsDisplayed()
+         composeRule.onNodeWithText("Agent Focus Notes").assertIsDisplayed()
+         composeRule.onNodeWithText("Accept priority").assertIsDisplayed()
+@@ -852,56 +854,71 @@ class VisualQaScreenshotTest {
+     }
+
+     @Test
+-    fun captureSprint28AgentInboxDriveAccessStates() {
++    fun captureSprint29AgentInboxFolderSelectorStates() {
+         launchOnboardedApp()
+
+         openTab("tab-settings", "settings-list")
+         composeRule.onNodeWithTag("settings-list")
+             .performScrollToNode(hasTestTag("settings-agent-inbox-section"))
+-        composeRule.onNodeWithText("Google Drive Agent Inbox not connected").assertIsDisplayed()
+-        composeRule.onNodeWithTag("settings-agent-inbox-folder-draft").assertIsDisplayed()
++        composeRule.onNodeWithText("Agent Inbox folder not selected").assertIsDisplayed()
+         composeRule.onNodeWithTag("settings-agent-inbox-scan").assertIsDisplayed().assertIsEnabled()
+-        composeRule.onNodeWithText("Connect folder").assertIsDisplayed()
+-        captureSprint28("00_agent_inbox_connect_folder_light")
++        composeRule.onNodeWithText("Choose folder").assertIsDisplayed()
++        captureSprint29("00_agent_inbox_choose_folder_light")
+
+-        scenario?.onActivity { activity ->
+-            activity.mainViewModel.connectAgentInboxReadonlyDriveFolder(
+-                folderId = "visual-readonly-folder",
+-                nowMillis = 1_781_256_700_000L,
+-            )
++        composeRule.onNodeWithTag("settings-agent-inbox-scan").performClick()
++        val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
++        composeRule.waitUntil(timeoutMillis = 10_000) {
++            device.currentPackageName != "com.qualityalternative.app"
+         }
++        assertTrue(
++            "Expected Android folder picker instead of an in-app paste field.",
++            device.currentPackageName.contains("documentsui"),
++        )
++        captureSprint29("00b_agent_inbox_system_folder_picker_light")
++        val documentsFolder = device.wait(Until.findObject(By.text("Documents")), 5_000)
++            ?: error("Expected Documents folder in Android folder picker.")
++        documentsFolder.click()
++        val useFolderButton = device.wait(Until.findObject(By.text("USE THIS FOLDER")), 5_000)
++            ?: error("Expected Use this folder action after selecting Documents.")
++        useFolderButton.click()
++        val allowButton = device.wait(Until.findObject(By.text("ALLOW")), 3_000)
++            ?: device.wait(Until.findObject(By.text("Allow")), 1_000)
++        allowButton?.click()
+         composeRule.waitUntil(timeoutMillis = 10_000) {
+-            hasNode("Google Drive Agent Inbox folder connected")
++            device.currentPackageName == "com.qualityalternative.app"
++        }
++        composeRule.waitUntil(timeoutMillis = 10_000) {
++            hasNode("Agent Inbox folder connected")
+         }
+         composeRule.onNodeWithTag("settings-list")
+             .performScrollToNode(hasTestTag("settings-agent-inbox-section"))
+-        composeRule.onNodeWithText("Google Drive Agent Inbox folder connected").assertIsDisplayed()
+-        composeRule.onNodeWithText("Drive read access", substring = true).assertIsDisplayed()
++        composeRule.onNodeWithText("Agent Inbox folder connected").assertIsDisplayed()
++        composeRule.onNodeWithTag("settings-agent-inbox-status").assertIsDisplayed()
+         composeRule.onNodeWithText("Scan now").assertIsDisplayed()
+         composeRule.onNodeWithTag("settings-agent-inbox-disconnect").assertIsDisplayed().assertIsEnabled()
+-        waitForTransientMessageToClear("Agent Inbox folder connected with Drive read access.")
+-        captureSprint28("01_agent_inbox_readonly_folder_connected_light")
++        waitForTransientMessageToClear("Agent Inbox folder selected.")
++        captureSprint29("01_agent_inbox_document_tree_folder_connected_light")
+
+         scenario?.onActivity { activity ->
+             activity.mainViewModel.seedAgentInboxDriveAccessLostForTests()
+         }
+         composeRule.waitUntil(timeoutMillis = 10_000) {
+-            hasNode("Google Drive Agent Inbox not connected")
++            hasNode("Agent Inbox folder not selected")
+         }
+         composeRule.onNodeWithTag("settings-list")
+             .performScrollToNode(hasTestTag("settings-agent-inbox-section"))
+-        composeRule.onNodeWithText("Google Drive Agent Inbox not connected").assertIsDisplayed()
+-        composeRule.onNodeWithTag("settings-agent-inbox-folder-draft").assertIsDisplayed()
+-        composeRule.onNodeWithText("Connect folder").assertIsDisplayed()
++        composeRule.onNodeWithText("Agent Inbox folder not selected").assertIsDisplayed()
++        composeRule.onNodeWithText("Choose folder").assertIsDisplayed()
+         waitForTransientMessageToClear("Agent Inbox folder access was lost.")
+-        captureSprint28("02_agent_inbox_access_lost_light")
++        captureSprint29("02_agent_inbox_access_lost_light")
+
+         val imageDriveClient = VisualAgentInboxDriveClient()
+         val imageFixture = agentInboxMarkdownImageVisualFixture()
+         scenario?.onActivity { activity ->
+             activity.mainViewModel.setAgentInboxDriveClientForTests(imageDriveClient)
+-            activity.mainViewModel.connectAgentInboxReadonlyDriveFolder(
+-                folderId = "visual-readonly-folder",
++            activity.mainViewModel.connectAgentInboxDocumentTreeFolder(
++                uri = "content://com.google.android.apps.docs.storage/tree/visual-agent-inbox",
++                displayName = "Visual Agent Inbox",
+                 nowMillis = 1_781_256_702_000L,
+             )
+         }
+@@ -910,6 +927,7 @@ class VisualQaScreenshotTest {
+             fixture = imageFixture,
+             acceptPriority = false,
+             nowMillis = 1_781_256_703_000L,
++            accessToken = "",
+         )
+         assertTrue(
+             "Expected Agent Inbox Markdown image attachment to import with the user document",
+@@ -919,12 +937,13 @@ class VisualQaScreenshotTest {
+         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
+         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-markdown-image") }
+         composeRule.onNodeWithText("Inbox blue square").assertIsDisplayed()
+-        captureSprint28("03_agent_inbox_markdown_image_reader_light")
++        captureSprint29("03_agent_inbox_markdown_image_reader_light")
+
+         scenario?.onActivity { activity ->
+             activity.mainViewModel.openSettings()
+-            activity.mainViewModel.connectAgentInboxReadonlyDriveFolder(
+-                folderId = "visual-readonly-folder",
++            activity.mainViewModel.connectAgentInboxDocumentTreeFolder(
++                uri = "content://com.google.android.apps.docs.storage/tree/visual-agent-inbox",
++                displayName = "Visual Agent Inbox",
+                 nowMillis = 1_781_256_704_000L,
+             )
+             activity.mainViewModel.selectThemeMode(AppThemeMode.DARK)
+@@ -932,10 +951,10 @@ class VisualQaScreenshotTest {
+         composeRule.waitForIdle()
+         composeRule.onNodeWithTag("settings-list")
+             .performScrollToNode(hasTestTag("settings-agent-inbox-section"))
+-        composeRule.onNodeWithText("Google Drive Agent Inbox folder connected").assertIsDisplayed()
+-        composeRule.onNodeWithText("Drive read access", substring = true).assertIsDisplayed()
+-        waitForTransientMessageToClear("Agent Inbox folder connected with Drive read access.")
+-        captureSprint28("04_agent_inbox_readonly_folder_connected_dark")
++        composeRule.onNodeWithText("Agent Inbox folder connected").assertIsDisplayed()
++        composeRule.onNodeWithTag("settings-agent-inbox-status").assertIsDisplayed()
++        waitForTransientMessageToClear("Agent Inbox folder selected.")
++        captureSprint29("04_agent_inbox_document_tree_folder_connected_dark")
+     }
+
+     @Test
+@@ -2063,8 +2082,8 @@ class VisualQaScreenshotTest {
+         captureTo(sprint27ScreenshotDir, name)
+     }
+
+-    private fun captureSprint28(name: String) {
+-        captureTo(sprint28ScreenshotDir, name)
++    private fun captureSprint29(name: String) {
++        captureTo(sprint29ScreenshotDir, name)
+     }
+
+     private fun captureTo(directory: File, name: String) {
+@@ -2335,6 +2354,7 @@ class VisualQaScreenshotTest {
+         fixture: VisualAgentInboxPackageFixture,
+         acceptPriority: Boolean,
+         nowMillis: Long,
++        accessToken: String = "visual-agent-token",
+     ): ContentItem {
+         val app = InstrumentationRegistry.getInstrumentation()
+             .targetContext
+@@ -2345,7 +2365,7 @@ class VisualQaScreenshotTest {
+         }
+         openTab("tab-settings", "settings-list")
+         scenario?.onActivity { activity ->
+-            activity.mainViewModel.scanAgentInboxDrive(accessToken = "visual-agent-token", nowMillis = nowMillis)
++            activity.mainViewModel.scanAgentInboxDrive(accessToken = accessToken, nowMillis = nowMillis)
+         }
+         composeRule.waitUntil(timeoutMillis = 10_000) {
+             hasTag("settings-agent-inbox-candidate-${fixture.packageFolderId}")
+@@ -2364,7 +2384,7 @@ class VisualQaScreenshotTest {
+         scenario?.onActivity { activity ->
+             activity.mainViewModel.importAgentInboxCandidate(
+                 packageFolderId = fixture.packageFolderId,
+-                accessToken = "visual-agent-token",
++                accessToken = accessToken,
+                 nowMillis = nowMillis + 1L,
+             )
+         }
+diff --git a/app/src/main/java/com/qualityalternative/app/data/AndroidDocumentTreeAgentInboxClient.kt b/app/src/main/java/com/qualityalternative/app/data/AndroidDocumentTreeAgentInboxClient.kt
+new file mode 100644
+index 0000000..53fab5c
+--- /dev/null
++++ b/app/src/main/java/com/qualityalternative/app/data/AndroidDocumentTreeAgentInboxClient.kt
+@@ -0,0 +1,260 @@
++package com.qualityalternative.app.data
++
++import android.content.Context
++import android.database.Cursor
++import android.net.Uri
++import android.provider.DocumentsContract
++import com.qualityalternative.app.domain.service.AGENT_INBOX_MANIFEST_FILE_NAME
++import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_FILES_PER_PACKAGE
++import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_PACKAGES_PER_SCAN
++import com.qualityalternative.app.domain.service.AgentInboxDriveAccessLostException
++import com.qualityalternative.app.domain.service.AgentInboxDriveClient
++import com.qualityalternative.app.domain.service.AgentInboxDriveDownloadTooLargeException
++import com.qualityalternative.app.domain.service.AgentInboxDriveFile
++import com.qualityalternative.app.domain.service.AgentInboxDriveFolderNotSelectedException
++import com.qualityalternative.app.domain.service.AgentInboxDrivePackage
++import com.qualityalternative.app.domain.service.AgentInboxDriveScanRequest
++import com.qualityalternative.app.domain.service.AgentInboxDriveScanResult
++import java.io.ByteArrayOutputStream
++import java.io.FileNotFoundException
++import java.io.InputStream
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.withContext
++
++class AndroidHybridAgentInboxDriveClient(
++    context: Context,
++    private val googleDriveClient: AgentInboxDriveClient = AndroidGoogleDriveAgentInboxClient(),
++    private val documentTreeClient: AgentInboxDriveClient = AndroidDocumentTreeAgentInboxClient(context),
++) : AgentInboxDriveClient {
++    override suspend fun scanPackages(request: AgentInboxDriveScanRequest): AgentInboxDriveScanResult {
++        return if (request.folderId.isDocumentTreeUri()) {
++            documentTreeClient.scanPackages(request)
++        } else {
++            googleDriveClient.scanPackages(request)
++        }
++    }
++
++    override suspend fun downloadFile(accessToken: String, fileId: String, maxBytes: Long): ByteArray {
++        return if (fileId.isContentUri()) {
++            documentTreeClient.downloadFile(accessToken = accessToken, fileId = fileId, maxBytes = maxBytes)
++        } else {
++            googleDriveClient.downloadFile(accessToken = accessToken, fileId = fileId, maxBytes = maxBytes)
++        }
++    }
++}
++
++class AndroidDocumentTreeAgentInboxClient(
++    private val context: Context,
++) : AgentInboxDriveClient {
++    override suspend fun scanPackages(
++        request: AgentInboxDriveScanRequest,
++    ): AgentInboxDriveScanResult = withContext(Dispatchers.IO) {
++        val treeUri = request.folderId?.takeIf(String::isNotBlank)?.let(Uri::parse)
++            ?: throw AgentInboxDriveFolderNotSelectedException()
++        val rootDocumentId = treeUri.safeTreeDocumentId()
++        val packageFolders = listChildren(
++            treeUri = treeUri,
++            parentDocumentId = rootDocumentId,
++            limit = AGENT_INBOX_MAX_PACKAGES_PER_SCAN,
++            maxRows = MAX_DOCUMENT_TREE_ROOT_ROWS,
++            include = TreeDocument::isDirectory,
++        )
++        val packages = packageFolders.documents.map { folder ->
++            val files = listChildren(
++                treeUri = treeUri,
++                parentDocumentId = folder.documentId,
++                limit = AGENT_INBOX_MAX_FILES_PER_PACKAGE,
++                maxRows = MAX_DOCUMENT_TREE_PACKAGE_ROWS,
++                include = { true },
++            )
++            AgentInboxDrivePackage(
++                folderId = folder.uri.toString(),
++                folderName = folder.name,
++                manifestFile = files.documents.firstOrNull { file -> file.name == AGENT_INBOX_MANIFEST_FILE_NAME }
++                    ?.toAgentInboxDriveFile(),
++                contentFiles = files.documents
++                    .map(TreeDocument::toAgentInboxDriveFile)
++                    .filter(AgentInboxDriveFile::isAgentContentFile),
++                allFiles = files.documents.map(TreeDocument::toAgentInboxDriveFile),
++                hasMoreFiles = files.hasMore,
++            )
++        }
++        AgentInboxDriveScanResult(
++            folderId = treeUri.toString(),
++            packages = packages,
++            hasMorePackages = packageFolders.hasMore,
++        )
++    }
++
++    override suspend fun downloadFile(
++        accessToken: String,
++        fileId: String,
++        maxBytes: Long,
++    ): ByteArray = withContext(Dispatchers.IO) {
++        val fileUri = Uri.parse(fileId)
++        try {
++            context.contentResolver.openInputStream(fileUri)?.use { input ->
++                input.readBoundedBytes(maxBytes)
++            } ?: throw AgentInboxDriveAccessLostException()
++        } catch (error: SecurityException) {
++            throw AgentInboxDriveAccessLostException(cause = error)
++        } catch (error: FileNotFoundException) {
++            throw AgentInboxDriveAccessLostException(cause = error)
++        } catch (error: IllegalArgumentException) {
++            throw AgentInboxDriveAccessLostException(cause = error)
++        }
++    }
++
++    private fun listChildren(
++        treeUri: Uri,
++        parentDocumentId: String,
++        limit: Int,
++        maxRows: Int,
++        include: (TreeDocument) -> Boolean,
++    ): ListedTreeDocuments {
++        val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentDocumentId)
++        val documents = mutableListOf<TreeDocument>()
++        var hasMore = false
++        queryChildren(childrenUri).use { cursor ->
++            var inspectedRows = 0
++            while (cursor.moveToNext()) {
++                inspectedRows += 1
++                if (inspectedRows > maxRows) {
++                    hasMore = true
++                    break
++                }
++                val document = cursor.toTreeDocument(treeUri) ?: continue
++                if (!include(document)) continue
++                documents += document
++                if (documents.size > limit) {
++                    hasMore = true
++                    break
++                }
++            }
++        }
++        return ListedTreeDocuments(
++            documents = documents.take(limit),
++            hasMore = hasMore,
++        )
++    }
++
++    private fun queryChildren(childrenUri: Uri): Cursor {
++        return try {
++            context.contentResolver.query(
++                childrenUri,
++                DOCUMENT_TREE_COLUMNS,
++                null,
++                null,
++                null,
++            ) ?: throw AgentInboxDriveAccessLostException()
++        } catch (error: SecurityException) {
++            throw AgentInboxDriveAccessLostException(cause = error)
++        } catch (error: IllegalArgumentException) {
++            throw AgentInboxDriveAccessLostException(cause = error)
++        }
++    }
++
++    private fun Cursor.toTreeDocument(treeUri: Uri): TreeDocument? {
++        val documentId = stringColumn(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
++            ?.takeIf(String::isNotBlank)
++            ?: return null
++        val name = stringColumn(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
++            ?.takeIf(String::isNotBlank)
++            ?: return null
++        return TreeDocument(
++            documentId = documentId,
++            name = name,
++            mimeType = stringColumn(DocumentsContract.Document.COLUMN_MIME_TYPE),
++            sizeBytes = longColumn(DocumentsContract.Document.COLUMN_SIZE),
++            lastModifiedMillis = longColumn(DocumentsContract.Document.COLUMN_LAST_MODIFIED),
++            uri = DocumentsContract.buildDocumentUriUsingTree(treeUri, documentId),
++        )
++    }
++
++    private fun Uri.safeTreeDocumentId(): String {
++        return try {
++            DocumentsContract.getTreeDocumentId(this)?.takeIf(String::isNotBlank)
++                ?: throw AgentInboxDriveAccessLostException()
++        } catch (error: IllegalArgumentException) {
++            throw AgentInboxDriveAccessLostException(cause = error)
++        }
++    }
++
++    private data class ListedTreeDocuments(
++        val documents: List<TreeDocument>,
++        val hasMore: Boolean,
++    )
++
++    private data class TreeDocument(
++        val documentId: String,
++        val name: String,
++        val mimeType: String?,
++        val sizeBytes: Long?,
++        val lastModifiedMillis: Long?,
++        val uri: Uri,
++    ) {
++        val isDirectory: Boolean
++            get() = mimeType == DocumentsContract.Document.MIME_TYPE_DIR
++
++        fun toAgentInboxDriveFile(): AgentInboxDriveFile {
++            return AgentInboxDriveFile(
++                id = uri.toString(),
++                name = name,
++                mimeType = mimeType,
++                sizeBytes = sizeBytes,
++                md5Checksum = null,
++                modifiedTime = lastModifiedMillis?.toString(),
++            )
++        }
++    }
++
++    private companion object {
++        val DOCUMENT_TREE_COLUMNS = arrayOf(
++            DocumentsContract.Document.COLUMN_DOCUMENT_ID,
++            DocumentsContract.Document.COLUMN_DISPLAY_NAME,
++            DocumentsContract.Document.COLUMN_MIME_TYPE,
++            DocumentsContract.Document.COLUMN_SIZE,
++            DocumentsContract.Document.COLUMN_LAST_MODIFIED,
++        )
++        const val MAX_DOCUMENT_TREE_ROOT_ROWS = 50
++        const val MAX_DOCUMENT_TREE_PACKAGE_ROWS = 50
++    }
++}
++
++private fun String?.isDocumentTreeUri(): Boolean {
++    val uri = this?.takeIf(String::isNotBlank)?.let(Uri::parse) ?: return false
++    return uri.scheme == "content" && uri.path.orEmpty().contains("/tree/")
++}
++
++private fun String.isContentUri(): Boolean = Uri.parse(this).scheme == "content"
++
++private fun Cursor.stringColumn(columnName: String): String? {
++    val index = getColumnIndex(columnName)
++    return if (index >= 0 && !isNull(index)) getString(index) else null
++}
++
++private fun Cursor.longColumn(columnName: String): Long? {
++    val index = getColumnIndex(columnName)
++    return if (index >= 0 && !isNull(index)) getLong(index) else null
++}
++
++private fun AgentInboxDriveFile.isAgentContentFile(): Boolean {
++    val lower = name.lowercase()
++    return lower.endsWith(".md") || lower.endsWith(".markdown") || lower.endsWith(".epub")
++}
++
++private fun InputStream.readBoundedBytes(maxBytes: Long): ByteArray {
++    val output = ByteArrayOutputStream()
++    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
++    var total = 0L
++    while (true) {
++        val read = read(buffer)
++        if (read == -1) break
++        total += read.toLong()
++        if (total > maxBytes) {
++            throw AgentInboxDriveDownloadTooLargeException(maxBytes = maxBytes)
++        }
++        output.write(buffer, 0, read)
++    }
++    return output.toByteArray()
++}
+diff --git a/app/src/main/java/com/qualityalternative/app/data/AppContainer.kt b/app/src/main/java/com/qualityalternative/app/data/AppContainer.kt
+index 3235a63..f24cc58 100644
+--- a/app/src/main/java/com/qualityalternative/app/data/AppContainer.kt
++++ b/app/src/main/java/com/qualityalternative/app/data/AppContainer.kt
+@@ -88,7 +88,7 @@ class AppContainer(context: Context) {
+     val readingAnnotationDriveTokenProvider: ReadingAnnotationDriveTokenProvider = AndroidGoogleDriveTokenProvider(
+         context = context,
+     )
+-    val agentInboxDriveClient = AndroidGoogleDriveAgentInboxClient()
++    val agentInboxDriveClient = AndroidHybridAgentInboxDriveClient(context = context)
+     val agentInboxPackageImporter = AgentInboxPackageImporter(
+         userDocumentRepository = userDocumentRepository,
+         documentStore = FileAgentInboxDocumentStore(
+diff --git a/app/src/main/java/com/qualityalternative/app/data/PreferencesSettingsRepository.kt b/app/src/main/java/com/qualityalternative/app/data/PreferencesSettingsRepository.kt
+index 3ea9f73..d08122e 100644
+--- a/app/src/main/java/com/qualityalternative/app/data/PreferencesSettingsRepository.kt
++++ b/app/src/main/java/com/qualityalternative/app/data/PreferencesSettingsRepository.kt
+@@ -41,6 +41,7 @@ import com.qualityalternative.app.domain.model.TopicTag
+ import com.qualityalternative.app.domain.model.WebsiteRule
+ import com.qualityalternative.app.domain.model.WebsiteRuleType
+ import com.qualityalternative.app.domain.service.AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER
++import com.qualityalternative.app.domain.service.AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER
+ import com.qualityalternative.app.domain.service.AGENT_INBOX_DRIVE_GRANT_MODE_READONLY_FOLDER
+ import com.qualityalternative.app.domain.service.SettingsRepository
+ import java.io.IOException
+@@ -544,6 +545,7 @@ class PreferencesSettingsRepository(
+         val AgentInboxDriveLastError = stringPreferencesKey("agent_inbox_drive_last_error")
+         val AGENT_INBOX_SUPPORTED_GRANT_MODES = setOf(
+             AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER,
++            AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER,
+             AGENT_INBOX_DRIVE_GRANT_MODE_READONLY_FOLDER,
+         )
+         val ProfileAutosaveUri = stringPreferencesKey("profile_autosave_uri")
+diff --git a/app/src/main/java/com/qualityalternative/app/domain/service/AgentInboxDrive.kt b/app/src/main/java/com/qualityalternative/app/domain/service/AgentInboxDrive.kt
+index 8c8f9ee..fc27e5d 100644
+--- a/app/src/main/java/com/qualityalternative/app/domain/service/AgentInboxDrive.kt
++++ b/app/src/main/java/com/qualityalternative/app/domain/service/AgentInboxDrive.kt
+@@ -10,6 +10,7 @@ const val AGENT_INBOX_MAX_IMAGE_ATTACHMENT_BYTES = 5L * 1024L * 1024L
+ const val AGENT_INBOX_MAX_TOTAL_IMAGE_ATTACHMENT_BYTES = 15L * 1024L * 1024L
+ const val AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER = "picker_folder"
+ const val AGENT_INBOX_DRIVE_GRANT_MODE_READONLY_FOLDER = "readonly_folder"
++const val AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER = "document_tree_folder"
+
+ data class AgentInboxDriveScanRequest(
+     val accessToken: String,
+@@ -52,6 +53,11 @@ class AgentInboxDriveHttpException(
+     val errorBody: String,
+ ) : java.io.IOException("Drive request failed with HTTP $statusCode${errorBody.toErrorSuffix()}")
+
++class AgentInboxDriveAccessLostException(
++    message: String = "Agent Inbox folder access was lost.",
++    cause: Throwable? = null,
++) : java.io.IOException(message, cause)
++
+ interface AgentInboxDriveClient {
+     suspend fun scanPackages(request: AgentInboxDriveScanRequest): AgentInboxDriveScanResult
+
+diff --git a/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt b/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
+index 76d42c8..8359fe7 100644
+--- a/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
++++ b/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
+@@ -97,8 +97,10 @@ import com.qualityalternative.app.domain.service.AccountLightProfileAutosaveWrit
+ import com.qualityalternative.app.domain.service.AccountLightProfileBackupReader
+ import com.qualityalternative.app.domain.service.AddUserDocumentResult
+ import com.qualityalternative.app.domain.service.AddUserLinkResult
++import com.qualityalternative.app.domain.service.AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER
+ import com.qualityalternative.app.domain.service.AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER
+ import com.qualityalternative.app.domain.service.AGENT_INBOX_DRIVE_GRANT_MODE_READONLY_FOLDER
++import com.qualityalternative.app.domain.service.AgentInboxDriveAccessLostException
+ import com.qualityalternative.app.domain.service.AgentInboxDriveClient
+ import com.qualityalternative.app.domain.service.AgentInboxDriveDownloadTooLargeException
+ import com.qualityalternative.app.domain.service.AgentInboxDriveHttpException
+@@ -260,8 +262,15 @@ data class MainUiState(
+             !agentInboxDriveFolderId.isNullOrBlank() &&
+             agentInboxDriveGrantMode == AGENT_INBOX_DRIVE_GRANT_MODE_READONLY_FOLDER
+
++    val hasAgentInboxDocumentTreeFolderGrant: Boolean
++        get() = agentInboxDriveEnabled &&
++            !agentInboxDriveFolderId.isNullOrBlank() &&
++            agentInboxDriveGrantMode == AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER
++
+     val hasAgentInboxDriveFolderGrant: Boolean
+-        get() = hasAgentInboxPickerFolderGrant || hasAgentInboxReadonlyFolderGrant
++        get() = hasAgentInboxPickerFolderGrant ||
++            hasAgentInboxReadonlyFolderGrant ||
++            hasAgentInboxDocumentTreeFolderGrant
+ }
+
+ internal fun parseAgentInboxDriveFolderId(value: String): String? {
+@@ -1295,8 +1304,9 @@ class MainViewModel(
+             reportAgentInboxDriveFailure("Connect an Agent Inbox folder before scanning.")
+             return
+         }
++        val requiresAccessToken = selectedGrantMode != AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER
+         val normalizedToken = accessToken.trim()
+-        if (normalizedToken.isBlank()) {
++        if (requiresAccessToken && normalizedToken.isBlank()) {
+             reportAgentInboxDriveFailure("Google Drive did not return an access token.")
+             return
+         }
+@@ -1346,6 +1356,7 @@ class MainViewModel(
+                                 )
+                             } catch (error: Throwable) {
+                                 if (error is CancellationException) throw error
++                                if (error is AgentInboxDriveAccessLostException) throw error
+                                 return@map AgentInboxReviewCandidateFactory.invalidPackage(
+                                     drivePackage = drivePackage,
+                                     packageErrors = setOf(AgentInboxPackageValidationError.DOWNLOAD_UNAVAILABLE),
+@@ -1390,6 +1401,7 @@ class MainViewModel(
+                                 )
+                             } catch (error: Throwable) {
+                                 if (error is CancellationException) throw error
++                                if (error is AgentInboxDriveAccessLostException) throw error
+                                 return@map initialCandidate.copy(
+                                     status = AgentInboxReviewStatus.INVALID,
+                                     packageErrors = initialCandidate.packageErrors +
+@@ -1444,7 +1456,11 @@ class MainViewModel(
+                     agentInboxDriveFolderId = scan.folderId,
+                     agentInboxDriveLastSuccessfulAtMillis = nowMillis,
+                     agentInboxDriveLastError = null,
+-                    agentInboxDriveFolderDraft = scan.folderId,
++                    agentInboxDriveFolderDraft = if (selectedGrantMode == AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER) {
++                        uiState.agentInboxDriveFolderDraft
++                    } else {
++                        scan.folderId
++                    },
+                     agentInboxDriveFolderDraftError = null,
+                     isAgentInboxScanning = false,
+                     agentInboxCandidates = candidates,
+@@ -1464,6 +1480,10 @@ class MainViewModel(
+                     reportAgentInboxDriveAccessLost(
+                         "Agent Inbox folder access was lost. Connect the folder again.",
+                     )
++                } else if (error is AgentInboxDriveAccessLostException) {
++                    reportAgentInboxDriveAccessLost(
++                        "Agent Inbox folder access was lost. Choose the folder again.",
++                    )
+                 } else {
+                     reportAgentInboxDriveFailure("Agent Inbox scan failed. Retry from Settings.")
+                 }
+@@ -1578,6 +1598,44 @@ class MainViewModel(
+         }
+     }
+
++    fun connectAgentInboxDocumentTreeFolder(
++        uri: String,
++        displayName: String,
++        nowMillis: Long = nowProvider(),
++    ) {
++        val normalizedUri = uri.trim()
++        if (normalizedUri.isBlank()) {
++            reportAgentInboxDriveFailure("No Agent Inbox folder was selected.")
++            return
++        }
++        val safeDisplayName = displayName.trim().takeIf(String::isNotBlank) ?: "selected folder"
++        uiState = uiState.copy(
++            agentInboxDriveEnabled = true,
++            agentInboxDriveFolderId = normalizedUri,
++            agentInboxDriveGrantMode = AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER,
++            agentInboxDriveLastError = null,
++            agentInboxDriveFolderDraft = safeDisplayName,
++            agentInboxDriveFolderDraftError = null,
++            agentInboxCandidates = emptyList(),
++            agentInboxPriorityAcceptedPackageIds = emptySet(),
++            agentInboxScanTruncated = false,
++            latestMessage = "Agent Inbox folder selected.",
++        )
++        viewModelScope.launch {
++            settingsRepository.saveAgentInboxDriveConnection(
++                folderId = normalizedUri,
++                grantMode = AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER,
++            )
++            recordEventDurably(
++                AnalyticsEvent(
++                    type = AnalyticsEventType.AGENT_INBOX_CONNECTED,
++                    timestampMillis = nowMillis,
++                    metadata = mapOf("grantMode" to "documentTreeFolder"),
++                ),
++            )
++        }
++    }
++
+     fun reportAgentInboxDriveAuthorizationFailure(errorMessage: String) {
+         val message = errorMessage.trim().ifBlank { "Google Drive authorization failed." }
+         reportAgentInboxDriveFailure(message)
+@@ -1673,8 +1731,9 @@ class MainViewModel(
+             uiState = uiState.copy(latestMessage = "Agent Inbox package is no longer available.")
+             return
+         }
++        val requiresAccessToken = uiState.agentInboxDriveGrantMode != AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER
+         val normalizedToken = accessToken.trim()
+-        if (normalizedToken.isBlank()) {
++        if (requiresAccessToken && normalizedToken.isBlank()) {
+             reportAgentInboxDriveFailure("Google Drive did not return an access token.")
+             return
+         }
+@@ -1704,6 +1763,12 @@ class MainViewModel(
+                     return@launch
+                 } catch (error: Throwable) {
+                     if (error is CancellationException) throw error
++                    if (error is AgentInboxDriveAccessLostException) {
++                        reportAgentInboxDriveAccessLost(
++                            "Agent Inbox folder access was lost. Choose the folder again.",
++                        )
++                        return@launch
++                    }
+                     applyAgentInboxImportResult(
+                         packageFolderId = packageFolderId,
+                         result = AgentInboxImportResult(
+@@ -1749,6 +1814,12 @@ class MainViewModel(
+                         return@launch
+                     } catch (error: Throwable) {
+                         if (error is CancellationException) throw error
++                        if (error is AgentInboxDriveAccessLostException) {
++                            reportAgentInboxDriveAccessLost(
++                                "Agent Inbox folder access was lost. Choose the folder again.",
++                            )
++                            return@launch
++                        }
+                         applyAgentInboxImportResult(
+                             packageFolderId = packageFolderId,
+                             result = AgentInboxImportResult(
+@@ -1998,14 +2069,13 @@ class MainViewModel(
+     }
+
+     private fun reportAgentInboxDriveAccessLost(message: String) {
+-        val reconnectFolderDraft = uiState.agentInboxDriveFolderId.orEmpty()
+         uiState = uiState.copy(
+             agentInboxDriveEnabled = false,
+             agentInboxDriveFolderId = null,
+             agentInboxDriveGrantMode = null,
+             agentInboxDriveLastSuccessfulAtMillis = null,
+             agentInboxDriveLastError = message,
+-            agentInboxDriveFolderDraft = reconnectFolderDraft,
++            agentInboxDriveFolderDraft = "",
+             agentInboxDriveFolderDraftError = null,
+             isAgentInboxScanning = false,
+             isAgentInboxImporting = false,
+@@ -5292,7 +5362,7 @@ class MainViewModel(
+     }
+
+     internal fun seedAgentInboxDriveAccessLostForTests(
+-        message: String = "Agent Inbox folder access was lost. Connect the folder again.",
++        message: String = "Agent Inbox folder access was lost. Choose the folder again.",
+     ) {
+         check(BuildConfig.DEBUG) { "Agent Inbox access-lost visual fixture state is only available in debug builds." }
+         uiState = uiState.copy(
+diff --git a/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt b/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
+index e71ace6..5a345a1 100644
+--- a/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
++++ b/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
+@@ -524,16 +524,22 @@ private fun MainRoute(
+     val disconnectAgentInboxDrive = {
+         val annotationDriveConfigured = state.annotationDriveSyncEnabled ||
+             annotationExportUsesGoogleDriveProvider(state.annotationExportUri)
+-        val agentInboxScope = if (state.hasAgentInboxReadonlyFolderGrant) {
+-            AGENT_INBOX_DRIVE_READONLY_SCOPE
++        if (state.hasAgentInboxDocumentTreeFolderGrant) {
++            state.agentInboxDriveFolderId?.takeIf(String::isNotBlank)?.let { folderUri ->
++                releaseAgentInboxFolderPermission(context = context, uri = Uri.parse(folderUri))
++            }
+         } else {
+-            ANNOTATION_DRIVE_SCOPE
+-        }
+-        if (agentInboxScope == AGENT_INBOX_DRIVE_READONLY_SCOPE || !annotationDriveConfigured) {
+-            val revokeRequest = RevokeAccessRequest.builder()
+-                .setScopes(listOf(Scope(agentInboxScope)))
+-                .build()
+-            driveAuthorizationClient.revokeAccess(revokeRequest)
++            val agentInboxScope = if (state.hasAgentInboxReadonlyFolderGrant) {
++                AGENT_INBOX_DRIVE_READONLY_SCOPE
++            } else {
++                ANNOTATION_DRIVE_SCOPE
++            }
++            if (agentInboxScope == AGENT_INBOX_DRIVE_READONLY_SCOPE || !annotationDriveConfigured) {
++                val revokeRequest = RevokeAccessRequest.builder()
++                    .setScopes(listOf(Scope(agentInboxScope)))
++                    .build()
++                driveAuthorizationClient.revokeAccess(revokeRequest)
++            }
+         }
+         viewModel.disconnectAgentInboxDrive()
+     }
+@@ -583,6 +589,23 @@ private fun MainRoute(
+             },
+         )
+     }
++    val agentInboxFolderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
++        if (uri == null) {
++            return@rememberLauncherForActivityResult
++        }
++        val metadata = context.documentMetadata(uri)
++        runCatching {
++            persistAgentInboxFolderPermission(context = context, uri = uri)
++        }.onSuccess {
++            viewModel.connectAgentInboxDocumentTreeFolder(
++                uri = uri.toString(),
++                displayName = metadata.displayName,
++            )
++            viewModel.scanAgentInboxDrive(accessToken = "")
++        }.onFailure {
++            viewModel.reportAgentInboxDriveAuthorizationFailure("Agent Inbox folder permission was not granted.")
++        }
++    }
+     val accountLightExportPicker = rememberLauncherForActivityResult(
+         ActivityResultContracts.CreateDocument("application/json"),
+     ) { uri ->
+@@ -748,31 +771,38 @@ private fun MainRoute(
+                     startGoogleDriveSyncAuthorization(GoogleDriveAuthorizationMode.ANNOTATION_RETRY)
+                 },
+                 onDisconnectAnnotationDrive = disconnectGoogleDriveSync,
+-                onAgentInboxFolderDraftChange = viewModel::updateAgentInboxDriveFolderDraft,
+                 onScanAgentInbox = {
+-                    val mode = when {
+-                        state.hasAgentInboxReadonlyFolderGrant -> GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_SCAN
+-                        state.hasAgentInboxPickerFolderGrant -> GoogleDriveAuthorizationMode.AGENT_INBOX_SCAN
+-                        viewModel.beginAgentInboxReadonlyFolderConnection() -> {
+-                            GoogleDriveAuthorizationMode.AGENT_INBOX_CONNECT_READONLY
++                    when {
++                        state.hasAgentInboxDocumentTreeFolderGrant -> {
++                            viewModel.scanAgentInboxDrive(accessToken = "")
++                        }
++                        state.hasAgentInboxReadonlyFolderGrant -> {
++                            startGoogleDriveSyncAuthorization(GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_SCAN)
++                        }
++                        state.hasAgentInboxPickerFolderGrant -> {
++                            startGoogleDriveSyncAuthorization(GoogleDriveAuthorizationMode.AGENT_INBOX_SCAN)
++                        }
++                        else -> {
++                            viewModel.beginAgentInboxFolderSelection()
++                            agentInboxFolderPicker.launch(null)
+                         }
+-                        else -> null
+-                    }
+-                    if (mode != null) {
+-                        startGoogleDriveSyncAuthorization(mode)
+                     }
+                 },
+                 onDisconnectAgentInbox = disconnectAgentInboxDrive,
+                 onToggleAgentInboxPriority = viewModel::toggleAgentInboxPriority,
+                 onRejectAgentInboxCandidate = viewModel::rejectAgentInboxCandidate,
+                 onImportAgentInboxCandidate = { packageFolderId ->
+-                    pendingAgentInboxImportPackageId = packageFolderId
+-                    val mode = if (state.hasAgentInboxReadonlyFolderGrant) {
+-                        GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_IMPORT
++                    if (state.hasAgentInboxDocumentTreeFolderGrant) {
++                        viewModel.importAgentInboxCandidate(packageFolderId = packageFolderId, accessToken = "")
+                     } else {
+-                        GoogleDriveAuthorizationMode.AGENT_INBOX_IMPORT
++                        pendingAgentInboxImportPackageId = packageFolderId
++                        val mode = if (state.hasAgentInboxReadonlyFolderGrant) {
++                            GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_IMPORT
++                        } else {
++                            GoogleDriveAuthorizationMode.AGENT_INBOX_IMPORT
++                        }
++                        startGoogleDriveSyncAuthorization(mode)
+                     }
+-                    startGoogleDriveSyncAuthorization(mode)
+                 },
+                 onExportAccountLightProfile = { accountLightExportPicker.launch(ACCOUNT_LIGHT_PROFILE_FILE_NAME) },
+                 onExportAccountLightBackup = { accountLightExportPicker.launch(accountLightTimestampedBackupFileName()) },
+@@ -4241,7 +4271,6 @@ private fun SettingsTab(
+     onConnectAnnotationDrive: () -> Unit,
+     onRetryAnnotationDrive: () -> Unit,
+     onDisconnectAnnotationDrive: () -> Unit,
+-    onAgentInboxFolderDraftChange: (String) -> Unit,
+     onScanAgentInbox: () -> Unit,
+     onDisconnectAgentInbox: () -> Unit,
+     onToggleAgentInboxPriority: (String) -> Unit,
+@@ -4448,7 +4477,6 @@ private fun SettingsTab(
+         item {
+             AgentInboxSettingsSection(
+                 state = state,
+-                onFolderDraftChange = onAgentInboxFolderDraftChange,
+                 onScan = onScanAgentInbox,
+                 onDisconnect = onDisconnectAgentInbox,
+                 onTogglePriority = onToggleAgentInboxPriority,
+@@ -5322,7 +5350,6 @@ private fun AnnotationAutosaveSettingsSection(
+ @Composable
+ private fun AgentInboxSettingsSection(
+     state: MainUiState,
+-    onFolderDraftChange: (String) -> Unit,
+     onScan: () -> Unit,
+     onDisconnect: () -> Unit,
+     onTogglePriority: (String) -> Unit,
+@@ -5336,6 +5363,7 @@ private fun AgentInboxSettingsSection(
+             "Agent Inbox",
+             right = when {
+                 state.isAgentInboxScanning -> "Scanning"
++                state.hasAgentInboxDocumentTreeFolderGrant -> "Folder"
+                 state.hasAgentInboxDriveFolderGrant -> "Drive"
+                 else -> "Off"
+             },
+@@ -5350,9 +5378,9 @@ private fun AgentInboxSettingsSection(
+                 Column(modifier = Modifier.weight(1f)) {
+                     Text(
+                         text = if (state.hasAgentInboxDriveFolderGrant) {
+-                            "Google Drive Agent Inbox folder connected"
++                            "Agent Inbox folder connected"
+                         } else {
+-                            "Google Drive Agent Inbox not connected"
++                            "Agent Inbox folder not selected"
+                         },
+                         style = MaterialTheme.typography.titleMedium,
+                         fontSize = 16.sp,
+@@ -5378,31 +5406,22 @@ private fun AgentInboxSettingsSection(
+                     )
+                 }
+             }
+-            if (!state.hasAgentInboxDriveFolderGrant) {
+-                QaTextField(
+-                    value = state.agentInboxDriveFolderDraft,
+-                    onValueChange = onFolderDraftChange,
+-                    placeholder = "Drive folder URL or id",
+-                    isError = state.agentInboxDriveFolderDraftError != null,
+-                    modifier = Modifier
+-                        .padding(top = 14.dp)
+-                        .testTag("settings-agent-inbox-folder-draft"),
++            if (!state.hasAgentInboxDriveFolderGrant && state.agentInboxDriveFolderDraftError != null) {
++                BodyText(
++                    text = state.agentInboxDriveFolderDraftError,
++                    color = colors.accent,
++                    fontSize = 12.5.sp,
++                    lineHeight = 17.sp,
++                    modifier = Modifier.padding(top = 10.dp),
+                 )
+-                state.agentInboxDriveFolderDraftError?.let { error ->
+-                    BodyText(
+-                        text = error,
+-                        color = colors.accent,
+-                        fontSize = 12.5.sp,
+-                        lineHeight = 17.sp,
+-                        modifier = Modifier.padding(top = 6.dp),
+-                    )
+-                }
++            }
++            if (!state.hasAgentInboxDriveFolderGrant) {
+                 BodyText(
+-                    text = "Drive read access is used only after consent, and this app scans only the folder id pasted here.",
++                    text = "Choose the folder where your agent writes package folders.",
+                     color = colors.mutedText,
+                     fontSize = 12.5.sp,
+                     lineHeight = 17.sp,
+-                    modifier = Modifier.padding(top = 8.dp),
++                    modifier = Modifier.padding(top = 10.dp),
+                 )
+             }
+             Row(
+@@ -5413,7 +5432,7 @@ private fun AgentInboxSettingsSection(
+                     text = when {
+                         state.isAgentInboxScanning -> "Scanning"
+                         state.hasAgentInboxDriveFolderGrant -> "Scan now"
+-                        else -> "Connect folder"
++                        else -> "Choose folder"
+                     },
+                     onClick = onScan,
+                     variant = QaButtonVariant.Outline,
+@@ -9657,6 +9676,9 @@ private fun agentInboxDriveStatusText(state: MainUiState): String {
+         return "Last scanned ${annotationUpdatedLabel(timestampMillis)}"
+     }
+     return when {
++        state.hasAgentInboxDocumentTreeFolderGrant -> {
++            "Ready to scan the selected folder for private Markdown and EPUB packages"
++        }
+         state.hasAgentInboxReadonlyFolderGrant -> {
+             "Drive read access; scanning only the saved Agent Inbox folder"
+         }
+@@ -9664,7 +9686,7 @@ private fun agentInboxDriveStatusText(state: MainUiState): String {
+             "Ready to scan the selected folder for private Markdown and EPUB packages"
+         }
+         else -> {
+-            "Paste the Drive folder URL or id your agent or rclone writes packages into"
++            "Choose the folder your agent writes packages into"
+         }
+     }
+ }
+@@ -10137,6 +10159,16 @@ private fun persistProfileAutosavePermission(context: Context, uri: Uri) {
+     )
+ }
+
++private fun persistAgentInboxFolderPermission(context: Context, uri: Uri) {
++    context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
++}
++
++private fun releaseAgentInboxFolderPermission(context: Context, uri: Uri) {
++    runCatching {
++        context.contentResolver.releasePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
++    }
++}
++
+ private fun releaseAnnotationExportPermission(context: Context, uri: Uri) {
+     runCatching {
+         context.contentResolver.releasePersistableUriPermission(
+diff --git a/app/src/test/java/com/qualityalternative/app/data/AccountLightProfileExporterTest.kt b/app/src/test/java/com/qualityalternative/app/data/AccountLightProfileExporterTest.kt
+index b354489..ef06d74 100644
+--- a/app/src/test/java/com/qualityalternative/app/data/AccountLightProfileExporterTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/data/AccountLightProfileExporterTest.kt
+@@ -24,6 +24,7 @@ import com.qualityalternative.app.domain.model.WebsiteRule
+ import com.qualityalternative.app.domain.model.WebsiteRuleType
+ import com.qualityalternative.app.domain.service.AddUserDocumentResult
+ import com.qualityalternative.app.domain.service.AddUserLinkResult
++import com.qualityalternative.app.domain.service.AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER
+ import com.qualityalternative.app.domain.service.ReadingProgressRepository
+ import com.qualityalternative.app.domain.service.UserDocumentRepository
+ import com.qualityalternative.app.domain.service.UserLinkRepository
+@@ -93,9 +94,13 @@ class AccountLightProfileExporterTest {
+             timestampMillis = 13_000L,
+             folderId = "raw-drive-folder-id",
+         )
++        repository.saveAgentInboxDriveConnection(
++            folderId = "content://com.google.android.apps.docs.storage/tree/raw-agent-inbox-tree-id",
++            grantMode = AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER,
++        )
+         repository.saveAgentInboxDriveScanSuccess(
+             timestampMillis = 15_000L,
+-            folderId = "raw-agent-inbox-folder-id",
++            folderId = "content://com.google.android.apps.docs.storage/tree/raw-agent-inbox-tree-id",
+         )
+         repository.saveAgentInboxDriveScanFailure(
+             "Agent Inbox scan failed for raw-agent-inbox-folder-id",
+@@ -185,6 +190,7 @@ class AccountLightProfileExporterTest {
+         assertFalse(rawJson.contains("content://"))
+         assertFalse(rawJson.contains("raw-drive-folder-id"))
+         assertFalse(rawJson.contains("raw-agent-inbox-folder-id"))
++        assertFalse(rawJson.contains("raw-agent-inbox-tree-id"))
+         assertFalse(rawJson.contains("Agent Inbox scan failed"))
+         assertFalse(rawJson.contains("agentInbox"))
+         assertFalse(rawJson.contains("agent_inbox"))
+diff --git a/app/src/test/java/com/qualityalternative/app/data/PreferencesSettingsRepositoryTest.kt b/app/src/test/java/com/qualityalternative/app/data/PreferencesSettingsRepositoryTest.kt
+index 35183fb..61757e1 100644
+--- a/app/src/test/java/com/qualityalternative/app/data/PreferencesSettingsRepositoryTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/data/PreferencesSettingsRepositoryTest.kt
+@@ -20,6 +20,7 @@ import com.qualityalternative.app.domain.model.OnboardingSelection
+ import com.qualityalternative.app.domain.model.TopicTag
+ import com.qualityalternative.app.domain.model.WebsiteRule
+ import com.qualityalternative.app.domain.model.WebsiteRuleType
++import com.qualityalternative.app.domain.service.AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER
+ import com.qualityalternative.app.domain.service.AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER
+ import com.qualityalternative.app.domain.service.AGENT_INBOX_DRIVE_GRANT_MODE_READONLY_FOLDER
+ import java.io.File
+@@ -454,6 +455,25 @@ class PreferencesSettingsRepositoryTest {
+         assertEquals(8_500L, readonlySynced.agentInboxDriveLastSuccessfulAtMillis)
+         assertEquals(null, readonlySynced.agentInboxDriveLastError)
+
++        repository.saveAgentInboxDriveConnection(
++            folderId = "content://com.google.android.apps.docs.storage/tree/agent-inbox",
++            grantMode = AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER,
++        )
++        repository.saveAgentInboxDriveScanSuccess(
++            timestampMillis = 8_750L,
++            folderId = "content://com.google.android.apps.docs.storage/tree/agent-inbox",
++        )
++
++        val documentTreeSynced = repository.observeAppSettings().first()
++        assertEquals(true, documentTreeSynced.agentInboxDriveEnabled)
++        assertEquals(
++            "content://com.google.android.apps.docs.storage/tree/agent-inbox",
++            documentTreeSynced.agentInboxDriveFolderId,
++        )
++        assertEquals(AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER, documentTreeSynced.agentInboxDriveGrantMode)
++        assertEquals(8_750L, documentTreeSynced.agentInboxDriveLastSuccessfulAtMillis)
++        assertEquals(null, documentTreeSynced.agentInboxDriveLastError)
++
+         repository.saveAgentInboxDriveScanSuccess(
+             timestampMillis = 9_000L,
+             folderId = "unexpected-folder",
+diff --git a/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt b/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
+index 238ac21..9b550cd 100644
+--- a/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
+@@ -69,12 +69,14 @@ import com.qualityalternative.app.domain.service.AccountLightProfileBackupReader
+ import com.qualityalternative.app.domain.service.AddUserDocumentIfFingerprintAbsentResult
+ import com.qualityalternative.app.domain.service.AddUserDocumentResult
+ import com.qualityalternative.app.domain.service.AddUserLinkResult
++import com.qualityalternative.app.domain.service.AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER
+ import com.qualityalternative.app.domain.service.AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER
+ import com.qualityalternative.app.domain.service.AGENT_INBOX_DRIVE_GRANT_MODE_READONLY_FOLDER
+ import com.qualityalternative.app.domain.service.AGENT_INBOX_MANIFEST_FILE_NAME
+ import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_IMAGE_ATTACHMENT_BYTES
+ import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_MANIFEST_BYTES
+ import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_REVIEW_CONTENT_BYTES
++import com.qualityalternative.app.domain.service.AgentInboxDriveAccessLostException
+ import com.qualityalternative.app.domain.service.AgentInboxDriveClient
+ import com.qualityalternative.app.domain.service.AgentInboxDriveDownloadTooLargeException
+ import com.qualityalternative.app.domain.service.AgentInboxDriveFile
+@@ -2731,6 +2733,46 @@ class MainViewModelTest {
+         assertFalse(remotePayloadText.contains("new-folder"))
+     }
+
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun connectAgentInboxDocumentTreeFolderPersistsSelectorGrantWithoutLeakingUri() = runTest {
++        val folderUri = "content://com.google.android.apps.docs.storage/tree/agent-inbox"
++        val settingsRepository = FakeSettingsRepository()
++        val analyticsTracker = InMemoryAnalyticsTracker()
++        val viewModel = createViewModel(
++            settingsRepository = settingsRepository,
++            analyticsTracker = analyticsTracker,
++        )
++
++        advanceUntilIdle()
++        viewModel.connectAgentInboxDocumentTreeFolder(
++            uri = folderUri,
++            displayName = "Agent Inbox",
++            nowMillis = 4_000L,
++        )
++        advanceUntilIdle()
++
++        assertTrue(viewModel.uiState.agentInboxDriveEnabled)
++        assertEquals(folderUri, viewModel.uiState.agentInboxDriveFolderId)
++        assertEquals(AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER, viewModel.uiState.agentInboxDriveGrantMode)
++        assertTrue(viewModel.uiState.hasAgentInboxDocumentTreeFolderGrant)
++        assertTrue(viewModel.uiState.hasAgentInboxDriveFolderGrant)
++        assertEquals(folderUri, settingsRepository.state.value.agentInboxDriveFolderId)
++        assertEquals(
++            AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER,
++            settingsRepository.state.value.agentInboxDriveGrantMode,
++        )
++        val connectedEvent = analyticsTracker.allEvents().single { event ->
++            event.type == AnalyticsEventType.AGENT_INBOX_CONNECTED
++        }
++        assertEquals("documentTreeFolder", connectedEvent.metadata["grantMode"])
++        val remotePayloadText = analyticsTracker.allRemoteSafePayloads().joinToString("\n") { payload ->
++            payload.toString()
++        }
++        assertFalse(remotePayloadText.contains(folderUri))
++        assertFalse(remotePayloadText.contains("agent-inbox"))
++    }
++
+     @Test
+     @OptIn(ExperimentalCoroutinesApi::class)
+     fun scanAgentInboxDriveWithLegacyFolderIdWithoutPickerGrantDoesNotCallDrive() = runTest {
+@@ -2816,7 +2858,7 @@ class MainViewModelTest {
+             "Agent Inbox folder access was lost. Connect the folder again.",
+             viewModel.uiState.agentInboxDriveLastError,
+         )
+-        assertEquals("agent-inbox-folder", viewModel.uiState.agentInboxDriveFolderDraft)
++        assertEquals("", viewModel.uiState.agentInboxDriveFolderDraft)
+         assertTrue(viewModel.uiState.agentInboxCandidates.isEmpty())
+         assertFalse(settingsRepository.state.value.agentInboxDriveEnabled)
+         assertEquals(null, settingsRepository.state.value.agentInboxDriveFolderId)
+@@ -2832,6 +2874,162 @@ class MainViewModelTest {
+         assertTrue(AnalyticsPrivacyGuard.unsafeRemoteFields(failedEvent.toRemoteAnalyticsPayload()).isEmpty())
+     }
+
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun scanAgentInboxDocumentTreeFolderDoesNotRequireGoogleAccessToken() = runTest {
++        val folderUri = "content://com.google.android.apps.docs.storage/tree/agent-inbox"
++        val contentBytes = "# Agent Note\n\nPrivate attention note.".toByteArray()
++        val driveClient = RecordingAgentInboxDriveClient(
++            scanResult = AgentInboxDriveScanResult(
++                folderId = folderUri,
++                packages = listOf(agentInboxDrivePackage()),
++            ),
++            files = mapOf(
++                "manifest-file" to agentInboxManifest(priority = "normal").toByteArray(),
++                "content-file" to contentBytes,
++            ),
++        )
++        val viewModel = createViewModel(agentInboxDriveClient = driveClient)
++
++        advanceUntilIdle()
++        viewModel.connectAgentInboxDocumentTreeFolder(uri = folderUri, displayName = "Agent Inbox")
++        advanceUntilIdle()
++        viewModel.scanAgentInboxDrive(accessToken = "", nowMillis = 5_000L)
++        advanceUntilIdle()
++
++        assertEquals(folderUri, viewModel.uiState.agentInboxDriveFolderId)
++        assertEquals(AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER, viewModel.uiState.agentInboxDriveGrantMode)
++        assertTrue(viewModel.uiState.hasAgentInboxDocumentTreeFolderGrant)
++        assertEquals("", driveClient.scanRequests.single().accessToken)
++        assertEquals(folderUri, driveClient.scanRequests.single().folderId)
++        assertEquals("agent-package", viewModel.uiState.agentInboxCandidates.single().packageFolderId)
++        assertEquals(listOf("manifest-file", "content-file"), driveClient.downloadedFileIds)
++    }
++
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun scanAgentInboxDocumentTreeFolderAccessLostDuringDownloadClearsFolderGrant() = runTest {
++        val folderUri = "content://com.google.android.apps.docs.storage/tree/agent-inbox"
++        val settingsRepository = FakeSettingsRepository()
++        val analyticsTracker = InMemoryAnalyticsTracker()
++        val driveClient = RecordingAgentInboxDriveClient(
++            scanResult = AgentInboxDriveScanResult(
++                folderId = folderUri,
++                packages = listOf(agentInboxDrivePackage()),
++            ),
++            downloadFailures = mapOf("manifest-file" to AgentInboxDriveAccessLostException()),
++        )
++        val viewModel = createViewModel(
++            settingsRepository = settingsRepository,
++            agentInboxDriveClient = driveClient,
++            analyticsTracker = analyticsTracker,
++        )
++
++        advanceUntilIdle()
++        viewModel.connectAgentInboxDocumentTreeFolder(uri = folderUri, displayName = "Agent Inbox")
++        advanceUntilIdle()
++        viewModel.scanAgentInboxDrive(accessToken = "", nowMillis = 5_000L)
++        advanceUntilIdle()
++
++        assertEquals(listOf("manifest-file"), driveClient.downloadedFileIds)
++        assertFalse(viewModel.uiState.agentInboxDriveEnabled)
++        assertNull(viewModel.uiState.agentInboxDriveFolderId)
++        assertNull(viewModel.uiState.agentInboxDriveGrantMode)
++        assertFalse(viewModel.uiState.hasAgentInboxDocumentTreeFolderGrant)
++        assertFalse(viewModel.uiState.isAgentInboxScanning)
++        assertEquals(
++            "Agent Inbox folder access was lost. Choose the folder again.",
++            viewModel.uiState.agentInboxDriveLastError,
++        )
++        assertEquals("", viewModel.uiState.agentInboxDriveFolderDraft)
++        assertTrue(viewModel.uiState.agentInboxCandidates.isEmpty())
++        assertFalse(settingsRepository.state.value.agentInboxDriveEnabled)
++        assertNull(settingsRepository.state.value.agentInboxDriveFolderId)
++        assertNull(settingsRepository.state.value.agentInboxDriveGrantMode)
++        assertEquals(
++            "Agent Inbox folder access was lost. Choose the folder again.",
++            settingsRepository.state.value.agentInboxDriveLastError,
++        )
++        val failedEvent = analyticsTracker.allEvents().last { event ->
++            event.type == AnalyticsEventType.AGENT_INBOX_SCAN_FAILED
++        }
++        assertEquals("access_lost", failedEvent.metadata["reason"])
++        assertTrue(AnalyticsPrivacyGuard.unsafeRemoteFields(failedEvent.toRemoteAnalyticsPayload()).isEmpty())
++    }
++
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun importAgentInboxDocumentTreeAccessLostDuringDownloadClearsFolderGrant() = runTest {
++        val folderUri = "content://com.google.android.apps.docs.storage/tree/agent-inbox"
++        val contentBytes = "# Agent Note\n\nPrivate attention note.".toByteArray()
++        val settingsRepository = FakeSettingsRepository()
++        val analyticsTracker = InMemoryAnalyticsTracker()
++        val driveClient = RecordingAgentInboxDriveClient(
++            scanResult = AgentInboxDriveScanResult(
++                folderId = folderUri,
++                packages = listOf(agentInboxDrivePackage()),
++            ),
++            files = mapOf(
++                "manifest-file" to agentInboxManifest(priority = "normal").toByteArray(),
++                "content-file" to contentBytes,
++            ),
++            downloadFailuresByOrdinal = mapOf(3 to AgentInboxDriveAccessLostException()),
++        )
++        val userDocumentRepository = FakeUserDocumentRepository()
++        val viewModel = createViewModel(
++            settingsRepository = settingsRepository,
++            userDocumentRepository = userDocumentRepository,
++            agentInboxDriveClient = driveClient,
++            analyticsTracker = analyticsTracker,
++            agentInboxPackageImporter = AgentInboxPackageImporter(
++                userDocumentRepository = userDocumentRepository,
++                documentStore = RecordingAgentInboxDocumentStore(),
++            ),
++        )
++
++        advanceUntilIdle()
++        viewModel.completeOnboarding()
++        advanceUntilIdle()
++        viewModel.connectAgentInboxDocumentTreeFolder(uri = folderUri, displayName = "Agent Inbox")
++        advanceUntilIdle()
++        viewModel.scanAgentInboxDrive(accessToken = "", nowMillis = 5_000L)
++        advanceUntilIdle()
++        viewModel.importAgentInboxCandidate(
++            packageFolderId = "agent-package",
++            accessToken = "",
++            nowMillis = 6_000L,
++        )
++        advanceUntilIdle()
++
++        assertEquals(
++            listOf(
++                AgentInboxDownloadRequest("manifest-file", AGENT_INBOX_MAX_MANIFEST_BYTES, accessToken = ""),
++                AgentInboxDownloadRequest("content-file", AGENT_INBOX_MAX_REVIEW_CONTENT_BYTES, accessToken = ""),
++                AgentInboxDownloadRequest("content-file", AGENT_INBOX_MAX_REVIEW_CONTENT_BYTES, accessToken = ""),
++            ),
++            driveClient.downloadRequests,
++        )
++        assertFalse(viewModel.uiState.agentInboxDriveEnabled)
++        assertNull(viewModel.uiState.agentInboxDriveFolderId)
++        assertNull(viewModel.uiState.agentInboxDriveGrantMode)
++        assertFalse(viewModel.uiState.hasAgentInboxDocumentTreeFolderGrant)
++        assertFalse(viewModel.uiState.isAgentInboxImporting)
++        assertEquals(
++            "Agent Inbox folder access was lost. Choose the folder again.",
++            viewModel.uiState.agentInboxDriveLastError,
++        )
++        assertTrue(viewModel.uiState.agentInboxCandidates.isEmpty())
++        assertTrue(userDocumentRepository.documents.value.isEmpty())
++        assertFalse(settingsRepository.state.value.agentInboxDriveEnabled)
++        assertNull(settingsRepository.state.value.agentInboxDriveFolderId)
++        assertNull(settingsRepository.state.value.agentInboxDriveGrantMode)
++        val failedEvent = analyticsTracker.allEvents().last { event ->
++            event.type == AnalyticsEventType.AGENT_INBOX_SCAN_FAILED
++        }
++        assertEquals("access_lost", failedEvent.metadata["reason"])
++        assertTrue(AnalyticsPrivacyGuard.unsafeRemoteFields(failedEvent.toRemoteAnalyticsPayload()).isEmpty())
++    }
++
+     @Test
+     @OptIn(ExperimentalCoroutinesApi::class)
+     fun scanAgentInboxDriveBuildsReviewCandidatesWithoutAutoAcceptingManifestPriority() = runTest {
+@@ -2970,6 +3168,59 @@ class MainViewModelTest {
+         assertTrue(AnalyticsPrivacyGuard.unsafeRemoteFields(importedEvent.toRemoteAnalyticsPayload()).isEmpty())
+     }
+
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun importAgentInboxDocumentTreeCandidateDoesNotRequireGoogleAccessToken() = runTest {
++        val folderUri = "content://com.google.android.apps.docs.storage/tree/agent-inbox"
++        val contentBytes = "# Agent Note\n\nPrivate attention note.".toByteArray()
++        val driveClient = RecordingAgentInboxDriveClient(
++            scanResult = AgentInboxDriveScanResult(
++                folderId = folderUri,
++                packages = listOf(agentInboxDrivePackage()),
++            ),
++            files = mapOf(
++                "manifest-file" to agentInboxManifest(priority = "normal").toByteArray(),
++                "content-file" to contentBytes,
++            ),
++        )
++        val userDocumentRepository = FakeUserDocumentRepository()
++        val documentStore = RecordingAgentInboxDocumentStore()
++        val viewModel = createViewModel(
++            userDocumentRepository = userDocumentRepository,
++            agentInboxDriveClient = driveClient,
++            agentInboxPackageImporter = AgentInboxPackageImporter(
++                userDocumentRepository = userDocumentRepository,
++                documentStore = documentStore,
++            ),
++        )
++
++        advanceUntilIdle()
++        viewModel.completeOnboarding()
++        advanceUntilIdle()
++        viewModel.connectAgentInboxDocumentTreeFolder(uri = folderUri, displayName = "Agent Inbox")
++        advanceUntilIdle()
++        viewModel.scanAgentInboxDrive(accessToken = "", nowMillis = 5_000L)
++        advanceUntilIdle()
++        viewModel.importAgentInboxCandidate(
++            packageFolderId = "agent-package",
++            accessToken = "",
++            nowMillis = 6_000L,
++        )
++        advanceUntilIdle()
++
++        assertEquals("Agent Note", userDocumentRepository.documents.value.single().title)
++        assertTrue(viewModel.uiState.agentInboxCandidates.isEmpty())
++        assertEquals(
++            listOf(
++                AgentInboxDownloadRequest("manifest-file", AGENT_INBOX_MAX_MANIFEST_BYTES, accessToken = ""),
++                AgentInboxDownloadRequest("content-file", AGENT_INBOX_MAX_REVIEW_CONTENT_BYTES, accessToken = ""),
++                AgentInboxDownloadRequest("content-file", AGENT_INBOX_MAX_REVIEW_CONTENT_BYTES, accessToken = ""),
++            ),
++            driveClient.downloadRequests,
++        )
++        assertEquals(contentBytes.toList(), documentStore.writes.single().bytes.toList())
++    }
++
+     @Test
+     @OptIn(ExperimentalCoroutinesApi::class)
+     fun importAgentInboxMarkdownCandidateDownloadsAndStoresImageAttachments() = runTest {
+@@ -7057,6 +7308,7 @@ class MainViewModelTest {
+             val normalizedFolderId = folderId?.takeIf(String::isNotBlank)
+             val normalizedGrantMode = grantMode.takeIf {
+                 it == AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER ||
++                    it == AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER ||
+                     it == AGENT_INBOX_DRIVE_GRANT_MODE_READONLY_FOLDER
+             } ?: AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER
+             state.value = if (normalizedFolderId == null) {
+@@ -7089,8 +7341,9 @@ class MainViewModelTest {
+         override suspend fun saveAgentInboxDriveScanSuccess(timestampMillis: Long, folderId: String) {
+             state.value = if (
+                 (
+-                    state.value.agentInboxDriveGrantMode == AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER ||
+-                        state.value.agentInboxDriveGrantMode == AGENT_INBOX_DRIVE_GRANT_MODE_READONLY_FOLDER
++                state.value.agentInboxDriveGrantMode == AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER ||
++                    state.value.agentInboxDriveGrantMode == AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER ||
++                    state.value.agentInboxDriveGrantMode == AGENT_INBOX_DRIVE_GRANT_MODE_READONLY_FOLDER
+                     ) &&
+                 state.value.agentInboxDriveFolderId == folderId
+             ) {
+@@ -7974,6 +8227,7 @@ class MainViewModelTest {
+         ),
+         private val files: Map<String, ByteArray> = emptyMap(),
+         private val downloadFailures: Map<String, Throwable> = emptyMap(),
++        private val downloadFailuresByOrdinal: Map<Int, Throwable> = emptyMap(),
+         private val scanFailure: Throwable? = null,
+     ) : AgentInboxDriveClient {
+         val scanRequests = mutableListOf<AgentInboxDriveScanRequest>()
+@@ -7988,7 +8242,12 @@ class MainViewModelTest {
+
+         override suspend fun downloadFile(accessToken: String, fileId: String, maxBytes: Long): ByteArray {
+             downloadedFileIds += fileId
+-            downloadRequests += AgentInboxDownloadRequest(fileId = fileId, maxBytes = maxBytes)
++            downloadRequests += AgentInboxDownloadRequest(
++                fileId = fileId,
++                maxBytes = maxBytes,
++                accessToken = accessToken,
++            )
++            downloadFailuresByOrdinal[downloadRequests.size]?.let { error -> throw error }
+             downloadFailures[fileId]?.let { error -> throw error }
+             val bytes = files[fileId] ?: error("Missing fake Drive file $fileId")
+             if (bytes.size.toLong() > maxBytes) {
+@@ -8001,6 +8260,7 @@ class MainViewModelTest {
+     private data class AgentInboxDownloadRequest(
+         val fileId: String,
+         val maxBytes: Long,
++        val accessToken: String = "drive-token",
+     )
+
+     private fun MainViewModel.selectAgentInboxDriveFolderForTest(
+diff --git a/docs/LANE_STATUS.md b/docs/LANE_STATUS.md
+index 308f10f..e096baa 100644
+--- a/docs/LANE_STATUS.md
++++ b/docs/LANE_STATUS.md
+@@ -1,6 +1,6 @@
+ # Lane Status
+
+-Status timestamp: 2026-06-14
++Status timestamp: 2026-06-15
+
+ This file is the repo-level index for active and recently completed execution lanes. It should point to the canonical branch, review lane, validation artifacts, and next gate for each lane.
+
+@@ -11,6 +11,39 @@ This file is the repo-level index for active and recently completed execution la
+ - Heartbeats should exist only while waiting for a current GPT Pro lane.
+ - Do not infer lane status from untracked local files alone. For example, `ios/` can appear untracked on non-iOS branches; the canonical iOS implementation source is the pushed iOS branch listed below.
+
++## Sprint 29 Agent Inbox Folder Selector
++
++Status: `r2_validation_passed_pending_gpt_pro`
++
++- Branch: `codex/sprint29-agent-inbox-folder-selector`
++- Scope: remove the need to paste an Agent Inbox Drive folder URL/id by making Android's normal folder picker the primary connection path.
++- Canonical sprint plan: `docs/SPRINT_29_AGENT_INBOX_FOLDER_SELECTOR.md`
++- Current implementation state:
++  - Added `AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER`.
++  - Added a document-tree Agent Inbox client that scans direct child folders under a persisted `content://tree/...` URI and downloads manifest/content/image files through the selected tree grant.
++  - Added a hybrid production client so existing Google Drive API folder ids still route through the Drive API, while new system-folder grants route through DocumentsProvider.
++  - Settings disconnected Agent Inbox state now shows `Choose folder` and launches `OpenDocumentTree`; it no longer shows the pasted Drive folder URL/id field in the primary UX.
++  - Document-tree scan/import no longer require a Google OAuth token; the persisted URI read grant is the authorization boundary.
++  - Disconnect releases the persisted document-tree read permission.
++  - Historical `drive.readonly` compatibility remains for already-connected states, but the disconnected primary UX is the folder selector.
++  - GPT Pro R1 returned `SCORE 8/10`, `VERDICT REVISE`, `VISUAL REVIEW REVISE`; R2 fixes the access-loss stream handling and stale Drive visual copy.
++  - R2 visual evidence uses `VisualQaScreenshotTest#captureSprint29AgentInboxFolderSelectorStates`, opens Android DocumentsUI, selects the `Documents` folder through the system picker, returns through the real ActivityResult callback, and captures the connected folder state.
++  - R2 adds direct Portable Profile exporter evidence that raw `content://tree/...` Agent Inbox folder URIs are omitted from profile JSON.
++- Validation:
++  - Passed: targeted `MainViewModelTest`, `PreferencesSettingsRepositoryTest`, and `AccountLightProfileExporterTest`.
++  - Passed: full local gate `testDebugUnitTest :app:compileDebugAndroidTestKotlin :app:lintDebug :app:processReleaseManifestForPackage :app:assembleDebug`.
++  - Passed: focused connected visual E2E on `qaApi36(AVD) - 16` for `VisualQaScreenshotTest#captureSprint29AgentInboxFolderSelectorStates`.
++  - Passed: full `connectedDebugAndroidTest` on `qaApi36(AVD) - 16`, 138/138 tests, 0 skipped, 0 failed.
++  - Passed: `git diff --check`.
++- Evidence:
++  - Visual selector contact sheet: `evidence/sprint29_agent_inbox_folder_selector/visual_e2e_selector_r2/contact_sheet_selector_r2.png`
++  - Visual selector screenshots: `evidence/sprint29_agent_inbox_folder_selector/visual_e2e_selector_r2/sprint29-agent-inbox-folder-selector-1781513593337/`
++  - Focused visual result XML/logcat: `evidence/sprint29_agent_inbox_folder_selector/visual_e2e_selector_r2/TEST-sprint29-selector-visual-r2.xml`, `evidence/sprint29_agent_inbox_folder_selector/visual_e2e_selector_r2/logcat-sprint29-selector-visual-r2.txt`
++  - Full connected log/XML: `evidence/sprint29_agent_inbox_folder_selector/logs/full_connected_debug_android_test_r2.log`, `evidence/sprint29_agent_inbox_folder_selector/logs/TEST-full-connected-debug-android-test-r2.xml`
++  - Local gate log: `evidence/sprint29_agent_inbox_folder_selector/logs/full_local_gate_r2.log`
++- Next gate:
++  - Prepare GPT Pro R2 review bundle and iterate until `SCORE 10/10`, `VERDICT PASS`, `VISUAL REVIEW PASS`.
++
+ ## Sprint 28 Agent Inbox Drive Access Fix
+
+ Status: `release_gate_passed`
+diff --git a/docs/SPRINT_29_AGENT_INBOX_FOLDER_SELECTOR.md b/docs/SPRINT_29_AGENT_INBOX_FOLDER_SELECTOR.md
+new file mode 100644
+index 0000000..a9c3b71
+--- /dev/null
++++ b/docs/SPRINT_29_AGENT_INBOX_FOLDER_SELECTOR.md
+@@ -0,0 +1,50 @@
++# Sprint 29 - Agent Inbox Folder Selector
++
++## Goal
++
++Replace the Sprint 28 pasted-folder fallback with a normal folder selector for Agent Inbox. The user must not need to paste a Google Drive folder URL or id. The app should open Android's system folder picker, persist the selected folder tree read grant, scan only that folder, and continue using the existing finite Agent Inbox review/import contract.
++
++## Requirements
++
++- Settings Agent Inbox disconnected state shows a `Choose folder` action, not a text field for Drive folder URL/id.
++- The action launches Android `OpenDocumentTree`, which can surface Google Drive folders on devices with the Drive DocumentsProvider.
++- The selected folder persists as an Agent Inbox grant mode distinct from historical Google Picker and `drive.readonly` modes.
++- Scanning and importing packages from the selected tree do not require a Google OAuth token.
++- The scan remains finite: direct child folders are candidate packages; package files remain bounded by the existing package/file/content/image limits.
++- Access loss from a revoked or unavailable folder tree returns to the select-folder state and does not show a false empty scan.
++- Remote-safe analytics and Portable Profile must not expose raw folder URIs, Drive ids, file ids, package paths, or content file names.
++- Existing `drive.readonly` behavior may remain only for compatibility with already-connected states; it must not be the primary disconnected UX.
++
++## Implementation State
++
++- Added `AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER`.
++- Added `AndroidDocumentTreeAgentInboxClient` and `AndroidHybridAgentInboxDriveClient`.
++- Production container now routes Agent Inbox scans/downloads to the document-tree client when the saved folder is a `content://tree/...` URI.
++- Settings now launches `ActivityResultContracts.OpenDocumentTree()` for disconnected Agent Inbox instead of asking for a pasted folder id.
++- Document-tree scan/import paths allow an empty access token because the persisted URI grant is the authorization boundary.
++- Disconnect releases the persisted tree read permission for document-tree grants.
++- Sprint 29 visual coverage proves the selector UX, Android system folder picker launch, real folder selection callback, connected folder state, access-lost select-folder state, Markdown sidecar image rendering, and dark connected state.
++- R2 closes the GPT Pro R1 access-loss finding: document-tree access loss while opening manifest/content/image streams now clears the folder grant instead of marking a single package invalid.
++- R2 adds direct Portable Profile evidence that raw `content://tree/...` Agent Inbox folder URIs do not export.
++
++## Validation
++
++- `JAVA_HOME=/opt/homebrew/opt/openjdk@17 ./gradlew testDebugUnitTest --tests com.qualityalternative.app.ui.MainViewModelTest --tests com.qualityalternative.app.data.PreferencesSettingsRepositoryTest --tests com.qualityalternative.app.data.AccountLightProfileExporterTest` - PASS.
++- `JAVA_HOME=/opt/homebrew/opt/openjdk@17 ./gradlew testDebugUnitTest :app:compileDebugAndroidTestKotlin :app:lintDebug :app:processReleaseManifestForPackage :app:assembleDebug` - PASS.
++- `JAVA_HOME=/opt/homebrew/opt/openjdk@17 ./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.qualityalternative.app.VisualQaScreenshotTest#captureSprint29AgentInboxFolderSelectorStates` - PASS on `qaApi36(AVD) - 16`.
++- `JAVA_HOME=/opt/homebrew/opt/openjdk@17 ./gradlew connectedDebugAndroidTest` - PASS, 138/138 tests, 0 skipped, 0 failed on `qaApi36(AVD) - 16`.
++- `git diff --check` - PASS.
++
++## Evidence
++
++- Visual contact sheet: `evidence/sprint29_agent_inbox_folder_selector/visual_e2e_selector_r2/contact_sheet_selector_r2.png`
++- Visual screenshots: `evidence/sprint29_agent_inbox_folder_selector/visual_e2e_selector_r2/sprint29-agent-inbox-folder-selector-1781513593337/`
++- Focused visual test XML/logcat: `evidence/sprint29_agent_inbox_folder_selector/visual_e2e_selector_r2/TEST-sprint29-selector-visual-r2.xml`, `evidence/sprint29_agent_inbox_folder_selector/visual_e2e_selector_r2/logcat-sprint29-selector-visual-r2.txt`
++- Full connected test log/XML: `evidence/sprint29_agent_inbox_folder_selector/logs/full_connected_debug_android_test_r2.log`, `evidence/sprint29_agent_inbox_folder_selector/logs/TEST-full-connected-debug-android-test-r2.xml`
++- Local gate log: `evidence/sprint29_agent_inbox_folder_selector/logs/full_local_gate_r2.log`
++
++## GPT Pro Review
++
++- R1 returned `SCORE 8/10`, `VERDICT REVISE`, `VISUAL REVIEW REVISE`.
++- R1 findings fixed for R2: document-tree stream access loss now clears the folder grant; visual copy now says `Folder` and `Choose the folder again`; visual evidence now uses Sprint 29 naming and includes a real Android folder selection callback.
++- Required target remains `SCORE 10/10`, `VERDICT PASS`, `VISUAL REVIEW PASS`.
+diff --git a/evidence/sprint29_agent_inbox_folder_selector/GPT_PRO_REVIEW_PROMPT_R2.md b/evidence/sprint29_agent_inbox_folder_selector/GPT_PRO_REVIEW_PROMPT_R2.md
+new file mode 100644
+index 0000000..2ff0d9e
+--- /dev/null
++++ b/evidence/sprint29_agent_inbox_folder_selector/GPT_PRO_REVIEW_PROMPT_R2.md
+@@ -0,0 +1,77 @@
++# GPT Pro Review R2 - Sprint 29 Agent Inbox Folder Selector
++
++You are reviewing Sprint 29 R2 for the Android app in this bundle. The user goal is strict:
++
++> The user should not need to paste anything into Agent Inbox. The app should use a normal folder selector, and this sprint should iterate until GPT Pro gives 10/10.
++
++Please review as a senior Android/product-quality reviewer. Be skeptical and evidence-based.
++
++## Review Principles
++
++- Audit the shipped evidence and current code, not hidden development history.
++- Do not inflate already-covered R1 feedback into fresh findings if the R2 code and evidence close it.
++- If a claim cannot be proven from the bundle, label it `BUNDLE GAP` rather than guessing.
++- Style suggestions are not blockers unless they change user-visible correctness, privacy, or release quality.
++
++## R1 Result To Close
++
++GPT Pro R1 returned:
++
++- `SCORE: 8/10`
++- `VERDICT: REVISE`
++- `VISUAL REVIEW: REVISE`
++
++R1 findings to verify are fixed:
++
++1. High: document-tree access loss while opening manifest/content/image streams was swallowed as a package download failure. R2 should clear the selected folder grant and return to select-folder state.
++2. Low visual: document-tree connected state still looked like Drive. R2 should show `Folder`.
++3. Low visual: access-lost state said `Connect the folder again`. R2 should say `Choose the folder again`.
++4. Bundle gap: visual evidence opened the system picker but did not prove a real folder selection callback. R2 visual test now selects the `Documents` folder through Android DocumentsUI, returns to the app through ActivityResult, and captures connected state.
++5. Bundle gap: Portable Profile privacy proof was incomplete. R2 includes exporter source and a direct test that a raw `content://.../tree/...` Agent Inbox URI is omitted from exported JSON.
++
++## Acceptance Contract
++
++Pass only if all are true:
++
++- Disconnected Agent Inbox UX has a `Choose folder` action, not a pasted Drive folder URL/id field.
++- The action launches Android `OpenDocumentTree` / DocumentsUI.
++- A selected tree URI is persisted as a distinct `document_tree_folder` grant mode.
++- Scan/import under document-tree grants do not require a Google OAuth access token.
++- Revoked/unavailable tree access during scan or import clears the folder grant, clears stale candidates, records privacy-safe access-lost analytics, and asks the user to choose the folder again.
++- The scan remains finite and bounded: direct child folders only, existing package/file/content/image limits retained.
++- Historical Google Drive API grant paths may remain for compatibility, but they must not be the primary disconnected UX.
++- Remote-safe analytics and Portable Profile exports do not leak raw `content://tree/...` URIs, Drive ids, file ids, package ids, package paths, content file names, or raw failure text.
++- Existing Agent Inbox sidecar image safety and import behavior remain intact.
++- Visual evidence is sufficient for `VISUAL REVIEW: PASS`.
++
++## Evidence To Inspect First
++
++- `VALIDATION_SUMMARY.md`
++- `docs/SPRINT_29_AGENT_INBOX_FOLDER_SELECTOR.md`
++- `GPT_PRO_REVIEW_R1.md`
++- `sprint29_selector_r2_code_docs.diff`
++- `visual_e2e_selector_r2/contact_sheet_selector_r2.png`
++- `visual_e2e_selector_r2/TEST-sprint29-selector-visual-r2.xml`
++- `logs/full_connected_debug_android_test_r2.log`
++- `logs/full_local_gate_r2.log`
++
++Then inspect the included source files as needed.
++
++## Required Output Format
++
++Start your answer with exactly:
++
++```text
++SCORE: <0-10>/10
++VERDICT: PASS | REVISE | BLOCK
++VISUAL REVIEW: PASS | REVISE | BLOCK
++```
++
++Then include:
++
++- `FRESH FINDINGS`: only actionable issues, ordered by severity, with file/line references where possible.
++- `R1 CLOSURE`: say whether each R1 finding is closed.
++- `BUNDLE GAPS`: missing evidence or source that prevents confidence.
++- `RELEASE READINESS`: whether this can proceed as a completed sprint after review.
++
++If there are no fresh findings and evidence is sufficient, give `SCORE: 10/10`, `VERDICT: PASS`, and `VISUAL REVIEW: PASS`.
+diff --git a/evidence/sprint29_agent_inbox_folder_selector/REVIEW_BUNDLE_MANIFEST_R2.md b/evidence/sprint29_agent_inbox_folder_selector/REVIEW_BUNDLE_MANIFEST_R2.md
+new file mode 100644
+index 0000000..eb1b1b0
+--- /dev/null
++++ b/evidence/sprint29_agent_inbox_folder_selector/REVIEW_BUNDLE_MANIFEST_R2.md
+@@ -0,0 +1,76 @@
++# Sprint 29 Agent Inbox Folder Selector - R2 Review Bundle Manifest
++
++Branch: `codex/sprint29-agent-inbox-folder-selector`
++
++## Review Goal
++
++Close GPT Pro R1 and reach:
++
++- `SCORE: 10/10`
++- `VERDICT: PASS`
++- `VISUAL REVIEW: PASS`
++
++## R2 Changes Since R1
++
++- Document-tree access loss during manifest/content/image stream opening now propagates to the outer access-lost handler and clears the folder grant.
++- Import-time document-tree access loss now clears the folder grant instead of leaving a stale ready/invalid package row.
++- Added ViewModel tests for scan-time and import-time document-tree access loss.
++- Connected document-tree UI badge now says `Folder`; historical Drive grants still say `Drive`.
++- Access-lost visual copy now says `Choose the folder again`.
++- Visual test is renamed to Sprint 29 and selects `Documents` through Android DocumentsUI before capturing the connected state.
++- Portable Profile exporter test now proves raw `content://.../tree/...` Agent Inbox folder URIs are omitted from JSON.
++- R2 bundle includes missing R1 source context for sidecar review/import/storage and Portable Profile export.
++
++## Validation Evidence
++
++- Targeted unit tests:
++  - `testDebugUnitTest --tests com.qualityalternative.app.ui.MainViewModelTest --tests com.qualityalternative.app.data.PreferencesSettingsRepositoryTest --tests com.qualityalternative.app.data.AccountLightProfileExporterTest`
++- Full local gate:
++  - `testDebugUnitTest :app:compileDebugAndroidTestKotlin :app:lintDebug :app:processReleaseManifestForPackage :app:assembleDebug`
++  - Log: `logs/full_local_gate_r2.log`
++  - Status: `logs/full_local_gate_r2.status.txt`
++- Focused visual E2E:
++  - `connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.qualityalternative.app.VisualQaScreenshotTest#captureSprint29AgentInboxFolderSelectorStates`
++  - XML: `visual_e2e_selector_r2/TEST-sprint29-selector-visual-r2.xml`
++  - Logcat: `visual_e2e_selector_r2/logcat-sprint29-selector-visual-r2.txt`
++  - Contact sheet: `visual_e2e_selector_r2/contact_sheet_selector_r2.png`
++- Full connected Android gate:
++  - `connectedDebugAndroidTest`
++  - Result: 138/138 tests, 0 skipped, 0 failed.
++  - Log: `logs/full_connected_debug_android_test_r2.log`
++  - XML: `logs/TEST-full-connected-debug-android-test-r2.xml`
++- Diff hygiene:
++  - `git diff --check`
++  - Log: `logs/git_diff_check_r2.log`
++  - Status: `logs/git_diff_check_r2.status.txt`
++
++## Source Files Included
++
++- `PRD.md`
++- `docs/SPRINT_29_AGENT_INBOX_FOLDER_SELECTOR.md`
++- `docs/LANE_STATUS.md`
++- `sprint29_selector_r2_code_docs.diff`
++- `app/src/main/java/com/qualityalternative/app/domain/service/AgentInboxDrive.kt`
++- `app/src/main/java/com/qualityalternative/app/data/AndroidDocumentTreeAgentInboxClient.kt`
++- `app/src/main/java/com/qualityalternative/app/data/AndroidGoogleDriveAgentInboxClient.kt`
++- `app/src/main/java/com/qualityalternative/app/data/AppContainer.kt`
++- `app/src/main/java/com/qualityalternative/app/data/PreferencesSettingsRepository.kt`
++- `app/src/main/java/com/qualityalternative/app/data/AgentInboxManifest.kt`
++- `app/src/main/java/com/qualityalternative/app/data/AgentInboxReviewCandidate.kt`
++- `app/src/main/java/com/qualityalternative/app/data/AgentInboxPackageImporter.kt`
++- `app/src/main/java/com/qualityalternative/app/data/AgentInboxDocumentStore.kt`
++- `app/src/main/java/com/qualityalternative/app/data/AccountLightProfile.kt`
++- `app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt`
++- `app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt`
++- `app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt`
++- `app/src/test/java/com/qualityalternative/app/data/PreferencesSettingsRepositoryTest.kt`
++- `app/src/test/java/com/qualityalternative/app/data/AccountLightProfileExporterTest.kt`
++- `app/src/test/java/com/qualityalternative/app/data/AgentInboxReviewCandidateFactoryTest.kt`
++- `app/src/test/java/com/qualityalternative/app/data/AgentInboxPackageImporterTest.kt`
++- `app/src/androidTest/java/com/qualityalternative/app/VisualQaScreenshotTest.kt`
++
++## R1 Context Included
++
++- `GPT_PRO_REVIEW_R1.md`
++- `GPT_PRO_REVIEW_PROMPT_R1.md`
++- `REVIEW_BUNDLE_MANIFEST_R1.md`
+diff --git a/evidence/sprint29_agent_inbox_folder_selector/VALIDATION_SUMMARY.md b/evidence/sprint29_agent_inbox_folder_selector/VALIDATION_SUMMARY.md
+new file mode 100644
+index 0000000..13e3e61
+--- /dev/null
++++ b/evidence/sprint29_agent_inbox_folder_selector/VALIDATION_SUMMARY.md
+@@ -0,0 +1,54 @@
++# Sprint 29 Validation Summary
++
++Status: ready for GPT Pro R2 review
++
++Branch: `codex/sprint29-agent-inbox-folder-selector`
++
++## Scope
++
++Sprint 29 replaces the pasted Agent Inbox Drive folder URL/id fallback with Android's normal folder selector. The primary user flow is now:
++
++1. Settings Agent Inbox disconnected state shows `Choose folder`.
++2. The app launches Android `OpenDocumentTree`.
++3. The selected `content://tree/...` URI is persisted as `document_tree_folder`.
++4. Scan/import use the persisted tree grant and do not require a Google OAuth token.
++5. Existing review/import safety still applies before private Markdown/EPUB content enters the library.
++
++The legacy `drive.readonly` path remains only as compatibility for already-connected states; it is no longer the disconnected primary UX.
++
++## R2 Fixes After GPT Pro R1
++
++- Stream-level `AgentInboxDriveAccessLostException` from document-tree manifest/content/image downloads now clears the Agent Inbox folder grant instead of marking one package invalid.
++- Added focused ViewModel regressions for scan-time and import-time document-tree access loss.
++- Settings badge now distinguishes document-tree `Folder` grants from historical Google Drive API grants.
++- Access-lost copy now says `Choose the folder again`.
++- Visual test is renamed to Sprint 29 and selects the `Documents` folder through Android DocumentsUI before capturing the connected state.
++- Portable Profile exporter test now covers a raw `content://.../tree/...` Agent Inbox folder URI and asserts it is omitted from JSON.
++
++## Validation
++
++- `JAVA_HOME=/opt/homebrew/opt/openjdk@17 ./gradlew testDebugUnitTest --tests com.qualityalternative.app.ui.MainViewModelTest --tests com.qualityalternative.app.data.PreferencesSettingsRepositoryTest --tests com.qualityalternative.app.data.AccountLightProfileExporterTest` - PASS.
++- `JAVA_HOME=/opt/homebrew/opt/openjdk@17 ./gradlew testDebugUnitTest :app:compileDebugAndroidTestKotlin :app:lintDebug :app:processReleaseManifestForPackage :app:assembleDebug` - PASS.
++- `JAVA_HOME=/opt/homebrew/opt/openjdk@17 ./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.qualityalternative.app.VisualQaScreenshotTest#captureSprint29AgentInboxFolderSelectorStates` - PASS on `qaApi36(AVD) - 16`.
++- `JAVA_HOME=/opt/homebrew/opt/openjdk@17 ./gradlew connectedDebugAndroidTest` - PASS, 138/138 tests, 0 skipped, 0 failed on `qaApi36(AVD) - 16`.
++- `git diff --check` - PASS.
++
++## Visual Evidence
++
++- Contact sheet: `evidence/sprint29_agent_inbox_folder_selector/visual_e2e_selector_r2/contact_sheet_selector_r2.png`
++- Canonical screenshots: `evidence/sprint29_agent_inbox_folder_selector/visual_e2e_selector_r2/sprint29-agent-inbox-folder-selector-1781513593337/`
++- The visual run includes:
++  - disconnected Agent Inbox with `Choose folder` and no pasted folder field,
++  - Android system folder picker after clicking `Choose folder`,
++  - connected `document_tree_folder` state after a real Android folder selection callback,
++  - access-lost select-folder state,
++  - Markdown sidecar image rendering after Agent Inbox import,
++  - dark connected state.
++
++## Notes For Review
++
++- The emulator has both `com.google.android.documentsui` and `com.google.android.apps.docs` installed.
++- The visual picker screenshot is the Android DocumentsUI folder picker. It proves the app launches a real system folder selector instead of an in-app paste field.
++- The R2 visual test then selects the `Documents` folder through DocumentsUI, confirms the tree grant, returns to the app, scans with no Google access token, and captures the connected state.
++- The implementation scans only direct child folders of the selected tree and keeps the existing finite package/file/content/image byte limits.
++- Remote-safe analytics expose only `grantMode=documentTreeFolder`, not raw `content://tree/...` URIs or package file ids.

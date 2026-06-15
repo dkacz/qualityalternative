@@ -97,8 +97,10 @@ import com.qualityalternative.app.domain.service.AccountLightProfileAutosaveWrit
 import com.qualityalternative.app.domain.service.AccountLightProfileBackupReader
 import com.qualityalternative.app.domain.service.AddUserDocumentResult
 import com.qualityalternative.app.domain.service.AddUserLinkResult
+import com.qualityalternative.app.domain.service.AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER
 import com.qualityalternative.app.domain.service.AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER
 import com.qualityalternative.app.domain.service.AGENT_INBOX_DRIVE_GRANT_MODE_READONLY_FOLDER
+import com.qualityalternative.app.domain.service.AgentInboxDriveAccessLostException
 import com.qualityalternative.app.domain.service.AgentInboxDriveClient
 import com.qualityalternative.app.domain.service.AgentInboxDriveDownloadTooLargeException
 import com.qualityalternative.app.domain.service.AgentInboxDriveHttpException
@@ -260,8 +262,15 @@ data class MainUiState(
             !agentInboxDriveFolderId.isNullOrBlank() &&
             agentInboxDriveGrantMode == AGENT_INBOX_DRIVE_GRANT_MODE_READONLY_FOLDER
 
+    val hasAgentInboxDocumentTreeFolderGrant: Boolean
+        get() = agentInboxDriveEnabled &&
+            !agentInboxDriveFolderId.isNullOrBlank() &&
+            agentInboxDriveGrantMode == AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER
+
     val hasAgentInboxDriveFolderGrant: Boolean
-        get() = hasAgentInboxPickerFolderGrant || hasAgentInboxReadonlyFolderGrant
+        get() = hasAgentInboxPickerFolderGrant ||
+            hasAgentInboxReadonlyFolderGrant ||
+            hasAgentInboxDocumentTreeFolderGrant
 }
 
 internal fun parseAgentInboxDriveFolderId(value: String): String? {
@@ -1295,8 +1304,9 @@ class MainViewModel(
             reportAgentInboxDriveFailure("Connect an Agent Inbox folder before scanning.")
             return
         }
+        val requiresAccessToken = selectedGrantMode != AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER
         val normalizedToken = accessToken.trim()
-        if (normalizedToken.isBlank()) {
+        if (requiresAccessToken && normalizedToken.isBlank()) {
             reportAgentInboxDriveFailure("Google Drive did not return an access token.")
             return
         }
@@ -1346,6 +1356,7 @@ class MainViewModel(
                                 )
                             } catch (error: Throwable) {
                                 if (error is CancellationException) throw error
+                                if (error is AgentInboxDriveAccessLostException) throw error
                                 return@map AgentInboxReviewCandidateFactory.invalidPackage(
                                     drivePackage = drivePackage,
                                     packageErrors = setOf(AgentInboxPackageValidationError.DOWNLOAD_UNAVAILABLE),
@@ -1390,6 +1401,7 @@ class MainViewModel(
                                 )
                             } catch (error: Throwable) {
                                 if (error is CancellationException) throw error
+                                if (error is AgentInboxDriveAccessLostException) throw error
                                 return@map initialCandidate.copy(
                                     status = AgentInboxReviewStatus.INVALID,
                                     packageErrors = initialCandidate.packageErrors +
@@ -1444,7 +1456,11 @@ class MainViewModel(
                     agentInboxDriveFolderId = scan.folderId,
                     agentInboxDriveLastSuccessfulAtMillis = nowMillis,
                     agentInboxDriveLastError = null,
-                    agentInboxDriveFolderDraft = scan.folderId,
+                    agentInboxDriveFolderDraft = if (selectedGrantMode == AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER) {
+                        uiState.agentInboxDriveFolderDraft
+                    } else {
+                        scan.folderId
+                    },
                     agentInboxDriveFolderDraftError = null,
                     isAgentInboxScanning = false,
                     agentInboxCandidates = candidates,
@@ -1463,6 +1479,10 @@ class MainViewModel(
                 if (error is AgentInboxDriveHttpException && error.requiresAgentInboxReconnect()) {
                     reportAgentInboxDriveAccessLost(
                         "Agent Inbox folder access was lost. Connect the folder again.",
+                    )
+                } else if (error is AgentInboxDriveAccessLostException) {
+                    reportAgentInboxDriveAccessLost(
+                        "Agent Inbox folder access was lost. Choose the folder again.",
                     )
                 } else {
                     reportAgentInboxDriveFailure("Agent Inbox scan failed. Retry from Settings.")
@@ -1578,6 +1598,44 @@ class MainViewModel(
         }
     }
 
+    fun connectAgentInboxDocumentTreeFolder(
+        uri: String,
+        displayName: String,
+        nowMillis: Long = nowProvider(),
+    ) {
+        val normalizedUri = uri.trim()
+        if (normalizedUri.isBlank()) {
+            reportAgentInboxDriveFailure("No Agent Inbox folder was selected.")
+            return
+        }
+        val safeDisplayName = displayName.trim().takeIf(String::isNotBlank) ?: "selected folder"
+        uiState = uiState.copy(
+            agentInboxDriveEnabled = true,
+            agentInboxDriveFolderId = normalizedUri,
+            agentInboxDriveGrantMode = AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER,
+            agentInboxDriveLastError = null,
+            agentInboxDriveFolderDraft = safeDisplayName,
+            agentInboxDriveFolderDraftError = null,
+            agentInboxCandidates = emptyList(),
+            agentInboxPriorityAcceptedPackageIds = emptySet(),
+            agentInboxScanTruncated = false,
+            latestMessage = "Agent Inbox folder selected.",
+        )
+        viewModelScope.launch {
+            settingsRepository.saveAgentInboxDriveConnection(
+                folderId = normalizedUri,
+                grantMode = AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER,
+            )
+            recordEventDurably(
+                AnalyticsEvent(
+                    type = AnalyticsEventType.AGENT_INBOX_CONNECTED,
+                    timestampMillis = nowMillis,
+                    metadata = mapOf("grantMode" to "documentTreeFolder"),
+                ),
+            )
+        }
+    }
+
     fun reportAgentInboxDriveAuthorizationFailure(errorMessage: String) {
         val message = errorMessage.trim().ifBlank { "Google Drive authorization failed." }
         reportAgentInboxDriveFailure(message)
@@ -1673,8 +1731,9 @@ class MainViewModel(
             uiState = uiState.copy(latestMessage = "Agent Inbox package is no longer available.")
             return
         }
+        val requiresAccessToken = uiState.agentInboxDriveGrantMode != AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER
         val normalizedToken = accessToken.trim()
-        if (normalizedToken.isBlank()) {
+        if (requiresAccessToken && normalizedToken.isBlank()) {
             reportAgentInboxDriveFailure("Google Drive did not return an access token.")
             return
         }
@@ -1704,6 +1763,12 @@ class MainViewModel(
                     return@launch
                 } catch (error: Throwable) {
                     if (error is CancellationException) throw error
+                    if (error is AgentInboxDriveAccessLostException) {
+                        reportAgentInboxDriveAccessLost(
+                            "Agent Inbox folder access was lost. Choose the folder again.",
+                        )
+                        return@launch
+                    }
                     applyAgentInboxImportResult(
                         packageFolderId = packageFolderId,
                         result = AgentInboxImportResult(
@@ -1749,6 +1814,12 @@ class MainViewModel(
                         return@launch
                     } catch (error: Throwable) {
                         if (error is CancellationException) throw error
+                        if (error is AgentInboxDriveAccessLostException) {
+                            reportAgentInboxDriveAccessLost(
+                                "Agent Inbox folder access was lost. Choose the folder again.",
+                            )
+                            return@launch
+                        }
                         applyAgentInboxImportResult(
                             packageFolderId = packageFolderId,
                             result = AgentInboxImportResult(
@@ -1998,14 +2069,13 @@ class MainViewModel(
     }
 
     private fun reportAgentInboxDriveAccessLost(message: String) {
-        val reconnectFolderDraft = uiState.agentInboxDriveFolderId.orEmpty()
         uiState = uiState.copy(
             agentInboxDriveEnabled = false,
             agentInboxDriveFolderId = null,
             agentInboxDriveGrantMode = null,
             agentInboxDriveLastSuccessfulAtMillis = null,
             agentInboxDriveLastError = message,
-            agentInboxDriveFolderDraft = reconnectFolderDraft,
+            agentInboxDriveFolderDraft = "",
             agentInboxDriveFolderDraftError = null,
             isAgentInboxScanning = false,
             isAgentInboxImporting = false,
@@ -5292,7 +5362,7 @@ class MainViewModel(
     }
 
     internal fun seedAgentInboxDriveAccessLostForTests(
-        message: String = "Agent Inbox folder access was lost. Connect the folder again.",
+        message: String = "Agent Inbox folder access was lost. Choose the folder again.",
     ) {
         check(BuildConfig.DEBUG) { "Agent Inbox access-lost visual fixture state is only available in debug builds." }
         uiState = uiState.copy(

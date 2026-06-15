@@ -41,6 +41,7 @@ import com.qualityalternative.app.domain.model.TopicTag
 import com.qualityalternative.app.domain.model.WebsiteRule
 import com.qualityalternative.app.domain.model.WebsiteRuleType
 import com.qualityalternative.app.domain.service.AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER
+import com.qualityalternative.app.domain.service.AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER
 import com.qualityalternative.app.domain.service.AGENT_INBOX_DRIVE_GRANT_MODE_READONLY_FOLDER
 import com.qualityalternative.app.domain.service.SettingsRepository
 import java.io.IOException
@@ -544,6 +545,7 @@ class PreferencesSettingsRepository(
         val AgentInboxDriveLastError = stringPreferencesKey("agent_inbox_drive_last_error")
         val AGENT_INBOX_SUPPORTED_GRANT_MODES = setOf(
             AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER,
+            AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER,
             AGENT_INBOX_DRIVE_GRANT_MODE_READONLY_FOLDER,
         )
         val ProfileAutosaveUri = stringPreferencesKey("profile_autosave_uri")
