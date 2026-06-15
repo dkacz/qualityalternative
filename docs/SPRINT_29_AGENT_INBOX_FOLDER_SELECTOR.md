@@ -59,3 +59,7 @@ Replace the Sprint 28 pasted-folder fallback with a normal folder selector for A
 - Release APK SHA-256: `753362b76fdd0110fd15668a1215cbe6e1291b674efca9dc9c94e61c8d9b0fec`
 - Release gate summary: `docs/release-gate-logs/2026-06-15-sprint29-agent-inbox-folder-selector/VALIDATION_SUMMARY.md`
 - Release notes: `docs/release-gate-logs/2026-06-15-sprint29-agent-inbox-folder-selector/RELEASE_NOTES_v0.11.17-agent-inbox-folder-selector-alpha.md`
+- Release commit: `9e88d7c0b081b43ace7b01f54ecb35f9c5e34ae9`.
+- Release tag: `v0.11.17-agent-inbox-folder-selector-alpha`.
+- Release URL: `https://github.com/dkacz/qualityalternative/releases/tag/v0.11.17-agent-inbox-folder-selector-alpha`.
+- Integration method: committed on `codex/sprint29-agent-inbox-folder-selector`, tagged the release commit, pushed branch and tag to `origin`, and published the GitHub release from the committed release notes.

@@ -49,8 +49,10 @@ GPT Pro R2 returned `SCORE 10/10`, `VERDICT PASS`, `VISUAL REVIEW PASS`, with no
 
 ## Publication Status
 
-Prepared for GitHub release publication.
+Published to GitHub Releases.
 
+- Release commit: `9e88d7c0b081b43ace7b01f54ecb35f9c5e34ae9`
 - Release tag: `v0.11.17-agent-inbox-folder-selector-alpha`
-- Expected release URL: `https://github.com/dkacz/qualityalternative/releases/tag/v0.11.17-agent-inbox-folder-selector-alpha`
-- Integration method: commit this release gate on `codex/sprint29-agent-inbox-folder-selector`, tag the release commit, push branch and tag to `origin`, and publish the GitHub release from these release notes.
+- Release URL: `https://github.com/dkacz/qualityalternative/releases/tag/v0.11.17-agent-inbox-folder-selector-alpha`
+- Published assets: `quality-alternative-v0.11.17-agent-inbox-folder-selector-alpha-debug.apk` and `quality-alternative-v0.11.17-agent-inbox-folder-selector-alpha-debug.apk.sha256`.
+- Integration method: committed on `codex/sprint29-agent-inbox-folder-selector`, tagged the release commit, pushed branch and tag to `origin`, and published the GitHub release from these release notes.

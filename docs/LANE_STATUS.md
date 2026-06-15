@@ -13,7 +13,7 @@ This file is the repo-level index for active and recently completed execution la
 
 ## Sprint 29 Agent Inbox Folder Selector
 
-Status: `release_gate_passed`
+Status: `release_published`
 
 - Branch: `codex/sprint29-agent-inbox-folder-selector`
 - Scope: remove the need to paste an Agent Inbox Drive folder URL/id by making Android's normal folder picker the primary connection path.
@@ -35,6 +35,11 @@ Status: `release_gate_passed`
   - SHA-256: `753362b76fdd0110fd15668a1215cbe6e1291b674efca9dc9c94e61c8d9b0fec`
   - Release gate summary: `docs/release-gate-logs/2026-06-15-sprint29-agent-inbox-folder-selector/VALIDATION_SUMMARY.md`
   - Release notes: `docs/release-gate-logs/2026-06-15-sprint29-agent-inbox-folder-selector/RELEASE_NOTES_v0.11.17-agent-inbox-folder-selector-alpha.md`
+  - Release commit: `9e88d7c0b081b43ace7b01f54ecb35f9c5e34ae9` (`Prepare Sprint 29 agent inbox folder selector release`).
+  - Release tag: `v0.11.17-agent-inbox-folder-selector-alpha`.
+  - Release URL: `https://github.com/dkacz/qualityalternative/releases/tag/v0.11.17-agent-inbox-folder-selector-alpha`.
+  - Published assets: `quality-alternative-v0.11.17-agent-inbox-folder-selector-alpha-debug.apk` and `quality-alternative-v0.11.17-agent-inbox-folder-selector-alpha-debug.apk.sha256`.
+  - Integration method: committed on `codex/sprint29-agent-inbox-folder-selector`, tagged the release commit, pushed branch and tag to `origin`, and published the GitHub release from the committed release notes.
 - Validation:
   - Passed: targeted `MainViewModelTest`, `PreferencesSettingsRepositoryTest`, and `AccountLightProfileExporterTest`.
   - Passed: full local gate `testDebugUnitTest :app:compileDebugAndroidTestKotlin :app:lintDebug :app:processReleaseManifestForPackage :app:assembleDebug`.
@@ -52,7 +57,7 @@ Status: `release_gate_passed`
   - Release gate summary: `docs/release-gate-logs/2026-06-15-sprint29-agent-inbox-folder-selector/VALIDATION_SUMMARY.md`
   - Release APK: `release_artifacts/quality-alternative-v0.11.17-agent-inbox-folder-selector-alpha-debug.apk`
 - Next gate:
-  - Tag, push, and publish the GitHub release if this local release gate is accepted for publication.
+  - Decide whether to merge the release branch back to `main`.
 
 ## Sprint 28 Agent Inbox Drive Access Fix
 
