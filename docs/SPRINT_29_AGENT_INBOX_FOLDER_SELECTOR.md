@@ -48,3 +48,14 @@ Replace the Sprint 28 pasted-folder fallback with a normal folder selector for A
 - R1 returned `SCORE 8/10`, `VERDICT REVISE`, `VISUAL REVIEW REVISE`.
 - R1 findings fixed for R2: document-tree stream access loss now clears the folder grant; visual copy now says `Folder` and `Choose the folder again`; visual evidence now uses Sprint 29 naming and includes a real Android folder selection callback.
 - R2 returned `SCORE 10/10`, `VERDICT PASS`, `VISUAL REVIEW PASS`; fresh findings none, bundle gaps none.
+
+## Release Gate
+
+- Release gate passed for `v0.11.17-agent-inbox-folder-selector-alpha`: `versionCode=33`, `versionName=0.11.17-alpha`.
+- Final Gradle gate passed: `:app:testDebugUnitTest :app:lintDebug :app:assembleDebug`.
+- Final connected Android gate passed: `connectedDebugAndroidTest`, 138 tests, 0 failures, 0 skipped.
+- APK badging, signature verification, install, and explicit launch evidence passed.
+- Release artifact: `release_artifacts/quality-alternative-v0.11.17-agent-inbox-folder-selector-alpha-debug.apk`
+- Release APK SHA-256: `753362b76fdd0110fd15668a1215cbe6e1291b674efca9dc9c94e61c8d9b0fec`
+- Release gate summary: `docs/release-gate-logs/2026-06-15-sprint29-agent-inbox-folder-selector/VALIDATION_SUMMARY.md`
+- Release notes: `docs/release-gate-logs/2026-06-15-sprint29-agent-inbox-folder-selector/RELEASE_NOTES_v0.11.17-agent-inbox-folder-selector-alpha.md`

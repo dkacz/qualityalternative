@@ -13,7 +13,7 @@ This file is the repo-level index for active and recently completed execution la
 
 ## Sprint 29 Agent Inbox Folder Selector
 
-Status: `gpt_pro_passed`
+Status: `release_gate_passed`
 
 - Branch: `codex/sprint29-agent-inbox-folder-selector`
 - Scope: remove the need to paste an Agent Inbox Drive folder URL/id by making Android's normal folder picker the primary connection path.
@@ -30,12 +30,18 @@ Status: `gpt_pro_passed`
   - R2 visual evidence uses `VisualQaScreenshotTest#captureSprint29AgentInboxFolderSelectorStates`, opens Android DocumentsUI, selects the `Documents` folder through the system picker, returns through the real ActivityResult callback, and captures the connected folder state.
   - R2 adds direct Portable Profile exporter evidence that raw `content://tree/...` Agent Inbox folder URIs are omitted from profile JSON.
   - GPT Pro R2 returned `SCORE 10/10`, `VERDICT PASS`, `VISUAL REVIEW PASS`; fresh findings none, bundle gaps none.
+  - Final release gate passed for `v0.11.17-agent-inbox-folder-selector-alpha`: `versionCode=33`, `versionName=0.11.17-alpha`, final local Gradle gate PASS, final connected Android gate PASS 138/138, APK badging/signature/install/launch PASS.
+  - Release artifact: `release_artifacts/quality-alternative-v0.11.17-agent-inbox-folder-selector-alpha-debug.apk`
+  - SHA-256: `753362b76fdd0110fd15668a1215cbe6e1291b674efca9dc9c94e61c8d9b0fec`
+  - Release gate summary: `docs/release-gate-logs/2026-06-15-sprint29-agent-inbox-folder-selector/VALIDATION_SUMMARY.md`
+  - Release notes: `docs/release-gate-logs/2026-06-15-sprint29-agent-inbox-folder-selector/RELEASE_NOTES_v0.11.17-agent-inbox-folder-selector-alpha.md`
 - Validation:
   - Passed: targeted `MainViewModelTest`, `PreferencesSettingsRepositoryTest`, and `AccountLightProfileExporterTest`.
   - Passed: full local gate `testDebugUnitTest :app:compileDebugAndroidTestKotlin :app:lintDebug :app:processReleaseManifestForPackage :app:assembleDebug`.
   - Passed: focused connected visual E2E on `qaApi36(AVD) - 16` for `VisualQaScreenshotTest#captureSprint29AgentInboxFolderSelectorStates`.
   - Passed: full `connectedDebugAndroidTest` on `qaApi36(AVD) - 16`, 138/138 tests, 0 skipped, 0 failed.
   - Passed: `git diff --check`.
+  - Passed: release-gate final Gradle build, APK badging, signature verification, emulator install, and explicit launch smoke.
 - Evidence:
   - Visual selector contact sheet: `evidence/sprint29_agent_inbox_folder_selector/visual_e2e_selector_r2/contact_sheet_selector_r2.png`
   - Visual selector screenshots: `evidence/sprint29_agent_inbox_folder_selector/visual_e2e_selector_r2/sprint29-agent-inbox-folder-selector-1781513593337/`
@@ -43,8 +49,10 @@ Status: `gpt_pro_passed`
   - Full connected log/XML: `evidence/sprint29_agent_inbox_folder_selector/logs/full_connected_debug_android_test_r2.log`, `evidence/sprint29_agent_inbox_folder_selector/logs/TEST-full-connected-debug-android-test-r2.xml`
   - Local gate log: `evidence/sprint29_agent_inbox_folder_selector/logs/full_local_gate_r2.log`
   - GPT Pro R2 output: `evidence/sprint29_agent_inbox_folder_selector/GPT_PRO_REVIEW_R2.md`
+  - Release gate summary: `docs/release-gate-logs/2026-06-15-sprint29-agent-inbox-folder-selector/VALIDATION_SUMMARY.md`
+  - Release APK: `release_artifacts/quality-alternative-v0.11.17-agent-inbox-folder-selector-alpha-debug.apk`
 - Next gate:
-  - Commit the completed sprint branch and decide whether to roll this into an APK release gate.
+  - Tag, push, and publish the GitHub release if this local release gate is accepted for publication.
 
 ## Sprint 28 Agent Inbox Drive Access Fix
 
