@@ -46,6 +46,8 @@ This repository now contains:
    Strategic context and positioning rationale. Use it to understand the thesis, not to expand scope.
 3. `AGENTS.md`
    Repository working rules for human and AI contributors.
+4. `docs/AGENT_INBOX_PACKAGE_AUTHORING.md`
+   Portable contract for AI agents that create Agent Inbox Markdown or EPUB packages.
 
 ## Current Product Decision
 

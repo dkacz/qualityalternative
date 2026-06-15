@@ -30,6 +30,13 @@ This repository defines an Android-first MVP for "quality replacement at the mom
 - Prefer simple, explainable ranking logic first. Complexity should follow observed product value, not precede it.
 - Treat analytics instrumentation as part of the feature, not a follow-up task.
 
+## Agent Inbox Package Authoring
+
+- When creating private Markdown or EPUB packages for Agent Inbox, follow `docs/AGENT_INBOX_PACKAGE_AUTHORING.md`.
+- Validate each package with `python3 tools/validate_agent_inbox_package.py <package-folder>` before uploading or syncing it into the user's selected Agent Inbox folder.
+- Do not hard-code the user's local paths, rclone remote names, Google account, Drive folder ids, access tokens, or machine-specific assumptions into package content or instructions.
+- Keep generated private content packages out of git unless the user explicitly asks to commit an example fixture.
+
 ## Testing Strategy
 
 - Use acceptance criteria from `PRD.md` as the baseline test contract.
