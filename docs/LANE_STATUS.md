@@ -13,7 +13,7 @@ This file is the repo-level index for active and recently completed execution la
 
 ## Sprint 34 Agent Inbox Readonly Link Fallback
 
-Status: `release_published_r2_review_pending`
+Status: `release_published_gpt_pro_r2_pass_10_10`
 
 - Date opened: 2026-06-16
 - Trigger: GPT Pro R1 for Sprint 33 returned `SCORE: 8/10`, `VERDICT: REVISE`.
@@ -38,9 +38,10 @@ Status: `release_published_r2_review_pending`
   - R2 launched on 2026-06-16 with prompt `evidence/sprint34_agent_inbox_readonly_link_fallback/pro_review_r2/GPT_PRO_REVIEW_PROMPT_R2.md`.
   - R2 bundle ZIP artifact: `SPRINT34_AGENT_INBOX_READONLY_LINK_FALLBACK_R2_GPT_PRO_REVIEW_BUNDLE_20260616.zip`.
   - R2 ChatGPT URL: `https://chatgpt.com/c/6a31294a-f7ac-83eb-970f-1a1652c1c431`.
-  - R2 status: launched and still generating during the first harvest attempts; no `SCORE`/`VERDICT` has been harvested yet.
+  - R2 result: `SCORE: 10/10`, `VERDICT: PASS`, `VISUAL REVIEW: NOT APPLICABLE`.
+  - R2 output: `evidence/sprint34_agent_inbox_readonly_link_fallback/pro_review_r2/GPT_PRO_REVIEW_R2.md`.
 - Next gate:
-  - Harvest GPT Pro R2. Do not claim review-clean status unless R2 returns `SCORE: 10/10`, `VERDICT: PASS`.
+  - Install the published APK on the signed-in Android device and confirm the Google Drive folder picker opens instead of returning Google Play Services `INTERNAL_ERROR`; use the `Drive folder link or id` fallback if Picker grants still do not expose externally populated package children.
 
 ## Sprint 33 Agent Inbox Google Drive Picker Play Services Hotfix
 
