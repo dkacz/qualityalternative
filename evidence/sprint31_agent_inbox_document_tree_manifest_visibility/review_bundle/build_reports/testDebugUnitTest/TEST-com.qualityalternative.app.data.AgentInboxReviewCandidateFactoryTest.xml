@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.qualityalternative.app.data.AgentInboxReviewCandidateFactoryTest" tests="18" skipped="0" failures="0" errors="0" timestamp="2026-06-16T08:23:08.027Z" hostname="mac-studio.home" time="0.005">
+  <properties/>
+  <testcase name="fromDrivePackage_marksTruncatedPackageFileListingInvalid" classname="com.qualityalternative.app.data.AgentInboxReviewCandidateFactoryTest" time="0.001"/>
+  <testcase name="fromDrivePackage_marksTooManyMarkdownImageAttachmentsInvalid" classname="com.qualityalternative.app.data.AgentInboxReviewCandidateFactoryTest" time="0.001"/>
+  <testcase name="fromDrivePackage_marksActualContentShaAsDuplicateWhenManifestIncludesSameSha" classname="com.qualityalternative.app.data.AgentInboxReviewCandidateFactoryTest" time="0.0"/>
+  <testcase name="fromDrivePackage_marksMissingContentFileInvalid" classname="com.qualityalternative.app.data.AgentInboxReviewCandidateFactoryTest" time="0.0"/>
+  <testcase name="fromDrivePackage_marksOversizedMarkdownImageAttachmentInvalid" classname="com.qualityalternative.app.data.AgentInboxReviewCandidateFactoryTest" time="0.001"/>
+  <testcase name="fromDrivePackage_marksUnsupportedExtraFilesInvalid" classname="com.qualityalternative.app.data.AgentInboxReviewCandidateFactoryTest" time="0.0"/>
+  <testcase name="fromDrivePackage_marksEpubImageSidecarInvalid" classname="com.qualityalternative.app.data.AgentInboxReviewCandidateFactoryTest" time="0.0"/>
+  <testcase name="fromDrivePackage_marksActualContentShaAsDuplicateWhenManifestOmitsSha" classname="com.qualityalternative.app.data.AgentInboxReviewCandidateFactoryTest" time="0.0"/>
+  <testcase name="fromDrivePackage_marksDuplicateManifestsInvalid" classname="com.qualityalternative.app.data.AgentInboxReviewCandidateFactoryTest" time="0.0"/>
+  <testcase name="fromDrivePackage_marksMultipleContentFilesInvalid" classname="com.qualityalternative.app.data.AgentInboxReviewCandidateFactoryTest" time="0.0"/>
+  <testcase name="fromDrivePackage_buildsReadyCandidateWithPriorityIntent" classname="com.qualityalternative.app.data.AgentInboxReviewCandidateFactoryTest" time="0.0"/>
+  <testcase name="fromDrivePackage_marksCanonicalMarkdownImageAttachmentCollisionsInvalid" classname="com.qualityalternative.app.data.AgentInboxReviewCandidateFactoryTest" time="0.0"/>
+  <testcase name="fromDrivePackage_marksDuplicateMarkdownImageAttachmentNamesInvalid" classname="com.qualityalternative.app.data.AgentInboxReviewCandidateFactoryTest" time="0.001"/>
+  <testcase name="fromDrivePackage_doesNotMarkDuplicateFromUnverifiedManifestSha" classname="com.qualityalternative.app.data.AgentInboxReviewCandidateFactoryTest" time="0.0"/>
+  <testcase name="fromDrivePackage_marksMissingManifestInvalid" classname="com.qualityalternative.app.data.AgentInboxReviewCandidateFactoryTest" time="0.0"/>
+  <testcase name="fromDrivePackage_allowsMarkdownImageAttachments" classname="com.qualityalternative.app.data.AgentInboxReviewCandidateFactoryTest" time="0.0"/>
+  <testcase name="fromDrivePackage_marksTotalMarkdownImageAttachmentBytesInvalid" classname="com.qualityalternative.app.data.AgentInboxReviewCandidateFactoryTest" time="0.0"/>
+  <testcase name="fromDrivePackage_marksManifestValidationErrorsInvalid" classname="com.qualityalternative.app.data.AgentInboxReviewCandidateFactoryTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

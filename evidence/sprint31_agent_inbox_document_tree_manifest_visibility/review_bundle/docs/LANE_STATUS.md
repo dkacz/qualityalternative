@@ -11,28 +11,14 @@ This file is the repo-level index for active and recently completed execution la
 - Heartbeats should exist only while waiting for a current GPT Pro lane.
 - Do not infer lane status from untracked local files alone. For example, `ios/` can appear untracked on non-iOS branches; the canonical iOS implementation source is the pushed iOS branch listed below.
 
-## Sprint 31 Agent Inbox Google Drive Document-Tree Manifest Visibility
+## Agent Inbox Drive Package Shape Triage
 
-Status: `release_ready_local`
+Status: `triage_requested`
 
 - Date opened: 2026-06-16
 - Trigger: after Sprint 30 release, the app screenshot still shows multiple Drive Agent Inbox folders such as `hegel-maybee-kant-obiektywnosc-a-intersubiektywnosc` in `NEEDS PACKAGE CLEANUP` with `Package is missing manifest.json`.
-- Direct Drive inspection confirmed the package shape is valid: the selected Agent Inbox parent `10adaGo_eN3Pnb-FplpkJfxF4cNJCXiz-` contains six package folders, and each inspected package has direct `manifest.json`, `content.md`, and image children.
-- Root cause: the app trusted Android's Google Drive document-tree provider listing. That provider can expose package folders while not exposing their nested files to the app, so the review factory saw an incomplete `allFiles` list and mislabeled valid Drive packages as missing `manifest.json`.
-- Fix branch: `codex/agent-inbox-document-tree-manifest-visibility`.
-- Implementation state:
-  - Google Drive-backed document-tree URIs now require Drive readonly authorization for scan/import.
-  - The hybrid Agent Inbox Drive client extracts `doc=<folderId>` from Google Drive document-tree URIs and scans packages through the existing Drive API client when a token is available.
-  - The original `content://...` folder URI is preserved in app state/settings after Drive API scans so Android permission release and UI status stay coherent.
-  - Local Android document-tree folders still scan and import without a Google token.
-- Evidence:
-  - Final local gate passed after version bump: `JAVA_HOME=/opt/homebrew/Cellar/openjdk@17/17.0.18/libexec/openjdk.jdk/Contents/Home ./gradlew testDebugUnitTest lintDebug assembleRelease`.
-  - Signed debug APK artifact built with `versionCode=35`, `versionName=0.11.19-alpha`.
-  - Release artifact: `release_artifacts/quality-alternative-v0.11.19-agent-inbox-manifest-visibility-alpha-debug.apk`.
-  - SHA-256: `e6b83c4adcff52ed13e45485a6f9cef5012759a0894aa8f7c6650a8a1b61a79d`.
-  - Connected visual/e2e was not run locally because `adb devices -l` showed no attached device and the machine has AVD definitions but no accessible Android emulator binary in the usual SDK paths.
-  - GPT Pro R1 returned `VERDICT: PASS`, `SCORE: 10/10`, no blockers, and accepted the connected-test gap for this routing/state fix.
-- Review bundle: `ARCHITECT_REVIEW_BUNDLE_sprint31_agent_inbox_manifest_visibility.zip`.
+- Initial hypothesis to verify: the app is scanning folder objects that do not contain `manifest.json` as direct children, despite the package author claiming manifests were generated. This may be a Drive folder-level/package-shape issue rather than the Sprint 30 image-sidecar import bug.
+- Next diagnostic step: inspect the selected Agent Inbox Drive folder contents directly, confirm each package folder's direct children, and compare actual Drive layout against `docs/AGENT_INBOX_PACKAGE_AUTHORING.md`.
 
 ## Sprint 30 Agent Inbox Large Image Import Fix
 

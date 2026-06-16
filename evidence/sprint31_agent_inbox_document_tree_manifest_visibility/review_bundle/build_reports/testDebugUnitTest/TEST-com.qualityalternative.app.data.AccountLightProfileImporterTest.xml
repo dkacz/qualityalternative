@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.qualityalternative.app.data.AccountLightProfileImporterTest" tests="26" skipped="0" failures="0" errors="0" timestamp="2026-06-16T08:23:07.406Z" hostname="mac-studio.home" time="0.489">
+  <properties/>
+  <testcase name="validateImportProfileJson_acceptsReadingProgressForImportedLibraryContent" classname="com.qualityalternative.app.data.AccountLightProfileImporterTest" time="0.022"/>
+  <testcase name="validateImportProfileJson_rejectsContentIdTypeMismatchesBeforeMutation" classname="com.qualityalternative.app.data.AccountLightProfileImporterTest" time="0.009"/>
+  <testcase name="exportedPrivateDocumentOmitsRawFingerprintAndDoesNotReconcileBySha" classname="com.qualityalternative.app.data.AccountLightProfileImporterTest" time="0.006"/>
+  <testcase name="validateImportProfileJson_rejectsUnsafeNestedPortableDataBeforeMutation" classname="com.qualityalternative.app.data.AccountLightProfileImporterTest" time="0.298"/>
+  <testcase name="validateImportProfileJson_acceptsReadingProgressTextOffsetWithoutUnknownWarning" classname="com.qualityalternative.app.data.AccountLightProfileImporterTest" time="0.004"/>
+  <testcase name="applyMergeMapsFingerprintOnlyDocumentProgressToLocalContentId" classname="com.qualityalternative.app.data.AccountLightProfileImporterTest" time="0.007"/>
+  <testcase name="applyReplace_replacesPortableSettingsAndPreservesLocalAnnotationDestinations" classname="com.qualityalternative.app.data.AccountLightProfileImporterTest" time="0.006"/>
+  <testcase name="validateImportProfileJson_rejectsUnsafeWebsiteRules" classname="com.qualityalternative.app.data.AccountLightProfileImporterTest" time="0.016"/>
+  <testcase name="applyReplace_restoresPortableWebsiteRules" classname="com.qualityalternative.app.data.AccountLightProfileImporterTest" time="0.005"/>
+  <testcase name="validateImportProfileJson_activatesEligibleCustomAppAndKeepsMissingPackageInactiveOnReplace" classname="com.qualityalternative.app.data.AccountLightProfileImporterTest" time="0.005"/>
+  <testcase name="validateImportProfileJson_rejectsMalformedLibraryAndReadingEntriesBeforeMutation" classname="com.qualityalternative.app.data.AccountLightProfileImporterTest" time="0.01"/>
+  <testcase name="applyMerge_validatesButKeepsLocalPortableSettings" classname="com.qualityalternative.app.data.AccountLightProfileImporterTest" time="0.005"/>
+  <testcase name="validateImportProfileJson_warnsAndKeepsUnsupportedAppsInactiveOnReplace" classname="com.qualityalternative.app.data.AccountLightProfileImporterTest" time="0.005"/>
+  <testcase name="applyReplace_restoresLibraryWhenProgressImportFails" classname="com.qualityalternative.app.data.AccountLightProfileImporterTest" time="0.007"/>
+  <testcase name="applyMergeStoresProgressOnlyForAcceptedImportedContentIds" classname="com.qualityalternative.app.data.AccountLightProfileImporterTest" time="0.004"/>
+  <testcase name="validateImportProfileJson_keepsAllMissingAppTargetsInactiveOnReplace" classname="com.qualityalternative.app.data.AccountLightProfileImporterTest" time="0.005"/>
+  <testcase name="applyMergeStopsBeforeProgressWhenPortableContentIdsConflict" classname="com.qualityalternative.app.data.AccountLightProfileImporterTest" time="0.006"/>
+  <testcase name="validateImportProfileJson_acceptsPortableAnnotationSidecarFileName" classname="com.qualityalternative.app.data.AccountLightProfileImporterTest" time="0.004"/>
+  <testcase name="validateImportProfileJson_rejectsMalformedMissingAndUnsupportedProfiles" classname="com.qualityalternative.app.data.AccountLightProfileImporterTest" time="0.011"/>
+  <testcase name="applyMerge_importsLibraryMarksDocumentsMissingAndKeepsMissingDocumentProgressDormant" classname="com.qualityalternative.app.data.AccountLightProfileImporterTest" time="0.004"/>
+  <testcase name="applyMergeMapsSecondaryOnlyLinkProgressToLocalContentId" classname="com.qualityalternative.app.data.AccountLightProfileImporterTest" time="0.004"/>
+  <testcase name="validateImportProfileJson_rejectsUnsafeSelectedPackIds" classname="com.qualityalternative.app.data.AccountLightProfileImporterTest" time="0.021"/>
+  <testcase name="validateImportProfileJson_sanitizesDottedUnknownFieldSections" classname="com.qualityalternative.app.data.AccountLightProfileImporterTest" time="0.008"/>
+  <testcase name="validateImportProfileJson_reportsUnknownNestedFieldsAsWarnings" classname="com.qualityalternative.app.data.AccountLightProfileImporterTest" time="0.005"/>
+  <testcase name="validateImportProfileJson_doesNotExposeMissingCustomPackageInWarnings" classname="com.qualityalternative.app.data.AccountLightProfileImporterTest" time="0.005"/>
+  <testcase name="validateImportProfileJsonPreflightsWholeLibraryBeforeAnyMutation" classname="com.qualityalternative.app.data.AccountLightProfileImporterTest" time="0.004"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

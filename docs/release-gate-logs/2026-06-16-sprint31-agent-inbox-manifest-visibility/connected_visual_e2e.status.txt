@@ -1,0 +1,1 @@
+connected_visual_e2e_not_run: no adb device attached and no accessible emulator binary found in local SDK paths

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.qualityalternative.app.data.EpubTextExtractorTest" tests="25" skipped="0" failures="0" errors="0" timestamp="2026-06-16T08:23:09.206Z" hostname="mac-studio.home" time="0.52">
+  <properties/>
+  <testcase name="extractDocumentMapsManyAnchorsWithoutChangingGlobalBlockTargets" classname="com.qualityalternative.app.data.EpubTextExtractorTest" time="0.032"/>
+  <testcase name="extractDocumentMapsTocHrefToNearestSourceBlockWhenAnchorIsUnavailable" classname="com.qualityalternative.app.data.EpubTextExtractorTest" time="0.002"/>
+  <testcase name="extractKeepsParentLevelContinuationAroundNestedChildListAtParentDepth" classname="com.qualityalternative.app.data.EpubTextExtractorTest" time="0.002"/>
+  <testcase name="extractDocumentKeepsSourceBlockIndexesGlobalAcrossSpineDocuments" classname="com.qualityalternative.app.data.EpubTextExtractorTest" time="0.001"/>
+  <testcase name="extractPreservesThreeLevelNestedListDepth" classname="com.qualityalternative.app.data.EpubTextExtractorTest" time="0.002"/>
+  <testcase name="extractKeepsSameTypeNestedListsAttachedToTheirParentItem" classname="com.qualityalternative.app.data.EpubTextExtractorTest" time="0.001"/>
+  <testcase name="extractAndReaderHandleNestedEmphasisWithoutRawMarkerLeakage" classname="com.qualityalternative.app.data.EpubTextExtractorTest" time="0.048"/>
+  <testcase name="extractDocumentParsesEpub3NavTocAndMapsAnchorsToBlocks" classname="com.qualityalternative.app.data.EpubTextExtractorTest" time="0.003"/>
+  <testcase name="extractDocumentMapsLaterTocAnchorAfterInlinePagebreakWithoutDrift" classname="com.qualityalternative.app.data.EpubTextExtractorTest" time="0.002"/>
+  <testcase name="extractPreservesEpubStructureAsReaderMarkdown" classname="com.qualityalternative.app.data.EpubTextExtractorTest" time="0.001"/>
+  <testcase name="extractKeepsNestedListsAttachedToTheirParentItem" classname="com.qualityalternative.app.data.EpubTextExtractorTest" time="0.001"/>
+  <testcase name="extractPreservesContinuationParagraphsInsideNestedListDepth" classname="com.qualityalternative.app.data.EpubTextExtractorTest" time="0.0"/>
+  <testcase name="extractDocumentFallsBackToHeadingTocWhenPackageHasNoToc" classname="com.qualityalternative.app.data.EpubTextExtractorTest" time="0.001"/>
+  <testcase name="extractThrowsWhenReadableEntryExceedsSafetyLimit" classname="com.qualityalternative.app.data.EpubTextExtractorTest" time="0.082"/>
+  <testcase name="extractPreservesOrderedListsAndContinuationText" classname="com.qualityalternative.app.data.EpubTextExtractorTest" time="0.002"/>
+  <testcase name="extractReadsSpineOrderedXhtmlAsFiniteReaderText" classname="com.qualityalternative.app.data.EpubTextExtractorTest" time="0.0"/>
+  <testcase name="extractKeepsLegitimateChapterNamesThatContainCover" classname="com.qualityalternative.app.data.EpubTextExtractorTest" time="0.001"/>
+  <testcase name="extractDocumentIgnoresLargeBinaryAssetsWhileKeepingReadableSpine" classname="com.qualityalternative.app.data.EpubTextExtractorTest" time="0.019"/>
+  <testcase name="extractDocumentKeepsEpub3GroupedNavParentOutOfTocWhenItHasNoDirectHref" classname="com.qualityalternative.app.data.EpubTextExtractorTest" time="0.002"/>
+  <testcase name="extractDocumentParsesEpub2NcxToc" classname="com.qualityalternative.app.data.EpubTextExtractorTest" time="0.002"/>
+  <testcase name="extractThrowsWhenAggregateReadableTextExceedsSafetyLimit" classname="com.qualityalternative.app.data.EpubTextExtractorTest" time="0.313"/>
+  <testcase name="extractDoesNotFallbackToFilteredSpineOrUnlistedDocuments" classname="com.qualityalternative.app.data.EpubTextExtractorTest" time="0.0"/>
+  <testcase name="extractSkipsNavCoverAndNonLinearSpineItems" classname="com.qualityalternative.app.data.EpubTextExtractorTest" time="0.002"/>
+  <testcase name="extractThrowsWhenPackageDocumentIsMissing" classname="com.qualityalternative.app.data.EpubTextExtractorTest" time="0.001"/>
+  <testcase name="extractDecodesNonBmpNumericEntities" classname="com.qualityalternative.app.data.EpubTextExtractorTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

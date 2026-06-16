@@ -1,0 +1,326 @@
+diff --git a/app/src/main/java/com/qualityalternative/app/data/AndroidDocumentTreeAgentInboxClient.kt b/app/src/main/java/com/qualityalternative/app/data/AndroidDocumentTreeAgentInboxClient.kt
+index 95111aa..1943c06 100644
+--- a/app/src/main/java/com/qualityalternative/app/data/AndroidDocumentTreeAgentInboxClient.kt
++++ b/app/src/main/java/com/qualityalternative/app/data/AndroidDocumentTreeAgentInboxClient.kt
+@@ -18,19 +18,35 @@ import com.qualityalternative.app.domain.service.AgentInboxDriveScanResult
+ import java.io.ByteArrayOutputStream
+ import java.io.FileNotFoundException
+ import java.io.InputStream
++import java.net.URLDecoder
+ import kotlinx.coroutines.Dispatchers
+ import kotlinx.coroutines.withContext
+
+ class AndroidHybridAgentInboxDriveClient(
+-    context: Context,
+-    private val googleDriveClient: AgentInboxDriveClient = AndroidGoogleDriveAgentInboxClient(),
+-    private val documentTreeClient: AgentInboxDriveClient = AndroidDocumentTreeAgentInboxClient(context),
++    private val googleDriveClient: AgentInboxDriveClient,
++    private val documentTreeClient: AgentInboxDriveClient,
+ ) : AgentInboxDriveClient {
++    constructor(
++        context: Context,
++        googleDriveClient: AgentInboxDriveClient = AndroidGoogleDriveAgentInboxClient(),
++        documentTreeClient: AgentInboxDriveClient = AndroidDocumentTreeAgentInboxClient(context),
++    ) : this(
++        googleDriveClient = googleDriveClient,
++        documentTreeClient = documentTreeClient,
++    )
++
+     override suspend fun scanPackages(request: AgentInboxDriveScanRequest): AgentInboxDriveScanResult {
+-        return if (request.folderId.isDocumentTreeUri()) {
+-            documentTreeClient.scanPackages(request)
+-        } else {
+-            googleDriveClient.scanPackages(request)
++        val folderId = request.folderId
++        if (folderId.isGoogleDriveDocumentTreeUri() && request.accessToken.isNotBlank()) {
++            val documentTreeFolderId = folderId ?: throw AgentInboxDriveAccessLostException()
++            val driveFolderId = folderId.googleDriveDocumentTreeFolderId()
++                ?: throw AgentInboxDriveAccessLostException()
++            val driveScan = googleDriveClient.scanPackages(request.copy(folderId = driveFolderId))
++            return driveScan.copy(folderId = documentTreeFolderId)
++        }
++        return when {
++            folderId.isDocumentTreeUri() -> documentTreeClient.scanPackages(request)
++            else -> googleDriveClient.scanPackages(request)
+         }
+     }
+
+@@ -238,11 +254,40 @@ class AndroidDocumentTreeAgentInboxClient(
+ }
+
+ private fun String?.isDocumentTreeUri(): Boolean {
+-    val uri = this?.takeIf(String::isNotBlank)?.let(Uri::parse) ?: return false
+-    return uri.scheme == "content" && uri.path.orEmpty().contains("/tree/")
++    val rawUri = this?.takeIf(String::isNotBlank) ?: return false
++    return rawUri.startsWith("content://", ignoreCase = true) &&
++        rawUri.contains("/tree/", ignoreCase = true)
++}
++
++internal fun String?.isGoogleDriveDocumentTreeUri(): Boolean {
++    val rawUri = this?.takeIf(String::isNotBlank) ?: return false
++    if (!rawUri.startsWith("content://", ignoreCase = true)) return false
++    val authority = rawUri
++        .removePrefix("content://")
++        .substringBefore('/')
++    return authority.contains("com.google.android.apps.docs", ignoreCase = true) &&
++        rawUri.contains("/tree/", ignoreCase = true)
++}
++
++internal fun String?.googleDriveDocumentTreeFolderId(): String? {
++    if (!isGoogleDriveDocumentTreeUri()) return null
++    val rawTreeDocumentId = this
++        ?.substringAfter("/tree/", missingDelimiterValue = "")
++        ?.substringBefore('/')
++        ?.takeIf(String::isNotBlank)
++        ?.urlDecodeOrSelf()
++        ?: return null
++    val docParameter = rawTreeDocumentId
++        .split(';')
++        .firstNotNullOfOrNull { segment ->
++            val trimmed = segment.trim()
++            trimmed.substringAfter("doc=", missingDelimiterValue = "")
++                .takeIf { value -> trimmed.startsWith("doc=") && value.isNotBlank() }
++        }
++    return docParameter ?: rawTreeDocumentId.takeUnless { treeId -> treeId.contains('=') }
+ }
+
+-private fun String.isContentUri(): Boolean = Uri.parse(this).scheme == "content"
++private fun String.isContentUri(): Boolean = startsWith("content://", ignoreCase = true)
+
+ private fun Cursor.stringColumn(columnName: String): String? {
+     val index = getColumnIndex(columnName)
+@@ -259,6 +304,10 @@ private fun AgentInboxDriveFile.isAgentContentFile(): Boolean {
+     return lower.endsWith(".md") || lower.endsWith(".markdown") || lower.endsWith(".epub")
+ }
+
++private fun String.urlDecodeOrSelf(): String {
++    return runCatching { URLDecoder.decode(this, "UTF-8") }.getOrDefault(this)
++}
++
+ private fun InputStream.readBoundedBytes(maxBytes: Long, expectedBytes: Long? = null): ByteArray {
+     val boundedExpectedBytes = expectedBytes
+         ?.takeIf { bytes -> bytes >= 0L && bytes <= maxBytes && bytes <= Int.MAX_VALUE }
+diff --git a/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt b/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
+index b3fdbfc..258e720 100644
+--- a/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
++++ b/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
+@@ -24,6 +24,7 @@ import com.qualityalternative.app.data.AgentInboxPackageImporter
+ import com.qualityalternative.app.data.AgentInboxReviewCandidate
+ import com.qualityalternative.app.data.AgentInboxReviewCandidateFactory
+ import com.qualityalternative.app.data.AgentInboxReviewStatus
++import com.qualityalternative.app.data.isGoogleDriveDocumentTreeUri
+ import com.qualityalternative.app.data.toAgentInboxImportFailureDetail
+ import com.qualityalternative.app.data.toAgentInboxImportPackageError
+ import com.qualityalternative.app.data.ReadingTimeEstimateSource
+@@ -1309,7 +1310,8 @@ class MainViewModel(
+             reportAgentInboxDriveFailure("Connect an Agent Inbox folder before scanning.")
+             return
+         }
+-        val requiresAccessToken = selectedGrantMode != AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER
++        val requiresAccessToken = selectedGrantMode != AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER ||
++            selectedFolderId.isGoogleDriveDocumentTreeUri()
+         val normalizedToken = accessToken.trim()
+         if (requiresAccessToken && normalizedToken.isBlank()) {
+             reportAgentInboxDriveFailure("Google Drive did not return an access token.")
+@@ -1738,7 +1740,8 @@ class MainViewModel(
+             uiState = uiState.copy(latestMessage = "Agent Inbox package is no longer available.")
+             return
+         }
+-        val requiresAccessToken = uiState.agentInboxDriveGrantMode != AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER
++        val requiresAccessToken = uiState.agentInboxDriveGrantMode != AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER ||
++            uiState.agentInboxDriveFolderId.isGoogleDriveDocumentTreeUri()
+         val normalizedToken = accessToken.trim()
+         if (requiresAccessToken && normalizedToken.isBlank()) {
+             reportAgentInboxDriveFailure("Google Drive did not return an access token.")
+diff --git a/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt b/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
+index 67bdf7b..9d7cb9d 100644
+--- a/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
++++ b/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
+@@ -140,6 +140,7 @@ import com.qualityalternative.app.data.AgentInboxReviewStatus
+ import com.qualityalternative.app.data.accountLightTimestampedBackupFileName
+ import com.qualityalternative.app.data.displayTitle
+ import com.qualityalternative.app.BuildConfig
++import com.qualityalternative.app.data.isGoogleDriveDocumentTreeUri
+ import com.qualityalternative.app.data.ReadingTimeEstimateSource
+ import com.qualityalternative.app.data.SupportedCatalog
+ import com.qualityalternative.app.data.UserDocumentValidator
+@@ -521,6 +522,10 @@ private fun MainRoute(
+         driveAuthorizationClient.revokeAccess(revokeRequest)
+         viewModel.disconnectAnnotationDriveSync()
+     }
++    fun agentInboxDocumentTreeUsesGoogleDriveProvider(): Boolean {
++        return state.hasAgentInboxDocumentTreeFolderGrant &&
++            state.agentInboxDriveFolderId.isGoogleDriveDocumentTreeUri()
++    }
+     val disconnectAgentInboxDrive = {
+         val annotationDriveConfigured = state.annotationDriveSyncEnabled ||
+             annotationExportUsesGoogleDriveProvider(state.annotationExportUri)
+@@ -528,6 +533,12 @@ private fun MainRoute(
+             state.agentInboxDriveFolderId?.takeIf(String::isNotBlank)?.let { folderUri ->
+                 releaseAgentInboxFolderPermission(context = context, uri = Uri.parse(folderUri))
+             }
++            if (state.agentInboxDriveFolderId.isGoogleDriveDocumentTreeUri()) {
++                val revokeRequest = RevokeAccessRequest.builder()
++                    .setScopes(listOf(Scope(AGENT_INBOX_DRIVE_READONLY_SCOPE)))
++                    .build()
++                driveAuthorizationClient.revokeAccess(revokeRequest)
++            }
+         } else {
+             val agentInboxScope = if (state.hasAgentInboxReadonlyFolderGrant) {
+                 AGENT_INBOX_DRIVE_READONLY_SCOPE
+@@ -601,7 +612,11 @@ private fun MainRoute(
+                 uri = uri.toString(),
+                 displayName = metadata.displayName,
+             )
+-            viewModel.scanAgentInboxDrive(accessToken = "")
++            if (uri.toString().isGoogleDriveDocumentTreeUri()) {
++                startGoogleDriveSyncAuthorization(GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_SCAN)
++            } else {
++                viewModel.scanAgentInboxDrive(accessToken = "")
++            }
+         }.onFailure {
+             viewModel.reportAgentInboxDriveAuthorizationFailure("Agent Inbox folder permission was not granted.")
+         }
+@@ -774,7 +789,11 @@ private fun MainRoute(
+                 onScanAgentInbox = {
+                     when {
+                         state.hasAgentInboxDocumentTreeFolderGrant -> {
+-                            viewModel.scanAgentInboxDrive(accessToken = "")
++                            if (agentInboxDocumentTreeUsesGoogleDriveProvider()) {
++                                startGoogleDriveSyncAuthorization(GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_SCAN)
++                            } else {
++                                viewModel.scanAgentInboxDrive(accessToken = "")
++                            }
+                         }
+                         state.hasAgentInboxReadonlyFolderGrant -> {
+                             startGoogleDriveSyncAuthorization(GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_SCAN)
+@@ -792,7 +811,10 @@ private fun MainRoute(
+                 onToggleAgentInboxPriority = viewModel::toggleAgentInboxPriority,
+                 onRejectAgentInboxCandidate = viewModel::rejectAgentInboxCandidate,
+                 onImportAgentInboxCandidate = { packageFolderId ->
+-                    if (state.hasAgentInboxDocumentTreeFolderGrant) {
++                    if (agentInboxDocumentTreeUsesGoogleDriveProvider()) {
++                        pendingAgentInboxImportPackageId = packageFolderId
++                        startGoogleDriveSyncAuthorization(GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_IMPORT)
++                    } else if (state.hasAgentInboxDocumentTreeFolderGrant) {
+                         viewModel.importAgentInboxCandidate(packageFolderId = packageFolderId, accessToken = "")
+                     } else {
+                         pendingAgentInboxImportPackageId = packageFolderId
+@@ -9676,6 +9698,10 @@ private fun agentInboxDriveStatusText(state: MainUiState): String {
+         return "Last scanned ${annotationUpdatedLabel(timestampMillis)}"
+     }
+     return when {
++        state.hasAgentInboxDocumentTreeFolderGrant &&
++            state.agentInboxDriveFolderId.isGoogleDriveDocumentTreeUri() -> {
++            "Google Drive folder selected; scans use Drive read access for that folder"
++        }
+         state.hasAgentInboxDocumentTreeFolderGrant -> {
+             "Ready to scan the selected folder for private Markdown and EPUB packages"
+         }
+diff --git a/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt b/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
+index d66ec8a..dad4bc3 100644
+--- a/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
+@@ -2878,7 +2878,7 @@ class MainViewModelTest {
+     @Test
+     @OptIn(ExperimentalCoroutinesApi::class)
+     fun scanAgentInboxDocumentTreeFolderDoesNotRequireGoogleAccessToken() = runTest {
+-        val folderUri = "content://com.google.android.apps.docs.storage/tree/agent-inbox"
++        val folderUri = "content://com.android.externalstorage.documents/tree/agent-inbox"
+         val contentBytes = "# Agent Note\n\nPrivate attention note.".toByteArray()
+         val driveClient = RecordingAgentInboxDriveClient(
+             scanResult = AgentInboxDriveScanResult(
+@@ -2907,10 +2907,74 @@ class MainViewModelTest {
+         assertEquals(listOf("manifest-file", "content-file"), driveClient.downloadedFileIds)
+     }
+
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun scanAgentInboxGoogleDriveDocumentTreeFolderRequiresAccessToken() = runTest {
++        val folderUri = "content://com.google.android.apps.docs.storage/tree/acc%3Duser%40example.com%3Bdoc%3Dagent-inbox-folder"
++        val driveClient = RecordingAgentInboxDriveClient()
++        val viewModel = createViewModel(agentInboxDriveClient = driveClient)
++
++        advanceUntilIdle()
++        viewModel.connectAgentInboxDocumentTreeFolder(uri = folderUri, displayName = "Agent Inbox")
++        advanceUntilIdle()
++        viewModel.scanAgentInboxDrive(accessToken = "", nowMillis = 5_000L)
++        advanceUntilIdle()
++
++        assertTrue(driveClient.scanRequests.isEmpty())
++        assertFalse(viewModel.uiState.isAgentInboxScanning)
++        assertEquals("Google Drive did not return an access token.", viewModel.uiState.agentInboxDriveLastError)
++        assertEquals(folderUri, viewModel.uiState.agentInboxDriveFolderId)
++        assertEquals(AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER, viewModel.uiState.agentInboxDriveGrantMode)
++    }
++
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun importAgentInboxGoogleDriveDocumentTreeCandidateRequiresAccessToken() = runTest {
++        val folderUri = "content://com.google.android.apps.docs.storage/tree/acc%3Duser%40example.com%3Bdoc%3Dagent-inbox-folder"
++        val contentBytes = "# Agent Note\n\nPrivate attention note.".toByteArray()
++        val driveClient = RecordingAgentInboxDriveClient(
++            scanResult = AgentInboxDriveScanResult(
++                folderId = folderUri,
++                packages = listOf(agentInboxDrivePackage()),
++            ),
++            files = mapOf(
++                "manifest-file" to agentInboxManifest(priority = "normal").toByteArray(),
++                "content-file" to contentBytes,
++            ),
++        )
++        val viewModel = createViewModel(agentInboxDriveClient = driveClient)
++
++        advanceUntilIdle()
++        viewModel.completeOnboarding()
++        advanceUntilIdle()
++        viewModel.connectAgentInboxDocumentTreeFolder(uri = folderUri, displayName = "Agent Inbox")
++        advanceUntilIdle()
++        viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 5_000L)
++        advanceUntilIdle()
++        viewModel.importAgentInboxCandidate(
++            packageFolderId = "agent-package",
++            accessToken = "",
++            nowMillis = 6_000L,
++        )
++        advanceUntilIdle()
++
++        assertEquals("drive-token", driveClient.scanRequests.single().accessToken)
++        assertEquals(
++            listOf(
++                AgentInboxDownloadRequest("manifest-file", AGENT_INBOX_MAX_MANIFEST_BYTES),
++                AgentInboxDownloadRequest("content-file", AGENT_INBOX_MAX_REVIEW_CONTENT_BYTES),
++            ),
++            driveClient.downloadRequests,
++        )
++        assertFalse(viewModel.uiState.isAgentInboxImporting)
++        assertEquals("Google Drive did not return an access token.", viewModel.uiState.agentInboxDriveLastError)
++        assertEquals("Agent Inbox connection failed.", viewModel.uiState.latestMessage)
++    }
++
+     @Test
+     @OptIn(ExperimentalCoroutinesApi::class)
+     fun scanAgentInboxDocumentTreeFolderAccessLostDuringDownloadClearsFolderGrant() = runTest {
+-        val folderUri = "content://com.google.android.apps.docs.storage/tree/agent-inbox"
++        val folderUri = "content://com.android.externalstorage.documents/tree/agent-inbox"
+         val settingsRepository = FakeSettingsRepository()
+         val analyticsTracker = InMemoryAnalyticsTracker()
+         val driveClient = RecordingAgentInboxDriveClient(
+@@ -2961,7 +3025,7 @@ class MainViewModelTest {
+     @Test
+     @OptIn(ExperimentalCoroutinesApi::class)
+     fun importAgentInboxDocumentTreeAccessLostDuringDownloadClearsFolderGrant() = runTest {
+-        val folderUri = "content://com.google.android.apps.docs.storage/tree/agent-inbox"
++        val folderUri = "content://com.android.externalstorage.documents/tree/agent-inbox"
+         val contentBytes = "# Agent Note\n\nPrivate attention note.".toByteArray()
+         val settingsRepository = FakeSettingsRepository()
+         val analyticsTracker = InMemoryAnalyticsTracker()
+@@ -3181,7 +3245,7 @@ class MainViewModelTest {
+     @Test
+     @OptIn(ExperimentalCoroutinesApi::class)
+     fun importAgentInboxDocumentTreeCandidateDoesNotRequireGoogleAccessToken() = runTest {
+-        val folderUri = "content://com.google.android.apps.docs.storage/tree/agent-inbox"
++        val folderUri = "content://com.android.externalstorage.documents/tree/agent-inbox"
+         val contentBytes = "# Agent Note\n\nPrivate attention note.".toByteArray()
+         val driveClient = RecordingAgentInboxDriveClient(
+             scanResult = AgentInboxDriveScanResult(

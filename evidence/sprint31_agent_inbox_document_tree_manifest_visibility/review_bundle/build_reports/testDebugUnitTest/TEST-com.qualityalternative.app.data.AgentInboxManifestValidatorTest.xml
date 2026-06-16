@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.qualityalternative.app.data.AgentInboxManifestValidatorTest" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-06-16T08:23:07.897Z" hostname="mac-studio.home" time="0.016">
+  <properties/>
+  <testcase name="validate_rejectsUnsupportedSchemaBlankTitleAndNoTopics" classname="com.qualityalternative.app.data.AgentInboxManifestValidatorTest" time="0.004"/>
+  <testcase name="validate_rejectsUnsafeContentFilePath" classname="com.qualityalternative.app.data.AgentInboxManifestValidatorTest" time="0.008"/>
+  <testcase name="validate_rejectsNonPrivateRightsClass" classname="com.qualityalternative.app.data.AgentInboxManifestValidatorTest" time="0.0"/>
+  <testcase name="validate_rejectsInvalidOrMismatchedSha" classname="com.qualityalternative.app.data.AgentInboxManifestValidatorTest" time="0.001"/>
+  <testcase name="validate_acceptsEpubManifestWithDefaultNormalPriority" classname="com.qualityalternative.app.data.AgentInboxManifestValidatorTest" time="0.001"/>
+  <testcase name="validate_rejectsInvalidPriority" classname="com.qualityalternative.app.data.AgentInboxManifestValidatorTest" time="0.0"/>
+  <testcase name="validate_rejectsUnsupportedFormatAndMismatch" classname="com.qualityalternative.app.data.AgentInboxManifestValidatorTest" time="0.0"/>
+  <testcase name="validate_rejectsMalformedJson" classname="com.qualityalternative.app.data.AgentInboxManifestValidatorTest" time="0.0"/>
+  <testcase name="validate_rejectsMissingContentFileFromPackage" classname="com.qualityalternative.app.data.AgentInboxManifestValidatorTest" time="0.001"/>
+  <testcase name="validate_rejectsUnknownTopicEvenWhenAnotherTopicIsValid" classname="com.qualityalternative.app.data.AgentInboxManifestValidatorTest" time="0.0"/>
+  <testcase name="validate_acceptsMarkdownManifestWithHighPriorityIntent" classname="com.qualityalternative.app.data.AgentInboxManifestValidatorTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

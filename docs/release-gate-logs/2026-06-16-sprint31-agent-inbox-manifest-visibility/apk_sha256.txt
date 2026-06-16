@@ -1,0 +1,1 @@
+e6b83c4adcff52ed13e45485a6f9cef5012759a0894aa8f7c6650a8a1b61a79d  release_artifacts/quality-alternative-v0.11.19-agent-inbox-manifest-visibility-alpha-debug.apk
