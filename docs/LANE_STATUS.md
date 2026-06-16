@@ -13,7 +13,7 @@ This file is the repo-level index for active and recently completed execution la
 
 ## Sprint 36 Agent Inbox Live Drive Folder Browser Repair
 
-Status: `release_artifacts_built_after_gpt_pro_r2_pass_10_10`
+Status: `release_published_gpt_pro_r2_pass_10_10`
 
 - Date opened: 2026-06-16
 - Trigger: after published `v0.11.23-agent-inbox-folder-selector-repair-alpha`, the user reports the installed app still shows only `Use Drive link`, clicking it returns `connection failed`, and no real folder picker is visible.
@@ -48,6 +48,10 @@ Status: `release_artifacts_built_after_gpt_pro_r2_pass_10_10`
   - Release gate: `docs/release-gate-logs/2026-06-16-sprint36-agent-inbox-live-drive-folder-browser/VALIDATION_SUMMARY.md`.
   - Debug APK: `release_artifacts/quality-alternative-v0.11.24-agent-inbox-live-drive-folder-browser-alpha-debug.apk`, SHA-256 `96fc0011e3ce192897da4750d83497244fa97fcc4c924e9b49191199d6dddb54`.
   - Release unsigned APK: `release_artifacts/quality-alternative-v0.11.24-agent-inbox-live-drive-folder-browser-alpha-release-unsigned.apk`, SHA-256 `0054437d86962e7abba49391dd7a514894f404ed0720d8e92e1a995a85ec66a9`.
+  - Release commit: `e2078bddbaea60a5c7c4e7ef8fc3de7e38e0afa1`.
+  - Release tag: `v0.11.24-agent-inbox-live-drive-folder-browser-alpha`.
+  - Release URL: `https://github.com/dkacz/qualityalternative/releases/tag/v0.11.24-agent-inbox-live-drive-folder-browser-alpha`.
+  - Integration method: committed the repair, live evidence, GPT Pro R2 pass, release gate, and APK artifacts on `codex/agent-inbox-folder-selector-repair`; pushed the branch; tagged release commit `e2078bddbaea60a5c7c4e7ef8fc3de7e38e0afa1`; pushed the tag; and published the GitHub release with debug and unsigned release APK assets plus checksum files.
   - New permanent release gate: `docs/AGENT_INBOX_LIVE_REVIEW_GATE.md`.
 - Live Drive evidence prepared:
   - Signed-in emulator account observed: `omareth@gmail.com`.
@@ -57,8 +61,7 @@ Status: `release_artifacts_built_after_gpt_pro_r2_pass_10_10`
   - Content SHA-256: `5f78462f8b982817e184803849779175d391c0d58ecf1fcbb95f564c34f774e1`.
   - Evidence directory: `evidence/sprint36_agent_inbox_live_picker_e2e/`.
 - Next gates:
-  - Commit the release gate and artifacts.
-  - Push the branch, tag the release, and publish the APK assets.
+  - Install the published `v0.11.24` debug APK on the user's target Android device and confirm the same live Drive folder flow there.
 
 ## Sprint 35 Agent Inbox Folder Selector Repair
 
