@@ -35,7 +35,13 @@ Status: `release_published`
 - Release tag: `v0.11.21-agent-inbox-drive-file-picker-alpha`.
 - Release URL: `https://github.com/dkacz/qualityalternative/releases/tag/v0.11.21-agent-inbox-drive-file-picker-alpha`.
 - Integration method: committed and pushed the release gate on `codex/agent-inbox-drive-tree-access-lost`, tagged the release commit, pushed the tag, and published the GitHub release from the committed release notes.
+- GPT Pro review:
+  - R1 launched on 2026-06-16 with prompt `evidence/sprint33_agent_inbox_drive_file_picker/pro_review_r1/GPT_PRO_REVIEW_PROMPT_R1.md`.
+  - R1 bundle ZIP artifact: `SPRINT33_AGENT_INBOX_DRIVE_FILE_PICKER_R1_GPT_PRO_REVIEW_BUNDLE_20260616.zip`.
+  - R1 ChatGPT URL: `https://chatgpt.com/c/6a31231c-4224-83eb-a48e-cacaa7fd2a6d`.
+  - R1 status: launched and still generating during the first harvest attempts; no `SCORE`/`VERDICT` has been harvested yet.
 - Next gate:
+  - Harvest GPT Pro R1. If it is not `SCORE: 10/10`, `VERDICT: PASS`, address findings before claiming the sprint is review-clean.
   - Install the published APK on the signed-in Android device and confirm the Google Drive folder picker opens instead of returning Google Play Services `INTERNAL_ERROR`.
 
 ## Sprint 32 Agent Inbox Google Drive Document-Tree Access Lost Regression
