@@ -11,6 +11,15 @@ This file is the repo-level index for active and recently completed execution la
 - Heartbeats should exist only while waiting for a current GPT Pro lane.
 - Do not infer lane status from untracked local files alone. For example, `ios/` can appear untracked on non-iOS branches; the canonical iOS implementation source is the pushed iOS branch listed below.
 
+## Agent Inbox Drive Package Shape Triage
+
+Status: `triage_requested`
+
+- Date opened: 2026-06-16
+- Trigger: after Sprint 30 release, the app screenshot still shows multiple Drive Agent Inbox folders such as `hegel-maybee-kant-obiektywnosc-a-intersubiektywnosc` in `NEEDS PACKAGE CLEANUP` with `Package is missing manifest.json`.
+- Initial hypothesis to verify: the app is scanning folder objects that do not contain `manifest.json` as direct children, despite the package author claiming manifests were generated. This may be a Drive folder-level/package-shape issue rather than the Sprint 30 image-sidecar import bug.
+- Next diagnostic step: inspect the selected Agent Inbox Drive folder contents directly, confirm each package folder's direct children, and compare actual Drive layout against `docs/AGENT_INBOX_PACKAGE_AUTHORING.md`.
+
 ## Sprint 30 Agent Inbox Large Image Import Fix
 
 Status: `release_published`
