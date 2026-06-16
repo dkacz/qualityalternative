@@ -13,7 +13,7 @@ This file is the repo-level index for active and recently completed execution la
 
 ## Sprint 31 Agent Inbox Google Drive Document-Tree Manifest Visibility
 
-Status: `release_ready_local`
+Status: `release_published`
 
 - Date opened: 2026-06-16
 - Trigger: after Sprint 30 release, the app screenshot still shows multiple Drive Agent Inbox folders such as `hegel-maybee-kant-obiektywnosc-a-intersubiektywnosc` in `NEEDS PACKAGE CLEANUP` with `Package is missing manifest.json`.
@@ -33,6 +33,9 @@ Status: `release_ready_local`
   - Connected visual/e2e was not run locally because `adb devices -l` showed no attached device and the machine has AVD definitions but no accessible Android emulator binary in the usual SDK paths.
   - GPT Pro R1 returned `VERDICT: PASS`, `SCORE: 10/10`, no blockers, and accepted the connected-test gap for this routing/state fix.
 - Review bundle: `ARCHITECT_REVIEW_BUNDLE_sprint31_agent_inbox_manifest_visibility.zip`.
+- Release commit: `8221eade1bdeee5e06374ffb43ef7d2480f758eb`.
+- Release tag: `v0.11.19-agent-inbox-manifest-visibility-alpha`.
+- Release URL: `https://github.com/dkacz/qualityalternative/releases/tag/v0.11.19-agent-inbox-manifest-visibility-alpha`.
 
 ## Sprint 30 Agent Inbox Large Image Import Fix
 
