@@ -11,6 +11,29 @@ This file is the repo-level index for active and recently completed execution la
 - Heartbeats should exist only while waiting for a current GPT Pro lane.
 - Do not infer lane status from untracked local files alone. For example, `ios/` can appear untracked on non-iOS branches; the canonical iOS implementation source is the pushed iOS branch listed below.
 
+## Sprint 32 Agent Inbox Google Drive Document-Tree Access Lost Regression
+
+Status: `release_ready_local`
+
+- Date opened: 2026-06-16
+- Trigger: after installing the Sprint 31 APK, the app no longer shows false `Package is missing manifest.json`, but Agent Inbox is now `OFF` with `Agent Inbox folder access was lost. Connect the folder again.`
+- Screenshot state: Settings > Agent Inbox shows `Agent Inbox folder not selected`; the folder grant has been cleared from app state.
+- Working hypothesis: Sprint 31 routed Google Drive-backed `content://.../tree/...` folder grants through Drive API, but some real Google Drive document-tree URIs may not encode the target folder ID in the simple `doc=<folderId>` shape. The hybrid client then throws `AgentInboxDriveAccessLostException`, and `MainViewModel` clears the saved folder grant.
+- Fix branch: `codex/agent-inbox-drive-tree-access-lost`.
+- Implementation state:
+  - Added a dedicated Agent Inbox readonly Drive folder picker mode that requests `drive.readonly` and returns the selected folder ID through Google Picker.
+  - Empty Agent Inbox state now starts the readonly Drive picker when Google Drive is already configured; local Android document-tree selection remains available when Drive is not configured.
+  - Selecting a Google Drive folder through Android `OpenDocumentTree` now redirects to the readonly Google Drive picker instead of persisting/scanning the provider URI.
+  - Legacy Google Drive document-tree Agent Inbox grants now show a reconnect state and route `Scan now` through the readonly Drive picker instead of attempting another scan through the fragile `content://tree` URI.
+- Validation so far:
+  - Targeted `GoogleDriveAuthorizationTest` and `GoogleDriveAuthorizationUiTest` passed with JDK 17.
+  - Final local gate passed after version bump: `JAVA_HOME=/opt/homebrew/Cellar/openjdk@17/17.0.18/libexec/openjdk.jdk/Contents/Home ./gradlew testDebugUnitTest lintDebug assembleRelease assembleDebug`.
+  - Signed debug APK artifact built with `versionCode=36`, `versionName=0.11.20-alpha`.
+  - Release artifact: `release_artifacts/quality-alternative-v0.11.20-agent-inbox-drive-picker-alpha-debug.apk`.
+  - SHA-256: `e7dc89166cdfd3406796a1f89e491bdbec1af850c830134ff3899371464c17c7`.
+  - Connected visual/e2e was not run locally because `adb devices -l` showed no attached device and the machine has AVD definitions but no accessible Android emulator binary in the usual SDK paths.
+- Next gate: commit, push, tag, and publish GitHub release.
+
 ## Sprint 31 Agent Inbox Google Drive Document-Tree Manifest Visibility
 
 Status: `release_published`

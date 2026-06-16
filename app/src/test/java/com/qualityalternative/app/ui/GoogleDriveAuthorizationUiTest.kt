@@ -3,6 +3,7 @@ package com.qualityalternative.app.ui
 import com.google.android.gms.common.api.ApiException
 import com.google.android.gms.common.api.CommonStatusCodes
 import com.google.android.gms.common.api.Status
+import com.qualityalternative.app.domain.service.AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -66,5 +67,48 @@ class GoogleDriveAuthorizationUiTest {
         )
         assertEquals(false, annotationExportUsesGoogleDriveProvider("content://com.android.externalstorage.documents/tree/home"))
         assertEquals(false, annotationExportUsesGoogleDriveProvider(null))
+    }
+
+    @Test
+    fun agentInboxReadonlyDrivePickerIsUsedForGoogleDriveConfiguredEmptyInbox() {
+        assertEquals(
+            true,
+            agentInboxShouldUseReadonlyDrivePicker(
+                MainUiState(annotationDriveSyncEnabled = true),
+            ),
+        )
+        assertEquals(
+            true,
+            agentInboxShouldUseReadonlyDrivePicker(
+                MainUiState(
+                    annotationExportUri = "content://com.google.android.apps.docs.storage/tree/acc%3Duser%3Bdoc%3Dannotations",
+                ),
+            ),
+        )
+        assertEquals(false, agentInboxShouldUseReadonlyDrivePicker(MainUiState()))
+    }
+
+    @Test
+    fun legacyGoogleDriveDocumentTreeAgentInboxUsesReadonlyDrivePicker() {
+        assertEquals(
+            true,
+            agentInboxShouldUseReadonlyDrivePicker(
+                MainUiState(
+                    agentInboxDriveEnabled = true,
+                    agentInboxDriveFolderId = "content://com.google.android.apps.docs.storage/tree/acc%3Duser%40example.com%3Bdoc%3Dfolder",
+                    agentInboxDriveGrantMode = AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER,
+                ),
+            ),
+        )
+        assertEquals(
+            false,
+            agentInboxShouldUseReadonlyDrivePicker(
+                MainUiState(
+                    agentInboxDriveEnabled = true,
+                    agentInboxDriveFolderId = "content://com.android.externalstorage.documents/tree/home",
+                    agentInboxDriveGrantMode = AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER,
+                ),
+            ),
+        )
     }
 }
