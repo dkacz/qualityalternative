@@ -13,7 +13,7 @@ This file is the repo-level index for active and recently completed execution la
 
 ## Sprint 33 Agent Inbox Google Drive Picker Play Services Hotfix
 
-Status: `release_ready_local`
+Status: `release_published`
 
 - Date opened: 2026-06-16
 - Trigger: after installing the Sprint 32 APK, Settings > Agent Inbox showed `Google Drive authorization hit a Google Play services error. Retry Google Drive connection.` before the user could select a folder.
@@ -31,8 +31,12 @@ Status: `release_ready_local`
   - Release artifact: `release_artifacts/quality-alternative-v0.11.21-agent-inbox-drive-file-picker-alpha-debug.apk`.
   - SHA-256: `8390cf0fb2a09c0301e11cb9f850a0da3031e2c42f24db6ad8b76064b07760da`.
   - Connected visual/e2e was not run locally because `adb devices -l` showed no attached device and no Android emulator binary was available in the standard SDK paths checked.
+- Release commit: `28bbf7f8cedb619c976eac05f1c55b8cb9f5407a`.
+- Release tag: `v0.11.21-agent-inbox-drive-file-picker-alpha`.
+- Release URL: `https://github.com/dkacz/qualityalternative/releases/tag/v0.11.21-agent-inbox-drive-file-picker-alpha`.
+- Integration method: committed and pushed the release gate on `codex/agent-inbox-drive-tree-access-lost`, tagged the release commit, pushed the tag, and published the GitHub release from the committed release notes.
 - Next gate:
-  - Commit, push, tag, and publish `v0.11.21-agent-inbox-drive-file-picker-alpha`.
+  - Install the published APK on the signed-in Android device and confirm the Google Drive folder picker opens instead of returning Google Play Services `INTERNAL_ERROR`.
 
 ## Sprint 32 Agent Inbox Google Drive Document-Tree Access Lost Regression
 
