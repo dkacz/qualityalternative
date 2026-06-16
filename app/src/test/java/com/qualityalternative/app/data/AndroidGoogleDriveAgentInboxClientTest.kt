@@ -4,6 +4,7 @@ import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_FILES_PER_PACKA
 import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_PACKAGES_PER_SCAN
 import com.qualityalternative.app.domain.service.AGENT_INBOX_MANIFEST_FILE_NAME
 import com.qualityalternative.app.domain.service.AgentInboxDriveDownloadTooLargeException
+import com.qualityalternative.app.domain.service.AgentInboxDriveFolderListRequest
 import com.qualityalternative.app.domain.service.AgentInboxDriveFolderNotSelectedException
 import com.qualityalternative.app.domain.service.AgentInboxDriveHttpException
 import com.qualityalternative.app.domain.service.AgentInboxDriveScanRequest
@@ -45,6 +46,45 @@ class AndroidGoogleDriveAgentInboxClientTest {
         }
 
         assertTrue(capturedRequests.isEmpty())
+    }
+
+    @Test
+    fun listFoldersReadsChildFoldersFromRootForDriveFolderBrowser() = runBlocking {
+        val baseUrl = startDriveServer { request ->
+            when {
+                request.method == "GET" &&
+                    request.path == "/drive/v3/files" &&
+                    request.decodedQuery.contains("'root' in parents") &&
+                    request.decodedQuery.contains("mimeType = 'application/vnd.google-apps.folder'") ->
+                    200 to """
+                        {
+                          "files": [
+                            {
+                              "id": "agent-inbox-folder",
+                              "name": "QA Agent Inbox",
+                              "mimeType": "application/vnd.google-apps.folder",
+                              "modifiedTime": "2026-06-16T15:37:29Z"
+                            }
+                          ]
+                        }
+                    """.trimIndent()
+
+                else -> 404 to """{"error":"unexpected ${request.method} ${request.path} ${request.decodedQuery}"}"""
+            }
+        }
+        val client = AndroidGoogleDriveAgentInboxClient(testEndpoints(baseUrl))
+
+        val result = client.listFolders(
+            AgentInboxDriveFolderListRequest(accessToken = "drive-token", parentFolderId = null),
+        )
+
+        assertEquals(null, result.parentFolderId)
+        assertEquals(1, result.folders.size)
+        assertEquals("agent-inbox-folder", result.folders.single().id)
+        assertEquals("QA Agent Inbox", result.folders.single().name)
+        assertEquals("2026-06-16T15:37:29Z", result.folders.single().modifiedTime)
+        assertTrue(capturedRequests.single().authorization == "Bearer drive-token")
+        assertFalse(capturedRequests.single().decodedQuery.contains("manifest.json"))
     }
 
     @Test

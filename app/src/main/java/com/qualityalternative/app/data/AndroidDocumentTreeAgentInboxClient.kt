@@ -11,6 +11,8 @@ import com.qualityalternative.app.domain.service.AgentInboxDriveAccessLostExcept
 import com.qualityalternative.app.domain.service.AgentInboxDriveClient
 import com.qualityalternative.app.domain.service.AgentInboxDriveDownloadTooLargeException
 import com.qualityalternative.app.domain.service.AgentInboxDriveFile
+import com.qualityalternative.app.domain.service.AgentInboxDriveFolderListRequest
+import com.qualityalternative.app.domain.service.AgentInboxDriveFolderListResult
 import com.qualityalternative.app.domain.service.AgentInboxDriveFolderNotSelectedException
 import com.qualityalternative.app.domain.service.AgentInboxDrivePackage
 import com.qualityalternative.app.domain.service.AgentInboxDriveScanRequest
@@ -34,6 +36,10 @@ class AndroidHybridAgentInboxDriveClient(
         googleDriveClient = googleDriveClient,
         documentTreeClient = documentTreeClient,
     )
+
+    override suspend fun listFolders(request: AgentInboxDriveFolderListRequest): AgentInboxDriveFolderListResult {
+        return googleDriveClient.listFolders(request)
+    }
 
     override suspend fun scanPackages(request: AgentInboxDriveScanRequest): AgentInboxDriveScanResult {
         val folderId = request.folderId
@@ -77,6 +83,10 @@ class AndroidHybridAgentInboxDriveClient(
 class AndroidDocumentTreeAgentInboxClient(
     private val context: Context,
 ) : AgentInboxDriveClient {
+    override suspend fun listFolders(request: AgentInboxDriveFolderListRequest): AgentInboxDriveFolderListResult {
+        throw AgentInboxDriveAccessLostException("Agent Inbox Drive folder browser is not available for local folders.")
+    }
+
     override suspend fun scanPackages(
         request: AgentInboxDriveScanRequest,
     ): AgentInboxDriveScanResult = withContext(Dispatchers.IO) {

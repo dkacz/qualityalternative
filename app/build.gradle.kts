@@ -13,8 +13,8 @@ android {
         applicationId = "com.qualityalternative.app"
         minSdk = 29
         targetSdk = 36
-        versionCode = 39
-        versionName = "0.11.23-alpha"
+        versionCode = 40
+        versionName = "0.11.24-alpha"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // Run each instrumented test in its own process with cleared app data so heavy
         // VisualQaScreenshotTest cases cannot leak state into later tests (see Test Orchestrator below).

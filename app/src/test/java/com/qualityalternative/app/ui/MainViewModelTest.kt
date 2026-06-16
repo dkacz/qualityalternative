@@ -81,6 +81,9 @@ import com.qualityalternative.app.domain.service.AgentInboxDriveAccessLostExcept
 import com.qualityalternative.app.domain.service.AgentInboxDriveClient
 import com.qualityalternative.app.domain.service.AgentInboxDriveDownloadTooLargeException
 import com.qualityalternative.app.domain.service.AgentInboxDriveFile
+import com.qualityalternative.app.domain.service.AgentInboxDriveFolder
+import com.qualityalternative.app.domain.service.AgentInboxDriveFolderListRequest
+import com.qualityalternative.app.domain.service.AgentInboxDriveFolderListResult
 import com.qualityalternative.app.domain.service.AgentInboxDriveHttpException
 import com.qualityalternative.app.domain.service.AgentInboxDrivePackage
 import com.qualityalternative.app.domain.service.AgentInboxDriveScanRequest
@@ -2659,6 +2662,74 @@ class MainViewModelTest {
             payload.toString()
         }
         assertFalse(remotePayloadText.contains("readonly-folder-123"))
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun selectAgentInboxDriveFolderFromBrowserPersistsGrantAndScansSelectedFolder() = runTest {
+        val settingsRepository = FakeSettingsRepository()
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val driveClient = RecordingAgentInboxDriveClient(
+            scanResult = AgentInboxDriveScanResult(
+                folderId = "selected-folder-123",
+                packages = emptyList(),
+            ),
+            folderListResult = AgentInboxDriveFolderListResult(
+                parentFolderId = null,
+                folders = listOf(
+                    AgentInboxDriveFolder(
+                        id = "selected-folder-123",
+                        name = "QA Agent Inbox",
+                        modifiedTime = "2026-06-16T15:37:29Z",
+                    ),
+                ),
+            ),
+        )
+        val viewModel = createViewModel(
+            settingsRepository = settingsRepository,
+            analyticsTracker = analyticsTracker,
+            agentInboxDriveClient = driveClient,
+        )
+
+        advanceUntilIdle()
+        viewModel.beginAgentInboxDriveFolderBrowser()
+        viewModel.loadAgentInboxDriveFolderBrowserRoot("drive-token")
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.isAgentInboxDriveFolderBrowserLoading)
+        assertEquals("QA Agent Inbox", viewModel.uiState.agentInboxDriveFolderOptions.single().name)
+        assertEquals(listOf(AgentInboxDriveFolderListRequest("drive-token", null)), driveClient.folderListRequests)
+
+        viewModel.selectAgentInboxDriveFolderFromBrowser(
+            accessToken = "drive-token",
+            folderId = "selected-folder-123",
+            folderName = "QA Agent Inbox",
+            nowMillis = 6_000L,
+        )
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.agentInboxDriveEnabled)
+        assertEquals("selected-folder-123", viewModel.uiState.agentInboxDriveFolderId)
+        assertEquals(AGENT_INBOX_DRIVE_GRANT_MODE_READONLY_FOLDER, viewModel.uiState.agentInboxDriveGrantMode)
+        assertEquals("QA Agent Inbox", viewModel.uiState.agentInboxDriveFolderDraft)
+        assertFalse(viewModel.uiState.isAgentInboxDriveFolderBrowserOpen)
+        assertEquals(
+            listOf(AgentInboxDriveScanRequest("drive-token", "selected-folder-123")),
+            driveClient.scanRequests,
+        )
+        assertEquals("selected-folder-123", settingsRepository.state.value.agentInboxDriveFolderId)
+        assertEquals(
+            AGENT_INBOX_DRIVE_GRANT_MODE_READONLY_FOLDER,
+            settingsRepository.state.value.agentInboxDriveGrantMode,
+        )
+        val connectedEvent = analyticsTracker.allEvents().first { event ->
+            event.type == AnalyticsEventType.AGENT_INBOX_CONNECTED
+        }
+        assertEquals("driveFolderBrowser", connectedEvent.metadata["grantMode"])
+        val remotePayloadText = analyticsTracker.allRemoteSafePayloads().joinToString("\n") { payload ->
+            payload.toString()
+        }
+        assertFalse(remotePayloadText.contains("selected-folder-123"))
     }
 
     @Test
@@ -8415,14 +8486,26 @@ class MainViewModelTest {
             folderId = "agent-inbox-folder",
             packages = emptyList(),
         ),
+        private val folderListResult: AgentInboxDriveFolderListResult = AgentInboxDriveFolderListResult(
+            parentFolderId = null,
+            folders = emptyList(),
+        ),
         private val files: Map<String, ByteArray> = emptyMap(),
         private val downloadFailures: Map<String, Throwable> = emptyMap(),
         private val downloadFailuresByOrdinal: Map<Int, Throwable> = emptyMap(),
         private val scanFailure: Throwable? = null,
     ) : AgentInboxDriveClient {
+        val folderListRequests = mutableListOf<AgentInboxDriveFolderListRequest>()
         val scanRequests = mutableListOf<AgentInboxDriveScanRequest>()
         val downloadedFileIds = mutableListOf<String>()
         val downloadRequests = mutableListOf<AgentInboxDownloadRequest>()
+
+        override suspend fun listFolders(
+            request: AgentInboxDriveFolderListRequest,
+        ): AgentInboxDriveFolderListResult {
+            folderListRequests += request
+            return folderListResult
+        }
 
         override suspend fun scanPackages(request: AgentInboxDriveScanRequest): AgentInboxDriveScanResult {
             scanRequests += request

@@ -11,6 +11,55 @@ This file is the repo-level index for active and recently completed execution la
 - Heartbeats should exist only while waiting for a current GPT Pro lane.
 - Do not infer lane status from untracked local files alone. For example, `ios/` can appear untracked on non-iOS branches; the canonical iOS implementation source is the pushed iOS branch listed below.
 
+## Sprint 36 Agent Inbox Live Drive Folder Browser Repair
+
+Status: `release_artifacts_built_after_gpt_pro_r2_pass_10_10`
+
+- Date opened: 2026-06-16
+- Trigger: after published `v0.11.23-agent-inbox-folder-selector-repair-alpha`, the user reports the installed app still shows only `Use Drive link`, clicking it returns `connection failed`, and no real folder picker is visible.
+- Correction to Sprint 35: Sprint 35 GPT Pro R3 reached `SCORE: 10/10`, `VERDICT: PASS`, but the review gate was still insufficient because it accepted emulator visual fixtures and code evidence without requiring a signed-in live Google Drive folder selection, scan, import, and screenshots from that real flow.
+- Active goal: repair Agent Inbox so the primary `Choose folder` path is a real Drive folder selection path, not the Drive link fallback; verify on a signed-in emulator or device with a real Google Drive folder and Agent Inbox package; run GPT Pro review that must reject missing live visual/log evidence; release a new APK only after `SCORE: 10/10`, `VERDICT: PASS`.
+- Branch: `codex/agent-inbox-folder-selector-repair`.
+- Current implementation:
+  - Added `AgentInboxDriveClient.listFolders(...)` plus Drive API folder listing through `AndroidGoogleDriveAgentInboxClient`.
+  - Added in-app Agent Inbox Drive folder browser state and UI: current Drive level, back stack, folder rows, `Open`, `Select`, and `Close`.
+  - Added `GoogleDriveAuthorizationMode.AGENT_INBOX_BROWSE_READONLY`; `Choose folder` now requests `drive.readonly`, loads Drive folders, and selecting a folder persists `readonly_folder` and scans it with the same token.
+  - Legacy `picker_folder` repair now routes to the Drive folder browser path instead of the typed Drive link path.
+  - The typed `Use Drive link` fallback remains separate and visible only as fallback.
+  - Adjusted the annotation Drive sync card title to `Drive sync not connected` so it does not visually contradict Agent Inbox `DRIVE` connection state.
+- Validation so far:
+  - Passed targeted unit tests for `AndroidGoogleDriveAgentInboxClientTest`, `AndroidHybridAgentInboxDriveClientTest`, and `MainViewModelTest`.
+  - Initial Sprint 36 GPT Pro review returned `SCORE: 8/10`, `VERDICT: FAIL` because live visual evidence showed clipped folder-browser controls and the scan screenshot had snackbar coverage over the lower action area.
+  - Fixed the folder-browser layout by hiding the Drive-link fallback and redundant scan/disconnect row while the browser is open; reran connected visual evidence after the fix.
+  - Passed connected visual test `VisualQaScreenshotTest#captureSprint35AgentInboxFolderSelectorRepairStates` after the final folder-browser layout/text pass.
+  - Final connected visual evidence: `evidence/sprint36_agent_inbox_live_picker_e2e/visual_e2e/sprint35-agent-inbox-folder-selector-repair-1781630925520/`.
+  - Final live signed-in Drive E2E R4 passed on emulator `emulator-5554`: account chooser, in-app Drive folder browser, folder selection, package scan after snackbar clearance, import, Library `Files` visibility, and reader rendering.
+  - Final debug APK evidence hash: `83544a7efce11141c48cca25bed5ffb6a8da9e1429565c9c074b2fe35ba71348`.
+  - Final live evidence report: `evidence/sprint36_agent_inbox_live_picker_e2e/LIVE_E2E_REPORT.md`.
+  - Final Pro review prompt: `evidence/sprint36_agent_inbox_live_picker_e2e/GPT_PRO_REVIEW_PROMPT.md`.
+  - GPT Pro R1 review URL: `https://chatgpt.com/c/6a3183b8-daf8-83ed-93b2-e5fde8a012ab`.
+  - GPT Pro R1 result: `SCORE: 8/10`, `VERDICT: FAIL`.
+  - GPT Pro R1 output: `evidence/sprint36_agent_inbox_live_picker_e2e/gpt_pro_review_response.md`.
+  - GPT Pro R2 bundle: `SPRINT36_AGENT_INBOX_LIVE_REVIEW_BUNDLE_R2.zip`, SHA-256 `e97eb53d4b814f845025455085a8ac33d8380192bd43d20a3fc09f3c7cc55de4`.
+  - GPT Pro R2 review URL: `https://chatgpt.com/c/6a318b65-c210-83eb-9af7-c86ab9c4afc4`.
+  - GPT Pro R2 result: `SCORE: 10/10`, `VERDICT: PASS`, `BLOCKERS: None`.
+  - GPT Pro R2 output: `evidence/sprint36_agent_inbox_live_picker_e2e/gpt_pro_review_response_r2.md`.
+  - Release version bump after Pro PASS: `versionCode=40`, `versionName=0.11.24-alpha`.
+  - Release gate: `docs/release-gate-logs/2026-06-16-sprint36-agent-inbox-live-drive-folder-browser/VALIDATION_SUMMARY.md`.
+  - Debug APK: `release_artifacts/quality-alternative-v0.11.24-agent-inbox-live-drive-folder-browser-alpha-debug.apk`, SHA-256 `96fc0011e3ce192897da4750d83497244fa97fcc4c924e9b49191199d6dddb54`.
+  - Release unsigned APK: `release_artifacts/quality-alternative-v0.11.24-agent-inbox-live-drive-folder-browser-alpha-release-unsigned.apk`, SHA-256 `0054437d86962e7abba49391dd7a514894f404ed0720d8e92e1a995a85ec66a9`.
+  - New permanent release gate: `docs/AGENT_INBOX_LIVE_REVIEW_GATE.md`.
+- Live Drive evidence prepared:
+  - Signed-in emulator account observed: `omareth@gmail.com`.
+  - Real Google Drive folder created via rclone: `QA-Agent-Inbox-Live-E2E-20260616-173729`.
+  - Drive folder link: `https://drive.google.com/open?id=1-mUNYizvDv3XLn6ap3j3g3be5eXuHNuV`.
+  - Package folder: `codex-live-drive-e2e-package` with `manifest.json` and `content.md`.
+  - Content SHA-256: `5f78462f8b982817e184803849779175d391c0d58ecf1fcbb95f564c34f774e1`.
+  - Evidence directory: `evidence/sprint36_agent_inbox_live_picker_e2e/`.
+- Next gates:
+  - Commit the release gate and artifacts.
+  - Push the branch, tag the release, and publish the APK assets.
+
 ## Sprint 35 Agent Inbox Folder Selector Repair
 
 Status: `release_published_gpt_pro_r3_pass_10_10`

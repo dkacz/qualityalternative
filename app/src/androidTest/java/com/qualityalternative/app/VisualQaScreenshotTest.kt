@@ -61,6 +61,9 @@ import com.qualityalternative.app.domain.service.AddUserLinkResult
 import com.qualityalternative.app.domain.service.AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER
 import com.qualityalternative.app.domain.service.AgentInboxDriveClient
 import com.qualityalternative.app.domain.service.AgentInboxDriveFile
+import com.qualityalternative.app.domain.service.AgentInboxDriveFolder
+import com.qualityalternative.app.domain.service.AgentInboxDriveFolderListRequest
+import com.qualityalternative.app.domain.service.AgentInboxDriveFolderListResult
 import com.qualityalternative.app.domain.service.AgentInboxDriveHttpException
 import com.qualityalternative.app.domain.service.AgentInboxDrivePackage
 import com.qualityalternative.app.domain.service.AgentInboxDriveScanRequest
@@ -869,7 +872,19 @@ class VisualQaScreenshotTest {
     }
 
     private fun captureAgentInboxFolderSelectorRepairStates(capture: (String) -> Unit) {
+        val folderBrowserDriveClient = VisualAgentInboxDriveClient().apply {
+            setFolders(
+                AgentInboxDriveFolder(
+                    id = "visual-drive-inbox-folder",
+                    name = "QA Agent Inbox",
+                    modifiedTime = "2026-06-16T15:37:29Z",
+                ),
+            )
+        }
         launchOnboardedApp()
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.setAgentInboxDriveClientForTests(folderBrowserDriveClient)
+        }
 
         openTab("tab-settings", "settings-list")
         composeRule.onNodeWithTag("settings-list")
@@ -879,27 +894,43 @@ class VisualQaScreenshotTest {
         composeRule.onNodeWithText("Choose folder").assertIsDisplayed()
         capture("00_agent_inbox_choose_folder_light")
 
-        composeRule.onNodeWithTag("settings-agent-inbox-scan").performClick()
-        val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
-        composeRule.waitUntil(timeoutMillis = 10_000) {
-            device.currentPackageName != "com.qualityalternative.app"
+        runBlocking {
+            val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication
+            app.appContainer.settingsRepository.saveAgentInboxDriveConnection(
+                folderId = "legacy-picker-folder",
+                grantMode = AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER,
+            )
         }
-        assertTrue(
-            "Expected Android folder picker instead of an in-app paste field.",
-            device.currentPackageName.contains("documentsui"),
-        )
-        capture("00b_agent_inbox_system_folder_picker_light")
-        val documentsFolder = device.wait(Until.findObject(By.text("Documents")), 5_000)
-            ?: error("Expected Documents folder in Android folder picker.")
-        documentsFolder.click()
-        val useFolderButton = device.wait(Until.findObject(By.text("USE THIS FOLDER")), 5_000)
-            ?: error("Expected Use this folder action after selecting Documents.")
-        useFolderButton.click()
-        val allowButton = device.wait(Until.findObject(By.text("ALLOW")), 3_000)
-            ?: device.wait(Until.findObject(By.text("Allow")), 1_000)
-        allowButton?.click()
         composeRule.waitUntil(timeoutMillis = 10_000) {
-            device.currentPackageName == "com.qualityalternative.app"
+            hasNode("Agent Inbox folder needs reconnect")
+        }
+        composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasTestTag("settings-agent-inbox-section"))
+        composeRule.onNodeWithText("Agent Inbox folder needs reconnect").assertIsDisplayed()
+        composeRule.onNodeWithText("Choose folder").assertIsDisplayed()
+        composeRule.onNodeWithText("Use Drive link").assertIsDisplayed()
+        capture("00a_agent_inbox_legacy_picker_repair_choose_folder_light")
+
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.beginAgentInboxDriveFolderBrowser()
+            activity.mainViewModel.loadAgentInboxDriveFolderBrowserRoot("visual-drive-token")
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasTag("settings-agent-inbox-drive-folder-browser") && hasNode("QA Agent Inbox")
+        }
+        composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasTestTag("settings-agent-inbox-drive-folder-select-visual-drive-inbox-folder"))
+        composeRule.onNodeWithTag("settings-agent-inbox-drive-folder-select-visual-drive-inbox-folder")
+            .assertIsDisplayed()
+        capture("00b_agent_inbox_drive_folder_browser_light")
+
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.selectAgentInboxDriveFolderFromBrowser(
+                accessToken = "visual-drive-token",
+                folderId = "visual-drive-inbox-folder",
+                folderName = "QA Agent Inbox",
+                nowMillis = 1_781_256_601_000L,
+            )
         }
         composeRule.waitUntil(timeoutMillis = 10_000) {
             hasNode("Agent Inbox folder connected")
@@ -911,7 +942,7 @@ class VisualQaScreenshotTest {
         composeRule.onNodeWithText("Scan now").assertIsDisplayed()
         composeRule.onNodeWithTag("settings-agent-inbox-disconnect").assertIsDisplayed().assertIsEnabled()
         waitForTransientMessageToClear("Agent Inbox folder selected.")
-        capture("01_agent_inbox_document_tree_folder_connected_light")
+        capture("01_agent_inbox_drive_folder_connected_light")
 
         scenario?.onActivity { activity ->
             activity.mainViewModel.seedAgentInboxDriveAccessLostForTests()
@@ -2591,6 +2622,17 @@ class VisualQaScreenshotTest {
     private class VisualAgentInboxDriveClient : AgentInboxDriveClient {
         private var packages: List<AgentInboxDrivePackage> = emptyList()
         private var bytesByFileId: Map<String, ByteArray> = emptyMap()
+        private var folders: List<AgentInboxDriveFolder> = emptyList()
+
+        fun setFolders(vararg driveFolders: AgentInboxDriveFolder) {
+            folders = driveFolders.toList()
+        }
+
+        override suspend fun listFolders(
+            request: AgentInboxDriveFolderListRequest,
+        ): AgentInboxDriveFolderListResult {
+            return AgentInboxDriveFolderListResult(parentFolderId = request.parentFolderId, folders = folders)
+        }
 
         fun setPackages(vararg fixtures: VisualAgentInboxPackageFixture) {
             val nextBytes = linkedMapOf<String, ByteArray>()
@@ -2626,6 +2668,15 @@ class VisualQaScreenshotTest {
     }
 
     private class AccessLostAgentInboxDriveClient : AgentInboxDriveClient {
+        override suspend fun listFolders(
+            request: AgentInboxDriveFolderListRequest,
+        ): AgentInboxDriveFolderListResult {
+            throw AgentInboxDriveHttpException(
+                statusCode = 403,
+                errorBody = """{"error":"forbidden"}""",
+            )
+        }
+
         override suspend fun scanPackages(request: AgentInboxDriveScanRequest): AgentInboxDriveScanResult {
             throw AgentInboxDriveHttpException(
                 statusCode = 403,

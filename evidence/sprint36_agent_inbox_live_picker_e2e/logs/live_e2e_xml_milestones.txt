@@ -1,0 +1,8 @@
+live_07_agent_inbox_section_before_choose.xml: Drive sync not connected, Agent Inbox folder not selected, Choose folder, No packages waiting for review.
+live_08_after_choose_folder_tap.xml: Choose an account, omareth@gmail.com
+live_09_after_google_account_selected.xml: Drive sync not connected, QA-Agent-Inbox-Live-E2E-20260616-173729, Agent Inbox folder not selected
+live_10_after_drive_folder_selected.xml: Drive sync not connected, Agent Inbox folder connected, 1 package waiting for review, Live Drive Agent Inbox Test, Import
+live_11_after_import_tap.xml: Drive sync not connected, Agent Inbox folder connected, Import, No packages waiting for review.
+live_12_library_after_import.xml: Import
+live_13_library_files_filter_after_import.xml: Live Drive Agent Inbox Test, Import, Your file · Agent Inbox document
+live_14_reader_opened_imported_drive_document.xml: Live Drive Agent Inbox Test, This private Markdown package was created outside

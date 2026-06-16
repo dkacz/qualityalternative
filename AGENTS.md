@@ -38,6 +38,12 @@ This repository defines an Android-first MVP for "quality replacement at the mom
 - Treat the Agent Inbox destination as operator-supplied runtime input. If you are not given a destination folder, create only the local validated package and ask for the destination instead of guessing one.
 - Keep generated private content packages out of git unless the user explicitly asks to commit an example fixture.
 
+## Agent Inbox Drive Release Gate
+
+- For any Agent Inbox Drive picker, scan, package import, or Google Drive authorization change, follow `docs/AGENT_INBOX_LIVE_REVIEW_GATE.md` before claiming release readiness.
+- Code inspection, mocked unit tests, or static screenshots are not enough for this feature. A release candidate must include live evidence from a signed-in emulator or device, a real Google Drive folder, and an externally created package.
+- A GPT Pro or reviewer score of 10/10 is invalid unless it cites the live evidence bundle paths and confirms folder selection, scan, import, library visibility, reader rendering, APK hash, account state, and crash/error sentinel logs.
+
 ## Testing Strategy
 
 - Use acceptance criteria from `PRD.md` as the baseline test contract.

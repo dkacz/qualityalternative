@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "title": "Live Drive Agent Inbox Test",
+  "topics": ["PHILOSOPHY", "TECH"],
+  "contentFile": "content.md",
+  "format": "MARKDOWN",
+  "rightsClass": "USER_PRIVATE",
+  "sourceLabel": "Codex live Drive E2E",
+  "description": "Externally uploaded package used to verify live Agent Inbox Drive import.",
+  "priority": "normal",
+  "documentSha256": "5f78462f8b982817e184803849779175d391c0d58ecf1fcbb95f564c34f774e1",
+  "createdAt": "2026-06-16T16:00:00Z"
+}

@@ -1,0 +1,3 @@
+codex-live-drive-e2e-package/
+codex-live-drive-e2e-package/content.md
+codex-live-drive-e2e-package/manifest.json

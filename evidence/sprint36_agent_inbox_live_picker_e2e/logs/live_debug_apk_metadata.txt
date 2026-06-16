@@ -1,0 +1,9 @@
+APK: app/build/outputs/apk/debug/app-debug.apk
+83544a7efce11141c48cca25bed5ffb6a8da9e1429565c9c074b2fe35ba71348  app/build/outputs/apk/debug/app-debug.apk
+-rw-r--r--@ 1 omare  staff    38M Jun 16 19:28 app/build/outputs/apk/debug/app-debug.apk
+54:    pkg=Package{31f6b78 com.qualityalternative.app}
+62:    versionCode=39 minSdk=29 targetSdk=36
+64:    versionName=0.11.23-alpha
+83:    lastUpdateTime=2026-06-16 19:34:29
+84:    installerPackageName=null
+108:      firstInstallTime=2026-06-16 19:30:28

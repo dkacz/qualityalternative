@@ -2,10 +2,14 @@ package com.qualityalternative.app.data
 
 import com.qualityalternative.app.domain.service.AGENT_INBOX_MANIFEST_FILE_NAME
 import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_FILES_PER_PACKAGE
+import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_FOLDERS_PER_PICKER_PAGE
 import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_PACKAGES_PER_SCAN
 import com.qualityalternative.app.domain.service.AgentInboxDriveClient
 import com.qualityalternative.app.domain.service.AgentInboxDriveDownloadTooLargeException
 import com.qualityalternative.app.domain.service.AgentInboxDriveFile
+import com.qualityalternative.app.domain.service.AgentInboxDriveFolder
+import com.qualityalternative.app.domain.service.AgentInboxDriveFolderListRequest
+import com.qualityalternative.app.domain.service.AgentInboxDriveFolderListResult
 import com.qualityalternative.app.domain.service.AgentInboxDriveFolderNotSelectedException
 import com.qualityalternative.app.domain.service.AgentInboxDriveHttpException
 import com.qualityalternative.app.domain.service.AgentInboxDrivePackage
@@ -24,12 +28,38 @@ import org.json.JSONObject
 class AndroidGoogleDriveAgentInboxClient(
     private val endpoints: GoogleDriveAgentInboxEndpoints = GoogleDriveAgentInboxEndpoints(),
 ) : AgentInboxDriveClient {
+    override suspend fun listFolders(
+        request: AgentInboxDriveFolderListRequest,
+    ): AgentInboxDriveFolderListResult = withContext(Dispatchers.IO) {
+        val parentFolderId = request.parentFolderId?.takeIf(String::isNotBlank)
+        val listedFolders = listChildFolders(
+            accessToken = request.accessToken,
+            parentFolderId = parentFolderId ?: DRIVE_ROOT_FOLDER_ID,
+            limit = AGENT_INBOX_MAX_FOLDERS_PER_PICKER_PAGE,
+        )
+        AgentInboxDriveFolderListResult(
+            parentFolderId = parentFolderId,
+            folders = listedFolders.files.map { folder ->
+                AgentInboxDriveFolder(
+                    id = folder.id,
+                    name = folder.name,
+                    modifiedTime = folder.modifiedTime,
+                )
+            },
+            hasMoreFolders = listedFolders.hasMore,
+        )
+    }
+
     override suspend fun scanPackages(
         request: AgentInboxDriveScanRequest,
     ): AgentInboxDriveScanResult = withContext(Dispatchers.IO) {
         val folderId = request.folderId?.takeIf(String::isNotBlank)
             ?: throw AgentInboxDriveFolderNotSelectedException()
-        val packageFolders = listChildFolders(accessToken = request.accessToken, parentFolderId = folderId)
+        val packageFolders = listChildFolders(
+            accessToken = request.accessToken,
+            parentFolderId = folderId,
+            limit = AGENT_INBOX_MAX_PACKAGES_PER_SCAN,
+        )
         val packages = packageFolders.files.map { folder ->
             val files = listChildFiles(accessToken = request.accessToken, parentFolderId = folder.id)
             AgentInboxDrivePackage(
@@ -64,13 +94,13 @@ class AndroidGoogleDriveAgentInboxClient(
         ).body
     }
 
-    private fun listChildFolders(accessToken: String, parentFolderId: String): ListedAgentInboxFiles {
+    private fun listChildFolders(accessToken: String, parentFolderId: String, limit: Int): ListedAgentInboxFiles {
         val query = listOf(
             "'${parentFolderId.driveQueryValue()}' in parents",
             "mimeType = '$DRIVE_FOLDER_MIME_TYPE'",
             "trashed = false",
         ).joinToString(" and ")
-        return listFiles(accessToken = accessToken, query = query, limit = AGENT_INBOX_MAX_PACKAGES_PER_SCAN)
+        return listFiles(accessToken = accessToken, query = query, limit = limit)
     }
 
     private fun listChildFiles(accessToken: String, parentFolderId: String): ListedAgentInboxFiles {
@@ -209,6 +239,7 @@ class AndroidGoogleDriveAgentInboxClient(
         const val PAGE_SIZE = 100
         const val MAX_JSON_RESPONSE_BYTES = 256L * 1024L
         const val DRIVE_FOLDER_MIME_TYPE = "application/vnd.google-apps.folder"
+        const val DRIVE_ROOT_FOLDER_ID = "root"
     }
 }
 

@@ -2713,7 +2713,7 @@ class MainActivityTest {
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("settings-list") }
         composeRule.onNodeWithTag("settings-list")
             .performScrollToNode(hasTestTag("settings-annotation-drive-connect"))
-        composeRule.onNodeWithText("Google Drive not connected").assertIsDisplayed()
+        composeRule.onNodeWithText("Drive sync not connected").assertIsDisplayed()
         composeRule.onNodeWithTag("settings-annotation-drive-status").assertIsDisplayed()
         composeRule.onNodeWithTag("settings-annotation-drive-connect").assertIsDisplayed()
         composeRule.onNodeWithTag("settings-annotation-drive-disconnect").assertIsNotEnabled()

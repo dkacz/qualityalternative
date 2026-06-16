@@ -2,6 +2,8 @@ package com.qualityalternative.app.data
 
 import com.qualityalternative.app.domain.service.AgentInboxDriveClient
 import com.qualityalternative.app.domain.service.AgentInboxDriveFile
+import com.qualityalternative.app.domain.service.AgentInboxDriveFolderListRequest
+import com.qualityalternative.app.domain.service.AgentInboxDriveFolderListResult
 import com.qualityalternative.app.domain.service.AgentInboxDrivePackage
 import com.qualityalternative.app.domain.service.AgentInboxDriveScanRequest
 import com.qualityalternative.app.domain.service.AgentInboxDriveScanResult
@@ -106,6 +108,21 @@ class AndroidHybridAgentInboxDriveClientTest {
         assertEquals(listOf("content://file"), treeClient.downloadedFileIds)
     }
 
+    @Test
+    fun listFoldersRoutesThroughGoogleDriveClient() = runBlocking {
+        val googleClient = RecordingDriveClient()
+        val treeClient = RecordingDriveClient()
+        val client = AndroidHybridAgentInboxDriveClient(
+            googleDriveClient = googleClient,
+            documentTreeClient = treeClient,
+        )
+
+        client.listFolders(AgentInboxDriveFolderListRequest(accessToken = "drive-token", parentFolderId = "parent"))
+
+        assertEquals(listOf(AgentInboxDriveFolderListRequest("drive-token", "parent")), googleClient.folderListRequests)
+        assertTrue(treeClient.folderListRequests.isEmpty())
+    }
+
     private class RecordingDriveClient(
         private val scanResult: AgentInboxDriveScanResult = AgentInboxDriveScanResult(
             folderId = "folder",
@@ -113,8 +130,16 @@ class AndroidHybridAgentInboxDriveClientTest {
         ),
         private val files: Map<String, ByteArray> = emptyMap(),
     ) : AgentInboxDriveClient {
+        val folderListRequests = mutableListOf<AgentInboxDriveFolderListRequest>()
         val scanRequests = mutableListOf<AgentInboxDriveScanRequest>()
         val downloadedFileIds = mutableListOf<String>()
+
+        override suspend fun listFolders(
+            request: AgentInboxDriveFolderListRequest,
+        ): AgentInboxDriveFolderListResult {
+            folderListRequests += request
+            return AgentInboxDriveFolderListResult(parentFolderId = request.parentFolderId, folders = emptyList())
+        }
 
         override suspend fun scanPackages(request: AgentInboxDriveScanRequest): AgentInboxDriveScanResult {
             scanRequests += request

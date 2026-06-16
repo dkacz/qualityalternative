@@ -8,6 +8,7 @@ import com.qualityalternative.app.domain.service.ANNOTATION_DRIVE_SCOPE
 internal enum class GoogleDriveAuthorizationMode {
     ANNOTATION_CONNECT,
     ANNOTATION_RETRY,
+    AGENT_INBOX_BROWSE_READONLY,
     AGENT_INBOX_CONNECT_READONLY,
     AGENT_INBOX_READONLY_SCAN,
     AGENT_INBOX_READONLY_IMPORT,
@@ -25,6 +26,13 @@ internal fun googleDriveAuthorizationRequestSpecFor(
 ): GoogleDriveAuthorizationRequestSpec {
     return when (mode) {
         GoogleDriveAuthorizationMode.AGENT_INBOX_CONNECT_READONLY -> {
+            GoogleDriveAuthorizationRequestSpec(
+                requestedScopes = listOf(AGENT_INBOX_DRIVE_READONLY_SCOPE),
+                prompt = AuthorizationRequest.Prompt.CONSENT,
+            )
+        }
+
+        GoogleDriveAuthorizationMode.AGENT_INBOX_BROWSE_READONLY -> {
             GoogleDriveAuthorizationRequestSpec(
                 requestedScopes = listOf(AGENT_INBOX_DRIVE_READONLY_SCOPE),
                 prompt = AuthorizationRequest.Prompt.CONSENT,
