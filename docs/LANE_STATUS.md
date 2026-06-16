@@ -13,7 +13,7 @@ This file is the repo-level index for active and recently completed execution la
 
 ## Sprint 32 Agent Inbox Google Drive Document-Tree Access Lost Regression
 
-Status: `release_ready_local`
+Status: `release_published`
 
 - Date opened: 2026-06-16
 - Trigger: after installing the Sprint 31 APK, the app no longer shows false `Package is missing manifest.json`, but Agent Inbox is now `OFF` with `Agent Inbox folder access was lost. Connect the folder again.`
@@ -32,7 +32,9 @@ Status: `release_ready_local`
   - Release artifact: `release_artifacts/quality-alternative-v0.11.20-agent-inbox-drive-picker-alpha-debug.apk`.
   - SHA-256: `e7dc89166cdfd3406796a1f89e491bdbec1af850c830134ff3899371464c17c7`.
   - Connected visual/e2e was not run locally because `adb devices -l` showed no attached device and the machine has AVD definitions but no accessible Android emulator binary in the usual SDK paths.
-- Next gate: commit, push, tag, and publish GitHub release.
+- Release commit: `38b96dade376228d3fca8293b227915ac487deae`.
+- Release tag: `v0.11.20-agent-inbox-drive-picker-alpha`.
+- Release URL: `https://github.com/dkacz/qualityalternative/releases/tag/v0.11.20-agent-inbox-drive-picker-alpha`.
 
 ## Sprint 31 Agent Inbox Google Drive Document-Tree Manifest Visibility
 
