@@ -11,9 +11,31 @@ This file is the repo-level index for active and recently completed execution la
 - Heartbeats should exist only while waiting for a current GPT Pro lane.
 - Do not infer lane status from untracked local files alone. For example, `ios/` can appear untracked on non-iOS branches; the canonical iOS implementation source is the pushed iOS branch listed below.
 
+## Sprint 34 Agent Inbox Readonly Link Fallback
+
+Status: `release_ready_local`
+
+- Date opened: 2026-06-16
+- Trigger: GPT Pro R1 for Sprint 33 returned `SCORE: 8/10`, `VERDICT: REVISE`.
+- R1 review output: `evidence/sprint33_agent_inbox_drive_file_picker/pro_review_r1/GPT_PRO_REVIEW_R1.md`.
+- R1 findings addressed:
+  - The controlled typed/manual readonly folder-id path is now reachable from Settings through a visible `Drive folder link or id` field and `Use Drive link` action.
+  - Authorization tests now assert literal Google OAuth scope strings for `drive.file` and `drive.readonly`.
+  - Removed the stale unreachable Google Drive document-tree branch after the early Picker redirect.
+- Fix branch: `codex/agent-inbox-drive-tree-access-lost`.
+- Validation so far:
+  - Final local gate passed: `JAVA_HOME=/opt/homebrew/Cellar/openjdk@17/17.0.18/libexec/openjdk.jdk/Contents/Home ./gradlew testDebugUnitTest lintDebug assembleRelease assembleDebug`.
+  - `git diff --check` passed.
+  - Debug APK artifact built with `versionCode=38`, `versionName=0.11.22-alpha`.
+  - Release artifact: `release_artifacts/quality-alternative-v0.11.22-agent-inbox-readonly-link-fallback-alpha-debug.apk`.
+  - SHA-256: `2bd452f4b37b5e92fa203940096474da7d35b092bb820d306e19e1bc2c280264`.
+  - Connected visual/e2e was not run locally because `adb devices -l` showed no attached device and no Android emulator binary was available in the standard SDK paths checked.
+- Next gate:
+  - Commit, push, publish `v0.11.22-agent-inbox-readonly-link-fallback-alpha`, then run GPT Pro R2 with an expanded bundle that includes scope constants, Drive clients/tests, and URI predicate source.
+
 ## Sprint 33 Agent Inbox Google Drive Picker Play Services Hotfix
 
-Status: `release_published`
+Status: `release_published_superseded_by_sprint34_hotfix`
 
 - Date opened: 2026-06-16
 - Trigger: after installing the Sprint 32 APK, Settings > Agent Inbox showed `Google Drive authorization hit a Google Play services error. Retry Google Drive connection.` before the user could select a folder.
@@ -39,10 +61,10 @@ Status: `release_published`
   - R1 launched on 2026-06-16 with prompt `evidence/sprint33_agent_inbox_drive_file_picker/pro_review_r1/GPT_PRO_REVIEW_PROMPT_R1.md`.
   - R1 bundle ZIP artifact: `SPRINT33_AGENT_INBOX_DRIVE_FILE_PICKER_R1_GPT_PRO_REVIEW_BUNDLE_20260616.zip`.
   - R1 ChatGPT URL: `https://chatgpt.com/c/6a31231c-4224-83eb-a48e-cacaa7fd2a6d`.
-  - R1 status: launched and still generating during the first harvest attempts; no `SCORE`/`VERDICT` has been harvested yet.
+  - R1 result: `SCORE: 8/10`, `VERDICT: REVISE`, `VISUAL REVIEW: NOT APPLICABLE`.
+  - R1 findings: typed/manual readonly fallback was documented but not reachable from UI; bundle omitted literal scope definitions and concrete Drive client evidence.
 - Next gate:
-  - Harvest GPT Pro R1. If it is not `SCORE: 10/10`, `VERDICT: PASS`, address findings before claiming the sprint is review-clean.
-  - Install the published APK on the signed-in Android device and confirm the Google Drive folder picker opens instead of returning Google Play Services `INTERNAL_ERROR`.
+  - Superseded by Sprint 34 before claiming review-clean status.
 
 ## Sprint 32 Agent Inbox Google Drive Document-Tree Access Lost Regression
 

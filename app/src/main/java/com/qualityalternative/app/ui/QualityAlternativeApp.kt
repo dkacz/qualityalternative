@@ -615,11 +615,7 @@ private fun MainRoute(
                 uri = uri.toString(),
                 displayName = metadata.displayName,
             )
-            if (uri.toString().isGoogleDriveDocumentTreeUri()) {
-                startGoogleDriveSyncAuthorization(GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_SCAN)
-            } else {
-                viewModel.scanAgentInboxDrive(accessToken = "")
-            }
+            viewModel.scanAgentInboxDrive(accessToken = "")
         }.onFailure {
             viewModel.reportAgentInboxDriveAuthorizationFailure("Agent Inbox folder permission was not granted.")
         }
@@ -814,6 +810,12 @@ private fun MainRoute(
                     }
                 },
                 onDisconnectAgentInbox = disconnectAgentInboxDrive,
+                onAgentInboxDriveFolderDraftChange = viewModel::updateAgentInboxDriveFolderDraft,
+                onConnectAgentInboxReadonly = {
+                    if (viewModel.beginAgentInboxReadonlyFolderConnection()) {
+                        startGoogleDriveSyncAuthorization(GoogleDriveAuthorizationMode.AGENT_INBOX_CONNECT_READONLY)
+                    }
+                },
                 onToggleAgentInboxPriority = viewModel::toggleAgentInboxPriority,
                 onRejectAgentInboxCandidate = viewModel::rejectAgentInboxCandidate,
                 onImportAgentInboxCandidate = { packageFolderId ->
@@ -4301,6 +4303,8 @@ private fun SettingsTab(
     onDisconnectAnnotationDrive: () -> Unit,
     onScanAgentInbox: () -> Unit,
     onDisconnectAgentInbox: () -> Unit,
+    onAgentInboxDriveFolderDraftChange: (String) -> Unit,
+    onConnectAgentInboxReadonly: () -> Unit,
     onToggleAgentInboxPriority: (String) -> Unit,
     onRejectAgentInboxCandidate: (String) -> Unit,
     onImportAgentInboxCandidate: (String) -> Unit,
@@ -4507,6 +4511,8 @@ private fun SettingsTab(
                 state = state,
                 onScan = onScanAgentInbox,
                 onDisconnect = onDisconnectAgentInbox,
+                onDriveFolderDraftChange = onAgentInboxDriveFolderDraftChange,
+                onConnectReadonly = onConnectAgentInboxReadonly,
                 onTogglePriority = onToggleAgentInboxPriority,
                 onRejectCandidate = onRejectAgentInboxCandidate,
                 onImportCandidate = onImportAgentInboxCandidate,
@@ -5380,6 +5386,8 @@ private fun AgentInboxSettingsSection(
     state: MainUiState,
     onScan: () -> Unit,
     onDisconnect: () -> Unit,
+    onDriveFolderDraftChange: (String) -> Unit,
+    onConnectReadonly: () -> Unit,
     onTogglePriority: (String) -> Unit,
     onRejectCandidate: (String) -> Unit,
     onImportCandidate: (String) -> Unit,
@@ -5454,6 +5462,29 @@ private fun AgentInboxSettingsSection(
                     lineHeight = 17.sp,
                     modifier = Modifier.padding(top = 10.dp),
                 )
+            }
+            if (!state.hasAgentInboxDriveFolderGrant) {
+                Column(
+                    modifier = Modifier.padding(top = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    QaTextField(
+                        value = state.agentInboxDriveFolderDraft,
+                        onValueChange = onDriveFolderDraftChange,
+                        placeholder = "Drive folder link or id",
+                        isError = state.agentInboxDriveFolderDraftError != null,
+                        modifier = Modifier.testTag("settings-agent-inbox-drive-folder-draft"),
+                    )
+                    QaButton(
+                        text = "Use Drive link",
+                        onClick = onConnectReadonly,
+                        variant = QaButtonVariant.Ghost,
+                        size = QaButtonSize.Small,
+                        enabled = !state.isAgentInboxScanning && !state.isAgentInboxImporting,
+                        leadingIcon = QaIconKind.Link,
+                        modifier = Modifier.testTag("settings-agent-inbox-connect-readonly"),
+                    )
+                }
             }
             Row(
                 modifier = Modifier.padding(top = 14.dp),

@@ -8,12 +8,19 @@ import org.junit.Test
 
 class GoogleDriveAuthorizationTest {
     @Test
+    fun driveAuthorizationScopeConstantsUseExpectedGoogleDriveScopes() {
+        assertEquals("https://www.googleapis.com/auth/drive.file", ANNOTATION_DRIVE_SCOPE)
+        assertEquals("https://www.googleapis.com/auth/drive.readonly", AGENT_INBOX_DRIVE_READONLY_SCOPE)
+    }
+
+    @Test
     fun pickerFolderAuthorizationUsesDriveFileWithExplicitPickerFolderGrant() {
         val spec = googleDriveAuthorizationRequestSpecFor(
             GoogleDriveAuthorizationMode.AGENT_INBOX_PICK_FOLDER,
         )
 
         assertEquals(listOf(ANNOTATION_DRIVE_SCOPE), spec.requestedScopes)
+        assertEquals(listOf("https://www.googleapis.com/auth/drive.file"), spec.requestedScopes)
         assertEquals(ANNOTATION_DRIVE_SCOPE, googleDriveAuthorizationScopeFor(GoogleDriveAuthorizationMode.AGENT_INBOX_PICK_FOLDER))
         assertEquals(true, spec.optOutIncludingGrantedScopes)
         assertEquals(AuthorizationRequest.Prompt.CONSENT, spec.prompt)
@@ -55,6 +62,7 @@ class GoogleDriveAuthorizationTest {
             val spec = googleDriveAuthorizationRequestSpecFor(mode)
 
             assertEquals(listOf(AGENT_INBOX_DRIVE_READONLY_SCOPE), spec.requestedScopes)
+            assertEquals(listOf("https://www.googleapis.com/auth/drive.readonly"), spec.requestedScopes)
             assertEquals(AGENT_INBOX_DRIVE_READONLY_SCOPE, googleDriveAuthorizationScopeFor(mode))
             assertEquals(false, spec.optOutIncludingGrantedScopes)
             assertEquals(

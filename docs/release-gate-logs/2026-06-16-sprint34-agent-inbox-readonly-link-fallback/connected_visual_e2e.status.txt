@@ -1,0 +1,7 @@
+NOT RUN
+
+Reason:
+adb devices -l reported no attached devices. No local Android emulator binary was available in the standard SDK paths checked during the prior release gate.
+
+Impact:
+This release candidate is validated by unit/lint/build gates and addresses GPT Pro R1 source-review findings. Final Drive Picker behavior still needs confirmation on a signed-in Android device.
