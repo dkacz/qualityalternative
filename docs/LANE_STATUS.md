@@ -13,7 +13,7 @@ This file is the repo-level index for active and recently completed execution la
 
 ## Sprint 30 Agent Inbox Large Image Import Fix
 
-Status: `release_prepared`
+Status: `release_published`
 
 - Branch: `codex/agent-inbox-large-image-import-fix`
 - Scope: fix Agent Inbox Markdown image sidecar imports that failed opaquely around 2.4 MiB despite the documented 5 MiB per-image limit.
@@ -36,6 +36,11 @@ Status: `release_prepared`
   - SHA-256: `705c344ade36cd96753183c967f46908a647c4d3310c78f10adb268f0047ab8b`
   - Release gate summary: `docs/release-gate-logs/2026-06-16-sprint30-agent-inbox-large-image-import-fix/VALIDATION_SUMMARY.md`
   - Release notes: `docs/release-gate-logs/2026-06-16-sprint30-agent-inbox-large-image-import-fix/RELEASE_NOTES_v0.11.18-agent-inbox-large-image-import-fix-alpha.md`
+  - Release commit: `a1f257692860004e6101d311aded3472c2f8a1b6` (`Prepare Sprint 30 agent inbox image import release`).
+  - Release tag: `v0.11.18-agent-inbox-large-image-import-fix-alpha`.
+  - Release URL: `https://github.com/dkacz/qualityalternative/releases/tag/v0.11.18-agent-inbox-large-image-import-fix-alpha`.
+  - Published assets: `quality-alternative-v0.11.18-agent-inbox-large-image-import-fix-alpha-debug.apk` and `quality-alternative-v0.11.18-agent-inbox-large-image-import-fix-alpha-debug.apk.sha256`.
+  - Integration method: committed the release gate on `codex/agent-inbox-large-image-import-fix`, tagged the release commit, pushed branch and tag to `origin`, and published the GitHub release from the committed release notes.
 - Validation:
   - Passed: targeted Agent Inbox unit tests for `AgentInboxPackageImporterTest` and `MainViewModelTest`.
   - Passed: full `testDebugUnitTest`.
@@ -51,7 +56,7 @@ Status: `release_prepared`
   - GPT Pro R1 output: `evidence/sprint30_agent_inbox_large_image_import_fix/review/GPT_PRO_REVIEW_R1.md`
   - GPT Pro R2 output: `evidence/sprint30_agent_inbox_large_image_import_fix/review/GPT_PRO_REVIEW_R2.md`
 - Next gate:
-  - Tag release commit, push branch/tag, publish GitHub release with APK and SHA assets.
+  - Merge/cherry-pick the release branch into the stable integration branch when ready.
 
 ## Sprint 29 Agent Inbox Folder Selector
 

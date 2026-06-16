@@ -50,8 +50,10 @@ GPT Pro R2 returned `SCORE 10/10`, `VERDICT PASS`, `VISUAL REVIEW NOT APPLICABLE
 
 ## Publication Status
 
-Prepared for GitHub release publication.
+Published to GitHub Releases.
 
+- Release commit: `a1f257692860004e6101d311aded3472c2f8a1b6`
 - Release tag: `v0.11.18-agent-inbox-large-image-import-fix-alpha`
-- Expected release URL: `https://github.com/dkacz/qualityalternative/releases/tag/v0.11.18-agent-inbox-large-image-import-fix-alpha`
-- Integration method: commit this release gate on `codex/agent-inbox-large-image-import-fix`, tag the release commit, push branch and tag to `origin`, and publish the GitHub release from these release notes.
+- Release URL: `https://github.com/dkacz/qualityalternative/releases/tag/v0.11.18-agent-inbox-large-image-import-fix-alpha`
+- Published assets: `quality-alternative-v0.11.18-agent-inbox-large-image-import-fix-alpha-debug.apk` and `quality-alternative-v0.11.18-agent-inbox-large-image-import-fix-alpha-debug.apk.sha256`.
+- Integration method: committed the release gate on `codex/agent-inbox-large-image-import-fix`, tagged the release commit, pushed branch and tag to `origin`, and published the GitHub release from these release notes.
