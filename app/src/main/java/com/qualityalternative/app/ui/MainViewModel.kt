@@ -1,5 +1,6 @@
 package com.qualityalternative.app.ui
 
+import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -23,6 +24,8 @@ import com.qualityalternative.app.data.AgentInboxPackageImporter
 import com.qualityalternative.app.data.AgentInboxReviewCandidate
 import com.qualityalternative.app.data.AgentInboxReviewCandidateFactory
 import com.qualityalternative.app.data.AgentInboxReviewStatus
+import com.qualityalternative.app.data.toAgentInboxImportFailureDetail
+import com.qualityalternative.app.data.toAgentInboxImportPackageError
 import com.qualityalternative.app.data.ReadingTimeEstimateSource
 import com.qualityalternative.app.data.ReadingTimeEstimator
 import com.qualityalternative.app.data.StoredAgentInboxDocument
@@ -144,6 +147,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+
+private const val MAIN_VIEW_MODEL_LOG_TAG = "MainViewModel"
 
 data class MainUiState(
     val isLoadingSettings: Boolean = true,
@@ -1348,6 +1353,7 @@ class MainViewModel(
                                     accessToken = normalizedToken,
                                     fileId = manifestFile.id,
                                     maxBytes = AGENT_INBOX_MAX_MANIFEST_BYTES,
+                                    expectedBytes = manifestFile.sizeBytes,
                                 )
                             } catch (tooLarge: AgentInboxDriveDownloadTooLargeException) {
                                 return@map AgentInboxReviewCandidateFactory.invalidPackage(
@@ -1392,6 +1398,7 @@ class MainViewModel(
                                     accessToken = normalizedToken,
                                     fileId = contentFileId,
                                     maxBytes = AGENT_INBOX_MAX_REVIEW_CONTENT_BYTES,
+                                    expectedBytes = contentFile?.sizeBytes,
                                 )
                             } catch (tooLarge: AgentInboxDriveDownloadTooLargeException) {
                                 return@map initialCandidate.copy(
@@ -1749,6 +1756,7 @@ class MainViewModel(
                         accessToken = normalizedToken,
                         fileId = requireNotNull(candidate.contentFileId),
                         maxBytes = AGENT_INBOX_MAX_REVIEW_CONTENT_BYTES,
+                        expectedBytes = candidate.reviewedContentSizeBytes,
                     )
                 } catch (tooLarge: AgentInboxDriveDownloadTooLargeException) {
                     applyAgentInboxImportResult(
@@ -1769,12 +1777,14 @@ class MainViewModel(
                         )
                         return@launch
                     }
+                    logAgentInboxImportFailure(error)
                     applyAgentInboxImportResult(
                         packageFolderId = packageFolderId,
                         result = AgentInboxImportResult(
                             status = AgentInboxImportStatus.INVALID,
                             requestedHighPriority = candidate.requestsHighPriority,
                             packageErrors = setOf(AgentInboxPackageValidationError.DOWNLOAD_UNAVAILABLE),
+                            failureDetail = error.toAgentInboxImportFailureDetail(),
                         ),
                         nowMillis = nowMillis,
                     )
@@ -1800,6 +1810,7 @@ class MainViewModel(
                             accessToken = normalizedToken,
                             fileId = attachment.fileId,
                             maxBytes = AGENT_INBOX_MAX_IMAGE_ATTACHMENT_BYTES,
+                            expectedBytes = attachment.sizeBytes,
                         )
                     } catch (tooLarge: AgentInboxDriveDownloadTooLargeException) {
                         applyAgentInboxImportResult(
@@ -1820,12 +1831,14 @@ class MainViewModel(
                             )
                             return@launch
                         }
+                        logAgentInboxImportFailure(error)
                         applyAgentInboxImportResult(
                             packageFolderId = packageFolderId,
                             result = AgentInboxImportResult(
                                 status = AgentInboxImportStatus.INVALID,
                                 requestedHighPriority = candidate.requestsHighPriority,
                                 packageErrors = setOf(AgentInboxPackageValidationError.DOWNLOAD_UNAVAILABLE),
+                                failureDetail = error.toAgentInboxImportFailureDetail(),
                             ),
                             nowMillis = nowMillis,
                         )
@@ -1859,12 +1872,14 @@ class MainViewModel(
                 )
             } catch (error: Throwable) {
                 if (error is CancellationException) throw error
+                logAgentInboxImportFailure(error)
                 applyAgentInboxImportResult(
                     packageFolderId = packageFolderId,
                     result = AgentInboxImportResult(
                         status = AgentInboxImportStatus.REJECTED,
                         requestedHighPriority = candidate.requestsHighPriority,
-                        packageErrors = setOf(AgentInboxPackageValidationError.LOCAL_IMPORT_REJECTED),
+                        packageErrors = setOf(error.toAgentInboxImportPackageError()),
+                        failureDetail = error.toAgentInboxImportFailureDetail(),
                     ),
                     nowMillis = nowMillis,
                 )
@@ -2013,6 +2028,7 @@ class MainViewModel(
                             reviewedContentSizeBytes = null,
                             manifestErrors = candidate.manifestErrors + result.manifestErrors,
                             packageErrors = packageErrors,
+                            importFailureDetail = result.failureDetail,
                         )
                     } else {
                         candidate
@@ -2040,11 +2056,28 @@ class MainViewModel(
                         AgentInboxPackageValidationError.CONTENT_CHANGED_AFTER_REVIEW in result.packageErrors
                     ) {
                         "Agent Inbox package changed. Scan again before importing."
+                    } else if (result.failureDetail != null) {
+                        "Agent Inbox import failed: ${result.failureDetail.exceptionClass}."
                     } else {
                         "Agent Inbox package could not be imported."
                     },
                 )
             }
+        }
+    }
+
+    private fun logAgentInboxImportFailure(error: Throwable) {
+        val detail = error.toAgentInboxImportFailureDetail()
+        val message = buildString {
+            append("Agent Inbox import failed with ")
+            append(detail.exceptionClass)
+            detail.message?.let { failureMessage ->
+                append(": ")
+                append(failureMessage)
+            }
+        }
+        runCatching {
+            Log.e(MAIN_VIEW_MODEL_LOG_TAG, message, error)
         }
     }
 
@@ -6149,7 +6182,12 @@ private object NoOpAgentInboxDriveClient : AgentInboxDriveClient {
         request: AgentInboxDriveScanRequest,
     ) = error("Agent Inbox Drive is not available in this build.")
 
-    override suspend fun downloadFile(accessToken: String, fileId: String, maxBytes: Long): ByteArray =
+    override suspend fun downloadFile(
+        accessToken: String,
+        fileId: String,
+        maxBytes: Long,
+        expectedBytes: Long?,
+    ): ByteArray =
         error("Agent Inbox Drive is not available in this build.")
 }
 

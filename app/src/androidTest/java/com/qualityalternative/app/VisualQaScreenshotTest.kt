@@ -2596,7 +2596,12 @@ class VisualQaScreenshotTest {
             )
         }
 
-        override suspend fun downloadFile(accessToken: String, fileId: String, maxBytes: Long): ByteArray {
+        override suspend fun downloadFile(
+            accessToken: String,
+            fileId: String,
+            maxBytes: Long,
+            expectedBytes: Long?,
+        ): ByteArray {
             val bytes = bytesByFileId[fileId] ?: error("Missing visual Agent Inbox file bytes for $fileId")
             check(bytes.size.toLong() <= maxBytes) { "Visual Agent Inbox fixture exceeded maxBytes." }
             return bytes
@@ -2611,7 +2616,12 @@ class VisualQaScreenshotTest {
             )
         }
 
-        override suspend fun downloadFile(accessToken: String, fileId: String, maxBytes: Long): ByteArray {
+        override suspend fun downloadFile(
+            accessToken: String,
+            fileId: String,
+            maxBytes: Long,
+            expectedBytes: Long?,
+        ): ByteArray {
             error("Access-lost visual fixture does not download files.")
         }
     }

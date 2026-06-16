@@ -1,6 +1,6 @@
 # Lane Status
 
-Status timestamp: 2026-06-15
+Status timestamp: 2026-06-16
 
 This file is the repo-level index for active and recently completed execution lanes. It should point to the canonical branch, review lane, validation artifacts, and next gate for each lane.
 
@@ -10,6 +10,48 @@ This file is the repo-level index for active and recently completed execution la
 - Use the branch-specific sprint docs for detailed implementation notes.
 - Heartbeats should exist only while waiting for a current GPT Pro lane.
 - Do not infer lane status from untracked local files alone. For example, `ios/` can appear untracked on non-iOS branches; the canonical iOS implementation source is the pushed iOS branch listed below.
+
+## Sprint 30 Agent Inbox Large Image Import Fix
+
+Status: `release_prepared`
+
+- Branch: `codex/agent-inbox-large-image-import-fix`
+- Scope: fix Agent Inbox Markdown image sidecar imports that failed opaquely around 2.4 MiB despite the documented 5 MiB per-image limit.
+- Canonical sprint plan: `docs/SPRINT_30_AGENT_INBOX_LARGE_IMAGE_IMPORT_FIX.md`
+- Current implementation state:
+  - Import-time exceptions are logged with class/message/stacktrace through `Log.e`.
+  - Failed Agent Inbox candidates now carry `importFailureDetail` so UI detail text can show the exception class/message.
+  - Image sidecar write `IOException`/`OutOfMemoryError` maps to `IMAGE_WRITE_FAILED` instead of generic `LOCAL_IMPORT_REJECTED`.
+  - Drive and document-tree download paths accept expected byte sizes and avoid unhinted buffer growth when metadata provides bounded file size.
+  - `FileAgentInboxDocumentStore` verifies content SHA from existing bytes instead of re-reading the temp file.
+  - R1 fix: sidecar temp-file plan creation now happens inside the same cleanup/wrap scope as sidecar writes, so pre-write `IOException`/`OutOfMemoryError` maps to `IMAGE_WRITE_FAILED` and temp files are cleaned.
+  - R1 fix: image-write failure detail unwraps nested `AgentInboxImageAttachmentWriteException` wrappers to show the root class/message.
+  - A 3.5 MiB Markdown image sidecar regression test imports successfully under the existing 5 MiB contract.
+  - A sidecar temp-file creation regression test verifies `IMAGE_WRITE_FAILED` mapping and cleanup.
+  - The unrelated Chrome connected-test evidence path now uses app-scoped external files instead of a stale public Downloads directory.
+  - GPT Pro R1 returned `SCORE 8/10`, `VERDICT REVISE`, `VISUAL REVIEW NOT APPLICABLE`; R2 fixed the sidecar temp-file creation gap.
+  - GPT Pro R2 returned `SCORE 10/10`, `VERDICT PASS`, `VISUAL REVIEW NOT APPLICABLE`; no findings remain and release readiness is approved.
+  - Release gate passed for `v0.11.18-agent-inbox-large-image-import-fix-alpha`: `versionCode=34`, `versionName=0.11.18-alpha`, final local Gradle gate PASS, final connected Android gate PASS 138/138, APK badging/signature/install/launch PASS.
+  - Release artifact: `release_artifacts/quality-alternative-v0.11.18-agent-inbox-large-image-import-fix-alpha-debug.apk`
+  - SHA-256: `705c344ade36cd96753183c967f46908a647c4d3310c78f10adb268f0047ab8b`
+  - Release gate summary: `docs/release-gate-logs/2026-06-16-sprint30-agent-inbox-large-image-import-fix/VALIDATION_SUMMARY.md`
+  - Release notes: `docs/release-gate-logs/2026-06-16-sprint30-agent-inbox-large-image-import-fix/RELEASE_NOTES_v0.11.18-agent-inbox-large-image-import-fix-alpha.md`
+- Validation:
+  - Passed: targeted Agent Inbox unit tests for `AgentInboxPackageImporterTest` and `MainViewModelTest`.
+  - Passed: full `testDebugUnitTest`.
+  - Passed: `lintDebug`, `compileDebugAndroidTestKotlin`, and `assembleDebug`.
+  - Passed: targeted Chrome evidence-path rerun after the app-scoped evidence fix.
+  - Passed after the R1 fix: full `connectedDebugAndroidTest` on `qaApi36(AVD) - 16`, 138/138 tests, 0 skipped, 0 failed.
+  - Passed: `git diff --check`.
+- Evidence:
+  - Sprint doc: `docs/SPRINT_30_AGENT_INBOX_LARGE_IMAGE_IMPORT_FIX.md`
+  - Bug report/fix record: `docs/AGENT_INBOX_LARGE_IMAGE_IMPORT_BUG.md`
+  - Unit and connected XML: `evidence/sprint30_agent_inbox_large_image_import_fix/logs/`
+  - Review patch: `evidence/sprint30_agent_inbox_large_image_import_fix/review/current_patch.diff`
+  - GPT Pro R1 output: `evidence/sprint30_agent_inbox_large_image_import_fix/review/GPT_PRO_REVIEW_R1.md`
+  - GPT Pro R2 output: `evidence/sprint30_agent_inbox_large_image_import_fix/review/GPT_PRO_REVIEW_R2.md`
+- Next gate:
+  - Tag release commit, push branch/tag, publish GitHub release with APK and SHA assets.
 
 ## Sprint 29 Agent Inbox Folder Selector
 

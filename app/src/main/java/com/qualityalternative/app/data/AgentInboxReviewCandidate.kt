@@ -26,9 +26,18 @@ enum class AgentInboxPackageValidationError {
     TOO_MANY_IMAGE_ATTACHMENTS,
     DUPLICATE_IMAGE_ATTACHMENTS,
     IMAGE_ATTACHMENT_TOO_LARGE,
+    IMAGE_WRITE_FAILED,
     CONTENT_CHANGED_AFTER_REVIEW,
     DOWNLOAD_UNAVAILABLE,
     LOCAL_IMPORT_REJECTED,
+}
+
+data class AgentInboxImportFailureDetail(
+    val exceptionClass: String,
+    val message: String?,
+) {
+    val hasMessage: Boolean
+        get() = !message.isNullOrBlank()
 }
 
 data class AgentInboxImageAttachmentFile(
@@ -51,6 +60,7 @@ data class AgentInboxReviewCandidate(
     val imageAttachmentFiles: List<AgentInboxImageAttachmentFile> = emptyList(),
     val manifestErrors: Set<AgentInboxManifestValidationError> = emptySet(),
     val packageErrors: Set<AgentInboxPackageValidationError> = emptySet(),
+    val importFailureDetail: AgentInboxImportFailureDetail? = null,
 ) {
     val requestsHighPriority: Boolean
         get() = manifest?.requestsHighPriority == true
@@ -252,4 +262,38 @@ private fun String.isSafeAgentInboxMarkdownImageAttachmentName(): Boolean {
 
 fun AgentInboxReviewCandidate.displayTitle(): String {
     return manifest?.title ?: packageFolderName.ifBlank { AGENT_INBOX_MANIFEST_FILE_NAME }
+}
+
+internal fun Throwable.toAgentInboxImportFailureDetail(): AgentInboxImportFailureDetail {
+    val reported = unwrapAgentInboxImageAttachmentWriteFailure()
+    val exceptionClass = reported.javaClass.simpleName.ifBlank { reported.javaClass.name }
+    return AgentInboxImportFailureDetail(
+        exceptionClass = exceptionClass,
+        message = reported.message?.trim()?.take(180)?.takeIf(String::isNotBlank),
+    )
+}
+
+private fun Throwable.unwrapAgentInboxImageAttachmentWriteFailure(): Throwable {
+    var reported = this
+    while (reported is AgentInboxImageAttachmentWriteException && reported.cause != null) {
+        reported = reported.cause!!
+    }
+    return reported
+}
+
+internal fun Throwable.toAgentInboxImportPackageError(): AgentInboxPackageValidationError {
+    return if (hasAgentInboxImageAttachmentWriteFailure()) {
+        AgentInboxPackageValidationError.IMAGE_WRITE_FAILED
+    } else {
+        AgentInboxPackageValidationError.LOCAL_IMPORT_REJECTED
+    }
+}
+
+private fun Throwable.hasAgentInboxImageAttachmentWriteFailure(): Boolean {
+    var current: Throwable? = this
+    while (current != null) {
+        if (current is AgentInboxImageAttachmentWriteException) return true
+        current = current.cause
+    }
+    return false
 }

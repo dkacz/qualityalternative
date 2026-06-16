@@ -52,6 +52,7 @@ class AndroidGoogleDriveAgentInboxClient(
         accessToken: String,
         fileId: String,
         maxBytes: Long,
+        expectedBytes: Long?,
     ): ByteArray = withContext(Dispatchers.IO) {
         request(
             method = "GET",
@@ -59,6 +60,7 @@ class AndroidGoogleDriveAgentInboxClient(
             accessToken = accessToken,
             throwOnError = true,
             maxBodyBytes = maxBytes,
+            expectedBodyBytes = expectedBytes,
         ).body
     }
 
@@ -148,6 +150,7 @@ class AndroidGoogleDriveAgentInboxClient(
         contentType: String? = null,
         throwOnError: Boolean = true,
         maxBodyBytes: Long? = null,
+        expectedBodyBytes: Long? = null,
     ): DriveByteResponse {
         val connection = (URL(url).openConnection() as HttpURLConnection).apply {
             requestMethod = method
@@ -164,7 +167,11 @@ class AndroidGoogleDriveAgentInboxClient(
         try {
             val code = connection.responseCode
             val responseBody = if (code in 200..299) {
-                connection.inputStream.readBoundedBytes(maxBodyBytes)
+                val contentLength = connection.contentLengthLong.takeIf { length -> length >= 0L }
+                connection.inputStream.readBoundedBytes(
+                    maxBytes = maxBodyBytes,
+                    expectedBytes = expectedBodyBytes ?: contentLength,
+                )
             } else {
                 val errorBody = connection.errorStream?.readBoundedBytes(MAX_JSON_RESPONSE_BYTES) ?: ByteArray(0)
                 if (throwOnError) {
@@ -228,16 +235,57 @@ private fun String.driveQueryValue(): String {
     return replace("\\", "\\\\").replace("'", "\\'")
 }
 
-private fun InputStream.readBoundedBytes(maxBytes: Long?): ByteArray {
+private fun InputStream.readBoundedBytes(maxBytes: Long?, expectedBytes: Long? = null): ByteArray {
+    val boundedExpectedBytes = expectedBytes
+        ?.takeIf { bytes -> bytes >= 0L && (maxBytes == null || bytes <= maxBytes) && bytes <= Int.MAX_VALUE }
+        ?.toInt()
+    if (boundedExpectedBytes != null) {
+        val bytes = ByteArray(boundedExpectedBytes)
+        var offset = 0
+        while (offset < bytes.size) {
+            val read = read(bytes, offset, bytes.size - offset)
+            if (read == -1) {
+                return bytes.copyOf(offset)
+            }
+            offset += read
+        }
+        val extra = read()
+        if (extra == -1) {
+            return bytes
+        }
+        val output = ByteArrayOutputStream(
+            ((boundedExpectedBytes.toLong() + DEFAULT_BUFFER_SIZE).coerceAtMost(maxBytes ?: Int.MAX_VALUE.toLong()))
+                .coerceAtMost(Int.MAX_VALUE.toLong())
+                .toInt(),
+        )
+        output.write(bytes)
+        output.write(extra)
+        return readRemainingBoundedBytes(
+            output = output,
+            initialTotal = boundedExpectedBytes + 1L,
+            maxBytes = maxBytes,
+        )
+    }
     if (maxBytes == null) return readBytes()
-    val output = ByteArrayOutputStream()
+    val output = ByteArrayOutputStream(DEFAULT_BUFFER_SIZE)
+    return readRemainingBoundedBytes(output = output, initialTotal = 0L, maxBytes = maxBytes)
+}
+
+private fun InputStream.readRemainingBoundedBytes(
+    output: ByteArrayOutputStream,
+    initialTotal: Long,
+    maxBytes: Long?,
+): ByteArray {
     val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-    var total = 0L
+    var total = initialTotal
+    if (maxBytes != null && total > maxBytes) {
+        throw AgentInboxDriveDownloadTooLargeException(maxBytes = maxBytes)
+    }
     while (true) {
         val read = read(buffer)
         if (read == -1) break
         total += read.toLong()
-        if (total > maxBytes) {
+        if (maxBytes != null && total > maxBytes) {
             throw AgentInboxDriveDownloadTooLargeException(maxBytes = maxBytes)
         }
         output.write(buffer, 0, read)

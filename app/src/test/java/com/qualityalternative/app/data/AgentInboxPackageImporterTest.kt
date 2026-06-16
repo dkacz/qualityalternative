@@ -10,9 +10,11 @@ import com.qualityalternative.app.domain.model.UserDocumentDraft
 import com.qualityalternative.app.domain.model.UserDocumentValidationError
 import com.qualityalternative.app.domain.service.AddUserDocumentIfFingerprintAbsentResult
 import com.qualityalternative.app.domain.service.AddUserDocumentResult
+import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_IMAGE_ATTACHMENT_BYTES
 import com.qualityalternative.app.domain.service.AGENT_INBOX_MAX_REVIEW_CONTENT_BYTES
 import com.qualityalternative.app.domain.service.UserDocumentRepository
 import java.io.File
+import java.io.IOException
 import java.net.URI
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -88,6 +90,78 @@ class AgentInboxPackageImporterTest {
         val storedImage = File(URI.create(requireNotNull(attachmentUris["cover.png"])))
         assertEquals(imageBytes.toList(), storedImage.readBytes().toList())
         assertTrue(storedImage.canonicalFile.toPath().startsWith(storageRoot.canonicalFile.toPath()))
+    }
+
+    @Test
+    fun importCandidatePersistsMultiMegabyteMarkdownImageAttachment() = runBlocking {
+        val contentBytes = "# Attention\n\n![Large](large.png)".toByteArray()
+        val imageBytes = ByteArray((3.5 * 1024 * 1024).toInt()) { index -> (index % 251).toByte() }
+        assertTrue(imageBytes.size.toLong() < AGENT_INBOX_MAX_IMAGE_ATTACHMENT_BYTES)
+        val sha = AgentInboxManifestValidator.sha256(contentBytes)
+        val repository = FakeAgentInboxUserDocumentRepository()
+        val storageRoot = temporaryFolder.newFolder("agent-inbox-large-images")
+        val store = FileAgentInboxDocumentStore(storageRoot)
+        val importer = AgentInboxPackageImporter(userDocumentRepository = repository, documentStore = store)
+        val candidate = readyCandidate(documentSha256 = sha)
+
+        val result = importer.importCandidate(
+            candidate = candidate,
+            contentBytes = contentBytes,
+            imageAttachmentBytes = mapOf("large.png" to imageBytes),
+            nowMillis = 2_000L,
+        )
+
+        assertEquals(AgentInboxImportStatus.IMPORTED, result.status)
+        val attachmentUri = requireNotNull(repository.addedDrafts.single().imageAttachmentUris["large.png"])
+        val storedImage = File(URI.create(attachmentUri))
+        assertEquals(imageBytes.size.toLong(), storedImage.length())
+        assertEquals(
+            AgentInboxManifestValidator.sha256(imageBytes),
+            AgentInboxManifestValidator.sha256(storedImage.readBytes()),
+        )
+        assertTrue(storedImage.canonicalFile.toPath().startsWith(storageRoot.canonicalFile.toPath()))
+    }
+
+    @Test
+    fun importCandidateMapsSidecarTempCreationFailureToImageWriteFailure() = runBlocking {
+        val contentBytes = "# Attention\n\n![Cover](cover.png)".toByteArray()
+        val imageBytes = byteArrayOf(1, 2, 3, 4)
+        val sha = AgentInboxManifestValidator.sha256(contentBytes)
+        val repository = FakeAgentInboxUserDocumentRepository()
+        val storageRoot = temporaryFolder.newFolder("agent-inbox-sidecar-temp-failure")
+        val store = FileAgentInboxDocumentStore(
+            rootDirectory = storageRoot,
+            tempFileFactory = { prefix, suffix, directory ->
+                if ("-img-" in prefix && suffix == ".tmp") {
+                    throw IOException("sidecar temp denied")
+                }
+                File.createTempFile(prefix, suffix, directory)
+            },
+        )
+        val importer = AgentInboxPackageImporter(userDocumentRepository = repository, documentStore = store)
+        val candidate = readyCandidate(documentSha256 = sha)
+
+        var thrown: Throwable? = null
+        try {
+            importer.importCandidate(
+                candidate = candidate,
+                contentBytes = contentBytes,
+                imageAttachmentBytes = mapOf("cover.png" to imageBytes),
+                nowMillis = 2_000L,
+            )
+        } catch (error: Throwable) {
+            thrown = error
+        }
+
+        assertTrue(thrown is AgentInboxImageAttachmentWriteException)
+        val imageWriteError = thrown as AgentInboxImageAttachmentWriteException
+        val rootCause = generateSequence<Throwable>(imageWriteError) { cause -> cause.cause }.last()
+        assertEquals("sidecar temp denied", rootCause.message)
+        assertEquals(
+            AgentInboxPackageValidationError.IMAGE_WRITE_FAILED,
+            imageWriteError.toAgentInboxImportPackageError(),
+        )
+        assertTrue(storageRoot.listFiles().orEmpty().isEmpty())
     }
 
     @Test

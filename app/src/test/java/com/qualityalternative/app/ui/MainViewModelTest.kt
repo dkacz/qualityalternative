@@ -7,6 +7,7 @@ import com.qualityalternative.app.analytics.InMemoryAnalyticsTracker
 import com.qualityalternative.app.data.AccountLightProfileExporter
 import com.qualityalternative.app.data.CompositeContentRepository
 import com.qualityalternative.app.data.AgentInboxDocumentStore
+import com.qualityalternative.app.data.AgentInboxImageAttachmentWriteException
 import com.qualityalternative.app.data.AgentInboxImageAttachmentWrite
 import com.qualityalternative.app.data.AgentInboxManifestValidationError
 import com.qualityalternative.app.data.AgentInboxManifestValidator
@@ -3005,7 +3006,12 @@ class MainViewModelTest {
             listOf(
                 AgentInboxDownloadRequest("manifest-file", AGENT_INBOX_MAX_MANIFEST_BYTES, accessToken = ""),
                 AgentInboxDownloadRequest("content-file", AGENT_INBOX_MAX_REVIEW_CONTENT_BYTES, accessToken = ""),
-                AgentInboxDownloadRequest("content-file", AGENT_INBOX_MAX_REVIEW_CONTENT_BYTES, accessToken = ""),
+                AgentInboxDownloadRequest(
+                    "content-file",
+                    AGENT_INBOX_MAX_REVIEW_CONTENT_BYTES,
+                    accessToken = "",
+                    expectedBytes = contentBytes.size.toLong(),
+                ),
             ),
             driveClient.downloadRequests,
         )
@@ -3155,7 +3161,11 @@ class MainViewModelTest {
             listOf(
                 AgentInboxDownloadRequest("manifest-file", AGENT_INBOX_MAX_MANIFEST_BYTES),
                 AgentInboxDownloadRequest("content-file", AGENT_INBOX_MAX_REVIEW_CONTENT_BYTES),
-                AgentInboxDownloadRequest("content-file", AGENT_INBOX_MAX_REVIEW_CONTENT_BYTES),
+                AgentInboxDownloadRequest(
+                    "content-file",
+                    AGENT_INBOX_MAX_REVIEW_CONTENT_BYTES,
+                    expectedBytes = contentBytes.size.toLong(),
+                ),
             ),
             driveClient.downloadRequests,
         )
@@ -3214,7 +3224,12 @@ class MainViewModelTest {
             listOf(
                 AgentInboxDownloadRequest("manifest-file", AGENT_INBOX_MAX_MANIFEST_BYTES, accessToken = ""),
                 AgentInboxDownloadRequest("content-file", AGENT_INBOX_MAX_REVIEW_CONTENT_BYTES, accessToken = ""),
-                AgentInboxDownloadRequest("content-file", AGENT_INBOX_MAX_REVIEW_CONTENT_BYTES, accessToken = ""),
+                AgentInboxDownloadRequest(
+                    "content-file",
+                    AGENT_INBOX_MAX_REVIEW_CONTENT_BYTES,
+                    accessToken = "",
+                    expectedBytes = contentBytes.size.toLong(),
+                ),
             ),
             driveClient.downloadRequests,
         )
@@ -3276,8 +3291,16 @@ class MainViewModelTest {
             listOf(
                 AgentInboxDownloadRequest("manifest-file", AGENT_INBOX_MAX_MANIFEST_BYTES),
                 AgentInboxDownloadRequest("content-file", AGENT_INBOX_MAX_REVIEW_CONTENT_BYTES),
-                AgentInboxDownloadRequest("content-file", AGENT_INBOX_MAX_REVIEW_CONTENT_BYTES),
-                AgentInboxDownloadRequest("cover-file", AGENT_INBOX_MAX_IMAGE_ATTACHMENT_BYTES),
+                AgentInboxDownloadRequest(
+                    "content-file",
+                    AGENT_INBOX_MAX_REVIEW_CONTENT_BYTES,
+                    expectedBytes = contentBytes.size.toLong(),
+                ),
+                AgentInboxDownloadRequest(
+                    "cover-file",
+                    AGENT_INBOX_MAX_IMAGE_ATTACHMENT_BYTES,
+                    expectedBytes = imageBytes.size.toLong(),
+                ),
             ),
             driveClient.downloadRequests,
         )
@@ -3642,6 +3665,9 @@ class MainViewModelTest {
         assertNull(candidate.reviewedContentSha256)
         assertNull(candidate.reviewedContentSizeBytes)
         assertEquals(setOf(AgentInboxPackageValidationError.DOWNLOAD_UNAVAILABLE), candidate.packageErrors)
+        assertEquals("IllegalStateException", candidate.importFailureDetail?.exceptionClass)
+        assertEquals("download failed", candidate.importFailureDetail?.message)
+        assertEquals("Agent Inbox import failed: IllegalStateException.", viewModel.uiState.latestMessage)
         assertTrue(userDocumentRepository.documents.value.isEmpty())
     }
 
@@ -3688,6 +3714,61 @@ class MainViewModelTest {
         assertNull(candidate.reviewedContentSha256)
         assertNull(candidate.reviewedContentSizeBytes)
         assertEquals(setOf(AgentInboxPackageValidationError.LOCAL_IMPORT_REJECTED), candidate.packageErrors)
+        assertTrue(userDocumentRepository.documents.value.isEmpty())
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun importAgentInboxCandidateCapturesImageWriteFailureDetail() = runTest {
+        val contentBytes = "# Reviewed\n\n![Cover](cover.png)".toByteArray()
+        val imageBytes = byteArrayOf(9, 8, 7)
+        val coverFile = AgentInboxDriveFile(
+            id = "cover-file",
+            name = "cover.png",
+            mimeType = "image/png",
+            sizeBytes = imageBytes.size.toLong(),
+            md5Checksum = null,
+            modifiedTime = null,
+        )
+        val driveClient = RecordingAgentInboxDriveClient(
+            scanResult = AgentInboxDriveScanResult(
+                folderId = "agent-inbox-folder",
+                packages = listOf(agentInboxDrivePackage(imageFiles = listOf(coverFile))),
+            ),
+            files = mapOf(
+                "manifest-file" to agentInboxManifest(priority = "normal").toByteArray(),
+                "content-file" to contentBytes,
+                "cover-file" to imageBytes,
+            ),
+        )
+        val userDocumentRepository = FakeUserDocumentRepository()
+        val viewModel = createViewModel(
+            userDocumentRepository = userDocumentRepository,
+            agentInboxDriveClient = driveClient,
+            agentInboxPackageImporter = AgentInboxPackageImporter(
+                userDocumentRepository = userDocumentRepository,
+                documentStore = ThrowingImageWriteDocumentStore(IOException("disk full")),
+            ),
+        )
+
+        advanceUntilIdle()
+        viewModel.selectAgentInboxDriveFolderForTest()
+        advanceUntilIdle()
+        viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 5_000L)
+        advanceUntilIdle()
+        viewModel.importAgentInboxCandidate(
+            packageFolderId = "agent-package",
+            accessToken = "drive-token",
+            nowMillis = 6_000L,
+        )
+        advanceUntilIdle()
+
+        val candidate = viewModel.uiState.agentInboxCandidates.single()
+        assertEquals(AgentInboxReviewStatus.INVALID, candidate.status)
+        assertEquals(setOf(AgentInboxPackageValidationError.IMAGE_WRITE_FAILED), candidate.packageErrors)
+        assertEquals("IOException", candidate.importFailureDetail?.exceptionClass)
+        assertEquals("disk full", candidate.importFailureDetail?.message)
+        assertEquals("Agent Inbox import failed: IOException.", viewModel.uiState.latestMessage)
         assertTrue(userDocumentRepository.documents.value.isEmpty())
     }
 
@@ -8240,12 +8321,18 @@ class MainViewModelTest {
             return scanResult
         }
 
-        override suspend fun downloadFile(accessToken: String, fileId: String, maxBytes: Long): ByteArray {
+        override suspend fun downloadFile(
+            accessToken: String,
+            fileId: String,
+            maxBytes: Long,
+            expectedBytes: Long?,
+        ): ByteArray {
             downloadedFileIds += fileId
             downloadRequests += AgentInboxDownloadRequest(
                 fileId = fileId,
                 maxBytes = maxBytes,
                 accessToken = accessToken,
+                expectedBytes = expectedBytes,
             )
             downloadFailuresByOrdinal[downloadRequests.size]?.let { error -> throw error }
             downloadFailures[fileId]?.let { error -> throw error }
@@ -8261,6 +8348,7 @@ class MainViewModelTest {
         val fileId: String,
         val maxBytes: Long,
         val accessToken: String = "drive-token",
+        val expectedBytes: Long? = null,
     )
 
     private fun MainViewModel.selectAgentInboxDriveFolderForTest(
@@ -8307,6 +8395,23 @@ class MainViewModelTest {
         override suspend fun deleteDocument(stored: StoredAgentInboxDocument) {
             deletedUris += stored.uri
         }
+    }
+
+    private class ThrowingImageWriteDocumentStore(
+        private val cause: Throwable,
+    ) : AgentInboxDocumentStore {
+        override suspend fun writeDocument(
+            packageFolderId: String,
+            contentFileName: String,
+            verifiedContentSha256: String,
+            format: ContentFormat,
+            bytes: ByteArray,
+            imageAttachments: List<AgentInboxImageAttachmentWrite>,
+        ): StoredAgentInboxDocument {
+            throw AgentInboxImageAttachmentWriteException(cause)
+        }
+
+        override suspend fun deleteDocument(stored: StoredAgentInboxDocument) = Unit
     }
 
     private data class AgentInboxDocumentWrite(

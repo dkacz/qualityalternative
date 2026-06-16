@@ -34,11 +34,26 @@ class AndroidHybridAgentInboxDriveClient(
         }
     }
 
-    override suspend fun downloadFile(accessToken: String, fileId: String, maxBytes: Long): ByteArray {
+    override suspend fun downloadFile(
+        accessToken: String,
+        fileId: String,
+        maxBytes: Long,
+        expectedBytes: Long?,
+    ): ByteArray {
         return if (fileId.isContentUri()) {
-            documentTreeClient.downloadFile(accessToken = accessToken, fileId = fileId, maxBytes = maxBytes)
+            documentTreeClient.downloadFile(
+                accessToken = accessToken,
+                fileId = fileId,
+                maxBytes = maxBytes,
+                expectedBytes = expectedBytes,
+            )
         } else {
-            googleDriveClient.downloadFile(accessToken = accessToken, fileId = fileId, maxBytes = maxBytes)
+            googleDriveClient.downloadFile(
+                accessToken = accessToken,
+                fileId = fileId,
+                maxBytes = maxBytes,
+                expectedBytes = expectedBytes,
+            )
         }
     }
 }
@@ -90,11 +105,12 @@ class AndroidDocumentTreeAgentInboxClient(
         accessToken: String,
         fileId: String,
         maxBytes: Long,
+        expectedBytes: Long?,
     ): ByteArray = withContext(Dispatchers.IO) {
         val fileUri = Uri.parse(fileId)
         try {
             context.contentResolver.openInputStream(fileUri)?.use { input ->
-                input.readBoundedBytes(maxBytes)
+                input.readBoundedBytes(maxBytes = maxBytes, expectedBytes = expectedBytes)
             } ?: throw AgentInboxDriveAccessLostException()
         } catch (error: SecurityException) {
             throw AgentInboxDriveAccessLostException(cause = error)
@@ -243,10 +259,52 @@ private fun AgentInboxDriveFile.isAgentContentFile(): Boolean {
     return lower.endsWith(".md") || lower.endsWith(".markdown") || lower.endsWith(".epub")
 }
 
-private fun InputStream.readBoundedBytes(maxBytes: Long): ByteArray {
-    val output = ByteArrayOutputStream()
+private fun InputStream.readBoundedBytes(maxBytes: Long, expectedBytes: Long? = null): ByteArray {
+    val boundedExpectedBytes = expectedBytes
+        ?.takeIf { bytes -> bytes >= 0L && bytes <= maxBytes && bytes <= Int.MAX_VALUE }
+        ?.toInt()
+    if (boundedExpectedBytes != null) {
+        val bytes = ByteArray(boundedExpectedBytes)
+        var offset = 0
+        while (offset < bytes.size) {
+            val read = read(bytes, offset, bytes.size - offset)
+            if (read == -1) {
+                return bytes.copyOf(offset)
+            }
+            offset += read
+        }
+        val extra = read()
+        if (extra == -1) {
+            return bytes
+        }
+        val output = ByteArrayOutputStream(
+            (boundedExpectedBytes.toLong() + DEFAULT_BUFFER_SIZE)
+                .coerceAtMost(maxBytes)
+                .coerceAtMost(Int.MAX_VALUE.toLong())
+                .toInt(),
+        )
+        output.write(bytes)
+        output.write(extra)
+        return readRemainingBoundedBytes(
+            output = output,
+            initialTotal = boundedExpectedBytes + 1L,
+            maxBytes = maxBytes,
+        )
+    }
+    val output = ByteArrayOutputStream(DEFAULT_BUFFER_SIZE)
+    return readRemainingBoundedBytes(output = output, initialTotal = 0L, maxBytes = maxBytes)
+}
+
+private fun InputStream.readRemainingBoundedBytes(
+    output: ByteArrayOutputStream,
+    initialTotal: Long,
+    maxBytes: Long,
+): ByteArray {
     val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-    var total = 0L
+    var total = initialTotal
+    if (total > maxBytes) {
+        throw AgentInboxDriveDownloadTooLargeException(maxBytes = maxBytes)
+    }
     while (true) {
         val read = read(buffer)
         if (read == -1) break

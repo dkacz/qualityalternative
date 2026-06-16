@@ -28,6 +28,7 @@ data class AgentInboxImportResult(
     val manifestErrors: Set<AgentInboxManifestValidationError> = emptySet(),
     val packageErrors: Set<AgentInboxPackageValidationError> = emptySet(),
     val documentErrors: Set<UserDocumentValidationError> = emptySet(),
+    val failureDetail: AgentInboxImportFailureDetail? = null,
 )
 
 class AgentInboxPackageImporter(

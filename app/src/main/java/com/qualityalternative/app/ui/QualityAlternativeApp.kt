@@ -9760,6 +9760,10 @@ private fun agentInboxCandidateDetailText(candidate: AgentInboxReviewCandidate):
                     "Markdown image attachment is too large. Use smaller images and scan again."
                 }
 
+                AgentInboxPackageValidationError.IMAGE_WRITE_FAILED in candidate.packageErrors -> {
+                    "Image attachment could not be saved${candidate.agentInboxFailureDetailSuffix()}. Use a smaller image or scan again."
+                }
+
                 AgentInboxPackageValidationError.CONTENT_FILE_TOO_LARGE in candidate.packageErrors -> {
                     "Content is too large for review. Use a smaller Markdown or EPUB package."
                 }
@@ -9769,11 +9773,11 @@ private fun agentInboxCandidateDetailText(candidate: AgentInboxReviewCandidate):
                 }
 
                 AgentInboxPackageValidationError.DOWNLOAD_UNAVAILABLE in candidate.packageErrors -> {
-                    "Package file could not be downloaded. Check Drive access and scan again."
+                    "Package file could not be downloaded${candidate.agentInboxFailureDetailSuffix()}. Check Drive access and scan again."
                 }
 
                 AgentInboxPackageValidationError.LOCAL_IMPORT_REJECTED in candidate.packageErrors -> {
-                    "Package could not be saved. Update it and scan again."
+                    "Package could not be saved${candidate.agentInboxFailureDetailSuffix()}. Update it and scan again."
                 }
 
                 candidate.manifestErrors.isNotEmpty() -> {
@@ -9783,6 +9787,15 @@ private fun agentInboxCandidateDetailText(candidate: AgentInboxReviewCandidate):
                 else -> "Package cannot be imported yet. Update it and scan again."
             }
         }
+    }
+}
+
+private fun AgentInboxReviewCandidate.agentInboxFailureDetailSuffix(): String {
+    val detail = importFailureDetail ?: return "."
+    return if (detail.hasMessage) {
+        ": ${detail.exceptionClass}: ${detail.message}."
+    } else {
+        ": ${detail.exceptionClass}."
     }
 }
 

@@ -35,7 +35,8 @@ class AccessibilityInterceptionTest {
     private val targetContext = instrumentation.targetContext
     private val device = UiDevice.getInstance(instrumentation)
     private val chromeEvidenceDir = File(
-        "/sdcard/Download/qualityalternative/sprint26-chrome-verified-host-${System.currentTimeMillis()}",
+        targetContext.getExternalFilesDir("qualityalternative") ?: targetContext.filesDir,
+        "sprint26-chrome-verified-host-${System.currentTimeMillis()}",
     )
     private var preserveStateAfterTest = false
 

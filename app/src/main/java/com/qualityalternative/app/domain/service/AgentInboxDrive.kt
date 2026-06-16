@@ -61,7 +61,12 @@ class AgentInboxDriveAccessLostException(
 interface AgentInboxDriveClient {
     suspend fun scanPackages(request: AgentInboxDriveScanRequest): AgentInboxDriveScanResult
 
-    suspend fun downloadFile(accessToken: String, fileId: String, maxBytes: Long): ByteArray
+    suspend fun downloadFile(
+        accessToken: String,
+        fileId: String,
+        maxBytes: Long,
+        expectedBytes: Long? = null,
+    ): ByteArray
 }
 
 private fun String.toErrorSuffix(): String {

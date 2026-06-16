@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.qualityalternative.app.data.AgentInboxPackageImporterTest" tests="17" skipped="0" failures="0" errors="0" timestamp="2026-06-16T06:54:47.039Z" hostname="mac-studio.home" time="0.112">
+  <properties/>
+  <testcase name="importCandidateDoesNotExposeRawDriveFileNameAsDocumentDisplayName" classname="com.qualityalternative.app.data.AgentInboxPackageImporterTest" time="0.013"/>
+  <testcase name="fileStoreReplacesStaleMismatchingFinalFileWithVerifiedBytes" classname="com.qualityalternative.app.data.AgentInboxPackageImporterTest" time="0.005"/>
+  <testcase name="importCandidateRejectsContentChangedAfterReviewWhenManifestOmitsSha" classname="com.qualityalternative.app.data.AgentInboxPackageImporterTest" time="0.001"/>
+  <testcase name="importCandidateWritesDocumentAndAddsUserDocumentDraft" classname="com.qualityalternative.app.data.AgentInboxPackageImporterTest" time="0.002"/>
+  <testcase name="importCandidateReturnsDuplicateFromAuthoritativeFingerprintLookupWhenSnapshotIsEmpty" classname="com.qualityalternative.app.data.AgentInboxPackageImporterTest" time="0.001"/>
+  <testcase name="importCandidateRejectsShaMismatchBeforeWriting" classname="com.qualityalternative.app.data.AgentInboxPackageImporterTest" time="0.001"/>
+  <testcase name="importCandidateRejectsOversizedContentBeforeWriting" classname="com.qualityalternative.app.data.AgentInboxPackageImporterTest" time="0.001"/>
+  <testcase name="importCandidateReturnsInvalidForNonImportableCandidate" classname="com.qualityalternative.app.data.AgentInboxPackageImporterTest" time="0.001"/>
+  <testcase name="importCandidateWithSamePackageAndNameButDifferentBytesDoesNotOverwritePriorDocument" classname="com.qualityalternative.app.data.AgentInboxPackageImporterTest" time="0.004"/>
+  <testcase name="importCandidateDeletesStoredFileWhenAtomicRepositoryAddThrows" classname="com.qualityalternative.app.data.AgentInboxPackageImporterTest" time="0.002"/>
+  <testcase name="importCandidateReturnsRepositoryValidationErrors" classname="com.qualityalternative.app.data.AgentInboxPackageImporterTest" time="0.002"/>
+  <testcase name="importCandidateReturnsDuplicateBeforeWritingWhenContentShaAlreadyExists" classname="com.qualityalternative.app.data.AgentInboxPackageImporterTest" time="0.001"/>
+  <testcase name="importCandidateSerializesConcurrentSameShaPackagesThroughAtomicRepositoryAdd" classname="com.qualityalternative.app.data.AgentInboxPackageImporterTest" time="0.004"/>
+  <testcase name="importCandidateStoresMarkdownImageAttachmentsInDraft" classname="com.qualityalternative.app.data.AgentInboxPackageImporterTest" time="0.003"/>
+  <testcase name="fileStoreRemovesPromotedSidecarsWhenLaterAttachmentWriteFails" classname="com.qualityalternative.app.data.AgentInboxPackageImporterTest" time="0.006"/>
+  <testcase name="importCandidatePersistsMultiMegabyteMarkdownImageAttachment" classname="com.qualityalternative.app.data.AgentInboxPackageImporterTest" time="0.06"/>
+  <testcase name="importCandidateMapsSidecarTempCreationFailureToImageWriteFailure" classname="com.qualityalternative.app.data.AgentInboxPackageImporterTest" time="0.004"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

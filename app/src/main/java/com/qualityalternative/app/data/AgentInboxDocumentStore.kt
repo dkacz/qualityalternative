@@ -2,6 +2,7 @@ package com.qualityalternative.app.data
 
 import com.qualityalternative.app.domain.model.ContentFormat
 import java.io.File
+import java.io.IOException
 import java.net.URI
 import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
@@ -21,6 +22,10 @@ data class AgentInboxImageAttachmentWrite(
     val bytes: ByteArray,
 )
 
+class AgentInboxImageAttachmentWriteException(
+    cause: Throwable,
+) : IOException("Agent Inbox image attachment could not be written.", cause)
+
 interface AgentInboxDocumentStore {
     suspend fun writeDocument(
         packageFolderId: String,
@@ -36,6 +41,7 @@ interface AgentInboxDocumentStore {
 
 class FileAgentInboxDocumentStore(
     private val rootDirectory: File,
+    private val tempFileFactory: (prefix: String, suffix: String, directory: File) -> File = File::createTempFile,
 ) : AgentInboxDocumentStore {
     override suspend fun writeDocument(
         packageFolderId: String,
@@ -64,10 +70,10 @@ class FileAgentInboxDocumentStore(
         }
 
         var attachmentUris: Map<String, String> = emptyMap()
-        val tempFile = File.createTempFile("$safeName-", ".tmp", rootDirectory)
+        val tempFile = tempFileFactory("$safeName-", ".tmp", rootDirectory)
         try {
             tempFile.writeBytes(bytes)
-            val tempSha256 = AgentInboxManifestValidator.sha256(tempFile.readBytes())
+            val tempSha256 = AgentInboxManifestValidator.sha256(bytes)
             check(tempSha256 == verifiedContentSha256) {
                 "Temporary Agent Inbox document bytes do not match verified SHA-256."
             }
@@ -93,18 +99,19 @@ class FileAgentInboxDocumentStore(
         contentSafeName: String,
     ): Map<String, String> {
         if (isEmpty()) return emptyMap()
-        val plans = map { attachment ->
-            val safeAttachmentName = attachment.fileName.safeAgentInboxFileSegment()
-            AttachmentWritePlan(
-                displayName = attachment.fileName.trim(),
-                targetFile = File(rootDirectory, "$contentSafeName-img-$safeAttachmentName"),
-                tempFile = File.createTempFile("$contentSafeName-img-$safeAttachmentName-", ".tmp", rootDirectory),
-                bytes = attachment.bytes,
-            )
-        }
+        val plans = mutableListOf<AttachmentWritePlan>()
         val backups = mutableListOf<Pair<File, File>>()
         val promotedTargets = mutableListOf<File>()
         try {
+            forEach { attachment ->
+                val safeAttachmentName = attachment.fileName.safeAgentInboxFileSegment()
+                plans += AttachmentWritePlan(
+                    displayName = attachment.fileName.trim(),
+                    targetFile = File(rootDirectory, "$contentSafeName-img-$safeAttachmentName"),
+                    tempFile = tempFileFactory("$contentSafeName-img-$safeAttachmentName-", ".tmp", rootDirectory),
+                    bytes = attachment.bytes,
+                )
+            }
             check(plans.map { plan -> plan.targetFile.name }.distinct().size == plans.size) {
                 "Duplicate Agent Inbox image attachment storage segment."
             }
@@ -112,7 +119,7 @@ class FileAgentInboxDocumentStore(
             plans.forEach { plan ->
                 if (plan.targetFile.exists()) {
                     check(plan.targetFile.isFile) { "Agent Inbox image attachment target is not a file." }
-                    val backup = File.createTempFile("${plan.targetFile.name}-", ".bak", rootDirectory)
+                    val backup = tempFileFactory("${plan.targetFile.name}-", ".bak", rootDirectory)
                     moveIntoPlace(tempFile = plan.targetFile, targetFile = backup)
                     backups += plan.targetFile to backup
                 }
@@ -127,6 +134,12 @@ class FileAgentInboxDocumentStore(
                 if (backup.exists()) {
                     runCatching { moveIntoPlace(tempFile = backup, targetFile = target) }
                 }
+            }
+            if (error is AgentInboxImageAttachmentWriteException) {
+                throw error
+            }
+            if (error is IOException || error is OutOfMemoryError) {
+                throw AgentInboxImageAttachmentWriteException(error)
             }
             throw error
         } finally {
