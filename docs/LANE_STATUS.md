@@ -34,8 +34,13 @@ Status: `release_published_r2_review_pending`
 - Release tag: `v0.11.22-agent-inbox-readonly-link-fallback-alpha`.
 - Release URL: `https://github.com/dkacz/qualityalternative/releases/tag/v0.11.22-agent-inbox-readonly-link-fallback-alpha`.
 - Integration method: committed and pushed the R1 fixes and release gate on `codex/agent-inbox-drive-tree-access-lost`, tagged the release commit, pushed the tag, and published the GitHub release from the committed release notes.
+- GPT Pro review:
+  - R2 launched on 2026-06-16 with prompt `evidence/sprint34_agent_inbox_readonly_link_fallback/pro_review_r2/GPT_PRO_REVIEW_PROMPT_R2.md`.
+  - R2 bundle ZIP artifact: `SPRINT34_AGENT_INBOX_READONLY_LINK_FALLBACK_R2_GPT_PRO_REVIEW_BUNDLE_20260616.zip`.
+  - R2 ChatGPT URL: `https://chatgpt.com/c/6a31294a-f7ac-83eb-970f-1a1652c1c431`.
+  - R2 status: launched and still generating during the first harvest attempts; no `SCORE`/`VERDICT` has been harvested yet.
 - Next gate:
-  - Run GPT Pro R2 with an expanded bundle that includes scope constants, Drive clients/tests, and URI predicate source. Do not claim review-clean status unless R2 returns `SCORE: 10/10`, `VERDICT: PASS`.
+  - Harvest GPT Pro R2. Do not claim review-clean status unless R2 returns `SCORE: 10/10`, `VERDICT: PASS`.
 
 ## Sprint 33 Agent Inbox Google Drive Picker Play Services Hotfix
 
