@@ -4,6 +4,8 @@ import com.google.android.gms.common.api.ApiException
 import com.google.android.gms.common.api.CommonStatusCodes
 import com.google.android.gms.common.api.Status
 import com.qualityalternative.app.domain.service.AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER
+import com.qualityalternative.app.domain.service.AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER
+import com.qualityalternative.app.domain.service.AGENT_INBOX_DRIVE_GRANT_MODE_READONLY_FOLDER
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -70,29 +72,29 @@ class GoogleDriveAuthorizationUiTest {
     }
 
     @Test
-    fun agentInboxDrivePickerIsUsedForGoogleDriveConfiguredEmptyInbox() {
+    fun googleDriveConfiguredEmptyInboxDoesNotUseAgentInboxDrivePicker() {
         assertEquals(
-            true,
-            agentInboxShouldUseDrivePicker(
+            false,
+            agentInboxNeedsDriveLinkRepair(
                 MainUiState(annotationDriveSyncEnabled = true),
             ),
         )
         assertEquals(
-            true,
-            agentInboxShouldUseDrivePicker(
+            false,
+            agentInboxNeedsDriveLinkRepair(
                 MainUiState(
                     annotationExportUri = "content://com.google.android.apps.docs.storage/tree/acc%3Duser%3Bdoc%3Dannotations",
                 ),
             ),
         )
-        assertEquals(false, agentInboxShouldUseDrivePicker(MainUiState()))
+        assertEquals(false, agentInboxNeedsDriveLinkRepair(MainUiState()))
     }
 
     @Test
-    fun legacyGoogleDriveDocumentTreeAgentInboxUsesDrivePicker() {
+    fun legacyGoogleDriveDocumentTreeAgentInboxDoesNotNeedDriveLinkRepair() {
         assertEquals(
-            true,
-            agentInboxShouldUseDrivePicker(
+            false,
+            agentInboxNeedsDriveLinkRepair(
                 MainUiState(
                     agentInboxDriveEnabled = true,
                     agentInboxDriveFolderId = "content://com.google.android.apps.docs.storage/tree/acc%3Duser%40example.com%3Bdoc%3Dfolder",
@@ -102,11 +104,35 @@ class GoogleDriveAuthorizationUiTest {
         )
         assertEquals(
             false,
-            agentInboxShouldUseDrivePicker(
+            agentInboxNeedsDriveLinkRepair(
                 MainUiState(
                     agentInboxDriveEnabled = true,
                     agentInboxDriveFolderId = "content://com.android.externalstorage.documents/tree/home",
                     agentInboxDriveGrantMode = AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER,
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun pickerFolderAgentInboxNeedsDriveLinkRepair() {
+        assertEquals(
+            true,
+            agentInboxNeedsDriveLinkRepair(
+                MainUiState(
+                    agentInboxDriveEnabled = true,
+                    agentInboxDriveFolderId = "picker-folder",
+                    agentInboxDriveGrantMode = AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER,
+                ),
+            ),
+        )
+        assertEquals(
+            false,
+            agentInboxNeedsDriveLinkRepair(
+                MainUiState(
+                    agentInboxDriveEnabled = true,
+                    agentInboxDriveFolderId = "readonly-folder",
+                    agentInboxDriveGrantMode = AGENT_INBOX_DRIVE_GRANT_MODE_READONLY_FOLDER,
                 ),
             ),
         )

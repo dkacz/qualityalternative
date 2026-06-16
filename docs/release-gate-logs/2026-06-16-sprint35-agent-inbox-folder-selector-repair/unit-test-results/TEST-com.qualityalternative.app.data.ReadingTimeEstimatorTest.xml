@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.qualityalternative.app.data.ReadingTimeEstimatorTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-06-16T13:49:37.151Z" hostname="mac-studio.home" time="0.032">
+  <properties/>
+  <testcase name="estimateFromTextUsesFullDocumentTimeWithSafetyCap" classname="com.qualityalternative.app.data.ReadingTimeEstimatorTest" time="0.032"/>
+  <testcase name="pdfDefaultUsesInterventionSessionEstimate" classname="com.qualityalternative.app.data.ReadingTimeEstimatorTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

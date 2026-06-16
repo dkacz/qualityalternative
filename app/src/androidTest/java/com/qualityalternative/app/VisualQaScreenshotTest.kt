@@ -97,6 +97,7 @@ class VisualQaScreenshotTest {
     private val sprint26ScreenshotDirName = "sprint26-custom-targets-${System.currentTimeMillis()}"
     private val sprint27ScreenshotDirName = "sprint27-agent-content-inbox-${System.currentTimeMillis()}"
     private val sprint29ScreenshotDirName = "sprint29-agent-inbox-folder-selector-${System.currentTimeMillis()}"
+    private val sprint35ScreenshotDirName = "sprint35-agent-inbox-folder-selector-repair-${System.currentTimeMillis()}"
     private lateinit var screenshotDir: File
     private lateinit var legacyScreenshotDir: File
     private lateinit var sprint10ScreenshotDir: File
@@ -113,6 +114,7 @@ class VisualQaScreenshotTest {
     private lateinit var sprint26ScreenshotDir: File
     private lateinit var sprint27ScreenshotDir: File
     private lateinit var sprint29ScreenshotDir: File
+    private lateinit var sprint35ScreenshotDir: File
 
     @Before
     fun resetAppState() {
@@ -167,6 +169,9 @@ class VisualQaScreenshotTest {
         sprint29ScreenshotDir = File("/sdcard/Download/qualityalternative/$sprint29ScreenshotDirName")
         sprint29ScreenshotDir.deleteRecursively()
         sprint29ScreenshotDir.mkdirs()
+        sprint35ScreenshotDir = File("/sdcard/Download/qualityalternative/$sprint35ScreenshotDirName")
+        sprint35ScreenshotDir.deleteRecursively()
+        sprint35ScreenshotDir.mkdirs()
     }
 
     @After
@@ -854,7 +859,16 @@ class VisualQaScreenshotTest {
     }
 
     @Test
+    fun captureSprint35AgentInboxFolderSelectorRepairStates() {
+        captureAgentInboxFolderSelectorRepairStates(::captureSprint35)
+    }
+
+    @Test
     fun captureSprint29AgentInboxFolderSelectorStates() {
+        captureAgentInboxFolderSelectorRepairStates(::captureSprint29)
+    }
+
+    private fun captureAgentInboxFolderSelectorRepairStates(capture: (String) -> Unit) {
         launchOnboardedApp()
 
         openTab("tab-settings", "settings-list")
@@ -863,7 +877,7 @@ class VisualQaScreenshotTest {
         composeRule.onNodeWithText("Agent Inbox folder not selected").assertIsDisplayed()
         composeRule.onNodeWithTag("settings-agent-inbox-scan").assertIsDisplayed().assertIsEnabled()
         composeRule.onNodeWithText("Choose folder").assertIsDisplayed()
-        captureSprint29("00_agent_inbox_choose_folder_light")
+        capture("00_agent_inbox_choose_folder_light")
 
         composeRule.onNodeWithTag("settings-agent-inbox-scan").performClick()
         val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
@@ -874,7 +888,7 @@ class VisualQaScreenshotTest {
             "Expected Android folder picker instead of an in-app paste field.",
             device.currentPackageName.contains("documentsui"),
         )
-        captureSprint29("00b_agent_inbox_system_folder_picker_light")
+        capture("00b_agent_inbox_system_folder_picker_light")
         val documentsFolder = device.wait(Until.findObject(By.text("Documents")), 5_000)
             ?: error("Expected Documents folder in Android folder picker.")
         documentsFolder.click()
@@ -897,7 +911,7 @@ class VisualQaScreenshotTest {
         composeRule.onNodeWithText("Scan now").assertIsDisplayed()
         composeRule.onNodeWithTag("settings-agent-inbox-disconnect").assertIsDisplayed().assertIsEnabled()
         waitForTransientMessageToClear("Agent Inbox folder selected.")
-        captureSprint29("01_agent_inbox_document_tree_folder_connected_light")
+        capture("01_agent_inbox_document_tree_folder_connected_light")
 
         scenario?.onActivity { activity ->
             activity.mainViewModel.seedAgentInboxDriveAccessLostForTests()
@@ -910,7 +924,7 @@ class VisualQaScreenshotTest {
         composeRule.onNodeWithText("Agent Inbox folder not selected").assertIsDisplayed()
         composeRule.onNodeWithText("Choose folder").assertIsDisplayed()
         waitForTransientMessageToClear("Agent Inbox folder access was lost.")
-        captureSprint29("02_agent_inbox_access_lost_light")
+        capture("02_agent_inbox_access_lost_light")
 
         val imageDriveClient = VisualAgentInboxDriveClient()
         val imageFixture = agentInboxMarkdownImageVisualFixture()
@@ -927,7 +941,6 @@ class VisualQaScreenshotTest {
             fixture = imageFixture,
             acceptPriority = false,
             nowMillis = 1_781_256_703_000L,
-            accessToken = "",
         )
         assertTrue(
             "Expected Agent Inbox Markdown image attachment to import with the user document",
@@ -937,7 +950,7 @@ class VisualQaScreenshotTest {
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
         composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-markdown-image") }
         composeRule.onNodeWithText("Inbox blue square").assertIsDisplayed()
-        captureSprint29("03_agent_inbox_markdown_image_reader_light")
+        capture("03_agent_inbox_markdown_image_reader_light")
 
         scenario?.onActivity { activity ->
             activity.mainViewModel.openSettings()
@@ -954,7 +967,7 @@ class VisualQaScreenshotTest {
         composeRule.onNodeWithText("Agent Inbox folder connected").assertIsDisplayed()
         composeRule.onNodeWithTag("settings-agent-inbox-status").assertIsDisplayed()
         waitForTransientMessageToClear("Agent Inbox folder selected.")
-        captureSprint29("04_agent_inbox_document_tree_folder_connected_dark")
+        capture("04_agent_inbox_document_tree_folder_connected_dark")
     }
 
     @Test
@@ -2084,6 +2097,10 @@ class VisualQaScreenshotTest {
 
     private fun captureSprint29(name: String) {
         captureTo(sprint29ScreenshotDir, name)
+    }
+
+    private fun captureSprint35(name: String) {
+        captureTo(sprint35ScreenshotDir, name)
     }
 
     private fun captureTo(directory: File, name: String) {

@@ -14,33 +14,10 @@ class GoogleDriveAuthorizationTest {
     }
 
     @Test
-    fun pickerFolderAuthorizationUsesDriveFileWithExplicitPickerFolderGrant() {
-        val spec = googleDriveAuthorizationRequestSpecFor(
-            GoogleDriveAuthorizationMode.AGENT_INBOX_PICK_FOLDER,
-        )
-
-        assertEquals(listOf(ANNOTATION_DRIVE_SCOPE), spec.requestedScopes)
-        assertEquals(listOf("https://www.googleapis.com/auth/drive.file"), spec.requestedScopes)
-        assertEquals(ANNOTATION_DRIVE_SCOPE, googleDriveAuthorizationScopeFor(GoogleDriveAuthorizationMode.AGENT_INBOX_PICK_FOLDER))
-        assertEquals(true, spec.optOutIncludingGrantedScopes)
-        assertEquals(AuthorizationRequest.Prompt.CONSENT, spec.prompt)
-        assertEquals(
-            GOOGLE_DRIVE_PICKER_TRUE,
-            spec.resourceParameters[AuthorizationRequest.ResourceParameter.PICKER_OAUTH_TRIGGER],
-        )
-        assertEquals(
-            GOOGLE_DRIVE_PICKER_TRUE,
-            spec.resourceParameters[AuthorizationRequest.ResourceParameter.PICKER_ALLOW_FOLDER_SELECTION],
-        )
-    }
-
-    @Test
-    fun driveFileAuthorizationDoesNotForcePickerFolderGrant() {
+    fun annotationDriveFileAuthorizationDoesNotForcePickerFolderGrant() {
         listOf(
             GoogleDriveAuthorizationMode.ANNOTATION_CONNECT,
             GoogleDriveAuthorizationMode.ANNOTATION_RETRY,
-            GoogleDriveAuthorizationMode.AGENT_INBOX_SCAN,
-            GoogleDriveAuthorizationMode.AGENT_INBOX_IMPORT,
         ).forEach { mode ->
             val spec = googleDriveAuthorizationRequestSpecFor(mode)
 
@@ -75,18 +52,5 @@ class GoogleDriveAuthorizationTest {
             )
             assertEquals(emptyMap<AuthorizationRequest.ResourceParameter, String>(), spec.resourceParameters)
         }
-    }
-
-    @Test
-    fun pickedDriveFileIdsParsesPickerTokenResponseParams() {
-        assertEquals(
-            listOf("folder-1", "folder-2"),
-            pickedDriveFileIdsFromTokenResponseValue(" folder-1 , folder-2 ,, "),
-        )
-    }
-
-    @Test
-    fun pickedDriveFileIdsReturnsEmptyListWhenPickerParamsAreMissing() {
-        assertEquals(emptyList<String>(), pickedDriveFileIdsFromTokenResponseValue(null))
     }
 }

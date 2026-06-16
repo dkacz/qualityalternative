@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.qualityalternative.app.domain.service.RecommendationExplainerTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-06-16T13:49:37.232Z" hostname="mac-studio.home" time="0.005">
+  <properties/>
+  <testcase name="explain_marksMeditationAsFiniteResetTimer" classname="com.qualityalternative.app.domain.service.RecommendationExplainerTest" time="0.001"/>
+  <testcase name="explain_fallsBackToTopicReasonWhenItemHasNoWhyThisNow" classname="com.qualityalternative.app.domain.service.RecommendationExplainerTest" time="0.0"/>
+  <testcase name="surfacedStarterPackCopyDoesNotExposeInternalCurationLanguage" classname="com.qualityalternative.app.domain.service.RecommendationExplainerTest" time="0.004"/>
+  <testcase name="explain_usesEditorialWhyThisNowAndDynamicChipsWithoutDurationFitCopy" classname="com.qualityalternative.app.domain.service.RecommendationExplainerTest" time="0.0"/>
+  <testcase name="explain_marksUnfinishedContentAsContinuePath" classname="com.qualityalternative.app.domain.service.RecommendationExplainerTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

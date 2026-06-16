@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.qualityalternative.app.data.ContentSourceExpansionArtifactsTest" tests="20" skipped="0" failures="0" errors="0" timestamp="2026-06-16T13:49:35.394Z" hostname="mac-studio.home" time="0.168">
+  <properties/>
+  <testcase name="sprint9IntegrationDocsPreserveReviewAndRuntimeBoundaries" classname="com.qualityalternative.app.data.ContentSourceExpansionArtifactsTest" time="0.013"/>
+  <testcase name="slice95BacklogFlagsCreativityAssetAndContextRisks" classname="com.qualityalternative.app.data.ContentSourceExpansionArtifactsTest" time="0.006"/>
+  <testcase name="sprint9FinalReleaseApprovalReconcilesIntegratedRows" classname="com.qualityalternative.app.data.ContentSourceExpansionArtifactsTest" time="0.002"/>
+  <testcase name="slice93BacklogPreservesWonderScienceMixAndPolicy" classname="com.qualityalternative.app.data.ContentSourceExpansionArtifactsTest" time="0.017"/>
+  <testcase name="sprint9CandidatePoolIsIntegratedIntoStarterPacks" classname="com.qualityalternative.app.data.ContentSourceExpansionArtifactsTest" time="0.084"/>
+  <testcase name="sprint9CandidatePoolKeepsModernSourceCapsAndNoApprovedRows" classname="com.qualityalternative.app.data.ContentSourceExpansionArtifactsTest" time="0.004"/>
+  <testcase name="slice93BacklogFlagsChartImageAndDurabilityRisks" classname="com.qualityalternative.app.data.ContentSourceExpansionArtifactsTest" time="0.004"/>
+  <testcase name="taxonomyRejectsUserFacingOtherAndAddsMissingReplacementTopics" classname="com.qualityalternative.app.data.ContentSourceExpansionArtifactsTest" time="0.001"/>
+  <testcase name="slice95BacklogCompletesCreativityPlayAndFinalRightsMix" classname="com.qualityalternative.app.data.ContentSourceExpansionArtifactsTest" time="0.006"/>
+  <testcase name="slice91BacklogPreservesSourcingOnlyMixAndRightsPolicy" classname="com.qualityalternative.app.data.ContentSourceExpansionArtifactsTest" time="0.004"/>
+  <testcase name="slice92BacklogEncodesSensitiveBodyAndCalmSpotChecks" classname="com.qualityalternative.app.data.ContentSourceExpansionArtifactsTest" time="0.004"/>
+  <testcase name="candidateBacklogHeaderMatchesSchemaFieldOrder" classname="com.qualityalternative.app.data.ContentSourceExpansionArtifactsTest" time="0.001"/>
+  <testcase name="existingInventoryAuditPreservesPreSprint9Baseline" classname="com.qualityalternative.app.data.ContentSourceExpansionArtifactsTest" time="0.004"/>
+  <testcase name="slice94BacklogFlagsLongViewAndCulturalSensitivityRisks" classname="com.qualityalternative.app.data.ContentSourceExpansionArtifactsTest" time="0.003"/>
+  <testcase name="slice94BacklogPreservesLongViewHistoryMixAndPolicy" classname="com.qualityalternative.app.data.ContentSourceExpansionArtifactsTest" time="0.003"/>
+  <testcase name="sourceCapsPreserveFiniteNonFeedInventoryShape" classname="com.qualityalternative.app.data.ContentSourceExpansionArtifactsTest" time="0.0"/>
+  <testcase name="slice91BacklogEncodesKnownRiskSpotChecks" classname="com.qualityalternative.app.data.ContentSourceExpansionArtifactsTest" time="0.001"/>
+  <testcase name="slice92BacklogPreservesEmbodiedCalmMixAndPolicy" classname="com.qualityalternative.app.data.ContentSourceExpansionArtifactsTest" time="0.003"/>
+  <testcase name="sprint9DocumentsDurationDistributionDeviation" classname="com.qualityalternative.app.data.ContentSourceExpansionArtifactsTest" time="0.002"/>
+  <testcase name="sprint9CandidatePoolDoesNotReuseBaselineSourceUrls" classname="com.qualityalternative.app.data.ContentSourceExpansionArtifactsTest" time="0.003"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

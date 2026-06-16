@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.qualityalternative.app.interception.ForegroundAppDetectionPolicyTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-06-16T13:49:37.240Z" hostname="mac-studio.home" time="0.0">
+  <properties/>
+  <testcase name="shouldLog_suppressesFastDuplicateForSamePackage" classname="com.qualityalternative.app.interception.ForegroundAppDetectionPolicyTest" time="0.0"/>
+  <testcase name="shouldLog_allowsSamePackageWhenForegroundEventCrossesIntoBedtime" classname="com.qualityalternative.app.interception.ForegroundAppDetectionPolicyTest" time="0.0"/>
+  <testcase name="shouldLog_acceptsSelectedPackage_onFirstObservation" classname="com.qualityalternative.app.interception.ForegroundAppDetectionPolicyTest" time="0.0"/>
+  <testcase name="shouldLog_allowsSamePackageDuplicateDuringActiveBedtime" classname="com.qualityalternative.app.interception.ForegroundAppDetectionPolicyTest" time="0.0"/>
+  <testcase name="shouldLog_allowsSamePackageAfterDifferentForegroundApp" classname="com.qualityalternative.app.interception.ForegroundAppDetectionPolicyTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

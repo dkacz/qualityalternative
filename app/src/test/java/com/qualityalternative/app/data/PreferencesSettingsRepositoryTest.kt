@@ -433,10 +433,10 @@ class PreferencesSettingsRepositoryTest {
         )
 
         val pickerSynced = repository.observeAppSettings().first()
-        assertEquals(true, pickerSynced.agentInboxDriveEnabled)
-        assertEquals("drive-folder-agent-inbox", pickerSynced.agentInboxDriveFolderId)
-        assertEquals(AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER, pickerSynced.agentInboxDriveGrantMode)
-        assertEquals(8_000L, pickerSynced.agentInboxDriveLastSuccessfulAtMillis)
+        assertEquals(false, pickerSynced.agentInboxDriveEnabled)
+        assertEquals(null, pickerSynced.agentInboxDriveFolderId)
+        assertEquals(null, pickerSynced.agentInboxDriveGrantMode)
+        assertEquals(null, pickerSynced.agentInboxDriveLastSuccessfulAtMillis)
         assertEquals(null, pickerSynced.agentInboxDriveLastError)
 
         repository.saveAgentInboxDriveConnection(

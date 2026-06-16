@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.qualityalternative.app.data.WebsiteRuleNormalizerTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-06-16T13:49:37.188Z" hostname="mac-studio.home" time="0.019">
+  <properties/>
+  <testcase name="normalize_rejectsLocalPrivateIpAndAmbiguousHosts" classname="com.qualityalternative.app.data.WebsiteRuleNormalizerTest" time="0.001"/>
+  <testcase name="normalize_detectsExplicitWildcardPrefix" classname="com.qualityalternative.app.data.WebsiteRuleNormalizerTest" time="0.0"/>
+  <testcase name="matches_exactDomainOnlyMatchesThatDomain" classname="com.qualityalternative.app.data.WebsiteRuleNormalizerTest" time="0.0"/>
+  <testcase name="normalize_stripsSchemePathPortAndTrailingDot" classname="com.qualityalternative.app.data.WebsiteRuleNormalizerTest" time="0.0"/>
+  <testcase name="matches_wildcardSubdomainsCanOptionallyIncludeApex" classname="com.qualityalternative.app.data.WebsiteRuleNormalizerTest" time="0.0"/>
+  <testcase name="normalize_convertsSchemedUnicodeHostToAscii" classname="com.qualityalternative.app.data.WebsiteRuleNormalizerTest" time="0.017"/>
+  <testcase name="normalize_convertsUnicodeDomainsToAscii" classname="com.qualityalternative.app.data.WebsiteRuleNormalizerTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

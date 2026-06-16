@@ -362,7 +362,7 @@ class PreferencesSettingsRepository(
                 preferences[AgentInboxDriveEnabled] = true
                 preferences[AgentInboxDriveFolderId] = folderId
                 preferences[AgentInboxDriveGrantMode] = grantMode.takeIf(AGENT_INBOX_SUPPORTED_GRANT_MODES::contains)
-                    ?: AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER
+                    ?: AGENT_INBOX_DRIVE_GRANT_MODE_READONLY_FOLDER
             }
             preferences.remove(AgentInboxDriveLastError)
         }
@@ -381,7 +381,7 @@ class PreferencesSettingsRepository(
     override suspend fun saveAgentInboxDriveScanSuccess(timestampMillis: Long, folderId: String) {
         dataStore.edit { preferences ->
             val currentFolderId = preferences[AgentInboxDriveFolderId]?.takeIf(String::isNotBlank)
-            if (preferences[AgentInboxDriveGrantMode] in AGENT_INBOX_SUPPORTED_GRANT_MODES &&
+            if (preferences[AgentInboxDriveGrantMode] in AGENT_INBOX_OPERATIONAL_GRANT_MODES &&
                 currentFolderId != null &&
                 folderId == currentFolderId
             ) {
@@ -545,6 +545,10 @@ class PreferencesSettingsRepository(
         val AgentInboxDriveLastError = stringPreferencesKey("agent_inbox_drive_last_error")
         val AGENT_INBOX_SUPPORTED_GRANT_MODES = setOf(
             AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER,
+            AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER,
+            AGENT_INBOX_DRIVE_GRANT_MODE_READONLY_FOLDER,
+        )
+        val AGENT_INBOX_OPERATIONAL_GRANT_MODES = setOf(
             AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER,
             AGENT_INBOX_DRIVE_GRANT_MODE_READONLY_FOLDER,
         )

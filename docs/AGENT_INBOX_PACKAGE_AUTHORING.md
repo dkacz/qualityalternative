@@ -7,6 +7,10 @@ The contract is intentionally local and portable. It does not assume the
 operator's machine, rclone config, Google account, Drive folder id, or absolute
 filesystem paths.
 
+The destination Agent Inbox folder is runtime input from the operator. If the
+operator has not supplied a destination, prepare and validate the local package
+only; do not guess a Drive folder, remote name, account, or path.
+
 ## What The App Expects
 
 The user selects an Agent Inbox folder in the Android app. Your automation writes
@@ -149,8 +153,17 @@ app expects. A package that fails validation should not be uploaded.
 After validation passes, upload the package folder as a direct child of the
 folder that the user selected in the Android app.
 
-Do not assume a global Drive scope. Current app releases authorize the selected
-folder through Android's folder picker, so the app scans only that folder.
+Do not assume a global Drive scope. Current app releases use Android's folder
+picker as the primary folder selector. When the selected tree is backed by
+Google Drive, the app may request explicit Drive read consent, but it still
+scans only the selected Agent Inbox folder id.
+
+Do not upload partially built packages. Build the complete folder locally first,
+including `manifest.json`, run the validator, and only then copy or sync that
+complete package folder to the selected Agent Inbox folder. Avoid creating an
+empty package folder in Drive and filling it file-by-file while the app may scan;
+that can produce temporary `Package is missing manifest.json` or `Package
+changed` states.
 
 Any sync tool is acceptable if it preserves this folder shape:
 

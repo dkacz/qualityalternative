@@ -35,6 +35,7 @@ This repository defines an Android-first MVP for "quality replacement at the mom
 - When creating private Markdown or EPUB packages for Agent Inbox, follow `docs/AGENT_INBOX_PACKAGE_AUTHORING.md`.
 - Validate each package with `python3 tools/validate_agent_inbox_package.py <package-folder>` before uploading or syncing it into the user's selected Agent Inbox folder.
 - Do not hard-code the user's local paths, rclone remote names, Google account, Drive folder ids, access tokens, or machine-specific assumptions into package content or instructions.
+- Treat the Agent Inbox destination as operator-supplied runtime input. If you are not given a destination folder, create only the local validated package and ask for the destination instead of guessing one.
 - Keep generated private content packages out of git unless the user explicitly asks to commit an example fixture.
 
 ## Testing Strategy

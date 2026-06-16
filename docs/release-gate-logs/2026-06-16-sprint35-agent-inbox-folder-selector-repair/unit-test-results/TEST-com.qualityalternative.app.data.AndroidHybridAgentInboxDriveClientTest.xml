@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.qualityalternative.app.data.AndroidHybridAgentInboxDriveClientTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-06-16T13:49:35.364Z" hostname="mac-studio.home" time="0.002">
+  <properties/>
+  <testcase name="downloadFileRoutesContentUrisToDocumentTreeAndDriveIdsToDriveApi" classname="com.qualityalternative.app.data.AndroidHybridAgentInboxDriveClientTest" time="0.001"/>
+  <testcase name="scanPackagesKeepsLocalDocumentTreeUriOnDocumentProviderWhenNoDriveTokenExists" classname="com.qualityalternative.app.data.AndroidHybridAgentInboxDriveClientTest" time="0.0"/>
+  <testcase name="scanPackagesRoutesGoogleDriveDocumentTreeUriThroughDriveApiWhenTokenIsAvailable" classname="com.qualityalternative.app.data.AndroidHybridAgentInboxDriveClientTest" time="0.0"/>
+  <testcase name="googleDriveDocumentTreeFolderIdExtractsDocParameterAndRawTreeSegment" classname="com.qualityalternative.app.data.AndroidHybridAgentInboxDriveClientTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

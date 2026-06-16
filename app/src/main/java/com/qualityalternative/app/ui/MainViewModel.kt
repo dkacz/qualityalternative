@@ -274,8 +274,7 @@ data class MainUiState(
             agentInboxDriveGrantMode == AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER
 
     val hasAgentInboxDriveFolderGrant: Boolean
-        get() = hasAgentInboxPickerFolderGrant ||
-            hasAgentInboxReadonlyFolderGrant ||
+        get() = hasAgentInboxReadonlyFolderGrant ||
             hasAgentInboxDocumentTreeFolderGrant
 }
 
@@ -1306,6 +1305,14 @@ class MainViewModel(
         }
         val selectedFolderId = uiState.agentInboxDriveFolderId?.takeIf(String::isNotBlank)
         val selectedGrantMode = uiState.agentInboxDriveGrantMode
+        if (selectedGrantMode == AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER) {
+            uiState = uiState.copy(
+                agentInboxDriveFolderDraft = selectedFolderId.orEmpty(),
+                agentInboxDriveFolderDraftError = null,
+            )
+            reportAgentInboxDriveFailure("Drive file Picker access is not enough for Agent Inbox. Use Drive link access.")
+            return
+        }
         if (!uiState.hasAgentInboxDriveFolderGrant || selectedFolderId == null || selectedGrantMode == null) {
             reportAgentInboxDriveFailure("Connect an Agent Inbox folder before scanning.")
             return
@@ -1545,34 +1552,6 @@ class MainViewModel(
         return true
     }
 
-    fun connectAgentInboxDriveFolder(folderId: String, nowMillis: Long = nowProvider()) {
-        val normalizedFolderId = folderId.trim()
-        if (normalizedFolderId.isBlank()) {
-            reportAgentInboxDriveFailure("No Agent Inbox folder was selected.")
-            return
-        }
-        uiState = uiState.copy(
-            agentInboxDriveEnabled = true,
-            agentInboxDriveFolderId = normalizedFolderId,
-            agentInboxDriveGrantMode = AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER,
-            agentInboxDriveLastError = null,
-            agentInboxCandidates = emptyList(),
-            agentInboxPriorityAcceptedPackageIds = emptySet(),
-            agentInboxScanTruncated = false,
-            latestMessage = "Agent Inbox folder selected.",
-        )
-        viewModelScope.launch {
-            settingsRepository.saveAgentInboxDriveConnection(normalizedFolderId)
-            recordEventDurably(
-                AnalyticsEvent(
-                    type = AnalyticsEventType.AGENT_INBOX_CONNECTED,
-                    timestampMillis = nowMillis,
-                    metadata = mapOf("grantMode" to "pickerFolder"),
-                ),
-            )
-        }
-    }
-
     fun connectAgentInboxReadonlyDriveFolder(folderId: String, nowMillis: Long = nowProvider()) {
         val normalizedFolderId = parseAgentInboxDriveFolderId(folderId)
         if (normalizedFolderId == null) {
@@ -1738,6 +1717,14 @@ class MainViewModel(
         val candidate = uiState.agentInboxCandidates.firstOrNull { it.packageFolderId == packageFolderId }
         if (candidate == null) {
             uiState = uiState.copy(latestMessage = "Agent Inbox package is no longer available.")
+            return
+        }
+        if (uiState.agentInboxDriveGrantMode == AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER) {
+            uiState = uiState.copy(
+                agentInboxDriveFolderDraft = uiState.agentInboxDriveFolderId.orEmpty(),
+                agentInboxDriveFolderDraftError = null,
+            )
+            reportAgentInboxDriveFailure("Drive file Picker access is not enough for Agent Inbox import. Use Drive link access.")
             return
         }
         val requiresAccessToken = uiState.agentInboxDriveGrantMode != AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER ||
@@ -5386,7 +5373,7 @@ class MainViewModel(
             screen = MainScreen.Settings,
             agentInboxDriveEnabled = true,
             agentInboxDriveFolderId = "visual-test-agent-inbox",
-            agentInboxDriveGrantMode = AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER,
+            agentInboxDriveGrantMode = AGENT_INBOX_DRIVE_GRANT_MODE_READONLY_FOLDER,
             agentInboxDriveLastSuccessfulAtMillis = lastSuccessfulAtMillis,
             agentInboxDriveLastError = null,
             isAgentInboxScanning = false,
@@ -5408,6 +5395,8 @@ class MainViewModel(
             agentInboxDriveGrantMode = null,
             agentInboxDriveLastSuccessfulAtMillis = null,
             agentInboxDriveLastError = message,
+            agentInboxDriveFolderDraft = "",
+            agentInboxDriveFolderDraftError = null,
             isAgentInboxScanning = false,
             isAgentInboxImporting = false,
             agentInboxCandidates = emptyList(),

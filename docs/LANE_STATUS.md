@@ -11,6 +11,54 @@ This file is the repo-level index for active and recently completed execution la
 - Heartbeats should exist only while waiting for a current GPT Pro lane.
 - Do not infer lane status from untracked local files alone. For example, `ios/` can appear untracked on non-iOS branches; the canonical iOS implementation source is the pushed iOS branch listed below.
 
+## Sprint 35 Agent Inbox Folder Selector Repair
+
+Status: `release_ready_gpt_pro_r3_pass_10_10`
+
+- Date opened: 2026-06-16
+- Trigger: after `v0.11.22-agent-inbox-readonly-link-fallback-alpha`, the user reports that the Picker path still does not work for Agent Inbox and the app shows `No packages waiting for review`.
+- Device feedback: Google Picker is not a reliable folder grant for this rclone/external-package Agent Inbox workflow; the app still shows `No packages waiting for review`.
+- Correction to prior assumption: Sprint 34 GPT Pro R2 returned `SCORE: 10/10`, `VERDICT: PASS` for the source/release audit, but that review explicitly did not prove live signed-in Android behavior or future rclone child visibility. The real device result now supersedes the Picker-based product assumption.
+- Required next implementation direction:
+  - Use a real folder-selection flow for Agent Inbox: Android `OpenDocumentTree` for folder selection, including Google Drive folders exposed by DocumentsUI.
+  - When the selected system folder is backed by Google Drive, persist the selected tree and scan it through Drive API with `drive.readonly` against the selected folder id rather than Google file Picker.
+  - Keep the controlled `drive.readonly` user-supplied folder link/id path as a recovery/manual path for externally populated folders.
+  - Treat existing `picker_folder` grants as needing repair because file Picker access does not prove package-folder visibility.
+  - Keep scanning limited to the saved user-supplied Agent Inbox folder id; do not discover or scan the user's whole Drive.
+- Local implementation:
+  - Removed Agent Inbox production authorization/routing through Google file Picker.
+  - Android `OpenDocumentTree` is again the primary folder selector.
+  - Google Drive-backed document-tree folders scan via explicit readonly token and selected folder id.
+  - Legacy `picker_folder` grants now route to the readonly repair path instead of continuing under `drive.file`.
+  - Repo-level package authoring instructions now tell agents to build and validate complete package folders before upload and not to assume user-specific Drive/rclone details.
+- Local validation:
+  - Passed `testDebugUnitTest`, `lintDebug`, `assembleRelease`, and `assembleDebug`.
+  - Final Gradle gate was rerun with `--rerun-tasks`.
+  - Passed connected screenshot E2E on `emulator-5554` / `qaApi36(AVD) - 16`: `VisualQaScreenshotTest#captureSprint35AgentInboxFolderSelectorRepairStates`.
+  - Evidence: `evidence/sprint35_agent_inbox_folder_selector_repair/` and `docs/release-gate-logs/2026-06-16-sprint35-agent-inbox-folder-selector-repair/`.
+- APK artifacts:
+  - `release_artifacts/quality-alternative-v0.11.23-agent-inbox-folder-selector-repair-alpha-debug.apk`
+  - `release_artifacts/quality-alternative-v0.11.23-agent-inbox-folder-selector-repair-alpha-release-unsigned.apk`
+- Next gate:
+  - Validate with GPT Pro until `SCORE: 10/10`, `VERDICT: PASS`, then publish/tag the release.
+  - R1 launched on 2026-06-16 with prompt `evidence/sprint35_agent_inbox_folder_selector_repair/pro_review_r1/SPRINT35_GPT_PRO_REVIEW_PROMPT_R1.md`.
+  - R1 bundle ZIP artifact: `SPRINT35_AGENT_INBOX_FOLDER_SELECTOR_REPAIR_R1_GPT_PRO_REVIEW_BUNDLE_20260616.zip`.
+  - R1 ChatGPT URL: `https://chatgpt.com/c/6a3146df-11c4-83eb-a68e-f069f7a0e407`.
+  - R1 result: `SCORE: 8/10`, `VERDICT: REVISE`, `VISUAL REVIEW: REVISE`.
+  - R1 output: `evidence/sprint35_agent_inbox_folder_selector_repair/pro_review_r1/GPT_PRO_REVIEW_R1.md`.
+  - R1 findings addressed for R2: include production `AppContainer` wiring, scope constants, app-side package model/validation sources, unit XML reports, APK badging/install evidence, and Sprint 35-named visual E2E with access-lost fixture parity.
+  - R2 launched on 2026-06-16 with prompt `evidence/sprint35_agent_inbox_folder_selector_repair/pro_review_r2/SPRINT35_GPT_PRO_REVIEW_PROMPT_R2.md`.
+  - R2 bundle ZIP artifact: `SPRINT35_AGENT_INBOX_FOLDER_SELECTOR_REPAIR_R2_GPT_PRO_REVIEW_BUNDLE_20260616.zip`.
+  - R2 ChatGPT URL: `https://chatgpt.com/c/6a314ea6-2ad8-83eb-b3da-7980bd829eeb`.
+  - R2 result: `SCORE: 9/10`, `VERDICT: REVISE`, `VISUAL REVIEW: PASS`.
+  - R2 output: `evidence/sprint35_agent_inbox_folder_selector_repair/pro_review_r2/GPT_PRO_REVIEW_R2.md`.
+  - R2 finding addressed for R3: legacy `picker_folder` grants remain restoreable as repair state but are excluded from operational `hasAgentInboxDriveFolderGrant`, blocked in direct ViewModel scan/import calls, and rejected by repository scan-success persistence.
+  - R3 launched on 2026-06-16 with prompt `evidence/sprint35_agent_inbox_folder_selector_repair/pro_review_r3/SPRINT35_GPT_PRO_REVIEW_PROMPT_R3.md`.
+  - R3 bundle ZIP artifact: `SPRINT35_AGENT_INBOX_FOLDER_SELECTOR_REPAIR_R3_GPT_PRO_REVIEW_BUNDLE_20260616.zip`.
+  - R3 ChatGPT URL: `https://chatgpt.com/c/6a3155b0-8178-83eb-9e9b-cc378abbcd30`.
+  - R3 result: `SCORE: 10/10`, `VERDICT: PASS`, `VISUAL REVIEW: PASS`.
+  - R3 output: `evidence/sprint35_agent_inbox_folder_selector_repair/pro_review_r3/GPT_PRO_REVIEW_R3.md`.
+
 ## Sprint 34 Agent Inbox Readonly Link Fallback
 
 Status: `release_published_gpt_pro_r2_pass_10_10`

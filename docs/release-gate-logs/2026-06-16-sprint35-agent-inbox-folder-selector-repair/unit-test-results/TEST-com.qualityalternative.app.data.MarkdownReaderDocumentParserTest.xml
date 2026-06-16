@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.qualityalternative.app.data.MarkdownReaderDocumentParserTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-06-16T13:49:37.092Z" hostname="mac-studio.home" time="0.001">
+  <properties/>
+  <testcase name="parseCreatesStructuredBlocksForPipeMarkdownTables" classname="com.qualityalternative.app.data.MarkdownReaderDocumentParserTest" time="0.001"/>
+  <testcase name="parseReplacesInlineMarkdownImagesWithAltTextInsideTextBlocks" classname="com.qualityalternative.app.data.MarkdownReaderDocumentParserTest" time="0.0"/>
+  <testcase name="parseKeepsDataUriImageSourcesForSelfContainedMarkdown" classname="com.qualityalternative.app.data.MarkdownReaderDocumentParserTest" time="0.0"/>
+  <testcase name="parseResolvesRelativeImagesFromPickedAttachmentMap" classname="com.qualityalternative.app.data.MarkdownReaderDocumentParserTest" time="0.0"/>
+  <testcase name="parseBlocksUnreviewedLocalImagesWhenFallbackDisabled" classname="com.qualityalternative.app.data.MarkdownReaderDocumentParserTest" time="0.0"/>
+  <testcase name="parseCreatesImageBlocksForStandaloneMarkdownImages" classname="com.qualityalternative.app.data.MarkdownReaderDocumentParserTest" time="0.0"/>
+  <testcase name="parseKeepsDataUriImageSourcesWhenMarkdownImageHasTitle" classname="com.qualityalternative.app.data.MarkdownReaderDocumentParserTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

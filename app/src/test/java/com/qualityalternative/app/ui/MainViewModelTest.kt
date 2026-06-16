@@ -2588,43 +2588,6 @@ class MainViewModelTest {
     }
 
     @Test
-    @OptIn(ExperimentalCoroutinesApi::class)
-    fun connectAgentInboxDriveFolderPersistsPickerFolderAndRecordsPrivacySafeEvent() = runTest {
-        val settingsRepository = FakeSettingsRepository()
-        val analyticsTracker = InMemoryAnalyticsTracker()
-        val viewModel = createViewModel(
-            settingsRepository = settingsRepository,
-            analyticsTracker = analyticsTracker,
-        )
-
-        advanceUntilIdle()
-        viewModel.connectAgentInboxDriveFolder(folderId = " picked-folder ", nowMillis = 4_000L)
-        advanceUntilIdle()
-
-        assertTrue(viewModel.uiState.agentInboxDriveEnabled)
-        assertEquals("picked-folder", viewModel.uiState.agentInboxDriveFolderId)
-        assertEquals(AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER, viewModel.uiState.agentInboxDriveGrantMode)
-        assertTrue(viewModel.uiState.hasAgentInboxPickerFolderGrant)
-        assertEquals(null, viewModel.uiState.agentInboxDriveLastError)
-        assertEquals("Agent Inbox folder selected.", viewModel.uiState.latestMessage)
-        assertEquals("picked-folder", settingsRepository.state.value.agentInboxDriveFolderId)
-        assertEquals(
-            AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER,
-            settingsRepository.state.value.agentInboxDriveGrantMode,
-        )
-        val connectedEvent = analyticsTracker.allEvents().single { event ->
-            event.type == AnalyticsEventType.AGENT_INBOX_CONNECTED
-        }
-        assertEquals(4_000L, connectedEvent.timestampMillis)
-        assertEquals("pickerFolder", connectedEvent.metadata["grantMode"])
-        assertTrue(AnalyticsPrivacyGuard.unsafeRemoteFields(connectedEvent.toRemoteAnalyticsPayload()).isEmpty())
-        val remotePayloadText = analyticsTracker.allRemoteSafePayloads().joinToString("\n") { payload ->
-            payload.toString()
-        }
-        assertFalse(remotePayloadText.contains("picked-folder"))
-    }
-
-    @Test
     fun parseAgentInboxDriveFolderIdAcceptsDriveFolderLinksAndRawIds() {
         assertEquals(
             "folder_12345678",
@@ -2700,7 +2663,7 @@ class MainViewModelTest {
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
-    fun connectAgentInboxDriveFolderReconnectReplacesPreviousFolderId() = runTest {
+    fun connectAgentInboxReadonlyDriveFolderReconnectReplacesPreviousFolderId() = runTest {
         val settingsRepository = FakeSettingsRepository()
         val analyticsTracker = InMemoryAnalyticsTracker()
         val viewModel = createViewModel(
@@ -2709,18 +2672,19 @@ class MainViewModelTest {
         )
 
         advanceUntilIdle()
-        viewModel.connectAgentInboxDriveFolder(folderId = "old-folder", nowMillis = 4_000L)
+        viewModel.connectAgentInboxReadonlyDriveFolder(folderId = "old-folder-123", nowMillis = 4_000L)
         advanceUntilIdle()
-        viewModel.connectAgentInboxDriveFolder(folderId = "new-folder", nowMillis = 5_000L)
+        viewModel.connectAgentInboxReadonlyDriveFolder(folderId = "new-folder-123", nowMillis = 5_000L)
         advanceUntilIdle()
 
         assertTrue(viewModel.uiState.agentInboxDriveEnabled)
-        assertEquals("new-folder", viewModel.uiState.agentInboxDriveFolderId)
-        assertEquals(AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER, viewModel.uiState.agentInboxDriveGrantMode)
-        assertTrue(viewModel.uiState.hasAgentInboxPickerFolderGrant)
-        assertEquals("new-folder", settingsRepository.state.value.agentInboxDriveFolderId)
+        assertEquals("new-folder-123", viewModel.uiState.agentInboxDriveFolderId)
+        assertEquals(AGENT_INBOX_DRIVE_GRANT_MODE_READONLY_FOLDER, viewModel.uiState.agentInboxDriveGrantMode)
+        assertTrue(viewModel.uiState.hasAgentInboxReadonlyFolderGrant)
+        assertFalse(viewModel.uiState.hasAgentInboxPickerFolderGrant)
+        assertEquals("new-folder-123", settingsRepository.state.value.agentInboxDriveFolderId)
         assertEquals(
-            AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER,
+            AGENT_INBOX_DRIVE_GRANT_MODE_READONLY_FOLDER,
             settingsRepository.state.value.agentInboxDriveGrantMode,
         )
         val connectedEvents = analyticsTracker.allEvents().filter { event ->
@@ -2730,8 +2694,40 @@ class MainViewModelTest {
         val remotePayloadText = analyticsTracker.allRemoteSafePayloads().joinToString("\n") { payload ->
             payload.toString()
         }
-        assertFalse(remotePayloadText.contains("old-folder"))
-        assertFalse(remotePayloadText.contains("new-folder"))
+        assertFalse(remotePayloadText.contains("old-folder-123"))
+        assertFalse(remotePayloadText.contains("new-folder-123"))
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun legacyPickerFolderGrantIsRepairOnlyAndCannotScanBelowUi() = runTest {
+        val driveClient = RecordingAgentInboxDriveClient()
+        val settingsRepository = FakeSettingsRepository(
+            initial = completedSettings(selectedAppPackages = setOf("com.instagram.android")).copy(
+                agentInboxDriveEnabled = true,
+                agentInboxDriveFolderId = "legacy-picker-folder",
+                agentInboxDriveGrantMode = AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER,
+            ),
+        )
+        val viewModel = createViewModel(
+            settingsRepository = settingsRepository,
+            agentInboxDriveClient = driveClient,
+        )
+
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.hasAgentInboxPickerFolderGrant)
+        assertFalse(viewModel.uiState.hasAgentInboxDriveFolderGrant)
+
+        viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 5_000L)
+        advanceUntilIdle()
+
+        assertTrue(driveClient.scanRequests.isEmpty())
+        assertEquals("legacy-picker-folder", viewModel.uiState.agentInboxDriveFolderDraft)
+        assertEquals(
+            "Drive file Picker access is not enough for Agent Inbox. Use Drive link access.",
+            viewModel.uiState.agentInboxDriveLastError,
+        )
+        assertEquals(null, settingsRepository.state.value.agentInboxDriveLastSuccessfulAtMillis)
     }
 
     @Test
@@ -3129,8 +3125,8 @@ class MainViewModelTest {
         advanceUntilIdle()
 
         assertEquals("agent-inbox-folder", viewModel.uiState.agentInboxDriveFolderId)
-        assertEquals(AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER, viewModel.uiState.agentInboxDriveGrantMode)
-        assertTrue(viewModel.uiState.hasAgentInboxPickerFolderGrant)
+        assertEquals(AGENT_INBOX_DRIVE_GRANT_MODE_READONLY_FOLDER, viewModel.uiState.agentInboxDriveGrantMode)
+        assertTrue(viewModel.uiState.hasAgentInboxReadonlyFolderGrant)
         assertEquals(5_000L, viewModel.uiState.agentInboxDriveLastSuccessfulAtMillis)
         assertEquals(null, viewModel.uiState.agentInboxDriveLastError)
         assertEquals("agent-package", viewModel.uiState.agentInboxCandidates.single().packageFolderId)
@@ -3138,7 +3134,7 @@ class MainViewModelTest {
         assertEquals(emptySet<String>(), viewModel.uiState.agentInboxPriorityAcceptedPackageIds)
         assertEquals("agent-inbox-folder", settingsRepository.state.value.agentInboxDriveFolderId)
         assertEquals(
-            AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER,
+            AGENT_INBOX_DRIVE_GRANT_MODE_READONLY_FOLDER,
             settingsRepository.state.value.agentInboxDriveGrantMode,
         )
         assertEquals(listOf("manifest-file", "content-file"), driveClient.downloadedFileIds)
@@ -3240,6 +3236,56 @@ class MainViewModelTest {
         assertEquals(saved.id, importedEvent.contentId)
         assertEquals("true", importedEvent.metadata["acceptedPriority"])
         assertTrue(AnalyticsPrivacyGuard.unsafeRemoteFields(importedEvent.toRemoteAnalyticsPayload()).isEmpty())
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun legacyPickerFolderGrantIsRepairOnlyAndCannotImportBelowUi() = runTest {
+        val contentBytes = "# Agent Note\n\nPrivate attention note.".toByteArray()
+        val driveClient = RecordingAgentInboxDriveClient(
+            scanResult = AgentInboxDriveScanResult(
+                folderId = "agent-inbox-folder",
+                packages = listOf(agentInboxDrivePackage()),
+            ),
+            files = mapOf(
+                "manifest-file" to agentInboxManifest(priority = "normal").toByteArray(),
+                "content-file" to contentBytes,
+            ),
+        )
+        val settingsRepository = FakeSettingsRepository()
+        val viewModel = createViewModel(
+            settingsRepository = settingsRepository,
+            agentInboxDriveClient = driveClient,
+        )
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+        viewModel.selectAgentInboxDriveFolderForTest()
+        advanceUntilIdle()
+        viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 5_000L)
+        advanceUntilIdle()
+        val downloadCountAfterScan = driveClient.downloadRequests.size
+        settingsRepository.state.value = settingsRepository.state.value.copy(
+            agentInboxDriveEnabled = true,
+            agentInboxDriveFolderId = "agent-inbox-folder",
+            agentInboxDriveGrantMode = AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER,
+        )
+        advanceUntilIdle()
+
+        viewModel.importAgentInboxCandidate(
+            packageFolderId = "agent-package",
+            accessToken = "drive-token",
+            nowMillis = 6_000L,
+        )
+        advanceUntilIdle()
+
+        assertEquals(downloadCountAfterScan, driveClient.downloadRequests.size)
+        assertEquals("agent-inbox-folder", viewModel.uiState.agentInboxDriveFolderDraft)
+        assertEquals(
+            "Drive file Picker access is not enough for Agent Inbox import. Use Drive link access.",
+            viewModel.uiState.agentInboxDriveLastError,
+        )
     }
 
     @Test
@@ -7455,7 +7501,7 @@ class MainViewModelTest {
                 it == AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER ||
                     it == AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER ||
                     it == AGENT_INBOX_DRIVE_GRANT_MODE_READONLY_FOLDER
-            } ?: AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER
+            } ?: AGENT_INBOX_DRIVE_GRANT_MODE_READONLY_FOLDER
             state.value = if (normalizedFolderId == null) {
                 state.value.copy(
                     agentInboxDriveEnabled = false,
@@ -7486,8 +7532,7 @@ class MainViewModelTest {
         override suspend fun saveAgentInboxDriveScanSuccess(timestampMillis: Long, folderId: String) {
             state.value = if (
                 (
-                state.value.agentInboxDriveGrantMode == AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER ||
-                    state.value.agentInboxDriveGrantMode == AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER ||
+                state.value.agentInboxDriveGrantMode == AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER ||
                     state.value.agentInboxDriveGrantMode == AGENT_INBOX_DRIVE_GRANT_MODE_READONLY_FOLDER
                     ) &&
                 state.value.agentInboxDriveFolderId == folderId
@@ -8418,7 +8463,7 @@ class MainViewModelTest {
     private fun MainViewModel.selectAgentInboxDriveFolderForTest(
         folderId: String = "agent-inbox-folder",
     ) {
-        connectAgentInboxDriveFolder(folderId = folderId, nowMillis = 4_000L)
+        connectAgentInboxReadonlyDriveFolder(folderId = folderId, nowMillis = 4_000L)
     }
 
     private class RecordingAgentInboxDocumentStore : AgentInboxDocumentStore {
