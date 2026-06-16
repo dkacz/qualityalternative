@@ -13,7 +13,7 @@ This file is the repo-level index for active and recently completed execution la
 
 ## Sprint 34 Agent Inbox Readonly Link Fallback
 
-Status: `release_ready_local`
+Status: `release_published_r2_review_pending`
 
 - Date opened: 2026-06-16
 - Trigger: GPT Pro R1 for Sprint 33 returned `SCORE: 8/10`, `VERDICT: REVISE`.
@@ -30,8 +30,12 @@ Status: `release_ready_local`
   - Release artifact: `release_artifacts/quality-alternative-v0.11.22-agent-inbox-readonly-link-fallback-alpha-debug.apk`.
   - SHA-256: `2bd452f4b37b5e92fa203940096474da7d35b092bb820d306e19e1bc2c280264`.
   - Connected visual/e2e was not run locally because `adb devices -l` showed no attached device and no Android emulator binary was available in the standard SDK paths checked.
+- Release commit: `8c3d20e1858c125f96fa45c84282e6e3da0aed99`.
+- Release tag: `v0.11.22-agent-inbox-readonly-link-fallback-alpha`.
+- Release URL: `https://github.com/dkacz/qualityalternative/releases/tag/v0.11.22-agent-inbox-readonly-link-fallback-alpha`.
+- Integration method: committed and pushed the R1 fixes and release gate on `codex/agent-inbox-drive-tree-access-lost`, tagged the release commit, pushed the tag, and published the GitHub release from the committed release notes.
 - Next gate:
-  - Commit, push, publish `v0.11.22-agent-inbox-readonly-link-fallback-alpha`, then run GPT Pro R2 with an expanded bundle that includes scope constants, Drive clients/tests, and URI predicate source.
+  - Run GPT Pro R2 with an expanded bundle that includes scope constants, Drive clients/tests, and URI predicate source. Do not claim review-clean status unless R2 returns `SCORE: 10/10`, `VERDICT: PASS`.
 
 ## Sprint 33 Agent Inbox Google Drive Picker Play Services Hotfix
 
