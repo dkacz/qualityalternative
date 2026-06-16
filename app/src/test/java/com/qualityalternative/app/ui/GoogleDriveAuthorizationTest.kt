@@ -28,29 +28,6 @@ class GoogleDriveAuthorizationTest {
     }
 
     @Test
-    fun readonlyPickerFolderAuthorizationUsesDriveReadonlyWithExplicitPickerFolderGrant() {
-        val spec = googleDriveAuthorizationRequestSpecFor(
-            GoogleDriveAuthorizationMode.AGENT_INBOX_PICK_READONLY_FOLDER,
-        )
-
-        assertEquals(listOf(AGENT_INBOX_DRIVE_READONLY_SCOPE), spec.requestedScopes)
-        assertEquals(
-            AGENT_INBOX_DRIVE_READONLY_SCOPE,
-            googleDriveAuthorizationScopeFor(GoogleDriveAuthorizationMode.AGENT_INBOX_PICK_READONLY_FOLDER),
-        )
-        assertEquals(true, spec.optOutIncludingGrantedScopes)
-        assertEquals(AuthorizationRequest.Prompt.CONSENT, spec.prompt)
-        assertEquals(
-            GOOGLE_DRIVE_PICKER_TRUE,
-            spec.resourceParameters[AuthorizationRequest.ResourceParameter.PICKER_OAUTH_TRIGGER],
-        )
-        assertEquals(
-            GOOGLE_DRIVE_PICKER_TRUE,
-            spec.resourceParameters[AuthorizationRequest.ResourceParameter.PICKER_ALLOW_FOLDER_SELECTION],
-        )
-    }
-
-    @Test
     fun driveFileAuthorizationDoesNotForcePickerFolderGrant() {
         listOf(
             GoogleDriveAuthorizationMode.ANNOTATION_CONNECT,

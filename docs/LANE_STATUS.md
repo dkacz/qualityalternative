@@ -11,9 +11,32 @@ This file is the repo-level index for active and recently completed execution la
 - Heartbeats should exist only while waiting for a current GPT Pro lane.
 - Do not infer lane status from untracked local files alone. For example, `ios/` can appear untracked on non-iOS branches; the canonical iOS implementation source is the pushed iOS branch listed below.
 
+## Sprint 33 Agent Inbox Google Drive Picker Play Services Hotfix
+
+Status: `release_ready_local`
+
+- Date opened: 2026-06-16
+- Trigger: after installing the Sprint 32 APK, Settings > Agent Inbox showed `Google Drive authorization hit a Google Play services error. Retry Google Drive connection.` before the user could select a folder.
+- Root cause: the Sprint 32 reconnect path requested `drive.readonly` together with Google Picker folder resource parameters. On the user's device, Google Play Services rejected that picker request with `INTERNAL_ERROR`.
+- Fix branch: `codex/agent-inbox-drive-tree-access-lost`.
+- Implementation state:
+  - Removed the dedicated readonly folder picker authorization mode.
+  - Agent Inbox folder picker now reuses the supported Google Picker request with `drive.file`, explicit folder selection parameters, consent prompt, and picked folder id extraction.
+  - Existing typed/manual readonly folder-id support remains available for non-picker Drive readonly scans/imports.
+  - Legacy Google Drive document-tree Agent Inbox grants and empty Agent Inbox states with Google Drive already configured now route through the supported picker request instead of the readonly picker.
+- Validation so far:
+  - Final local gate passed: `JAVA_HOME=/opt/homebrew/Cellar/openjdk@17/17.0.18/libexec/openjdk.jdk/Contents/Home ./gradlew testDebugUnitTest lintDebug assembleRelease assembleDebug`.
+  - `git diff --check` passed.
+  - Debug APK artifact built with `versionCode=37`, `versionName=0.11.21-alpha`.
+  - Release artifact: `release_artifacts/quality-alternative-v0.11.21-agent-inbox-drive-file-picker-alpha-debug.apk`.
+  - SHA-256: `8390cf0fb2a09c0301e11cb9f850a0da3031e2c42f24db6ad8b76064b07760da`.
+  - Connected visual/e2e was not run locally because `adb devices -l` showed no attached device and no Android emulator binary was available in the standard SDK paths checked.
+- Next gate:
+  - Commit, push, tag, and publish `v0.11.21-agent-inbox-drive-file-picker-alpha`.
+
 ## Sprint 32 Agent Inbox Google Drive Document-Tree Access Lost Regression
 
-Status: `release_published`
+Status: `release_published_superseded_by_sprint33_hotfix`
 
 - Date opened: 2026-06-16
 - Trigger: after installing the Sprint 31 APK, the app no longer shows false `Package is missing manifest.json`, but Agent Inbox is now `OFF` with `Agent Inbox folder access was lost. Connect the folder again.`
@@ -21,10 +44,11 @@ Status: `release_published`
 - Working hypothesis: Sprint 31 routed Google Drive-backed `content://.../tree/...` folder grants through Drive API, but some real Google Drive document-tree URIs may not encode the target folder ID in the simple `doc=<folderId>` shape. The hybrid client then throws `AgentInboxDriveAccessLostException`, and `MainViewModel` clears the saved folder grant.
 - Fix branch: `codex/agent-inbox-drive-tree-access-lost`.
 - Implementation state:
-  - Added a dedicated Agent Inbox readonly Drive folder picker mode that requests `drive.readonly` and returns the selected folder ID through Google Picker.
-  - Empty Agent Inbox state now starts the readonly Drive picker when Google Drive is already configured; local Android document-tree selection remains available when Drive is not configured.
-  - Selecting a Google Drive folder through Android `OpenDocumentTree` now redirects to the readonly Google Drive picker instead of persisting/scanning the provider URI.
-  - Legacy Google Drive document-tree Agent Inbox grants now show a reconnect state and route `Scan now` through the readonly Drive picker instead of attempting another scan through the fragile `content://tree` URI.
+  - Added an Agent Inbox Google Drive folder picker reconnect path that requested `drive.readonly` with Google Picker folder parameters and returned the selected folder ID.
+  - Empty Agent Inbox state now starts the Google Drive picker when Google Drive is already configured; local Android document-tree selection remains available when Drive is not configured.
+  - Selecting a Google Drive folder through Android `OpenDocumentTree` now redirects to the Google Drive picker instead of persisting/scanning the provider URI.
+  - Legacy Google Drive document-tree Agent Inbox grants now show a reconnect state and route `Scan now` through the Google Drive picker instead of attempting another scan through the fragile `content://tree` URI.
+  - Post-release device feedback: `drive.readonly` combined with Google Picker folder parameters fails on-device with Google Play Services `INTERNAL_ERROR`, so Sprint 33 replaces the picker scope while keeping readonly for non-picker typed folder IDs.
 - Validation so far:
   - Targeted `GoogleDriveAuthorizationTest` and `GoogleDriveAuthorizationUiTest` passed with JDK 17.
   - Final local gate passed after version bump: `JAVA_HOME=/opt/homebrew/Cellar/openjdk@17/17.0.18/libexec/openjdk.jdk/Contents/Home ./gradlew testDebugUnitTest lintDebug assembleRelease assembleDebug`.

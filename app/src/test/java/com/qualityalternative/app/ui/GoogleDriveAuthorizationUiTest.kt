@@ -70,29 +70,29 @@ class GoogleDriveAuthorizationUiTest {
     }
 
     @Test
-    fun agentInboxReadonlyDrivePickerIsUsedForGoogleDriveConfiguredEmptyInbox() {
+    fun agentInboxDrivePickerIsUsedForGoogleDriveConfiguredEmptyInbox() {
         assertEquals(
             true,
-            agentInboxShouldUseReadonlyDrivePicker(
+            agentInboxShouldUseDrivePicker(
                 MainUiState(annotationDriveSyncEnabled = true),
             ),
         )
         assertEquals(
             true,
-            agentInboxShouldUseReadonlyDrivePicker(
+            agentInboxShouldUseDrivePicker(
                 MainUiState(
                     annotationExportUri = "content://com.google.android.apps.docs.storage/tree/acc%3Duser%3Bdoc%3Dannotations",
                 ),
             ),
         )
-        assertEquals(false, agentInboxShouldUseReadonlyDrivePicker(MainUiState()))
+        assertEquals(false, agentInboxShouldUseDrivePicker(MainUiState()))
     }
 
     @Test
-    fun legacyGoogleDriveDocumentTreeAgentInboxUsesReadonlyDrivePicker() {
+    fun legacyGoogleDriveDocumentTreeAgentInboxUsesDrivePicker() {
         assertEquals(
             true,
-            agentInboxShouldUseReadonlyDrivePicker(
+            agentInboxShouldUseDrivePicker(
                 MainUiState(
                     agentInboxDriveEnabled = true,
                     agentInboxDriveFolderId = "content://com.google.android.apps.docs.storage/tree/acc%3Duser%40example.com%3Bdoc%3Dfolder",
@@ -102,7 +102,7 @@ class GoogleDriveAuthorizationUiTest {
         )
         assertEquals(
             false,
-            agentInboxShouldUseReadonlyDrivePicker(
+            agentInboxShouldUseDrivePicker(
                 MainUiState(
                     agentInboxDriveEnabled = true,
                     agentInboxDriveFolderId = "content://com.android.externalstorage.documents/tree/home",

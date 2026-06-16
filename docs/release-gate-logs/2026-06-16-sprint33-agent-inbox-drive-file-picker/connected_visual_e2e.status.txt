@@ -1,0 +1,7 @@
+NOT RUN
+
+Reason:
+adb devices -l reported no attached devices. The local machine also did not expose an Android emulator binary in the standard SDK paths checked during the release gate.
+
+Impact:
+This hotfix is validated by unit/lint/build gates and targets the Google Drive authorization request shape that caused the device-reported Google Play Services INTERNAL_ERROR. The final picker behavior still needs confirmation on a signed-in Android device after installing the published APK.

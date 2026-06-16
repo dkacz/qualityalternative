@@ -1,0 +1,7 @@
+PASS
+
+Command:
+JAVA_HOME=/opt/homebrew/Cellar/openjdk@17/17.0.18/libexec/openjdk.jdk/Contents/Home ./gradlew testDebugUnitTest lintDebug assembleRelease assembleDebug
+
+Result:
+BUILD SUCCESSFUL

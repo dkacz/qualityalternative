@@ -10,7 +10,6 @@ internal enum class GoogleDriveAuthorizationMode {
     ANNOTATION_CONNECT,
     ANNOTATION_RETRY,
     AGENT_INBOX_PICK_FOLDER,
-    AGENT_INBOX_PICK_READONLY_FOLDER,
     AGENT_INBOX_CONNECT_READONLY,
     AGENT_INBOX_SCAN,
     AGENT_INBOX_READONLY_SCAN,
@@ -32,18 +31,6 @@ internal fun googleDriveAuthorizationRequestSpecFor(
         GoogleDriveAuthorizationMode.AGENT_INBOX_PICK_FOLDER -> {
             GoogleDriveAuthorizationRequestSpec(
                 requestedScopes = listOf(ANNOTATION_DRIVE_SCOPE),
-                optOutIncludingGrantedScopes = true,
-                prompt = AuthorizationRequest.Prompt.CONSENT,
-                resourceParameters = mapOf(
-                    AuthorizationRequest.ResourceParameter.PICKER_OAUTH_TRIGGER to GOOGLE_DRIVE_PICKER_TRUE,
-                    AuthorizationRequest.ResourceParameter.PICKER_ALLOW_FOLDER_SELECTION to GOOGLE_DRIVE_PICKER_TRUE,
-                ),
-            )
-        }
-
-        GoogleDriveAuthorizationMode.AGENT_INBOX_PICK_READONLY_FOLDER -> {
-            GoogleDriveAuthorizationRequestSpec(
-                requestedScopes = listOf(AGENT_INBOX_DRIVE_READONLY_SCOPE),
                 optOutIncludingGrantedScopes = true,
                 prompt = AuthorizationRequest.Prompt.CONSENT,
                 resourceParameters = mapOf(
