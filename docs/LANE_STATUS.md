@@ -13,7 +13,7 @@ This file is the repo-level index for active and recently completed execution la
 
 ## Sprint 35 Agent Inbox Folder Selector Repair
 
-Status: `release_ready_gpt_pro_r3_pass_10_10`
+Status: `release_published_gpt_pro_r3_pass_10_10`
 
 - Date opened: 2026-06-16
 - Trigger: after `v0.11.22-agent-inbox-readonly-link-fallback-alpha`, the user reports that the Picker path still does not work for Agent Inbox and the app shows `No packages waiting for review`.
@@ -58,6 +58,10 @@ Status: `release_ready_gpt_pro_r3_pass_10_10`
   - R3 ChatGPT URL: `https://chatgpt.com/c/6a3155b0-8178-83eb-9e9b-cc378abbcd30`.
   - R3 result: `SCORE: 10/10`, `VERDICT: PASS`, `VISUAL REVIEW: PASS`.
   - R3 output: `evidence/sprint35_agent_inbox_folder_selector_repair/pro_review_r3/GPT_PRO_REVIEW_R3.md`.
+  - Release commit: `4060a3c`.
+  - Release tag: `v0.11.23-agent-inbox-folder-selector-repair-alpha`.
+  - Release URL: `https://github.com/dkacz/qualityalternative/releases/tag/v0.11.23-agent-inbox-folder-selector-repair-alpha`.
+  - Integration method: committed and pushed the repair branch, tagged release commit `4060a3c`, pushed the tag, and published the GitHub release with debug and unsigned release APK artifacts.
 
 ## Sprint 34 Agent Inbox Readonly Link Fallback
 
