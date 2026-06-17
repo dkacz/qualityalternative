@@ -13,7 +13,7 @@ This file is the repo-level index for active and recently completed execution la
 
 ## Sprint 38 Agent Inbox Import All + Autoimport
 
-Status: `release_artifact_prepared_gpt_pro_r1_pass_10_10`
+Status: `release_published_gpt_pro_r1_pass_10_10`
 
 - Date opened: 2026-06-17
 - Trigger: user requested a stricter Pro-reviewed sprint for `Import all` and opt-in autoimport on app startup, with hard visual evidence that real Drive packages import into Library and render in the reader.
@@ -39,6 +39,8 @@ Status: `release_artifact_prepared_gpt_pro_r1_pass_10_10`
 - Release artifacts:
   - `release_artifacts/quality-alternative-v0.11.25-agent-inbox-import-all-autoimport-alpha-debug.apk`
   - `release_artifacts/quality-alternative-v0.11.25-agent-inbox-import-all-autoimport-alpha-release-unsigned.apk`
+- Release commit: `0dd4cdb` (`Add Agent Inbox import all and autoimport`).
+- Release tag: `v0.11.25-agent-inbox-import-all-autoimport-alpha`.
 
 ## Sprint 37 Agent Inbox Real Device Drive Authorization Repair
 
