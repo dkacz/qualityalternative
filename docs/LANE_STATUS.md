@@ -13,7 +13,7 @@ This file is the repo-level index for active and recently completed execution la
 
 ## Sprint 37 Agent Inbox Real Device Drive Authorization Repair
 
-Status: `gpt_pro_pass_release_artifacts_built_pending_publish`
+Status: `release_published_gpt_pro_r1_pass_10_10`
 
 - Date opened: 2026-06-17
 - Trigger: after published `v0.11.24-agent-inbox-live-drive-folder-browser-alpha`, the user's real device screenshot at 16:16 shows Settings > Agent Inbox with:
@@ -50,8 +50,10 @@ Status: `gpt_pro_pass_release_artifacts_built_pending_publish`
   - Release gate summary: `docs/release-gate-logs/2026-06-17-sprint37-agent-inbox-drive-auth-repair/VALIDATION_SUMMARY.md`.
   - Debug APK: `release_artifacts/quality-alternative-v0.11.25-agent-inbox-drive-auth-repair-alpha-debug.apk`, SHA-256 `58112a9f26e531c29dd85feaa1d39026a4d861e2229f294e1bde2605c78a1846`.
   - Release unsigned APK: `release_artifacts/quality-alternative-v0.11.25-agent-inbox-drive-auth-repair-alpha-release-unsigned.apk`, SHA-256 `f73569b747d1367fd2e3e36a00235560484981e57860551aa2e7f1b5c9f31ef5`.
-- Remaining release gate:
-  - Commit, push, tag, and publish the `v0.11.25-agent-inbox-drive-auth-repair-alpha` GitHub release with the new APK artifacts.
+  - Release commit: `e5e5f84f5b9857f90a78fe8223381a5048800c98`.
+  - Release tag: `v0.11.25-agent-inbox-drive-auth-repair-alpha`.
+  - Release URL: `https://github.com/dkacz/qualityalternative/releases/tag/v0.11.25-agent-inbox-drive-auth-repair-alpha`.
+  - Integration method: committed the repair, evidence, GPT Pro R1 pass, release gate, and APK artifacts on `codex/agent-inbox-folder-selector-repair`; pushed the branch; tagged release commit `e5e5f84f5b9857f90a78fe8223381a5048800c98`; pushed the tag; and published the GitHub release with debug and unsigned release APK assets plus checksum files.
 - Required outcome:
   - Fix Agent Inbox Drive connection so the real device can choose the intended Drive folder, scan externally created packages, import one, show it in Library `Files`, and open it in the reader.
   - If Google Play Services cannot provide a reliable token on the target device, implement a robust alternate path that still satisfies the Agent Inbox product requirement without pretending the folder browser succeeded.
@@ -62,12 +64,8 @@ Status: `gpt_pro_pass_release_artifacts_built_pending_publish`
   - Include Google account state, APK hash/version, Drive folder identity, remote folder listing, package validator output, scan result, import, Library `Files`, reader rendering, and logcat sentinels.
   - Fail the review if the UI can show an empty `My Drive` folder list after an authorization error without a clear repair state.
 - Branch: create a fresh branch from current `codex/agent-inbox-folder-selector-repair` or the latest release commit before implementation.
-- Next gates:
-  - Set an explicit Codex goal for Sprint 37.
-  - Reproduce or instrument the real failure path.
-  - Implement the smallest reliable repair.
-  - Run targeted tests, live visual E2E, and GPT Pro review until `SCORE: 10/10`, `VERDICT: PASS`.
-  - Release a new APK only after the Pro gate passes with target-device-grade evidence.
+- Next gate:
+  - Install the published `v0.11.25` debug APK on the user's target Android device and confirm the Agent Inbox folder selection, scan, import, Library `Files`, and reader flow there.
 
 ## Sprint 36 Agent Inbox Live Drive Folder Browser Repair
 
