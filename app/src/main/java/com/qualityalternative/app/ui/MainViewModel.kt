@@ -1823,7 +1823,7 @@ class MainViewModel(
 
     fun reportAgentInboxDriveAuthorizationFailure(errorMessage: String) {
         val message = errorMessage.trim().ifBlank { "Google Drive authorization failed." }
-        reportAgentInboxDriveFailure(message)
+        reportAgentInboxDriveFailure(message, closeFolderBrowser = true)
     }
 
     fun disconnectAgentInboxDrive(nowMillis: Long = nowProvider()) {
@@ -2275,8 +2275,8 @@ class MainViewModel(
         }
     }
 
-    private fun reportAgentInboxDriveFailure(message: String) {
-        uiState = uiState.copy(
+    private fun reportAgentInboxDriveFailure(message: String, closeFolderBrowser: Boolean = false) {
+        var nextState = uiState.copy(
             isAgentInboxScanning = false,
             isAgentInboxImporting = false,
             isAgentInboxDriveFolderBrowserLoading = false,
@@ -2284,6 +2284,17 @@ class MainViewModel(
             agentInboxScanTruncated = false,
             latestMessage = "Agent Inbox connection failed.",
         )
+        if (closeFolderBrowser) {
+            nextState = nextState.copy(
+                isAgentInboxDriveFolderBrowserOpen = false,
+                agentInboxDriveFolderBrowserLocation = AgentInboxDriveFolderBrowserLocation.Root,
+                agentInboxDriveFolderBrowserBackStack = emptyList(),
+                agentInboxDriveFolderOptions = emptyList(),
+                agentInboxDriveFolderBrowserHasMore = false,
+                agentInboxDriveFolderBrowserError = null,
+            )
+        }
+        uiState = nextState
         viewModelScope.launch {
             settingsRepository.saveAgentInboxDriveScanFailure(message)
             recordEventDurably(

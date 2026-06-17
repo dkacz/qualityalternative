@@ -1,0 +1,10 @@
+ M app/build.gradle.kts
+ M app/src/androidTest/java/com/qualityalternative/app/VisualQaScreenshotTest.kt
+ M app/src/main/java/com/qualityalternative/app/ui/GoogleDriveAuthorization.kt
+ M app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
+ M app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
+ M app/src/test/java/com/qualityalternative/app/ui/GoogleDriveAuthorizationTest.kt
+ M app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
+ M docs/LANE_STATUS.md
+?? docs/release-gate-logs/2026-06-17-sprint37-agent-inbox-drive-auth-repair/
+?? evidence/sprint37_agent_inbox_real_device_auth_repair/

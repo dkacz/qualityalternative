@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "title": "Sprint 37 Drive Auth Repair Test",
+  "topics": ["PHILOSOPHY", "TECH"],
+  "contentFile": "content.md",
+  "format": "MARKDOWN",
+  "rightsClass": "USER_PRIVATE",
+  "sourceLabel": "Codex Sprint 37 Drive E2E",
+  "description": "Externally uploaded package used to verify the Sprint 37 Agent Inbox Drive authorization repair.",
+  "priority": "high",
+  "documentSha256": "0326a3f5fd85fe1f3c169cd5b78444a69233dcc5411d59c12bb313bddcf95110",
+  "createdAt": "2026-06-17T14:30:08Z"
+}

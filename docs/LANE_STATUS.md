@@ -1,6 +1,6 @@
 # Lane Status
 
-Status timestamp: 2026-06-16
+Status timestamp: 2026-06-17
 
 This file is the repo-level index for active and recently completed execution lanes. It should point to the canonical branch, review lane, validation artifacts, and next gate for each lane.
 
@@ -10,6 +10,64 @@ This file is the repo-level index for active and recently completed execution la
 - Use the branch-specific sprint docs for detailed implementation notes.
 - Heartbeats should exist only while waiting for a current GPT Pro lane.
 - Do not infer lane status from untracked local files alone. For example, `ios/` can appear untracked on non-iOS branches; the canonical iOS implementation source is the pushed iOS branch listed below.
+
+## Sprint 37 Agent Inbox Real Device Drive Authorization Repair
+
+Status: `gpt_pro_pass_release_artifacts_built_pending_publish`
+
+- Date opened: 2026-06-17
+- Trigger: after published `v0.11.24-agent-inbox-live-drive-folder-browser-alpha`, the user's real device screenshot at 16:16 shows Settings > Agent Inbox with:
+  - `Agent Inbox folder not selected`
+  - `GOOGLE DRIVE AUTHORIZATION HIT A GOOGLE PLAY SERVICES ERROR. RETRY GOOGLE DRIVE CONNECTION`
+  - in-app browser card at `My Drive` showing `No folders on this level.`
+  - snackbar `Agent Inbox connection failed.`
+- Why Sprint 36 is insufficient: Sprint 36 proved the in-app Drive folder browser on the local signed-in emulator and reached GPT Pro R2 `SCORE: 10/10`, but the user's target device still fails in the real installed app. The next review gate must require target-device evidence or a faithfully reproduced Play Services failure path, not only the previous emulator account.
+- Working hypothesis to validate, not assume:
+  - The app may be opening the folder browser after an authorization failure and showing an empty root, making the UI look connected enough to continue while the token/listing path is invalid.
+  - The Drive folder listing may be using an account/scope/token state that works on the emulator but fails on the user's Google Play Services configuration.
+  - `No folders on this level` is not acceptable as a terminal state when authorization just failed; the UI must clearly block/repair auth and offer a reliable recovery path.
+- Validated diagnosis:
+  - The screenshot's contradictory state was reproducible from code: `AGENT_INBOX_BROWSE_READONLY` opened the in-app Drive folder browser before Google authorization succeeded, and `reportAgentInboxDriveAuthorizationFailure(...)` did not close/reset that folder-browser state.
+  - Result: after a Google Play Services authorization failure, the UI could keep rendering `My Drive` with empty options and `No folders on this level.`
+- Current implementation:
+  - `AGENT_INBOX_BROWSE_READONLY` now starts folder selection without opening the browser until an access token is actually returned.
+  - Agent Inbox Drive authorization failure now clears the pending browser token, closes the Drive folder browser, resets root/back stack/options, and leaves a clear connection-failed state instead of a false empty Drive root.
+  - Agent Inbox readonly connect/browse requests no longer force `Prompt.CONSENT`; Google Identity can reuse existing granted scopes and prompt only when needed.
+- Current validation:
+  - Targeted unit tests passed: `evidence/sprint37_agent_inbox_real_device_auth_repair/logs/targeted_unit_tests.log`.
+  - Connected visual regression passed: `evidence/sprint37_agent_inbox_real_device_auth_repair/logs/connected_visual.log`, `evidence/sprint37_agent_inbox_real_device_auth_repair/logs/TEST-visual.xml`.
+  - Auth-failure visual proof: `evidence/sprint37_agent_inbox_real_device_auth_repair/visual_e2e/sprint35-agent-inbox-folder-selector-repair-1781706377433/00a_agent_inbox_drive_authorization_failed_light.png` shows the failure state no longer leaves the empty `My Drive` browser visible.
+  - Live signed-in emulator E2E passed on current candidate APK: `evidence/sprint37_agent_inbox_real_device_auth_repair/LIVE_E2E_REPORT.md`.
+  - Live Drive folder: `QA-Agent-Inbox-Sprint37-Auth-Repair-20260617-143008`.
+  - Live package: `codex-sprint37-drive-auth-repair-package` with `manifest.json`, `content.md`, and manifest `priority: high`.
+  - Live flow evidence covers Google Play Services account chooser, in-app Drive folder browser, folder selection, package scan, priority acceptance, import queue clearing, Library `Files`, reader rendering, and logcat sentinels.
+  - GPT Pro R1 review URL: `https://chatgpt.com/c/6a32b275-25f0-83eb-8e8d-aabd98ba1fa7`.
+  - GPT Pro R1 result: `SCORE: 10/10`, `VERDICT: PASS`, `BLOCKERS: None`.
+  - GPT Pro R1 output: `evidence/sprint37_agent_inbox_real_device_auth_repair/gpt_pro_review_response_r1.md`.
+  - Review bundle: `SPRINT37_AGENT_INBOX_AUTH_REPAIR_REVIEW_BUNDLE_R1.zip`, SHA-256 `4e2052da7dedeeca9dbe5e4927ad3b5a9a8d22e1b5bfc1d2a29153f0853f0a5f`.
+  - Release version bump after Pro PASS: `versionCode=41`, `versionName=0.11.25-alpha`.
+  - Final release local gate passed after the version bump: `testDebugUnitTest`, `lintDebug`, `assembleDebug`, `assembleRelease`.
+  - Release gate summary: `docs/release-gate-logs/2026-06-17-sprint37-agent-inbox-drive-auth-repair/VALIDATION_SUMMARY.md`.
+  - Debug APK: `release_artifacts/quality-alternative-v0.11.25-agent-inbox-drive-auth-repair-alpha-debug.apk`, SHA-256 `58112a9f26e531c29dd85feaa1d39026a4d861e2229f294e1bde2605c78a1846`.
+  - Release unsigned APK: `release_artifacts/quality-alternative-v0.11.25-agent-inbox-drive-auth-repair-alpha-release-unsigned.apk`, SHA-256 `f73569b747d1367fd2e3e36a00235560484981e57860551aa2e7f1b5c9f31ef5`.
+- Remaining release gate:
+  - Commit, push, tag, and publish the `v0.11.25-agent-inbox-drive-auth-repair-alpha` GitHub release with the new APK artifacts.
+- Required outcome:
+  - Fix Agent Inbox Drive connection so the real device can choose the intended Drive folder, scan externally created packages, import one, show it in Library `Files`, and open it in the reader.
+  - If Google Play Services cannot provide a reliable token on the target device, implement a robust alternate path that still satisfies the Agent Inbox product requirement without pretending the folder browser succeeded.
+  - GPT Pro review must reach `SCORE: 10/10`, `VERDICT: PASS` only after citing visual/log evidence for the actual failing state, the fix, and the real scan/import flow.
+- Evidence requirements for the next Pro gate:
+  - Include the user's failing screenshot and a written diagnosis of what exactly is wrong.
+  - Include real device or equivalent signed-in device/emulator evidence that reproduces the Google Play Services error or proves it no longer occurs under the same installed release path.
+  - Include Google account state, APK hash/version, Drive folder identity, remote folder listing, package validator output, scan result, import, Library `Files`, reader rendering, and logcat sentinels.
+  - Fail the review if the UI can show an empty `My Drive` folder list after an authorization error without a clear repair state.
+- Branch: create a fresh branch from current `codex/agent-inbox-folder-selector-repair` or the latest release commit before implementation.
+- Next gates:
+  - Set an explicit Codex goal for Sprint 37.
+  - Reproduce or instrument the real failure path.
+  - Implement the smallest reliable repair.
+  - Run targeted tests, live visual E2E, and GPT Pro review until `SCORE: 10/10`, `VERDICT: PASS`.
+  - Release a new APK only after the Pro gate passes with target-device-grade evidence.
 
 ## Sprint 36 Agent Inbox Live Drive Folder Browser Repair
 

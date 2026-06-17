@@ -894,6 +894,29 @@ class VisualQaScreenshotTest {
         composeRule.onNodeWithText("Choose folder").assertIsDisplayed()
         capture("00_agent_inbox_choose_folder_light")
 
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.beginAgentInboxDriveFolderBrowser()
+            activity.mainViewModel.reportAgentInboxDriveAuthorizationFailure(
+                "Google Drive authorization hit a Google Play services error. Retry Google Drive connection.",
+            )
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            !hasTag("settings-agent-inbox-drive-folder-browser") &&
+                !hasNode("No folders on this level.")
+        }
+        composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasTestTag("settings-agent-inbox-section"))
+        assertTrue(
+            "Authorization failure must not leave an empty My Drive browser visible",
+            !hasTag("settings-agent-inbox-drive-folder-browser"),
+        )
+        assertTrue(
+            "Authorization failure must not render an empty Drive-root message",
+            !hasNode("No folders on this level."),
+        )
+        composeRule.onNodeWithText("Agent Inbox folder not selected").assertIsDisplayed()
+        capture("00a_agent_inbox_drive_authorization_failed_light")
+
         runBlocking {
             val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication
             app.appContainer.settingsRepository.saveAgentInboxDriveConnection(
@@ -909,7 +932,7 @@ class VisualQaScreenshotTest {
         composeRule.onNodeWithText("Agent Inbox folder needs reconnect").assertIsDisplayed()
         composeRule.onNodeWithText("Choose folder").assertIsDisplayed()
         composeRule.onNodeWithText("Use Drive link").assertIsDisplayed()
-        capture("00a_agent_inbox_legacy_picker_repair_choose_folder_light")
+        capture("00b_agent_inbox_legacy_picker_repair_choose_folder_light")
 
         scenario?.onActivity { activity ->
             activity.mainViewModel.beginAgentInboxDriveFolderBrowser()
@@ -922,7 +945,7 @@ class VisualQaScreenshotTest {
             .performScrollToNode(hasTestTag("settings-agent-inbox-drive-folder-select-visual-drive-inbox-folder"))
         composeRule.onNodeWithTag("settings-agent-inbox-drive-folder-select-visual-drive-inbox-folder")
             .assertIsDisplayed()
-        capture("00b_agent_inbox_drive_folder_browser_light")
+        capture("00c_agent_inbox_drive_folder_browser_light")
 
         scenario?.onActivity { activity ->
             activity.mainViewModel.selectAgentInboxDriveFolderFromBrowser(

@@ -1,0 +1,6 @@
+APK path: app/build/outputs/apk/debug/app-debug.apk
+SHA-256: 83696744691fa2c0fcc7a2bff93ac35c90d1212a283fbad0895025949766cee2
+versionCode: 40
+versionName: 0.11.24-alpha
+outputFile: app-debug.apk
+Built at UTC: 2026-06-17T14:32:07Z

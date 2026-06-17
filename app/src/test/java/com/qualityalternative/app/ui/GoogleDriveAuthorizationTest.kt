@@ -32,6 +32,7 @@ class GoogleDriveAuthorizationTest {
     @Test
     fun readonlyAgentInboxAuthorizationUsesReadonlyScopeWithoutPickerParameters() {
         listOf(
+            GoogleDriveAuthorizationMode.AGENT_INBOX_BROWSE_READONLY,
             GoogleDriveAuthorizationMode.AGENT_INBOX_CONNECT_READONLY,
             GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_SCAN,
             GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_IMPORT,
@@ -42,14 +43,7 @@ class GoogleDriveAuthorizationTest {
             assertEquals(listOf("https://www.googleapis.com/auth/drive.readonly"), spec.requestedScopes)
             assertEquals(AGENT_INBOX_DRIVE_READONLY_SCOPE, googleDriveAuthorizationScopeFor(mode))
             assertEquals(false, spec.optOutIncludingGrantedScopes)
-            assertEquals(
-                if (mode == GoogleDriveAuthorizationMode.AGENT_INBOX_CONNECT_READONLY) {
-                    AuthorizationRequest.Prompt.CONSENT
-                } else {
-                    AuthorizationRequest.Prompt.NOT_SET
-                },
-                spec.prompt,
-            )
+            assertEquals(AuthorizationRequest.Prompt.NOT_SET, spec.prompt)
             assertEquals(emptyMap<AuthorizationRequest.ResourceParameter, String>(), spec.resourceParameters)
         }
     }

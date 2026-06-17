@@ -2734,6 +2734,40 @@ class MainViewModelTest {
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
+    fun agentInboxDriveAuthorizationFailureClosesFolderBrowserInsteadOfShowingEmptyDrive() = runTest {
+        val settingsRepository = FakeSettingsRepository()
+        val viewModel = createViewModel(settingsRepository = settingsRepository)
+
+        advanceUntilIdle()
+        viewModel.beginAgentInboxDriveFolderBrowser()
+
+        assertTrue(viewModel.uiState.isAgentInboxDriveFolderBrowserOpen)
+        assertTrue(viewModel.uiState.isAgentInboxDriveFolderBrowserLoading)
+
+        viewModel.reportAgentInboxDriveAuthorizationFailure(
+            "Google Drive authorization hit a Google Play services error. Retry Google Drive connection.",
+        )
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.isAgentInboxDriveFolderBrowserOpen)
+        assertFalse(viewModel.uiState.isAgentInboxDriveFolderBrowserLoading)
+        assertEquals(AgentInboxDriveFolderBrowserLocation.Root, viewModel.uiState.agentInboxDriveFolderBrowserLocation)
+        assertTrue(viewModel.uiState.agentInboxDriveFolderBrowserBackStack.isEmpty())
+        assertTrue(viewModel.uiState.agentInboxDriveFolderOptions.isEmpty())
+        assertNull(viewModel.uiState.agentInboxDriveFolderBrowserError)
+        assertEquals(
+            "Google Drive authorization hit a Google Play services error. Retry Google Drive connection.",
+            viewModel.uiState.agentInboxDriveLastError,
+        )
+        assertEquals("Agent Inbox connection failed.", viewModel.uiState.latestMessage)
+        assertEquals(
+            "Google Drive authorization hit a Google Play services error. Retry Google Drive connection.",
+            settingsRepository.state.value.agentInboxDriveLastError,
+        )
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
     fun connectAgentInboxReadonlyDriveFolderReconnectReplacesPreviousFolderId() = runTest {
         val settingsRepository = FakeSettingsRepository()
         val analyticsTracker = InMemoryAnalyticsTracker()

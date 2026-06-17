@@ -396,6 +396,7 @@ private fun MainRoute(
             GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_IMPORT,
             -> {
                 pendingAgentInboxImportPackageId = null
+                agentInboxFolderBrowserAccessToken = null
                 viewModel.reportAgentInboxDriveAuthorizationFailure(message)
             }
 
@@ -468,7 +469,7 @@ private fun MainRoute(
             GoogleDriveAuthorizationMode.ANNOTATION_CONNECT,
             GoogleDriveAuthorizationMode.ANNOTATION_RETRY -> viewModel.beginAnnotationDriveAuthorization()
 
-            GoogleDriveAuthorizationMode.AGENT_INBOX_BROWSE_READONLY -> viewModel.beginAgentInboxDriveFolderBrowser()
+            GoogleDriveAuthorizationMode.AGENT_INBOX_BROWSE_READONLY -> viewModel.beginAgentInboxFolderSelection()
             GoogleDriveAuthorizationMode.AGENT_INBOX_CONNECT_READONLY -> Unit
             GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_SCAN,
             -> viewModel.beginAgentInboxDriveScan()

@@ -1,0 +1,9 @@
+Live E2E health sentinels
+Checked log: evidence/sprint37_agent_inbox_real_device_auth_repair/logs/live_e2e_logcat.txt
+PASS: not found FATAL EXCEPTION
+PASS: not found Process: com.qualityalternative.app
+PASS: not found Package is missing manifest.json
+PASS: not found Package could not be saved
+PASS: not found Agent Inbox package could not be imported
+PASS: not found Google Drive authorization hit a Google Play services error
+PASS: not found Agent Inbox connection failed

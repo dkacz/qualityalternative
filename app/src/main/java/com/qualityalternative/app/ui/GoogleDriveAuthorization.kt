@@ -28,14 +28,12 @@ internal fun googleDriveAuthorizationRequestSpecFor(
         GoogleDriveAuthorizationMode.AGENT_INBOX_CONNECT_READONLY -> {
             GoogleDriveAuthorizationRequestSpec(
                 requestedScopes = listOf(AGENT_INBOX_DRIVE_READONLY_SCOPE),
-                prompt = AuthorizationRequest.Prompt.CONSENT,
             )
         }
 
         GoogleDriveAuthorizationMode.AGENT_INBOX_BROWSE_READONLY -> {
             GoogleDriveAuthorizationRequestSpec(
                 requestedScopes = listOf(AGENT_INBOX_DRIVE_READONLY_SCOPE),
-                prompt = AuthorizationRequest.Prompt.CONSENT,
             )
         }
 

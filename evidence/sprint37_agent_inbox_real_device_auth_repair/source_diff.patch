@@ -1,0 +1,299 @@
+diff --git a/app/build.gradle.kts b/app/build.gradle.kts
+index 42abf74..25739b1 100644
+--- a/app/build.gradle.kts
++++ b/app/build.gradle.kts
+@@ -13,8 +13,8 @@ android {
+         applicationId = "com.qualityalternative.app"
+         minSdk = 29
+         targetSdk = 36
+-        versionCode = 40
+-        versionName = "0.11.24-alpha"
++        versionCode = 41
++        versionName = "0.11.25-alpha"
+         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+         // Run each instrumented test in its own process with cleared app data so heavy
+         // VisualQaScreenshotTest cases cannot leak state into later tests (see Test Orchestrator below).
+diff --git a/app/src/androidTest/java/com/qualityalternative/app/VisualQaScreenshotTest.kt b/app/src/androidTest/java/com/qualityalternative/app/VisualQaScreenshotTest.kt
+index eed2d7b..20d800b 100644
+--- a/app/src/androidTest/java/com/qualityalternative/app/VisualQaScreenshotTest.kt
++++ b/app/src/androidTest/java/com/qualityalternative/app/VisualQaScreenshotTest.kt
+@@ -894,6 +894,29 @@ class VisualQaScreenshotTest {
+         composeRule.onNodeWithText("Choose folder").assertIsDisplayed()
+         capture("00_agent_inbox_choose_folder_light")
+ 
++        scenario?.onActivity { activity ->
++            activity.mainViewModel.beginAgentInboxDriveFolderBrowser()
++            activity.mainViewModel.reportAgentInboxDriveAuthorizationFailure(
++                "Google Drive authorization hit a Google Play services error. Retry Google Drive connection.",
++            )
++        }
++        composeRule.waitUntil(timeoutMillis = 10_000) {
++            !hasTag("settings-agent-inbox-drive-folder-browser") &&
++                !hasNode("No folders on this level.")
++        }
++        composeRule.onNodeWithTag("settings-list")
++            .performScrollToNode(hasTestTag("settings-agent-inbox-section"))
++        assertTrue(
++            "Authorization failure must not leave an empty My Drive browser visible",
++            !hasTag("settings-agent-inbox-drive-folder-browser"),
++        )
++        assertTrue(
++            "Authorization failure must not render an empty Drive-root message",
++            !hasNode("No folders on this level."),
++        )
++        composeRule.onNodeWithText("Agent Inbox folder not selected").assertIsDisplayed()
++        capture("00a_agent_inbox_drive_authorization_failed_light")
++
+         runBlocking {
+             val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication
+             app.appContainer.settingsRepository.saveAgentInboxDriveConnection(
+@@ -909,7 +932,7 @@ class VisualQaScreenshotTest {
+         composeRule.onNodeWithText("Agent Inbox folder needs reconnect").assertIsDisplayed()
+         composeRule.onNodeWithText("Choose folder").assertIsDisplayed()
+         composeRule.onNodeWithText("Use Drive link").assertIsDisplayed()
+-        capture("00a_agent_inbox_legacy_picker_repair_choose_folder_light")
++        capture("00b_agent_inbox_legacy_picker_repair_choose_folder_light")
+ 
+         scenario?.onActivity { activity ->
+             activity.mainViewModel.beginAgentInboxDriveFolderBrowser()
+@@ -922,7 +945,7 @@ class VisualQaScreenshotTest {
+             .performScrollToNode(hasTestTag("settings-agent-inbox-drive-folder-select-visual-drive-inbox-folder"))
+         composeRule.onNodeWithTag("settings-agent-inbox-drive-folder-select-visual-drive-inbox-folder")
+             .assertIsDisplayed()
+-        capture("00b_agent_inbox_drive_folder_browser_light")
++        capture("00c_agent_inbox_drive_folder_browser_light")
+ 
+         scenario?.onActivity { activity ->
+             activity.mainViewModel.selectAgentInboxDriveFolderFromBrowser(
+diff --git a/app/src/main/java/com/qualityalternative/app/ui/GoogleDriveAuthorization.kt b/app/src/main/java/com/qualityalternative/app/ui/GoogleDriveAuthorization.kt
+index a81cf97..d853d4f 100644
+--- a/app/src/main/java/com/qualityalternative/app/ui/GoogleDriveAuthorization.kt
++++ b/app/src/main/java/com/qualityalternative/app/ui/GoogleDriveAuthorization.kt
+@@ -28,14 +28,12 @@ internal fun googleDriveAuthorizationRequestSpecFor(
+         GoogleDriveAuthorizationMode.AGENT_INBOX_CONNECT_READONLY -> {
+             GoogleDriveAuthorizationRequestSpec(
+                 requestedScopes = listOf(AGENT_INBOX_DRIVE_READONLY_SCOPE),
+-                prompt = AuthorizationRequest.Prompt.CONSENT,
+             )
+         }
+ 
+         GoogleDriveAuthorizationMode.AGENT_INBOX_BROWSE_READONLY -> {
+             GoogleDriveAuthorizationRequestSpec(
+                 requestedScopes = listOf(AGENT_INBOX_DRIVE_READONLY_SCOPE),
+-                prompt = AuthorizationRequest.Prompt.CONSENT,
+             )
+         }
+ 
+diff --git a/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt b/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
+index ef686d7..e40e6a7 100644
+--- a/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
++++ b/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
+@@ -1823,7 +1823,7 @@ class MainViewModel(
+ 
+     fun reportAgentInboxDriveAuthorizationFailure(errorMessage: String) {
+         val message = errorMessage.trim().ifBlank { "Google Drive authorization failed." }
+-        reportAgentInboxDriveFailure(message)
++        reportAgentInboxDriveFailure(message, closeFolderBrowser = true)
+     }
+ 
+     fun disconnectAgentInboxDrive(nowMillis: Long = nowProvider()) {
+@@ -2275,8 +2275,8 @@ class MainViewModel(
+         }
+     }
+ 
+-    private fun reportAgentInboxDriveFailure(message: String) {
+-        uiState = uiState.copy(
++    private fun reportAgentInboxDriveFailure(message: String, closeFolderBrowser: Boolean = false) {
++        var nextState = uiState.copy(
+             isAgentInboxScanning = false,
+             isAgentInboxImporting = false,
+             isAgentInboxDriveFolderBrowserLoading = false,
+@@ -2284,6 +2284,17 @@ class MainViewModel(
+             agentInboxScanTruncated = false,
+             latestMessage = "Agent Inbox connection failed.",
+         )
++        if (closeFolderBrowser) {
++            nextState = nextState.copy(
++                isAgentInboxDriveFolderBrowserOpen = false,
++                agentInboxDriveFolderBrowserLocation = AgentInboxDriveFolderBrowserLocation.Root,
++                agentInboxDriveFolderBrowserBackStack = emptyList(),
++                agentInboxDriveFolderOptions = emptyList(),
++                agentInboxDriveFolderBrowserHasMore = false,
++                agentInboxDriveFolderBrowserError = null,
++            )
++        }
++        uiState = nextState
+         viewModelScope.launch {
+             settingsRepository.saveAgentInboxDriveScanFailure(message)
+             recordEventDurably(
+diff --git a/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt b/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
+index 64fb069..8ab9a3a 100644
+--- a/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
++++ b/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
+@@ -396,6 +396,7 @@ private fun MainRoute(
+             GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_IMPORT,
+             -> {
+                 pendingAgentInboxImportPackageId = null
++                agentInboxFolderBrowserAccessToken = null
+                 viewModel.reportAgentInboxDriveAuthorizationFailure(message)
+             }
+ 
+@@ -468,7 +469,7 @@ private fun MainRoute(
+             GoogleDriveAuthorizationMode.ANNOTATION_CONNECT,
+             GoogleDriveAuthorizationMode.ANNOTATION_RETRY -> viewModel.beginAnnotationDriveAuthorization()
+ 
+-            GoogleDriveAuthorizationMode.AGENT_INBOX_BROWSE_READONLY -> viewModel.beginAgentInboxDriveFolderBrowser()
++            GoogleDriveAuthorizationMode.AGENT_INBOX_BROWSE_READONLY -> viewModel.beginAgentInboxFolderSelection()
+             GoogleDriveAuthorizationMode.AGENT_INBOX_CONNECT_READONLY -> Unit
+             GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_SCAN,
+             -> viewModel.beginAgentInboxDriveScan()
+diff --git a/app/src/test/java/com/qualityalternative/app/ui/GoogleDriveAuthorizationTest.kt b/app/src/test/java/com/qualityalternative/app/ui/GoogleDriveAuthorizationTest.kt
+index 4206abb..5761d13 100644
+--- a/app/src/test/java/com/qualityalternative/app/ui/GoogleDriveAuthorizationTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/ui/GoogleDriveAuthorizationTest.kt
+@@ -32,6 +32,7 @@ class GoogleDriveAuthorizationTest {
+     @Test
+     fun readonlyAgentInboxAuthorizationUsesReadonlyScopeWithoutPickerParameters() {
+         listOf(
++            GoogleDriveAuthorizationMode.AGENT_INBOX_BROWSE_READONLY,
+             GoogleDriveAuthorizationMode.AGENT_INBOX_CONNECT_READONLY,
+             GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_SCAN,
+             GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_IMPORT,
+@@ -42,14 +43,7 @@ class GoogleDriveAuthorizationTest {
+             assertEquals(listOf("https://www.googleapis.com/auth/drive.readonly"), spec.requestedScopes)
+             assertEquals(AGENT_INBOX_DRIVE_READONLY_SCOPE, googleDriveAuthorizationScopeFor(mode))
+             assertEquals(false, spec.optOutIncludingGrantedScopes)
+-            assertEquals(
+-                if (mode == GoogleDriveAuthorizationMode.AGENT_INBOX_CONNECT_READONLY) {
+-                    AuthorizationRequest.Prompt.CONSENT
+-                } else {
+-                    AuthorizationRequest.Prompt.NOT_SET
+-                },
+-                spec.prompt,
+-            )
++            assertEquals(AuthorizationRequest.Prompt.NOT_SET, spec.prompt)
+             assertEquals(emptyMap<AuthorizationRequest.ResourceParameter, String>(), spec.resourceParameters)
+         }
+     }
+diff --git a/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt b/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
+index 1c95c39..c96bdd6 100644
+--- a/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
+@@ -2732,6 +2732,40 @@ class MainViewModelTest {
+         assertFalse(remotePayloadText.contains("selected-folder-123"))
+     }
+ 
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun agentInboxDriveAuthorizationFailureClosesFolderBrowserInsteadOfShowingEmptyDrive() = runTest {
++        val settingsRepository = FakeSettingsRepository()
++        val viewModel = createViewModel(settingsRepository = settingsRepository)
++
++        advanceUntilIdle()
++        viewModel.beginAgentInboxDriveFolderBrowser()
++
++        assertTrue(viewModel.uiState.isAgentInboxDriveFolderBrowserOpen)
++        assertTrue(viewModel.uiState.isAgentInboxDriveFolderBrowserLoading)
++
++        viewModel.reportAgentInboxDriveAuthorizationFailure(
++            "Google Drive authorization hit a Google Play services error. Retry Google Drive connection.",
++        )
++        advanceUntilIdle()
++
++        assertFalse(viewModel.uiState.isAgentInboxDriveFolderBrowserOpen)
++        assertFalse(viewModel.uiState.isAgentInboxDriveFolderBrowserLoading)
++        assertEquals(AgentInboxDriveFolderBrowserLocation.Root, viewModel.uiState.agentInboxDriveFolderBrowserLocation)
++        assertTrue(viewModel.uiState.agentInboxDriveFolderBrowserBackStack.isEmpty())
++        assertTrue(viewModel.uiState.agentInboxDriveFolderOptions.isEmpty())
++        assertNull(viewModel.uiState.agentInboxDriveFolderBrowserError)
++        assertEquals(
++            "Google Drive authorization hit a Google Play services error. Retry Google Drive connection.",
++            viewModel.uiState.agentInboxDriveLastError,
++        )
++        assertEquals("Agent Inbox connection failed.", viewModel.uiState.latestMessage)
++        assertEquals(
++            "Google Drive authorization hit a Google Play services error. Retry Google Drive connection.",
++            settingsRepository.state.value.agentInboxDriveLastError,
++        )
++    }
++
+     @Test
+     @OptIn(ExperimentalCoroutinesApi::class)
+     fun connectAgentInboxReadonlyDriveFolderReconnectReplacesPreviousFolderId() = runTest {
+diff --git a/docs/LANE_STATUS.md b/docs/LANE_STATUS.md
+index 1b3b9cb..3f17b8d 100644
+--- a/docs/LANE_STATUS.md
++++ b/docs/LANE_STATUS.md
+@@ -1,6 +1,6 @@
+ # Lane Status
+ 
+-Status timestamp: 2026-06-16
++Status timestamp: 2026-06-17
+ 
+ This file is the repo-level index for active and recently completed execution lanes. It should point to the canonical branch, review lane, validation artifacts, and next gate for each lane.
+ 
+@@ -11,6 +11,64 @@ This file is the repo-level index for active and recently completed execution la
+ - Heartbeats should exist only while waiting for a current GPT Pro lane.
+ - Do not infer lane status from untracked local files alone. For example, `ios/` can appear untracked on non-iOS branches; the canonical iOS implementation source is the pushed iOS branch listed below.
+ 
++## Sprint 37 Agent Inbox Real Device Drive Authorization Repair
++
++Status: `gpt_pro_pass_release_artifacts_built_pending_publish`
++
++- Date opened: 2026-06-17
++- Trigger: after published `v0.11.24-agent-inbox-live-drive-folder-browser-alpha`, the user's real device screenshot at 16:16 shows Settings > Agent Inbox with:
++  - `Agent Inbox folder not selected`
++  - `GOOGLE DRIVE AUTHORIZATION HIT A GOOGLE PLAY SERVICES ERROR. RETRY GOOGLE DRIVE CONNECTION`
++  - in-app browser card at `My Drive` showing `No folders on this level.`
++  - snackbar `Agent Inbox connection failed.`
++- Why Sprint 36 is insufficient: Sprint 36 proved the in-app Drive folder browser on the local signed-in emulator and reached GPT Pro R2 `SCORE: 10/10`, but the user's target device still fails in the real installed app. The next review gate must require target-device evidence or a faithfully reproduced Play Services failure path, not only the previous emulator account.
++- Working hypothesis to validate, not assume:
++  - The app may be opening the folder browser after an authorization failure and showing an empty root, making the UI look connected enough to continue while the token/listing path is invalid.
++  - The Drive folder listing may be using an account/scope/token state that works on the emulator but fails on the user's Google Play Services configuration.
++  - `No folders on this level` is not acceptable as a terminal state when authorization just failed; the UI must clearly block/repair auth and offer a reliable recovery path.
++- Validated diagnosis:
++  - The screenshot's contradictory state was reproducible from code: `AGENT_INBOX_BROWSE_READONLY` opened the in-app Drive folder browser before Google authorization succeeded, and `reportAgentInboxDriveAuthorizationFailure(...)` did not close/reset that folder-browser state.
++  - Result: after a Google Play Services authorization failure, the UI could keep rendering `My Drive` with empty options and `No folders on this level.`
++- Current implementation:
++  - `AGENT_INBOX_BROWSE_READONLY` now starts folder selection without opening the browser until an access token is actually returned.
++  - Agent Inbox Drive authorization failure now clears the pending browser token, closes the Drive folder browser, resets root/back stack/options, and leaves a clear connection-failed state instead of a false empty Drive root.
++  - Agent Inbox readonly connect/browse requests no longer force `Prompt.CONSENT`; Google Identity can reuse existing granted scopes and prompt only when needed.
++- Current validation:
++  - Targeted unit tests passed: `evidence/sprint37_agent_inbox_real_device_auth_repair/logs/targeted_unit_tests.log`.
++  - Connected visual regression passed: `evidence/sprint37_agent_inbox_real_device_auth_repair/logs/connected_visual.log`, `evidence/sprint37_agent_inbox_real_device_auth_repair/logs/TEST-visual.xml`.
++  - Auth-failure visual proof: `evidence/sprint37_agent_inbox_real_device_auth_repair/visual_e2e/sprint35-agent-inbox-folder-selector-repair-1781706377433/00a_agent_inbox_drive_authorization_failed_light.png` shows the failure state no longer leaves the empty `My Drive` browser visible.
++  - Live signed-in emulator E2E passed on current candidate APK: `evidence/sprint37_agent_inbox_real_device_auth_repair/LIVE_E2E_REPORT.md`.
++  - Live Drive folder: `QA-Agent-Inbox-Sprint37-Auth-Repair-20260617-143008`.
++  - Live package: `codex-sprint37-drive-auth-repair-package` with `manifest.json`, `content.md`, and manifest `priority: high`.
++  - Live flow evidence covers Google Play Services account chooser, in-app Drive folder browser, folder selection, package scan, priority acceptance, import queue clearing, Library `Files`, reader rendering, and logcat sentinels.
++  - GPT Pro R1 review URL: `https://chatgpt.com/c/6a32b275-25f0-83eb-8e8d-aabd98ba1fa7`.
++  - GPT Pro R1 result: `SCORE: 10/10`, `VERDICT: PASS`, `BLOCKERS: None`.
++  - GPT Pro R1 output: `evidence/sprint37_agent_inbox_real_device_auth_repair/gpt_pro_review_response_r1.md`.
++  - Review bundle: `SPRINT37_AGENT_INBOX_AUTH_REPAIR_REVIEW_BUNDLE_R1.zip`, SHA-256 `4e2052da7dedeeca9dbe5e4927ad3b5a9a8d22e1b5bfc1d2a29153f0853f0a5f`.
++  - Release version bump after Pro PASS: `versionCode=41`, `versionName=0.11.25-alpha`.
++  - Final release local gate passed after the version bump: `testDebugUnitTest`, `lintDebug`, `assembleDebug`, `assembleRelease`.
++  - Release gate summary: `docs/release-gate-logs/2026-06-17-sprint37-agent-inbox-drive-auth-repair/VALIDATION_SUMMARY.md`.
++  - Debug APK: `release_artifacts/quality-alternative-v0.11.25-agent-inbox-drive-auth-repair-alpha-debug.apk`, SHA-256 `58112a9f26e531c29dd85feaa1d39026a4d861e2229f294e1bde2605c78a1846`.
++  - Release unsigned APK: `release_artifacts/quality-alternative-v0.11.25-agent-inbox-drive-auth-repair-alpha-release-unsigned.apk`, SHA-256 `f73569b747d1367fd2e3e36a00235560484981e57860551aa2e7f1b5c9f31ef5`.
++- Remaining release gate:
++  - Commit, push, tag, and publish the `v0.11.25-agent-inbox-drive-auth-repair-alpha` GitHub release with the new APK artifacts.
++- Required outcome:
++  - Fix Agent Inbox Drive connection so the real device can choose the intended Drive folder, scan externally created packages, import one, show it in Library `Files`, and open it in the reader.
++  - If Google Play Services cannot provide a reliable token on the target device, implement a robust alternate path that still satisfies the Agent Inbox product requirement without pretending the folder browser succeeded.
++  - GPT Pro review must reach `SCORE: 10/10`, `VERDICT: PASS` only after citing visual/log evidence for the actual failing state, the fix, and the real scan/import flow.
++- Evidence requirements for the next Pro gate:
++  - Include the user's failing screenshot and a written diagnosis of what exactly is wrong.
++  - Include real device or equivalent signed-in device/emulator evidence that reproduces the Google Play Services error or proves it no longer occurs under the same installed release path.
++  - Include Google account state, APK hash/version, Drive folder identity, remote folder listing, package validator output, scan result, import, Library `Files`, reader rendering, and logcat sentinels.
++  - Fail the review if the UI can show an empty `My Drive` folder list after an authorization error without a clear repair state.
++- Branch: create a fresh branch from current `codex/agent-inbox-folder-selector-repair` or the latest release commit before implementation.
++- Next gates:
++  - Set an explicit Codex goal for Sprint 37.
++  - Reproduce or instrument the real failure path.
++  - Implement the smallest reliable repair.
++  - Run targeted tests, live visual E2E, and GPT Pro review until `SCORE: 10/10`, `VERDICT: PASS`.
++  - Release a new APK only after the Pro gate passes with target-device-grade evidence.
++
+ ## Sprint 36 Agent Inbox Live Drive Folder Browser Repair
+ 
+ Status: `release_published_gpt_pro_r2_pass_10_10`

@@ -1,0 +1,3 @@
+codex-sprint37-drive-auth-repair-package/
+codex-sprint37-drive-auth-repair-package/content.md
+codex-sprint37-drive-auth-repair-package/manifest.json
