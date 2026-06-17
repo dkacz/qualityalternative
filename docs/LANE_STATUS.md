@@ -40,8 +40,7 @@ Status: `release_published_gpt_pro_r1_pass_10_10`
   - `release_artifacts/quality-alternative-v0.11.25-agent-inbox-import-all-autoimport-alpha-debug.apk`
   - `release_artifacts/quality-alternative-v0.11.25-agent-inbox-import-all-autoimport-alpha-release-unsigned.apk`
 - Implementation commit: `0dd4cdb` (`Add Agent Inbox import all and autoimport`).
-- Release status commit: `749a810` (`Record Sprint 38 release status`).
-- Release tag: `v0.11.25-agent-inbox-import-all-autoimport-alpha`.
+- Release tag: `v0.11.25-agent-inbox-import-all-autoimport-alpha` on the final lane HEAD.
 
 ## Sprint 37 Agent Inbox Real Device Drive Authorization Repair
 
