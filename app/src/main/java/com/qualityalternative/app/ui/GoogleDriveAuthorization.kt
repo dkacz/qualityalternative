@@ -12,6 +12,8 @@ internal enum class GoogleDriveAuthorizationMode {
     AGENT_INBOX_CONNECT_READONLY,
     AGENT_INBOX_READONLY_SCAN,
     AGENT_INBOX_READONLY_IMPORT,
+    AGENT_INBOX_READONLY_IMPORT_ALL,
+    AGENT_INBOX_READONLY_AUTOIMPORT,
 }
 
 internal data class GoogleDriveAuthorizationRequestSpec(
@@ -39,6 +41,8 @@ internal fun googleDriveAuthorizationRequestSpecFor(
 
         GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_SCAN,
         GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_IMPORT,
+        GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_IMPORT_ALL,
+        GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_AUTOIMPORT,
         -> {
             GoogleDriveAuthorizationRequestSpec(
                 requestedScopes = listOf(AGENT_INBOX_DRIVE_READONLY_SCOPE),

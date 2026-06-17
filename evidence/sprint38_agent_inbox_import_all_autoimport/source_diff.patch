@@ -1,0 +1,1259 @@
+diff --git a/PRD.md b/PRD.md
+index 993bbe2..179723a 100644
+--- a/PRD.md
++++ b/PRD.md
+@@ -498,7 +498,7 @@ The system must provide account-like portability without requiring a Quality Alt
+ - Portable profile exports must be human-auditable JSON rather than opaque database backups.
+ - Export/import should preserve behaviorally important state without pretending to provide server-backed identity, cross-device conflict resolution, or guaranteed document-file transfer.
+ - Any cloud sync must be explicit, revocable, and scoped to user-owned files. Cloud authorization state must be re-established on each device rather than copied through profile export.
+-- Agent Inbox cloud access must remain explicit, revocable, finite, and user-reviewed. The product must not ingest agent-produced Drive content without a visible accept/reject step.
++- Agent Inbox cloud access must remain explicit, revocable, finite, and user-reviewed by default. The product must not ingest agent-produced Drive content without a visible accept/reject step unless the user has explicitly enabled Agent Inbox autoimport for the already selected folder. Autoimport is opt-in, revocable from Settings, limited to the selected Agent Inbox folder, and must not silently accept a manifest priority request; high-priority requests affect ranking only after explicit user acceptance.
+ - Agent Inbox Drive access must prefer user-scoped folder selection over broader Drive scopes. Android `OpenDocumentTree` is the primary user-facing selector because it gives a revocable persisted read grant to the selected folder tree without requiring a pasted Drive id. Google file Picker is not sufficient for externally populated Agent Inbox folders. Any visible `drive.readonly` path must be explicit, revocable, limited in app behavior to the selected or user-supplied Agent Inbox folder id, and described as broader Drive read authorization.
+ - Website matching must remain local-first and user-authored. The app must not collect browsing history as an input or side effect of website target matching.
+
+diff --git a/app/src/androidTest/java/com/qualityalternative/app/VisualQaScreenshotTest.kt b/app/src/androidTest/java/com/qualityalternative/app/VisualQaScreenshotTest.kt
+index 20d800b..00c7f87 100644
+--- a/app/src/androidTest/java/com/qualityalternative/app/VisualQaScreenshotTest.kt
++++ b/app/src/androidTest/java/com/qualityalternative/app/VisualQaScreenshotTest.kt
+@@ -966,6 +966,15 @@ class VisualQaScreenshotTest {
+         composeRule.onNodeWithTag("settings-agent-inbox-disconnect").assertIsDisplayed().assertIsEnabled()
+         waitForTransientMessageToClear("Agent Inbox folder selected.")
+         capture("01_agent_inbox_drive_folder_connected_light")
++        composeRule.onNodeWithTag("settings-agent-inbox-autoimport-toggle")
++            .assertIsDisplayed()
++            .assertIsNotSelected()
++            .performClick()
++        composeRule.waitForIdle()
++        composeRule.onNodeWithTag("settings-agent-inbox-autoimport-toggle")
++            .assertIsSelected()
++        waitForTransientMessageToClear("Agent Inbox autoimport enabled.")
++        capture("01a_agent_inbox_autoimport_enabled_light")
+
+         scenario?.onActivity { activity ->
+             activity.mainViewModel.seedAgentInboxDriveAccessLostForTests()
+@@ -980,6 +989,69 @@ class VisualQaScreenshotTest {
+         waitForTransientMessageToClear("Agent Inbox folder access was lost.")
+         capture("02_agent_inbox_access_lost_light")
+
++        val importAllDriveClient = VisualAgentInboxDriveClient()
++        val importAllFirst = agentInboxMarkdownVisualFixture().copy(
++            packageFolderId = "visual-agent-import-all-a",
++            packageFolderName = "visual-agent-import-all-a",
++            title = "Agent Inbox Import All One",
++            contentFileName = "import-all-one.md",
++            contentBytes = """
++                # Agent Inbox Import All One
++
++                This first Markdown package proves the batch import path can save more than one ready package.
++            """.trimIndent().toByteArray(Charsets.UTF_8),
++        )
++        val importAllSecond = agentInboxMarkdownVisualFixture().copy(
++            packageFolderId = "visual-agent-import-all-b",
++            packageFolderName = "visual-agent-import-all-b",
++            title = "Agent Inbox Import All Two",
++            contentFileName = "import-all-two.md",
++            priority = AgentInboxPriorityIntent.NORMAL,
++            contentBytes = """
++                # Agent Inbox Import All Two
++
++                This second Markdown package proves the batch import path keeps the review queue finite.
++            """.trimIndent().toByteArray(Charsets.UTF_8),
++        )
++        scenario?.onActivity { activity ->
++            activity.mainViewModel.setAgentInboxDriveClientForTests(importAllDriveClient)
++            activity.mainViewModel.connectAgentInboxDocumentTreeFolder(
++                uri = "content://com.android.externalstorage.documents/tree/visual-agent-inbox-import-all",
++                displayName = "Visual Agent Inbox",
++                nowMillis = 1_781_256_705_000L,
++            )
++        }
++        importAllDriveClient.setPackages(importAllFirst, importAllSecond)
++        scenario?.onActivity { activity ->
++            activity.mainViewModel.scanAgentInboxDrive(accessToken = "", nowMillis = 1_781_256_706_000L)
++        }
++        composeRule.waitUntil(timeoutMillis = 10_000) {
++            hasTag("settings-agent-inbox-import-all") &&
++                hasTag("settings-agent-inbox-candidate-visual-agent-import-all-a") &&
++                hasTag("settings-agent-inbox-candidate-visual-agent-import-all-b")
++        }
++        composeRule.onNodeWithTag("settings-list")
++            .performScrollToNode(hasTestTag("settings-agent-inbox-import-all"))
++        composeRule.onNodeWithTag("settings-agent-inbox-import-all").assertIsDisplayed().assertIsEnabled()
++        composeRule.onNodeWithText("2 packages waiting for review").assertIsDisplayed()
++        capture("02a_agent_inbox_import_all_ready_light")
++        composeRule.onNodeWithTag("settings-agent-inbox-import-all").performClick()
++        composeRule.waitUntil(timeoutMillis = 10_000) {
++            userDocumentByTitle(importAllFirst.title) != null &&
++                userDocumentByTitle(importAllSecond.title) != null &&
++                !hasTag("settings-agent-inbox-candidate-visual-agent-import-all-a") &&
++                !hasTag("settings-agent-inbox-candidate-visual-agent-import-all-b")
++        }
++        composeRule.onNodeWithTag("settings-list")
++            .performScrollToNode(hasTestTag("settings-agent-inbox-section"))
++        composeRule.onNodeWithText("No packages waiting for review.").assertIsDisplayed()
++        capture("02b_agent_inbox_import_all_completed_light")
++        val importedByBatch = requireNotNull(userDocumentByTitle(importAllFirst.title))
++        scenario?.onActivity { activity -> activity.mainViewModel.openLibraryItem(importedByBatch) }
++        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
++        assertTrue("Expected Import all reader title or heading to be visible", hasAnyNode(importAllFirst.title))
++        capture("02c_agent_inbox_import_all_reader_light")
++
+         val imageDriveClient = VisualAgentInboxDriveClient()
+         val imageFixture = agentInboxMarkdownImageVisualFixture()
+         scenario?.onActivity { activity ->
+@@ -2434,12 +2506,23 @@ class VisualQaScreenshotTest {
+         runBlocking {
+             app.appContainer.userDocumentRepository.observeReady().first { it }
+         }
+-        openTab("tab-settings", "settings-list")
++        if (hasTag("tab-settings")) {
++            openTab("tab-settings", "settings-list")
++        } else {
++            scenario?.onActivity { activity -> activity.mainViewModel.openSettings() }
++            composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("settings-list") }
++        }
+         scenario?.onActivity { activity ->
+             activity.mainViewModel.scanAgentInboxDrive(accessToken = accessToken, nowMillis = nowMillis)
+         }
+         composeRule.waitUntil(timeoutMillis = 10_000) {
+-            hasTag("settings-agent-inbox-candidate-${fixture.packageFolderId}")
++            var candidateReady = false
++            scenario?.onActivity { activity ->
++                candidateReady = activity.mainViewModel.uiState.agentInboxCandidates.any { candidate ->
++                    candidate.packageFolderId == fixture.packageFolderId
++                }
++            }
++            candidateReady
+         }
+         composeRule.onNodeWithTag("settings-list")
+             .performScrollToNode(hasTestTag("settings-agent-inbox-candidate-${fixture.packageFolderId}"))
+diff --git a/app/src/main/java/com/qualityalternative/app/data/PreferencesSettingsRepository.kt b/app/src/main/java/com/qualityalternative/app/data/PreferencesSettingsRepository.kt
+index ccd862d..a192cc0 100644
+--- a/app/src/main/java/com/qualityalternative/app/data/PreferencesSettingsRepository.kt
++++ b/app/src/main/java/com/qualityalternative/app/data/PreferencesSettingsRepository.kt
+@@ -119,6 +119,8 @@ class PreferencesSettingsRepository(
+                     agentInboxDriveLastSuccessfulAtMillis =
+                         preferences[AgentInboxDriveLastSuccessfulAtMillis].takeIf { hasAgentInboxFolderGrant },
+                     agentInboxDriveLastError = preferences[AgentInboxDriveLastError],
++                    agentInboxAutoImportEnabled = hasAgentInboxFolderGrant &&
++                        (preferences[AgentInboxAutoImportEnabled] ?: false),
+                     profileAutosaveUri = preferences[ProfileAutosaveUri],
+                     profileAutosaveDisplayName = preferences[ProfileAutosaveDisplayName],
+                     profileAutosaveLastSuccessfulAtMillis = preferences[ProfileAutosaveLastSuccessfulAtMillis],
+@@ -375,6 +377,7 @@ class PreferencesSettingsRepository(
+             preferences.remove(AgentInboxDriveGrantMode)
+             preferences.remove(AgentInboxDriveLastSuccessfulAtMillis)
+             preferences.remove(AgentInboxDriveLastError)
++            preferences.remove(AgentInboxAutoImportEnabled)
+         }
+     }
+
+@@ -393,6 +396,7 @@ class PreferencesSettingsRepository(
+                 preferences.remove(AgentInboxDriveFolderId)
+                 preferences.remove(AgentInboxDriveGrantMode)
+                 preferences.remove(AgentInboxDriveLastSuccessfulAtMillis)
++                preferences.remove(AgentInboxAutoImportEnabled)
+             }
+             preferences.remove(AgentInboxDriveLastError)
+         }
+@@ -404,6 +408,19 @@ class PreferencesSettingsRepository(
+         }
+     }
+
++    override suspend fun saveAgentInboxAutoImportEnabled(enabled: Boolean) {
++        dataStore.edit { preferences ->
++            val hasOperationalGrant = preferences[AgentInboxDriveEnabled] == true &&
++                preferences[AgentInboxDriveFolderId]?.isNotBlank() == true &&
++                preferences[AgentInboxDriveGrantMode] in AGENT_INBOX_OPERATIONAL_GRANT_MODES
++            if (enabled && hasOperationalGrant) {
++                preferences[AgentInboxAutoImportEnabled] = true
++            } else {
++                preferences.remove(AgentInboxAutoImportEnabled)
++            }
++        }
++    }
++
+     override suspend fun saveProfileAutosaveDestination(uri: String, displayName: String) {
+         dataStore.edit { preferences ->
+             preferences[ProfileAutosaveUri] = uri
+@@ -543,6 +560,7 @@ class PreferencesSettingsRepository(
+         val AgentInboxDriveGrantMode = stringPreferencesKey("agent_inbox_drive_grant_mode")
+         val AgentInboxDriveLastSuccessfulAtMillis = longPreferencesKey("agent_inbox_drive_last_successful_at_millis")
+         val AgentInboxDriveLastError = stringPreferencesKey("agent_inbox_drive_last_error")
++        val AgentInboxAutoImportEnabled = booleanPreferencesKey("agent_inbox_auto_import_enabled")
+         val AGENT_INBOX_SUPPORTED_GRANT_MODES = setOf(
+             AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER,
+             AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER,
+diff --git a/app/src/main/java/com/qualityalternative/app/domain/model/InterventionModels.kt b/app/src/main/java/com/qualityalternative/app/domain/model/InterventionModels.kt
+index c3ef5d4..58af0f2 100644
+--- a/app/src/main/java/com/qualityalternative/app/domain/model/InterventionModels.kt
++++ b/app/src/main/java/com/qualityalternative/app/domain/model/InterventionModels.kt
+@@ -85,6 +85,9 @@ enum class AnalyticsEventType {
+     AGENT_INBOX_CANDIDATE_DUPLICATE,
+     AGENT_INBOX_CANDIDATE_REJECTED,
+     AGENT_INBOX_PRIORITY_TOGGLED,
++    AGENT_INBOX_IMPORT_ALL_STARTED,
++    AGENT_INBOX_IMPORT_ALL_COMPLETED,
++    AGENT_INBOX_AUTOIMPORT_TOGGLED,
+     AGENT_INBOX_DISCONNECTED,
+ }
+
+diff --git a/app/src/main/java/com/qualityalternative/app/domain/model/UserModels.kt b/app/src/main/java/com/qualityalternative/app/domain/model/UserModels.kt
+index 28d60d3..8267fb9 100644
+--- a/app/src/main/java/com/qualityalternative/app/domain/model/UserModels.kt
++++ b/app/src/main/java/com/qualityalternative/app/domain/model/UserModels.kt
+@@ -155,6 +155,7 @@ data class AppSettings(
+     val agentInboxDriveGrantMode: String? = null,
+     val agentInboxDriveLastSuccessfulAtMillis: Long? = null,
+     val agentInboxDriveLastError: String? = null,
++    val agentInboxAutoImportEnabled: Boolean = false,
+     val profileAutosaveUri: String? = null,
+     val profileAutosaveDisplayName: String? = null,
+     val profileAutosaveLastSuccessfulAtMillis: Long? = null,
+diff --git a/app/src/main/java/com/qualityalternative/app/domain/service/Contracts.kt b/app/src/main/java/com/qualityalternative/app/domain/service/Contracts.kt
+index 199eb89..6141cdc 100644
+--- a/app/src/main/java/com/qualityalternative/app/domain/service/Contracts.kt
++++ b/app/src/main/java/com/qualityalternative/app/domain/service/Contracts.kt
+@@ -183,6 +183,7 @@ interface SettingsRepository {
+     suspend fun clearAgentInboxDriveConnection() {}
+     suspend fun saveAgentInboxDriveScanSuccess(timestampMillis: Long, folderId: String) {}
+     suspend fun saveAgentInboxDriveScanFailure(errorMessage: String) {}
++    suspend fun saveAgentInboxAutoImportEnabled(enabled: Boolean) {}
+     suspend fun saveProfileAutosaveDestination(uri: String, displayName: String)
+     suspend fun clearProfileAutosaveDestination()
+     suspend fun saveProfileAutosaveSuccess(timestampMillis: Long)
+diff --git a/app/src/main/java/com/qualityalternative/app/ui/GoogleDriveAuthorization.kt b/app/src/main/java/com/qualityalternative/app/ui/GoogleDriveAuthorization.kt
+index d853d4f..5e54a09 100644
+--- a/app/src/main/java/com/qualityalternative/app/ui/GoogleDriveAuthorization.kt
++++ b/app/src/main/java/com/qualityalternative/app/ui/GoogleDriveAuthorization.kt
+@@ -12,6 +12,8 @@ internal enum class GoogleDriveAuthorizationMode {
+     AGENT_INBOX_CONNECT_READONLY,
+     AGENT_INBOX_READONLY_SCAN,
+     AGENT_INBOX_READONLY_IMPORT,
++    AGENT_INBOX_READONLY_IMPORT_ALL,
++    AGENT_INBOX_READONLY_AUTOIMPORT,
+ }
+
+ internal data class GoogleDriveAuthorizationRequestSpec(
+@@ -39,6 +41,8 @@ internal fun googleDriveAuthorizationRequestSpecFor(
+
+         GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_SCAN,
+         GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_IMPORT,
++        GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_IMPORT_ALL,
++        GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_AUTOIMPORT,
+         -> {
+             GoogleDriveAuthorizationRequestSpec(
+                 requestedScopes = listOf(AGENT_INBOX_DRIVE_READONLY_SCOPE),
+diff --git a/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt b/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
+index e40e6a7..9dd749c 100644
+--- a/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
++++ b/app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
+@@ -238,6 +238,7 @@ data class MainUiState(
+     val agentInboxCandidates: List<AgentInboxReviewCandidate> = emptyList(),
+     val agentInboxPriorityAcceptedPackageIds: Set<String> = emptySet(),
+     val agentInboxScanTruncated: Boolean = false,
++    val agentInboxAutoImportEnabled: Boolean = false,
+     val profileAutosaveUri: String? = null,
+     val profileAutosaveDisplayName: String? = null,
+     val profileAutosaveUsesLocalDefault: Boolean = false,
+@@ -1826,6 +1827,29 @@ class MainViewModel(
+         reportAgentInboxDriveFailure(message, closeFolderBrowser = true)
+     }
+
++    fun reportAgentInboxAutoImportAuthorizationFailure(errorMessage: String) {
++        val message = errorMessage.trim().ifBlank {
++            "Agent Inbox autoimport needs Google Drive retry from Settings."
++        }
++        uiState = uiState.copy(
++            isAgentInboxScanning = false,
++            isAgentInboxImporting = false,
++            isAgentInboxDriveFolderBrowserLoading = false,
++            agentInboxDriveLastError = message,
++            latestMessage = "Agent Inbox autoimport needs Drive retry from Settings.",
++        )
++        viewModelScope.launch {
++            settingsRepository.saveAgentInboxDriveScanFailure(message)
++            recordEventDurably(
++                AnalyticsEvent(
++                    type = AnalyticsEventType.AGENT_INBOX_SCAN_FAILED,
++                    timestampMillis = nowProvider(),
++                    metadata = mapOf("reason" to "autoimport_authorization_failed"),
++                ),
++            )
++        }
++    }
++
+     fun disconnectAgentInboxDrive(nowMillis: Long = nowProvider()) {
+         uiState = uiState.copy(
+             agentInboxDriveEnabled = false,
+@@ -1847,6 +1871,7 @@ class MainViewModel(
+             agentInboxCandidates = emptyList(),
+             agentInboxPriorityAcceptedPackageIds = emptySet(),
+             agentInboxScanTruncated = false,
++            agentInboxAutoImportEnabled = false,
+             latestMessage = "Agent Inbox disconnected.",
+         )
+         viewModelScope.launch {
+@@ -1860,6 +1885,31 @@ class MainViewModel(
+         }
+     }
+
++    fun setAgentInboxAutoImportEnabled(enabled: Boolean, nowMillis: Long = nowProvider()) {
++        if (enabled && !uiState.hasAgentInboxDriveFolderGrant) {
++            uiState = uiState.copy(latestMessage = "Connect an Agent Inbox folder before enabling autoimport.")
++            return
++        }
++        uiState = uiState.copy(
++            agentInboxAutoImportEnabled = enabled,
++            latestMessage = if (enabled) {
++                "Agent Inbox autoimport enabled."
++            } else {
++                "Agent Inbox autoimport disabled."
++            },
++        )
++        viewModelScope.launch {
++            settingsRepository.saveAgentInboxAutoImportEnabled(enabled)
++            recordEventDurably(
++                AnalyticsEvent(
++                    type = AnalyticsEventType.AGENT_INBOX_AUTOIMPORT_TOGGLED,
++                    timestampMillis = nowMillis,
++                    metadata = mapOf("enabled" to enabled.toString()),
++                ),
++            )
++        }
++    }
++
+     fun toggleAgentInboxPriority(packageFolderId: String) {
+         val selected = uiState.agentInboxPriorityAcceptedPackageIds.toMutableSet()
+         val accepted = if (selected.add(packageFolderId)) {
+@@ -1945,24 +1995,110 @@ class MainViewModel(
+         uiState = uiState.copy(isAgentInboxImporting = true, latestMessage = null)
+         viewModelScope.launch {
+             try {
+-                val contentBytes = try {
+-                    agentInboxDriveClient.downloadFile(
+-                        accessToken = normalizedToken,
+-                        fileId = requireNotNull(candidate.contentFileId),
+-                        maxBytes = AGENT_INBOX_MAX_REVIEW_CONTENT_BYTES,
+-                        expectedBytes = candidate.reviewedContentSizeBytes,
++                val result = buildAgentInboxImportResult(
++                    candidate = candidate,
++                    accessToken = normalizedToken,
++                    nowMillis = nowMillis,
++                )
++                applyAgentInboxImportResult(
++                    packageFolderId = packageFolderId,
++                    result = result,
++                    nowMillis = nowMillis,
++                )
++            } catch (error: Throwable) {
++                if (error is CancellationException) throw error
++                if (error is AgentInboxDriveAccessLostException) {
++                    reportAgentInboxDriveAccessLost(
++                        "Agent Inbox folder access was lost. Choose the folder again.",
+                     )
+-                } catch (tooLarge: AgentInboxDriveDownloadTooLargeException) {
+-                    applyAgentInboxImportResult(
+-                        packageFolderId = packageFolderId,
+-                        result = AgentInboxImportResult(
+-                            status = AgentInboxImportStatus.INVALID,
+-                            requestedHighPriority = candidate.requestsHighPriority,
+-                            packageErrors = setOf(AgentInboxPackageValidationError.CONTENT_FILE_TOO_LARGE),
+-                        ),
++                    return@launch
++                }
++                logAgentInboxImportFailure(error)
++                applyAgentInboxImportResult(
++                    packageFolderId = packageFolderId,
++                    result = AgentInboxImportResult(
++                        status = AgentInboxImportStatus.REJECTED,
++                        requestedHighPriority = candidate.requestsHighPriority,
++                        packageErrors = setOf(error.toAgentInboxImportPackageError()),
++                        failureDetail = error.toAgentInboxImportFailureDetail(),
++                    ),
++                    nowMillis = nowMillis,
++                )
++            }
++        }
++    }
++
++    fun importAllAgentInboxCandidates(
++        accessToken: String,
++        nowMillis: Long = nowProvider(),
++        automatic: Boolean = false,
++    ) {
++        if (!userDocumentReady) {
++            uiState = uiState.copy(latestMessage = "Agent Inbox is waiting for your library to finish loading.")
++            return
++        }
++        if (uiState.isAgentInboxImporting || uiState.isAgentInboxScanning) {
++            uiState = uiState.copy(latestMessage = "Agent Inbox sync is already running.")
++            return
++        }
++        if (uiState.agentInboxDriveGrantMode == AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER) {
++            uiState = uiState.copy(
++                agentInboxDriveFolderDraft = uiState.agentInboxDriveFolderId.orEmpty(),
++                agentInboxDriveFolderDraftError = null,
++            )
++            reportAgentInboxDriveFailure("Drive file Picker access is not enough for Agent Inbox import. Use Drive link access.")
++            return
++        }
++        val requiresAccessToken = uiState.agentInboxDriveGrantMode != AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER ||
++            uiState.agentInboxDriveFolderId.isGoogleDriveDocumentTreeUri()
++        val normalizedToken = accessToken.trim()
++        if (requiresAccessToken && normalizedToken.isBlank()) {
++            reportAgentInboxDriveFailure("Google Drive did not return an access token.")
++            return
++        }
++        val packageFolderIds = uiState.agentInboxCandidates
++            .filter(AgentInboxReviewCandidate::canImport)
++            .map(AgentInboxReviewCandidate::packageFolderId)
++        if (packageFolderIds.isEmpty()) {
++            uiState = uiState.copy(
++                latestMessage = if (automatic) {
++                    "Agent Inbox autoimport found no ready packages."
++                } else {
++                    "No ready Agent Inbox packages to import."
++                },
++            )
++            return
++        }
++        uiState = uiState.copy(isAgentInboxImporting = true, latestMessage = null)
++        viewModelScope.launch {
++            recordEventDurably(
++                AnalyticsEvent(
++                    type = AnalyticsEventType.AGENT_INBOX_IMPORT_ALL_STARTED,
++                    timestampMillis = nowMillis,
++                    metadata = mapOf(
++                        "automatic" to automatic.toString(),
++                        "readyCount" to packageFolderIds.size.toString(),
++                    ),
++                ),
++            )
++            var importedCount = 0
++            var duplicateCount = 0
++            var failedCount = 0
++            var skippedCount = 0
++            for (packageFolderId in packageFolderIds) {
++                val candidate = uiState.agentInboxCandidates.firstOrNull {
++                    it.packageFolderId == packageFolderId
++                }
++                if (candidate?.canImport != true) {
++                    skippedCount += 1
++                    continue
++                }
++                val result = try {
++                    buildAgentInboxImportResult(
++                        candidate = candidate,
++                        accessToken = normalizedToken,
+                         nowMillis = nowMillis,
+                     )
+-                    return@launch
+                 } catch (error: Throwable) {
+                     if (error is CancellationException) throw error
+                     if (error is AgentInboxDriveAccessLostException) {
+@@ -1972,119 +2108,149 @@ class MainViewModel(
+                         return@launch
+                     }
+                     logAgentInboxImportFailure(error)
+-                    applyAgentInboxImportResult(
+-                        packageFolderId = packageFolderId,
+-                        result = AgentInboxImportResult(
+-                            status = AgentInboxImportStatus.INVALID,
+-                            requestedHighPriority = candidate.requestsHighPriority,
+-                            packageErrors = setOf(AgentInboxPackageValidationError.DOWNLOAD_UNAVAILABLE),
+-                            failureDetail = error.toAgentInboxImportFailureDetail(),
+-                        ),
+-                        nowMillis = nowMillis,
++                    AgentInboxImportResult(
++                        status = AgentInboxImportStatus.REJECTED,
++                        requestedHighPriority = candidate.requestsHighPriority,
++                        packageErrors = setOf(error.toAgentInboxImportPackageError()),
++                        failureDetail = error.toAgentInboxImportFailureDetail(),
+                     )
+-                    return@launch
+                 }
+-                val imageAttachmentBytes = mutableMapOf<String, ByteArray>()
+-                var totalImageAttachmentBytes = 0L
+-                candidate.imageAttachmentFiles.forEach { attachment ->
+-                    if ((attachment.sizeBytes ?: 0L) > AGENT_INBOX_MAX_IMAGE_ATTACHMENT_BYTES) {
+-                        applyAgentInboxImportResult(
+-                            packageFolderId = packageFolderId,
+-                            result = AgentInboxImportResult(
+-                                status = AgentInboxImportStatus.INVALID,
+-                                requestedHighPriority = candidate.requestsHighPriority,
+-                                packageErrors = setOf(AgentInboxPackageValidationError.IMAGE_ATTACHMENT_TOO_LARGE),
+-                            ),
+-                            nowMillis = nowMillis,
+-                        )
+-                        return@launch
+-                    }
+-                    val attachmentBytes = try {
+-                        agentInboxDriveClient.downloadFile(
+-                            accessToken = normalizedToken,
+-                            fileId = attachment.fileId,
+-                            maxBytes = AGENT_INBOX_MAX_IMAGE_ATTACHMENT_BYTES,
+-                            expectedBytes = attachment.sizeBytes,
+-                        )
+-                    } catch (tooLarge: AgentInboxDriveDownloadTooLargeException) {
+-                        applyAgentInboxImportResult(
+-                            packageFolderId = packageFolderId,
+-                            result = AgentInboxImportResult(
+-                                status = AgentInboxImportStatus.INVALID,
+-                                requestedHighPriority = candidate.requestsHighPriority,
+-                                packageErrors = setOf(AgentInboxPackageValidationError.IMAGE_ATTACHMENT_TOO_LARGE),
+-                            ),
+-                            nowMillis = nowMillis,
+-                        )
+-                        return@launch
+-                    } catch (error: Throwable) {
+-                        if (error is CancellationException) throw error
+-                        if (error is AgentInboxDriveAccessLostException) {
+-                            reportAgentInboxDriveAccessLost(
+-                                "Agent Inbox folder access was lost. Choose the folder again.",
+-                            )
+-                            return@launch
+-                        }
+-                        logAgentInboxImportFailure(error)
+-                        applyAgentInboxImportResult(
+-                            packageFolderId = packageFolderId,
+-                            result = AgentInboxImportResult(
+-                                status = AgentInboxImportStatus.INVALID,
+-                                requestedHighPriority = candidate.requestsHighPriority,
+-                                packageErrors = setOf(AgentInboxPackageValidationError.DOWNLOAD_UNAVAILABLE),
+-                                failureDetail = error.toAgentInboxImportFailureDetail(),
+-                            ),
+-                            nowMillis = nowMillis,
+-                        )
+-                        return@launch
+-                    }
+-                    totalImageAttachmentBytes += attachmentBytes.size.toLong()
+-                    if (totalImageAttachmentBytes > AGENT_INBOX_MAX_TOTAL_IMAGE_ATTACHMENT_BYTES) {
+-                        applyAgentInboxImportResult(
+-                            packageFolderId = packageFolderId,
+-                            result = AgentInboxImportResult(
+-                                status = AgentInboxImportStatus.INVALID,
+-                                requestedHighPriority = candidate.requestsHighPriority,
+-                                packageErrors = setOf(AgentInboxPackageValidationError.IMAGE_ATTACHMENT_TOO_LARGE),
+-                            ),
+-                            nowMillis = nowMillis,
+-                        )
+-                        return@launch
+-                    }
+-                    imageAttachmentBytes[attachment.fileName] = attachmentBytes
++                when (result.status) {
++                    AgentInboxImportStatus.IMPORTED -> importedCount += 1
++                    AgentInboxImportStatus.DUPLICATE -> duplicateCount += 1
++                    AgentInboxImportStatus.INVALID,
++                    AgentInboxImportStatus.REJECTED,
++                    -> failedCount += 1
+                 }
+-                val result = agentInboxPackageImporter.importCandidate(
+-                    candidate = candidate,
+-                    contentBytes = contentBytes,
+-                    imageAttachmentBytes = imageAttachmentBytes,
+-                    nowMillis = nowMillis,
+-                )
+                 applyAgentInboxImportResult(
+                     packageFolderId = packageFolderId,
+                     result = result,
+                     nowMillis = nowMillis,
++                    keepImporting = true,
++                )
++            }
++            recordEventDurably(
++                AnalyticsEvent(
++                    type = AnalyticsEventType.AGENT_INBOX_IMPORT_ALL_COMPLETED,
++                    timestampMillis = nowMillis,
++                    metadata = mapOf(
++                        "automatic" to automatic.toString(),
++                        "attemptedCount" to packageFolderIds.size.toString(),
++                        "importedCount" to importedCount.toString(),
++                        "duplicateCount" to duplicateCount.toString(),
++                        "failedCount" to failedCount.toString(),
++                        "skippedCount" to skippedCount.toString(),
++                    ),
++                ),
++            )
++            val prefix = if (automatic) "Agent Inbox autoimport" else "Agent Inbox import all"
++            uiState = uiState.copy(
++                isAgentInboxImporting = false,
++                latestMessage = when {
++                    importedCount > 0 && failedCount == 0 -> {
++                        "$prefix imported ${quantityLabel(importedCount, "package")}."
++                    }
++                    importedCount > 0 -> {
++                        "$prefix imported ${quantityLabel(importedCount, "package")}; ${quantityLabel(failedCount, "package")} need review."
++                    }
++                    failedCount > 0 -> {
++                        "$prefix could not import ${quantityLabel(failedCount, "package")}."
++                    }
++                    duplicateCount > 0 -> {
++                        "$prefix found ${quantityLabel(duplicateCount, "duplicate")}."
++                    }
++                    else -> "$prefix found no ready packages."
++                },
++            )
++        }
++    }
++
++    private suspend fun buildAgentInboxImportResult(
++        candidate: AgentInboxReviewCandidate,
++        accessToken: String,
++        nowMillis: Long,
++    ): AgentInboxImportResult {
++        val contentBytes = try {
++            agentInboxDriveClient.downloadFile(
++                accessToken = accessToken,
++                fileId = requireNotNull(candidate.contentFileId),
++                maxBytes = AGENT_INBOX_MAX_REVIEW_CONTENT_BYTES,
++                expectedBytes = candidate.reviewedContentSizeBytes,
++            )
++        } catch (tooLarge: AgentInboxDriveDownloadTooLargeException) {
++            return AgentInboxImportResult(
++                status = AgentInboxImportStatus.INVALID,
++                requestedHighPriority = candidate.requestsHighPriority,
++                packageErrors = setOf(AgentInboxPackageValidationError.CONTENT_FILE_TOO_LARGE),
++            )
++        } catch (error: Throwable) {
++            if (error is CancellationException) throw error
++            if (error is AgentInboxDriveAccessLostException) throw error
++            logAgentInboxImportFailure(error)
++            return AgentInboxImportResult(
++                status = AgentInboxImportStatus.INVALID,
++                requestedHighPriority = candidate.requestsHighPriority,
++                packageErrors = setOf(AgentInboxPackageValidationError.DOWNLOAD_UNAVAILABLE),
++                failureDetail = error.toAgentInboxImportFailureDetail(),
++            )
++        }
++        val imageAttachmentBytes = mutableMapOf<String, ByteArray>()
++        var totalImageAttachmentBytes = 0L
++        candidate.imageAttachmentFiles.forEach { attachment ->
++            if ((attachment.sizeBytes ?: 0L) > AGENT_INBOX_MAX_IMAGE_ATTACHMENT_BYTES) {
++                return AgentInboxImportResult(
++                    status = AgentInboxImportStatus.INVALID,
++                    requestedHighPriority = candidate.requestsHighPriority,
++                    packageErrors = setOf(AgentInboxPackageValidationError.IMAGE_ATTACHMENT_TOO_LARGE),
++                )
++            }
++            val attachmentBytes = try {
++                agentInboxDriveClient.downloadFile(
++                    accessToken = accessToken,
++                    fileId = attachment.fileId,
++                    maxBytes = AGENT_INBOX_MAX_IMAGE_ATTACHMENT_BYTES,
++                    expectedBytes = attachment.sizeBytes,
++                )
++            } catch (tooLarge: AgentInboxDriveDownloadTooLargeException) {
++                return AgentInboxImportResult(
++                    status = AgentInboxImportStatus.INVALID,
++                    requestedHighPriority = candidate.requestsHighPriority,
++                    packageErrors = setOf(AgentInboxPackageValidationError.IMAGE_ATTACHMENT_TOO_LARGE),
+                 )
+             } catch (error: Throwable) {
+                 if (error is CancellationException) throw error
++                if (error is AgentInboxDriveAccessLostException) throw error
+                 logAgentInboxImportFailure(error)
+-                applyAgentInboxImportResult(
+-                    packageFolderId = packageFolderId,
+-                    result = AgentInboxImportResult(
+-                        status = AgentInboxImportStatus.REJECTED,
+-                        requestedHighPriority = candidate.requestsHighPriority,
+-                        packageErrors = setOf(error.toAgentInboxImportPackageError()),
+-                        failureDetail = error.toAgentInboxImportFailureDetail(),
+-                    ),
+-                    nowMillis = nowMillis,
++                return AgentInboxImportResult(
++                    status = AgentInboxImportStatus.INVALID,
++                    requestedHighPriority = candidate.requestsHighPriority,
++                    packageErrors = setOf(AgentInboxPackageValidationError.DOWNLOAD_UNAVAILABLE),
++                    failureDetail = error.toAgentInboxImportFailureDetail(),
++                )
++            }
++            totalImageAttachmentBytes += attachmentBytes.size.toLong()
++            if (totalImageAttachmentBytes > AGENT_INBOX_MAX_TOTAL_IMAGE_ATTACHMENT_BYTES) {
++                return AgentInboxImportResult(
++                    status = AgentInboxImportStatus.INVALID,
++                    requestedHighPriority = candidate.requestsHighPriority,
++                    packageErrors = setOf(AgentInboxPackageValidationError.IMAGE_ATTACHMENT_TOO_LARGE),
+                 )
+             }
++            imageAttachmentBytes[attachment.fileName] = attachmentBytes
+         }
++        return agentInboxPackageImporter.importCandidate(
++            candidate = candidate,
++            contentBytes = contentBytes,
++            imageAttachmentBytes = imageAttachmentBytes,
++            nowMillis = nowMillis,
++        )
+     }
+
+     private suspend fun applyAgentInboxImportResult(
+         packageFolderId: String,
+         result: AgentInboxImportResult,
+         nowMillis: Long,
++        keepImporting: Boolean = false,
+     ) {
+         when (result.status) {
+             AgentInboxImportStatus.IMPORTED -> {
+@@ -2142,7 +2308,7 @@ class MainViewModel(
+                 )
+                 autosaveAccountLightProfileAfterPortableMutation(nowMillis = nowMillis)
+                 uiState = uiState.copy(
+-                    isAgentInboxImporting = false,
++                    isAgentInboxImporting = keepImporting,
+                     agentInboxCandidates = updatedCandidates,
+                     agentInboxPriorityAcceptedPackageIds = uiState.agentInboxPriorityAcceptedPackageIds -
+                         packageFolderId -
+@@ -2191,7 +2357,7 @@ class MainViewModel(
+                     ),
+                 )
+                 uiState = uiState.copy(
+-                    isAgentInboxImporting = false,
++                    isAgentInboxImporting = keepImporting,
+                     agentInboxCandidates = updatedCandidates,
+                     agentInboxPriorityAcceptedPackageIds = uiState.agentInboxPriorityAcceptedPackageIds -
+                         duplicatePackageIds,
+@@ -2242,7 +2408,7 @@ class MainViewModel(
+                     ),
+                 )
+                 uiState = uiState.copy(
+-                    isAgentInboxImporting = false,
++                    isAgentInboxImporting = keepImporting,
+                     agentInboxCandidates = updatedCandidates,
+                     agentInboxPriorityAcceptedPackageIds = uiState.agentInboxPriorityAcceptedPackageIds -
+                         packageFolderId,
+@@ -2328,6 +2494,7 @@ class MainViewModel(
+             agentInboxCandidates = emptyList(),
+             agentInboxPriorityAcceptedPackageIds = emptySet(),
+             agentInboxScanTruncated = false,
++            agentInboxAutoImportEnabled = false,
+             latestMessage = "Agent Inbox folder access was lost.",
+         )
+         viewModelScope.launch {
+@@ -4529,6 +4696,7 @@ class MainViewModel(
+             agentInboxDriveLastSuccessfulAtMillis = settings.agentInboxDriveLastSuccessfulAtMillis,
+             agentInboxDriveLastError = settings.agentInboxDriveLastError,
+             agentInboxDriveFolderDraft = agentInboxDriveFolderDraft,
++            agentInboxAutoImportEnabled = settings.agentInboxAutoImportEnabled,
+             profileAutosaveUri = effectiveProfileAutosaveUri,
+             profileAutosaveDisplayName = effectiveProfileAutosaveDisplayName,
+             profileAutosaveUsesLocalDefault = profileAutosaveUsesLocalDefault,
+diff --git a/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt b/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
+index 8ab9a3a..69ba4ee 100644
+--- a/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
++++ b/app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
+@@ -388,18 +388,29 @@ private fun MainRoute(
+     var driveAuthorizationMode by remember { mutableStateOf(GoogleDriveAuthorizationMode.ANNOTATION_CONNECT) }
+     var pendingAgentInboxImportPackageId by remember { mutableStateOf<String?>(null) }
+     var agentInboxFolderBrowserAccessToken by remember { mutableStateOf<String?>(null) }
++    var agentInboxAutoImportStarted by remember { mutableStateOf(false) }
++    var agentInboxAutoImportWaitingForScan by remember { mutableStateOf(false) }
++    var agentInboxAutoImportAccessToken by remember { mutableStateOf<String?>(null) }
+     fun reportDriveAuthorizationFailure(message: String) {
+         when (driveAuthorizationMode) {
+             GoogleDriveAuthorizationMode.AGENT_INBOX_BROWSE_READONLY,
+             GoogleDriveAuthorizationMode.AGENT_INBOX_CONNECT_READONLY,
+             GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_SCAN,
+             GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_IMPORT,
++            GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_IMPORT_ALL,
+             -> {
+                 pendingAgentInboxImportPackageId = null
+                 agentInboxFolderBrowserAccessToken = null
+                 viewModel.reportAgentInboxDriveAuthorizationFailure(message)
+             }
+
++            GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_AUTOIMPORT -> {
++                pendingAgentInboxImportPackageId = null
++                agentInboxAutoImportWaitingForScan = false
++                agentInboxAutoImportAccessToken = null
++                viewModel.reportAgentInboxAutoImportAuthorizationFailure(message)
++            }
++
+             GoogleDriveAuthorizationMode.ANNOTATION_CONNECT,
+             GoogleDriveAuthorizationMode.ANNOTATION_RETRY -> {
+                 viewModel.reportAnnotationDriveAuthorizationFailure(message)
+@@ -445,6 +456,14 @@ private fun MainRoute(
+                     viewModel.importAgentInboxCandidate(packageFolderId = packageFolderId, accessToken = token)
+                 }
+             }
++            GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_IMPORT_ALL -> {
++                viewModel.importAllAgentInboxCandidates(accessToken = token)
++            }
++            GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_AUTOIMPORT -> {
++                agentInboxAutoImportAccessToken = token
++                agentInboxAutoImportWaitingForScan = true
++                viewModel.scanAgentInboxDrive(token)
++            }
+         }
+     }
+     val driveAuthorizationLauncher = rememberLauncherForActivityResult(
+@@ -474,6 +493,8 @@ private fun MainRoute(
+             GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_SCAN,
+             -> viewModel.beginAgentInboxDriveScan()
+             GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_IMPORT,
++            GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_IMPORT_ALL,
++            GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_AUTOIMPORT,
+             -> Unit
+         }
+         val authorizationRequest = googleDriveAuthorizationRequestFor(mode)
+@@ -498,6 +519,30 @@ private fun MainRoute(
+                 reportDriveAuthorizationFailure(error.googleDriveAuthMessage())
+             }
+     }
++    val startAgentInboxAutoImportAuthorization: () -> Unit = {
++        driveAuthorizationMode = GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_AUTOIMPORT
++        viewModel.beginAgentInboxDriveScan()
++        val authorizationRequest = googleDriveAuthorizationRequestFor(
++            GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_AUTOIMPORT,
++        )
++        driveAuthorizationClient.authorize(authorizationRequest)
++            .addOnSuccessListener { authorizationResult ->
++                if (authorizationResult.hasResolution()) {
++                    agentInboxAutoImportWaitingForScan = false
++                    agentInboxAutoImportAccessToken = null
++                    viewModel.reportAgentInboxAutoImportAuthorizationFailure(
++                        "Agent Inbox autoimport needs Google Drive retry from Settings.",
++                    )
++                } else {
++                    handleDriveAuthorizationResult(authorizationResult)
++                }
++            }
++            .addOnFailureListener { error ->
++                agentInboxAutoImportWaitingForScan = false
++                agentInboxAutoImportAccessToken = null
++                viewModel.reportAgentInboxAutoImportAuthorizationFailure(error.googleDriveAuthMessage())
++            }
++    }
+     val disconnectGoogleDriveSync = {
+         val revokeRequest = RevokeAccessRequest.builder()
+             .setScopes(listOf(Scope(ANNOTATION_DRIVE_SCOPE)))
+@@ -647,6 +692,54 @@ private fun MainRoute(
+         releaseProfileAutosavePermission(context = context, uri = Uri.parse(uri))
+     }
+
++    LaunchedEffect(
++        state.agentInboxAutoImportEnabled,
++        state.agentInboxDriveFolderId,
++        state.agentInboxDriveGrantMode,
++    ) {
++        if (
++            state.agentInboxAutoImportEnabled &&
++            state.hasAgentInboxDriveFolderGrant &&
++            !agentInboxAutoImportStarted &&
++            !state.isAgentInboxScanning &&
++            !state.isAgentInboxImporting
++        ) {
++            agentInboxAutoImportStarted = true
++            when {
++                state.hasAgentInboxDocumentTreeFolderGrant && !agentInboxDocumentTreeUsesGoogleDriveProvider() -> {
++                    agentInboxAutoImportAccessToken = ""
++                    agentInboxAutoImportWaitingForScan = true
++                    viewModel.scanAgentInboxDrive(accessToken = "")
++                }
++
++                state.hasAgentInboxReadonlyFolderGrant || agentInboxDocumentTreeUsesGoogleDriveProvider() -> {
++                    startAgentInboxAutoImportAuthorization()
++                }
++            }
++        }
++    }
++
++    LaunchedEffect(
++        agentInboxAutoImportWaitingForScan,
++        state.isAgentInboxScanning,
++        state.agentInboxDriveLastError,
++        state.agentInboxCandidates,
++    ) {
++        if (
++            agentInboxAutoImportWaitingForScan &&
++            !state.isAgentInboxScanning &&
++            state.agentInboxDriveLastError == null
++        ) {
++            val token = agentInboxAutoImportAccessToken.orEmpty()
++            agentInboxAutoImportWaitingForScan = false
++            agentInboxAutoImportAccessToken = null
++            viewModel.importAllAgentInboxCandidates(
++                accessToken = token,
++                automatic = true,
++            )
++        }
++    }
++
+     Box(modifier = Modifier.fillMaxSize()) {
+         when (state.screen) {
+             MainScreen.Onboarding -> OnboardingFlow(
+@@ -835,6 +928,7 @@ private fun MainRoute(
+                 },
+                 onToggleAgentInboxPriority = viewModel::toggleAgentInboxPriority,
+                 onRejectAgentInboxCandidate = viewModel::rejectAgentInboxCandidate,
++                onToggleAgentInboxAutoImport = { enabled -> viewModel.setAgentInboxAutoImportEnabled(enabled) },
+                 onImportAgentInboxCandidate = { packageFolderId ->
+                     if (agentInboxDocumentTreeUsesGoogleDriveProvider()) {
+                         pendingAgentInboxImportPackageId = packageFolderId
+@@ -846,6 +940,15 @@ private fun MainRoute(
+                         startGoogleDriveSyncAuthorization(GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_IMPORT)
+                     }
+                 },
++                onImportAllAgentInboxCandidates = {
++                    if (agentInboxDocumentTreeUsesGoogleDriveProvider()) {
++                        startGoogleDriveSyncAuthorization(GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_IMPORT_ALL)
++                    } else if (state.hasAgentInboxDocumentTreeFolderGrant) {
++                        viewModel.importAllAgentInboxCandidates(accessToken = "")
++                    } else {
++                        startGoogleDriveSyncAuthorization(GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_IMPORT_ALL)
++                    }
++                },
+                 onExportAccountLightProfile = { accountLightExportPicker.launch(ACCOUNT_LIGHT_PROFILE_FILE_NAME) },
+                 onExportAccountLightBackup = { accountLightExportPicker.launch(accountLightTimestampedBackupFileName()) },
+                 onImportAccountLightProfile = { accountLightImportPicker.launch(arrayOf("application/json", "text/json", "*/*")) },
+@@ -4323,7 +4426,9 @@ private fun SettingsTab(
+     onCancelAgentInboxDriveFolderBrowser: () -> Unit,
+     onToggleAgentInboxPriority: (String) -> Unit,
+     onRejectAgentInboxCandidate: (String) -> Unit,
++    onToggleAgentInboxAutoImport: (Boolean) -> Unit,
+     onImportAgentInboxCandidate: (String) -> Unit,
++    onImportAllAgentInboxCandidates: () -> Unit,
+     onExportAccountLightProfile: () -> Unit,
+     onExportAccountLightBackup: () -> Unit,
+     onImportAccountLightProfile: () -> Unit,
+@@ -4535,7 +4640,9 @@ private fun SettingsTab(
+                 onCancelDriveFolderBrowser = onCancelAgentInboxDriveFolderBrowser,
+                 onTogglePriority = onToggleAgentInboxPriority,
+                 onRejectCandidate = onRejectAgentInboxCandidate,
++                onToggleAutoImport = onToggleAgentInboxAutoImport,
+                 onImportCandidate = onImportAgentInboxCandidate,
++                onImportAllCandidates = onImportAllAgentInboxCandidates,
+             )
+         }
+         item {
+@@ -5414,10 +5521,13 @@ private fun AgentInboxSettingsSection(
+     onCancelDriveFolderBrowser: () -> Unit,
+     onTogglePriority: (String) -> Unit,
+     onRejectCandidate: (String) -> Unit,
++    onToggleAutoImport: (Boolean) -> Unit,
+     onImportCandidate: (String) -> Unit,
++    onImportAllCandidates: () -> Unit,
+ ) {
+     val colors = QualityAlternativeThemeTokens.colors
+     val candidateCount = state.agentInboxCandidates.size
++    val readyCandidateCount = state.agentInboxCandidates.count(AgentInboxReviewCandidate::canImport)
+     val needsDriveLinkRepair = agentInboxNeedsDriveLinkRepair(state)
+     val showsDriveLinkFallback =
+         (!state.hasAgentInboxDriveFolderGrant || needsDriveLinkRepair) &&
+@@ -5558,6 +5668,39 @@ private fun AgentInboxSettingsSection(
+                     }
+                 }
+             }
++            if (state.hasAgentInboxDriveFolderGrant && !state.isAgentInboxDriveFolderBrowserOpen) {
++                Row(
++                    modifier = Modifier
++                        .fillMaxWidth()
++                        .padding(top = 12.dp)
++                        .clip(RoundedCornerShape(10.dp))
++                        .border(BorderStroke(1.dp, colors.line), RoundedCornerShape(10.dp))
++                        .clickable(
++                            enabled = !state.isAgentInboxScanning && !state.isAgentInboxImporting,
++                            onClick = { onToggleAutoImport(!state.agentInboxAutoImportEnabled) },
++                        )
++                        .semantics { selected = state.agentInboxAutoImportEnabled }
++                        .testTag("settings-agent-inbox-autoimport-toggle")
++                        .padding(horizontal = 12.dp, vertical = 10.dp),
++                    verticalAlignment = Alignment.CenterVertically,
++                    horizontalArrangement = Arrangement.spacedBy(10.dp),
++                ) {
++                    ToggleVisual(granted = state.agentInboxAutoImportEnabled)
++                    Column(modifier = Modifier.weight(1f)) {
++                        BodyText(
++                            text = "Autoimport on app start",
++                            color = colors.primaryText,
++                            fontSize = 13.sp,
++                            lineHeight = 17.sp,
++                        )
++                        MonoText(
++                            text = if (state.agentInboxAutoImportEnabled) "ON" else "OFF",
++                            color = if (state.agentInboxAutoImportEnabled) colors.success else colors.mutedText,
++                            modifier = Modifier.padding(top = 2.dp),
++                        )
++                    }
++                }
++            }
+             HorizontalDivider(
+                 color = colors.line,
+                 modifier = Modifier.padding(vertical = 14.dp),
+@@ -5585,6 +5728,20 @@ private fun AgentInboxSettingsSection(
+                     modifier = Modifier.padding(bottom = 8.dp),
+                     preserveCase = true,
+                 )
++                if (readyCandidateCount > 0) {
++                    QaButton(
++                        text = if (state.isAgentInboxImporting) "Importing" else "Import all",
++                        onClick = onImportAllCandidates,
++                        variant = QaButtonVariant.Primary,
++                        size = QaButtonSize.Small,
++                        enabled = !state.isAgentInboxScanning && !state.isAgentInboxImporting,
++                        leadingIcon = QaIconKind.Plus,
++                        modifier = Modifier
++                            .fillMaxWidth()
++                            .padding(bottom = 10.dp)
++                            .testTag("settings-agent-inbox-import-all"),
++                    )
++                }
+                 state.agentInboxCandidates.forEachIndexed { index, candidate ->
+                     if (index > 0) {
+                         HorizontalDivider(
+diff --git a/app/src/test/java/com/qualityalternative/app/ui/GoogleDriveAuthorizationTest.kt b/app/src/test/java/com/qualityalternative/app/ui/GoogleDriveAuthorizationTest.kt
+index 5761d13..6e95441 100644
+--- a/app/src/test/java/com/qualityalternative/app/ui/GoogleDriveAuthorizationTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/ui/GoogleDriveAuthorizationTest.kt
+@@ -36,6 +36,8 @@ class GoogleDriveAuthorizationTest {
+             GoogleDriveAuthorizationMode.AGENT_INBOX_CONNECT_READONLY,
+             GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_SCAN,
+             GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_IMPORT,
++            GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_IMPORT_ALL,
++            GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_AUTOIMPORT,
+         ).forEach { mode ->
+             val spec = googleDriveAuthorizationRequestSpecFor(mode)
+
+diff --git a/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt b/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
+index c96bdd6..ba9e58d 100644
+--- a/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
++++ b/app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
+@@ -3579,6 +3579,128 @@ class MainViewModelTest {
+         assertEquals("true", importedEvent.metadata["priorityRequested"])
+     }
+
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun importAllAgentInboxCandidatesImportsEveryReadyPackageWithoutAutoAcceptingPriority() = runTest {
++        val firstBytes = "# First Agent Note\n\nPrivate attention note.".toByteArray()
++        val secondBytes = "# Second Agent Note\n\nAnother private note.".toByteArray()
++        val driveClient = RecordingAgentInboxDriveClient(
++            scanResult = AgentInboxDriveScanResult(
++                folderId = "agent-inbox-folder",
++                packages = listOf(
++                    agentInboxDrivePackage(
++                        folderId = "agent-package-a",
++                        manifestFileId = "manifest-file-a",
++                        contentFileId = "content-file-a",
++                    ),
++                    agentInboxDrivePackage(
++                        folderId = "agent-package-b",
++                        manifestFileId = "manifest-file-b",
++                        contentFileId = "content-file-b",
++                    ),
++                ),
++            ),
++            files = mapOf(
++                "manifest-file-a" to agentInboxManifest(priority = "high").toByteArray(),
++                "content-file-a" to firstBytes,
++                "manifest-file-b" to agentInboxManifest(priority = "normal").toByteArray(),
++                "content-file-b" to secondBytes,
++            ),
++        )
++        val userDocumentRepository = FakeUserDocumentRepository()
++        val settingsRepository = FakeSettingsRepository()
++        val analyticsTracker = InMemoryAnalyticsTracker()
++        val documentStore = RecordingAgentInboxDocumentStore()
++        val viewModel = createViewModel(
++            settingsRepository = settingsRepository,
++            userDocumentRepository = userDocumentRepository,
++            agentInboxDriveClient = driveClient,
++            analyticsTracker = analyticsTracker,
++            agentInboxPackageImporter = AgentInboxPackageImporter(
++                userDocumentRepository = userDocumentRepository,
++                documentStore = documentStore,
++            ),
++        )
++
++        advanceUntilIdle()
++        viewModel.completeOnboarding()
++        advanceUntilIdle()
++        viewModel.selectAgentInboxDriveFolderForTest()
++        advanceUntilIdle()
++        viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 5_000L)
++        advanceUntilIdle()
++
++        assertEquals(2, viewModel.uiState.agentInboxCandidates.count { it.canImport })
++
++        viewModel.importAllAgentInboxCandidates(
++            accessToken = "drive-token",
++            nowMillis = 6_000L,
++        )
++        advanceUntilIdle()
++
++        assertEquals(2, userDocumentRepository.documents.value.size)
++        assertEquals(2, documentStore.writes.size)
++        assertTrue(viewModel.uiState.agentInboxCandidates.isEmpty())
++        assertTrue(viewModel.uiState.agentInboxPriorityAcceptedPackageIds.isEmpty())
++        assertTrue(viewModel.uiState.priorityContentIds.isEmpty())
++        assertTrue(settingsRepository.state.value.priorityContentIds.isEmpty())
++        assertEquals(
++            "Agent Inbox import all imported 2 packages.",
++            viewModel.uiState.latestMessage,
++        )
++        val startedEvent = analyticsTracker.allEvents().single { event ->
++            event.type == AnalyticsEventType.AGENT_INBOX_IMPORT_ALL_STARTED
++        }
++        assertEquals("false", startedEvent.metadata["automatic"])
++        assertEquals("2", startedEvent.metadata["readyCount"])
++        val completedEvent = analyticsTracker.allEvents().single { event ->
++            event.type == AnalyticsEventType.AGENT_INBOX_IMPORT_ALL_COMPLETED
++        }
++        assertEquals("2", completedEvent.metadata["attemptedCount"])
++        assertEquals("2", completedEvent.metadata["importedCount"])
++        assertEquals("0", completedEvent.metadata["failedCount"])
++        assertTrue(AnalyticsPrivacyGuard.unsafeRemoteFields(startedEvent.toRemoteAnalyticsPayload()).isEmpty())
++        assertTrue(AnalyticsPrivacyGuard.unsafeRemoteFields(completedEvent.toRemoteAnalyticsPayload()).isEmpty())
++    }
++
++    @Test
++    @OptIn(ExperimentalCoroutinesApi::class)
++    fun agentInboxAutoImportToggleRequiresConfiguredFolderAndClearsOnDisconnect() = runTest {
++        val settingsRepository = FakeSettingsRepository()
++        val analyticsTracker = InMemoryAnalyticsTracker()
++        val viewModel = createViewModel(
++            settingsRepository = settingsRepository,
++            analyticsTracker = analyticsTracker,
++        )
++
++        advanceUntilIdle()
++        viewModel.setAgentInboxAutoImportEnabled(true, nowMillis = 5_000L)
++        advanceUntilIdle()
++
++        assertFalse(viewModel.uiState.agentInboxAutoImportEnabled)
++        assertFalse(settingsRepository.state.value.agentInboxAutoImportEnabled)
++        assertEquals("Connect an Agent Inbox folder before enabling autoimport.", viewModel.uiState.latestMessage)
++
++        viewModel.selectAgentInboxDriveFolderForTest()
++        advanceUntilIdle()
++        viewModel.setAgentInboxAutoImportEnabled(true, nowMillis = 6_000L)
++        advanceUntilIdle()
++
++        assertTrue(viewModel.uiState.agentInboxAutoImportEnabled)
++        assertTrue(settingsRepository.state.value.agentInboxAutoImportEnabled)
++
++        viewModel.disconnectAgentInboxDrive(nowMillis = 7_000L)
++        advanceUntilIdle()
++
++        assertFalse(viewModel.uiState.agentInboxAutoImportEnabled)
++        assertFalse(settingsRepository.state.value.agentInboxAutoImportEnabled)
++        val toggledEvents = analyticsTracker.allEvents().filter { event ->
++            event.type == AnalyticsEventType.AGENT_INBOX_AUTOIMPORT_TOGGLED
++        }
++        assertEquals(listOf("true"), toggledEvents.map { event -> event.metadata["enabled"] })
++        assertTrue(AnalyticsPrivacyGuard.unsafeRemoteFields(toggledEvents.single().toRemoteAnalyticsPayload()).isEmpty())
++    }
++
+     @Test
+     @OptIn(ExperimentalCoroutinesApi::class)
+     fun importAgentInboxCandidateMarksSameShaScanSiblingDuplicateAfterFirstImport() = runTest {
+@@ -7504,6 +7626,7 @@ class MainViewModelTest {
+                 agentInboxDriveGrantMode = state.value.agentInboxDriveGrantMode,
+                 agentInboxDriveLastSuccessfulAtMillis = state.value.agentInboxDriveLastSuccessfulAtMillis,
+                 agentInboxDriveLastError = state.value.agentInboxDriveLastError,
++                agentInboxAutoImportEnabled = state.value.agentInboxAutoImportEnabled,
+                 profileAutosaveUri = state.value.profileAutosaveUri,
+                 profileAutosaveDisplayName = state.value.profileAutosaveDisplayName,
+                 profileAutosaveLastSuccessfulAtMillis = state.value.profileAutosaveLastSuccessfulAtMillis,
+@@ -7613,6 +7736,7 @@ class MainViewModelTest {
+                     agentInboxDriveFolderId = null,
+                     agentInboxDriveGrantMode = null,
+                     agentInboxDriveLastError = null,
++                    agentInboxAutoImportEnabled = false,
+                 )
+             } else {
+                 state.value.copy(
+@@ -7631,6 +7755,7 @@ class MainViewModelTest {
+                 agentInboxDriveGrantMode = null,
+                 agentInboxDriveLastSuccessfulAtMillis = null,
+                 agentInboxDriveLastError = null,
++                agentInboxAutoImportEnabled = false,
+             )
+         }
+
+@@ -7655,6 +7780,7 @@ class MainViewModelTest {
+                     agentInboxDriveGrantMode = null,
+                     agentInboxDriveLastSuccessfulAtMillis = null,
+                     agentInboxDriveLastError = null,
++                    agentInboxAutoImportEnabled = false,
+                 )
+             }
+         }
+@@ -7663,6 +7789,17 @@ class MainViewModelTest {
+             state.value = state.value.copy(agentInboxDriveLastError = errorMessage)
+         }
+
++        override suspend fun saveAgentInboxAutoImportEnabled(enabled: Boolean) {
++            state.value = state.value.copy(
++                agentInboxAutoImportEnabled = enabled &&
++                    state.value.agentInboxDriveEnabled &&
++                    (
++                        state.value.agentInboxDriveGrantMode == AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER ||
++                            state.value.agentInboxDriveGrantMode == AGENT_INBOX_DRIVE_GRANT_MODE_READONLY_FOLDER
++                        ),
++            )
++        }
++
+         override suspend fun saveAnnotationExportDestination(uri: String, displayName: String) {
+             state.value = state.value.copy(
+                 annotationExportUri = uri,
+diff --git a/docs/AGENT_INBOX_LIVE_REVIEW_GATE.md b/docs/AGENT_INBOX_LIVE_REVIEW_GATE.md
+index 51909f9..cd445ea 100644
+--- a/docs/AGENT_INBOX_LIVE_REVIEW_GATE.md
++++ b/docs/AGENT_INBOX_LIVE_REVIEW_GATE.md
+@@ -18,6 +18,8 @@ A release candidate must provide an evidence directory containing:
+   - import result with queue cleared
+   - Library `Files` view showing the imported document
+   - reader showing imported content
++- For any `Import all` change: evidence that at least two externally uploaded packages were found together, batch imported together, cleared from the review queue, appeared in Library `Files`, and at least one batch-imported document rendered in the reader.
++- For any autoimport change: evidence that autoimport was explicitly enabled after folder connection, a new externally uploaded package was added after that enablement, the app was force-stopped/relaunched, no new approval chooser was shown when access had already been granted, the autoimport result was visible, the document appeared in Library `Files`, and the reader rendered the autoimported content.
+ - UIAutomator XML or equivalent machine-readable screen dumps for the same milestones.
+ - Logcat health sentinels proving there is no app crash and no old failure text such as `Package is missing manifest`, `Package could not be saved`, `Agent Inbox package could not be imported`, or `Google Drive authorization hit a Google Play services error`.
+ - Automated test results for the changed logic and a connected visual test for the Agent Inbox Drive picker states.
+@@ -45,5 +47,6 @@ A 10/10 PASS is only valid when the reviewer cites the exact evidence paths and
+ - import cleared the queue
+ - the imported document appeared in Library
+ - the reader rendered the imported file content
++- import-all and/or autoimport proof covers the extra criteria above when those behaviors changed
+ - automated tests passed
+ - the final APK hash is recorded
+diff --git a/docs/LANE_STATUS.md b/docs/LANE_STATUS.md
+index d60bc09..a3f2f05 100644
+--- a/docs/LANE_STATUS.md
++++ b/docs/LANE_STATUS.md
+@@ -11,6 +11,35 @@ This file is the repo-level index for active and recently completed execution la
+ - Heartbeats should exist only while waiting for a current GPT Pro lane.
+ - Do not infer lane status from untracked local files alone. For example, `ios/` can appear untracked on non-iOS branches; the canonical iOS implementation source is the pushed iOS branch listed below.
+
++## Sprint 38 Agent Inbox Import All + Autoimport
++
++Status: `release_artifact_prepared_gpt_pro_r1_pass_10_10`
++
++- Date opened: 2026-06-17
++- Trigger: user requested a stricter Pro-reviewed sprint for `Import all` and opt-in autoimport on app startup, with hard visual evidence that real Drive packages import into Library and render in the reader.
++- Scope:
++  - Add `Import all` for all current ready Agent Inbox candidates.
++  - Add opt-in `Autoimport on app start` after the user has explicitly connected an Agent Inbox folder.
++  - Autoimport scans/imports only the selected folder and does not silently accept manifest priority requests.
++- PRD mapping:
++  - FR3B Agent Inbox remains limited to an explicitly selected folder and does not scan whole Drive.
++  - NFR privacy remains intact: analytics do not include raw Drive ids, file names, document text, or reversible fingerprints.
++  - The previous no-ingest-without-review rule is narrowed for explicit, revocable autoimport only; priority requests still need explicit acceptance before ranking changes.
++- Validation:
++  - Targeted unit tests passed for `MainViewModelTest` and `GoogleDriveAuthorizationTest`.
++  - Connected visual test passed for Agent Inbox folder selector states, autoimport toggle, import-all queue, queue cleared, and reader rendering.
++  - Live signed-in emulator Drive proof passed on `emulator-5554` with Google account `omareth@gmail.com`.
++  - Real Google Drive folder: `QA-Agent-Inbox-Sprint38-Import-All-Autoimport-20260617-182500`.
++  - Live `Import all` proof covers two externally uploaded packages with `manifest.json` and `content.md`, batch import, queue clearing, Library `Files`, and reader rendering.
++  - Live autoimport proof covers enabling autoimport, uploading a new external package after enablement, force-stopping/relaunching the app, visible `Agent Inbox autoimport imported 1 package.`, Library `Files`, and reader rendering.
++  - Local release gate passed: `testDebugUnitTest`, `lintDebug`, and `assembleRelease`.
++  - GPT Pro R1 returned `SCORE: 10/10`, `VERDICT: PASS`, `BLOCKERS: None`.
++- Evidence root: `evidence/sprint38_agent_inbox_import_all_autoimport/`.
++- Release APK candidate: `evidence/sprint38_agent_inbox_import_all_autoimport/apk/app-release-unsigned.apk`.
++- Release artifacts:
++  - `release_artifacts/quality-alternative-v0.11.25-agent-inbox-import-all-autoimport-alpha-debug.apk`
++  - `release_artifacts/quality-alternative-v0.11.25-agent-inbox-import-all-autoimport-alpha-release-unsigned.apk`
++
+ ## Sprint 37 Agent Inbox Real Device Drive Authorization Repair
+
+ Status: `release_published_gpt_pro_r1_pass_10_10`

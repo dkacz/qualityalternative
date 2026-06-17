@@ -155,6 +155,7 @@ data class AppSettings(
     val agentInboxDriveGrantMode: String? = null,
     val agentInboxDriveLastSuccessfulAtMillis: Long? = null,
     val agentInboxDriveLastError: String? = null,
+    val agentInboxAutoImportEnabled: Boolean = false,
     val profileAutosaveUri: String? = null,
     val profileAutosaveDisplayName: String? = null,
     val profileAutosaveLastSuccessfulAtMillis: Long? = null,

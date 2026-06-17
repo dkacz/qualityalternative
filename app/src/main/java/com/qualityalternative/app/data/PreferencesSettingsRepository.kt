@@ -119,6 +119,8 @@ class PreferencesSettingsRepository(
                     agentInboxDriveLastSuccessfulAtMillis =
                         preferences[AgentInboxDriveLastSuccessfulAtMillis].takeIf { hasAgentInboxFolderGrant },
                     agentInboxDriveLastError = preferences[AgentInboxDriveLastError],
+                    agentInboxAutoImportEnabled = hasAgentInboxFolderGrant &&
+                        (preferences[AgentInboxAutoImportEnabled] ?: false),
                     profileAutosaveUri = preferences[ProfileAutosaveUri],
                     profileAutosaveDisplayName = preferences[ProfileAutosaveDisplayName],
                     profileAutosaveLastSuccessfulAtMillis = preferences[ProfileAutosaveLastSuccessfulAtMillis],
@@ -375,6 +377,7 @@ class PreferencesSettingsRepository(
             preferences.remove(AgentInboxDriveGrantMode)
             preferences.remove(AgentInboxDriveLastSuccessfulAtMillis)
             preferences.remove(AgentInboxDriveLastError)
+            preferences.remove(AgentInboxAutoImportEnabled)
         }
     }
 
@@ -393,6 +396,7 @@ class PreferencesSettingsRepository(
                 preferences.remove(AgentInboxDriveFolderId)
                 preferences.remove(AgentInboxDriveGrantMode)
                 preferences.remove(AgentInboxDriveLastSuccessfulAtMillis)
+                preferences.remove(AgentInboxAutoImportEnabled)
             }
             preferences.remove(AgentInboxDriveLastError)
         }
@@ -401,6 +405,19 @@ class PreferencesSettingsRepository(
     override suspend fun saveAgentInboxDriveScanFailure(errorMessage: String) {
         dataStore.edit { preferences ->
             preferences[AgentInboxDriveLastError] = errorMessage
+        }
+    }
+
+    override suspend fun saveAgentInboxAutoImportEnabled(enabled: Boolean) {
+        dataStore.edit { preferences ->
+            val hasOperationalGrant = preferences[AgentInboxDriveEnabled] == true &&
+                preferences[AgentInboxDriveFolderId]?.isNotBlank() == true &&
+                preferences[AgentInboxDriveGrantMode] in AGENT_INBOX_OPERATIONAL_GRANT_MODES
+            if (enabled && hasOperationalGrant) {
+                preferences[AgentInboxAutoImportEnabled] = true
+            } else {
+                preferences.remove(AgentInboxAutoImportEnabled)
+            }
         }
     }
 
@@ -543,6 +560,7 @@ class PreferencesSettingsRepository(
         val AgentInboxDriveGrantMode = stringPreferencesKey("agent_inbox_drive_grant_mode")
         val AgentInboxDriveLastSuccessfulAtMillis = longPreferencesKey("agent_inbox_drive_last_successful_at_millis")
         val AgentInboxDriveLastError = stringPreferencesKey("agent_inbox_drive_last_error")
+        val AgentInboxAutoImportEnabled = booleanPreferencesKey("agent_inbox_auto_import_enabled")
         val AGENT_INBOX_SUPPORTED_GRANT_MODES = setOf(
             AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER,
             AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER,

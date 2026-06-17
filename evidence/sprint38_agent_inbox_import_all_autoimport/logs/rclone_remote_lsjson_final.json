@@ -1,0 +1,11 @@
+[
+{"Path":"codex-sprint38-autoimport-startup","Name":"codex-sprint38-autoimport-startup","Size":0,"MimeType":"inode/directory","ModTime":"2026-06-17T17:07:32.303Z","IsDir":true,"ID":"1Tf41d4tp4N9RpvxkYgDmWwMng_PUaV2-"},
+{"Path":"codex-sprint38-import-all-two","Name":"codex-sprint38-import-all-two","Size":0,"MimeType":"inode/directory","ModTime":"2026-06-17T16:53:43.923Z","IsDir":true,"ID":"1yf6mzgFUI70YuVdywoD80w7Sjh4-3av4"},
+{"Path":"codex-sprint38-import-all-one","Name":"codex-sprint38-import-all-one","Size":0,"MimeType":"inode/directory","ModTime":"2026-06-17T16:53:43.318Z","IsDir":true,"ID":"1apfJY02KW0kZJZhOR_1OY_ShOz0Pg2BT"},
+{"Path":"codex-sprint38-import-all-one/manifest.json","Name":"manifest.json","Size":441,"MimeType":"application/json","ModTime":"2026-06-17T16:52:37.130Z","IsDir":false,"ID":"16mn5CqqEjzWBM3lZHNaspibNxTmH1JjP"},
+{"Path":"codex-sprint38-import-all-one/content.md","Name":"content.md","Size":313,"MimeType":"text/markdown","ModTime":"2026-06-17T16:52:14.447Z","IsDir":false,"ID":"1ryDc1E0p7WHIhFXgZIFUOWVY6VAjJ9eW"},
+{"Path":"codex-sprint38-import-all-two/manifest.json","Name":"manifest.json","Size":445,"MimeType":"application/json","ModTime":"2026-06-17T16:52:37.130Z","IsDir":false,"ID":"1EvKGfZENsazGyxtasCysHwgOsbgRJt2p"},
+{"Path":"codex-sprint38-import-all-two/content.md","Name":"content.md","Size":287,"MimeType":"text/markdown","ModTime":"2026-06-17T16:52:14.447Z","IsDir":false,"ID":"14JjUpE9MGzQCfYZ_HaKf1Kea3msyZ--q"},
+{"Path":"codex-sprint38-autoimport-startup/manifest.json","Name":"manifest.json","Size":451,"MimeType":"application/json","ModTime":"2026-06-17T16:52:37.130Z","IsDir":false,"ID":"1zoemkG-u6_CI0xidYw9KfyP1jDtCSXO9"},
+{"Path":"codex-sprint38-autoimport-startup/content.md","Name":"content.md","Size":308,"MimeType":"text/markdown","ModTime":"2026-06-17T16:52:14.448Z","IsDir":false,"ID":"10syVlJIvj59rVGVrPtIcmzN-ABWQES6i"}
+]

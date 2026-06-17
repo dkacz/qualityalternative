@@ -388,16 +388,27 @@ private fun MainRoute(
     var driveAuthorizationMode by remember { mutableStateOf(GoogleDriveAuthorizationMode.ANNOTATION_CONNECT) }
     var pendingAgentInboxImportPackageId by remember { mutableStateOf<String?>(null) }
     var agentInboxFolderBrowserAccessToken by remember { mutableStateOf<String?>(null) }
+    var agentInboxAutoImportStarted by remember { mutableStateOf(false) }
+    var agentInboxAutoImportWaitingForScan by remember { mutableStateOf(false) }
+    var agentInboxAutoImportAccessToken by remember { mutableStateOf<String?>(null) }
     fun reportDriveAuthorizationFailure(message: String) {
         when (driveAuthorizationMode) {
             GoogleDriveAuthorizationMode.AGENT_INBOX_BROWSE_READONLY,
             GoogleDriveAuthorizationMode.AGENT_INBOX_CONNECT_READONLY,
             GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_SCAN,
             GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_IMPORT,
+            GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_IMPORT_ALL,
             -> {
                 pendingAgentInboxImportPackageId = null
                 agentInboxFolderBrowserAccessToken = null
                 viewModel.reportAgentInboxDriveAuthorizationFailure(message)
+            }
+
+            GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_AUTOIMPORT -> {
+                pendingAgentInboxImportPackageId = null
+                agentInboxAutoImportWaitingForScan = false
+                agentInboxAutoImportAccessToken = null
+                viewModel.reportAgentInboxAutoImportAuthorizationFailure(message)
             }
 
             GoogleDriveAuthorizationMode.ANNOTATION_CONNECT,
@@ -445,6 +456,14 @@ private fun MainRoute(
                     viewModel.importAgentInboxCandidate(packageFolderId = packageFolderId, accessToken = token)
                 }
             }
+            GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_IMPORT_ALL -> {
+                viewModel.importAllAgentInboxCandidates(accessToken = token)
+            }
+            GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_AUTOIMPORT -> {
+                agentInboxAutoImportAccessToken = token
+                agentInboxAutoImportWaitingForScan = true
+                viewModel.scanAgentInboxDrive(token)
+            }
         }
     }
     val driveAuthorizationLauncher = rememberLauncherForActivityResult(
@@ -474,6 +493,8 @@ private fun MainRoute(
             GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_SCAN,
             -> viewModel.beginAgentInboxDriveScan()
             GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_IMPORT,
+            GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_IMPORT_ALL,
+            GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_AUTOIMPORT,
             -> Unit
         }
         val authorizationRequest = googleDriveAuthorizationRequestFor(mode)
@@ -496,6 +517,30 @@ private fun MainRoute(
             }
             .addOnFailureListener { error ->
                 reportDriveAuthorizationFailure(error.googleDriveAuthMessage())
+            }
+    }
+    val startAgentInboxAutoImportAuthorization: () -> Unit = {
+        driveAuthorizationMode = GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_AUTOIMPORT
+        viewModel.beginAgentInboxDriveScan()
+        val authorizationRequest = googleDriveAuthorizationRequestFor(
+            GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_AUTOIMPORT,
+        )
+        driveAuthorizationClient.authorize(authorizationRequest)
+            .addOnSuccessListener { authorizationResult ->
+                if (authorizationResult.hasResolution()) {
+                    agentInboxAutoImportWaitingForScan = false
+                    agentInboxAutoImportAccessToken = null
+                    viewModel.reportAgentInboxAutoImportAuthorizationFailure(
+                        "Agent Inbox autoimport needs Google Drive retry from Settings.",
+                    )
+                } else {
+                    handleDriveAuthorizationResult(authorizationResult)
+                }
+            }
+            .addOnFailureListener { error ->
+                agentInboxAutoImportWaitingForScan = false
+                agentInboxAutoImportAccessToken = null
+                viewModel.reportAgentInboxAutoImportAuthorizationFailure(error.googleDriveAuthMessage())
             }
     }
     val disconnectGoogleDriveSync = {
@@ -645,6 +690,54 @@ private fun MainRoute(
     }
     val releasePersistedProfileAutosavePermission: (String) -> Unit = { uri ->
         releaseProfileAutosavePermission(context = context, uri = Uri.parse(uri))
+    }
+
+    LaunchedEffect(
+        state.agentInboxAutoImportEnabled,
+        state.agentInboxDriveFolderId,
+        state.agentInboxDriveGrantMode,
+    ) {
+        if (
+            state.agentInboxAutoImportEnabled &&
+            state.hasAgentInboxDriveFolderGrant &&
+            !agentInboxAutoImportStarted &&
+            !state.isAgentInboxScanning &&
+            !state.isAgentInboxImporting
+        ) {
+            agentInboxAutoImportStarted = true
+            when {
+                state.hasAgentInboxDocumentTreeFolderGrant && !agentInboxDocumentTreeUsesGoogleDriveProvider() -> {
+                    agentInboxAutoImportAccessToken = ""
+                    agentInboxAutoImportWaitingForScan = true
+                    viewModel.scanAgentInboxDrive(accessToken = "")
+                }
+
+                state.hasAgentInboxReadonlyFolderGrant || agentInboxDocumentTreeUsesGoogleDriveProvider() -> {
+                    startAgentInboxAutoImportAuthorization()
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(
+        agentInboxAutoImportWaitingForScan,
+        state.isAgentInboxScanning,
+        state.agentInboxDriveLastError,
+        state.agentInboxCandidates,
+    ) {
+        if (
+            agentInboxAutoImportWaitingForScan &&
+            !state.isAgentInboxScanning &&
+            state.agentInboxDriveLastError == null
+        ) {
+            val token = agentInboxAutoImportAccessToken.orEmpty()
+            agentInboxAutoImportWaitingForScan = false
+            agentInboxAutoImportAccessToken = null
+            viewModel.importAllAgentInboxCandidates(
+                accessToken = token,
+                automatic = true,
+            )
+        }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -835,6 +928,7 @@ private fun MainRoute(
                 },
                 onToggleAgentInboxPriority = viewModel::toggleAgentInboxPriority,
                 onRejectAgentInboxCandidate = viewModel::rejectAgentInboxCandidate,
+                onToggleAgentInboxAutoImport = { enabled -> viewModel.setAgentInboxAutoImportEnabled(enabled) },
                 onImportAgentInboxCandidate = { packageFolderId ->
                     if (agentInboxDocumentTreeUsesGoogleDriveProvider()) {
                         pendingAgentInboxImportPackageId = packageFolderId
@@ -844,6 +938,15 @@ private fun MainRoute(
                     } else {
                         pendingAgentInboxImportPackageId = packageFolderId
                         startGoogleDriveSyncAuthorization(GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_IMPORT)
+                    }
+                },
+                onImportAllAgentInboxCandidates = {
+                    if (agentInboxDocumentTreeUsesGoogleDriveProvider()) {
+                        startGoogleDriveSyncAuthorization(GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_IMPORT_ALL)
+                    } else if (state.hasAgentInboxDocumentTreeFolderGrant) {
+                        viewModel.importAllAgentInboxCandidates(accessToken = "")
+                    } else {
+                        startGoogleDriveSyncAuthorization(GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_IMPORT_ALL)
                     }
                 },
                 onExportAccountLightProfile = { accountLightExportPicker.launch(ACCOUNT_LIGHT_PROFILE_FILE_NAME) },
@@ -4323,7 +4426,9 @@ private fun SettingsTab(
     onCancelAgentInboxDriveFolderBrowser: () -> Unit,
     onToggleAgentInboxPriority: (String) -> Unit,
     onRejectAgentInboxCandidate: (String) -> Unit,
+    onToggleAgentInboxAutoImport: (Boolean) -> Unit,
     onImportAgentInboxCandidate: (String) -> Unit,
+    onImportAllAgentInboxCandidates: () -> Unit,
     onExportAccountLightProfile: () -> Unit,
     onExportAccountLightBackup: () -> Unit,
     onImportAccountLightProfile: () -> Unit,
@@ -4535,7 +4640,9 @@ private fun SettingsTab(
                 onCancelDriveFolderBrowser = onCancelAgentInboxDriveFolderBrowser,
                 onTogglePriority = onToggleAgentInboxPriority,
                 onRejectCandidate = onRejectAgentInboxCandidate,
+                onToggleAutoImport = onToggleAgentInboxAutoImport,
                 onImportCandidate = onImportAgentInboxCandidate,
+                onImportAllCandidates = onImportAllAgentInboxCandidates,
             )
         }
         item {
@@ -5414,10 +5521,13 @@ private fun AgentInboxSettingsSection(
     onCancelDriveFolderBrowser: () -> Unit,
     onTogglePriority: (String) -> Unit,
     onRejectCandidate: (String) -> Unit,
+    onToggleAutoImport: (Boolean) -> Unit,
     onImportCandidate: (String) -> Unit,
+    onImportAllCandidates: () -> Unit,
 ) {
     val colors = QualityAlternativeThemeTokens.colors
     val candidateCount = state.agentInboxCandidates.size
+    val readyCandidateCount = state.agentInboxCandidates.count(AgentInboxReviewCandidate::canImport)
     val needsDriveLinkRepair = agentInboxNeedsDriveLinkRepair(state)
     val showsDriveLinkFallback =
         (!state.hasAgentInboxDriveFolderGrant || needsDriveLinkRepair) &&
@@ -5558,6 +5668,39 @@ private fun AgentInboxSettingsSection(
                     }
                 }
             }
+            if (state.hasAgentInboxDriveFolderGrant && !state.isAgentInboxDriveFolderBrowserOpen) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 12.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .border(BorderStroke(1.dp, colors.line), RoundedCornerShape(10.dp))
+                        .clickable(
+                            enabled = !state.isAgentInboxScanning && !state.isAgentInboxImporting,
+                            onClick = { onToggleAutoImport(!state.agentInboxAutoImportEnabled) },
+                        )
+                        .semantics { selected = state.agentInboxAutoImportEnabled }
+                        .testTag("settings-agent-inbox-autoimport-toggle")
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    ToggleVisual(granted = state.agentInboxAutoImportEnabled)
+                    Column(modifier = Modifier.weight(1f)) {
+                        BodyText(
+                            text = "Autoimport on app start",
+                            color = colors.primaryText,
+                            fontSize = 13.sp,
+                            lineHeight = 17.sp,
+                        )
+                        MonoText(
+                            text = if (state.agentInboxAutoImportEnabled) "ON" else "OFF",
+                            color = if (state.agentInboxAutoImportEnabled) colors.success else colors.mutedText,
+                            modifier = Modifier.padding(top = 2.dp),
+                        )
+                    }
+                }
+            }
             HorizontalDivider(
                 color = colors.line,
                 modifier = Modifier.padding(vertical = 14.dp),
@@ -5585,6 +5728,20 @@ private fun AgentInboxSettingsSection(
                     modifier = Modifier.padding(bottom = 8.dp),
                     preserveCase = true,
                 )
+                if (readyCandidateCount > 0) {
+                    QaButton(
+                        text = if (state.isAgentInboxImporting) "Importing" else "Import all",
+                        onClick = onImportAllCandidates,
+                        variant = QaButtonVariant.Primary,
+                        size = QaButtonSize.Small,
+                        enabled = !state.isAgentInboxScanning && !state.isAgentInboxImporting,
+                        leadingIcon = QaIconKind.Plus,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 10.dp)
+                            .testTag("settings-agent-inbox-import-all"),
+                    )
+                }
                 state.agentInboxCandidates.forEachIndexed { index, candidate ->
                     if (index > 0) {
                         HorizontalDivider(

@@ -11,6 +11,35 @@ This file is the repo-level index for active and recently completed execution la
 - Heartbeats should exist only while waiting for a current GPT Pro lane.
 - Do not infer lane status from untracked local files alone. For example, `ios/` can appear untracked on non-iOS branches; the canonical iOS implementation source is the pushed iOS branch listed below.
 
+## Sprint 38 Agent Inbox Import All + Autoimport
+
+Status: `release_artifact_prepared_gpt_pro_r1_pass_10_10`
+
+- Date opened: 2026-06-17
+- Trigger: user requested a stricter Pro-reviewed sprint for `Import all` and opt-in autoimport on app startup, with hard visual evidence that real Drive packages import into Library and render in the reader.
+- Scope:
+  - Add `Import all` for all current ready Agent Inbox candidates.
+  - Add opt-in `Autoimport on app start` after the user has explicitly connected an Agent Inbox folder.
+  - Autoimport scans/imports only the selected folder and does not silently accept manifest priority requests.
+- PRD mapping:
+  - FR3B Agent Inbox remains limited to an explicitly selected folder and does not scan whole Drive.
+  - NFR privacy remains intact: analytics do not include raw Drive ids, file names, document text, or reversible fingerprints.
+  - The previous no-ingest-without-review rule is narrowed for explicit, revocable autoimport only; priority requests still need explicit acceptance before ranking changes.
+- Validation:
+  - Targeted unit tests passed for `MainViewModelTest` and `GoogleDriveAuthorizationTest`.
+  - Connected visual test passed for Agent Inbox folder selector states, autoimport toggle, import-all queue, queue cleared, and reader rendering.
+  - Live signed-in emulator Drive proof passed on `emulator-5554` with Google account `omareth@gmail.com`.
+  - Real Google Drive folder: `QA-Agent-Inbox-Sprint38-Import-All-Autoimport-20260617-182500`.
+  - Live `Import all` proof covers two externally uploaded packages with `manifest.json` and `content.md`, batch import, queue clearing, Library `Files`, and reader rendering.
+  - Live autoimport proof covers enabling autoimport, uploading a new external package after enablement, force-stopping/relaunching the app, visible `Agent Inbox autoimport imported 1 package.`, Library `Files`, and reader rendering.
+  - Local release gate passed: `testDebugUnitTest`, `lintDebug`, and `assembleRelease`.
+  - GPT Pro R1 returned `SCORE: 10/10`, `VERDICT: PASS`, `BLOCKERS: None`.
+- Evidence root: `evidence/sprint38_agent_inbox_import_all_autoimport/`.
+- Release APK candidate: `evidence/sprint38_agent_inbox_import_all_autoimport/apk/app-release-unsigned.apk`.
+- Release artifacts:
+  - `release_artifacts/quality-alternative-v0.11.25-agent-inbox-import-all-autoimport-alpha-debug.apk`
+  - `release_artifacts/quality-alternative-v0.11.25-agent-inbox-import-all-autoimport-alpha-release-unsigned.apk`
+
 ## Sprint 37 Agent Inbox Real Device Drive Authorization Repair
 
 Status: `release_published_gpt_pro_r1_pass_10_10`

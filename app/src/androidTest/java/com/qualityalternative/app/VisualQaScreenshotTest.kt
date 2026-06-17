@@ -966,6 +966,15 @@ class VisualQaScreenshotTest {
         composeRule.onNodeWithTag("settings-agent-inbox-disconnect").assertIsDisplayed().assertIsEnabled()
         waitForTransientMessageToClear("Agent Inbox folder selected.")
         capture("01_agent_inbox_drive_folder_connected_light")
+        composeRule.onNodeWithTag("settings-agent-inbox-autoimport-toggle")
+            .assertIsDisplayed()
+            .assertIsNotSelected()
+            .performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("settings-agent-inbox-autoimport-toggle")
+            .assertIsSelected()
+        waitForTransientMessageToClear("Agent Inbox autoimport enabled.")
+        capture("01a_agent_inbox_autoimport_enabled_light")
 
         scenario?.onActivity { activity ->
             activity.mainViewModel.seedAgentInboxDriveAccessLostForTests()
@@ -979,6 +988,69 @@ class VisualQaScreenshotTest {
         composeRule.onNodeWithText("Choose folder").assertIsDisplayed()
         waitForTransientMessageToClear("Agent Inbox folder access was lost.")
         capture("02_agent_inbox_access_lost_light")
+
+        val importAllDriveClient = VisualAgentInboxDriveClient()
+        val importAllFirst = agentInboxMarkdownVisualFixture().copy(
+            packageFolderId = "visual-agent-import-all-a",
+            packageFolderName = "visual-agent-import-all-a",
+            title = "Agent Inbox Import All One",
+            contentFileName = "import-all-one.md",
+            contentBytes = """
+                # Agent Inbox Import All One
+
+                This first Markdown package proves the batch import path can save more than one ready package.
+            """.trimIndent().toByteArray(Charsets.UTF_8),
+        )
+        val importAllSecond = agentInboxMarkdownVisualFixture().copy(
+            packageFolderId = "visual-agent-import-all-b",
+            packageFolderName = "visual-agent-import-all-b",
+            title = "Agent Inbox Import All Two",
+            contentFileName = "import-all-two.md",
+            priority = AgentInboxPriorityIntent.NORMAL,
+            contentBytes = """
+                # Agent Inbox Import All Two
+
+                This second Markdown package proves the batch import path keeps the review queue finite.
+            """.trimIndent().toByteArray(Charsets.UTF_8),
+        )
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.setAgentInboxDriveClientForTests(importAllDriveClient)
+            activity.mainViewModel.connectAgentInboxDocumentTreeFolder(
+                uri = "content://com.android.externalstorage.documents/tree/visual-agent-inbox-import-all",
+                displayName = "Visual Agent Inbox",
+                nowMillis = 1_781_256_705_000L,
+            )
+        }
+        importAllDriveClient.setPackages(importAllFirst, importAllSecond)
+        scenario?.onActivity { activity ->
+            activity.mainViewModel.scanAgentInboxDrive(accessToken = "", nowMillis = 1_781_256_706_000L)
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasTag("settings-agent-inbox-import-all") &&
+                hasTag("settings-agent-inbox-candidate-visual-agent-import-all-a") &&
+                hasTag("settings-agent-inbox-candidate-visual-agent-import-all-b")
+        }
+        composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasTestTag("settings-agent-inbox-import-all"))
+        composeRule.onNodeWithTag("settings-agent-inbox-import-all").assertIsDisplayed().assertIsEnabled()
+        composeRule.onNodeWithText("2 packages waiting for review").assertIsDisplayed()
+        capture("02a_agent_inbox_import_all_ready_light")
+        composeRule.onNodeWithTag("settings-agent-inbox-import-all").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            userDocumentByTitle(importAllFirst.title) != null &&
+                userDocumentByTitle(importAllSecond.title) != null &&
+                !hasTag("settings-agent-inbox-candidate-visual-agent-import-all-a") &&
+                !hasTag("settings-agent-inbox-candidate-visual-agent-import-all-b")
+        }
+        composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasTestTag("settings-agent-inbox-section"))
+        composeRule.onNodeWithText("No packages waiting for review.").assertIsDisplayed()
+        capture("02b_agent_inbox_import_all_completed_light")
+        val importedByBatch = requireNotNull(userDocumentByTitle(importAllFirst.title))
+        scenario?.onActivity { activity -> activity.mainViewModel.openLibraryItem(importedByBatch) }
+        composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("reader-screen") }
+        assertTrue("Expected Import all reader title or heading to be visible", hasAnyNode(importAllFirst.title))
+        capture("02c_agent_inbox_import_all_reader_light")
 
         val imageDriveClient = VisualAgentInboxDriveClient()
         val imageFixture = agentInboxMarkdownImageVisualFixture()
@@ -2434,12 +2506,23 @@ class VisualQaScreenshotTest {
         runBlocking {
             app.appContainer.userDocumentRepository.observeReady().first { it }
         }
-        openTab("tab-settings", "settings-list")
+        if (hasTag("tab-settings")) {
+            openTab("tab-settings", "settings-list")
+        } else {
+            scenario?.onActivity { activity -> activity.mainViewModel.openSettings() }
+            composeRule.waitUntil(timeoutMillis = 10_000) { hasTag("settings-list") }
+        }
         scenario?.onActivity { activity ->
             activity.mainViewModel.scanAgentInboxDrive(accessToken = accessToken, nowMillis = nowMillis)
         }
         composeRule.waitUntil(timeoutMillis = 10_000) {
-            hasTag("settings-agent-inbox-candidate-${fixture.packageFolderId}")
+            var candidateReady = false
+            scenario?.onActivity { activity ->
+                candidateReady = activity.mainViewModel.uiState.agentInboxCandidates.any { candidate ->
+                    candidate.packageFolderId == fixture.packageFolderId
+                }
+            }
+            candidateReady
         }
         composeRule.onNodeWithTag("settings-list")
             .performScrollToNode(hasTestTag("settings-agent-inbox-candidate-${fixture.packageFolderId}"))

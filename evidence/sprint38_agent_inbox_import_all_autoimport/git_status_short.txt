@@ -1,0 +1,15 @@
+ M PRD.md
+ M app/src/androidTest/java/com/qualityalternative/app/VisualQaScreenshotTest.kt
+ M app/src/main/java/com/qualityalternative/app/data/PreferencesSettingsRepository.kt
+ M app/src/main/java/com/qualityalternative/app/domain/model/InterventionModels.kt
+ M app/src/main/java/com/qualityalternative/app/domain/model/UserModels.kt
+ M app/src/main/java/com/qualityalternative/app/domain/service/Contracts.kt
+ M app/src/main/java/com/qualityalternative/app/ui/GoogleDriveAuthorization.kt
+ M app/src/main/java/com/qualityalternative/app/ui/MainViewModel.kt
+ M app/src/main/java/com/qualityalternative/app/ui/QualityAlternativeApp.kt
+ M app/src/test/java/com/qualityalternative/app/ui/GoogleDriveAuthorizationTest.kt
+ M app/src/test/java/com/qualityalternative/app/ui/MainViewModelTest.kt
+ M docs/AGENT_INBOX_LIVE_REVIEW_GATE.md
+ M docs/LANE_STATUS.md
+?? REVIEW_BUNDLE_SPRINT38_AGENT_INBOX_IMPORT_ALL_AUTOIMPORT_20260617_1915.zip
+?? evidence/sprint38_agent_inbox_import_all_autoimport/

@@ -183,6 +183,7 @@ interface SettingsRepository {
     suspend fun clearAgentInboxDriveConnection() {}
     suspend fun saveAgentInboxDriveScanSuccess(timestampMillis: Long, folderId: String) {}
     suspend fun saveAgentInboxDriveScanFailure(errorMessage: String) {}
+    suspend fun saveAgentInboxAutoImportEnabled(enabled: Boolean) {}
     suspend fun saveProfileAutosaveDestination(uri: String, displayName: String)
     suspend fun clearProfileAutosaveDestination()
     suspend fun saveProfileAutosaveSuccess(timestampMillis: Long)

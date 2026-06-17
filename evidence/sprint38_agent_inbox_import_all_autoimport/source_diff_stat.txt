@@ -1,0 +1,14 @@
+ PRD.md                                             |   2 +-
+ .../app/VisualQaScreenshotTest.kt                  |  87 ++++-
+ .../app/data/PreferencesSettingsRepository.kt      |  18 +
+ .../app/domain/model/InterventionModels.kt         |   3 +
+ .../app/domain/model/UserModels.kt                 |   1 +
+ .../app/domain/service/Contracts.kt                |   1 +
+ .../app/ui/GoogleDriveAuthorization.kt             |   4 +
+ .../com/qualityalternative/app/ui/MainViewModel.kt | 390 +++++++++++++++------
+ .../app/ui/QualityAlternativeApp.kt                | 157 +++++++++
+ .../app/ui/GoogleDriveAuthorizationTest.kt         |   2 +
+ .../qualityalternative/app/ui/MainViewModelTest.kt | 137 ++++++++
+ docs/AGENT_INBOX_LIVE_REVIEW_GATE.md               |   3 +
+ docs/LANE_STATUS.md                                |  29 ++
+ 13 files changed, 720 insertions(+), 114 deletions(-)

@@ -1,0 +1,26 @@
+User UserInfo{0:Owner:4c13}:
+  Accounts: 1
+    Account {name=omareth@gmail.com, type=com.google}
+
+  AccountId, Action_Type, timestamp, UID, TableName, Key
+  Accounts History
+  -1,action_called_account_add,2026-06-14 19:15:31,1000,accounts,0
+  1,action_account_add,2026-06-14 19:17:33,10144,accounts,1
+  1,action_clear_password,2026-06-14 19:17:33,10144,accounts,2
+
+  Active Sessions: 0
+
+  RegisteredServicesCache: 4 services
+    ServiceInfo: AuthenticatorDescription {type=com.google.android.gm.pop3}, ComponentInfo{com.google.android.gm/com.android.email.service.Pop3AuthenticatorService}, uid 10158, lastUpdateTime -1
+    ServiceInfo: AuthenticatorDescription {type=com.google}, ComponentInfo{com.google.android.gms/com.google.android.gms.auth.account.authenticator.GoogleAccountAuthenticatorService}, uid 10144, lastUpdateTime -1
+    ServiceInfo: AuthenticatorDescription {type=com.google.android.gm.exchange}, ComponentInfo{com.google.android.gm/com.android.email.service.EasAuthenticatorService}, uid 10158, lastUpdateTime -1
+    ServiceInfo: AuthenticatorDescription {type=com.google.android.gm.legacyimap}, ComponentInfo{com.google.android.gm/com.android.email.service.LegacyImapAuthenticatorService}, uid 10158, lastUpdateTime -1
+
+  Account visibility:
+    omareth@gmail.com
+      com.google.android.apps.photos, 2
+      com.google.android.apps.wellbeing, 2
+      com.google.android.apps.safetyhub, 2
+      com.google.android.apps.restore, 2
+      com.google.android.apps.docs, 2
+      com.google.android.apps.messaging, 2

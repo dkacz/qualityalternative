@@ -18,6 +18,8 @@ A release candidate must provide an evidence directory containing:
   - import result with queue cleared
   - Library `Files` view showing the imported document
   - reader showing imported content
+- For any `Import all` change: evidence that at least two externally uploaded packages were found together, batch imported together, cleared from the review queue, appeared in Library `Files`, and at least one batch-imported document rendered in the reader.
+- For any autoimport change: evidence that autoimport was explicitly enabled after folder connection, a new externally uploaded package was added after that enablement, the app was force-stopped/relaunched, no new approval chooser was shown when access had already been granted, the autoimport result was visible, the document appeared in Library `Files`, and the reader rendered the autoimported content.
 - UIAutomator XML or equivalent machine-readable screen dumps for the same milestones.
 - Logcat health sentinels proving there is no app crash and no old failure text such as `Package is missing manifest`, `Package could not be saved`, `Agent Inbox package could not be imported`, or `Google Drive authorization hit a Google Play services error`.
 - Automated test results for the changed logic and a connected visual test for the Agent Inbox Drive picker states.
@@ -45,5 +47,6 @@ A 10/10 PASS is only valid when the reviewer cites the exact evidence paths and 
 - import cleared the queue
 - the imported document appeared in Library
 - the reader rendered the imported file content
+- import-all and/or autoimport proof covers the extra criteria above when those behaviors changed
 - automated tests passed
 - the final APK hash is recorded

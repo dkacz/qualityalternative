@@ -1,0 +1,9 @@
+fatal exception crash marker: not found
+app process crash marker: not found
+old invalid manifest failure: not found
+old package save failure: not found
+old package import failure: not found
+old Drive auth failure text: not found
+old connection failure snackbar: not found
+AndroidRuntime lines: 20 total; 20 attributable to shell/uiautomator lifecycle; no FATAL EXCEPTION present
+Autoimport UI success: verified by live_23_after_autoimport_restart.xml and live_e2e_23_after_autoimport_restart.png

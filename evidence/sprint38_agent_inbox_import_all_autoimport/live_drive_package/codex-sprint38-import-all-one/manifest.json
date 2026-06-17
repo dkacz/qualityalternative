@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "title": "Sprint 38 Import All One",
+  "topics": ["PHILOSOPHY", "TECH"],
+  "contentFile": "content.md",
+  "format": "MARKDOWN",
+  "rightsClass": "USER_PRIVATE",
+  "sourceLabel": "Codex",
+  "description": "Live Drive package one for Sprint 38 Import all evidence.",
+  "priority": "high",
+  "documentSha256": "7643f342834875c18ca062c706e7adeb7bc847e2410c8b19807ec6c5b637cb0b",
+  "createdAt": "2026-06-17T18:20:00Z"
+}

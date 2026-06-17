@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "title": "Sprint 38 Autoimport Startup",
+  "topics": ["ATTENTION", "TECH"],
+  "contentFile": "content.md",
+  "format": "MARKDOWN",
+  "rightsClass": "USER_PRIVATE",
+  "sourceLabel": "Codex",
+  "description": "Live Drive package for Sprint 38 autoimport-on-start evidence.",
+  "priority": "normal",
+  "documentSha256": "6e38bdf9b127a2f82f39c9995d2ae89c7752399bbbb9886dd0bc0e8f1cef93e1",
+  "createdAt": "2026-06-17T18:22:00Z"
+}

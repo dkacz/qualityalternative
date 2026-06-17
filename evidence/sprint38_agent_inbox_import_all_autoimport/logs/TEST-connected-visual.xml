@@ -1,0 +1,11 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<testsuites tests="1" failures="0" errors="0" skipped="0" time="18.978" timestamp="2026-06-17T17:11:34" hostname="localhost">
+  <testsuite name="com.qualityalternative.app.VisualQaScreenshotTest" tests="1" failures="0" errors="0" skipped="0" time="17.985" timestamp="2026-06-17T17:11:34" hostname="localhost">
+    <properties>
+      <property name="device" value="qaApi36(AVD) - 16" />
+      <property name="flavor" value="" />
+      <property name="project" value=":app" />
+    </properties>
+    <testcase name="captureSprint35AgentInboxFolderSelectorRepairStates" classname="com.qualityalternative.app.VisualQaScreenshotTest" time="17.985" />
+  </testsuite>
+</testsuites>

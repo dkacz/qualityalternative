@@ -3581,6 +3581,128 @@ class MainViewModelTest {
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
+    fun importAllAgentInboxCandidatesImportsEveryReadyPackageWithoutAutoAcceptingPriority() = runTest {
+        val firstBytes = "# First Agent Note\n\nPrivate attention note.".toByteArray()
+        val secondBytes = "# Second Agent Note\n\nAnother private note.".toByteArray()
+        val driveClient = RecordingAgentInboxDriveClient(
+            scanResult = AgentInboxDriveScanResult(
+                folderId = "agent-inbox-folder",
+                packages = listOf(
+                    agentInboxDrivePackage(
+                        folderId = "agent-package-a",
+                        manifestFileId = "manifest-file-a",
+                        contentFileId = "content-file-a",
+                    ),
+                    agentInboxDrivePackage(
+                        folderId = "agent-package-b",
+                        manifestFileId = "manifest-file-b",
+                        contentFileId = "content-file-b",
+                    ),
+                ),
+            ),
+            files = mapOf(
+                "manifest-file-a" to agentInboxManifest(priority = "high").toByteArray(),
+                "content-file-a" to firstBytes,
+                "manifest-file-b" to agentInboxManifest(priority = "normal").toByteArray(),
+                "content-file-b" to secondBytes,
+            ),
+        )
+        val userDocumentRepository = FakeUserDocumentRepository()
+        val settingsRepository = FakeSettingsRepository()
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val documentStore = RecordingAgentInboxDocumentStore()
+        val viewModel = createViewModel(
+            settingsRepository = settingsRepository,
+            userDocumentRepository = userDocumentRepository,
+            agentInboxDriveClient = driveClient,
+            analyticsTracker = analyticsTracker,
+            agentInboxPackageImporter = AgentInboxPackageImporter(
+                userDocumentRepository = userDocumentRepository,
+                documentStore = documentStore,
+            ),
+        )
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+        viewModel.selectAgentInboxDriveFolderForTest()
+        advanceUntilIdle()
+        viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 5_000L)
+        advanceUntilIdle()
+
+        assertEquals(2, viewModel.uiState.agentInboxCandidates.count { it.canImport })
+
+        viewModel.importAllAgentInboxCandidates(
+            accessToken = "drive-token",
+            nowMillis = 6_000L,
+        )
+        advanceUntilIdle()
+
+        assertEquals(2, userDocumentRepository.documents.value.size)
+        assertEquals(2, documentStore.writes.size)
+        assertTrue(viewModel.uiState.agentInboxCandidates.isEmpty())
+        assertTrue(viewModel.uiState.agentInboxPriorityAcceptedPackageIds.isEmpty())
+        assertTrue(viewModel.uiState.priorityContentIds.isEmpty())
+        assertTrue(settingsRepository.state.value.priorityContentIds.isEmpty())
+        assertEquals(
+            "Agent Inbox import all imported 2 packages.",
+            viewModel.uiState.latestMessage,
+        )
+        val startedEvent = analyticsTracker.allEvents().single { event ->
+            event.type == AnalyticsEventType.AGENT_INBOX_IMPORT_ALL_STARTED
+        }
+        assertEquals("false", startedEvent.metadata["automatic"])
+        assertEquals("2", startedEvent.metadata["readyCount"])
+        val completedEvent = analyticsTracker.allEvents().single { event ->
+            event.type == AnalyticsEventType.AGENT_INBOX_IMPORT_ALL_COMPLETED
+        }
+        assertEquals("2", completedEvent.metadata["attemptedCount"])
+        assertEquals("2", completedEvent.metadata["importedCount"])
+        assertEquals("0", completedEvent.metadata["failedCount"])
+        assertTrue(AnalyticsPrivacyGuard.unsafeRemoteFields(startedEvent.toRemoteAnalyticsPayload()).isEmpty())
+        assertTrue(AnalyticsPrivacyGuard.unsafeRemoteFields(completedEvent.toRemoteAnalyticsPayload()).isEmpty())
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun agentInboxAutoImportToggleRequiresConfiguredFolderAndClearsOnDisconnect() = runTest {
+        val settingsRepository = FakeSettingsRepository()
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val viewModel = createViewModel(
+            settingsRepository = settingsRepository,
+            analyticsTracker = analyticsTracker,
+        )
+
+        advanceUntilIdle()
+        viewModel.setAgentInboxAutoImportEnabled(true, nowMillis = 5_000L)
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.agentInboxAutoImportEnabled)
+        assertFalse(settingsRepository.state.value.agentInboxAutoImportEnabled)
+        assertEquals("Connect an Agent Inbox folder before enabling autoimport.", viewModel.uiState.latestMessage)
+
+        viewModel.selectAgentInboxDriveFolderForTest()
+        advanceUntilIdle()
+        viewModel.setAgentInboxAutoImportEnabled(true, nowMillis = 6_000L)
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.agentInboxAutoImportEnabled)
+        assertTrue(settingsRepository.state.value.agentInboxAutoImportEnabled)
+
+        viewModel.disconnectAgentInboxDrive(nowMillis = 7_000L)
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.agentInboxAutoImportEnabled)
+        assertFalse(settingsRepository.state.value.agentInboxAutoImportEnabled)
+        val toggledEvents = analyticsTracker.allEvents().filter { event ->
+            event.type == AnalyticsEventType.AGENT_INBOX_AUTOIMPORT_TOGGLED
+        }
+        assertEquals(listOf("true"), toggledEvents.map { event -> event.metadata["enabled"] })
+        assertTrue(AnalyticsPrivacyGuard.unsafeRemoteFields(toggledEvents.single().toRemoteAnalyticsPayload()).isEmpty())
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
     fun importAgentInboxCandidateMarksSameShaScanSiblingDuplicateAfterFirstImport() = runTest {
         val contentBytes = "# Agent Note\n\nPrivate attention note.".toByteArray()
         val sha = AgentInboxManifestValidator.sha256(contentBytes)
@@ -7504,6 +7626,7 @@ class MainViewModelTest {
                 agentInboxDriveGrantMode = state.value.agentInboxDriveGrantMode,
                 agentInboxDriveLastSuccessfulAtMillis = state.value.agentInboxDriveLastSuccessfulAtMillis,
                 agentInboxDriveLastError = state.value.agentInboxDriveLastError,
+                agentInboxAutoImportEnabled = state.value.agentInboxAutoImportEnabled,
                 profileAutosaveUri = state.value.profileAutosaveUri,
                 profileAutosaveDisplayName = state.value.profileAutosaveDisplayName,
                 profileAutosaveLastSuccessfulAtMillis = state.value.profileAutosaveLastSuccessfulAtMillis,
@@ -7613,6 +7736,7 @@ class MainViewModelTest {
                     agentInboxDriveFolderId = null,
                     agentInboxDriveGrantMode = null,
                     agentInboxDriveLastError = null,
+                    agentInboxAutoImportEnabled = false,
                 )
             } else {
                 state.value.copy(
@@ -7631,6 +7755,7 @@ class MainViewModelTest {
                 agentInboxDriveGrantMode = null,
                 agentInboxDriveLastSuccessfulAtMillis = null,
                 agentInboxDriveLastError = null,
+                agentInboxAutoImportEnabled = false,
             )
         }
 
@@ -7655,12 +7780,24 @@ class MainViewModelTest {
                     agentInboxDriveGrantMode = null,
                     agentInboxDriveLastSuccessfulAtMillis = null,
                     agentInboxDriveLastError = null,
+                    agentInboxAutoImportEnabled = false,
                 )
             }
         }
 
         override suspend fun saveAgentInboxDriveScanFailure(errorMessage: String) {
             state.value = state.value.copy(agentInboxDriveLastError = errorMessage)
+        }
+
+        override suspend fun saveAgentInboxAutoImportEnabled(enabled: Boolean) {
+            state.value = state.value.copy(
+                agentInboxAutoImportEnabled = enabled &&
+                    state.value.agentInboxDriveEnabled &&
+                    (
+                        state.value.agentInboxDriveGrantMode == AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER ||
+                            state.value.agentInboxDriveGrantMode == AGENT_INBOX_DRIVE_GRANT_MODE_READONLY_FOLDER
+                        ),
+            )
         }
 
         override suspend fun saveAnnotationExportDestination(uri: String, displayName: String) {

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.qualityalternative.app.ui.GoogleDriveAuthorizationTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-06-17T16:41:52.622Z" hostname="mac-studio.home" time="0.012">
+  <properties/>
+  <testcase name="readonlyAgentInboxAuthorizationUsesReadonlyScopeWithoutPickerParameters" classname="com.qualityalternative.app.ui.GoogleDriveAuthorizationTest" time="0.011"/>
+  <testcase name="driveAuthorizationScopeConstantsUseExpectedGoogleDriveScopes" classname="com.qualityalternative.app.ui.GoogleDriveAuthorizationTest" time="0.0"/>
+  <testcase name="annotationDriveFileAuthorizationDoesNotForcePickerFolderGrant" classname="com.qualityalternative.app.ui.GoogleDriveAuthorizationTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

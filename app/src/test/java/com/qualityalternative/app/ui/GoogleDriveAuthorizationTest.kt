@@ -36,6 +36,8 @@ class GoogleDriveAuthorizationTest {
             GoogleDriveAuthorizationMode.AGENT_INBOX_CONNECT_READONLY,
             GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_SCAN,
             GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_IMPORT,
+            GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_IMPORT_ALL,
+            GoogleDriveAuthorizationMode.AGENT_INBOX_READONLY_AUTOIMPORT,
         ).forEach { mode ->
             val spec = googleDriveAuthorizationRequestSpecFor(mode)
 
