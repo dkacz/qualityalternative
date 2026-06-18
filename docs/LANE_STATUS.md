@@ -1,6 +1,6 @@
 # Lane Status
 
-Status timestamp: 2026-06-17
+Status timestamp: 2026-06-18
 
 This file is the repo-level index for active and recently completed execution lanes. It should point to the canonical branch, review lane, validation artifacts, and next gate for each lane.
 
@@ -10,6 +10,33 @@ This file is the repo-level index for active and recently completed execution la
 - Use the branch-specific sprint docs for detailed implementation notes.
 - Heartbeats should exist only while waiting for a current GPT Pro lane.
 - Do not infer lane status from untracked local files alone. For example, `ios/` can appear untracked on non-iOS branches; the canonical iOS implementation source is the pushed iOS branch listed below.
+
+## Sprint 39 Agent Inbox Autoimport Options + Agent Prompt
+
+Status: `active_goal_set`
+
+- Date opened: 2026-06-18
+- Trigger: user requested richer Autoimport options instead of a single on/off behavior, specifically priority handling, category/tag handling or leaving imported content uncategorized, and a copyable prompt that another agent can paste and use to create valid packages.
+- Goal:
+  - Add user-facing Agent Inbox autoimport options for priority behavior.
+  - Add category/tag import behavior controls, including an explicit "leave uncategorized" path.
+  - Add a copyable agent prompt in the app or adjacent operator UI that tells Codex/Claude-style agents how to author a valid Agent Inbox package for the selected workflow.
+  - Keep package authoring portable: no user-specific Drive paths, rclone remote names, tokens, or account assumptions.
+- PRD/release-gate mapping:
+  - FR3B remains limited to the explicitly selected Agent Inbox folder.
+  - Autoimport remains explicit and revocable.
+  - Priority must not silently change ranking unless the user has explicitly allowed that behavior in the new options.
+  - Category/tag defaults must be predictable and visible to the user before autoimport is trusted.
+  - Agent prompt output must point agents to the repo package-authoring contract and require local package validation before upload.
+- Required validation:
+  - Targeted tests for option persistence, priority/category behavior, generated prompt content, and analytics/privacy boundaries.
+  - Connected visual evidence for the new Settings controls and copy prompt action.
+  - Live signed-in emulator or device evidence with a real Google Drive Agent Inbox folder, externally created packages, autoimport/import, Library `Files` visibility, reader rendering, APK hash/version, account state, and crash/error sentinels.
+  - GPT Pro review must reach `SCORE: 10/10`, `VERDICT: PASS`, and cite the live evidence bundle paths.
+  - Publish the APK as a GitHub Release only after the Pro pass and release gate pass.
+- Branch: `codex/agent-inbox-autoimport-options-prompt`.
+- Next gate:
+  - Map the UI and data-model slice to `PRD.md`, inspect the existing Agent Inbox settings implementation, then implement the smallest end-to-end slice that can be proven visually and live.
 
 ## Sprint 38 Agent Inbox Import All + Autoimport
 
@@ -41,6 +68,7 @@ Status: `release_published_gpt_pro_r1_pass_10_10`
   - `release_artifacts/quality-alternative-v0.11.25-agent-inbox-import-all-autoimport-alpha-release-unsigned.apk`
 - Implementation commit: `0dd4cdb` (`Add Agent Inbox import all and autoimport`).
 - Release tag: `v0.11.25-agent-inbox-import-all-autoimport-alpha` on the final lane HEAD.
+- Release URL: `https://github.com/dkacz/qualityalternative/releases/tag/v0.11.25-agent-inbox-import-all-autoimport-alpha`.
 
 ## Sprint 37 Agent Inbox Real Device Drive Authorization Repair
 
