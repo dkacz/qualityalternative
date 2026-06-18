@@ -1,0 +1,394 @@
+06-18 11:17:00.887  1080  1135 D LauncherAppsCallbackImpl: onPackageAdded triggered for packageName=com.qualityalternative.app, user=UserHandle{0}
+06-18 11:17:00.887  1080  1135 D PackageUpdatedTask: Package updated: mOp=ADD packages=[com.qualityalternative.app], user=UserHandle{0}
+06-18 11:17:00.897  1648  1648 I AiAiEcho: AppFetcherImplV2 updateApps package:[com.qualityalternative.app], userId:[0], reason:[package is added.].
+06-18 11:17:00.900  1648 21582 I AiAiEcho: AppIndexer Package:[com.qualityalternative.app] UserProfile:[0] Enabled:[true].
+06-18 11:17:00.900  1648 21582 I AiAiEcho: AppFetcherImplV2 updateApps package:[com.qualityalternative.app], userId:[0], reason:[package is updated.].
+06-18 11:17:00.921  1637  2305 D MediaProvider: Deleted 0 Android/media items belonging to com.qualityalternative.app on /data/user/0/com.google.android.providers.media.module/databases/external.db
+06-18 11:17:00.923  1328  1328 D PersistedStoragePackageUninstalledReceiver: Received android.intent.action.PACKAGE_DATA_CLEARED for com.qualityalternative.app for u0
+06-18 11:17:00.926  1080  1135 D PackageUpdatedTask: Package updated: mOp=UPDATE packages=[com.qualityalternative.app], user=UserHandle{0}
+06-18 11:17:00.931  1637  2305 I FuseDaemon: Successfully deleted rows in leveldb for owner_id:  and ownerPackageIdentifier: com.qualityalternative.app::0
+06-18 11:17:00.936  1637  2305 D MediaGrants: Removed 0 media_grants for 0 user for [com.qualityalternative.app, com.qualityalternative.app]. Reason: Package orphaned
+06-18 11:17:00.941  1625 20722 I Icing   : doRemovePackageData com.qualityalternative.app
+06-18 11:17:00.964  1251 21580 I ProximityAuth: [RecentAppsMediator] Package added: (user=UserHandle{0}) com.qualityalternative.app
+06-18 11:17:43.014   678  2086 I ActivityTaskManager: START u0 {flg=0x10000000 xflg=0x5 cmp=com.qualityalternative.app/.MainActivity} with LAUNCH_SINGLE_TOP from uid 2000 (BAL_ALLOW_PERMISSION) result code=0
+06-18 11:17:43.014   949  1034 V WindowManagerShell: Transition requested (#95): android.os.BinderProxy@a921dac TransitionRequestInfo { type = OPEN, triggerTask = TaskInfo{userId=0 taskId=1758 effectiveUid=10269 displayId=0 isRunning=true baseIntent=Intent { flg=0x10000000 cmp=com.qualityalternative.app/.MainActivity } baseActivity=ComponentInfo{com.qualityalternative.app/com.qualityalternative.app.MainActivity} topActivity=ComponentInfo{com.qualityalternative.app/com.qualityalternative.app.MainActivity} origActivity=null realActivity=ComponentInfo{com.qualityalternative.app/com.qualityalternative.app.MainActivity} numActivities=1 lastActiveTime=6220570 supportsMultiWindow=true resizeMode=1 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{android.window.IWindowContainerToken$Stub$Proxy@4493a75} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=Rect(0, 128 - 0, 0) topActivityInfo=ActivityInfo{e7bba0a com.qualityalternative.app.MainActivity} launchCookies=[] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=false isVisible=false isVisibleRequested=false isTopActivityNoDisplay=false isSleeping=false locusId=null displayAreaFeatureId=1 isTopActivityTransparent=false isActivityStackTransparent=false lastNonFullscreenBounds=Rect(269, 661 - 812, 1741) capturedLink=null capturedLinkTimestamp=0 requestedVisibleTypes=-9 topActivityRequestOpenInBrowserEducationTimestamp=0 appCompatTaskInfo=AppCompatTaskInfo { topActivityInSizeCompat=false eligibleForLetterboxEducation= false isLetterboxEducationEnabled= true isLetterboxDoubleTapEnabled= false eligibleForUserAspectRatioButton= false topActivityBoundsLetterboxed= false isFromLetterboxDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=-1 topActivityLetterboxHeight=-1 topActivityAppBounds=Rect(0, 0 - 1080, 2400) isUserFullscreenOverrideEnabled=false isSystemFullscreenOverrideEnabled=false hasMinAspectRatioOverride=false topActivityLetterboxBounds=null cameraCompatTaskInfo=CameraCompatTaskInfo { freeformCameraCompatMode=inactive}} topActivityMainWindowFrame=null}, pipChange = null, remoteTransition = null, displayChange = null, flags = 0, debugId = 95 }
+06-18 11:17:43.022   678   886 I AppWidgetServiceImpl: Updating package stopped masked state for uid 10269 package com.qualityalternative.app isStopped false
+06-18 11:17:43.032   678   740 I ActivityManager: Start proc 21610:com.qualityalternative.app/u0a269 for next-top-activity {com.qualityalternative.app/com.qualityalternative.app.MainActivity}
+06-18 11:17:43.046   678   730 V WindowManager: Sent Transition (#95) createdAt=06-18 11:17:43.010 via request=TransitionRequestInfo { type = OPEN, triggerTask = TaskInfo{userId=0 taskId=1758 effectiveUid=10269 displayId=0 isRunning=true baseIntent=Intent { flg=0x10000000 cmp=com.qualityalternative.app/.MainActivity } baseActivity=ComponentInfo{com.qualityalternative.app/com.qualityalternative.app.MainActivity} topActivity=ComponentInfo{com.qualityalternative.app/com.qualityalternative.app.MainActivity} origActivity=null realActivity=ComponentInfo{com.qualityalternative.app/com.qualityalternative.app.MainActivity} numActivities=1 lastActiveTime=6220570 supportsMultiWindow=true resizeMode=1 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{RemoteToken{4065e37 Task{5ccc5f #1758 type=standard A=10269:com.qualityalternative.app}}} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=Rect(0, 128 - 0, 0) topActivityInfo=ActivityInfo{cf50fa4 com.qualityalternative.app.MainActivity} launchCookies=[] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=false isVisible=false isVisibleRequested=false isTopActivityNoDisplay=false isSleeping=false locusId=null displayAreaFeatureId=1 isTopActivityTransparent=false isActivityStackTransparent=false lastNonFullscreenBounds=Rect(269, 661 - 812, 1741) capturedLink=null capturedLinkTimestamp=0 requestedVisibleTypes=-9 topActivityRequestOpenInBrowserEducationTimestamp=0 appCompatTaskInfo=AppCompatTaskInfo { topActivityInSizeCompat=false eligibleForLetterboxEducation= false isLetterboxEducationEnabled= true isLetterboxDoubleTapEnabled= false eligibleForUserAspectRatioButton= false topActivityBoundsLetterboxed= false isFromLetterboxDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=-1 topActivityLetterboxHeight=-1 topActivityAppBounds=Rect(0, 0 - 1080, 2400) isUserFullscreenOverrideEnabled=false isSystemFullscreenOverrideEnabled=false hasMinAspectRatioOverride=false topActivityLetterboxBounds=null cameraCompatTaskInfo=CameraCompatTaskInfo { freeformCameraCompatMode=inactive}} topActivityMainWindowFrame=null}, pipChange = null, remoteTransition = null, displayChange = null, flags = 0, debugId = 95 }
+06-18 11:17:43.046   678   730 V WindowManager:         {WCT{RemoteToken{4065e37 Task{5ccc5f #1758 type=standard A=10269:com.qualityalternative.app}}} m=OPEN f=NONE leash=Surface(name=Task=1758)/@0x98ea75b sb=Rect(0, 0 - 1080, 2400) eb=Rect(0, 0 - 1080, 2400) epz=Point(1080, 2400) d=0 taskParent=-1},
+06-18 11:17:43.282 21610 21610 D nativeloader: Configuring clns-9 for other apk /data/app/~~64WKyHO72TIsUx2qYNXgCA==/com.qualityalternative.app-gNjBl96nzil3IUCqU3j5Ag==/base.apk. target_sdk_version=36, uses_libraries=, library_path=/data/app/~~64WKyHO72TIsUx2qYNXgCA==/com.qualityalternative.app-gNjBl96nzil3IUCqU3j5Ag==/lib/arm64:/data/app/~~64WKyHO72TIsUx2qYNXgCA==/com.qualityalternative.app-gNjBl96nzil3IUCqU3j5Ag==/base.apk!/lib/arm64-v8a, permitted_path=/data:/mnt/expand:/data/user/0/com.qualityalternative.app
+06-18 11:17:43.299 21610 21610 V GraphicsEnvironment: com.qualityalternative.app is not listed in per-application setting
+06-18 11:17:43.299 21610 21610 V GraphicsEnvironment: com.qualityalternative.app is not listed in ANGLE allowlist or settings, returning default
+06-18 11:17:43.698   678   774 D CoreBackPreview: Window{87b3b1 u0 com.qualityalternative.app/com.qualityalternative.app.MainActivity}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@59f4417, mPriority=-1, mIsAnimationCallback=false, mOverrideBehavior=0}
+06-18 11:17:44.064   678   730 I ActivityTaskManager: Displayed com.qualityalternative.app/.MainActivity for user 0: +1s54ms
+06-18 11:17:44.099   678   821 I ImeTracker: com.qualityalternative.app:b571b88c: onRequestHide at ORIGIN_SERVER reason HIDE_UNSPECIFIED_WINDOW fromUser false
+06-18 11:17:44.101 21610 21610 I ImeTracker: com.qualityalternative.app:b571b88c: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+06-18 11:17:44.104  1518  1518 I GoogleInputMethodService: GoogleInputMethodService.onStartInput():1293 onStartInput(EditorInfo{EditorInfo{packageName=com.qualityalternative.app, inputType=0, inputTypeString=NULL, enableLearning=false, autoCorrection=false, autoComplete=false, imeOptions=0, privateImeOptions=null, actionName=UNSPECIFIED, actionLabel=null, initialSelStart=-1, initialSelEnd=-1, initialCapsMode=0, label=null, fieldId=0, fieldName=null, extras=null, hintText=null, hintLocales=[]}}, false)
+06-18 11:17:44.106   678   774 W PackageConfigPersister: App-specific configuration not found for packageName: com.qualityalternative.app and userId: 0
+06-18 11:17:46.325 21659 21659 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:17:46.339 21659 21659 I AndroidRuntime: Using default boot image
+06-18 11:17:46.339 21659 21659 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:17:46.453 21659 21659 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:17:47.524 21659 21659 D AndroidRuntime: Shutting down VM
+06-18 11:17:49.044 21610 21673 D ProfileInstaller: Installing profile for com.qualityalternative.app
+06-18 11:18:17.496 21683 21683 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:18:17.499 21683 21683 I AndroidRuntime: Using default boot image
+06-18 11:18:17.499 21683 21683 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:18:17.558 21683 21683 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:18:18.594 21683 21683 D AndroidRuntime: Shutting down VM
+06-18 11:18:21.721 21708 21708 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:18:21.724 21708 21708 I AndroidRuntime: Using default boot image
+06-18 11:18:21.724 21708 21708 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:18:21.782 21708 21708 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:18:22.824 21708 21708 D AndroidRuntime: Shutting down VM
+06-18 11:18:54.501 21734 21734 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:18:54.504 21734 21734 I AndroidRuntime: Using default boot image
+06-18 11:18:54.504 21734 21734 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:18:54.562 21734 21734 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:18:55.603 21734 21734 D AndroidRuntime: Shutting down VM
+06-18 11:18:57.915 21758 21758 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:18:57.917 21758 21758 I AndroidRuntime: Using default boot image
+06-18 11:18:57.917 21758 21758 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:18:57.974 21758 21758 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:18:59.034 21758 21758 D AndroidRuntime: Shutting down VM
+06-18 11:19:00.113 21777 21777 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:19:00.116 21777 21777 I AndroidRuntime: Using default boot image
+06-18 11:19:00.116 21777 21777 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:19:00.172 21777 21777 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:19:01.222 21777 21777 D AndroidRuntime: Shutting down VM
+06-18 11:19:03.538 21801 21801 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:19:03.541 21801 21801 I AndroidRuntime: Using default boot image
+06-18 11:19:03.541 21801 21801 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:19:03.598 21801 21801 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:19:04.636 21801 21801 D AndroidRuntime: Shutting down VM
+06-18 11:19:05.703 21820 21820 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:19:05.705 21820 21820 I AndroidRuntime: Using default boot image
+06-18 11:19:05.705 21820 21820 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:19:05.766 21820 21820 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:19:06.803 21820 21820 D AndroidRuntime: Shutting down VM
+06-18 11:19:09.125 21843 21843 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:19:09.128 21843 21843 I AndroidRuntime: Using default boot image
+06-18 11:19:09.128 21843 21843 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:19:09.186 21843 21843 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:19:10.218 21843 21843 D AndroidRuntime: Shutting down VM
+06-18 11:19:11.296 21861 21861 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:19:11.298 21861 21861 I AndroidRuntime: Using default boot image
+06-18 11:19:11.298 21861 21861 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:19:11.358 21861 21861 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:19:12.386 21861 21861 D AndroidRuntime: Shutting down VM
+06-18 11:19:13.456 21879 21879 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:19:13.458 21879 21879 I AndroidRuntime: Using default boot image
+06-18 11:19:13.458 21879 21879 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:19:13.518 21879 21879 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:19:14.540 21879 21879 D AndroidRuntime: Shutting down VM
+06-18 11:20:05.597 21906 21906 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:20:05.599 21906 21906 I AndroidRuntime: Using default boot image
+06-18 11:20:05.599 21906 21906 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:20:05.656 21906 21906 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:20:06.681 21906 21906 D AndroidRuntime: Shutting down VM
+06-18 11:20:07.954  1637  1873 E DatabaseUtils: java.lang.IllegalStateException: Failed to build unique file: /storage/emulated/0/Download/Quality Alternative/quality-alternative-profile.json owner_package_name=com.qualityalternative.app _display_name=quality-alternative-profile.json mime_type=application/json _data=/storage/emulated/0/Download/Quality Alternative/quality-alternative-profile.json is_download=1 relative_path=Download/Quality Alternative/
+06-18 11:20:07.959  1637  1750 V MediaProvider: Created relation b/w 2023 and com.qualityalternative.app::0
+06-18 11:20:09.824 21930 21930 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:20:09.826 21930 21930 I AndroidRuntime: Using default boot image
+06-18 11:20:09.826 21930 21930 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:20:09.883 21930 21930 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:20:10.939 21930 21930 D AndroidRuntime: Shutting down VM
+06-18 11:20:38.335 21962 21962 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:20:38.337 21962 21962 I AndroidRuntime: Using default boot image
+06-18 11:20:38.337 21962 21962 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:20:38.393 21962 21962 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:20:39.440 21962 21962 D AndroidRuntime: Shutting down VM
+06-18 11:20:41.249 21986 21986 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:20:41.254 21986 21986 I AndroidRuntime: Using default boot image
+06-18 11:20:41.254 21986 21986 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:20:41.333 21986 21986 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:20:42.422 21986 21986 D AndroidRuntime: Shutting down VM
+06-18 11:20:44.256 22010 22010 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:20:44.259 22010 22010 I AndroidRuntime: Using default boot image
+06-18 11:20:44.259 22010 22010 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:20:44.330 22010 22010 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:20:45.396 22010 22010 D AndroidRuntime: Shutting down VM
+06-18 11:20:47.218 22034 22034 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:20:47.221 22034 22034 I AndroidRuntime: Using default boot image
+06-18 11:20:47.221 22034 22034 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:20:47.301 22034 22034 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:20:48.354 22034 22034 D AndroidRuntime: Shutting down VM
+06-18 11:20:50.184 22058 22058 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:20:50.187 22058 22058 I AndroidRuntime: Using default boot image
+06-18 11:20:50.187 22058 22058 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:20:50.256 22058 22058 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:20:51.302 22058 22058 D AndroidRuntime: Shutting down VM
+06-18 11:20:53.154 22081 22081 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:20:53.157 22081 22081 I AndroidRuntime: Using default boot image
+06-18 11:20:53.157 22081 22081 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:20:53.230 22081 22081 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:20:54.275 22081 22081 D AndroidRuntime: Shutting down VM
+06-18 11:20:56.104 22105 22105 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:20:56.106 22105 22105 I AndroidRuntime: Using default boot image
+06-18 11:20:56.106 22105 22105 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:20:56.176 22105 22105 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:20:57.261 22105 22105 D AndroidRuntime: Shutting down VM
+06-18 11:20:59.073 22129 22129 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:20:59.077 22129 22129 I AndroidRuntime: Using default boot image
+06-18 11:20:59.077 22129 22129 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:20:59.148 22129 22129 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:21:00.223 22129 22129 D AndroidRuntime: Shutting down VM
+06-18 11:21:30.891 22155 22155 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:21:30.893 22155 22155 I AndroidRuntime: Using default boot image
+06-18 11:21:30.893 22155 22155 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:21:30.956 22155 22155 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:21:31.993 22155 22155 D AndroidRuntime: Shutting down VM
+06-18 11:21:33.912 22178 22178 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:21:33.915 22178 22178 I AndroidRuntime: Using default boot image
+06-18 11:21:33.915 22178 22178 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:21:33.974 22178 22178 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:21:35.006 22178 22178 D AndroidRuntime: Shutting down VM
+06-18 11:21:36.108   949  1034 V WindowManagerShell: Transition requested (#96): android.os.BinderProxy@3a20516 TransitionRequestInfo { type = OPEN, triggerTask = TaskInfo{userId=0 taskId=1758 effectiveUid=10269 displayId=0 isRunning=true baseIntent=Intent { flg=0x10000000 cmp=com.qualityalternative.app/.MainActivity } baseActivity=ComponentInfo{com.qualityalternative.app/com.qualityalternative.app.MainActivity} topActivity=ComponentInfo{com.google.android.gms/com.google.android.gms.auth.api.credentials.authorization.ui.AuthorizationActivity} origActivity=null realActivity=ComponentInfo{com.qualityalternative.app/com.qualityalternative.app.MainActivity} numActivities=2 lastActiveTime=6453663 supportsMultiWindow=true resizeMode=1 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{android.window.IWindowContainerToken$Stub$Proxy@e8d0e97} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=Rect(0, 0 - 0, 0) topActivityInfo=ActivityInfo{c4b6884 com.google.android.gms.auth.api.credentials.authorization.ui.AuthorizationActivity} launchCookies=[] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=true isVisible=true isVisibleRequested=true isTopActivityNoDisplay=false isSleeping=false locusId=null displayAreaFeatureId=1 isTopActivityTransparent=true isActivityStackTransparent=false lastNonFullscreenBounds=Rect(269, 661 - 812, 1741) capturedLink=null capturedLinkTimestamp=0 requestedVisibleTypes=-9 topActivityRequestOpenInBrowserEducationTimestamp=0 appCompatTaskInfo=AppCompatTaskInfo { topActivityInSizeCompat=false eligibleForLetterboxEducation= false isLetterboxEducationEnabled= true isLetterboxDoubleTapEnabled= false eligibleForUserAspectRatioButton= false topActivityBoundsLetterboxed= false isFromLetterboxDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=-1 topActivityLetterboxHeight=-1 topActivityAppBounds=Rect(0, 0 - 1080, 2400) isUserFullscreenOverrideEnabled=false isSystemFullscreenOverrideEnabled=false hasMinAspectRatioOverride=false topActivityLetterboxBounds=null cameraCompatTaskInfo=CameraCompatTaskInfo { freeformCameraCompatMode=inactive}} topActivityMainWindowFrame=null}, pipChange = null, remoteTransition = null, displayChange = null, flags = 0, debugId = 96 }
+06-18 11:21:36.118  3449  3449 D ActivityThread: Package [com.qualityalternative.app] reported as REPLACED, but missing application info. Assuming REMOVED.
+06-18 11:21:36.216   678   730 V WindowManager: Sent Transition (#96) createdAt=06-18 11:21:36.103 via request=TransitionRequestInfo { type = OPEN, triggerTask = TaskInfo{userId=0 taskId=1758 effectiveUid=10269 displayId=0 isRunning=true baseIntent=Intent { flg=0x10000000 cmp=com.qualityalternative.app/.MainActivity } baseActivity=ComponentInfo{com.qualityalternative.app/com.qualityalternative.app.MainActivity} topActivity=ComponentInfo{com.google.android.gms/com.google.android.gms.auth.api.credentials.authorization.ui.AuthorizationActivity} origActivity=null realActivity=ComponentInfo{com.qualityalternative.app/com.qualityalternative.app.MainActivity} numActivities=2 lastActiveTime=6453663 supportsMultiWindow=true resizeMode=1 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{RemoteToken{4065e37 Task{5ccc5f #1758 type=standard A=10269:com.qualityalternative.app}}} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=Rect(0, 0 - 0, 0) topActivityInfo=ActivityInfo{1fff9c7 com.google.android.gms.auth.api.credentials.authorization.ui.AuthorizationActivity} launchCookies=[] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=true isVisible=true isVisibleRequested=true isTopActivityNoDisplay=false isSleeping=false locusId=null displayAreaFeatureId=1 isTopActivityTransparent=true isActivityStackTransparent=false lastNonFullscreenBounds=Rect(269, 661 - 812, 1741) capturedLink=null capturedLinkTimestamp=0 requestedVisibleTypes=-9 topActivityRequestOpenInBrowserEducationTimestamp=0 appCompatTaskInfo=AppCompatTaskInfo { topActivityInSizeCompat=false eligibleForLetterboxEducation= false isLetterboxEducationEnabled= true isLetterboxDoubleTapEnabled= false eligibleForUserAspectRatioButton= false topActivityBoundsLetterboxed= false isFromLetterboxDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=-1 topActivityLetterboxHeight=-1 topActivityAppBounds=Rect(0, 0 - 1080, 2400) isUserFullscreenOverrideEnabled=false isSystemFullscreenOverrideEnabled=false hasMinAspectRatioOverride=false topActivityLetterboxBounds=null cameraCompatTaskInfo=CameraCompatTaskInfo { freeformCameraCompatMode=inactive}} topActivityMainWindowFrame=null}, pipChange = null, remoteTransition = null, displayChange = null, flags = 0, debugId = 96 }
+06-18 11:21:39.149 22208 22208 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:21:39.151 22208 22208 I AndroidRuntime: Using default boot image
+06-18 11:21:39.152 22208 22208 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:21:39.213 22208 22208 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:21:40.240 22208 22208 D AndroidRuntime: Shutting down VM
+06-18 11:21:54.403   678  2087 I AccountManagerService: Notifying visibility changed for package=com.qualityalternative.app
+06-18 11:21:54.403   678  2087 I AccountManagerService: notifying package=com.qualityalternative.app for userId=0, sending broadcast of android.accounts.action.VISIBLE_ACCOUNTS_CHANGED
+06-18 11:21:54.440  2744  2744 D ActivityThread: Package [com.qualityalternative.app] reported as REPLACED, but missing application info. Assuming REMOVED.
+06-18 11:21:54.441  2744  2744 D ActivityThread: Package [com.qualityalternative.app] reported as REPLACED, but missing application info. Assuming REMOVED.
+06-18 11:21:54.502  2857  2857 D ActivityThread: Package [com.qualityalternative.app] reported as REPLACED, but missing application info. Assuming REMOVED.
+06-18 11:21:54.502  2857  2857 D ActivityThread: Package [com.qualityalternative.app] reported as REPLACED, but missing application info. Assuming REMOVED.
+06-18 11:21:54.540  2934  2934 D ActivityThread: Package [com.qualityalternative.app] reported as REPLACED, but missing application info. Assuming REMOVED.
+06-18 11:21:54.543  2934  2934 D ActivityThread: Package [com.qualityalternative.app] reported as REPLACED, but missing application info. Assuming REMOVED.
+06-18 11:21:54.554  1374  1374 D ActivityThread: Package [com.qualityalternative.app] reported as REPLACED, but missing application info. Assuming REMOVED.
+06-18 11:21:54.556  1374  1374 D ActivityThread: Package [com.qualityalternative.app] reported as REPLACED, but missing application info. Assuming REMOVED.
+06-18 11:21:55.422  1251  1263 W Auth    : [RequestTokenManager] getToken() -> NEED_REMOTE_CONSENT. App: com.qualityalternative.app, Service: oauth2:profile
+06-18 11:21:55.662   678   821 I ImeTracker: com.qualityalternative.app:8a5a834b: onRequestHide at ORIGIN_SERVER reason HIDE_UNSPECIFIED_WINDOW fromUser false
+06-18 11:21:55.664 21610 21610 I ImeTracker: com.qualityalternative.app:8a5a834b: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+06-18 11:21:55.664  1518  1518 I GoogleInputMethodService: GoogleInputMethodService.onStartInput():1293 onStartInput(EditorInfo{EditorInfo{packageName=com.qualityalternative.app, inputType=0, inputTypeString=NULL, enableLearning=false, autoCorrection=false, autoComplete=false, imeOptions=0, privateImeOptions=null, actionName=UNSPECIFIED, actionLabel=null, initialSelStart=-1, initialSelEnd=-1, initialCapsMode=0, label=null, fieldId=0, fieldName=null, extras=null, hintText=null, hintLocales=[]}}, false)
+06-18 11:21:55.666   678  2088 W PackageConfigPersister: App-specific configuration not found for packageName: com.qualityalternative.app and userId: 0
+06-18 11:21:59.668 22308 22308 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:21:59.675 22308 22308 I AndroidRuntime: Using default boot image
+06-18 11:21:59.675 22308 22308 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:21:59.761 22308 22308 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:22:00.803 22308 22308 D AndroidRuntime: Shutting down VM
+06-18 11:22:24.762 22341 22341 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:22:24.765 22341 22341 I AndroidRuntime: Using default boot image
+06-18 11:22:24.765 22341 22341 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:22:24.822 22341 22341 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:22:25.864 22341 22341 D AndroidRuntime: Shutting down VM
+06-18 11:22:44.121 22368 22368 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:22:44.124 22368 22368 I AndroidRuntime: Using default boot image
+06-18 11:22:44.124 22368 22368 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:22:44.183 22368 22368 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:22:45.221 22368 22368 D AndroidRuntime: Shutting down VM
+06-18 11:23:04.943 22399 22399 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:23:04.946 22399 22399 I AndroidRuntime: Using default boot image
+06-18 11:23:04.946 22399 22399 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:23:05.004 22399 22399 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:23:06.035 22399 22399 D AndroidRuntime: Shutting down VM
+06-18 11:23:25.237 21610 21615 I alternative.app: Compiler allocated 4977KB to compile kotlin.Unit com.qualityalternative.app.ui.QualityAlternativeAppKt.AgentInboxSettingsSection$lambda$890$lambda$889(boolean, com.qualityalternative.app.ui.MainUiState, com.qualityalternative.app.ui.theme.QualityAlternativeColors, kotlin.jvm.functions.Function1, kotlin.jvm.functions.Function0, kotlin.jvm.functions.Function1, kotlin.jvm.functions.Function0, kotlin.jvm.functions.Function1, kotlin.jvm.functions.Function1, kotlin.jvm.functions.Function1, android.content.Context, kotlin.jvm.functions.Function1, int, int, kotlin.jvm.functions.Function0, boolean, kotlin.jvm.functions.Function1, kotlin.jvm.functions.Function0, kotlin.jvm.functions.Function0, kotlin.jvm.functions.Function0, kotlin.jvm.functions.Function1, kotlin.jvm.functions.Function1, kotlin.jvm.functions.Function1, androidx.compose.foundation.layout.ColumnScope, androidx.compose.runtime.Composer, int)
+06-18 11:23:26.162 21610 21615 I alternative.app: Compiler allocated 7997KB to compile void com.qualityalternative.app.ui.QualityAlternativeAppKt.MainRoute(com.qualityalternative.app.ui.MainUiState, com.qualityalternative.app.ui.MainViewModel, kotlin.jvm.functions.Function0, androidx.compose.runtime.Composer, int)
+06-18 11:23:33.432 22434 22434 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:23:33.435 22434 22434 I AndroidRuntime: Using default boot image
+06-18 11:23:33.435 22434 22434 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:23:33.494 22434 22434 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:23:34.521 22434 22434 D AndroidRuntime: Shutting down VM
+06-18 11:23:53.416 22464 22464 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:23:53.419 22464 22464 I AndroidRuntime: Using default boot image
+06-18 11:23:53.419 22464 22464 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:23:53.484 22464 22464 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:23:54.521 22464 22464 D AndroidRuntime: Shutting down VM
+06-18 11:24:12.134   678   705 D CoreBackPreview: Window{87b3b1 u0 com.qualityalternative.app/com.qualityalternative.app.MainActivity}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@bd38624, mPriority=0, mIsAnimationCallback=true, mOverrideBehavior=0}
+06-18 11:24:14.323 22491 22491 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:24:14.325 22491 22491 I AndroidRuntime: Using default boot image
+06-18 11:24:14.325 22491 22491 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:24:14.381 22491 22491 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:24:15.409 22491 22491 I AccessibilityNodeInfoDumper: Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@13007; boundsInParent: Rect(0, 0 - 0, 0); boundsInScreen: Rect(0, 128 - 3, 131); boundsInWindow: Rect(0, 128 - 3, 131); packageName: com.qualityalternative.app; className: android.view.View; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: reader-first-visible-paragraph-0; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; granularScrollingSupported: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_NEXT_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SET_SELECTION - null]; isTextSelectable: false
+06-18 11:24:15.409 22491 22491 I AccessibilityNodeInfoDumper: Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@13026; boundsInParent: Rect(0, 0 - 0, 0); boundsInScreen: Rect(0, 131 - 3, 134); boundsInWindow: Rect(0, 131 - 3, 134); packageName: com.qualityalternative.app; className: android.view.View; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: reader-current-page-end-paragraph-2; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; granularScrollingSupported: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_NEXT_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SET_SELECTION - null]; isTextSelectable: false
+06-18 11:24:15.409 22491 22491 I AccessibilityNodeInfoDumper: Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@13045; boundsInParent: Rect(0, 0 - 0, 0); boundsInScreen: Rect(0, 134 - 3, 137); boundsInWindow: Rect(0, 134 - 3, 137); packageName: com.qualityalternative.app; className: android.view.View; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: reader-page-fit-411x790-font-100-weight-28-chars-65-gap-35-cap-18-blocks-3-pages-1; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; granularScrollingSupported: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_NEXT_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SET_SELECTION - null]; isTextSelectable: false
+06-18 11:24:15.411 22491 22491 D AndroidRuntime: Shutting down VM
+06-18 11:24:36.780   678  2087 D CoreBackPreview: Window{87b3b1 u0 com.qualityalternative.app/com.qualityalternative.app.MainActivity}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@86f7e5, mPriority=-1, mIsAnimationCallback=false, mOverrideBehavior=0}
+06-18 11:24:39.418 22518 22518 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:24:39.420 22518 22518 I AndroidRuntime: Using default boot image
+06-18 11:24:39.420 22518 22518 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:24:39.469 22518 22518 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:24:40.508 22518 22518 D AndroidRuntime: Shutting down VM
+06-18 11:24:42.334 22543 22543 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:24:42.338 22543 22543 I AndroidRuntime: Using default boot image
+06-18 11:24:42.338 22543 22543 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:24:42.411 22543 22543 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:24:43.483 22543 22543 D AndroidRuntime: Shutting down VM
+06-18 11:24:45.288 22568 22568 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:24:45.290 22568 22568 I AndroidRuntime: Using default boot image
+06-18 11:24:45.290 22568 22568 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:24:45.357 22568 22568 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:24:46.421 22568 22568 D AndroidRuntime: Shutting down VM
+06-18 11:24:48.239 22592 22592 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:24:48.243 22592 22592 I AndroidRuntime: Using default boot image
+06-18 11:24:48.243 22592 22592 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:24:48.312 22592 22592 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:24:49.363 22592 22592 D AndroidRuntime: Shutting down VM
+06-18 11:24:51.173 22616 22616 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:24:51.177 22616 22616 I AndroidRuntime: Using default boot image
+06-18 11:24:51.177 22616 22616 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:24:51.247 22616 22616 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:24:52.288 22616 22616 D AndroidRuntime: Shutting down VM
+06-18 11:24:54.222 22640 22640 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:24:54.224 22640 22640 I AndroidRuntime: Using default boot image
+06-18 11:24:54.224 22640 22640 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:24:54.280 22640 22640 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:24:55.308 22640 22640 D AndroidRuntime: Shutting down VM
+06-18 11:24:57.232 22663 22663 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:24:57.235 22663 22663 I AndroidRuntime: Using default boot image
+06-18 11:24:57.235 22663 22663 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:24:57.293 22663 22663 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:24:58.337 22663 22663 D AndroidRuntime: Shutting down VM
+06-18 11:25:00.220 22687 22687 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:25:00.222 22687 22687 I AndroidRuntime: Using default boot image
+06-18 11:25:00.223 22687 22687 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:25:00.283 22687 22687 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:25:01.323 22687 22687 D AndroidRuntime: Shutting down VM
+06-18 11:25:19.598 22727 22727 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:25:19.600 22727 22727 I AndroidRuntime: Using default boot image
+06-18 11:25:19.600 22727 22727 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:25:19.653 22727 22727 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:25:20.679 22727 22727 D AndroidRuntime: Shutting down VM
+06-18 11:25:59.860   678  1468 I ActivityManager: Force stopping com.qualityalternative.app appid=10269 user=0: from pid 22774
+06-18 11:25:59.861   678  1468 I ActivityManager: Killing 21610:com.qualityalternative.app/u0a269 (adj 0): stop com.qualityalternative.app due to from pid 22774
+06-18 11:25:59.864   678  1468 W ActivityTaskManager: Force removing ActivityRecord{55999742 u0 com.qualityalternative.app/.MainActivity t1758 f}}: app died, no saved state
+06-18 11:25:59.865   949  1034 V WindowManagerShell: Transition requested (#98): android.os.BinderProxy@d5a3c7e TransitionRequestInfo { type = CLOSE, triggerTask = TaskInfo{userId=0 taskId=1758 effectiveUid=10269 displayId=0 isRunning=false baseIntent=Intent { flg=0x10000000 cmp=com.qualityalternative.app/.MainActivity } baseActivity=null topActivity=null origActivity=null realActivity=ComponentInfo{com.qualityalternative.app/com.qualityalternative.app.MainActivity} numActivities=0 lastActiveTime=6473119 supportsMultiWindow=true resizeMode=1 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{android.window.IWindowContainerToken$Stub$Proxy@54e55df} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=Rect(0, 0 - 0, 0) topActivityInfo=null launchCookies=[] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=true isVisible=true isVisibleRequested=true isTopActivityNoDisplay=false isSleeping=false locusId=null displayAreaFeatureId=1 isTopActivityTransparent=false isActivityStackTransparent=true lastNonFullscreenBounds=Rect(269, 661 - 812, 1741) capturedLink=null capturedLinkTimestamp=0 requestedVisibleTypes=-9 topActivityRequestOpenInBrowserEducationTimestamp=0 appCompatTaskInfo=AppCompatTaskInfo { topActivityInSizeCompat=false eligibleForLetterboxEducation= false isLetterboxEducationEnabled= false isLetterboxDoubleTapEnabled= false eligibleForUserAspectRatioButton= false topActivityBoundsLetterboxed= false isFromLetterboxDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=-1 topActivityLetterboxHeight=-1 topActivityAppBounds=Rect(0, 0 - 0, 0) isUserFullscreenOverrideEnabled=false isSystemFullscreenOverrideEnabled=false hasMinAspectRatioOverride=false topActivityLetterboxBounds=null cameraCompatTaskInfo=CameraCompatTaskInfo { freeformCameraCompatMode=undefined}} topActivityMainWindowFrame=null}, pipChange = null, remoteTransition = null, displayChange = null, flags = 0, debugId = 98 }
+06-18 11:25:59.875   678   886 I AppWidgetServiceImpl: Updating package stopped masked state for uid 10269 package com.qualityalternative.app isStopped true
+06-18 11:25:59.882   678   813 W InputDispatcher: channel '87b3b1 com.qualityalternative.app/com.qualityalternative.app.MainActivity' ~ Consumer closed input channel or an error occurred.  events=0x9
+06-18 11:25:59.882   678   813 E InputDispatcher: channel '87b3b1 com.qualityalternative.app/com.qualityalternative.app.MainActivity' ~ Channel is unrecoverably broken and will be disposed!
+06-18 11:25:59.883   678   813 I WindowManager: WINDOW DIED Window{87b3b1 u0 com.qualityalternative.app/com.qualityalternative.app.MainActivity}
+06-18 11:25:59.885   678  1936 I ImeTracker: com.qualityalternative.app:8a3c6011: onRequestHide at ORIGIN_SERVER reason HIDE_REMOVE_CLIENT fromUser false
+06-18 11:25:59.885   678  1936 I ImeTracker: com.qualityalternative.app:8a3c6011: onCancelled at PHASE_SERVER_SHOULD_HIDE
+06-18 11:25:59.885  1066  1066 D CarrierSvcBindHelper: onHandleForceStop: [com.qualityalternative.app]
+06-18 11:25:59.886   678  2088 V ActivityManager: Got obituary of 21610:com.qualityalternative.app
+06-18 11:25:59.887   678  1932 I WindowManager: WIN DEATH: Window{87b3b1 u0 com.qualityalternative.app/com.qualityalternative.app.MainActivity EXITING}
+06-18 11:25:59.918   678   730 V WindowManager: Sent Transition (#98) createdAt=06-18 11:25:59.864 via request=TransitionRequestInfo { type = CLOSE, triggerTask = TaskInfo{userId=0 taskId=1758 effectiveUid=10269 displayId=0 isRunning=false baseIntent=Intent { flg=0x10000000 cmp=com.qualityalternative.app/.MainActivity } baseActivity=null topActivity=null origActivity=null realActivity=ComponentInfo{com.qualityalternative.app/com.qualityalternative.app.MainActivity} numActivities=0 lastActiveTime=6473119 supportsMultiWindow=true resizeMode=1 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{RemoteToken{4065e37 Task{5ccc5f #1758 type=standard A=10269:com.qualityalternative.app}}} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=Rect(0, 0 - 0, 0) topActivityInfo=null launchCookies=[] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=true isVisible=true isVisibleRequested=true isTopActivityNoDisplay=false isSleeping=false locusId=null displayAreaFeatureId=1 isTopActivityTransparent=false isActivityStackTransparent=true lastNonFullscreenBounds=Rect(269, 661 - 812, 1741) capturedLink=null capturedLinkTimestamp=0 requestedVisibleTypes=-9 topActivityRequestOpenInBrowserEducationTimestamp=0 appCompatTaskInfo=AppCompatTaskInfo { topActivityInSizeCompat=false eligibleForLetterboxEducation= false isLetterboxEducationEnabled= false isLetterboxDoubleTapEnabled= false eligibleForUserAspectRatioButton= false topActivityBoundsLetterboxed= false isFromLetterboxDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=-1 topActivityLetterboxHeight=-1 topActivityAppBounds=Rect(0, 0 - 0, 0) isUserFullscreenOverrideEnabled=false isSystemFullscreenOverrideEnabled=false hasMinAspectRatioOverride=false topActivityLetterboxBounds=null cameraCompatTaskInfo=CameraCompatTaskInfo { freeformCameraCompatMode=undefined}} topActivityMainWindowFrame=null}, pipChange = null, remoteTransition = null, displayChange = null, flags = 0, debugId = 98 }
+06-18 11:25:59.918   678   730 V WindowManager:         {WCT{RemoteToken{4065e37 Task{5ccc5f #1758 type=standard A=10269:com.qualityalternative.app}}} m=CLOSE f=NONE leash=Surface(name=Task=1758)/@0x98ea75b sb=Rect(0, 0 - 1080, 2400) eb=Rect(0, 0 - 1080, 2400) epz=Point(1080, 2400) d=0 taskParent=-1},
+06-18 11:25:59.920   678   734 W ActivityTaskManager: Unable to send transaction to client proc com.qualityalternative.app: no app thread
+06-18 11:25:59.936   678  1127 W WindowManager: Exception thrown during dispatchAppVisibility Window{87b3b1 u0 com.qualityalternative.app/com.qualityalternative.app.MainActivity EXITING}
+06-18 11:25:59.936   678  1127 W WindowManager: android.os.DeadObjectException
+06-18 11:26:00.916   678  1127 I ActivityTaskManager: START u0 {flg=0x10000000 xflg=0x5 cmp=com.qualityalternative.app/.MainActivity} with LAUNCH_SINGLE_TOP from uid 2000 (BAL_ALLOW_PERMISSION) result code=0
+06-18 11:26:00.916   949  1034 V WindowManagerShell: Transition requested (#99): android.os.BinderProxy@acc4426 TransitionRequestInfo { type = OPEN, triggerTask = TaskInfo{userId=0 taskId=1759 effectiveUid=10269 displayId=0 isRunning=true baseIntent=Intent { flg=0x10000000 cmp=com.qualityalternative.app/.MainActivity } baseActivity=ComponentInfo{com.qualityalternative.app/com.qualityalternative.app.MainActivity} topActivity=ComponentInfo{com.qualityalternative.app/com.qualityalternative.app.MainActivity} origActivity=null realActivity=ComponentInfo{com.qualityalternative.app/com.qualityalternative.app.MainActivity} numActivities=1 lastActiveTime=6718473 supportsMultiWindow=true resizeMode=1 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{android.window.IWindowContainerToken$Stub$Proxy@120c867} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=Rect(0, 128 - 0, 0) topActivityInfo=ActivityInfo{eaee614 com.qualityalternative.app.MainActivity} launchCookies=[] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=false isVisible=false isVisibleRequested=false isTopActivityNoDisplay=false isSleeping=false locusId=null displayAreaFeatureId=1 isTopActivityTransparent=false isActivityStackTransparent=false lastNonFullscreenBounds=Rect(269, 661 - 812, 1741) capturedLink=null capturedLinkTimestamp=0 requestedVisibleTypes=-9 topActivityRequestOpenInBrowserEducationTimestamp=0 appCompatTaskInfo=AppCompatTaskInfo { topActivityInSizeCompat=false eligibleForLetterboxEducation= false isLetterboxEducationEnabled= true isLetterboxDoubleTapEnabled= false eligibleForUserAspectRatioButton= false topActivityBoundsLetterboxed= false isFromLetterboxDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=-1 topActivityLetterboxHeight=-1 topActivityAppBounds=Rect(0, 0 - 1080, 2400) isUserFullscreenOverrideEnabled=false isSystemFullscreenOverrideEnabled=false hasMinAspectRatioOverride=false topActivityLetterboxBounds=null cameraCompatTaskInfo=CameraCompatTaskInfo { freeformCameraCompatMode=inactive}} topActivityMainWindowFrame=null}, pipChange = null, remoteTransition = null, displayChange = null, flags = 0, debugId = 99 }
+06-18 11:26:00.921   678   886 I AppWidgetServiceImpl: Updating package stopped masked state for uid 10269 package com.qualityalternative.app isStopped false
+06-18 11:26:00.927   678   740 I ActivityManager: Start proc 22814:com.qualityalternative.app/u0a269 for next-top-activity {com.qualityalternative.app/com.qualityalternative.app.MainActivity}
+06-18 11:26:00.942   678   730 V WindowManager: Sent Transition (#99) createdAt=06-18 11:26:00.913 via request=TransitionRequestInfo { type = OPEN, triggerTask = TaskInfo{userId=0 taskId=1759 effectiveUid=10269 displayId=0 isRunning=true baseIntent=Intent { flg=0x10000000 cmp=com.qualityalternative.app/.MainActivity } baseActivity=ComponentInfo{com.qualityalternative.app/com.qualityalternative.app.MainActivity} topActivity=ComponentInfo{com.qualityalternative.app/com.qualityalternative.app.MainActivity} origActivity=null realActivity=ComponentInfo{com.qualityalternative.app/com.qualityalternative.app.MainActivity} numActivities=1 lastActiveTime=6718473 supportsMultiWindow=true resizeMode=1 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{RemoteToken{8d4dddb Task{866b9cf #1759 type=standard A=10269:com.qualityalternative.app}}} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=Rect(0, 128 - 0, 0) topActivityInfo=ActivityInfo{9d6078 com.qualityalternative.app.MainActivity} launchCookies=[] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=false isVisible=false isVisibleRequested=false isTopActivityNoDisplay=false isSleeping=false locusId=null displayAreaFeatureId=1 isTopActivityTransparent=false isActivityStackTransparent=false lastNonFullscreenBounds=Rect(269, 661 - 812, 1741) capturedLink=null capturedLinkTimestamp=0 requestedVisibleTypes=-9 topActivityRequestOpenInBrowserEducationTimestamp=0 appCompatTaskInfo=AppCompatTaskInfo { topActivityInSizeCompat=false eligibleForLetterboxEducation= false isLetterboxEducationEnabled= true isLetterboxDoubleTapEnabled= false eligibleForUserAspectRatioButton= false topActivityBoundsLetterboxed= false isFromLetterboxDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=-1 topActivityLetterboxHeight=-1 topActivityAppBounds=Rect(0, 0 - 1080, 2400) isUserFullscreenOverrideEnabled=false isSystemFullscreenOverrideEnabled=false hasMinAspectRatioOverride=false topActivityLetterboxBounds=null cameraCompatTaskInfo=CameraCompatTaskInfo { freeformCameraCompatMode=inactive}} topActivityMainWindowFrame=null}, pipChange = null, remoteTransition = null, displayChange = null, flags = 0, debugId = 99 }
+06-18 11:26:00.942   678   730 V WindowManager:         {WCT{RemoteToken{8d4dddb Task{866b9cf #1759 type=standard A=10269:com.qualityalternative.app}}} m=OPEN f=NONE leash=Surface(name=Task=1759)/@0x44fb4bf sb=Rect(0, 0 - 1080, 2400) eb=Rect(0, 0 - 1080, 2400) epz=Point(1080, 2400) d=0 taskParent=-1},
+06-18 11:26:01.209 22814 22814 D nativeloader: Configuring clns-9 for other apk /data/app/~~64WKyHO72TIsUx2qYNXgCA==/com.qualityalternative.app-gNjBl96nzil3IUCqU3j5Ag==/base.apk. target_sdk_version=36, uses_libraries=, library_path=/data/app/~~64WKyHO72TIsUx2qYNXgCA==/com.qualityalternative.app-gNjBl96nzil3IUCqU3j5Ag==/lib/arm64:/data/app/~~64WKyHO72TIsUx2qYNXgCA==/com.qualityalternative.app-gNjBl96nzil3IUCqU3j5Ag==/base.apk!/lib/arm64-v8a, permitted_path=/data:/mnt/expand:/data/user/0/com.qualityalternative.app
+06-18 11:26:01.218 22814 22814 V GraphicsEnvironment: com.qualityalternative.app is not listed in per-application setting
+06-18 11:26:01.218 22814 22814 V GraphicsEnvironment: com.qualityalternative.app is not listed in ANGLE allowlist or settings, returning default
+06-18 11:26:01.740   678  1748 D CoreBackPreview: Window{15e1143 u0 com.qualityalternative.app/com.qualityalternative.app.MainActivity}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@c3978f9, mPriority=-1, mIsAnimationCallback=false, mOverrideBehavior=0}
+06-18 11:26:02.008   678   730 I ActivityTaskManager: Displayed com.qualityalternative.app/.MainActivity for user 0: +1s63ms
+06-18 11:26:02.248   678   821 I ImeTracker: com.qualityalternative.app:c5f5b384: onRequestHide at ORIGIN_SERVER reason HIDE_UNSPECIFIED_WINDOW fromUser false
+06-18 11:26:02.250 22814 22814 I ImeTracker: com.qualityalternative.app:c5f5b384: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+06-18 11:26:02.258  1518  1518 I GoogleInputMethodService: GoogleInputMethodService.onStartInput():1293 onStartInput(EditorInfo{EditorInfo{packageName=com.qualityalternative.app, inputType=0, inputTypeString=NULL, enableLearning=false, autoCorrection=false, autoComplete=false, imeOptions=0, privateImeOptions=null, actionName=UNSPECIFIED, actionLabel=null, initialSelStart=-1, initialSelEnd=-1, initialCapsMode=0, label=null, fieldId=0, fieldName=null, extras=null, hintText=null, hintLocales=[]}}, false)
+06-18 11:26:02.260   678   774 W PackageConfigPersister: App-specific configuration not found for packageName: com.qualityalternative.app and userId: 0
+06-18 11:26:07.179 22814 22938 D ProfileInstaller: Installing profile for com.qualityalternative.app
+06-18 11:26:17.198 22995 22995 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:26:17.211 22995 22995 I AndroidRuntime: Using default boot image
+06-18 11:26:17.211 22995 22995 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:26:17.304 22995 22995 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:26:18.404 22995 22995 D AndroidRuntime: Shutting down VM
+06-18 11:26:55.044 23080 23080 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:26:55.048 23080 23080 I AndroidRuntime: Using default boot image
+06-18 11:26:55.048 23080 23080 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:26:55.124 23080 23080 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:26:56.180 23080 23080 D AndroidRuntime: Shutting down VM
+06-18 11:27:07.321   678  1936 D CoreBackPreview: Window{15e1143 u0 com.qualityalternative.app/com.qualityalternative.app.MainActivity}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@7b46cf2, mPriority=0, mIsAnimationCallback=true, mOverrideBehavior=0}
+06-18 11:27:09.514 23109 23109 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:27:09.516 23109 23109 I AndroidRuntime: Using default boot image
+06-18 11:27:09.516 23109 23109 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:27:09.572 23109 23109 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:27:10.593 23109 23109 I AccessibilityNodeInfoDumper: Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@ba43; boundsInParent: Rect(0, 0 - 0, 0); boundsInScreen: Rect(0, 128 - 3, 131); boundsInWindow: Rect(0, 128 - 3, 131); packageName: com.qualityalternative.app; className: android.view.View; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: reader-first-visible-paragraph-0; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; granularScrollingSupported: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_NEXT_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SET_SELECTION - null]; isTextSelectable: false
+06-18 11:27:10.593 23109 23109 I AccessibilityNodeInfoDumper: Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@ba62; boundsInParent: Rect(0, 0 - 0, 0); boundsInScreen: Rect(0, 131 - 3, 134); boundsInWindow: Rect(0, 131 - 3, 134); packageName: com.qualityalternative.app; className: android.view.View; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: reader-current-page-end-paragraph-2; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; granularScrollingSupported: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_NEXT_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SET_SELECTION - null]; isTextSelectable: false
+06-18 11:27:10.593 23109 23109 I AccessibilityNodeInfoDumper: Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@ba81; boundsInParent: Rect(0, 0 - 0, 0); boundsInScreen: Rect(0, 134 - 3, 137); boundsInWindow: Rect(0, 134 - 3, 137); packageName: com.qualityalternative.app; className: android.view.View; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: reader-page-fit-411x790-font-100-weight-28-chars-65-gap-35-cap-18-blocks-3-pages-1; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; granularScrollingSupported: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_NEXT_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SET_SELECTION - null]; isTextSelectable: false
+06-18 11:27:10.602 23109 23109 D AndroidRuntime: Shutting down VM
+06-18 11:27:12.895 22814 22822 I alternative.app: Compiler allocated 7976KB to compile void com.qualityalternative.app.ui.QualityAlternativeAppKt.MainRoute(com.qualityalternative.app.ui.MainUiState, com.qualityalternative.app.ui.MainViewModel, kotlin.jvm.functions.Function0, androidx.compose.runtime.Composer, int)
+06-18 11:27:34.848   678  1127 D CoreBackPreview: Window{15e1143 u0 com.qualityalternative.app/com.qualityalternative.app.MainActivity}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@5c21f9c, mPriority=-1, mIsAnimationCallback=false, mOverrideBehavior=0}
+06-18 11:27:37.481 23149 23149 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:27:37.483 23149 23149 I AndroidRuntime: Using default boot image
+06-18 11:27:37.483 23149 23149 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:27:37.545 23149 23149 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:27:38.599 23149 23149 D AndroidRuntime: Shutting down VM
+06-18 11:27:40.380 23173 23173 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:27:40.383 23173 23173 I AndroidRuntime: Using default boot image
+06-18 11:27:40.383 23173 23173 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:27:40.456 23173 23173 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:27:41.642 23173 23173 D AndroidRuntime: Shutting down VM
+06-18 11:27:43.439 23198 23198 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:27:43.443 23198 23198 I AndroidRuntime: Using default boot image
+06-18 11:27:43.443 23198 23198 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:27:43.507 23198 23198 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:27:44.547 23198 23198 D AndroidRuntime: Shutting down VM
+06-18 11:27:46.396 23222 23222 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:27:46.399 23222 23222 I AndroidRuntime: Using default boot image
+06-18 11:27:46.399 23222 23222 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:27:46.473 23222 23222 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:27:47.526 23222 23222 D AndroidRuntime: Shutting down VM
+06-18 11:27:49.348 23246 23246 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:27:49.350 23246 23246 I AndroidRuntime: Using default boot image
+06-18 11:27:49.350 23246 23246 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:27:49.419 23246 23246 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:27:50.479 23246 23246 D AndroidRuntime: Shutting down VM
+06-18 11:27:52.287 23270 23270 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:27:52.290 23270 23270 I AndroidRuntime: Using default boot image
+06-18 11:27:52.290 23270 23270 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:27:52.360 23270 23270 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:27:53.428 23270 23270 D AndroidRuntime: Shutting down VM
+06-18 11:27:55.275 23294 23294 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:27:55.278 23294 23294 I AndroidRuntime: Using default boot image
+06-18 11:27:55.279 23294 23294 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:27:55.346 23294 23294 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:27:56.390 23294 23294 D AndroidRuntime: Shutting down VM
+06-18 11:27:58.253 23319 23319 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:27:58.257 23319 23319 I AndroidRuntime: Using default boot image
+06-18 11:27:58.257 23319 23319 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:27:58.323 23319 23319 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:27:59.367 23319 23319 D AndroidRuntime: Shutting down VM
+06-18 11:28:01.286 23343 23343 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:28:01.288 23343 23343 I AndroidRuntime: Using default boot image
+06-18 11:28:01.288 23343 23343 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:28:01.347 23343 23343 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:28:02.377 23343 23343 D AndroidRuntime: Shutting down VM
+06-18 11:28:04.246 23366 23366 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:28:04.249 23366 23366 I AndroidRuntime: Using default boot image
+06-18 11:28:04.249 23366 23366 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:28:04.316 23366 23366 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:28:05.338 23366 23366 D AndroidRuntime: Shutting down VM
+06-18 11:28:08.460 23395 23395 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:28:08.462 23395 23395 I AndroidRuntime: Using default boot image
+06-18 11:28:08.462 23395 23395 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:28:08.534 23395 23395 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:28:09.594 23395 23395 D AndroidRuntime: Shutting down VM
+06-18 11:28:39.214 23445 23445 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:28:39.216 23445 23445 I AndroidRuntime: Using default boot image
+06-18 11:28:39.216 23445 23445 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:28:39.274 23445 23445 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:28:40.298 23445 23445 D AndroidRuntime: Shutting down VM
+06-18 11:29:05.186 22814 22814 I ImeTracker: com.qualityalternative.app:b191ad96: onRequestShow at ORIGIN_CLIENT reason SHOW_SOFT_INPUT_BY_INSETS_API fromUser false
+06-18 11:29:05.199   678  1127 D ContentCapturePerUserService: Notified activity assist data for activity: Token{5745f5c ActivityRecord{36108846 u0 com.qualityalternative.app/.MainActivity t1759}} without a session Id
+06-18 11:29:05.201 22814 22814 I ImeTracker: com.qualityalternative.app:3cfea534: onRequestShow at ORIGIN_CLIENT reason SHOW_SOFT_INPUT fromUser false
+06-18 11:29:05.202 22814 22814 I ImeTracker: com.qualityalternative.app:3cfea534: onCancelled at PHASE_CLIENT_REPORT_REQUESTED_VISIBLE_TYPES
+06-18 11:29:05.206  1518  1518 I GoogleInputMethodService: GoogleInputMethodService.onStartInput():1293 onStartInput(EditorInfo{EditorInfo{packageName=com.qualityalternative.app, inputType=8001, inputTypeString=Normal[AutoCorrect], enableLearning=true, autoCorrection=true, autoComplete=true, imeOptions=2000006, privateImeOptions=null, actionName=DONE, actionLabel=null, initialSelStart=0, initialSelEnd=0, initialCapsMode=0, label=null, fieldId=-1, fieldName=null, extras=Bundle[mParcelledData.dataSize=404], hintText=null, hintLocales=[]}}, false)
+06-18 11:29:05.208   678  1127 W PackageConfigPersister: App-specific configuration not found for packageName: com.qualityalternative.app and userId: 0
+06-18 11:29:05.208  1518  1518 I GoogleInputMethodService: GoogleInputMethodService.onStartInput():1293 onStartInput(EditorInfo{EditorInfo{packageName=com.qualityalternative.app, inputType=8001, inputTypeString=Normal[AutoCorrect], enableLearning=true, autoCorrection=true, autoComplete=true, imeOptions=2000006, privateImeOptions=null, actionName=DONE, actionLabel=null, initialSelStart=0, initialSelEnd=0, initialCapsMode=0, label=null, fieldId=-1, fieldName=null, extras=Bundle[mParcelledData.dataSize=404], hintText=null, hintLocales=[]}}, true)
+06-18 11:29:05.217   678  1748 W PackageConfigPersister: App-specific configuration not found for packageName: com.qualityalternative.app and userId: 0
+06-18 11:29:05.229  1518  1518 I GoogleInputMethodService: GoogleInputMethodService.onStartInputView():1392 onStartInputView(EditorInfo{EditorInfo{packageName=com.qualityalternative.app, inputType=8001, inputTypeString=Normal[AutoCorrect], enableLearning=true, autoCorrection=true, autoComplete=true, imeOptions=2000006, privateImeOptions=null, actionName=DONE, actionLabel=null, initialSelStart=0, initialSelEnd=0, initialCapsMode=0, label=null, fieldId=-1, fieldName=null, extras=Bundle[{android.support.text.emoji.emojiCompat_metadataVersion=11, androidx.core.view.inputmethod.EditorInfoCompat.STYLUS_HANDWRITING_ENABLED=true, android.support.text.emoji.emojiCompat_replaceAll=false}], hintText=null, hintLocales=[]}}, false)
+06-18 11:29:05.273  1518  1518 I AndroidIME: AbstractIme.onActivate():90 LatinIme.onActivate() : EditorInfo = EditorInfo{packageName=com.qualityalternative.app, inputType=8001, inputTypeString=Normal[AutoCorrect], enableLearning=true, autoCorrection=true, autoComplete=true, imeOptions=2000006, privateImeOptions=null, actionName=DONE, actionLabel=null, initialSelStart=0, initialSelEnd=0, initialCapsMode=0, label=null, fieldId=-1, fieldName=null, extras=Bundle[{android.support.text.emoji.emojiCompat_metadataVersion=11, androidx.core.view.inputmethod.EditorInfoCompat.STYLUS_HANDWRITING_ENABLED=true, android.support.text.emoji.emojiCompat_replaceAll=false}], hintText=null, hintLocales=[]}, IncognitoMode = false, DeviceLocked = false
+06-18 11:29:05.499   678   707 D CoreBackPreview: Window{15e1143 u0 com.qualityalternative.app/com.qualityalternative.app.MainActivity}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@d41c7bd, mPriority=0, mIsAnimationCallback=true, mOverrideBehavior=0}
+06-18 11:29:05.714 22814 22814 W InteractionJankMonitor: Initializing without READ_DEVICE_CONFIG permission. enabled=true, interval=1, missedFrameThreshold=3, frameTimeThreshold=64, package=com.qualityalternative.app
+06-18 11:29:05.736 22814 22814 I ImeTracker: com.qualityalternative.app:b191ad96: onShown
+06-18 11:29:05.859 22814 22814 W FrameTracker: Missed SF frame:JANK_COMPOSER, 181094, 32886703, CUJ=J<IME_INSETS_SHOW_ANIMATION::0@1@com.qualityalternative.app>
+06-18 11:29:08.225 23547 23547 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:29:08.227 23547 23547 I AndroidRuntime: Using default boot image
+06-18 11:29:08.227 23547 23547 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:29:08.293 23547 23547 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:29:09.332 23547 23547 D AndroidRuntime: Shutting down VM
+06-18 11:29:12.461 23565 23565 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-18 11:29:12.463 23565 23565 I AndroidRuntime: Using default boot image
+06-18 11:29:12.463 23565 23565 I AndroidRuntime: Leaving lock profiling enabled
+06-18 11:29:12.523 23565 23565 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-18 11:29:13.560 23565 23565 D AndroidRuntime: Shutting down VM

@@ -124,6 +124,17 @@ enum class ContentPriority {
     MEDITATION,
 }
 
+enum class AgentInboxPriorityMode {
+    MANUAL_REVIEW,
+    IGNORE_MANIFEST,
+    AUTO_ACCEPT_HIGH,
+}
+
+enum class AgentInboxCategoryMode {
+    MANIFEST_TOPICS,
+    UNCATEGORIZED,
+}
+
 data class AppSettings(
     val hasCompletedOnboarding: Boolean,
     val selectedAppPackages: Set<String>,
@@ -156,6 +167,8 @@ data class AppSettings(
     val agentInboxDriveLastSuccessfulAtMillis: Long? = null,
     val agentInboxDriveLastError: String? = null,
     val agentInboxAutoImportEnabled: Boolean = false,
+    val agentInboxPriorityMode: AgentInboxPriorityMode = AgentInboxPriorityMode.MANUAL_REVIEW,
+    val agentInboxCategoryMode: AgentInboxCategoryMode = AgentInboxCategoryMode.MANIFEST_TOPICS,
     val profileAutosaveUri: String? = null,
     val profileAutosaveDisplayName: String? = null,
     val profileAutosaveLastSuccessfulAtMillis: Long? = null,

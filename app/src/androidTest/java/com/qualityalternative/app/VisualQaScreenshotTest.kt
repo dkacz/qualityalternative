@@ -59,6 +59,7 @@ import com.qualityalternative.app.domain.model.WebsiteRuleType
 import com.qualityalternative.app.domain.service.AddUserDocumentResult
 import com.qualityalternative.app.domain.service.AddUserLinkResult
 import com.qualityalternative.app.domain.service.AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER
+import com.qualityalternative.app.domain.service.AGENT_INBOX_DRIVE_GRANT_MODE_READONLY_FOLDER
 import com.qualityalternative.app.domain.service.AgentInboxDriveClient
 import com.qualityalternative.app.domain.service.AgentInboxDriveFile
 import com.qualityalternative.app.domain.service.AgentInboxDriveFolder
@@ -101,6 +102,7 @@ class VisualQaScreenshotTest {
     private val sprint27ScreenshotDirName = "sprint27-agent-content-inbox-${System.currentTimeMillis()}"
     private val sprint29ScreenshotDirName = "sprint29-agent-inbox-folder-selector-${System.currentTimeMillis()}"
     private val sprint35ScreenshotDirName = "sprint35-agent-inbox-folder-selector-repair-${System.currentTimeMillis()}"
+    private val sprint39ScreenshotDirName = "sprint39-agent-inbox-autoimport-options-${System.currentTimeMillis()}"
     private lateinit var screenshotDir: File
     private lateinit var legacyScreenshotDir: File
     private lateinit var sprint10ScreenshotDir: File
@@ -118,6 +120,7 @@ class VisualQaScreenshotTest {
     private lateinit var sprint27ScreenshotDir: File
     private lateinit var sprint29ScreenshotDir: File
     private lateinit var sprint35ScreenshotDir: File
+    private lateinit var sprint39ScreenshotDir: File
 
     @Before
     fun resetAppState() {
@@ -175,6 +178,9 @@ class VisualQaScreenshotTest {
         sprint35ScreenshotDir = File("/sdcard/Download/qualityalternative/$sprint35ScreenshotDirName")
         sprint35ScreenshotDir.deleteRecursively()
         sprint35ScreenshotDir.mkdirs()
+        sprint39ScreenshotDir = File("/sdcard/Download/qualityalternative/$sprint39ScreenshotDirName")
+        sprint39ScreenshotDir.deleteRecursively()
+        sprint39ScreenshotDir.mkdirs()
     }
 
     @After
@@ -864,6 +870,77 @@ class VisualQaScreenshotTest {
     @Test
     fun captureSprint35AgentInboxFolderSelectorRepairStates() {
         captureAgentInboxFolderSelectorRepairStates(::captureSprint35)
+    }
+
+    @Test
+    fun captureSprint39AgentInboxAutoimportOptionsPromptStates() {
+        val folderBrowserDriveClient = VisualAgentInboxDriveClient().apply {
+            setFolders(
+                AgentInboxDriveFolder(
+                    id = "sprint39-visual-drive-inbox",
+                    name = "Sprint 39 QA Agent Inbox",
+                    modifiedTime = "2026-06-18T09:39:00Z",
+                ),
+            )
+        }
+        launchFreshAppThroughTopicVisualQa()
+        scenario!!.onActivity { activity ->
+            activity.mainViewModel.setAgentInboxDriveClientForTests(folderBrowserDriveClient)
+        }
+        openTab("tab-settings", "settings-list")
+        composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasTestTag("settings-agent-inbox-section"))
+        scenario!!.onActivity { activity ->
+            activity.mainViewModel.beginAgentInboxDriveFolderBrowser()
+            activity.mainViewModel.loadAgentInboxDriveFolderBrowserRoot("visual-drive-token")
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            hasTag("settings-agent-inbox-drive-folder-browser") && hasNode("Sprint 39 QA Agent Inbox")
+        }
+        composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasTestTag("settings-agent-inbox-drive-folder-select-sprint39-visual-drive-inbox"))
+        composeRule.onNodeWithTag("settings-agent-inbox-drive-folder-select-sprint39-visual-drive-inbox")
+            .assertIsDisplayed()
+        captureSprint39("00_agent_inbox_drive_folder_browser_light")
+
+        scenario!!.onActivity { activity ->
+            activity.mainViewModel.selectAgentInboxDriveFolderFromBrowser(
+                accessToken = "visual-drive-token",
+                folderId = "sprint39-visual-drive-inbox",
+                folderName = "Sprint 39 QA Agent Inbox",
+                nowMillis = 1_781_768_740_000L,
+            )
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            runBlocking {
+                val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as QualityAlternativeApplication
+                val settings = app.appContainer.settingsRepository.observeAppSettings().first()
+                settings.agentInboxDriveEnabled &&
+                    settings.agentInboxDriveGrantMode == AGENT_INBOX_DRIVE_GRANT_MODE_READONLY_FOLDER
+            }
+        }
+        composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasTestTag("settings-agent-inbox-section"))
+        composeRule.onNodeWithText("Agent Inbox folder connected").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings-agent-inbox-autoimport-toggle").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasTestTag("settings-agent-inbox-import-options"))
+        composeRule.onNodeWithTag("settings-agent-inbox-import-options").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings-agent-inbox-priority-mode-MANUAL_REVIEW").assertIsSelected()
+        composeRule.onNodeWithTag("settings-agent-inbox-category-mode-MANIFEST_TOPICS").assertIsSelected()
+        composeRule.onNodeWithTag("settings-agent-inbox-copy-agent-prompt").assertIsDisplayed().assertIsEnabled()
+        captureSprint39("01_agent_inbox_autoimport_options_default_light")
+
+        composeRule.onNodeWithTag("settings-agent-inbox-priority-mode-AUTO_ACCEPT_HIGH").performClick()
+        composeRule.onNodeWithTag("settings-agent-inbox-category-mode-UNCATEGORIZED").performClick()
+        composeRule.onNodeWithTag("settings-agent-inbox-priority-mode-AUTO_ACCEPT_HIGH").assertIsSelected()
+        composeRule.onNodeWithTag("settings-agent-inbox-category-mode-UNCATEGORIZED").assertIsSelected()
+        composeRule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasTestTag("settings-agent-inbox-copy-agent-prompt"))
+        composeRule.onNodeWithTag("settings-agent-inbox-copy-agent-prompt")
+            .assertIsDisplayed()
+            .assertIsEnabled()
+        captureSprint39("02_agent_inbox_autoimport_options_prompt_ready_light")
     }
 
     @Test
@@ -2227,6 +2304,10 @@ class VisualQaScreenshotTest {
 
     private fun captureSprint35(name: String) {
         captureTo(sprint35ScreenshotDir, name)
+    }
+
+    private fun captureSprint39(name: String) {
+        captureTo(sprint39ScreenshotDir, name)
     }
 
     private fun captureTo(directory: File, name: String) {

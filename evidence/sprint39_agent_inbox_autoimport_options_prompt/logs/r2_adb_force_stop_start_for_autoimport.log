@@ -1,0 +1,5 @@
+$ adb shell am force-stop com.qualityalternative.app
+force_stop_exit=0
+$ adb shell am start -n com.qualityalternative.app/.MainActivity
+Starting: Intent { cmp=com.qualityalternative.app/.MainActivity }
+start_exit=0

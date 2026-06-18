@@ -2,6 +2,8 @@ package com.qualityalternative.app.ui
 
 import android.app.Activity
 import android.content.ActivityNotFoundException
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
@@ -146,6 +148,8 @@ import com.qualityalternative.app.data.SupportedCatalog
 import com.qualityalternative.app.data.UserDocumentValidator
 import com.qualityalternative.app.domain.model.AnalyticsEvent
 import com.qualityalternative.app.domain.model.AnalyticsEventType
+import com.qualityalternative.app.domain.model.AgentInboxCategoryMode
+import com.qualityalternative.app.domain.model.AgentInboxPriorityMode
 import com.qualityalternative.app.domain.model.AppThemeMode
 import com.qualityalternative.app.domain.model.BedtimeEndMinuteOptions
 import com.qualityalternative.app.domain.model.BedtimeStartMinuteOptions
@@ -929,6 +933,15 @@ private fun MainRoute(
                 onToggleAgentInboxPriority = viewModel::toggleAgentInboxPriority,
                 onRejectAgentInboxCandidate = viewModel::rejectAgentInboxCandidate,
                 onToggleAgentInboxAutoImport = { enabled -> viewModel.setAgentInboxAutoImportEnabled(enabled) },
+                onSelectAgentInboxPriorityMode = { mode ->
+                    viewModel.setAgentInboxImportOptions(priorityMode = mode)
+                },
+                onSelectAgentInboxCategoryMode = { mode ->
+                    viewModel.setAgentInboxImportOptions(categoryMode = mode)
+                },
+                onCopyAgentInboxPrompt = { copied ->
+                    viewModel.recordAgentInboxPromptCopied(copied = copied)
+                },
                 onImportAgentInboxCandidate = { packageFolderId ->
                     if (agentInboxDocumentTreeUsesGoogleDriveProvider()) {
                         pendingAgentInboxImportPackageId = packageFolderId
@@ -1188,6 +1201,7 @@ private enum class QaIconKind {
     Bell,
     ChevronRight,
     Note,
+    Copy,
     Dot,
 }
 
@@ -4427,6 +4441,9 @@ private fun SettingsTab(
     onToggleAgentInboxPriority: (String) -> Unit,
     onRejectAgentInboxCandidate: (String) -> Unit,
     onToggleAgentInboxAutoImport: (Boolean) -> Unit,
+    onSelectAgentInboxPriorityMode: (AgentInboxPriorityMode) -> Unit,
+    onSelectAgentInboxCategoryMode: (AgentInboxCategoryMode) -> Unit,
+    onCopyAgentInboxPrompt: (Boolean) -> Unit,
     onImportAgentInboxCandidate: (String) -> Unit,
     onImportAllAgentInboxCandidates: () -> Unit,
     onExportAccountLightProfile: () -> Unit,
@@ -4641,6 +4658,9 @@ private fun SettingsTab(
                 onTogglePriority = onToggleAgentInboxPriority,
                 onRejectCandidate = onRejectAgentInboxCandidate,
                 onToggleAutoImport = onToggleAgentInboxAutoImport,
+                onSelectPriorityMode = onSelectAgentInboxPriorityMode,
+                onSelectCategoryMode = onSelectAgentInboxCategoryMode,
+                onCopyAgentPrompt = onCopyAgentInboxPrompt,
                 onImportCandidate = onImportAgentInboxCandidate,
                 onImportAllCandidates = onImportAllAgentInboxCandidates,
             )
@@ -5522,9 +5542,13 @@ private fun AgentInboxSettingsSection(
     onTogglePriority: (String) -> Unit,
     onRejectCandidate: (String) -> Unit,
     onToggleAutoImport: (Boolean) -> Unit,
+    onSelectPriorityMode: (AgentInboxPriorityMode) -> Unit,
+    onSelectCategoryMode: (AgentInboxCategoryMode) -> Unit,
+    onCopyAgentPrompt: (Boolean) -> Unit,
     onImportCandidate: (String) -> Unit,
     onImportAllCandidates: () -> Unit,
 ) {
+    val context = LocalContext.current
     val colors = QualityAlternativeThemeTokens.colors
     val candidateCount = state.agentInboxCandidates.size
     val readyCandidateCount = state.agentInboxCandidates.count(AgentInboxReviewCandidate::canImport)
@@ -5700,6 +5724,27 @@ private fun AgentInboxSettingsSection(
                         )
                     }
                 }
+                AgentInboxImportOptionsPanel(
+                    state = state,
+                    enabled = !state.isAgentInboxScanning && !state.isAgentInboxImporting,
+                    onSelectPriorityMode = onSelectPriorityMode,
+                    onSelectCategoryMode = onSelectCategoryMode,
+                    onCopyAgentPrompt = {
+                        val prompt = state.agentInboxAgentPrompt()
+                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                        val copied = runCatching {
+                            clipboard?.setPrimaryClip(
+                                ClipData.newPlainText(
+                                    "Quality Alternative Agent Inbox prompt",
+                                    prompt,
+                                ),
+                            )
+                            clipboard != null
+                        }.getOrDefault(false)
+                        onCopyAgentPrompt(copied)
+                    },
+                    modifier = Modifier.padding(top = 12.dp),
+                )
             }
             HorizontalDivider(
                 color = colors.line,
@@ -5751,7 +5796,8 @@ private fun AgentInboxSettingsSection(
                     }
                     AgentInboxCandidateRow(
                         candidate = candidate,
-                        priorityAccepted = candidate.packageFolderId in state.agentInboxPriorityAcceptedPackageIds,
+                        priorityAccepted = state.agentInboxPriorityAccepted(candidate),
+                        priorityMode = state.agentInboxPriorityMode,
                         isImporting = state.isAgentInboxImporting,
                         onTogglePriority = { onTogglePriority(candidate.packageFolderId) },
                         onReject = { onRejectCandidate(candidate.packageFolderId) },
@@ -5760,6 +5806,96 @@ private fun AgentInboxSettingsSection(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun AgentInboxImportOptionsPanel(
+    state: MainUiState,
+    enabled: Boolean,
+    onSelectPriorityMode: (AgentInboxPriorityMode) -> Unit,
+    onSelectCategoryMode: (AgentInboxCategoryMode) -> Unit,
+    onCopyAgentPrompt: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = QualityAlternativeThemeTokens.colors
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .border(BorderStroke(1.dp, colors.line), RoundedCornerShape(10.dp))
+            .padding(12.dp)
+            .testTag("settings-agent-inbox-import-options"),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text(
+            text = "Autoimport options",
+            style = MaterialTheme.typography.titleSmall,
+            fontSize = 14.sp,
+            lineHeight = 18.sp,
+            color = colors.primaryText,
+            fontWeight = FontWeight.SemiBold,
+        )
+        MonoText(
+            text = "PRIORITY",
+            color = colors.mutedText,
+            modifier = Modifier.testTag("settings-agent-inbox-priority-mode-label"),
+        )
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            AgentInboxPriorityMode.entries.forEach { mode ->
+                QaChip(
+                    text = mode.displayLabel(),
+                    selected = state.agentInboxPriorityMode == mode,
+                    onClick = { onSelectPriorityMode(mode) },
+                    enabled = enabled,
+                    modifier = Modifier.testTag("settings-agent-inbox-priority-mode-${mode.name}"),
+                    minHeight = 32.dp,
+                    horizontalPadding = 11.dp,
+                    verticalPadding = 7.dp,
+                    fontSize = 11.5.sp,
+                )
+            }
+        }
+        BodyText(
+            text = state.agentInboxPriorityMode.displayDescription(),
+            color = colors.mutedText,
+            fontSize = 12.5.sp,
+            lineHeight = 17.sp,
+        )
+        MonoText(
+            text = "CATEGORIES",
+            color = colors.mutedText,
+            modifier = Modifier.testTag("settings-agent-inbox-category-mode-label"),
+        )
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            AgentInboxCategoryMode.entries.forEach { mode ->
+                QaChip(
+                    text = mode.displayLabel(),
+                    selected = state.agentInboxCategoryMode == mode,
+                    onClick = { onSelectCategoryMode(mode) },
+                    enabled = enabled,
+                    modifier = Modifier.testTag("settings-agent-inbox-category-mode-${mode.name}"),
+                    minHeight = 32.dp,
+                    horizontalPadding = 11.dp,
+                    verticalPadding = 7.dp,
+                    fontSize = 11.5.sp,
+                )
+            }
+        }
+        BodyText(
+            text = state.agentInboxCategoryMode.displayDescription(),
+            color = colors.mutedText,
+            fontSize = 12.5.sp,
+            lineHeight = 17.sp,
+        )
+        QaButton(
+            text = "Copy agent prompt",
+            onClick = onCopyAgentPrompt,
+            variant = QaButtonVariant.Outline,
+            size = QaButtonSize.Small,
+            enabled = enabled,
+            leadingIcon = QaIconKind.Copy,
+            modifier = Modifier.testTag("settings-agent-inbox-copy-agent-prompt"),
+        )
     }
 }
 
@@ -5954,6 +6090,7 @@ private fun AgentInboxDriveFolderBrowserRow(
 private fun AgentInboxCandidateRow(
     candidate: AgentInboxReviewCandidate,
     priorityAccepted: Boolean,
+    priorityMode: AgentInboxPriorityMode,
     isImporting: Boolean,
     onTogglePriority: () -> Unit,
     onReject: () -> Unit,
@@ -5983,7 +6120,7 @@ private fun AgentInboxCandidateRow(
                     overflow = TextOverflow.Ellipsis,
                 )
                 MonoText(
-                    text = agentInboxCandidateStatusText(candidate),
+                    text = agentInboxCandidateStatusText(candidate, priorityMode),
                     color = when (candidate.status) {
                         AgentInboxReviewStatus.READY -> colors.success
                         AgentInboxReviewStatus.DUPLICATE -> colors.mutedText
@@ -6014,6 +6151,10 @@ private fun AgentInboxCandidateRow(
                 AgentInboxPriorityToggle(
                     checked = priorityAccepted,
                     requested = candidate.requestsHighPriority,
+                    mode = priorityMode,
+                    enabled = !isImporting &&
+                        priorityMode != AgentInboxPriorityMode.IGNORE_MANIFEST &&
+                        !(priorityMode == AgentInboxPriorityMode.AUTO_ACCEPT_HIGH && candidate.requestsHighPriority),
                     onToggle = onTogglePriority,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -6071,11 +6212,15 @@ private fun AgentInboxCandidateRow(
 private fun AgentInboxPriorityToggle(
     checked: Boolean,
     requested: Boolean,
+    mode: AgentInboxPriorityMode,
+    enabled: Boolean,
     onToggle: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = QualityAlternativeThemeTokens.colors
     val label = when {
+        mode == AgentInboxPriorityMode.IGNORE_MANIFEST -> "Priority ignored"
+        mode == AgentInboxPriorityMode.AUTO_ACCEPT_HIGH && requested -> "Priority auto-accepted"
         checked && requested -> "Priority accepted"
         checked -> "Priority on"
         requested -> "Accept priority"
@@ -6091,7 +6236,8 @@ private fun AgentInboxPriorityToggle(
             )
             .background(if (checked) colors.accentSoft else colors.elevatedSurface)
             .semantics { selected = checked }
-            .clickable(onClick = onToggle)
+            .clickable(enabled = enabled, onClick = onToggle)
+            .alpha(if (enabled || checked) 1f else 0.56f)
             .padding(horizontal = 11.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(9.dp),
@@ -7755,6 +7901,24 @@ private fun QaIcon(
                 line(8f, 17f, 13f, 17f)
             }
 
+            QaIconKind.Copy -> {
+                path {
+                    moveTo(x(8f), y(8f))
+                    lineTo(x(19f), y(8f))
+                    lineTo(x(19f), y(21f))
+                    lineTo(x(8f), y(21f))
+                    close()
+                }
+                path {
+                    moveTo(x(5f), y(3f))
+                    lineTo(x(16f), y(3f))
+                    lineTo(x(16f), y(6f))
+                    moveTo(x(5f), y(3f))
+                    lineTo(x(5f), y(16f))
+                    lineTo(x(6f), y(16f))
+                }
+            }
+
             QaIconKind.Dot -> drawCircle(color = color, radius = x(2f), center = p(12f, 12f))
         }
     }
@@ -7796,12 +7960,16 @@ private fun QaChip(
     verticalPadding: androidx.compose.ui.unit.Dp = 9.dp,
     fontSize: androidx.compose.ui.unit.TextUnit = 12.sp,
     maxLines: Int = 2,
+    enabled: Boolean = true,
 ) {
     val colors = QualityAlternativeThemeTokens.colors
     val selectedColor = if (accentSelected) colors.accent else colors.primaryText
     Surface(
-        modifier = modifier,
+        modifier = modifier
+            .semantics { this.selected = selected }
+            .alpha(if (enabled) 1f else 0.45f),
         onClick = onClick,
+        enabled = enabled,
         shape = RoundedCornerShape(100.dp),
         color = if (selected) selectedColor else colors.elevatedSurface,
         contentColor = if (selected) colors.background else colors.mutedText,
@@ -9891,6 +10059,36 @@ private fun ContentPriority.displayDescription(): String {
     }
 }
 
+private fun AgentInboxPriorityMode.displayLabel(): String {
+    return when (this) {
+        AgentInboxPriorityMode.MANUAL_REVIEW -> "Ask me"
+        AgentInboxPriorityMode.IGNORE_MANIFEST -> "Ignore"
+        AgentInboxPriorityMode.AUTO_ACCEPT_HIGH -> "Auto high"
+    }
+}
+
+private fun AgentInboxPriorityMode.displayDescription(): String {
+    return when (this) {
+        AgentInboxPriorityMode.MANUAL_REVIEW -> "High priority from manifest stays a visible request until you accept it."
+        AgentInboxPriorityMode.IGNORE_MANIFEST -> "Imported packages never become priority just because the manifest asks."
+        AgentInboxPriorityMode.AUTO_ACCEPT_HIGH -> "High priority manifest requests are accepted during import and autoimport."
+    }
+}
+
+private fun AgentInboxCategoryMode.displayLabel(): String {
+    return when (this) {
+        AgentInboxCategoryMode.MANIFEST_TOPICS -> "Manifest topics"
+        AgentInboxCategoryMode.UNCATEGORIZED -> "No category"
+    }
+}
+
+private fun AgentInboxCategoryMode.displayDescription(): String {
+    return when (this) {
+        AgentInboxCategoryMode.MANIFEST_TOPICS -> "Imported files keep the topics supplied by the agent manifest."
+        AgentInboxCategoryMode.UNCATEGORIZED -> "Imported files are saved under Other so they do not inherit agent-selected categories."
+    }
+}
+
 internal fun prototypeTopics(): List<TopicTag> = listOf(
     TopicTag.ATTENTION,
     TopicTag.PRACTICAL,
@@ -10142,12 +10340,20 @@ private fun agentInboxDriveStatusText(state: MainUiState): String {
     }
 }
 
-private fun agentInboxCandidateStatusText(candidate: AgentInboxReviewCandidate): String {
+private fun agentInboxCandidateStatusText(
+    candidate: AgentInboxReviewCandidate,
+    priorityMode: AgentInboxPriorityMode,
+): String {
     return when (candidate.status) {
         AgentInboxReviewStatus.READY -> {
             val manifest = candidate.manifest
             val format = manifest?.format?.agentInboxFormatLabel() ?: "Document"
-            val priority = if (candidate.requestsHighPriority) "priority requested" else "normal priority"
+            val priority = when {
+                !candidate.requestsHighPriority -> "normal priority"
+                priorityMode == AgentInboxPriorityMode.AUTO_ACCEPT_HIGH -> "priority auto-accepted"
+                priorityMode == AgentInboxPriorityMode.IGNORE_MANIFEST -> "priority ignored"
+                else -> "priority requested"
+            }
             val topics = manifest?.topics
                 ?.sortedBy { topic -> topic.name }
                 ?.take(2)

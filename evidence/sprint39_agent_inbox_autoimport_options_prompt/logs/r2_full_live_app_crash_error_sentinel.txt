@@ -1,0 +1,1 @@
+PASS: no FATAL EXCEPTION, E/AndroidRuntime, Quality Alternative Agent Inbox connection/import failure, SecurityException, or DeadObjectException in app-filtered R2 live logcat. Full logcat separately contains expected uiautomator AndroidRuntime launcher lines.

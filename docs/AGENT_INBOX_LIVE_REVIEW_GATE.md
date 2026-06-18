@@ -1,6 +1,6 @@
 # Agent Inbox Live Review Gate
 
-This gate applies to every change that touches Agent Inbox Drive folder selection, Google Drive authorization, package scan, package validation, priority handling, import, or release APK delivery.
+This gate applies to every change that touches Agent Inbox Drive folder selection, Google Drive authorization, package scan, package validation, priority handling, import options, copyable agent prompts, or release APK delivery.
 
 ## Required Live Evidence
 
@@ -20,6 +20,7 @@ A release candidate must provide an evidence directory containing:
   - reader showing imported content
 - For any `Import all` change: evidence that at least two externally uploaded packages were found together, batch imported together, cleared from the review queue, appeared in Library `Files`, and at least one batch-imported document rendered in the reader.
 - For any autoimport change: evidence that autoimport was explicitly enabled after folder connection, a new externally uploaded package was added after that enablement, the app was force-stopped/relaunched, no new approval chooser was shown when access had already been granted, the autoimport result was visible, the document appeared in Library `Files`, and the reader rendered the autoimported content.
+- For any Agent Inbox import-options or agent-prompt change: evidence that Settings shows the priority mode options, category mode options, and copy prompt action; evidence that the selected priority/category modes affect a real import or autoimport result; and the copied prompt text or UI dump proving it contains portable package-authoring instructions without user-specific Drive ids, account names, rclone remotes, access tokens, local absolute paths, or document content.
 - UIAutomator XML or equivalent machine-readable screen dumps for the same milestones.
 - Logcat health sentinels proving there is no app crash and no old failure text such as `Package is missing manifest`, `Package could not be saved`, `Agent Inbox package could not be imported`, or `Google Drive authorization hit a Google Play services error`.
 - Automated test results for the changed logic and a connected visual test for the Agent Inbox Drive picker states.
@@ -34,6 +35,8 @@ A reviewer must return FAIL, regardless of code quality, if any of these are tru
 - The evidence stops at folder selection or scan and does not show import into Library and reader rendering.
 - The APK hash in evidence does not match the APK being proposed for release.
 - Screenshots show clipped, hidden, or unusable primary controls such as `Choose folder`, `Open`, `Select`, `Scan now`, or `Import`.
+- Import-options or prompt screenshots omit the priority mode, category mode, or copy prompt action when those behaviors changed.
+- The copied agent prompt contains user-specific Drive ids, account names, local absolute paths, rclone remotes, access tokens, or raw document content.
 - Logcat contains app crash signatures or the old Agent Inbox failure strings listed above.
 
 ## Acceptable PASS
@@ -44,6 +47,8 @@ A 10/10 PASS is only valid when the reviewer cites the exact evidence paths and 
 - the target Drive folder was visible and selected in the app
 - a package with `manifest.json` was found
 - the title, format, topics, and priority rendered correctly
+- Agent Inbox import options render correctly, and selected priority/category modes are reflected in import behavior when those behaviors changed
+- the copyable agent prompt is present and portable when prompt behavior changed
 - import cleared the queue
 - the imported document appeared in Library
 - the reader rendered the imported file content

@@ -78,7 +78,8 @@ Optional but recommended fields:
 - `sourceLabel`: short safe producer label, for example `Codex` or `Claude`.
 - `description`: short review summary shown before import.
 - `priority`: `normal` or `high`; `high` is only a request and the user must
-  explicitly accept it in the app.
+  explicitly accept it in the app unless the user has enabled the Agent Inbox
+  import option that auto-accepts high-priority package requests.
 - `documentSha256`: lowercase SHA-256 of the content file bytes. Strongly
   recommended because it lets the app detect changed content before import.
   Never upload a placeholder value; either omit this field or set it to the
@@ -109,6 +110,20 @@ CREATIVITY
 PSYCHOLOGY
 OTHER
 ```
+
+## Follow The App Prompt
+
+The Android app can show a copyable Agent Inbox prompt in Settings after the
+user connects an Agent Inbox folder. Prefer that prompt when the operator gives
+it to you. It reflects the user's current import options:
+
+- priority mode: manual review, ignore manifest priority, or auto-accept
+  manifest `high` requests
+- category mode: keep manifest topics, or import without a specific category
+
+Even when the app is set to import without a specific category, the manifest
+still needs a non-empty `topics` array for validation. Use `["OTHER"]` in that
+case; the app will treat it as the no-specific-category path.
 
 ## File Rules
 

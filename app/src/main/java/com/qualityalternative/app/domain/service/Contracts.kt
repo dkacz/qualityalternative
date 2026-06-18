@@ -1,6 +1,8 @@
 package com.qualityalternative.app.domain.service
 
 import com.qualityalternative.app.domain.model.AnalyticsEvent
+import com.qualityalternative.app.domain.model.AgentInboxCategoryMode
+import com.qualityalternative.app.domain.model.AgentInboxPriorityMode
 import com.qualityalternative.app.domain.model.AppSettings
 import com.qualityalternative.app.domain.model.AppThemeMode
 import com.qualityalternative.app.domain.model.ContentItem
@@ -184,6 +186,10 @@ interface SettingsRepository {
     suspend fun saveAgentInboxDriveScanSuccess(timestampMillis: Long, folderId: String) {}
     suspend fun saveAgentInboxDriveScanFailure(errorMessage: String) {}
     suspend fun saveAgentInboxAutoImportEnabled(enabled: Boolean) {}
+    suspend fun saveAgentInboxImportOptions(
+        priorityMode: AgentInboxPriorityMode,
+        categoryMode: AgentInboxCategoryMode,
+    ) {}
     suspend fun saveProfileAutosaveDestination(uri: String, displayName: String)
     suspend fun clearProfileAutosaveDestination()
     suspend fun saveProfileAutosaveSuccess(timestampMillis: Long)

@@ -16,6 +16,7 @@ import com.qualityalternative.app.data.AccountLightProfileImporter
 import com.qualityalternative.app.data.AppContainer
 import com.qualityalternative.app.data.ACCOUNT_LIGHT_PROFILE_FILE_NAME
 import com.qualityalternative.app.data.AgentInboxDocumentStore
+import com.qualityalternative.app.data.AgentInboxImportCategoryMode
 import com.qualityalternative.app.data.AgentInboxManifestValidator
 import com.qualityalternative.app.data.AgentInboxImportResult
 import com.qualityalternative.app.data.AgentInboxImportStatus
@@ -38,6 +39,8 @@ import com.qualityalternative.app.data.WebsiteRuleNormalizer
 import com.qualityalternative.app.domain.model.AnalyticsEvent
 import com.qualityalternative.app.domain.model.AnalyticsSemanticKeys
 import com.qualityalternative.app.domain.model.AnalyticsEventType
+import com.qualityalternative.app.domain.model.AgentInboxCategoryMode
+import com.qualityalternative.app.domain.model.AgentInboxPriorityMode
 import com.qualityalternative.app.domain.model.AppSettings
 import com.qualityalternative.app.domain.model.AppThemeMode
 import com.qualityalternative.app.domain.model.BEDTIME_OPEN_ANYWAY_UNLOCK_DELAY_MILLIS
@@ -239,6 +242,8 @@ data class MainUiState(
     val agentInboxPriorityAcceptedPackageIds: Set<String> = emptySet(),
     val agentInboxScanTruncated: Boolean = false,
     val agentInboxAutoImportEnabled: Boolean = false,
+    val agentInboxPriorityMode: AgentInboxPriorityMode = AgentInboxPriorityMode.MANUAL_REVIEW,
+    val agentInboxCategoryMode: AgentInboxCategoryMode = AgentInboxCategoryMode.MANIFEST_TOPICS,
     val profileAutosaveUri: String? = null,
     val profileAutosaveDisplayName: String? = null,
     val profileAutosaveUsesLocalDefault: Boolean = false,
@@ -1910,6 +1915,58 @@ class MainViewModel(
         }
     }
 
+    fun setAgentInboxImportOptions(
+        priorityMode: AgentInboxPriorityMode = uiState.agentInboxPriorityMode,
+        categoryMode: AgentInboxCategoryMode = uiState.agentInboxCategoryMode,
+        nowMillis: Long = nowProvider(),
+    ) {
+        uiState = uiState.copy(
+            agentInboxPriorityMode = priorityMode,
+            agentInboxCategoryMode = categoryMode,
+            latestMessage = "Agent Inbox import options saved.",
+        )
+        viewModelScope.launch {
+            settingsRepository.saveAgentInboxImportOptions(
+                priorityMode = priorityMode,
+                categoryMode = categoryMode,
+            )
+            recordEventDurably(
+                AnalyticsEvent(
+                    type = AnalyticsEventType.AGENT_INBOX_IMPORT_OPTIONS_CHANGED,
+                    timestampMillis = nowMillis,
+                    metadata = mapOf(
+                        "agentInboxPriorityMode" to priorityMode.name,
+                        "agentInboxCategoryMode" to categoryMode.name,
+                    ),
+                ),
+            )
+        }
+    }
+
+    fun recordAgentInboxPromptCopied(copied: Boolean = true, nowMillis: Long = nowProvider()) {
+        uiState = uiState.copy(
+            latestMessage = if (copied) {
+                "Agent prompt copied."
+            } else {
+                "Agent prompt could not be copied."
+            },
+        )
+        if (copied) {
+            viewModelScope.launch {
+                recordEventDurably(
+                    AnalyticsEvent(
+                        type = AnalyticsEventType.AGENT_INBOX_AGENT_PROMPT_COPIED,
+                        timestampMillis = nowMillis,
+                        metadata = mapOf(
+                            "agentInboxPriorityMode" to uiState.agentInboxPriorityMode.name,
+                            "agentInboxCategoryMode" to uiState.agentInboxCategoryMode.name,
+                        ),
+                    ),
+                )
+            }
+        }
+    }
+
     fun toggleAgentInboxPriority(packageFolderId: String) {
         val selected = uiState.agentInboxPriorityAcceptedPackageIds.toMutableSet()
         val accepted = if (selected.add(packageFolderId)) {
@@ -1992,6 +2049,7 @@ class MainViewModel(
             uiState = uiState.copy(latestMessage = "Agent Inbox package needs review before import.")
             return
         }
+        val importPolicy = uiState.agentInboxImportPolicy()
         uiState = uiState.copy(isAgentInboxImporting = true, latestMessage = null)
         viewModelScope.launch {
             try {
@@ -1999,11 +2057,13 @@ class MainViewModel(
                     candidate = candidate,
                     accessToken = normalizedToken,
                     nowMillis = nowMillis,
+                    policy = importPolicy,
                 )
                 applyAgentInboxImportResult(
                     packageFolderId = packageFolderId,
                     result = result,
                     nowMillis = nowMillis,
+                    policy = importPolicy,
                 )
             } catch (error: Throwable) {
                 if (error is CancellationException) throw error
@@ -2023,6 +2083,7 @@ class MainViewModel(
                         failureDetail = error.toAgentInboxImportFailureDetail(),
                     ),
                     nowMillis = nowMillis,
+                    policy = importPolicy,
                 )
             }
         }
@@ -2069,6 +2130,7 @@ class MainViewModel(
             )
             return
         }
+        val importPolicy = uiState.agentInboxImportPolicy()
         uiState = uiState.copy(isAgentInboxImporting = true, latestMessage = null)
         viewModelScope.launch {
             recordEventDurably(
@@ -2098,6 +2160,7 @@ class MainViewModel(
                         candidate = candidate,
                         accessToken = normalizedToken,
                         nowMillis = nowMillis,
+                        policy = importPolicy,
                     )
                 } catch (error: Throwable) {
                     if (error is CancellationException) throw error
@@ -2126,6 +2189,7 @@ class MainViewModel(
                     packageFolderId = packageFolderId,
                     result = result,
                     nowMillis = nowMillis,
+                    policy = importPolicy,
                     keepImporting = true,
                 )
             }
@@ -2169,6 +2233,7 @@ class MainViewModel(
         candidate: AgentInboxReviewCandidate,
         accessToken: String,
         nowMillis: Long,
+        policy: AgentInboxImportPolicy,
     ): AgentInboxImportResult {
         val contentBytes = try {
             agentInboxDriveClient.downloadFile(
@@ -2242,6 +2307,7 @@ class MainViewModel(
             candidate = candidate,
             contentBytes = contentBytes,
             imageAttachmentBytes = imageAttachmentBytes,
+            categoryMode = policy.categoryMode.toImportCategoryMode(),
             nowMillis = nowMillis,
         )
     }
@@ -2250,6 +2316,7 @@ class MainViewModel(
         packageFolderId: String,
         result: AgentInboxImportResult,
         nowMillis: Long,
+        policy: AgentInboxImportPolicy,
         keepImporting: Boolean = false,
     ) {
         when (result.status) {
@@ -2282,7 +2349,7 @@ class MainViewModel(
                         else -> candidate
                     }
                 }
-                val priorityAccepted = packageFolderId in uiState.agentInboxPriorityAcceptedPackageIds
+                val priorityAccepted = policy.priorityAccepted(candidate = importedCandidate)
                 val updatedPriorityIds = if (item != null && priorityAccepted) {
                     val ids = uiState.priorityContentIds + item.id
                     settingsRepository.savePriorityContentIds(ids)
@@ -4697,6 +4764,8 @@ class MainViewModel(
             agentInboxDriveLastError = settings.agentInboxDriveLastError,
             agentInboxDriveFolderDraft = agentInboxDriveFolderDraft,
             agentInboxAutoImportEnabled = settings.agentInboxAutoImportEnabled,
+            agentInboxPriorityMode = settings.agentInboxPriorityMode,
+            agentInboxCategoryMode = settings.agentInboxCategoryMode,
             profileAutosaveUri = effectiveProfileAutosaveUri,
             profileAutosaveDisplayName = effectiveProfileAutosaveDisplayName,
             profileAutosaveUsesLocalDefault = profileAutosaveUsesLocalDefault,
@@ -6023,6 +6092,100 @@ private fun AgentInboxReviewCandidate.agentInboxAnalyticsMetadata(): Map<String,
         put("priorityRequested", requestsHighPriority.toString())
         put("validationErrorCount", (manifestErrors.size + packageErrors.size).toString())
         manifest?.format?.let { format -> put("format", format.name) }
+    }
+}
+
+internal fun MainUiState.agentInboxAgentPrompt(): String {
+    val allowedTopicIds = TopicTag.entries.joinToString()
+    val exampleTopics = when (agentInboxCategoryMode) {
+        AgentInboxCategoryMode.MANIFEST_TOPICS -> "[\"PHILOSOPHY\"]"
+        AgentInboxCategoryMode.UNCATEGORIZED -> "[\"OTHER\"]"
+    }
+    val examplePriority = when (agentInboxPriorityMode) {
+        AgentInboxPriorityMode.MANUAL_REVIEW,
+        AgentInboxPriorityMode.IGNORE_MANIFEST,
+        -> "normal"
+        AgentInboxPriorityMode.AUTO_ACCEPT_HIGH -> "high"
+    }
+    val priorityInstruction = when (agentInboxPriorityMode) {
+        AgentInboxPriorityMode.MANUAL_REVIEW ->
+            "Use manifest priority \"high\" only when the package should ask me for priority during review; otherwise use \"normal\"."
+        AgentInboxPriorityMode.IGNORE_MANIFEST ->
+            "Use manifest priority \"normal\". This app is set to ignore agent priority requests."
+        AgentInboxPriorityMode.AUTO_ACCEPT_HIGH ->
+            "Use manifest priority \"high\" only for genuinely urgent replacement reading; this app is set to auto-accept high priority requests."
+    }
+    val categoryInstruction = when (agentInboxCategoryMode) {
+        AgentInboxCategoryMode.MANIFEST_TOPICS ->
+            "Choose 1-3 accurate manifest topics from the allowed app topic ids."
+        AgentInboxCategoryMode.UNCATEGORIZED ->
+            "Use [\"OTHER\"] in manifest topics for validator compatibility; this app is set to import Agent Inbox packages without a specific category."
+    }
+    return """
+        Create one Quality Alternative Agent Inbox package folder for private replacement reading.
+
+        Requirements:
+        - Create a local package folder containing exactly one manifest.json and one content file, content.md or book.epub.
+        - Do not create a zip as the package.
+        - Use schemaVersion 1, rightsClass USER_PRIVATE, and format MARKDOWN or EPUB.
+        - $categoryInstruction
+        - Allowed topic ids: $allowedTopicIds.
+        - $priorityInstruction
+        - Include sourceLabel with your agent name and a short description.
+        - If possible, include documentSha256 matching the final content bytes.
+        - Do not put local absolute paths, Google Drive ids, account names, access tokens, rclone remotes, or machine-specific data in manifest.json or content.
+        - If you are working inside the Quality Alternative repo, validate before upload with: python3 tools/validate_agent_inbox_package.py <package-folder>
+        - If that validator is not available, stop after creating the local package and ask the operator for the validator or destination-specific validation command.
+        - Upload or sync the fully validated package folder as a direct child of the Agent Inbox destination folder supplied by the operator. If no destination is supplied, stop after local validation and ask for it.
+
+        Minimal manifest shape; replace placeholder values before validation:
+        {
+          "schemaVersion": 1,
+          "title": "Readable title",
+          "topics": $exampleTopics,
+          "contentFile": "content.md",
+          "format": "MARKDOWN",
+          "rightsClass": "USER_PRIVATE",
+          "sourceLabel": "<agent-name>",
+          "description": "Private replacement reading prepared by an agent.",
+          "priority": "$examplePriority",
+          "createdAt": "<ISO-8601 UTC timestamp>"
+        }
+    """.trimIndent()
+}
+
+private data class AgentInboxImportPolicy(
+    val priorityMode: AgentInboxPriorityMode,
+    val categoryMode: AgentInboxCategoryMode,
+    val acceptedPriorityPackageIds: Set<String>,
+) {
+    fun priorityAccepted(candidate: AgentInboxReviewCandidate?): Boolean {
+        if (candidate?.canImport != true) return false
+        return when (priorityMode) {
+            AgentInboxPriorityMode.MANUAL_REVIEW -> candidate.packageFolderId in acceptedPriorityPackageIds
+            AgentInboxPriorityMode.IGNORE_MANIFEST -> false
+            AgentInboxPriorityMode.AUTO_ACCEPT_HIGH ->
+                candidate.requestsHighPriority || candidate.packageFolderId in acceptedPriorityPackageIds
+        }
+    }
+}
+
+private fun MainUiState.agentInboxImportPolicy(): AgentInboxImportPolicy {
+    return AgentInboxImportPolicy(
+        priorityMode = agentInboxPriorityMode,
+        categoryMode = agentInboxCategoryMode,
+        acceptedPriorityPackageIds = agentInboxPriorityAcceptedPackageIds,
+    )
+}
+
+internal fun MainUiState.agentInboxPriorityAccepted(candidate: AgentInboxReviewCandidate?): Boolean {
+    return agentInboxImportPolicy().priorityAccepted(candidate)
+}
+
+private fun AgentInboxCategoryMode.toImportCategoryMode(): AgentInboxImportCategoryMode {
+    return when (this) {
+        AgentInboxCategoryMode.MANIFEST_TOPICS -> AgentInboxImportCategoryMode.MANIFEST_TOPICS
+        AgentInboxCategoryMode.UNCATEGORIZED -> AgentInboxImportCategoryMode.UNCATEGORIZED
     }
 }
 

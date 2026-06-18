@@ -67,6 +67,26 @@ class AgentInboxPackageImporterTest {
     }
 
     @Test
+    fun importCandidateCanSaveAsUncategorizedCompatibleOtherTopic() = runBlocking {
+        val contentBytes = "# Attention\n\nA useful private note for an impulse.".toByteArray()
+        val sha = AgentInboxManifestValidator.sha256(contentBytes)
+        val repository = FakeAgentInboxUserDocumentRepository()
+        val store = FakeAgentInboxDocumentStore()
+        val importer = AgentInboxPackageImporter(userDocumentRepository = repository, documentStore = store)
+
+        val result = importer.importCandidate(
+            candidate = readyCandidate(documentSha256 = sha, priority = "normal"),
+            contentBytes = contentBytes,
+            categoryMode = AgentInboxImportCategoryMode.UNCATEGORIZED,
+            nowMillis = 2_000L,
+        )
+
+        assertEquals(AgentInboxImportStatus.IMPORTED, result.status)
+        assertEquals(setOf(TopicTag.OTHER), repository.addedDrafts.single().topicTags)
+        assertEquals(setOf(TopicTag.OTHER), result.item?.topicTags)
+    }
+
+    @Test
     fun importCandidateStoresMarkdownImageAttachmentsInDraft() = runBlocking {
         val contentBytes = "# Attention\n\n![Cover](cover.png)".toByteArray()
         val imageBytes = byteArrayOf(1, 2, 3, 4)

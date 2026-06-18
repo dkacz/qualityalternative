@@ -1,0 +1,29 @@
+Create one Quality Alternative Agent Inbox package folder for private replacement reading.
+
+Requirements:
+- Create a local package folder containing exactly one manifest.json and one content file, content.md or book.epub.
+- Do not create a zip as the package.
+- Use schemaVersion 1, rightsClass USER_PRIVATE, and format MARKDOWN or EPUB.
+- Use ["OTHER"] in manifest topics for validator compatibility; this app is set to import Agent Inbox packages without a specific category.
+- Allowed topic ids: ATTENTION, PRACTICAL, BODY, NATURE, HISTORY_CULTURE, ESSAYS, PHILOSOPHY, SCIENCE, DESIGN, POETRY, HISTORY, TECH, FICTION, CLIMATE, ECONOMICS, FOOD, ARCHITECTURE, CREATIVITY, PSYCHOLOGY, OTHER.
+- Use manifest priority "high" only for genuinely urgent replacement reading; this app is set to auto-accept high priority requests.
+- Include sourceLabel with your agent name and a short description.
+- If possible, include documentSha256 matching the final content bytes.
+- Do not put local absolute paths, Google Drive ids, account names, access tokens, rclone remotes, or machine-specific data in manifest.json or content.
+- If you are working inside the Quality Alternative repo, validate before upload with: python3 tools/validate_agent_inbox_package.py <package-folder>
+- If that validator is not available, stop after creating the local package and ask the operator for the validator or destination-specific validation command.
+- Upload or sync the fully validated package folder as a direct child of the Agent Inbox destination folder supplied by the operator. If no destination is supplied, stop after local validation and ask for it.
+
+Minimal manifest shape; replace placeholder values before validation:
+{
+  "schemaVersion": 1,
+  "title": "Readable title",
+  "topics": ["OTHER"],
+  "contentFile": "content.md",
+  "format": "MARKDOWN",
+  "rightsClass": "USER_PRIVATE",
+  "sourceLabel": "<agent-name>",
+  "description": "Private replacement reading prepared by an agent.",
+  "priority": "high",
+  "createdAt": "<ISO-8601 UTC timestamp>"
+}

@@ -1,0 +1,3 @@
+codex-sprint39-r2-import-all-alpha 0
+codex-sprint39-r2-import-all-beta 0
+codex-sprint39-r2-autoimport-gamma 0

@@ -8,6 +8,8 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.qualityalternative.app.domain.model.AgentInboxCategoryMode
+import com.qualityalternative.app.domain.model.AgentInboxPriorityMode
 import com.qualityalternative.app.domain.model.AppSettings
 import com.qualityalternative.app.domain.model.AppThemeMode
 import com.qualityalternative.app.domain.model.ContentPriority
@@ -515,6 +517,51 @@ class PreferencesSettingsRepositoryTest {
         assertEquals(null, restored.agentInboxDriveFolderId)
         assertEquals(null, restored.agentInboxDriveGrantMode)
         assertEquals(null, restored.agentInboxDriveLastSuccessfulAtMillis)
+    }
+
+    @Test
+    fun saveAgentInboxImportOptionsPersistsAndImportsThroughPortableSettings() = runBlocking {
+        val repository = PreferencesSettingsRepository(
+            dataStore = testDataStore(),
+            supportedApps = SupportedCatalog.distractingApps,
+        )
+
+        val initial = repository.observeAppSettings().first()
+        assertEquals(AgentInboxPriorityMode.MANUAL_REVIEW, initial.agentInboxPriorityMode)
+        assertEquals(AgentInboxCategoryMode.MANIFEST_TOPICS, initial.agentInboxCategoryMode)
+
+        repository.saveAgentInboxImportOptions(
+            priorityMode = AgentInboxPriorityMode.AUTO_ACCEPT_HIGH,
+            categoryMode = AgentInboxCategoryMode.UNCATEGORIZED,
+        )
+
+        val restored = repository.observeAppSettings().first()
+        assertEquals(AgentInboxPriorityMode.AUTO_ACCEPT_HIGH, restored.agentInboxPriorityMode)
+        assertEquals(AgentInboxCategoryMode.UNCATEGORIZED, restored.agentInboxCategoryMode)
+
+        repository.replacePortableSettings(
+            settings = AppSettings(
+                hasCompletedOnboarding = true,
+                selectedAppPackages = setOf("com.instagram.android"),
+                preferredTopics = setOf(TopicTag.PHILOSOPHY, TopicTag.SCIENCE, TopicTag.HISTORY),
+                preferredDurationBucket = DurationBucket.FOCUS,
+                selectedPackIds = setOf("philosophy"),
+                agentInboxPriorityMode = AgentInboxPriorityMode.IGNORE_MANIFEST,
+                agentInboxCategoryMode = AgentInboxCategoryMode.MANIFEST_TOPICS,
+                agentInboxDriveEnabled = true,
+                agentInboxDriveFolderId = "must-not-import-drive-folder",
+                agentInboxDriveGrantMode = AGENT_INBOX_DRIVE_GRANT_MODE_READONLY_FOLDER,
+                agentInboxAutoImportEnabled = true,
+            ),
+        )
+
+        val imported = repository.observeAppSettings().first()
+        assertEquals(AgentInboxPriorityMode.IGNORE_MANIFEST, imported.agentInboxPriorityMode)
+        assertEquals(AgentInboxCategoryMode.MANIFEST_TOPICS, imported.agentInboxCategoryMode)
+        assertEquals(false, imported.agentInboxDriveEnabled)
+        assertEquals(null, imported.agentInboxDriveFolderId)
+        assertEquals(null, imported.agentInboxDriveGrantMode)
+        assertEquals(false, imported.agentInboxAutoImportEnabled)
     }
 
     @Test

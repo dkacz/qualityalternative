@@ -12,6 +12,8 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import com.qualityalternative.app.domain.model.AppSettings
 import com.qualityalternative.app.domain.model.AppThemeMode
+import com.qualityalternative.app.domain.model.AgentInboxCategoryMode
+import com.qualityalternative.app.domain.model.AgentInboxPriorityMode
 import com.qualityalternative.app.domain.model.ContentPriority
 import com.qualityalternative.app.domain.model.DEFAULT_BEDTIME_ENABLED
 import com.qualityalternative.app.domain.model.DEFAULT_BEDTIME_END_MINUTES
@@ -121,6 +123,8 @@ class PreferencesSettingsRepository(
                     agentInboxDriveLastError = preferences[AgentInboxDriveLastError],
                     agentInboxAutoImportEnabled = hasAgentInboxFolderGrant &&
                         (preferences[AgentInboxAutoImportEnabled] ?: false),
+                    agentInboxPriorityMode = parseAgentInboxPriorityMode(preferences[AgentInboxPriorityModePreference]),
+                    agentInboxCategoryMode = parseAgentInboxCategoryMode(preferences[AgentInboxCategoryModePreference]),
                     profileAutosaveUri = preferences[ProfileAutosaveUri],
                     profileAutosaveDisplayName = preferences[ProfileAutosaveDisplayName],
                     profileAutosaveLastSuccessfulAtMillis = preferences[ProfileAutosaveLastSuccessfulAtMillis],
@@ -185,6 +189,8 @@ class PreferencesSettingsRepository(
             preferences[ContentPriorityPreference] = settings.contentPriority.name
             preferences[PriorityContentIds] = settings.priorityContentIds
             preferences[ReactivatedCompletedContentIds] = settings.reactivatedCompletedContentIds
+            preferences[AgentInboxPriorityModePreference] = settings.agentInboxPriorityMode.name
+            preferences[AgentInboxCategoryModePreference] = settings.agentInboxCategoryMode.name
             preferences[OpenAnywayUnlockMinutes] = settings.openAnywayUnlockMinutes
                 .coerceIn(MIN_OPEN_ANYWAY_UNLOCK_MINUTES, MAX_OPEN_ANYWAY_UNLOCK_MINUTES)
             preferences[BedtimeEnabled] = settings.bedtimeEnabled
@@ -421,6 +427,16 @@ class PreferencesSettingsRepository(
         }
     }
 
+    override suspend fun saveAgentInboxImportOptions(
+        priorityMode: AgentInboxPriorityMode,
+        categoryMode: AgentInboxCategoryMode,
+    ) {
+        dataStore.edit { preferences ->
+            preferences[AgentInboxPriorityModePreference] = priorityMode.name
+            preferences[AgentInboxCategoryModePreference] = categoryMode.name
+        }
+    }
+
     override suspend fun saveProfileAutosaveDestination(uri: String, displayName: String) {
         dataStore.edit { preferences ->
             preferences[ProfileAutosaveUri] = uri
@@ -476,6 +492,18 @@ class PreferencesSettingsRepository(
             return runCatching {
                 ContentPriority.valueOf(raw ?: ContentPriority.BALANCED.name)
             }.getOrDefault(ContentPriority.BALANCED)
+        }
+
+        fun parseAgentInboxPriorityMode(raw: String?): AgentInboxPriorityMode {
+            return runCatching {
+                AgentInboxPriorityMode.valueOf(raw ?: AgentInboxPriorityMode.MANUAL_REVIEW.name)
+            }.getOrDefault(AgentInboxPriorityMode.MANUAL_REVIEW)
+        }
+
+        fun parseAgentInboxCategoryMode(raw: String?): AgentInboxCategoryMode {
+            return runCatching {
+                AgentInboxCategoryMode.valueOf(raw ?: AgentInboxCategoryMode.MANIFEST_TOPICS.name)
+            }.getOrDefault(AgentInboxCategoryMode.MANIFEST_TOPICS)
         }
 
         fun portableReaderFontScale(raw: Double): Double {
@@ -561,6 +589,8 @@ class PreferencesSettingsRepository(
         val AgentInboxDriveLastSuccessfulAtMillis = longPreferencesKey("agent_inbox_drive_last_successful_at_millis")
         val AgentInboxDriveLastError = stringPreferencesKey("agent_inbox_drive_last_error")
         val AgentInboxAutoImportEnabled = booleanPreferencesKey("agent_inbox_auto_import_enabled")
+        val AgentInboxPriorityModePreference = stringPreferencesKey("agent_inbox_priority_mode")
+        val AgentInboxCategoryModePreference = stringPreferencesKey("agent_inbox_category_mode")
         val AGENT_INBOX_SUPPORTED_GRANT_MODES = setOf(
             AGENT_INBOX_DRIVE_GRANT_MODE_PICKER_FOLDER,
             AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER,

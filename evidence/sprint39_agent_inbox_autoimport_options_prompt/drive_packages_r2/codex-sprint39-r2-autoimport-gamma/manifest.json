@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "title": "Sprint 39 R2 Autoimport Gamma",
+  "topics": ["TECH"],
+  "contentFile": "content.md",
+  "format": "MARKDOWN",
+  "rightsClass": "USER_PRIVATE",
+  "sourceLabel": "Codex R2 live evidence",
+  "description": "External package uploaded only after Autoimport on app start was enabled.",
+  "priority": "high",
+  "createdAt": "2026-06-18T09:57:00Z"
+}

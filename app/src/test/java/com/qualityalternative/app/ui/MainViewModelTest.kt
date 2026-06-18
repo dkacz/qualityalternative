@@ -23,6 +23,8 @@ import com.qualityalternative.app.data.SupportedCatalog
 import com.qualityalternative.app.domain.model.AppSettings
 import com.qualityalternative.app.domain.model.AnalyticsEventType
 import com.qualityalternative.app.domain.model.AnalyticsPrivacyGuard
+import com.qualityalternative.app.domain.model.AgentInboxCategoryMode
+import com.qualityalternative.app.domain.model.AgentInboxPriorityMode
 import com.qualityalternative.app.domain.model.BEDTIME_OPEN_ANYWAY_UNLOCK_DELAY_MILLIS
 import com.qualityalternative.app.domain.model.ContentAvailability
 import com.qualityalternative.app.domain.model.AppThemeMode
@@ -3699,6 +3701,259 @@ class MainViewModelTest {
         }
         assertEquals(listOf("true"), toggledEvents.map { event -> event.metadata["enabled"] })
         assertTrue(AnalyticsPrivacyGuard.unsafeRemoteFields(toggledEvents.single().toRemoteAnalyticsPayload()).isEmpty())
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun agentInboxImportOptionsPersistAndAgentPromptReflectsModes() = runTest {
+        val settingsRepository = FakeSettingsRepository()
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val viewModel = createViewModel(
+            settingsRepository = settingsRepository,
+            analyticsTracker = analyticsTracker,
+        )
+
+        advanceUntilIdle()
+        viewModel.setAgentInboxImportOptions(
+            priorityMode = AgentInboxPriorityMode.AUTO_ACCEPT_HIGH,
+            categoryMode = AgentInboxCategoryMode.UNCATEGORIZED,
+            nowMillis = 8_000L,
+        )
+        advanceUntilIdle()
+
+        assertEquals(AgentInboxPriorityMode.AUTO_ACCEPT_HIGH, viewModel.uiState.agentInboxPriorityMode)
+        assertEquals(AgentInboxCategoryMode.UNCATEGORIZED, viewModel.uiState.agentInboxCategoryMode)
+        assertEquals(AgentInboxPriorityMode.AUTO_ACCEPT_HIGH, settingsRepository.state.value.agentInboxPriorityMode)
+        assertEquals(AgentInboxCategoryMode.UNCATEGORIZED, settingsRepository.state.value.agentInboxCategoryMode)
+
+        val prompt = viewModel.uiState.agentInboxAgentPrompt()
+        assertTrue(prompt.contains("auto-accept high priority requests"))
+        assertTrue(prompt.contains("\"topics\": [\"OTHER\"]"))
+        assertTrue(prompt.contains("\"priority\": \"high\""))
+        assertTrue(prompt.contains("<agent-name>"))
+        assertTrue(prompt.contains("<ISO-8601 UTC timestamp>"))
+        assertTrue(prompt.contains("If you are working inside the Quality Alternative repo"))
+        assertTrue(prompt.contains("ATTENTION, PRACTICAL"))
+        assertFalse(prompt.contains("drive.google.com"))
+        assertFalse(prompt.contains("rclone:"))
+        assertFalse(prompt.contains("omareth"))
+        assertFalse(prompt.contains("\"sourceLabel\": \"Codex\""))
+        assertFalse(prompt.contains("2026-06-18T00:00:00Z"))
+
+        viewModel.recordAgentInboxPromptCopied(nowMillis = 8_500L)
+        advanceUntilIdle()
+
+        val optionsEvent = analyticsTracker.allEvents().single { event ->
+            event.type == AnalyticsEventType.AGENT_INBOX_IMPORT_OPTIONS_CHANGED
+        }
+        assertEquals("AUTO_ACCEPT_HIGH", optionsEvent.metadata["agentInboxPriorityMode"])
+        assertEquals("UNCATEGORIZED", optionsEvent.metadata["agentInboxCategoryMode"])
+        assertTrue(AnalyticsPrivacyGuard.unsafeRemoteFields(optionsEvent.toRemoteAnalyticsPayload()).isEmpty())
+        val copiedEvent = analyticsTracker.allEvents().single { event ->
+            event.type == AnalyticsEventType.AGENT_INBOX_AGENT_PROMPT_COPIED
+        }
+        assertEquals("AUTO_ACCEPT_HIGH", copiedEvent.metadata["agentInboxPriorityMode"])
+        assertEquals("UNCATEGORIZED", copiedEvent.metadata["agentInboxCategoryMode"])
+        assertTrue(AnalyticsPrivacyGuard.unsafeRemoteFields(copiedEvent.toRemoteAnalyticsPayload()).isEmpty())
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun importAllAgentInboxCandidatesAutoAcceptsHighPriorityOnlyWhenOptionIsEnabled() = runTest {
+        val firstBytes = "# High Agent Note\n\nPrivate attention note.".toByteArray()
+        val secondBytes = "# Normal Agent Note\n\nAnother private note.".toByteArray()
+        val driveClient = RecordingAgentInboxDriveClient(
+            scanResult = AgentInboxDriveScanResult(
+                folderId = "agent-inbox-folder",
+                packages = listOf(
+                    agentInboxDrivePackage(
+                        folderId = "agent-package-a",
+                        manifestFileId = "manifest-file-a",
+                        contentFileId = "content-file-a",
+                    ),
+                    agentInboxDrivePackage(
+                        folderId = "agent-package-b",
+                        manifestFileId = "manifest-file-b",
+                        contentFileId = "content-file-b",
+                    ),
+                ),
+            ),
+            files = mapOf(
+                "manifest-file-a" to agentInboxManifest(priority = "high").toByteArray(),
+                "content-file-a" to firstBytes,
+                "manifest-file-b" to agentInboxManifest(priority = "normal").toByteArray(),
+                "content-file-b" to secondBytes,
+            ),
+        )
+        val userDocumentRepository = FakeUserDocumentRepository()
+        val settingsRepository = FakeSettingsRepository()
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val viewModel = createViewModel(
+            settingsRepository = settingsRepository,
+            userDocumentRepository = userDocumentRepository,
+            agentInboxDriveClient = driveClient,
+            analyticsTracker = analyticsTracker,
+            agentInboxPackageImporter = AgentInboxPackageImporter(
+                userDocumentRepository = userDocumentRepository,
+                documentStore = RecordingAgentInboxDocumentStore(),
+            ),
+        )
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+        viewModel.selectAgentInboxDriveFolderForTest()
+        viewModel.setAgentInboxImportOptions(
+            priorityMode = AgentInboxPriorityMode.AUTO_ACCEPT_HIGH,
+            categoryMode = AgentInboxCategoryMode.MANIFEST_TOPICS,
+            nowMillis = 5_500L,
+        )
+        advanceUntilIdle()
+        viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 6_000L)
+        advanceUntilIdle()
+        viewModel.importAllAgentInboxCandidates(
+            accessToken = "drive-token",
+            nowMillis = 7_000L,
+        )
+        advanceUntilIdle()
+
+        assertEquals(2, userDocumentRepository.documents.value.size)
+        assertEquals(1, viewModel.uiState.priorityContentIds.size)
+        assertEquals(viewModel.uiState.priorityContentIds, settingsRepository.state.value.priorityContentIds)
+        val priorityId = viewModel.uiState.priorityContentIds.single()
+        assertTrue(userDocumentRepository.documents.value.any { document -> document.id == priorityId })
+        val importedEvents = analyticsTracker.allEvents().filter { event ->
+            event.type == AnalyticsEventType.AGENT_INBOX_CANDIDATE_IMPORTED
+        }
+        assertEquals(listOf("true", "false"), importedEvents.map { event -> event.metadata["acceptedPriority"] })
+        assertTrue(importedEvents.all { event -> AnalyticsPrivacyGuard.unsafeRemoteFields(event.toRemoteAnalyticsPayload()).isEmpty() })
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun importAgentInboxCandidateCanIgnorePriorityAndSaveWithoutSpecificCategory() = runTest {
+        val contentBytes = "# Agent Note\n\nPrivate attention note.".toByteArray()
+        val driveClient = RecordingAgentInboxDriveClient(
+            scanResult = AgentInboxDriveScanResult(
+                folderId = "agent-inbox-folder",
+                packages = listOf(agentInboxDrivePackage()),
+            ),
+            files = mapOf(
+                "manifest-file" to agentInboxManifest(priority = "high").toByteArray(),
+                "content-file" to contentBytes,
+            ),
+        )
+        val userDocumentRepository = FakeUserDocumentRepository()
+        val settingsRepository = FakeSettingsRepository()
+        val analyticsTracker = InMemoryAnalyticsTracker()
+        val viewModel = createViewModel(
+            settingsRepository = settingsRepository,
+            userDocumentRepository = userDocumentRepository,
+            agentInboxDriveClient = driveClient,
+            analyticsTracker = analyticsTracker,
+            agentInboxPackageImporter = AgentInboxPackageImporter(
+                userDocumentRepository = userDocumentRepository,
+                documentStore = RecordingAgentInboxDocumentStore(),
+            ),
+        )
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+        viewModel.selectAgentInboxDriveFolderForTest()
+        viewModel.setAgentInboxImportOptions(
+            priorityMode = AgentInboxPriorityMode.IGNORE_MANIFEST,
+            categoryMode = AgentInboxCategoryMode.UNCATEGORIZED,
+            nowMillis = 5_500L,
+        )
+        advanceUntilIdle()
+        viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 6_000L)
+        advanceUntilIdle()
+        viewModel.toggleAgentInboxPriority("agent-package")
+        advanceUntilIdle()
+        assertFalse(viewModel.uiState.agentInboxPriorityAccepted(viewModel.uiState.agentInboxCandidates.single()))
+
+        viewModel.importAgentInboxCandidate(
+            packageFolderId = "agent-package",
+            accessToken = "drive-token",
+            nowMillis = 7_000L,
+        )
+        advanceUntilIdle()
+
+        assertEquals(setOf(TopicTag.OTHER), userDocumentRepository.addedDrafts.single().topicTags)
+        assertEquals(setOf(TopicTag.OTHER), userDocumentRepository.documents.value.single().topicTags)
+        assertTrue(viewModel.uiState.priorityContentIds.isEmpty())
+        assertTrue(settingsRepository.state.value.priorityContentIds.isEmpty())
+        val importedEvent = analyticsTracker.allEvents().first { event ->
+            event.type == AnalyticsEventType.AGENT_INBOX_CANDIDATE_IMPORTED
+        }
+        assertEquals("false", importedEvent.metadata["acceptedPriority"])
+        assertEquals("true", importedEvent.metadata["priorityRequested"])
+        assertTrue(AnalyticsPrivacyGuard.unsafeRemoteFields(importedEvent.toRemoteAnalyticsPayload()).isEmpty())
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun importAgentInboxCandidateSnapshotsOptionsAtDispatch() = runTest {
+        val contentBytes = "# Agent Note\n\nPrivate attention note.".toByteArray()
+        val driveClient = RecordingAgentInboxDriveClient(
+            scanResult = AgentInboxDriveScanResult(
+                folderId = "agent-inbox-folder",
+                packages = listOf(agentInboxDrivePackage()),
+            ),
+            files = mapOf(
+                "manifest-file" to agentInboxManifest(priority = "high").toByteArray(),
+                "content-file" to contentBytes,
+            ),
+        )
+        val userDocumentRepository = FakeUserDocumentRepository()
+        val settingsRepository = FakeSettingsRepository()
+        val viewModel = createViewModel(
+            settingsRepository = settingsRepository,
+            userDocumentRepository = userDocumentRepository,
+            agentInboxDriveClient = driveClient,
+            agentInboxPackageImporter = AgentInboxPackageImporter(
+                userDocumentRepository = userDocumentRepository,
+                documentStore = RecordingAgentInboxDocumentStore(),
+            ),
+        )
+        driveClient.beforeDownload = { fileId ->
+            if (
+                fileId == "content-file" &&
+                driveClient.downloadedFileIds.count { downloadedFileId -> downloadedFileId == "content-file" } >= 2
+            ) {
+                viewModel.setAgentInboxImportOptions(
+                    priorityMode = AgentInboxPriorityMode.IGNORE_MANIFEST,
+                    categoryMode = AgentInboxCategoryMode.MANIFEST_TOPICS,
+                    nowMillis = 7_050L,
+                )
+            }
+        }
+
+        advanceUntilIdle()
+        viewModel.completeOnboarding()
+        advanceUntilIdle()
+        viewModel.selectAgentInboxDriveFolderForTest()
+        viewModel.setAgentInboxImportOptions(
+            priorityMode = AgentInboxPriorityMode.AUTO_ACCEPT_HIGH,
+            categoryMode = AgentInboxCategoryMode.UNCATEGORIZED,
+            nowMillis = 5_500L,
+        )
+        advanceUntilIdle()
+        viewModel.scanAgentInboxDrive(accessToken = "drive-token", nowMillis = 6_000L)
+        advanceUntilIdle()
+        viewModel.importAgentInboxCandidate(
+            packageFolderId = "agent-package",
+            accessToken = "drive-token",
+            nowMillis = 7_000L,
+        )
+        advanceUntilIdle()
+
+        assertEquals(setOf(TopicTag.OTHER), userDocumentRepository.addedDrafts.single().topicTags)
+        assertEquals(setOf(TopicTag.OTHER), userDocumentRepository.documents.value.single().topicTags)
+        assertEquals(AgentInboxPriorityMode.IGNORE_MANIFEST, viewModel.uiState.agentInboxPriorityMode)
+        assertEquals(AgentInboxCategoryMode.MANIFEST_TOPICS, viewModel.uiState.agentInboxCategoryMode)
+        assertEquals(1, viewModel.uiState.priorityContentIds.size)
     }
 
     @Test
@@ -7627,6 +7882,8 @@ class MainViewModelTest {
                 agentInboxDriveLastSuccessfulAtMillis = state.value.agentInboxDriveLastSuccessfulAtMillis,
                 agentInboxDriveLastError = state.value.agentInboxDriveLastError,
                 agentInboxAutoImportEnabled = state.value.agentInboxAutoImportEnabled,
+                agentInboxPriorityMode = state.value.agentInboxPriorityMode,
+                agentInboxCategoryMode = state.value.agentInboxCategoryMode,
                 profileAutosaveUri = state.value.profileAutosaveUri,
                 profileAutosaveDisplayName = state.value.profileAutosaveDisplayName,
                 profileAutosaveLastSuccessfulAtMillis = state.value.profileAutosaveLastSuccessfulAtMillis,
@@ -7797,6 +8054,16 @@ class MainViewModelTest {
                         state.value.agentInboxDriveGrantMode == AGENT_INBOX_DRIVE_GRANT_MODE_DOCUMENT_TREE_FOLDER ||
                             state.value.agentInboxDriveGrantMode == AGENT_INBOX_DRIVE_GRANT_MODE_READONLY_FOLDER
                         ),
+            )
+        }
+
+        override suspend fun saveAgentInboxImportOptions(
+            priorityMode: AgentInboxPriorityMode,
+            categoryMode: AgentInboxCategoryMode,
+        ) {
+            state.value = state.value.copy(
+                agentInboxPriorityMode = priorityMode,
+                agentInboxCategoryMode = categoryMode,
             )
         }
 
@@ -8670,6 +8937,7 @@ class MainViewModelTest {
         val scanRequests = mutableListOf<AgentInboxDriveScanRequest>()
         val downloadedFileIds = mutableListOf<String>()
         val downloadRequests = mutableListOf<AgentInboxDownloadRequest>()
+        var beforeDownload: suspend (String) -> Unit = {}
 
         override suspend fun listFolders(
             request: AgentInboxDriveFolderListRequest,
@@ -8697,6 +8965,7 @@ class MainViewModelTest {
                 accessToken = accessToken,
                 expectedBytes = expectedBytes,
             )
+            beforeDownload(fileId)
             downloadFailuresByOrdinal[downloadRequests.size]?.let { error -> throw error }
             downloadFailures[fileId]?.let { error -> throw error }
             val bytes = files[fileId] ?: error("Missing fake Drive file $fileId")

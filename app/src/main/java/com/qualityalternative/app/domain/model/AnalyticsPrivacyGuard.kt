@@ -168,6 +168,8 @@ object AnalyticsPrivacyGuard {
     private val RemoteSafeMetadataKeys = setOf(
         "action",
         "acceptedPriority",
+        "agentInboxCategoryMode",
+        "agentInboxPriorityMode",
         "availability",
         "backupCount",
         "bedtimeActive",

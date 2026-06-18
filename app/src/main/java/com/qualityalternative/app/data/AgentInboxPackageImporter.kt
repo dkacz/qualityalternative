@@ -2,6 +2,7 @@ package com.qualityalternative.app.data
 
 import com.qualityalternative.app.domain.model.ContentItem
 import com.qualityalternative.app.domain.model.ContentFormat
+import com.qualityalternative.app.domain.model.TopicTag
 import com.qualityalternative.app.domain.model.UserDocumentDraft
 import com.qualityalternative.app.domain.model.UserDocumentValidationError
 import com.qualityalternative.app.domain.service.AddUserDocumentIfFingerprintAbsentResult
@@ -39,6 +40,7 @@ class AgentInboxPackageImporter(
         candidate: AgentInboxReviewCandidate,
         contentBytes: ByteArray,
         imageAttachmentBytes: Map<String, ByteArray> = emptyMap(),
+        categoryMode: AgentInboxImportCategoryMode = AgentInboxImportCategoryMode.MANIFEST_TOPICS,
         nowMillis: Long = System.currentTimeMillis(),
     ): AgentInboxImportResult {
         val manifest = candidate.manifest
@@ -124,7 +126,7 @@ class AgentInboxPackageImporter(
             title = manifest.title,
             description = manifest.description.orEmpty(),
             durationMinutes = estimate.minutes,
-            topicTags = manifest.topics,
+            topicTags = categoryMode.topicTagsFor(manifest.topics),
             imageAttachmentUris = stored.imageAttachmentUris,
             documentFingerprintSha256 = contentSha256,
             documentFingerprintSizeBytes = contentBytes.size.toLong(),
@@ -165,6 +167,19 @@ class AgentInboxPackageImporter(
                     documentErrors = addResult.errors,
                 )
             }
+        }
+    }
+}
+
+enum class AgentInboxImportCategoryMode {
+    MANIFEST_TOPICS,
+    UNCATEGORIZED,
+    ;
+
+    fun topicTagsFor(manifestTopics: Set<TopicTag>): Set<TopicTag> {
+        return when (this) {
+            MANIFEST_TOPICS -> manifestTopics
+            UNCATEGORIZED -> setOf(TopicTag.OTHER)
         }
     }
 }

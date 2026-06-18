@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "title": "Sprint 39 R2 Import All Alpha",
+  "topics": ["PHILOSOPHY"],
+  "contentFile": "content.md",
+  "format": "MARKDOWN",
+  "rightsClass": "USER_PRIVATE",
+  "sourceLabel": "Codex R2 live evidence",
+  "description": "First external package for Sprint 39 R2 Import all live evidence.",
+  "priority": "high",
+  "createdAt": "2026-06-18T09:55:00Z"
+}
