@@ -36,6 +36,7 @@ Status: `release_published_gpt_pro_r2_pass_10_10`
 - Branch: `codex/agent-inbox-autoimport-options-prompt`.
 - Evidence root: `evidence/sprint39_agent_inbox_autoimport_options_prompt/`.
 - GPT Pro R2 output: `evidence/sprint39_agent_inbox_autoimport_options_prompt/review_pro_r2_response.md`.
+- Post-release review provenance check: exact ChatGPT lane `https://chatgpt.com/c/6a33bc48-7660-83eb-8b65-5a861c3c2c60` was reopened through CDP on 2026-06-18; the UI showed the account as `Pro`, the response composer/action area as `Pro Extended`, and the completed audit response as `Thought for 27m 7s`, confirming this was the GPT Pro review lane rather than a normal quick chat.
 - Release gate summary: `docs/release-gate-logs/2026-06-18-sprint39-agent-inbox-autoimport-options/VALIDATION_SUMMARY.md`.
 - Release artifacts:
   - `release_artifacts/quality-alternative-v0.11.25-agent-inbox-autoimport-options-alpha-debug.apk`, SHA-256 `3d9b76ef581d737251370058a31c23912c932771a52efa663e45f30590cff501`
